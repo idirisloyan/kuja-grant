@@ -1,0 +1,70 @@
+GRANT BUDGET TEMPLATE
+Community Health Workers Scale-Up Program
+Budget Period: January 2026 - December 2026
+Currency: USD
+
+LINE ITEM BUDGET
+
+A. PERSONNEL COSTS
+A1. Program Manager (1 FTE)
+    Monthly: $8,500 x 12 months = $102,000
+A2. Community Health Workers (50)
+    Monthly stipend: $200 x 50 x 12 = $120,000
+A3. M&E Officer (1 FTE)
+    Monthly: $5,200 x 12 months = $62,400
+A4. Finance Officer (0.5 FTE)
+    Monthly: $2,600 x 12 months = $31,200
+A5. Program Assistants (2)
+    Monthly: $3,000 x 2 x 12 = $72,000
+A6. Staff Benefits (15% of salary costs)
+    = $58,140
+SUBTOTAL PERSONNEL: $445,740
+
+B. PROGRAM ACTIVITIES
+B1. CHW Training
+    Initial training (5 days x 25 new CHWs): $15,000
+    Refresher training (quarterly x 50 CHWs): $24,000
+B2. Community Outreach
+    Health education materials: $8,000
+    Community dialogue events (80): $16,000
+B3. Health Facility Support
+    Equipment and supplies: $25,000
+    EmONC training (30 staff): $18,000
+B4. Mobile Health
+    Smartphones for CHWs (25 new): $7,500
+    Airtime and data: $6,000
+SUBTOTAL ACTIVITIES: $119,500
+
+C. MONITORING AND EVALUATION
+C1. Baseline/Endline surveys: $15,000
+C2. Data collection tools and systems: $8,000
+C3. Quarterly monitoring visits: $12,000
+C4. Mid-term evaluation: $20,000
+C5. Annual impact assessment: $10,000
+SUBTOTAL M&E: $65,000
+
+D. OPERATING COSTS
+D1. Office rent and utilities: $14,400
+D2. Vehicle operations (2 vehicles): $24,000
+D3. Communications: $4,800
+D4. Insurance: $9,600
+D5. Bank charges: $2,400
+D6. Office supplies: $3,600
+SUBTOTAL OPERATING: $58,800
+
+E. INDIRECT COSTS (7% of direct costs)
+= $48,233
+
+GRAND TOTAL: $737,273
+
+COST SHARING
+Donor contribution (80%): $589,818
+Organization co-funding (15%): $110,591
+In-kind contribution (5%): $36,864
+
+BUDGET NOTES:
+1. CHW stipends are aligned with Kenya Ministry of Health community health strategy guidelines
+2. Vehicle costs assume 2 existing vehicles; no new vehicle procurement planned
+3. Indirect cost rate of 7% is within donor policy maximum of 10%
+4. Exchange rate assumption: 1 USD = 128 KES
+5. Budget includes 3% contingency within each line item

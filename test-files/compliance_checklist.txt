@@ -1,0 +1,76 @@
+ORGANIZATIONAL COMPLIANCE AND DUE DILIGENCE CHECKLIST
+Amani Community Development
+
+Date of Assessment: January 2026
+Assessed by: Internal Compliance Team
+
+SECTION A: LEGAL AND REGISTRATION
+[X] NGO registration certificate (current, expires March 2027)
+[X] Certificate of tax exemption (KRA PIN: P051234567A)
+[X] County business permit (valid through December 2026)
+[X] Constitution/Articles of Association filed
+[X] Annual returns filed with NGO Board (2024)
+[ ] Annual returns filed with NGO Board (2025) - Due June 2026
+
+SECTION B: GOVERNANCE
+[X] Board of Directors with minimum 5 members (currently 7)
+[X] Board meeting minutes for last 4 meetings on file
+[X] Board members declaration of interest forms signed
+[X] Board approved strategic plan (2024-2028)
+[X] Board approved annual work plan and budget (2026)
+[X] Organizational chart current and approved
+
+SECTION C: FINANCIAL MANAGEMENT
+[X] Written financial management policy (updated 2025)
+[X] External audit completed for FY 2024
+[X] External audit completed for FY 2025 (unqualified opinion)
+[X] Segregation of duties in finance department
+[X] Asset register maintained and updated
+[X] Bank reconciliations performed monthly
+[X] Procurement policy in place with thresholds
+[X] Travel and per diem policy documented
+
+SECTION D: HUMAN RESOURCES
+[X] Written HR manual (updated 2024)
+[X] Employment contracts for all staff
+[X] Staff Code of Conduct signed by all employees
+[X] Safeguarding policy in place
+[X] PSEA (Protection from Sexual Exploitation and Abuse) policy
+[X] Whistleblower/complaints mechanism established
+[X] Staff performance review conducted annually
+[ ] Anti-money laundering training for finance staff - Scheduled Q2 2026
+
+SECTION E: PROGRAM MANAGEMENT
+[X] M&E framework for all active programs
+[X] Beneficiary feedback mechanism in place
+[X] Data protection policy compliant with Kenya Data Protection Act
+[X] Partnership agreements with government agencies
+[X] MOU with county health department
+[X] Community engagement strategy documented
+
+SECTION F: SANCTIONS AND WATCHLIST SCREENING
+[X] Organization screened against UN Security Council sanctions list - CLEAR
+[X] Organization screened against OFAC SDN list - CLEAR
+[X] Organization screened against EU sanctions list - CLEAR
+[X] Organization screened against World Bank debarment list - CLEAR
+[X] Board members screened against sanctions lists - ALL CLEAR
+[X] Key partners screened against sanctions lists - ALL CLEAR
+
+SECTION G: RISK MANAGEMENT
+[X] Organizational risk register maintained
+[X] Fraud and corruption policy in place
+[X] Insurance coverage (professional liability, property, vehicle)
+[X] Business continuity plan
+[ ] Cybersecurity assessment - Planned for Q2 2026
+
+COMPLIANCE SCORE: 95% (37/39 items met)
+RISK RATING: LOW
+
+Items Requiring Action:
+1. File 2025 annual returns with NGO Board by June 2026
+2. Complete anti-money laundering training for finance staff by Q2 2026
+3. Conduct cybersecurity assessment by Q2 2026
+
+Verified by: Compliance Officer
+Approved by: Executive Director
+Next review date: July 2026

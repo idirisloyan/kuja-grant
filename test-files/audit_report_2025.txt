@@ -1,0 +1,49 @@
+INDEPENDENT AUDITOR'S REPORT
+
+To the Board of Directors of Amani Community Development
+
+Report on the Financial Statements
+
+Opinion
+We have audited the financial statements of Amani Community Development (the "Organization"), which comprise the statement of financial position as at December 31, 2025, the statement of activities, the statement of cash flows, and the statement of functional expenses for the year then ended, and the related notes to the financial statements.
+
+In our opinion, the accompanying financial statements present fairly, in all material respects, the financial position of the Organization as at December 31, 2025, and the changes in its net assets and its cash flows for the year then ended in accordance with International Financial Reporting Standards (IFRS).
+
+Basis for Opinion
+We conducted our audit in accordance with International Standards on Auditing (ISA). Our responsibilities under those standards are described in the Auditor's Responsibilities section of this report. We are independent of the Organization in accordance with the ethical requirements relevant to our audit, and we have fulfilled our other ethical responsibilities in accordance with these requirements. We believe that the audit evidence we have obtained is sufficient and appropriate to provide a basis for our opinion.
+
+Key Audit Matters
+1. Revenue Recognition from Grants
+   Grant revenue of $2,450,000 was recognized during the year from multiple donors. We examined grant agreements, disbursement records, and compliance with grant conditions. No material misstatements were identified.
+
+2. Program Expenditure Classification
+   The Organization incurred program expenditures of $1,890,000 across five programs. We verified the allocation methodology and tested a sample of 85 transactions. All sampled transactions were properly classified and supported by adequate documentation.
+
+3. Fixed Asset Management
+   The Organization maintains fixed assets valued at $245,000 (net book value). We performed physical verification of a sample of assets and confirmed existence and condition. One minor discrepancy ($2,300) was identified and corrected during the audit.
+
+Summary Financial Data (Year Ended December 31, 2025):
+Total Revenue: $2,673,500
+Total Expenses: $2,456,200
+Net Assets (End of Year): $847,300
+Total Assets: $1,234,500
+Total Liabilities: $387,200
+
+Internal Control Observations:
+1. STRENGTH: The Organization has a well-documented chart of accounts and financial procedures manual, last updated in June 2025.
+2. STRENGTH: Segregation of duties is maintained in the finance department with separate authorization, recording, and custody functions.
+3. OBSERVATION: The petty cash reconciliation process could be improved. We recommend monthly reconciliation rather than quarterly.
+4. OBSERVATION: While the procurement committee functions effectively, we recommend documenting the evaluation criteria used for vendor selection for amounts exceeding $5,000.
+
+Management Response:
+Management has agreed with both observations and has implemented corrective actions as of January 2026.
+
+Going Concern Assessment:
+Based on our review of the Organization's financial projections, existing grant agreements, and pipeline of proposals, we conclude there are no material uncertainties relating to the Organization's ability to continue as a going concern.
+
+Signed:
+Mohamed Abdi, CPA
+Partner, East Africa Audit Associates
+Nairobi, Kenya
+Date: February 28, 2026
+License No: ICPAK/2019/4567

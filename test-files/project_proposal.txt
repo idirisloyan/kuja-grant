@@ -1,0 +1,87 @@
+PROJECT PROPOSAL
+
+TITLE: Strengthening Maternal and Child Health Services in Wajir County, Kenya
+
+SUBMITTED BY: Amani Community Development
+DATE: January 10, 2026
+DONOR: Women's Protection and Empowerment Fund
+REQUESTED AMOUNT: $350,000 (USD)
+PROJECT DURATION: 24 months (April 2026 - March 2028)
+
+1. EXECUTIVE SUMMARY
+Amani Community Development proposes a 24-month project to strengthen maternal and child health (MCH) services in Wajir County, northeastern Kenya. The project will train 50 community health workers, equip 10 health facilities, and establish community-based surveillance systems to reduce maternal and infant mortality in an underserved region where 68% of births occur without skilled attendance.
+
+2. PROBLEM STATEMENT
+Wajir County has some of the poorest health indicators in Kenya:
+- Maternal mortality ratio: 689 per 100,000 live births (national average: 362)
+- Under-5 mortality rate: 82 per 1,000 (national average: 43)
+- Skilled birth attendance: 32% (national average: 62%)
+- Antenatal care (4+ visits): 18% (national average: 58%)
+
+Key barriers include: limited health infrastructure, shortage of skilled health workers, cultural barriers to facility-based delivery, long distances to health facilities, and limited health education.
+
+3. PROJECT OBJECTIVES
+Goal: Reduce maternal and infant mortality in target communities by 30% over 24 months.
+
+Objective 1: Increase skilled birth attendance from 32% to 55% in target communities
+Objective 2: Improve antenatal care coverage (4+ visits) from 18% to 45%
+Objective 3: Establish functional community health surveillance in 20 villages
+Objective 4: Strengthen capacity of 10 health facilities for emergency obstetric care
+
+4. METHODOLOGY
+4.1 Community Health Worker Training
+- Recruit and train 50 CHWs (30 female, 20 male) on MCH, referral protocols, and community mobilization
+- Equip CHWs with basic medical kits, mobile phones, and transport allowances
+- Establish monthly supervision and mentoring system
+
+4.2 Health Facility Strengthening
+- Assess and upgrade 10 health facilities with basic emergency obstetric care equipment
+- Train 30 health workers on emergency obstetric and newborn care (EmONC)
+- Establish medicine and supply chain systems
+
+4.3 Community Engagement
+- Conduct community dialogue sessions (4 per village, 20 villages)
+- Establish birth preparedness committees in each village
+- Engage religious and cultural leaders as health champions
+
+4.4 Health Information Systems
+- Deploy mobile-based reporting system for CHWs
+- Establish community-based surveillance for maternal and newborn deaths
+- Conduct quarterly facility data quality assessments
+
+5. MONITORING AND EVALUATION
+Indicator                              | Baseline | Target  | Data Source
+Skilled birth attendance rate          | 32%      | 55%     | Health facility records
+ANC 4+ visits coverage                | 18%      | 45%     | CHW reports, facility data
+Maternal mortality ratio (target area) | 689      | 480     | Community surveillance
+Under-5 mortality rate                 | 82       | 57      | Community surveillance
+CHWs active and reporting monthly     | 0        | 50      | Supervision records
+Health facilities with EmONC capacity | 2        | 10      | Facility assessments
+
+Data will be collected monthly by CHWs, quarterly through facility assessments, and semi-annually through household surveys.
+
+6. BUDGET SUMMARY
+Category                    | Year 1    | Year 2    | Total
+Personnel                   | $72,000   | $72,000   | $144,000
+CHW Allowances & Support    | $45,000   | $45,000   | $90,000
+Facility Upgrades           | $35,000   | $10,000   | $45,000
+Training & Workshops        | $20,000   | $10,000   | $30,000
+M&E and Data Systems        | $10,000   | $8,000    | $18,000
+Community Activities        | $7,000    | $5,000    | $12,000
+Operating Costs             | $6,000    | $5,000    | $11,000
+TOTAL                       | $195,000  | $155,000  | $350,000
+
+7. SUSTAINABILITY PLAN
+- Integration with county health department plans and budgets
+- Transition of CHW supervision to county health management teams
+- Advocacy for inclusion of CHW allowances in county budget
+- Partnerships with other NGOs for continued technical support
+- Community ownership through village health committees
+
+8. RISK ANALYSIS
+Risk                      | Probability | Impact | Mitigation
+Insecurity/access         | Medium      | High   | Flexible scheduling, community negotiations
+Staff turnover            | Low         | Medium | Competitive packages, capacity building
+Cultural resistance       | Medium      | Medium | Community engagement, religious leaders
+Government policy changes | Low         | High   | Alignment with national strategy
+Drought/climate           | High        | Medium | Contingency planning, adaptive programming

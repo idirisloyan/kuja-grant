@@ -1,0 +1,72 @@
+AMANI COMMUNITY DEVELOPMENT
+QUARTERLY FINANCIAL REPORT - Q1 2026 (January - March 2026)
+Grant: Community Health Workers Scale-Up Program
+Donor: Global Health Foundation
+Grant Reference: GHF-2025-0147
+
+EXECUTIVE SUMMARY
+This report covers the financial performance of the Community Health Workers Scale-Up Program for the first quarter of 2026 (January 1 - March 31, 2026). Total expenditure for the period was $127,450 against a quarterly budget of $145,000, representing 87.9% budget utilization.
+
+INCOME STATEMENT
+Opening Balance (Jan 1, 2026): $312,500.00
+
+Income Received:
+- Grant Disbursement (Q1): $145,000.00
+- Interest Income: $234.50
+Total Income: $145,234.50
+
+Expenditures by Category:
+1. Personnel Costs
+   - Program Manager (1): $8,500.00
+   - Community Health Workers (25): $62,500.00
+   - M&E Officer (1): $5,200.00
+   - Finance Officer (0.5 FTE): $2,600.00
+   Subtotal Personnel: $78,800.00
+
+2. Program Activities
+   - Training workshops (3): $12,450.00
+   - Community outreach materials: $4,230.00
+   - Medical supplies and equipment: $8,920.00
+   - Transportation and field visits: $6,340.00
+   Subtotal Activities: $31,940.00
+
+3. Operating Costs
+   - Office rent and utilities: $3,600.00
+   - Communications: $1,200.00
+   - Insurance: $2,400.00
+   - Bank charges: $210.00
+   Subtotal Operating: $7,410.00
+
+4. Monitoring & Evaluation
+   - Data collection tools: $2,800.00
+   - Quarterly survey: $4,500.00
+   - Report preparation: $2,000.00
+   Subtotal M&E: $9,300.00
+
+TOTAL EXPENDITURE: $127,450.00
+CLOSING BALANCE (Mar 31, 2026): $330,284.50
+
+BUDGET VARIANCE ANALYSIS
+Category          | Budget    | Actual    | Variance  | %
+Personnel         | $82,000   | $78,800   | -$3,200   | 96.1%
+Activities        | $35,000   | $31,940   | -$3,060   | 91.3%
+Operating         | $8,000    | $7,410    | -$590     | 92.6%
+M&E               | $20,000   | $9,300    | -$10,700  | 46.5%
+TOTAL             | $145,000  | $127,450  | -$17,550  | 87.9%
+
+Notes on Variances:
+- Personnel costs were slightly under budget due to delayed recruitment of 2 additional CHWs
+- M&E significantly under budget as the baseline survey was postponed to Q2 due to access constraints in two target districts
+- Activity costs slightly below target due to postponement of one training workshop
+
+CASH FLOW FORECAST (Q2 2026)
+Expected disbursement: $145,000.00
+Projected expenditure: $162,000.00 (includes catch-up activities from Q1)
+Projected closing balance: $313,284.50
+
+CERTIFICATION
+This report has been prepared in accordance with the terms of Grant Agreement GHF-2025-0147 and represents a true and fair view of the financial transactions for the period.
+
+Prepared by: Ahmed Hassan, Finance Officer
+Reviewed by: Fatima Hassan, Program Director
+Date: April 15, 2026
