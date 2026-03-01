@@ -1,0 +1,334 @@
+BENEFICIARY FEEDBACK AND ACCOUNTABILITY REPORT
+Community Accountability Mechanism - Quarterly Report
+
+Organization: Coastal Resilience Initiative (CRI)
+Project: Integrated Drought Response and Recovery Program
+Location: Garissa and Wajir Counties, Kenya
+Donor: ECHO (European Civil Protection and Humanitarian Aid Operations)
+Grant Reference: ECHO-KEN-2025-0334
+Reporting Period: October 1 - December 31, 2025
+Report Prepared by: Amina Wako Guyo, Accountability and MEAL Manager
+Date: January 15, 2026
+
+================================================================================
+1. EXECUTIVE SUMMARY
+================================================================================
+
+This quarterly accountability report presents findings from CRI's Community Feedback and Response Mechanism (CFRM) operating across 24 target communities in Garissa and Wajir Counties. During Q4 2025, the CFRM received a total of 287 feedback entries (complaints, suggestions, compliments, and queries), representing a 23% increase from Q3 (233 entries). This increase is attributed to expanded awareness campaigns and the activation of two additional feedback channels (WhatsApp and community radio).
+
+Of the 287 entries received, 241 (84%) were resolved within the 14-day standard response time, 34 (12%) required extended investigation and were resolved within 30 days, and 12 (4%) remain open and under active management. The overall beneficiary satisfaction rate, as measured through the quarterly perception survey (n=480), was 81%, an improvement from 74% in Q3 2025.
+
+The report also presents findings from the annual beneficiary satisfaction survey conducted in November 2025 across all program locations, with a sample of 720 beneficiaries representing all demographic groups.
+
+This report is structured in alignment with Core Humanitarian Standard (CHS) Commitment 5 (Complaints are welcomed and addressed) and Commitment 4 (Communication and participation).
+
+================================================================================
+2. FEEDBACK CHANNELS AND ACCESSIBILITY
+================================================================================
+
+CRI operates seven complementary feedback channels to maximize accessibility for diverse community members:
+
+Channel                    | Entries Received | % of Total | Primary Users
+Complaints/suggestion box  |       72         |    25.1%   | Women, elderly
+Toll-free hotline (0800)   |       58         |    20.2%   | Youth, men
+Community meetings         |       47         |    16.4%   | Community leaders, women
+WhatsApp number (new Q4)   |       41         |    14.3%   | Youth, educated adults
+Direct to staff            |       34         |    11.8%   | All groups
+Community radio call-in    |       23         |     8.0%   | Pastoralists, remote areas
+Written letter to office   |       12         |     4.2%   | Literate adults
+TOTAL                      |      287         |   100.0%   |
+
+Accessibility improvements in Q4 2025:
+- Launched WhatsApp feedback channel in October 2025, reaching 41 entries in first quarter
+- Partnered with Star FM (Garissa) and Frontier FM (Wajir) for weekly community radio segments with call-in component
+- Installed 6 additional suggestion boxes at water points and market centers
+- Printed feedback channel information cards in Somali, Oromo, and English (5,000 copies distributed)
+- Trained 12 community feedback facilitators (8 female, 4 male) to assist illiterate and elderly community members in providing feedback
+
+Language distribution of feedback received:
+- Somali: 68%
+- Oromo: 22%
+- English: 7%
+- Swahili: 3%
+
+================================================================================
+3. FEEDBACK CLASSIFICATION AND ANALYSIS
+================================================================================
+
+3.1 FEEDBACK BY TYPE
+
+Type            | Count | % of Total | Trend vs Q3
+Complaints      |  134  |    46.7%   | +18% (was 114)
+Suggestions     |   67  |    23.3%   | +31% (was 51)
+Queries         |   52  |    18.1%   | +13% (was 46)
+Compliments     |   34  |    11.8%   | +55% (was 22)
+TOTAL           |  287  |   100.0%   | +23% (was 233)
+
+3.2 COMPLAINTS BY CATEGORY (n=134)
+
+Category                              | Count | %    | Severity
+Waiting times at distribution         |   28  | 20.9%| Low
+Quality of food commodities           |   22  | 16.4%| Medium
+Beneficiary selection/targeting       |   18  | 13.4%| High
+Water point functionality             |   16  | 11.9%| Medium
+Staff behavior/attitudes              |   14  | 10.4%| High
+Insufficient quantity of rations      |   12  |  9.0%| Medium
+Distance to service delivery points   |    9  |  6.7%| Low
+Hygiene promotion relevance           |    6  |  4.5%| Low
+Timeliness of response                |    5  |  3.7%| Medium
+Privacy concerns during registration  |    4  |  3.0%| High
+TOTAL                                 |  134  |100.0%|
+
+3.3 ANALYSIS OF HIGH-SEVERITY COMPLAINTS
+
+Beneficiary Selection/Targeting (18 complaints):
+Twelve complaints related to perceived exclusion of eligible households from food distribution in Modogashe sub-location. Investigation revealed that the October 2025 re-targeting exercise inadvertently removed 8 households that had temporarily relocated during the verification period but remained vulnerable. Six complaints related to inclusion of perceived non-eligible individuals in livelihood programs in Wajir. Post-distribution monitoring confirmed that 3 cases involved clerical errors in registration (corrected immediately) and 3 were unfounded (beneficiaries met all eligibility criteria).
+
+Actions taken: The 8 excluded households in Modogashe were reinstated in the November distribution cycle. A revised verification protocol now includes a 7-day community review period with public posting of beneficiary lists (anonymized codes) before finalization. Community targeting committees received refresher training on vulnerability criteria.
+
+Staff Behavior/Attitudes (14 complaints):
+Seven complaints related to a specific community mobilizer in Habaswein who was described as using disrespectful language during household visits. Four complaints related to perceived favoritism by distribution staff. Three complaints reported long wait times without explanation or apology from staff.
+
+Actions taken: The community mobilizer in Habaswein received a formal written warning and mandatory refresher training on CRI's Code of Conduct and respectful communication. All distribution teams received training on beneficiary communication and managing expectations. A "services charter" poster was developed and displayed at all distribution points, stating beneficiary rights and expected staff conduct.
+
+Privacy Concerns (4 complaints):
+Four complaints from women in Wajir reported that registration questions about household income and assets were asked in public settings, causing embarrassment and potential protection concerns.
+
+Actions taken: Registration protocols revised to require private interview spaces. All registration staff retrained on data protection and privacy standards. Mobile registration screens (portable privacy barriers) procured and deployed.
+
+3.4 SUGGESTIONS RECEIVED (n=67)
+
+Top suggestions from community members:
+1. Increase distribution frequency from monthly to bi-weekly (17 suggestions)
+2. Add mobile money transfer option for cash assistance (12 suggestions)
+3. Include additional items in hygiene kits (menstrual hygiene materials) (9 suggestions)
+4. Extend water trucking service to additional settlements (8 suggestions)
+5. Provide veterinary services alongside food distribution (7 suggestions)
+6. Conduct livelihoods training at settlement level instead of central locations (6 suggestions)
+7. Increase variety of food commodities (5 suggestions)
+8. Provide shade at distribution points (3 suggestions)
+
+Program response to suggestions:
+- Mobile money transfer option is being piloted in Q1 2026 in Garissa County (responding to suggestion #2)
+- Menstrual hygiene materials have been added to hygiene kits from December 2025 (responding to suggestion #3)
+- Shade structures (temporary tents) have been deployed at 4 high-traffic distribution points (responding to suggestion #8)
+- Veterinary services have been coordinated with county government extension officers for joint outreach (responding to suggestion #5)
+- Other suggestions have been documented and will be considered in the next program revision
+
+================================================================================
+4. RESPONSE AND RESOLUTION TRACKING
+================================================================================
+
+Response Performance:
+
+Metric                                | Q3 2025 | Q4 2025 | Target  | Status
+Feedback entries received             |   233   |   287   |  >200   | Achieved
+Resolution within 14 days             |   78%   |   84%   |  >80%   | Achieved
+Resolution within 30 days             |   93%   |   96%   |  >95%   | Achieved
+Acknowledgment within 48 hours        |   85%   |   92%   |  >90%   | Achieved
+Complainant informed of outcome       |   81%   |   89%   |  >85%   | Achieved
+Sensitive complaints (SEA, fraud)     |    0    |    0    |    -    | No cases
+Referrals to external services        |    3    |    5    |    -    | Tracked
+
+Resolution process:
+1. All feedback is logged in a centralized database within 24 hours of receipt.
+2. Each entry is categorized by type, severity, and sector.
+3. Acknowledgment is provided to the complainant within 48 hours (where contact information is available).
+4. Low-severity complaints are addressed by the relevant program team within 7 days.
+5. Medium-severity complaints are escalated to the Program Manager for resolution within 14 days.
+6. High-severity complaints are escalated to the Country Director and investigated within 14 days, with potential extension to 30 days.
+7. Sensitive complaints (SEA, fraud, corruption) are immediately escalated to the Executive Director and handled through the safeguarding investigation protocol.
+8. All complainants are informed of the outcome of their complaint and any actions taken.
+
+================================================================================
+5. ANNUAL BENEFICIARY SATISFACTION SURVEY RESULTS
+================================================================================
+
+Survey conducted: November 10-22, 2025
+Methodology: Structured household surveys using KoBoToolbox
+Sample size: 720 beneficiaries (432 female, 288 male)
+Sampling: Stratified random sampling across all 24 target communities
+Confidence level: 95%, margin of error: +/- 3.6%
+
+5.1 OVERALL SATISFACTION
+
+Question: "Overall, how satisfied are you with the assistance provided by CRI?"
+
+Response             | Count | Percentage
+Very satisfied       |  187  |    26.0%
+Satisfied            |  396  |    55.0%
+Neutral              |   79  |    11.0%
+Dissatisfied         |   43  |     6.0%
+Very dissatisfied    |   15  |     2.0%
+TOTAL                |  720  |   100.0%
+
+Overall satisfaction (very satisfied + satisfied): 81%
+Baseline (March 2025): 62%
+Q2 2025: 69%
+Q3 2025: 74%
+Q4 2025: 81%
+
+5.2 SATISFACTION BY PROGRAM SECTOR
+
+Sector                    | Satisfaction Rate | Change from Baseline
+Food assistance           |       84%         |       +19%
+Water/WASH services       |       82%         |       +24%
+Livelihoods support       |       78%         |       +14%
+Protection services       |       80%         |       +21%
+Health/Nutrition          |       76%         |       +18%
+
+5.3 KEY SURVEY FINDINGS BY CHS COMMITMENT
+
+CHS 1 - Appropriateness:
+"Do you feel the assistance you receive meets your most important needs?"
+Yes: 73% | Partially: 19% | No: 8%
+
+CHS 2 - Effectiveness:
+"Has the assistance made a positive difference in your life?"
+Yes: 79% | Partially: 15% | No: 6%
+
+CHS 4 - Communication:
+"Do you feel well-informed about the program and your entitlements?"
+Yes: 68% | Partially: 22% | No: 10%
+
+CHS 4 - Participation:
+"Have you had opportunities to provide input into program decisions?"
+Yes: 54% | Partially: 23% | No: 23%
+
+CHS 5 - Complaints:
+"Do you know how to make a complaint if you are unhappy with the services?"
+Yes: 72% | No: 28%
+
+"Would you feel comfortable making a complaint?"
+Yes: 65% | Somewhat: 20% | No: 15%
+
+CHS 5 - Response:
+"If you made a complaint, was it addressed satisfactorily?"
+Yes: 71% | Partially: 18% | No: 11% (n=156 who had made complaints)
+
+CHS 7 - Coordination:
+"Have you received overlapping or duplicated assistance from multiple organizations?"
+Yes: 8% | No: 92%
+
+5.4 DISAGGREGATED SATISFACTION ANALYSIS
+
+By Gender:
+Female beneficiaries: 83% satisfaction (n=432)
+Male beneficiaries: 78% satisfaction (n=288)
+
+By Age Group:
+Youth (18-30): 76% satisfaction (n=158)
+Adults (31-59): 83% satisfaction (n=410)
+Elderly (60+): 80% satisfaction (n=152)
+
+By Displacement Status:
+IDPs: 77% satisfaction (n=324)
+Host community: 85% satisfaction (n=396)
+
+By Disability Status:
+Persons with disabilities: 74% satisfaction (n=58)
+Persons without disabilities: 82% satisfaction (n=662)
+
+Notable finding: Persons with disabilities reported lower satisfaction, particularly regarding physical accessibility of distribution points (62% satisfaction vs 84% for persons without disabilities). This has been flagged as a priority improvement area for Q1 2026.
+
+================================================================================
+6. COMMUNITY ENGAGEMENT AND INFORMATION SHARING
+================================================================================
+
+Information sharing activities during Q4 2025:
+
+Activity                              | Count  | Reach (estimated)
+Community information sessions         |   48   |     5,760
+Information boards updated              |   24   |     ongoing
+Community radio broadcasts              |   12   |     15,000+
+Printed information materials           | 5,000  |     5,000
+SMS/WhatsApp information messages       | 3,200  |     3,200
+Community leader briefings              |   24   |       360
+
+Information most requested by community members:
+1. Distribution dates and schedules (34% of queries)
+2. Eligibility criteria for programs (22% of queries)
+3. Entitlement quantities (18% of queries)
+4. Duration of program assistance (14% of queries)
+5. Referral pathways for protection concerns (12% of queries)
+
+Community participation in program governance:
+- 24 Community Accountability Committees (CACs) active, meeting monthly
+- Average CAC composition: 12 members (7 female, 5 male)
+- 4 quarterly community consultations held (one per sub-county)
+- 2 community-led monitoring visits conducted (communities visiting other program sites)
+
+================================================================================
+7. SAFEGUARDING AND SENSITIVE COMPLAINTS
+================================================================================
+
+During Q4 2025, zero sensitive complaints (SEA, sexual harassment, fraud, corruption) were received through the CFRM. While this may reflect effective prevention measures, CRI acknowledges that underreporting of sensitive issues is common and continues to invest in building trust and awareness regarding safe reporting channels.
+
+Proactive measures taken in Q4 2025:
+- Conducted 12 community awareness sessions specifically on SEA and reporting rights
+- Distributed "Say No to SEA" materials in Somali and Oromo languages
+- Ensured female feedback facilitators are available at all distribution points
+- Conducted unannounced monitoring visits at 8 program sites to observe staff-beneficiary interactions
+- All 287 feedback entries were reviewed for potential safeguarding indicators
+
+================================================================================
+8. ACTIONS TAKEN AND PROGRAM ADJUSTMENTS
+================================================================================
+
+The following program adjustments were made in direct response to community feedback:
+
+Action                                           | Status      | Timeline
+Re-verification of excluded households           | Completed   | Nov 2025
+Staff Code of Conduct refresher training         | Completed   | Nov 2025
+Privacy barriers for registration                | Completed   | Dec 2025
+Shade structures at distribution points          | Completed   | Dec 2025
+MHM items added to hygiene kits                  | Completed   | Dec 2025
+Veterinary services coordination with county     | In progress | Q1 2026
+Mobile money transfer pilot                      | In progress | Q1 2026
+Disability accessibility audit of all sites      | Planned     | Jan 2026
+Revised community information strategy           | Planned     | Jan 2026
+Expanded WhatsApp channel to Wajir communities   | Planned     | Feb 2026
+
+================================================================================
+9. LESSONS LEARNED AND RECOMMENDATIONS
+================================================================================
+
+Lessons Learned:
+
+1. Multi-channel feedback approach increases accessibility: The introduction of WhatsApp and community radio channels in Q4 reached demographics (youth, pastoralists in remote areas) that were previously underrepresented in feedback data. The diversity of channels is essential for capturing comprehensive community perspectives.
+
+2. Community feedback facilitators bridge literacy barriers: Trained community members who assist illiterate and elderly people in providing feedback have been critical. Communities with active facilitators generated 40% more feedback entries than those without.
+
+3. Closing the feedback loop builds trust: Communities where CRI consistently communicated back on actions taken in response to complaints showed a 15-percentage-point increase in willingness to provide future feedback compared to the baseline.
+
+4. Disaggregated satisfaction data reveals inequities: The lower satisfaction rates among persons with disabilities would not have been identified without deliberate disaggregation and oversampling of this group. Standard surveys risk masking the experiences of marginalized populations.
+
+Recommendations:
+
+1. Invest in making all distribution and service points physically accessible for persons with disabilities, including ramps, seating priority, and dedicated assistance.
+2. Increase frequency of feedback analysis from quarterly to monthly to enable faster programmatic response.
+3. Develop a real-time feedback dashboard accessible to all program managers for immediate awareness of emerging trends.
+4. Expand community-led monitoring approach, enabling beneficiary representatives to conduct joint monitoring visits.
+5. Strengthen the feedback mechanism's capacity to capture feedback from hard-to-reach pastoralist communities through mobile outreach.
+
+================================================================================
+10. CONCLUSION
+================================================================================
+
+The Q4 2025 accountability report demonstrates continued strengthening of CRI's Community Feedback and Response Mechanism. The increase in total feedback received (23% growth), improvement in resolution rates (84% within 14 days), and rising beneficiary satisfaction (81%, up from 62% at baseline) indicate that the accountability system is functioning effectively and contributing to program quality.
+
+Key areas for continued improvement include: strengthening accessibility for persons with disabilities, increasing community participation in program governance (currently 54% of beneficiaries report having input opportunities), and reducing the 28% of beneficiaries who still do not know how to make a complaint.
+
+CRI remains committed to the principle that accountability to affected populations is not an add-on but a core component of quality humanitarian programming, in full alignment with the Core Humanitarian Standard.
+
+================================================================================
+
+Report approved by:
+
+Name: Dr. James Kiprotich Bett
+Title: Country Director, CRI Kenya
+Date: January 18, 2026
+Signature: [Signed]
+
+Submitted to: ECHO Program Officer
+Submission date: January 20, 2026

@@ -1,0 +1,161 @@
+NARRATIVE PROGRESS REPORT
+Integrated Primary Healthcare and Nutrition Program (IPHCNP)
+Reporting Period: January 1 - December 31, 2025
+
+Implementing Organization: Somali Health Action Network (SHAN)
+Donor: Global Health Foundation
+Grant Reference: GHF-SOM-2025-0847
+Report Submission Date: January 31, 2026
+Prepared by: Dr. Amina Hassan, Program Director
+
+================================================================================
+1. EXECUTIVE SUMMARY
+================================================================================
+
+The Integrated Primary Healthcare and Nutrition Program (IPHCNP) completed its third year of implementation across five districts in Gedo Region, Somalia. During the reporting period, the program reached 47,832 direct beneficiaries (28,411 female, 19,421 male) against a target of 45,000, achieving 106% of the annual target. The program operated through 12 fixed health facilities and 35 mobile health teams, delivering primary healthcare, maternal and child health services, nutrition screening and treatment, and community health education.
+
+Key achievements include a 34% reduction in under-five mortality in target communities (from 2.1/1,000 to 1.39/1,000), successful treatment of 3,847 children with severe acute malnutrition (SAM) with a cure rate of 91.2% (exceeding the Sphere minimum standard of 75%), and an increase in skilled birth attendance from 23% to 41% across program catchment areas. The program maintained full compliance with the Core Humanitarian Standard (CHS) commitments and passed its mid-term evaluation with commendation.
+
+Total expenditure for the reporting period was $1,247,830 against a budget of $1,300,000, representing a 96% burn rate. The 4% variance is attributable to cost efficiencies achieved through local procurement and favorable exchange rate movements.
+
+================================================================================
+2. CONTEXT ANALYSIS
+================================================================================
+
+The operational context in Gedo Region during 2025 was characterized by three principal dynamics that shaped program implementation:
+
+Climate and Food Security: Below-average Gu rains (April-June) resulted in poor pastoral and agro-pastoral conditions, with the IPC analysis classifying three of our five target districts as Phase 3 (Crisis) and two as Phase 4 (Emergency) between July and September. This significantly increased demand for nutrition services and required the program to activate its contingency plan, deploying four additional mobile nutrition teams funded through the program's flexible reserve.
+
+Security Environment: The operational space remained constrained in Bardheere and El Wak districts due to Al-Shabaab activity along the Kenya-Somalia border corridor. The program maintained access through sustained community engagement and adherence to the humanitarian principles of neutrality and impartiality. Two temporary access suspensions occurred (March 17-24 and August 5-19), affecting mobile outreach schedules. These were mitigated through extended service hours upon resumption and targeted community health worker outreach during suspension periods.
+
+Health System Dynamics: The Federal Ministry of Health's rollout of the Essential Package of Health Services (EPHS) framework provided an important alignment opportunity. SHAN actively participated in the Regional Health Cluster and ensured all service delivery protocols conformed to the national EPHS guidelines, strengthening sustainability pathways.
+
+================================================================================
+3. PROGRESS AGAINST OBJECTIVES AND INDICATORS
+================================================================================
+
+OBJECTIVE 1: Increase access to quality primary healthcare services in underserved communities
+
+Output 1.1: 12 health facilities operational and staffed
+Result: 12 facilities maintained continuous operations throughout the reporting period. Average uptime was 97.3%, with 2.7% downtime attributable to security-related closures and facility rehabilitation. Staffing levels were maintained at 94% of established positions, with 3 midwife vacancies filled within 45 days through partnership with the Somali Nursing and Midwifery Association.
+
+Output 1.2: 156,000 outpatient consultations provided
+Result: 163,487 consultations delivered (104.8% of target). Common presentations included acute respiratory infections (31%), acute watery diarrhea (18%), malaria (14%), skin infections (9%), and maternal health visits (12%). Treatment protocols followed WHO Integrated Management of Childhood Illness (IMCI) guidelines. Drug stockout rate was maintained at 1.8% against a target of less than 5%.
+
+Output 1.3: 35 mobile health teams conducting regular outreach
+Result: 35 mobile teams conducted 1,820 outreach sessions across 87 hard-to-reach settlements. Each team consisted of a clinical officer, nurse, community health worker, and nutrition screener. Average distance covered per outreach session was 47 km.
+
+OBJECTIVE 2: Reduce malnutrition among children under five and pregnant/lactating women
+
+Output 2.1: 4,000 children with SAM admitted and treated through OTP
+Result: 3,847 children admitted to the Outpatient Therapeutic Program. Cure rate: 91.2% (Sphere standard: >75%). Death rate: 2.1% (Sphere standard: <10%). Default rate: 5.8% (Sphere standard: <15%). Average length of stay: 42 days. The program utilized the CMAM (Community-based Management of Acute Malnutrition) approach with RUTF (Ready-to-Use Therapeutic Food) as the primary treatment modality.
+
+Output 2.2: 12,000 children screened through MUAC monthly
+Result: An average of 13,200 children were screened monthly using Mid-Upper Arm Circumference (MUAC) measurements by trained community health workers. Referral compliance from community screening to OTP sites was 87%, an improvement from the baseline of 62%.
+
+Output 2.3: 2,500 pregnant/lactating women enrolled in supplementary feeding
+Result: 2,834 pregnant and lactating women (PLW) received supplementary rations through the Targeted Supplementary Feeding Program (TSFP). Iron-folic acid supplementation coverage among enrolled PLW reached 94%.
+
+OBJECTIVE 3: Strengthen community health systems and health-seeking behavior
+
+Output 3.1: 210 community health workers (CHWs) trained and deployed
+Result: 214 CHWs (127 female, 87 male) completed the standardized 21-day training curriculum covering IMCI, nutrition screening, health education, and community-based surveillance. Monthly supervision visits achieved 89% coverage. CHW attrition rate was 8% over the reporting period.
+
+Output 3.2: 500 community health education sessions conducted
+Result: 534 sessions delivered reaching an estimated 32,100 community members. Topics included infant and young child feeding (IYCF) practices, hygiene promotion, family planning, danger signs in pregnancy, and malaria prevention. Pre/post knowledge assessments showed an average knowledge increase of 41 percentage points.
+
+================================================================================
+4. BENEFICIARY STORIES
+================================================================================
+
+Story 1 - Hawa's Journey: Hawa Abdi, a 24-year-old mother of three from Luuq district, brought her 18-month-old son Abdullahi to the mobile health team outreach point in September 2025. Abdullahi's MUAC measurement was 10.8 cm, indicating severe acute malnutrition. He was immediately enrolled in the OTP program. Hawa attended weekly follow-up sessions at the nearest health facility, a 3-hour walk from her home. After eight weeks of RUTF treatment and nutritional counseling, Abdullahi's MUAC improved to 12.5 cm and his weight-for-height z-score recovered to above -2. Hawa reported: "I did not know that special food could save my child. The health workers taught me how to prepare nutritious meals with what we have. My son is now playing and eating well." Hawa has since become a volunteer CHW in her settlement, screening children and referring those with malnutrition.
+
+Story 2 - Transforming Birth Outcomes: Fatuma Mohamed, 31, a traditional birth attendant (TBA) in Garbaharey, initially resisted the program's efforts to promote facility-based deliveries. Through sustained dialogue and the TBA engagement strategy, Fatuma agreed to attend a five-day orientation at the health facility. She witnessed a complicated delivery where the skilled midwife managed a postpartum hemorrhage. This experience changed her perspective. Fatuma now refers women with high-risk pregnancies to the facility and accompanies them during labor. In her community of approximately 800 households, facility delivery rates increased from 11% to 38% during the reporting period.
+
+================================================================================
+5. CROSS-CUTTING THEMES
+================================================================================
+
+Gender and Inclusion: The program maintained gender-disaggregated data across all indicators. 59% of direct beneficiaries were female. Female representation among CHWs was 59%. The program incorporated GBV referral pathways into all health facility protocols, resulting in 47 referrals to specialized GBV services during the reporting period. Disability inclusion was addressed through home-based service delivery for 89 individuals with mobility limitations.
+
+Protection and Safeguarding: Zero safeguarding incidents were reported. All 247 program staff completed mandatory safeguarding training. The community-based complaints mechanism received 134 complaints, of which 128 (95.5%) were resolved within the 14-day standard. The most common complaint categories were waiting times (34%), drug availability (22%), and staff attitudes (18%).
+
+Environmental Sustainability: Medical waste management protocols were implemented across all 12 facilities, with incinerator functionality maintained at 92%. The program piloted solar-powered vaccine cold chain equipment in three facilities, reducing diesel consumption by 67%.
+
+Accountability to Affected Populations (AAP): Quarterly community consultations were held in all 87 target settlements. Beneficiary satisfaction surveys (n=1,240) showed an overall satisfaction rate of 84%, up from 76% at baseline. Information provision scores improved from 3.2/5 to 4.1/5 following the introduction of multilingual information boards and community radio messaging.
+
+================================================================================
+6. PARTNERSHIPS AND COORDINATION
+================================================================================
+
+The program maintained active coordination with the Health Cluster (national and sub-national levels), the Nutrition Cluster, and bilateral coordination with UNICEF, WHO, and WFP. SHAN co-led the Gedo Health Sub-Cluster, facilitating bi-weekly coordination meetings attended by an average of 14 partners. Referral partnerships were maintained with three secondary healthcare facilities for complicated cases. The program contributed to the OCHA-coordinated 4W (Who, What, Where, When) reporting on a monthly basis.
+
+================================================================================
+7. CHALLENGES AND MITIGATION MEASURES
+================================================================================
+
+Challenge 1 - Access Constraints: Security-related access restrictions in Bardheere and El Wak districts limited service delivery for 27 operational days. Mitigation: Pre-positioned supplies in community-managed storage, activated CHW networks for basic service continuity, and extended operational hours upon access resumption. This approach recovered approximately 73% of the service delivery gap.
+
+Challenge 2 - Supply Chain Disruptions: Global RUTF supply shortages in Q3 required the program to implement a prioritization protocol for the most severe SAM cases. Mitigation: Engaged alternative UNICEF supply pipeline, activated local procurement of complementary therapeutic foods, and implemented stricter admission criteria temporarily (MUAC <11.0 cm instead of <11.5 cm) with enhanced monitoring of moderate cases.
+
+Challenge 3 - Staff Retention: Competitive salary offerings from larger INGOs resulted in the loss of two clinical officers and one pharmacist during Q2. Mitigation: Implemented retention bonuses for hard-to-fill positions, introduced professional development pathways, and strengthened the talent pipeline through pre-service training partnerships with the University of Somalia Faculty of Health Sciences.
+
+================================================================================
+8. LESSONS LEARNED
+================================================================================
+
+1. Integration of Services Increases Efficiency: Co-locating nutrition screening with routine immunization outreach increased screening coverage by 28% without proportional cost increases. This "one-stop-shop" approach reduced the burden on caregivers who would otherwise need to attend multiple service points.
+
+2. Community Health Worker Investment Pays Dividends: The sustained investment in CHW training, supervision, and motivation (through small monthly stipends and recognition programs) resulted in a referral compliance rate of 87%, significantly above the regional average of 54%. The cost-per-beneficiary-reached through CHW networks was $2.40, compared to $8.70 through facility-based services.
+
+3. Flexible Funding Enables Adaptive Programming: The 10% flexible reserve within the grant enabled rapid response to the nutrition crisis triggered by poor Gu rains. Without this flexibility, the program would have been unable to deploy additional mobile teams during the critical July-September period, potentially resulting in preventable malnutrition-related mortality.
+
+4. Traditional Healer Engagement Strategy: The TBA orientation program proved more effective than exclusionary approaches. Converting TBAs into referral agents leveraged existing community trust while directing women to skilled care. This model is now being adopted by two other implementing partners in adjacent regions.
+
+================================================================================
+9. SUSTAINABILITY AND TRANSITION PLANNING
+================================================================================
+
+The program's sustainability strategy operates on three levels: (1) Health system strengthening through alignment with the EPHS framework and capacity building of Ministry of Health district health teams, who co-supervised 45% of program activities during the reporting period; (2) Community ownership through CHW networks that are progressively integrated into the community health system structure; and (3) Financial sustainability through health facility cost-recovery mechanisms for non-essential services, which generated $18,400 during the reporting period toward operational costs.
+
+A formal transition plan has been developed with the Regional Health Office, with a target of transferring operational responsibility for four of the 12 health facilities to government management by December 2026.
+
+================================================================================
+10. FINANCIAL SUMMARY
+================================================================================
+
+Budget Line                    | Budget (USD) | Actual (USD) | Variance (%)
+Personnel                      |    520,000   |    508,340    |    -2.2%
+Medical Supplies & Equipment   |    312,000   |    324,890    |    +4.1%
+Transport & Logistics          |    156,000   |    148,720    |    -4.7%
+Training & Capacity Building   |     78,000   |     76,430    |    -2.0%
+Monitoring & Evaluation        |     52,000   |     51,890    |    -0.2%
+Operational Costs              |    104,000   |     98,560    |    -5.2%
+Indirect Costs (6%)            |     78,000   |     39,000    |   -50.0%
+TOTAL                          |  1,300,000   |  1,247,830    |    -4.0%
+
+Note: Indirect cost underspend reflects the application of actual indirect cost rates against reduced direct cost base. A budget revision request for reallocation of $39,000 from indirect to medical supplies has been submitted separately.
+
+================================================================================
+11. NEXT STEPS AND RECOMMENDATIONS
+================================================================================
+
+1. Scale up the integrated outreach model to all 87 settlements with quarterly coverage targets.
+2. Pilot community-based management of moderate acute malnutrition (MAM) using locally produced supplementary foods to reduce dependence on imported commodities.
+3. Expand the TBA engagement program to cover all traditional birth attendants in the catchment area (estimated 340 TBAs).
+4. Invest in digital health information systems to replace paper-based reporting, improving data timeliness and quality.
+5. Develop a resource mobilization strategy to diversify funding sources and reduce single-donor dependency.
+
+================================================================================
+
+CERTIFICATION
+
+I certify that this report accurately reflects the activities, achievements, and financial status of the Integrated Primary Healthcare and Nutrition Program for the period January 1 - December 31, 2025.
+
+Name: Dr. Amina Hassan
+Title: Program Director, Somali Health Action Network
+Date: January 31, 2026
+Signature: [Signed]
+
+Reviewed by: Mohamed Yusuf Ahmed, Executive Director, SHAN
+Date: January 31, 2026

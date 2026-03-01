@@ -1,0 +1,175 @@
+RAPPORT DE PROJET
+Programme d'Eau, Assainissement et Hygiene (EAH/WASH)
+Province du Sud-Kivu, Republique Democratique du Congo
+
+Organisation: Action Solidaire pour le Developpement (ASD)
+Bailleur de fonds: Agence Europeenne de Cooperation Humanitaire
+Reference du projet: AECH-RDC-2025-0198
+Periode de rapportage: Juillet - Decembre 2025
+Date de soumission: 20 janvier 2026
+Redige par: Ing. Jean-Baptiste Mumbere, Coordonnateur du Programme WASH
+
+================================================================================
+1. RESUME EXECUTIF
+================================================================================
+
+Le programme EAH/WASH mis en oeuvre dans les territoires de Walungu et Kabare, province du Sud-Kivu, a realise des progres significatifs au cours du second semestre 2025. Le programme cible 45,000 beneficiaires directs dans 32 villages affectes par le conflit et les deplacements de populations.
+
+Au cours de cette periode, les principales realisations comprennent: la construction de 18 points d'eau ameliores (forages equipes de pompes manuelles), la rehabilitation de 7 systemes d'adduction d'eau gravitaire, la construction de 450 latrines familiales ameliorees, la formation de 32 comites de gestion de l'eau et la sensibilisation de 38,720 personnes aux bonnes pratiques d'hygiene.
+
+Le taux d'execution budgetaire est de 87% avec des depenses totales de 391,500 USD sur un budget semestriel de 450,000 USD. Le sous-utilisation de 13% est principalement attribuable aux retards d'approvisionnement en materiaux de construction et aux perturbations securitaires dans la zone de Kaniola en septembre 2025.
+
+================================================================================
+2. CONTEXTE OPERATIONNEL
+================================================================================
+
+La situation securitaire dans le Sud-Kivu est restee volatile pendant la periode de rapportage. Les affrontements entre groupes armes dans les hauts plateaux de Walungu ont provoque le deplacement de 12,400 personnes supplementaires vers les zones de sante de Nyangezi et Kaziba. Cette dynamique a augmente la pression sur les infrastructures d'eau existantes et necessitant une reponse adaptative du programme.
+
+Sur le plan sanitaire, une epidemie de cholera a ete declaree dans le territoire de Kabare en aout 2025, avec 847 cas confirmes et 23 deces (taux de letalite: 2.7%). Le programme a active son plan de contingence WASH en reponse a l'epidemie, en deployant des kits de chloration d'urgence dans 15 villages et en intensifiant les activites de promotion de l'hygiene.
+
+Les conditions climatiques ont ete marquees par des precipitations superieures a la moyenne pendant la saison des pluies (septembre-novembre), causant des inondations localisees qui ont endommage 3 captages de source et 12 latrines, necessitant des travaux de rehabilitation d'urgence.
+
+================================================================================
+3. PROGRES PAR RAPPORT AUX RESULTATS
+================================================================================
+
+RESULTAT 1: Acces ameliore a l'eau potable pour 25,000 personnes
+
+Indicateur 1.1: Nombre de points d'eau construits ou rehabilites
+Cible semestrielle: 22 | Realise: 25 | Taux de realisation: 114%
+
+Details des realisations:
+- 18 forages equipes de pompes manuelles India Mark II (profondeur moyenne: 45m)
+- 7 systemes gravitaires rehabilites (longueur totale du reseau: 23.4 km)
+- Debit moyen par point d'eau: 0.8 litres/seconde
+- Population desservie: 26,400 personnes (12,672 femmes, 13,728 hommes)
+
+Indicateur 1.2: Quantite d'eau disponible par personne et par jour
+Cible: 20 litres/personne/jour (norme Sphere)
+Resultat: 18.5 litres/personne/jour en moyenne dans les communautes ciblees
+Note: Trois villages restent en dessous de 15 l/p/j en raison de la pression demographique liee aux deplaces.
+
+Indicateur 1.3: Qualite de l'eau aux points de distribution
+Resultat: 94% des points d'eau testes conformes aux normes OMS pour l'eau potable (0 coliformes fecaux/100ml). Les 6% non conformes ont fait l'objet de traitement au chlore et de nouveaux tests de verification.
+
+Analyse de la qualite de l'eau (echantillons preleves en decembre 2025):
+- Nombre total d'echantillons: 156
+- Conformes aux normes: 147 (94.2%)
+- Non conformes - contamination bacteriologique: 6 (3.8%)
+- Non conformes - turbidite elevee: 3 (1.9%)
+
+RESULTAT 2: Amelioration de l'acces a l'assainissement
+
+Indicateur 2.1: Nombre de latrines familiales construites
+Cible: 400 | Realise: 450 | Taux de realisation: 113%
+
+Les latrines construites suivent le modele SanPlat ameliore avec dalle en beton arme, superstructure en materiaux locaux et systeme de ventilation (VIP - Ventilated Improved Pit). Chaque latrine dessert en moyenne une famille de 7 personnes.
+
+Indicateur 2.2: Proportion de menages ayant acces a des installations sanitaires ameliorees
+Baseline: 23% | Cible: 55% | Resultat: 52%
+Note: L'ecart de 3 points est lie a l'afflux de personnes deplacees non couvertes par le programme initial. Un avenant budgetaire a ete soumis pour couvrir 100 latrines supplementaires.
+
+Indicateur 2.3: Taux de defecation a l'air libre (DAL)
+Baseline: 67% | Cible: 30% | Resultat: 34%
+Des approches ATPC (Assainissement Total Pilote par la Communaute) ont ete mises en oeuvre dans 28 villages, dont 19 ont atteint le statut "Fin de DAL" certifie par les autorites sanitaires locales.
+
+RESULTAT 3: Amelioration des pratiques d'hygiene
+
+Indicateur 3.1: Nombre de personnes sensibilisees aux bonnes pratiques d'hygiene
+Cible: 35,000 | Realise: 38,720 | Taux de realisation: 111%
+
+Les activites de promotion de l'hygiene ont ete menees selon les methodologies suivantes:
+- Sessions PHAST (Participatory Hygiene and Sanitation Transformation): 245 sessions
+- Clubs d'hygiene scolaires: 28 ecoles, 3,400 eleves
+- Emissions radio communautaire: 48 emissions sur 3 stations locales
+- Theatre participatif: 32 representations dans les marches et places publiques
+- Visites a domicile par les relais communautaires: 4,200 visites
+
+Indicateur 3.2: Taux de lavage des mains aux moments critiques
+Baseline: 18% | Cible: 50% | Resultat: 47%
+Mesure par observation structuree dans 200 menages. Les moments critiques observes: avant de manger, apres utilisation des latrines, avant la preparation des aliments, apres le changement des couches.
+
+Indicateur 3.3: Prevalence de la diarrhee chez les enfants de moins de 5 ans
+Baseline: 32% | Cible: 18% | Resultat: 21%
+Donnees collectees a travers les registres des centres de sante et enquetes menages (n=600). La reduction est statistiquement significative (p<0.05) mais n'atteint pas encore la cible de 18%.
+
+================================================================================
+4. REPONSE A L'EPIDEMIE DE CHOLERA
+================================================================================
+
+Suite a la declaration de l'epidemie de cholera en aout 2025, le programme a deploye les mesures d'urgence suivantes dans un delai de 72 heures:
+
+- Distribution de 15,000 comprimes de chloration (Aquatabs) a 3,000 menages
+- Installation de 45 stations de lavage des mains (tippy-taps) dans les lieux publics
+- Formation de 60 agents de sante communautaire sur la prevention du cholera
+- Chloration d'urgence de 25 points d'eau dans la zone affectee
+- Campagne de sensibilisation porte-a-porte couvrant 4,500 menages
+
+Resultats de la reponse: Le nombre de nouveaux cas a diminue de 89% dans les zones d'intervention du programme (de 34 cas/semaine a 4 cas/semaine) sur une periode de 6 semaines. Aucun cas de cholera n'a ete enregistre dans les villages disposant de points d'eau ameliores construits par le programme.
+
+================================================================================
+5. THEMES TRANSVERSAUX
+================================================================================
+
+Genre et inclusion: 52% des membres des comites de gestion de l'eau sont des femmes (cible: 50%). Les femmes occupent des postes de presidence dans 18 des 32 comites. La conception des latrines a integre les besoins specifiques des femmes et des filles (eclairage, verrou interieur, gestion de l'hygiene menstruelle). Des consultations specifiques avec les personnes handicapees ont conduit a la construction de 25 latrines accessibles.
+
+Protection de l'environnement: Les etudes d'impact environnemental ont ete realisees pour tous les forages. Les zones de protection des captages de source ont ete delimitees et reboisees (2,400 arbres plantes). La gestion des boues de vidange a ete integree dans la formation des comites de gestion.
+
+Redevabilite envers les populations affectees: Un mecanisme de retour d'information a ete mis en place dans chaque village, comprenant des boites a suggestions, un numero vert telephonique et des reunions communautaires trimestrielles. 87 retours ont ete recus, dont 78 (89.7%) ont ete resolus dans un delai de 14 jours.
+
+================================================================================
+6. DEFIS ET MESURES D'ATTENUATION
+================================================================================
+
+Defi 1 - Insecurite: Les affrontements dans la zone de Kaniola ont suspendu les activites pendant 18 jours (8-26 septembre). Attenuation: Redeplacement temporaire des equipes vers les zones accessibles et reprogrammation des activites en octobre.
+
+Defi 2 - Approvisionnement: Rupture de stock des pompes India Mark II aupres du fournisseur principal pendant 6 semaines. Attenuation: Identification d'un fournisseur alternatif a Bukavu et pre-positionnement de pieces de rechange.
+
+Defi 3 - Deplacement de populations: L'afflux de personnes deplacees a exerce une pression supplementaire sur les infrastructures construites. Attenuation: Augmentation de la capacite de certains systemes et soumission d'un avenant budgetaire.
+
+================================================================================
+7. LECONS APPRISES
+================================================================================
+
+1. L'integration de la reponse au cholera dans le programme WASH regulier a permis une mobilisation rapide et efficace, demontrant la valeur de la preparedness.
+
+2. L'implication des femmes dans la gestion des points d'eau a ameliore la collecte des cotisations (taux de recouvrement de 78% contre 45% pour les comites a majorite masculine).
+
+3. L'approche ATPC est plus efficace lorsqu'elle est combinee avec la construction de latrines subventionnees, en particulier dans les communautes les plus vulnerables.
+
+================================================================================
+8. RESUME FINANCIER (en USD)
+================================================================================
+
+Ligne budgetaire              | Budget    | Depenses  | Taux (%)
+Personnel                      | 112,500   | 109,800   | 97.6%
+Construction points d'eau      | 157,500   | 148,200   | 94.1%
+Assainissement                 |  67,500   |  63,400   | 93.9%
+Promotion de l'hygiene         |  36,000   |  31,200   | 86.7%
+Fournitures et equipements     |  31,500   |  18,900   | 60.0%
+Transport et logistique        |  18,000   |  16,500   | 91.7%
+Suivi et evaluation            |   9,000   |   7,200   | 80.0%
+Couts indirects (7%)           |  18,000   |  16,300   | 90.6%
+TOTAL                          | 450,000   | 391,500   | 87.0%
+
+================================================================================
+9. PROCHAINES ETAPES
+================================================================================
+
+1. Finaliser la construction de 5 forages supplementaires dans les villages nouvellement accessibles.
+2. Deployer le programme ATPC dans les 4 villages restants.
+3. Renforcer la capacite des comites de gestion pour assurer la perennite des infrastructures.
+4. Conduire l'enquete de fin de projet (endline survey) en janvier 2026.
+5. Documenter les bonnes pratiques et les lecons apprises pour la capitalisation.
+
+================================================================================
+
+Certification: Je certifie que ce rapport reflete fidelement les activites et resultats du programme pour la periode de rapportage.
+
+Nom: Ing. Jean-Baptiste Mumbere
+Titre: Coordonnateur du Programme WASH
+Date: 20 janvier 2026
+Signature: [Signe]
+
+Approuve par: Marie-Claire Bahati, Directrice Nationale, ASD-RDC
+Date: 22 janvier 2026

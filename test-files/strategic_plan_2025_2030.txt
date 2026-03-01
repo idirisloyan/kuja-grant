@@ -1,0 +1,335 @@
+STRATEGIC PLAN 2025-2030
+Pathway to Resilience: A Five-Year Strategy
+
+Organization: East Africa Resilience Network (EARN)
+Approved by the Board of Directors: December 15, 2024
+Document Version: Final 1.0
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+1. Message from the Executive Director
+2. Organizational Overview
+3. Context Analysis
+4. Vision, Mission, and Core Values
+5. Theory of Change
+6. Strategic Priorities 2025-2030
+   Strategic Priority 1: Humanitarian Response Excellence
+   Strategic Priority 2: Sustainable Livelihoods and Economic Empowerment
+   Strategic Priority 3: Governance, Peacebuilding, and Social Cohesion
+   Strategic Priority 4: Climate Adaptation and Environmental Resilience
+7. Cross-Cutting Themes
+8. Implementation Approach
+9. Monitoring, Evaluation, Accountability, and Learning (MEAL) Framework
+10. Resource Mobilization Strategy
+11. Risk Management
+12. Governance and Organizational Development
+
+================================================================================
+1. MESSAGE FROM THE EXECUTIVE DIRECTOR
+================================================================================
+
+As we enter our second decade of operations, the East Africa Resilience Network stands at a critical juncture. The communities we serve face increasingly complex and interconnected challenges: protracted conflict, climate-induced displacement, economic fragility, and the lingering effects of the COVID-19 pandemic. Yet within these challenges lie opportunities for transformative change.
+
+This strategic plan represents the collective wisdom of our staff, partners, beneficiary communities, and board members. Through an inclusive 18-month consultation process involving over 2,400 stakeholders across four countries, we have developed a roadmap that builds on our proven strengths while positioning us to address emerging needs with innovation and agility.
+
+Our commitment remains unwavering: to walk alongside the most vulnerable communities in East Africa as they build pathways to lasting resilience. This plan provides the framework to make that commitment a reality.
+
+Fatima Abdi Mohamed
+Executive Director
+
+================================================================================
+2. ORGANIZATIONAL OVERVIEW
+================================================================================
+
+East Africa Resilience Network (EARN) was established in 2015 as a locally-led humanitarian and development organization. Over nine years, EARN has grown from a small emergency response initiative in Mogadishu to a multi-country operation working across Somalia, Kenya, Ethiopia, and Djibouti.
+
+Key organizational facts (as of December 2024):
+- Total staff: 287 (92% national staff)
+- Annual budget (2024): $8.2 million
+- Active projects: 14
+- Countries of operation: 4
+- Beneficiaries reached (2024): 312,000
+- Donor partners: 12 institutional and 3 private sector
+- Registration: Somalia (Federal), Kenya, Ethiopia, Djibouti; consultative status with ECOSOC
+
+Thematic areas of expertise: Emergency response, food security and livelihoods, WASH, health and nutrition, protection (GBV and child protection), education in emergencies, peacebuilding, and climate adaptation.
+
+Membership and networks: OCHA coordination mechanisms, Somalia NGO Consortium, Alliance for Peacebuilding, Climate Action Network, CHS Alliance (verified member since 2022), Sphere Association.
+
+================================================================================
+3. CONTEXT ANALYSIS
+================================================================================
+
+The East African region continues to experience a convergence of humanitarian and development challenges that necessitate an integrated approach:
+
+Conflict and displacement: Over 8.3 million people are internally displaced across the Horn of Africa, with Somalia alone hosting 3.8 million IDPs. Protracted clan conflicts, Al-Shabaab insurgency, and inter-state tensions continue to drive displacement.
+
+Climate crisis: The 2020-2023 drought was the longest and most severe in 40 years, affecting over 36 million people across the region. Climate models project a 2.5-degree Celsius increase in average temperatures by 2050, with more frequent and severe extreme weather events. The shift from drought to flooding cycles is intensifying, as witnessed by the devastating Deyr floods of late 2023.
+
+Economic fragility: Youth unemployment exceeds 65% across the region, with particular concentration among young women. Inflationary pressures, currency depreciation, and supply chain disruptions continue to erode household purchasing power. Remittance flows, critical to household survival, face increased regulatory scrutiny.
+
+Governance gaps: State-building processes in Somalia and South Sudan remain fragile, with limited government capacity to deliver basic services. Civic space is shrinking in several countries, affecting the operating environment for civil society organizations.
+
+Localization imperative: The Grand Bargain commitments and increasing recognition that locally-led responses are more effective, sustainable, and accountable create an opportunity for organizations like EARN to play a more central role in the humanitarian architecture.
+
+================================================================================
+4. VISION, MISSION, AND CORE VALUES
+================================================================================
+
+VISION: A resilient East Africa where communities thrive with dignity, security, and sustainable prosperity.
+
+MISSION: To strengthen the resilience of vulnerable communities in East Africa through locally-led humanitarian action, sustainable development, and peacebuilding, in partnership with communities, governments, and the international community.
+
+CORE VALUES:
+
+Dignity and Respect: We affirm the inherent dignity of every person and community we work with, ensuring our programs are designed and delivered with respect for local culture, knowledge, and agency.
+
+Accountability: We are accountable first and foremost to the communities we serve, and equally to our donors, partners, and the public. We adhere to the Core Humanitarian Standard and maintain transparent governance.
+
+Inclusion and Equity: We actively promote gender equity, disability inclusion, and the meaningful participation of marginalized groups in all aspects of our work. We apply a do-no-harm lens to all programming.
+
+Innovation and Learning: We embrace evidence-based approaches, invest in continuous learning, and adapt our programs based on data, feedback, and emerging best practices.
+
+Collaboration: We believe in the power of partnerships across sectors, recognizing that no single organization can address the complex challenges facing our communities.
+
+Integrity: We maintain the highest ethical standards in all our operations, with zero tolerance for fraud, corruption, exploitation, and abuse.
+
+================================================================================
+5. THEORY OF CHANGE
+================================================================================
+
+IF we deliver high-quality, timely humanitarian assistance that saves lives and protects dignity during crises,
+
+AND we invest in strengthening household and community economic foundations through diversified livelihoods, market linkages, and financial inclusion,
+
+AND we support inclusive governance, conflict resolution, and social cohesion at community and sub-national levels,
+
+AND we build community capacity to anticipate, adapt to, and recover from climate shocks and environmental degradation,
+
+WHILE ensuring meaningful participation of women, youth, and marginalized groups across all programming, maintaining accountability to affected populations, and fostering local ownership and sustainability,
+
+THEN vulnerable communities in East Africa will develop the absorptive, adaptive, and transformative capacities needed to thrive with dignity and self-reliance,
+
+BECAUSE resilience is built through the interconnection of immediate humanitarian protection, sustainable economic opportunity, inclusive governance, environmental stewardship, and community agency.
+
+ASSUMPTIONS:
+1. The operating environment permits access to target communities.
+2. Sufficient and predictable funding is available to sustain multi-year programming.
+3. Government partners are willing to engage in collaborative approaches.
+4. Communities are receptive to participatory program design.
+5. Climate projections remain within modeled ranges.
+
+================================================================================
+6. STRATEGIC PRIORITIES 2025-2030
+================================================================================
+
+STRATEGIC PRIORITY 1: HUMANITARIAN RESPONSE EXCELLENCE
+
+Goal: Deliver timely, effective, and principled humanitarian assistance to crisis-affected populations, with particular emphasis on rapid-onset emergencies and protracted displacement.
+
+Objectives:
+1.1 Maintain pre-positioned emergency stocks and deploy response teams within 72 hours of crisis onset in areas of operation.
+1.2 Reach 500,000 crisis-affected individuals with life-saving assistance annually by 2028.
+1.3 Achieve and maintain CHS verification, with a target score of 4.0/5.0 across all nine commitments.
+1.4 Integrate anticipatory action approaches into at least 60% of emergency response programs by 2027.
+1.5 Develop and operationalize a localization strategy that channels a minimum of 25% of humanitarian funding through local partners.
+
+Key strategies:
+- Establish and maintain emergency response hubs in Mogadishu, Baidoa, Garissa, and Jijiga.
+- Invest in cash and voucher assistance (CVA) as the default modality where markets are functional, targeting 70% of emergency transfers through CVA.
+- Strengthen early warning systems through community-based surveillance networks linked to the FEWS NET and SWALIM data platforms.
+- Develop standby partnership agreements with five local organizations in each country of operation.
+
+STRATEGIC PRIORITY 2: SUSTAINABLE LIVELIHOODS AND ECONOMIC EMPOWERMENT
+
+Goal: Strengthen household economic resilience through diversified livelihoods, market access, financial inclusion, and skills development, with a particular focus on women and youth.
+
+Objectives:
+2.1 Support 50,000 households to achieve measurable improvements in income and food security by 2030.
+2.2 Facilitate the establishment of 500 Village Savings and Loan Associations (VSLAs) with cumulative savings exceeding $2 million.
+2.3 Provide market-relevant vocational training to 15,000 youth (60% female), with a 50% employment or self-employment rate within 12 months of graduation.
+2.4 Establish 20 market linkage platforms connecting smallholder producers to buyers.
+2.5 Graduate 30% of beneficiary households from humanitarian assistance to self-reliance by 2030.
+
+Key strategies:
+- Implement the Graduation Approach adapted for pastoralist and agro-pastoralist contexts, integrating safety net support, livelihoods promotion, financial inclusion, and social empowerment.
+- Partner with private sector actors (banks, mobile money operators, agribusinesses) to create sustainable market ecosystems.
+- Develop climate-smart agriculture extension services reaching 10,000 farming households.
+- Pilot digital financial literacy programs leveraging mobile technology platforms.
+- Establish a revolving loan fund for women-led enterprises with initial capitalization of $500,000.
+
+STRATEGIC PRIORITY 3: GOVERNANCE, PEACEBUILDING, AND SOCIAL COHESION
+
+Goal: Contribute to peaceful and inclusive societies through community-led conflict resolution, civic engagement, and governance strengthening.
+
+Objectives:
+3.1 Support 100 community peace committees in mediating inter-clan and resource-based conflicts, with a 70% resolution rate.
+3.2 Increase women's representation in local governance structures to 30% in target communities.
+3.3 Strengthen civic education and voter awareness reaching 200,000 individuals ahead of electoral processes.
+3.4 Support 50 community-government dialogue platforms to improve service delivery accountability.
+3.5 Develop and disseminate conflict-sensitive programming guidance across all EARN programs.
+
+Key strategies:
+- Apply the Do No Harm framework and conflict sensitivity analysis across all program design.
+- Support traditional and customary conflict resolution mechanisms while linking them to formal justice systems.
+- Implement youth leadership development programs targeting 5,000 young people in peacebuilding roles.
+- Invest in media and communications for peace, including community radio programming and social media engagement.
+- Partner with research institutions to generate evidence on effective peacebuilding approaches in pastoralist contexts.
+
+STRATEGIC PRIORITY 4: CLIMATE ADAPTATION AND ENVIRONMENTAL RESILIENCE
+
+Goal: Build community capacity to anticipate, adapt to, and recover from climate shocks while promoting environmental sustainability and natural resource management.
+
+Objectives:
+4.1 Support 200 communities to develop and implement community-based climate adaptation plans.
+4.2 Rehabilitate or establish 150 water sources using climate-resilient technologies (solar-powered systems, rainwater harvesting, sand dams).
+4.3 Implement rangeland management programs covering 500,000 hectares in pastoralist areas.
+4.4 Establish 50 community-managed tree nurseries producing 2 million seedlings for reforestation.
+4.5 Integrate climate risk analysis into 100% of EARN's program design processes by 2026.
+
+Key strategies:
+- Develop a climate change adaptation mainstreaming toolkit for all program sectors.
+- Invest in nature-based solutions (mangrove restoration, community forestry, soil conservation) alongside engineered infrastructure.
+- Partner with meteorological agencies to provide localized seasonal forecasts to pastoralist communities.
+- Pilot index-based livestock insurance reaching 10,000 pastoralist households.
+- Implement the Payment for Ecosystem Services (PES) model in select watersheds.
+
+================================================================================
+7. CROSS-CUTTING THEMES
+================================================================================
+
+Gender Equality and Women's Empowerment: EARN will apply a gender transformative approach across all programs, moving beyond counting women's participation to actively challenging the structural barriers that perpetuate gender inequality. A Gender Equality Action Plan will be developed with annual gender audits.
+
+Youth Engagement: As over 70% of East Africa's population is under 30, EARN will establish a Youth Advisory Council and ensure youth participation in program design, implementation, and governance. A dedicated youth program strategy will allocate a minimum of 20% of programming resources to youth-focused interventions.
+
+Disability Inclusion: Guided by the Washington Group questions for disability identification and the IASC Guidelines on Inclusion of Persons with Disabilities, EARN will conduct accessibility audits of all programs and facilities by 2026.
+
+Protection Mainstreaming: The four key protection principles (avoid causing harm, ensure meaningful access, accountability, participation and empowerment) will be integrated into all sector responses through systematic protection risk analysis.
+
+Environmental and Social Safeguards: All programs will undergo environmental and social impact screening, with mitigation measures built into program design and budgets.
+
+================================================================================
+8. IMPLEMENTATION APPROACH
+================================================================================
+
+Phased implementation:
+Phase 1 (2025-2026): Foundation - Organizational strengthening, systems development, piloting of new approaches, baseline establishment.
+Phase 2 (2027-2028): Expansion - Scale-up of proven models, geographic expansion, deepening of partnerships, mid-term review.
+Phase 3 (2029-2030): Consolidation - Impact measurement, sustainability planning, transition strategies, endline evaluation.
+
+Partnership model: EARN will operate through a tiered partnership model:
+- Tier 1: Strategic partnerships with local organizations for program co-implementation, with capacity strengthening and progressive handover.
+- Tier 2: Technical partnerships with research institutions, UN agencies, and international NGOs for knowledge exchange and joint advocacy.
+- Tier 3: Private sector partnerships for market development, innovation, and resource mobilization.
+- Tier 4: Government partnerships for policy dialogue, alignment, and sustainability.
+
+Geographic focus: Primary operations will continue in Somalia (South Central, Puntland, Somaliland), Kenya (North Eastern, Coastal), Ethiopia (Somali Region), and Djibouti. Geographic expansion will be considered only where it aligns with strategic priorities and operational capacity.
+
+================================================================================
+9. MONITORING, EVALUATION, ACCOUNTABILITY, AND LEARNING (MEAL) FRAMEWORK
+================================================================================
+
+The MEAL framework is built on four pillars:
+
+Pillar 1 - Monitoring: Systematic tracking of output and outcome indicators using digital data collection (KoBoToolbox, ODK), real-time dashboards, and routine monitoring visits. A Results Framework with 45 indicators across the four strategic priorities will be tracked quarterly.
+
+Pillar 2 - Evaluation: External evaluations at baseline (2025), mid-term (2027), and endline (2030). Thematic evaluations on specific approaches (Graduation Model, anticipatory action, climate adaptation) will be commissioned based on learning needs. All evaluations will follow OECD-DAC criteria and ALNAP quality standards.
+
+Pillar 3 - Accountability: Aligned with CHS Commitment 5, EARN will maintain community feedback and complaints mechanisms across all programs with response within 14 days. Annual accountability self-assessments will be conducted with community participation. The Safeguarding Investigations Unit will be independent of program management.
+
+Pillar 4 - Learning: Quarterly learning reviews at program level, annual organizational learning events, and participation in sector-wide communities of practice. Knowledge management will be systematized through a digital learning platform. Research partnerships will generate evidence for policy and practice.
+
+Key performance indicators for strategic plan:
+- Total beneficiaries reached (target: 2 million cumulative by 2030)
+- CHS verification score (target: 4.0/5.0)
+- Program quality index (composite score based on evaluation findings)
+- Beneficiary satisfaction rate (target: >85%)
+- Staff engagement score (target: >80%)
+- Funding growth rate (target: 15% annual increase)
+- Partnership satisfaction index (target: >4.0/5.0)
+
+Data disaggregation: All indicators will be disaggregated by sex, age, disability status, displacement status, and geographic location to ensure inclusive tracking.
+
+================================================================================
+10. RESOURCE MOBILIZATION STRATEGY
+================================================================================
+
+Financial trajectory:
+Year     | Projected Revenue (USD) | Growth Rate
+2025     |     9,400,000           |     15%
+2026     |    10,800,000           |     15%
+2027     |    12,400,000           |     15%
+2028     |    14,300,000           |     15%
+2029     |    16,400,000           |     15%
+2030     |    18,900,000           |     15%
+
+Funding diversification targets (by 2030):
+- Bilateral government donors: 35% (current: 45%)
+- UN agencies: 25% (current: 30%)
+- Private foundations: 20% (current: 15%)
+- Private sector and corporate: 10% (current: 5%)
+- Individual giving and earned revenue: 10% (current: 5%)
+
+Key strategies:
+1. Establish a dedicated Resource Mobilization Unit with a Head of Business Development and two Grant Officers.
+2. Develop a donor engagement strategy with relationship management for the top 20 institutional donors.
+3. Launch an individual giving program targeting the Somali diaspora, with a digital fundraising platform and social media campaign.
+4. Explore social enterprise opportunities in renewable energy (solar), agriculture (value chain), and consulting (training services).
+5. Pursue Grand Bargain localization commitments to access direct funding from institutional donors rather than through intermediaries.
+6. Invest in proposal development capacity, targeting a 40% win rate on competitive bids.
+7. Develop multi-year funding proposals aligned with strategic priorities to secure predictable, flexible funding.
+8. Build an organizational reserve fund equivalent to 3 months of operating costs ($2.5 million by 2030).
+
+Cost efficiency targets:
+- Program-to-support cost ratio: minimum 80:20
+- Indirect cost rate: maximum 10% (current: 8%)
+- Cost per beneficiary: reduce by 10% through economies of scale
+
+================================================================================
+11. RISK MANAGEMENT
+================================================================================
+
+Strategic risks and mitigation:
+
+Risk 1 - Security deterioration: Invest in security management capacity (dedicated Security Manager, INSO membership), maintain flexible programming that can scale up or down, and develop remote management protocols.
+
+Risk 2 - Funding volatility: Diversify funding base, build reserves, develop flexible cost structures, and maintain a pipeline of pre-positioned proposals.
+
+Risk 3 - Organizational growth management: Invest in systems (HR, finance, IT) proportionate to growth, phase expansion carefully, and maintain organizational culture through values-based leadership.
+
+Risk 4 - Reputation risk: Strengthen safeguarding systems, maintain transparent communications, implement robust whistleblower protections, and invest in proactive stakeholder engagement.
+
+Risk 5 - Staff capacity and retention: Develop competitive compensation packages, invest in professional development, promote work-life balance, and build a strong organizational culture.
+
+================================================================================
+12. GOVERNANCE AND ORGANIZATIONAL DEVELOPMENT
+================================================================================
+
+Board development: Expand the Board of Directors from 7 to 9 members by 2026, with specific recruitment for financial management, legal, and private sector expertise. Board gender parity will be maintained at a minimum of 40% female representation.
+
+Organizational structure: Implement a matrix management structure with country offices reporting to the Country Director and technical sectors reporting to the Technical Director. Establish a Senior Management Team (SMT) with clearly defined decision-making authority.
+
+Systems strengthening:
+- Transition to a cloud-based ERP system (NetSuite or equivalent) by end of 2026.
+- Implement a Human Capital Management system for all HR processes.
+- Upgrade to a comprehensive grant management platform supporting the full grant lifecycle.
+- Develop and roll out a digital safeguarding case management system.
+- Achieve ISO 9001 certification for quality management by 2028.
+
+Staff development: Allocate 3% of personnel costs to staff training and development. Establish a leadership development program for high-potential national staff. Implement a mentoring and coaching framework. Target staff satisfaction score of 80% or above.
+
+Localization commitment: EARN is committed to advancing the localization agenda by: strengthening its own capacity as a locally-led organization, building the capacity of smaller local partners, advocating for equitable partnerships and direct funding access, and participating in localization networks and platforms.
+
+================================================================================
+
+This strategic plan is a living document that will be reviewed annually and updated as needed based on contextual changes, evaluation findings, and organizational learning. The Board of Directors will conduct a formal mid-term review in late 2027.
+
+Approved by:
+
+Dr. Hassan Ali Warsame, Board Chairperson
+Date: December 15, 2024
+
+Fatima Abdi Mohamed, Executive Director
+Date: December 15, 2024

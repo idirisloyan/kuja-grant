@@ -1,0 +1,211 @@
+QUARTERLY PROGRESS REPORT TEMPLATE
+
+Organization Name: [Enter organization name here]
+Project Title: [Enter project title here]
+Grant Reference Number: [Enter grant reference number]
+Reporting Period: [Enter start date] to [Enter end date]
+Report Submission Date: [Enter date]
+Prepared by: [Enter name and title]
+Approved by: [Enter name and title]
+
+================================================================================
+1. EXECUTIVE SUMMARY
+================================================================================
+
+[Provide a brief overview of key achievements, challenges, and financial status during the reporting period. Maximum 300 words.]
+
+[Enter here]
+
+================================================================================
+2. CONTEXT UPDATE
+================================================================================
+
+[Describe any significant changes in the operational context that affected program implementation during the reporting period.]
+
+[Enter here]
+
+================================================================================
+3. PROGRESS AGAINST RESULTS FRAMEWORK
+================================================================================
+
+3.1 Objective 1: [Enter objective]
+
+Output 1.1: [Enter output description]
+Indicator: [Enter indicator]
+Target: [Enter target]
+Achieved: [Enter achievement]
+Variance explanation: [Enter explanation if target not met]
+
+Output 1.2: [Enter output description]
+Indicator: [Enter indicator]
+Target: [Enter target]
+Achieved: [Enter achievement]
+Variance explanation: [Enter explanation if target not met]
+
+3.2 Objective 2: [Enter objective]
+
+Output 2.1: [Enter output description]
+Indicator: [Enter indicator]
+Target: [Enter target]
+Achieved: [Enter achievement]
+Variance explanation: [Enter explanation if target not met]
+
+Output 2.2: [Enter output description]
+Indicator: [Enter indicator]
+Target: [Enter target]
+Achieved: [Enter achievement]
+Variance explanation: [Enter explanation if target not met]
+
+3.3 Objective 3: [Enter objective]
+
+Output 3.1: [Enter output description]
+Indicator: [Enter indicator]
+Target: [Enter target]
+Achieved: [Enter achievement]
+Variance explanation: [Enter explanation if target not met]
+
+================================================================================
+4. BENEFICIARY DATA
+================================================================================
+
+Direct Beneficiaries:
+- Total: [Enter number]
+- Female: [Enter number]
+- Male: [Enter number]
+- Children (0-17): [Enter number]
+- Adults (18-59): [Enter number]
+- Elderly (60+): [Enter number]
+- Persons with disabilities: [Enter number]
+- IDPs: [Enter number]
+- Host community: [Enter number]
+
+Indirect Beneficiaries: [Enter number and description]
+
+================================================================================
+5. ACTIVITY IMPLEMENTATION TABLE
+================================================================================
+
+Activity | Planned | Completed | Status | Comments
+[Enter]  | [Enter] | [Enter]   | [Enter]| [Enter]
+[Enter]  | [Enter] | [Enter]   | [Enter]| [Enter]
+[Enter]  | [Enter] | [Enter]   | [Enter]| [Enter]
+[Enter]  | [Enter] | [Enter]   | [Enter]| [Enter]
+[Enter]  | [Enter] | [Enter]   | [Enter]| [Enter]
+
+================================================================================
+6. FINANCIAL SUMMARY
+================================================================================
+
+Budget Line          | Approved Budget | Expenditure This Period | Cumulative Expenditure | Balance | % Utilized
+[Enter budget line]  | [Enter amount]  | [Enter amount]          | [Enter amount]         | [Enter] | [Enter %]
+[Enter budget line]  | [Enter amount]  | [Enter amount]          | [Enter amount]         | [Enter] | [Enter %]
+[Enter budget line]  | [Enter amount]  | [Enter amount]          | [Enter amount]         | [Enter] | [Enter %]
+[Enter budget line]  | [Enter amount]  | [Enter amount]          | [Enter amount]         | [Enter] | [Enter %]
+[Enter budget line]  | [Enter amount]  | [Enter amount]          | [Enter amount]         | [Enter] | [Enter %]
+TOTAL                | [Enter amount]  | [Enter amount]          | [Enter amount]         | [Enter] | [Enter %]
+
+Explanation of any budget variances exceeding 10%:
+[Enter here]
+
+================================================================================
+7. CROSS-CUTTING THEMES
+================================================================================
+
+7.1 Gender and Inclusion:
+[Describe how gender equality and inclusion have been addressed during this period.]
+[Enter here]
+
+7.2 Protection Mainstreaming:
+[Describe protection considerations and any protection concerns identified.]
+[Enter here]
+
+7.3 Environmental Considerations:
+[Describe any environmental impacts and mitigation measures.]
+[Enter here]
+
+7.4 Accountability to Affected Populations:
+[Describe community feedback received and actions taken.]
+[Enter here]
+
+================================================================================
+8. CHALLENGES AND MITIGATION MEASURES
+================================================================================
+
+Challenge 1: [Enter challenge]
+Impact: [Enter impact on program]
+Mitigation: [Enter measures taken]
+
+Challenge 2: [Enter challenge]
+Impact: [Enter impact on program]
+Mitigation: [Enter measures taken]
+
+Challenge 3: [Enter challenge]
+Impact: [Enter impact on program]
+Mitigation: [Enter measures taken]
+
+================================================================================
+9. LESSONS LEARNED
+================================================================================
+
+[Describe key lessons learned during this reporting period and how they will be applied going forward.]
+
+[Enter here]
+
+================================================================================
+10. SUCCESS STORIES / CASE STUDIES
+================================================================================
+
+[Provide at least one beneficiary story with informed consent. Include context, intervention, and outcome.]
+
+[Enter here]
+
+[Photo caption: Enter description]
+[Consent obtained: Yes/No]
+
+================================================================================
+11. PARTNERSHIPS AND COORDINATION
+================================================================================
+
+[Describe coordination with government, UN, NGO, and community partners during the reporting period.]
+
+[Enter here]
+
+================================================================================
+12. PLANNED ACTIVITIES FOR NEXT PERIOD
+================================================================================
+
+Activity | Timeline | Responsible | Resources Required
+[Enter]  | [Enter]  | [Enter]     | [Enter]
+[Enter]  | [Enter]  | [Enter]     | [Enter]
+[Enter]  | [Enter]  | [Enter]     | [Enter]
+[Enter]  | [Enter]  | [Enter]     | [Enter]
+
+================================================================================
+13. SUPPORT REQUIRED FROM DONOR
+================================================================================
+
+[Describe any support or decisions needed from the donor.]
+
+[Enter here]
+
+================================================================================
+14. ANNEXES
+================================================================================
+
+Annex 1: Detailed financial report [Attach separately]
+Annex 2: Beneficiary lists [Attach separately]
+Annex 3: Activity photos [Attach separately]
+Annex 4: M&E data sheets [Attach separately]
+Annex 5: [Enter additional annexes as needed]
+
+================================================================================
+
+CERTIFICATION
+
+I certify that the information provided in this report is accurate and complete.
+
+Name: [Enter name]
+Title: [Enter title]
+Organization: [Enter organization]
+Signature: ___________________
+Date: [Enter date]

@@ -1,0 +1,197 @@
+DUE DILIGENCE QUESTIONNAIRE
+Partner Pre-Award Assessment
+
+Organization Name: Galgaduud Women's Empowerment Organization (GWEO)
+Date Completed: November 12, 2025
+Completed by: Halima Osman Abdi, Executive Director
+Reviewed by: Mohamed Aden Nur, Finance Director
+Assessment Purpose: Pre-award due diligence for USAID-funded Resilience Program Sub-Grant
+Assessor Organization: Development Partnerships International (DPI)
+
+================================================================================
+SECTION A: ORGANIZATIONAL GOVERNANCE AND LEGAL STATUS
+================================================================================
+
+Question 1: What is the legal status of your organization? Please provide registration details.
+
+Answer: GWEO is registered as a non-governmental organization (NGO) under the laws of the Federal Republic of Somalia. Registration Number: MOI/NGO/2018/0234, issued by the Ministry of Interior, Federal Affairs and Reconciliation on March 15, 2018. The registration has been renewed annually, with the current certificate valid through March 14, 2026. Additionally, GWEO is registered with the Galmudug State Ministry of Planning at the state level (Registration No: GS/NGO/2018/089). We also hold tax exemption status confirmed by the Ministry of Finance (Reference: MOF/TEX/2019/0112).
+
+Question 2: Describe your organization's governance structure, including the Board of Directors.
+
+Answer: GWEO is governed by a seven-member Board of Directors that meets quarterly. The board comprises: Chairperson (Dr. Amina Sheikh Mohamed, public health specialist), Vice Chairperson (Abdulkadir Hassan Farah, retired civil servant), Treasurer (Naima Ali Isse, chartered accountant), Secretary (Ibrahim Yusuf Osman, lawyer), and three general members with expertise in education, gender, and community development. The Board has three standing committees: Finance and Audit Committee, Programs Committee, and Human Resources and Governance Committee. Board members serve three-year terms with a maximum of two consecutive terms. The current board was constituted in January 2024. The Executive Director reports to the Board and is not a voting member. Conflict of interest declarations are completed annually by all board members, and a conflict of interest policy has been in place since 2019.
+
+Question 3: Does your organization have a strategic plan? What period does it cover?
+
+Answer: Yes. GWEO's current strategic plan covers 2024-2028 and was developed through a participatory process involving staff, board members, community representatives, and partners. The plan was facilitated by an external consultant and approved by the Board in November 2023. The strategic plan identifies four thematic areas: women's economic empowerment, GBV prevention and response, education and skills development, and health and nutrition. The plan includes a results framework with measurable indicators, an implementation roadmap, and a resource mobilization strategy.
+
+Question 4: How does your organization ensure compliance with anti-terrorism and sanctions regulations?
+
+Answer: GWEO has a comprehensive anti-terrorism and sanctions compliance policy adopted in 2020 and updated in 2024. The policy includes: mandatory screening of all staff, vendors, and beneficiaries against the UN Security Council Consolidated Sanctions List, OFAC SDN list, EU sanctions lists, and UK HMT sanctions list prior to any engagement or payment. Screening is conducted using the Descartes Visual Compliance platform. All staff receive annual training on sanctions compliance and diversion risk. The policy includes provisions for reporting suspected violations to donors and relevant authorities. GWEO maintains an anti-terrorism certification clause in all sub-contracts and vendor agreements. No matches have been identified to date.
+
+Question 5: Does your organization have a whistleblower/complaints mechanism?
+
+Answer: Yes. GWEO operates a multi-channel complaints and whistleblower mechanism: (1) a dedicated complaints email address (complaints@gweo.org) accessible to all stakeholders; (2) community-level complaints boxes at all project sites, emptied weekly by the M&E team; (3) a toll-free telephone hotline (available in Somali and English); (4) direct reporting to senior management or board members. The mechanism is governed by a Whistleblower Protection Policy that guarantees confidentiality and protection against retaliation. Complaints are logged in a centralized case management system, categorized by type and severity, and tracked through to resolution. Serious complaints (fraud, SEA, corruption) are escalated to the Board's Finance and Audit Committee. In 2024, the mechanism received 23 complaints, of which 21 were resolved and 2 are under investigation.
+
+================================================================================
+SECTION B: FINANCIAL MANAGEMENT
+================================================================================
+
+Question 6: Describe your financial management system, including accounting software used.
+
+Answer: GWEO uses QuickBooks Enterprise (Version 2023) as its primary accounting software. The chart of accounts is structured to allow tracking by donor, project, budget line, and cost center. Financial transactions are recorded on an accrual basis in accordance with International Financial Reporting Standards (IFRS) for SMEs. Bank reconciliations are performed monthly for all accounts. GWEO maintains separate bank accounts for each major donor grant, with a dedicated USD account at Dahabshiil Bank International (Account: 6019-XXXX-7834) and a general operations account. The finance team consists of a Finance Director (ACCA qualified), a Senior Accountant, two Project Accountants, and a Finance Assistant. All financial staff have received training on USAID financial management regulations (2 CFR 200).
+
+Question 7: Has your organization undergone external audits? Please provide details of the last three years.
+
+Answer: Yes, GWEO undergoes annual external audits conducted by independent audit firms:
+- FY 2024: Audited by Crowe Horwath Somalia (now Crowe Global affiliate). Unqualified (clean) opinion. No material findings. Two minor recommendations related to petty cash documentation (both addressed).
+- FY 2023: Audited by BDO East Africa. Unqualified opinion. One management letter observation regarding the timeliness of vendor payment reconciliation (addressed within 60 days).
+- FY 2022: Audited by KPMG Somalia. Unqualified opinion. No material findings. One recommendation to upgrade from QuickBooks Pro to Enterprise (implemented in Q1 2023).
+All audit reports are available upon request. GWEO also completed a USAID-required pre-award audit in August 2025 with satisfactory results.
+
+Question 8: Describe your procurement policies and procedures.
+
+Answer: GWEO's Procurement Policy (revised June 2024) establishes the following thresholds and procedures:
+- Under $500: Direct purchase with receipt and approval by budget holder
+- $500 - $5,000: Minimum three written quotations, comparative analysis, approval by Finance Director
+- $5,000 - $25,000: Formal Request for Quotation (RFQ) process, minimum three responses, evaluation committee (3 members), approval by Executive Director
+- $25,000 - $100,000: Formal Invitation to Bid (ITB), advertised publicly, evaluation committee (5 members), approval by Executive Director with board notification
+- Over $100,000: Formal tender process, advertised publicly for minimum 21 days, independent evaluation committee, board approval required
+All procurements above $5,000 require a procurement plan. Vendor conflict of interest declarations are mandatory. GWEO maintains a vetted vendor database reviewed annually. The policy explicitly prohibits bid splitting and single-source procurement except in documented emergencies with Executive Director approval.
+
+Question 9: What is your organization's policy on cost sharing and matching funds?
+
+Answer: GWEO recognizes cost-sharing as an important component of donor partnerships and sustainability. Our policy allows for both cash and in-kind contributions as cost share. Currently, GWEO contributes in-kind cost share through office space (valued at $14,400/year), senior management time allocated to program oversight (valued at approximately $24,000/year), and community volunteer time for program activities. GWEO does not commit to cash cost-share exceeding 10% of a grant budget without board approval. All cost-share commitments are documented and tracked in the accounting system with the same rigor as direct costs.
+
+Question 10: How does your organization manage exchange rate risks?
+
+Answer: GWEO implements the following exchange rate risk management strategies: (1) Donor funds received in USD are maintained in USD accounts and converted to local currency (Somali Shilling) only as needed for immediate payments; (2) Forward purchasing of local currency is arranged for large predictable payments such as rent and salaries; (3) Exchange rate gains and losses are tracked separately in the accounting system and reported to donors as required; (4) Budget proposals include a 3% exchange rate contingency line; (5) Monthly exchange rate variance reports are prepared and reviewed by the Finance Director. GWEO uses the UN operational exchange rate as the reference for all financial reporting.
+
+================================================================================
+SECTION C: HUMAN RESOURCES AND STAFFING
+================================================================================
+
+Question 11: Describe your HR policies and staff management systems.
+
+Answer: GWEO has a comprehensive HR Manual (last revised January 2025) covering recruitment, compensation and benefits, performance management, leave policies, code of conduct, disciplinary procedures, and separation. Recruitment follows a transparent process: vacancy announcement (minimum 14 days), shortlisting against defined criteria, panel interviews (minimum 3 panel members), reference checks, and Executive Director approval. All staff sign employment contracts compliant with Somali labor law. Performance appraisals are conducted bi-annually using a competency-based framework. HR records are maintained in a secure HR information system (BambooHR). Current staffing: 42 full-time employees (28 female, 14 male), 12 part-time/temporary staff, and 85 community volunteers/incentive workers.
+
+Question 12: What is your organization's policy on equal opportunity and non-discrimination?
+
+Answer: GWEO's Equal Opportunity Policy (adopted 2019, revised 2024) prohibits discrimination on the basis of sex, age, disability, clan affiliation, region of origin, marital status, or any other protected characteristic. The policy covers all aspects of employment from recruitment to separation. GWEO actively promotes gender equity: 67% of current staff are female, and the Senior Management Team has 60% female representation. Reasonable accommodations are provided for staff with disabilities. GWEO participates in the Disability Inclusion Pledge and has completed a workplace accessibility assessment. Complaints related to discrimination are handled through the organization's grievance mechanism with investigation by the HR Director.
+
+Question 13: What staff training and capacity building programs do you have?
+
+Answer: GWEO allocates 3% of personnel costs to staff development annually. Key programs include: (1) Annual mandatory training for all staff on safeguarding, PSEA, code of conduct, fraud awareness, and security management; (2) Technical skills training based on individual development plans created through the performance management process; (3) Leadership development program for mid-level managers (partnership with University of Nairobi Center for Open and Distance Learning); (4) Cross-training and job shadowing to build organizational resilience; (5) External conference and workshop participation based on organizational learning priorities. In 2024, a total of 156 training person-days were delivered across the organization.
+
+Question 14: How do you handle staff security and duty of care?
+
+Answer: GWEO has a Security Management Plan (SMP) updated quarterly, informed by INSO security briefings and internal security assessments. The SMP includes: security risk assessment for all operational areas (updated monthly), standard operating procedures for movement, communications, and incident response, mandatory security briefings for all staff and visitors, a security tree/communication chain, and hibernation/evacuation plans. All staff carry VHF radios in the field. A dedicated Security Focal Point coordinates security management with the Executive Director as the Security Management Team (SMT) lead. Staff welfare provisions include: psychosocial support through a contracted counseling service, rest and recuperation leave for staff in deep field locations, and comprehensive health insurance covering medical evacuation.
+
+Question 15: Describe your staff compensation structure and how you ensure competitive salaries.
+
+Answer: GWEO conducts a salary benchmarking exercise every two years using data from the Somalia NGO Consortium salary survey and Birches Group market data. The current salary scale (effective January 2025) has 7 grades with 5 steps each. Starting salaries are set at the median of the local NGO market. Benefits include: medical insurance (staff and dependents), 30 days annual leave, maternity leave (90 days), paternity leave (14 days), transportation allowance for field-based staff, and a gratuity payment of one month's salary per year of service upon separation. Staff in hardship locations receive a 15% hardship allowance. The total compensation package is reviewed annually by the Board's HR and Governance Committee.
+
+================================================================================
+SECTION D: SAFEGUARDING AND PROTECTION
+================================================================================
+
+Question 16: What safeguarding policies does your organization have in place?
+
+Answer: GWEO has the following safeguarding policies: (1) Safeguarding Policy (adopted 2020, revised 2024), covering all forms of harm including sexual exploitation and abuse, sexual harassment, bullying, and child abuse; (2) Child Safeguarding Policy with specific protocols for programs involving children; (3) Prevention of Sexual Exploitation and Abuse (PSEA) Policy aligned with the IASC Six Core Principles; (4) Code of Conduct signed annually by all staff, volunteers, and consultants. All policies define prohibited behaviors, reporting obligations, investigation procedures, and disciplinary consequences. GWEO has designated two trained Safeguarding Focal Points (one male, one female) who serve as points of contact for reporting.
+
+Question 17: How do you conduct background checks and vetting of staff?
+
+Answer: All prospective employees undergo: (1) verification of educational qualifications and professional certifications; (2) minimum two professional reference checks conducted by phone or in person; (3) police clearance certificate from the relevant authority; (4) screening against international sanctions and debarment lists; (5) self-declaration form regarding any prior investigations or disciplinary actions related to safeguarding, fraud, or misconduct. For positions involving contact with children or vulnerable adults, enhanced checks include verification with previous employers regarding any safeguarding concerns through the Inter-Agency Misconduct Disclosure Scheme (coordinated through the Steering Committee for Humanitarian Response). Consultants and contractors undergo the same vetting procedures. Vetting documentation is maintained securely in individual personnel files.
+
+Question 18: Describe any safeguarding incidents in the past three years and how they were handled.
+
+Answer: In the past three years, GWEO has investigated two safeguarding concerns: (1) In July 2023, a complaint was received through the community complaints mechanism alleging inappropriate behavior by a community volunteer during a distribution. An investigation was conducted by the Safeguarding Focal Point within 72 hours. The allegation was substantiated, and the volunteer was immediately terminated, reported to community leaders, and barred from future engagement. The donor was notified within 24 hours. Support services were offered to the complainant. (2) In February 2024, a workplace harassment complaint was filed by a staff member against a supervisor. The HR Director conducted an investigation with external support. The allegation was partially substantiated, resulting in a written warning, mandatory training, and restructured reporting lines. Both cases were documented in the safeguarding case register and reported to the board. Lessons learned were incorporated into the 2024 policy revision and staff training.
+
+================================================================================
+SECTION E: PROGRAM QUALITY AND TECHNICAL CAPACITY
+================================================================================
+
+Question 19: What are your organization's key technical areas of expertise?
+
+Answer: GWEO has established technical expertise in four primary areas over eight years of operation: (1) Women's Economic Empowerment: VSLA facilitation, IGA development, market linkages, women's cooperatives, and business skills training; (2) GBV Prevention and Response: case management, psychosocial support, referral pathways, community awareness, and women's safe spaces; (3) Education and Skills Development: non-formal education, vocational training, life skills, and education in emergencies; (4) Health and Nutrition: community health education, nutrition screening and referral, WASH in health facilities, and reproductive health awareness. The organization maintains a technical team of specialists in each area and regularly participates in relevant cluster/sector coordination mechanisms.
+
+Question 20: Describe your experience implementing donor-funded projects in the past five years.
+
+Answer: GWEO has implemented 18 donor-funded projects since 2020 with a cumulative value of $6.8 million. Key recent projects include:
+- USAID/BHA-funded emergency response in Galgaduud ($450,000, 2023-2024): Multi-sector response including food assistance, WASH, and protection for drought-affected IDPs. Reached 12,400 beneficiaries.
+- UNFPA-funded GBV program ($280,000, 2023-2025): Establishment of two women and girls safe spaces, case management for 340 GBV survivors, training of 45 community paralegals.
+- EU-funded livelihoods project ($520,000, 2022-2024): VSLA formation, IGA grants, and agricultural training for 3,200 women in Galgaduud.
+- UNICEF-funded education program ($180,000, 2024-2025): Non-formal education for 1,800 out-of-school children, teacher training.
+All projects were completed with satisfactory performance assessments. No projects have been suspended or terminated for cause.
+
+Question 21: How do you ensure program quality and adherence to humanitarian standards?
+
+Answer: GWEO's quality assurance framework is built on: (1) Adherence to the Core Humanitarian Standard (CHS) - GWEO completed a CHS self-assessment in 2024 scoring 3.2/5.0 across the nine commitments and is working toward independent verification; (2) Sphere Standards - all emergency response programming follows Sphere minimum standards for WASH, shelter, food security, and health; (3) Internal quality reviews conducted quarterly by the Programs Director; (4) Beneficiary feedback mechanisms at all project sites; (5) Regular third-party monitoring by external consultants; (6) Participation in cluster/sector peer review processes; (7) After-action reviews conducted at the completion of each project phase. GWEO has also adopted the IASC Gender with Age Marker and applies it to all project designs (current average score: 3 - Gender and Age Responsive).
+
+Question 22: How does your organization integrate beneficiary participation in program design?
+
+Answer: GWEO follows a participatory program design approach aligned with CHS Commitment 4. This includes: (1) Community-level needs assessments using mixed methods (household surveys, focus group discussions, key informant interviews, community mapping); (2) Establishment of community advisory committees at each project site with balanced representation (gender, age, disability, clan); (3) Participatory beneficiary selection criteria development involving community leaders and local authorities; (4) Feedback loops throughout implementation allowing course correction based on community input; (5) Joint annual reviews with community stakeholders. All needs assessments include specific consultations with women's groups, youth groups, elderly persons, and persons with disabilities to ensure diverse perspectives are captured.
+
+================================================================================
+SECTION F: MONITORING AND EVALUATION
+================================================================================
+
+Question 23: Describe your M&E system and data management practices.
+
+Answer: GWEO's M&E system is managed by a dedicated M&E Officer reporting to the Programs Director. Key components: (1) Results frameworks with SMART indicators for each project, aligned with donor log frames and the organizational strategic plan; (2) Data collection using KoBoToolbox on tablets for field surveys, with standardized data collection tools; (3) Monthly output tracking using an Excel-based indicator tracking table (ITT) with plans to migrate to an ActivityInfo platform in 2026; (4) Quarterly outcome monitoring through beneficiary surveys; (5) Data quality assurance through field verification visits, data cleaning protocols, and supervisor review; (6) Data storage on encrypted cloud servers (Microsoft 365) with access controls; (7) Data protection policy aligned with international best practices. All data is disaggregated by sex, age, disability status, and displacement status as standard practice.
+
+Question 24: How do you conduct baseline and endline assessments?
+
+Answer: Baseline assessments are conducted at the start of each project using a mixed-methods approach: (1) Quantitative household surveys with sample sizes calculated to achieve 95% confidence level and 5% margin of error; (2) Qualitative data collection including FGDs, KIIs, and case studies; (3) Secondary data review from OCHA, FSNAU, and cluster reports. Baselines are conducted by the internal M&E team with external consultant support for survey design and data analysis. Endline assessments mirror the baseline methodology to allow for comparison. Between baseline and endline, GWEO conducts mid-term reviews to track progress and enable course correction. All assessment reports are shared with donors and published on the GWEO website.
+
+================================================================================
+SECTION G: INFORMATION TECHNOLOGY AND DATA SECURITY
+================================================================================
+
+Question 25: Describe your IT infrastructure and data security measures.
+
+Answer: GWEO's IT infrastructure includes: (1) Microsoft 365 Business Premium subscription for email, document management, and collaboration; (2) Cloud-based accounting (QuickBooks Enterprise hosted); (3) Encrypted laptops with BitLocker encryption for all staff; (4) Multi-factor authentication (MFA) enforced on all organizational accounts; (5) Weekly automated backups to both cloud and external hard drive storage; (6) Antivirus software (Kaspersky Endpoint Security) on all devices; (7) VPN connectivity for remote access to organizational systems; (8) Annual IT security audit conducted by external provider. GWEO's IT Acceptable Use Policy governs staff use of organizational equipment and data. The organization complies with data protection requirements of major donors and follows OCHA's data responsibility guidelines for humanitarian data.
+
+Question 26: How do you protect beneficiary data and ensure informed consent?
+
+Answer: GWEO's Beneficiary Data Protection Protocol includes: (1) Informed consent obtained from all beneficiaries prior to data collection, explained in local language with clear information about data use, storage, and sharing; (2) Data minimization - only data necessary for program purposes is collected; (3) Anonymization of beneficiary data in all reports and publications; (4) Secure storage with role-based access controls; (5) Data retention and destruction schedules (beneficiary data retained for maximum 5 years post-project); (6) Specific protocols for sensitive data (GBV case data stored separately with restricted access to case managers only); (7) Data sharing agreements with partners specifying data use limitations. Staff handling beneficiary data receive annual training on data protection principles and procedures.
+
+================================================================================
+SECTION H: ENVIRONMENTAL AND SOCIAL SAFEGUARDS
+================================================================================
+
+Question 27: Does your organization have an environmental policy? How do you assess environmental impact?
+
+Answer: GWEO adopted an Environmental Policy in 2023 that commits the organization to minimizing the environmental footprint of its operations and programs. Environmental screening is conducted for all new projects using a standardized environmental and social screening form. For projects with potential environmental impacts (construction, WASH, agricultural inputs), a more detailed Environmental and Social Impact Assessment (ESIA) is conducted. Mitigation measures are integrated into project design and budgets. Specific measures include: use of solar energy at field offices, promotion of fuel-efficient cookstoves in program activities, proper medical waste management at supported health facilities, and sourcing of locally-produced materials to reduce transportation emissions. GWEO reports on environmental indicators as part of its annual report.
+
+Question 28: How does your organization ensure community engagement and social accountability?
+
+Answer: Community engagement and social accountability are core to GWEO's operating model: (1) Community entry process involves formal engagement with local authorities, elders, women's groups, and youth representatives before any program activities begin; (2) Community accountability committees are established at each project site with terms of reference, regular meetings (monthly), and direct communication channels with program management; (3) Annual community scorecards are facilitated in all target communities, allowing beneficiaries to rate program performance; (4) Information is proactively shared with communities through notice boards, community meetings, and local radio in accessible languages and formats; (5) Complaints and feedback data is analyzed quarterly and findings are shared back with communities, demonstrating responsive action.
+
+================================================================================
+SECTION I: ADDITIONAL COMPLIANCE
+================================================================================
+
+Question 29: Has your organization ever been subject to any investigation, suspension, or debarment by a donor or regulatory body?
+
+Answer: No. GWEO has never been subject to investigation, suspension, debarment, or termination for cause by any donor, regulatory body, or government authority. All donor-funded projects have been completed satisfactorily with clean audit opinions. GWEO maintains good standing with all regulatory authorities in its countries of operation. GWEO's Executive Director and all senior management staff have signed self-declaration forms confirming they have not been involved in any fraud, corruption, or misconduct in current or previous employment.
+
+Question 30: Does your organization have insurance coverage? Please describe.
+
+Answer: GWEO maintains the following insurance coverage: (1) Comprehensive general liability insurance (Takaful Insurance, Policy No: TI/GL/2025/0789, coverage: $500,000); (2) Workers' compensation and employer's liability insurance covering all employees (Takaful Insurance, coverage: as per Somali labor law requirements); (3) Vehicle comprehensive insurance for all organizational vehicles (3 vehicles currently insured); (4) Professional indemnity insurance (coverage: $250,000); (5) Medical insurance for all staff and dependents (through National Insurance Corporation, Policy No: NIC/MED/2025/4521); (6) Travel insurance for all staff on official travel including medical evacuation coverage. All policies are reviewed and renewed annually. Certificates of insurance are available upon request.
+
+================================================================================
+
+DECLARATION
+
+I hereby certify that the information provided in this questionnaire is true, accurate, and complete to the best of my knowledge. I understand that providing false or misleading information may result in disqualification from the grant award process and potential legal consequences.
+
+Name: Halima Osman Abdi
+Title: Executive Director, GWEO
+Signature: ___________________
+Date: November 12, 2025
+
+Witness:
+Name: Mohamed Aden Nur
+Title: Finance Director, GWEO
+Signature: ___________________
+Date: November 12, 2025
