@@ -14,7 +14,8 @@ from werkzeug.security import generate_password_hash
 # Don't override DATABASE_URL - let server.py set the default
 from server import (
     app, db, User, Organization, Grant, Application,
-    Assessment, Document, Review, ComplianceCheck, Report
+    Assessment, Document, Review, ComplianceCheck, Report,
+    RegistrationVerification
 )
 
 # ---------------------------------------------------------------------------
@@ -930,6 +931,254 @@ def seed():
         db.session.flush()
         print(f'  Created {len(reports)} reports')
 
+        # ---- Registration Verifications -----------------------------------
+        verifications = []
+
+        # Amani - Kenya, fully verified
+        v1 = RegistrationVerification(
+            org_id=orgs[0].id,
+            status='verified',
+            registration_number='NGO/2012/3847',
+            registration_authority='NGO Coordination Board',
+            registration_date=date(2012, 3, 15),
+            expiry_date=date(2027, 3, 15),
+            country='Kenya',
+            ai_confidence=92.0,
+            verified_by_user_id=users[5].id,  # Sarah (donor)
+            verified_at=datetime(2026, 1, 10, 14, 30),
+            notes='Verified against NGO Coordination Board public registry. Registration active and in good standing.',
+            registry_url='https://ngobureau.go.ke/search/',
+            created_at=datetime(2026, 1, 8),
+            updated_at=datetime(2026, 1, 10, 14, 30),
+        )
+        v1.set_ai_analysis({
+            'extracted_data': {
+                'organization_name': 'Amani Community Development',
+                'registration_number': 'NGO/2012/3847',
+                'registration_authority': 'NGO Coordination Board, Kenya',
+                'registration_date': '2012-03-15',
+                'expiry_date': '2027-03-15',
+                'registration_type': 'NGO',
+                'registered_address': 'Kilimani Road, Nairobi',
+                'authorized_activities': ['Health', 'Water & Sanitation', 'Nutrition Programs'],
+            },
+            'validation': {
+                'name_matches': True,
+                'number_format_valid': True,
+                'is_expired': False,
+                'authority_recognized': True,
+                'document_authentic_indicators': ['Official letterhead', 'Government seal', 'Registrar signature', 'Embossed stamp'],
+            },
+            'confidence': 92,
+            'findings': [
+                'Registration number NGO/2012/3847 matches Kenya NGO Board format',
+                'Organization registered since March 2012, valid until March 2027',
+                'Registration covers Health, WASH, and Nutrition activities',
+                'Official seal and registrar signature present on certificate',
+            ],
+            'recommendations': [
+                'Registration in good standing - no action needed',
+                'Schedule re-verification before March 2027 expiry',
+            ],
+        })
+        db.session.add(v1)
+        verifications.append(v1)
+
+        # Salam Relief - Somalia, AI reviewed pending manual check
+        v2 = RegistrationVerification(
+            org_id=orgs[1].id,
+            status='ai_reviewed',
+            registration_number='SOM/NGO/2015/221',
+            registration_authority='Ministry of Interior, Federal Affairs and Reconciliation',
+            registration_date=date(2015, 7, 20),
+            expiry_date=None,
+            country='Somalia',
+            ai_confidence=68.0,
+            notes='AI analysis complete. Manual verification recommended due to limited online registry access.',
+            registry_url='https://www.moi.gov.so/',
+            created_at=datetime(2026, 1, 12),
+            updated_at=datetime(2026, 1, 12),
+        )
+        v2.set_ai_analysis({
+            'extracted_data': {
+                'organization_name': 'Salam Relief Foundation',
+                'registration_number': 'SOM/NGO/2015/221',
+                'registration_authority': 'Ministry of Interior, Somalia',
+                'registration_date': '2015-07-20',
+                'expiry_date': None,
+                'registration_type': 'NGO',
+                'authorized_activities': ['Food Security', 'Protection', 'Shelter'],
+            },
+            'validation': {
+                'name_matches': True,
+                'number_format_valid': True,
+                'is_expired': None,
+                'authority_recognized': True,
+                'document_authentic_indicators': ['Ministry letterhead', 'Registration stamp'],
+            },
+            'confidence': 68,
+            'findings': [
+                'Registration number matches Somalia NGO format',
+                'Registered with Ministry of Interior since 2015',
+                'No online registry available for cross-verification',
+                'No expiry date found - may be perpetual registration',
+            ],
+            'recommendations': [
+                'Contact Ministry of Interior directly to confirm registration status',
+                'Request updated registration letter from Somali authorities',
+                'Verify through UN OCHA Somalia coordination mechanism',
+            ],
+        })
+        db.session.add(v2)
+        verifications.append(v2)
+
+        # Ubuntu - South Africa, verified
+        v3 = RegistrationVerification(
+            org_id=orgs[2].id,
+            status='verified',
+            registration_number='ZA-NPO-2008-071234',
+            registration_authority='Department of Social Development NPO Directorate',
+            registration_date=date(2008, 5, 10),
+            expiry_date=None,
+            country='South Africa',
+            ai_confidence=95.0,
+            verified_by_user_id=users[6].id,  # David (donor)
+            verified_at=datetime(2026, 1, 5, 9, 0),
+            notes='Verified online via DSD NPO Registry. Active and compliant with annual reporting.',
+            registry_url='https://npo.dsd.gov.za/public/SearchOrganisationOnline.aspx',
+            created_at=datetime(2026, 1, 3),
+            updated_at=datetime(2026, 1, 5, 9, 0),
+        )
+        v3.set_ai_analysis({
+            'extracted_data': {
+                'organization_name': 'Ubuntu Education Trust',
+                'registration_number': 'ZA-NPO-2008-071234',
+                'registration_authority': 'DSD NPO Directorate, South Africa',
+                'registration_date': '2008-05-10',
+                'expiry_date': None,
+                'registration_type': 'NPO',
+                'registered_address': 'Sandton, Johannesburg',
+                'authorized_activities': ['Education', 'Livelihoods', 'Youth Development'],
+            },
+            'validation': {
+                'name_matches': True,
+                'number_format_valid': True,
+                'is_expired': False,
+                'authority_recognized': True,
+                'document_authentic_indicators': ['Official DSD letterhead', 'NPO registration certificate', 'Compliance certificate current'],
+            },
+            'confidence': 95,
+            'findings': [
+                'Registration verified via South Africa NPO online registry',
+                'ZA-NPO-2008-071234 is active and in good standing',
+                'Annual compliance reports filed through 2025',
+                'Organization is fully compliant with NPO Act 1997',
+            ],
+            'recommendations': [
+                'Registration confirmed - no further action needed',
+                'Continue annual compliance monitoring',
+            ],
+        })
+        db.session.add(v3)
+        verifications.append(v3)
+
+        # Hope Bridges - Uganda, pending
+        v4 = RegistrationVerification(
+            org_id=orgs[3].id,
+            status='pending',
+            registration_number='UG/CBO/2019/445',
+            registration_authority='NGO Bureau, Ministry of Internal Affairs',
+            registration_date=date(2019, 11, 8),
+            expiry_date=date(2025, 11, 8),
+            country='Uganda',
+            ai_confidence=55.0,
+            notes='Registration may be expired. Manual verification with Uganda NGO Bureau recommended.',
+            registry_url='https://www.ngobureau.go.ug/organizations',
+            created_at=datetime(2026, 1, 15),
+            updated_at=datetime(2026, 1, 15),
+        )
+        v4.set_ai_analysis({
+            'extracted_data': {
+                'organization_name': 'Hope Bridges Initiative',
+                'registration_number': 'UG/CBO/2019/445',
+                'registration_authority': 'NGO Bureau, Uganda',
+                'registration_date': '2019-11-08',
+                'expiry_date': '2025-11-08',
+                'registration_type': 'CBO',
+                'authorized_activities': ['Health', 'Climate', 'Agriculture'],
+            },
+            'validation': {
+                'name_matches': True,
+                'number_format_valid': True,
+                'is_expired': True,
+                'authority_recognized': True,
+                'document_authentic_indicators': ['NGO Bureau stamp', 'Registration certificate'],
+            },
+            'confidence': 55,
+            'findings': [
+                'Registration UG/CBO/2019/445 matches Uganda format',
+                'WARNING: Registration expired November 2025 - renewal needed',
+                'Registered as Community-Based Organization (CBO)',
+                'NGO Bureau online registry available for verification',
+            ],
+            'recommendations': [
+                'URGENT: Request proof of registration renewal from Hope Bridges',
+                'Verify renewal status at ngobureau.go.ug/organizations',
+                'Do not proceed with grant until registration is renewed',
+            ],
+        })
+        db.session.add(v4)
+        verifications.append(v4)
+
+        # Sahel Women's Network - Nigeria, unverified/flagged
+        v5 = RegistrationVerification(
+            org_id=orgs[4].id,
+            status='flagged',
+            registration_number='',
+            registration_authority='Corporate Affairs Commission (CAC)',
+            country='Nigeria',
+            ai_confidence=20.0,
+            notes='No registration number provided. Organization claims pending registration.',
+            created_at=datetime(2026, 1, 20),
+            updated_at=datetime(2026, 1, 20),
+        )
+        v5.set_ai_analysis({
+            'extracted_data': {
+                'organization_name': "Sahel Women's Network",
+                'registration_number': 'Not found',
+                'registration_authority': 'CAC Nigeria (expected)',
+                'registration_date': None,
+                'expiry_date': None,
+                'registration_type': 'Network/Association',
+                'authorized_activities': ['Protection', 'Governance', 'Gender'],
+            },
+            'validation': {
+                'name_matches': True,
+                'number_format_valid': False,
+                'is_expired': None,
+                'authority_recognized': True,
+                'document_authentic_indicators': [],
+            },
+            'confidence': 20,
+            'findings': [
+                'No registration certificate provided',
+                'Organization claims registration is pending with CAC Nigeria',
+                'Cannot verify registration without certificate or number',
+                'Organization established in 2020 but no formal registration',
+            ],
+            'recommendations': [
+                'Request registration certificate from Sahel Women\'s Network',
+                'Verify at CAC Nigeria (search.cac.gov.ng) once number is provided',
+                'Consider whether unregistered status affects grant eligibility',
+                'May need to register as Incorporated Trustees with CAC',
+            ],
+        })
+        db.session.add(v5)
+        verifications.append(v5)
+
+        db.session.flush()
+        print(f'  Created {len(verifications)} registration verifications')
+
         # ---- Commit -------------------------------------------------------
         db.session.commit()
         print('\nDatabase seeded successfully!')
@@ -951,6 +1200,7 @@ def print_summary():
         print(f'  Reviews       : {Review.query.count()}')
         print(f'  Compliance    : {ComplianceCheck.query.count()}')
         print(f'  Reports       : {Report.query.count()}')
+        print(f'  Verifications : {RegistrationVerification.query.count()}')
         print('='*60)
         print('\n  LOGIN CREDENTIALS (all passwords: pass123)')
         print('  ' + '-'*55)

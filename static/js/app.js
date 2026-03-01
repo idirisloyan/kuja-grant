@@ -713,6 +713,7 @@ function renderSidebar(role) {
             { icon: '\u2B50', label: 'Review Applications', page: 'rankings' },
             { icon: '\uD83D\uDCC8', label: 'Grant Reports', page: 'reports' },
             { icon: '\uD83D\uDD0D', label: 'Organization Search', page: 'orgsearch' },
+            { icon: '\u2705', label: 'Registration Checks', page: 'verification' },
             { icon: '\uD83D\uDEE1\uFE0F', label: 'Compliance', page: 'compliance' }
         ];
     } else if (role === 'reviewer') {
@@ -814,6 +815,7 @@ function renderPageContent() {
         case 'reports': return renderReportsPage();
         case 'submitreport': return renderSubmitReport();
         case 'reviewreport': return renderReviewReport();
+        case 'verification': return renderVerificationDashboard();
         default: return '<div class="page-header"><h1>Page Not Found</h1><p>The page you are looking for does not exist.</p></div>' +
             '<button class="btn btn-primary" onclick="nav(\'dashboard\')">Go to Dashboard</button>';
     }
@@ -3439,6 +3441,12 @@ function renderOrgProfile() {
         '<button class="btn btn-primary" onclick="saveOrgProfile()">Save Changes</button>' +
         '</div></div>' +
 
+        // Registration Verification Status
+        '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">\u2705 Registration Verification</h3>' +
+        '<div id="org-verification-status">' + renderLoadingTable() + '</div>' +
+        '</div></div>' +
+
         // Compliance
         '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
         '<h3 style="font-weight:600;margin-bottom:16px;">\uD83D\uDEE1\uFE0F Compliance Status</h3>' +
@@ -3459,6 +3467,8 @@ async function loadOrgProfile() {
     if (res) {
         S.selectedOrg = res.org || res.organization || res;
     }
+    // Load verification status
+    loadOrgVerificationStatus();
     // Load compliance
     var cRes = await api('GET', '/api/compliance/' + S.user.org_id);
     if (cRes && cRes.checks) {
@@ -4134,7 +4144,411 @@ async function requestRevision(id) {
 }
 
 // =============================================================================
-// 35. AI Panel
+// 35. Registration Verification Dashboard (Donor)
+// =============================================================================
+
+function verificationStatusBadge(status) {
+    var map = {
+        'verified': { color: 'green', icon: '\u2705', label: 'Verified' },
+        'ai_reviewed': { color: 'blue', icon: '\uD83E\uDD16', label: 'AI Reviewed' },
+        'pending': { color: 'amber', icon: '\u23F3', label: 'Pending' },
+        'flagged': { color: 'red', icon: '\u26A0\uFE0F', label: 'Flagged' },
+        'expired': { color: 'red', icon: '\u274C', label: 'Expired' },
+        'unverified': { color: 'outline', icon: '\u2753', label: 'Unverified' },
+    };
+    var s = map[status] || map['unverified'];
+    return '<span class="badge badge-' + s.color + '">' + s.icon + ' ' + s.label + '</span>';
+}
+
+function renderVerificationDashboard() {
+    loadVerificationData();
+    return '<div class="page-header">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<div>' +
+        '<h1>\u2705 Registration Verification</h1>' +
+        '<p style="color:#64748b;">Verify NGO registrations against government registries. AI-powered analysis with manual verification workflow.</p>' +
+        '</div>' +
+        '<button class="btn btn-secondary" onclick="loadRegistryDirectory()">\uD83C\uDF10 Government Registries</button>' +
+        '</div></div>' +
+
+        // Summary stat cards
+        '<div id="verification-stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:24px;">' +
+        renderStatCard('\u2705', 'Verified', '-', 'green') +
+        renderStatCard('\uD83E\uDD16', 'AI Reviewed', '-', 'blue') +
+        renderStatCard('\u23F3', 'Pending', '-', 'amber') +
+        renderStatCard('\u26A0\uFE0F', 'Flagged', '-', 'red') +
+        renderStatCard('\u2753', 'Unverified', '-', 'outline') +
+        '</div>' +
+
+        // Registry directory (hidden by default)
+        '<div id="registry-directory" style="display:none;margin-bottom:24px;"></div>' +
+
+        // Main table
+        '<div class="card"><div class="card-body">' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">\uD83C\uDFE2 NGO Registration Status</h3>' +
+        '<div id="verification-table">' + renderLoadingTable() + '</div>' +
+        '</div></div>' +
+
+        // Detail panel (hidden by default)
+        '<div id="verification-detail" style="display:none;margin-top:24px;"></div>';
+}
+
+async function loadVerificationData() {
+    var res = await api('GET', '/api/verification/all');
+    if (!res || !res.organizations) return;
+
+    var orgs = res.organizations;
+
+    // Update stats
+    var counts = { verified: 0, ai_reviewed: 0, pending: 0, flagged: 0, unverified: 0, expired: 0 };
+    orgs.forEach(function(o) {
+        var s = o.verification_status || 'unverified';
+        if (counts[s] !== undefined) counts[s]++;
+        else counts['unverified']++;
+    });
+    var statsEl = document.getElementById('verification-stats');
+    if (statsEl) {
+        statsEl.innerHTML =
+            renderStatCard('\u2705', 'Verified', counts.verified, 'green') +
+            renderStatCard('\uD83E\uDD16', 'AI Reviewed', counts.ai_reviewed, 'blue') +
+            renderStatCard('\u23F3', 'Pending', counts.pending + counts.expired, 'amber') +
+            renderStatCard('\u26A0\uFE0F', 'Flagged', counts.flagged, 'red') +
+            renderStatCard('\u2753', 'Unverified', counts.unverified, 'outline');
+    }
+
+    // Render table
+    var el = document.getElementById('verification-table');
+    if (!el) return;
+
+    var rows = orgs.map(function(o) {
+        var regNum = o.registration_number || '<span style="color:#dc2626;">Not provided</span>';
+        var registryLink = o.registry_search_url ?
+            '<a href="' + esc(o.registry_search_url) + '" target="_blank" style="color:#2563eb;text-decoration:underline;font-size:12px;">Check Registry \u2197</a>' :
+            (o.registry_url ? '<a href="' + esc(o.registry_url) + '" target="_blank" style="color:#2563eb;text-decoration:underline;font-size:12px;">Registry \u2197</a>' : '');
+        var confidence = o.ai_confidence != null ?
+            '<span style="color:' + (o.ai_confidence >= 80 ? '#16a34a' : o.ai_confidence >= 50 ? '#d97706' : '#dc2626') + ';font-weight:600;">' + Math.round(o.ai_confidence) + '%</span>' : '-';
+        var actions = '<div style="display:flex;gap:6px;">';
+        if (o.verification_status === 'unverified' || o.verification_status === 'pending') {
+            actions += '<button class="btn btn-primary btn-sm" onclick="runVerification(' + o.org_id + ')">\uD83D\uDD0D Verify</button>';
+        }
+        if (o.verification_status === 'ai_reviewed') {
+            actions += '<button class="btn btn-primary btn-sm" onclick="confirmVerification(' + o.org_id + ')">\u2705 Confirm</button>';
+            actions += '<button class="btn btn-secondary btn-sm" onclick="flagVerification(' + o.org_id + ')">\u26A0\uFE0F Flag</button>';
+        }
+        if (o.verification_status === 'verified') {
+            actions += '<span style="color:#16a34a;font-size:12px;">Verified' + (o.verified_by ? ' by ' + esc(o.verified_by) : '') + '</span>';
+        }
+        if (o.verification_status === 'flagged' || o.verification_status === 'expired') {
+            actions += '<button class="btn btn-secondary btn-sm" onclick="runVerification(' + o.org_id + ')">\uD83D\uDD04 Re-verify</button>';
+        }
+        actions += '<button class="btn btn-secondary btn-sm" onclick="viewVerificationDetail(' + o.org_id + ')">\uD83D\uDC41\uFE0F</button>';
+        actions += '</div>';
+
+        return '<tr>' +
+            '<td><strong>' + esc(o.org_name) + '</strong><br><span style="font-size:12px;color:#64748b;">' + esc(o.country || '') + '</span></td>' +
+            '<td style="font-family:monospace;font-size:13px;">' + regNum + '</td>' +
+            '<td>' + (o.registry_authority ? '<span style="font-size:12px;">' + esc(o.registry_authority) + '</span><br>' : '') + registryLink + '</td>' +
+            '<td>' + verificationStatusBadge(o.verification_status) + '</td>' +
+            '<td style="text-align:center;">' + confidence + '</td>' +
+            '<td>' + actions + '</td></tr>';
+    }).join('');
+
+    el.innerHTML = '<div class="table-wrapper"><table class="table">' +
+        '<thead><tr>' +
+        '<th>Organization</th>' +
+        '<th>Reg. Number</th>' +
+        '<th>Authority</th>' +
+        '<th>Status</th>' +
+        '<th>AI Confidence</th>' +
+        '<th>Actions</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+async function runVerification(orgId) {
+    showToast('\uD83D\uDD0D Running AI registration verification...', 'info');
+    var res = await api('POST', '/api/verification/verify', { org_id: orgId });
+    if (res && res.success) {
+        var conf = res.verification.ai_confidence || 0;
+        var status = res.verification.status;
+        showToast('AI verification complete: ' + status + ' (confidence: ' + Math.round(conf) + '%)', conf >= 70 ? 'success' : 'warning');
+        loadVerificationData();
+        viewVerificationDetail(orgId);
+    } else {
+        showToast('Verification failed: ' + (res ? res.error : 'Unknown error'), 'error');
+    }
+}
+
+async function viewVerificationDetail(orgId) {
+    var res = await api('GET', '/api/verification/' + orgId);
+    if (!res || !res.success) return;
+
+    var el = document.getElementById('verification-detail');
+    if (!el) return;
+    el.style.display = 'block';
+
+    var v = (res.verifications && res.verifications.length) ? res.verifications[0] : null;
+    var reg = res.registry_info;
+    var analysis = v ? v.ai_analysis : null;
+
+    var html = '<div class="card"><div class="card-body">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+        '<h3 style="font-weight:600;">\uD83D\uDCC4 Verification Details: ' + esc(res.org_name) + '</h3>' +
+        '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'verification-detail\').style.display=\'none\';">\u2715 Close</button>' +
+        '</div>';
+
+    // Registration info
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">';
+
+    // Left: Org Registration Details
+    html += '<div>' +
+        '<h4 style="font-weight:600;margin-bottom:12px;font-size:14px;color:#475569;">Registration Information</h4>' +
+        '<table style="width:100%;font-size:14px;border-collapse:collapse;">' +
+        '<tr><td style="padding:6px 12px 6px 0;color:#64748b;width:40%;">Country</td><td style="padding:6px 0;font-weight:500;">' + esc(res.org_country || '-') + '</td></tr>' +
+        '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">Reg. Number</td><td style="padding:6px 0;font-family:monospace;font-weight:500;">' + esc(res.registration_number || 'Not provided') + '</td></tr>' +
+        '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">Status</td><td style="padding:6px 0;">' + verificationStatusBadge(res.overall_status) + '</td></tr>';
+
+    if (v) {
+        html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">Authority</td><td style="padding:6px 0;">' + esc(v.registration_authority || '-') + '</td></tr>';
+        if (v.registration_date) html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">Registered</td><td style="padding:6px 0;">' + formatDate(v.registration_date) + '</td></tr>';
+        if (v.expiry_date) html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">Expires</td><td style="padding:6px 0;' + (new Date(v.expiry_date) < new Date() ? 'color:#dc2626;font-weight:600;' : '') + '">' + formatDate(v.expiry_date) + (new Date(v.expiry_date) < new Date() ? ' (EXPIRED)' : '') + '</td></tr>';
+        html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">AI Confidence</td><td style="padding:6px 0;">' +
+            '<span style="color:' + (v.ai_confidence >= 80 ? '#16a34a' : v.ai_confidence >= 50 ? '#d97706' : '#dc2626') + ';font-weight:600;">' + Math.round(v.ai_confidence || 0) + '%</span></td></tr>';
+        if (v.verified_by_name) {
+            html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">Verified By</td><td style="padding:6px 0;">' + esc(v.verified_by_name) + ' on ' + formatDate(v.verified_at) + '</td></tr>';
+        }
+    }
+    html += '</table></div>';
+
+    // Right: Government Registry Info
+    html += '<div>' +
+        '<h4 style="font-weight:600;margin-bottom:12px;font-size:14px;color:#475569;">Government Registry</h4>';
+    if (reg) {
+        html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;font-size:14px;">' +
+            '<div style="font-weight:600;margin-bottom:8px;">\uD83C\uDFDB\uFE0F ' + esc(reg.authority) + '</div>' +
+            '<div style="color:#64748b;margin-bottom:4px;">Expected format: <code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:12px;">' + esc(reg.expected_format || 'N/A') + '</code></div>' +
+            '<div style="color:#64748b;font-size:13px;margin-bottom:12px;">' + esc(reg.notes || '') + '</div>';
+        if (reg.search_url) {
+            html += '<a href="' + esc(reg.search_url) + '" target="_blank" class="btn btn-primary btn-sm" style="margin-right:8px;">\uD83D\uDD0D Search Registry Online</a>';
+        }
+        if (reg.url) {
+            html += '<a href="' + esc(reg.url) + '" target="_blank" class="btn btn-secondary btn-sm">\uD83C\uDF10 Registry Website</a>';
+        }
+        html += '</div>';
+    } else {
+        html += '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:16px;font-size:14px;">' +
+            '<div style="font-weight:600;margin-bottom:4px;">\u26A0\uFE0F No Registry Data Available</div>' +
+            '<div style="color:#64748b;">Government registry information not available for this country. Manual verification required.</div>' +
+            '</div>';
+    }
+    html += '</div></div>';
+
+    // AI Analysis Section
+    if (analysis) {
+        // Findings
+        if (analysis.findings && analysis.findings.length) {
+            html += '<div style="margin-bottom:16px;">' +
+                '<h4 style="font-weight:600;margin-bottom:8px;font-size:14px;color:#475569;">\uD83E\uDD16 AI Findings</h4>' +
+                '<div style="background:#f8fafc;border-radius:8px;padding:16px;">' +
+                analysis.findings.map(function(f) {
+                    var icon = f.toLowerCase().includes('warning') || f.toLowerCase().includes('expired') || f.toLowerCase().includes('not match') ? '\u26A0\uFE0F' : '\u2139\uFE0F';
+                    return '<div style="display:flex;gap:8px;align-items:start;margin-bottom:8px;font-size:14px;">' +
+                        '<span>' + icon + '</span><span>' + esc(f) + '</span></div>';
+                }).join('') +
+                '</div></div>';
+        }
+
+        // Validation checks
+        if (analysis.validation) {
+            var checks = analysis.validation;
+            html += '<div style="margin-bottom:16px;">' +
+                '<h4 style="font-weight:600;margin-bottom:8px;font-size:14px;color:#475569;">\u2705 Validation Checks</h4>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+            var checkItems = [
+                { key: 'name_matches', label: 'Name matches certificate' },
+                { key: 'number_format_valid', label: 'Registration number format valid' },
+                { key: 'authority_recognized', label: 'Issuing authority recognized' },
+                { key: 'is_expired', label: 'Registration not expired', invert: true },
+            ];
+            checkItems.forEach(function(ci) {
+                var val = checks[ci.key];
+                if (val === null || val === undefined) {
+                    html += '<div style="display:flex;gap:8px;align-items:center;padding:8px;background:#f8fafc;border-radius:6px;font-size:13px;">' +
+                        '<span>\u2753</span><span style="color:#64748b;">' + esc(ci.label) + ' - Unknown</span></div>';
+                } else {
+                    var pass = ci.invert ? !val : val;
+                    html += '<div style="display:flex;gap:8px;align-items:center;padding:8px;background:' + (pass ? '#f0fdf4' : '#fef2f2') + ';border-radius:6px;font-size:13px;">' +
+                        '<span>' + (pass ? '\u2705' : '\u274C') + '</span><span>' + esc(ci.label) + '</span></div>';
+                }
+            });
+            html += '</div></div>';
+        }
+
+        // Recommendations
+        if (analysis.recommendations && analysis.recommendations.length) {
+            html += '<div style="margin-bottom:16px;">' +
+                '<h4 style="font-weight:600;margin-bottom:8px;font-size:14px;color:#475569;">\uD83D\uDCA1 Recommendations</h4>' +
+                '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;">' +
+                analysis.recommendations.map(function(r) {
+                    return '<div style="display:flex;gap:8px;align-items:start;margin-bottom:6px;font-size:14px;">' +
+                        '<span>\u27A1\uFE0F</span><span>' + esc(r) + '</span></div>';
+                }).join('') +
+                '</div></div>';
+        }
+    }
+
+    // Action buttons
+    if (v && v.status !== 'verified') {
+        html += '<div style="display:flex;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;">' +
+            '<button class="btn btn-primary" onclick="confirmVerificationById(' + v.id + ', ' + orgId + ')">\u2705 Mark as Verified</button>' +
+            '<button class="btn btn-secondary" style="background:#fef2f2;color:#dc2626;border-color:#fca5a5;" onclick="flagVerificationById(' + v.id + ', ' + orgId + ')">\u26A0\uFE0F Flag Issue</button>' +
+            '<button class="btn btn-secondary" onclick="runVerification(' + orgId + ')">\uD83D\uDD04 Re-run AI Check</button>' +
+            '</div>';
+    }
+
+    html += '</div></div>';
+    el.innerHTML = html;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function confirmVerification(orgId) {
+    // First get the verification to find its ID
+    var res = await api('GET', '/api/verification/' + orgId);
+    if (res && res.verifications && res.verifications.length) {
+        await confirmVerificationById(res.verifications[0].id, orgId);
+    } else {
+        showToast('No verification record found. Run verification first.', 'warning');
+    }
+}
+
+async function confirmVerificationById(vId, orgId) {
+    var res = await api('PUT', '/api/verification/' + vId + '/update', {
+        status: 'verified',
+        notes: 'Manually verified by donor after reviewing AI analysis and government registry.'
+    });
+    if (res && res.success) {
+        showToast('\u2705 Registration marked as verified!', 'success');
+        loadVerificationData();
+        viewVerificationDetail(orgId);
+    } else {
+        showToast('Failed to update verification', 'error');
+    }
+}
+
+async function flagVerification(orgId) {
+    var res = await api('GET', '/api/verification/' + orgId);
+    if (res && res.verifications && res.verifications.length) {
+        await flagVerificationById(res.verifications[0].id, orgId);
+    } else {
+        showToast('No verification record found. Run verification first.', 'warning');
+    }
+}
+
+async function flagVerificationById(vId, orgId) {
+    var res = await api('PUT', '/api/verification/' + vId + '/update', {
+        status: 'flagged',
+        notes: 'Flagged for further review. Manual verification with government registry required.'
+    });
+    if (res && res.success) {
+        showToast('\u26A0\uFE0F Registration flagged for review.', 'warning');
+        loadVerificationData();
+        viewVerificationDetail(orgId);
+    } else {
+        showToast('Failed to update verification', 'error');
+    }
+}
+
+async function loadRegistryDirectory() {
+    var el = document.getElementById('registry-directory');
+    if (!el) return;
+
+    if (el.style.display === 'block') {
+        el.style.display = 'none';
+        return;
+    }
+
+    var res = await api('GET', '/api/verification/registries');
+    if (!res || !res.registries) return;
+
+    var countries = Object.keys(res.registries).sort();
+    var html = '<div class="card"><div class="card-body">' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">\uD83C\uDF10 Government NGO Registries Directory</h3>' +
+        '<p style="color:#64748b;margin-bottom:16px;">Direct links to government registries where you can manually verify NGO registrations. Use these for cross-referencing AI verification results.</p>' +
+        '<div class="table-wrapper"><table class="table"><thead><tr>' +
+        '<th>Country</th><th>Registration Authority</th><th>Expected Format</th><th>Links</th>' +
+        '</tr></thead><tbody>' +
+        countries.map(function(c) {
+            var r = res.registries[c];
+            var links = '';
+            if (r.search_url) links += '<a href="' + esc(r.search_url) + '" target="_blank" class="btn btn-primary btn-sm" style="margin-right:4px;">\uD83D\uDD0D Search</a>';
+            if (r.url) links += '<a href="' + esc(r.url) + '" target="_blank" class="btn btn-secondary btn-sm">\uD83C\uDF10 Website</a>';
+            if (!r.search_url && !r.url) links = '<span style="color:#94a3b8;font-size:12px;">No online portal available</span>';
+            return '<tr>' +
+                '<td style="font-weight:600;">\uD83C\uDFF3\uFE0F ' + esc(c) + '</td>' +
+                '<td style="font-size:13px;">' + esc(r.authority) + '<br><span style="font-size:11px;color:#94a3b8;">' + esc(r.notes || '') + '</span></td>' +
+                '<td><code style="background:#f1f5f9;padding:2px 8px;border-radius:4px;font-size:12px;">' + esc(r.expected_format || 'N/A') + '</code></td>' +
+                '<td>' + links + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div></div></div>';
+
+    el.innerHTML = html;
+    el.style.display = 'block';
+}
+
+// -- NGO Verification Status (for org profile) --
+async function loadOrgVerificationStatus() {
+    if (!S.user.org_id) return;
+    var res = await api('GET', '/api/verification/' + S.user.org_id);
+    var el = document.getElementById('org-verification-status');
+    if (!el || !res) return;
+
+    var v = (res.verifications && res.verifications.length) ? res.verifications[0] : null;
+    var reg = res.registry_info;
+
+    var html = '';
+    if (v) {
+        html += '<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">' +
+            '<div style="font-size:36px;">' + (v.status === 'verified' ? '\u2705' : v.status === 'flagged' ? '\u26A0\uFE0F' : v.status === 'ai_reviewed' ? '\uD83E\uDD16' : '\u23F3') + '</div>' +
+            '<div><div style="font-size:18px;font-weight:600;">Registration ' + verificationStatusBadge(v.status) + '</div>' +
+            '<div style="font-size:13px;color:#64748b;margin-top:4px;">Reg #: <code>' + esc(v.registration_number || res.registration_number || 'Not provided') + '</code>' +
+            (v.registration_authority ? ' &mdash; ' + esc(v.registration_authority) : '') + '</div>';
+        if (v.verified_by_name) html += '<div style="font-size:12px;color:#16a34a;margin-top:2px;">Verified by ' + esc(v.verified_by_name) + ' on ' + formatDate(v.verified_at) + '</div>';
+        html += '</div></div>';
+
+        if (v.ai_confidence != null) {
+            html += '<div style="margin-bottom:12px;"><span style="font-size:13px;color:#64748b;">AI Confidence:</span> ' +
+                '<span style="font-weight:600;color:' + (v.ai_confidence >= 80 ? '#16a34a' : v.ai_confidence >= 50 ? '#d97706' : '#dc2626') + ';">' +
+                Math.round(v.ai_confidence) + '%</span></div>';
+        }
+
+        // Show findings briefly
+        var analysis = v.ai_analysis;
+        if (analysis && analysis.findings) {
+            html += '<div style="font-size:13px;">' +
+                analysis.findings.slice(0, 3).map(function(f) {
+                    return '<div style="margin-bottom:4px;color:#475569;">\u2022 ' + esc(f) + '</div>';
+                }).join('') +
+                '</div>';
+        }
+    } else {
+        html += '<div style="text-align:center;padding:16px;color:#94a3b8;">' +
+            '<p>\u2753 Registration has not been verified yet.</p>' +
+            '<p style="font-size:13px;">Upload your registration certificate in the Documents section to enable verification.</p>' +
+            '</div>';
+    }
+
+    // Government registry link
+    if (reg && (reg.url || reg.search_url)) {
+        html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;">' +
+            '<span style="font-size:13px;color:#64748b;">\uD83C\uDFDB\uFE0F ' + esc(reg.authority) + '</span>' +
+            (reg.search_url ? ' <a href="' + esc(reg.search_url) + '" target="_blank" style="font-size:12px;color:#2563eb;">View Registry \u2197</a>' : '') +
+            '</div>';
+    }
+
+    el.innerHTML = html;
+}
+
+// =============================================================================
+// 36. AI Panel
 // =============================================================================
 
 function renderAIPanel() {
