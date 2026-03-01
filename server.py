@@ -40,7 +40,12 @@ import json
 import uuid
 import math
 import re
+import csv
+import io
+import time
 import logging
+import xml.etree.ElementTree as ET
+from difflib import SequenceMatcher
 from datetime import datetime, date, timedelta
 from functools import wraps
 
@@ -114,6 +119,9 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 # Anthropic API key
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+
+# OpenSanctions API key for live sanctions screening
+OPENSANCTIONS_API_KEY = os.getenv('OPENSANCTIONS_API_KEY', '')
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -587,6 +595,7 @@ class RegistrationVerification(db.Model):
     # unverified, pending, ai_reviewed, verified, flagged, expired
     registration_number = db.Column(db.String(200), nullable=True)
     registration_authority = db.Column(db.String(300), nullable=True)
+    registry_check_result = db.Column(db.Text, nullable=True)  # JSON - live registry check result
     registration_date = db.Column(db.Date, nullable=True)
     expiry_date = db.Column(db.Date, nullable=True)
     country = db.Column(db.String(100), nullable=True)
@@ -611,6 +620,12 @@ class RegistrationVerification(db.Model):
     def set_ai_analysis(self, value):
         self.ai_analysis = _json_dump(value)
 
+    def get_registry_check_result(self):
+        return _json_load(self.registry_check_result) or {}
+
+    def set_registry_check_result(self, value):
+        self.registry_check_result = _json_dump(value)
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -620,6 +635,7 @@ class RegistrationVerification(db.Model):
             'status': self.status,
             'registration_number': self.registration_number,
             'registration_authority': self.registration_authority,
+            'registry_check_result': self.get_registry_check_result(),
             'registration_date': self.registration_date.isoformat() if self.registration_date else None,
             'expiry_date': self.expiry_date.isoformat() if self.expiry_date else None,
             'country': self.country,
@@ -1063,10 +1079,11 @@ class AIService:
         return template
 
     @staticmethod
-    def analyze_document(filename, doc_type=None, file_size=None, file_path=None):
+    def analyze_document(filename, doc_type=None, file_size=None, file_path=None, requirements=None):
         """
         Analyze an uploaded document using AI.
         Uses Claude if available, else returns realistic simulated results based on doc_type.
+        If requirements is provided (dict from grant's doc_requirements), evaluates against those specific criteria.
         """
         # Try real AI analysis first
         if HAS_ANTHROPIC and ANTHROPIC_API_KEY and file_path:
@@ -1084,6 +1101,22 @@ class AIService:
 
                 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
+                # Build requirements context if donor specified criteria
+                requirements_context = ''
+                if requirements:
+                    req_desc = requirements.get('requirements', requirements.get('description', ''))
+                    eval_criteria = requirements.get('evaluation_criteria', '')
+                    requirements_context = f"""
+DONOR-SPECIFIC REQUIREMENTS for this document type:
+- Document Type: {requirements.get('type', doc_type)}
+- Description: {req_desc}
+- Required: {requirements.get('required', True)}
+{f'- Evaluation Criteria: {eval_criteria}' if eval_criteria else ''}
+
+You MUST evaluate the document against EACH of these specific donor requirements.
+For each requirement, provide a compliance score (0-100) and a brief finding.
+"""
+
                 prompt = f"""Analyze this document for a grant management system.
 
 Document: {filename}
@@ -1091,16 +1124,19 @@ Type: {doc_type}
 Size: {file_size} bytes
 Content: {file_content}
 
+{requirements_context}
+
 Evaluate the document for:
 1. Relevance to the document type ({doc_type})
 2. Completeness
 3. Quality and professionalism
-4. Compliance with typical donor requirements
+4. {'Compliance with the SPECIFIC donor requirements listed above' if requirements else 'Compliance with typical donor requirements'}
 
 Return a JSON object with:
 - score (0-100, be realistic)
 - findings (array of 3-5 specific findings about the document)
 - recommendations (array of 2-4 specific improvement recommendations)
+{'''- requirement_scores (object mapping each donor requirement to {"score": 0-100, "finding": "brief assessment"})''' if requirements else ''}
 
 Return ONLY valid JSON."""
 
@@ -1473,46 +1509,63 @@ Analyze this registration document and extract the following information. Return
 
     @staticmethod
     def analyze_report(content, requirements, report_type):
-        """Analyze a submitted report against grant reporting requirements."""
+        """Analyze a submitted report against grant reporting requirements with per-requirement scoring."""
         if HAS_ANTHROPIC and ANTHROPIC_API_KEY:
             try:
                 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-                prompt = f"""Analyze this grant report against the reporting requirements.
+                # Build per-requirement context
+                req_context = ""
+                if requirements:
+                    # Filter requirements matching this report type
+                    matching_reqs = [r for r in requirements if r.get('type', '').lower() == report_type.lower() or r.get('type') == 'all']
+                    if not matching_reqs:
+                        matching_reqs = requirements  # Use all if no type match
+                    req_context = f"""
+The donor has set these specific reporting requirements. Evaluate EACH requirement individually:
+
+{json.dumps(matching_reqs, indent=2)}
+
+For each requirement, assess whether the report addresses it and give a score (0-100).
+"""
+
+                prompt = f"""You are a grant compliance analyst. Analyze this grant report against the donor's reporting requirements.
 
 Report Type: {report_type}
 Report Content: {json.dumps(content) if isinstance(content, dict) else str(content)}
 
-Reporting Requirements: {json.dumps(requirements)}
+{req_context if req_context else f"General Reporting Requirements: {json.dumps(requirements)}"}
 
 Evaluate:
 1. Completeness - are all required sections covered?
 2. Quality - is the content detailed and specific enough?
 3. Compliance - does it meet the stated requirements?
 4. Data quality - are metrics/indicators properly reported?
+5. Timeliness indicators - are there signs of late or rushed reporting?
 
 Return a JSON object with:
-- score (0-100)
+- score (0-100, overall report score)
 - completeness_score (0-100)
 - quality_score (0-100)
-- findings (array of strings)
-- missing_items (array of strings - what's missing)
-- recommendations (array of strings)
-- summary (1-2 sentence overall assessment)
+- compliance_score (0-100, how well it meets donor requirements)
+- findings (array of strings - positive observations)
+- missing_items (array of strings - what's missing or incomplete)
+- recommendations (array of strings - actionable improvements)
+- requirement_scores (array of objects, one per donor requirement, each with: "requirement" (the requirement title/description), "score" (0-100), "addressed" (boolean), "feedback" (1-2 sentence assessment))
+- summary (2-3 sentence overall assessment)
+- risk_flags (array of strings - any compliance or quality risks identified)
 
 Return ONLY valid JSON, no other text."""
 
                 response = client.messages.create(
                     model="claude-sonnet-4-20250514",
-                    max_tokens=1500,
+                    max_tokens=2500,
                     messages=[{"role": "user", "content": prompt}]
                 )
 
                 text = response.content[0].text.strip()
-                # Try to parse JSON from response
                 if text.startswith('{'):
                     return json.loads(text)
-                # Try to find JSON in the response
                 import re as _re
                 json_match = _re.search(r'\{[\s\S]*\}', text)
                 if json_match:
@@ -1520,13 +1573,31 @@ Return ONLY valid JSON, no other text."""
             except Exception as e:
                 logger.error(f"AI report analysis failed: {e}")
 
-        # Fallback simulated analysis
+        # Fallback simulated analysis with per-requirement scoring
         num_sections = len(content) if isinstance(content, dict) else 1
         completeness = min(100, num_sections * 20)
+
+        # Generate per-requirement scores from requirements list
+        requirement_scores = []
+        if requirements:
+            for req in requirements:
+                title = req.get('title', req.get('description', 'Unnamed requirement'))
+                req_type = req.get('type', '')
+                # Give higher scores if report type matches requirement type
+                base = 70 if req_type.lower() == report_type.lower() else 55
+                addressed = num_sections >= 3
+                requirement_scores.append({
+                    'requirement': title,
+                    'score': base if addressed else 30,
+                    'addressed': addressed,
+                    'feedback': f'Report {"addresses" if addressed else "does not fully address"} this requirement. {"Content appears adequate." if addressed else "More detail needed."}',
+                })
+
         return {
             'score': max(50, completeness - 10),
             'completeness_score': completeness,
             'quality_score': 65,
+            'compliance_score': 60,
             'findings': [
                 'Report structure follows the expected format',
                 'Key sections are present',
@@ -1538,7 +1609,9 @@ Return ONLY valid JSON, no other text."""
                 'Add comparison with planned vs actual results',
                 'Strengthen the lessons learned section',
             ],
-            'summary': f'The {report_type} report covers the basic requirements but could benefit from more detailed quantitative data and analysis.'
+            'requirement_scores': requirement_scores,
+            'summary': f'The {report_type} report covers the basic requirements but could benefit from more detailed quantitative data and analysis.',
+            'risk_flags': ['Limited quantitative data may affect donor confidence'] if completeness < 80 else [],
         }
 
     @staticmethod
@@ -1866,156 +1939,437 @@ class ScoringEngine:
 # 8. COMPLIANCE / SANCTIONS SCREENING SERVICE
 # =============================================================================
 
+class SimpleCache:
+    """In-memory cache with TTL for sanctions screening results."""
+    def __init__(self, ttl_seconds=3600):
+        self._cache = {}
+        self._ttl = ttl_seconds
+
+    def get(self, key):
+        if key in self._cache:
+            value, timestamp = self._cache[key]
+            if time.time() - timestamp < self._ttl:
+                return value
+            del self._cache[key]
+        return None
+
+    def set(self, key, value):
+        self._cache[key] = (value, time.time())
+
+    def clear(self):
+        self._cache.clear()
+
+
+_sanctions_cache = SimpleCache(ttl_seconds=3600)      # 1 hour for API results
+_list_cache = SimpleCache(ttl_seconds=86400)           # 24 hours for downloaded lists
+
+
 class ComplianceService:
     """
-    Simulates sanctions and compliance screening.
-    In production, this would integrate with real sanctions databases
-    (UN, OFAC, EU) via their APIs.
+    Live sanctions and compliance screening.
+    Primary: OpenSanctions API (unified, covers UN/OFAC/EU/World Bank).
+    Fallback: Direct download and parse of UN XML, OFAC CSV, EU CSV.
+    Supplementary: Keyword screening.
     """
 
-    # Organization name fragments that trigger a flag for demonstration
     FLAGGED_KEYWORDS = ['shadow', 'phantom', 'ghost', 'blacklisted']
+    FUZZY_THRESHOLD = 0.75  # SequenceMatcher ratio threshold
+
+    # --- Main entry point ---
 
     @classmethod
     def screen_organization(cls, org_name, country, personnel=None, org_id=None):
         """
         Run full compliance screening against an organization.
-        Returns a list of ComplianceCheck results.
-
-        For demonstration: most organizations return clear; organizations with
-        certain keywords in the name will be flagged.
+        Returns a list of check result dicts with check_type, status, result.
         """
         checks = []
-        is_flagged = any(kw in org_name.lower() for kw in cls.FLAGGED_KEYWORDS)
-        # Also flag org_id == 5 for demo seeded data
-        if org_id and org_id == 5:
-            is_flagged = True
 
-        # 1. UN Sanctions List
-        checks.append(cls._check_un_sanctions(org_name, country, is_flagged))
-        # 2. OFAC SDN List
-        checks.append(cls._check_ofac(org_name, country, is_flagged))
-        # 3. EU Sanctions
-        checks.append(cls._check_eu_sanctions(org_name, country, is_flagged))
-        # 4. World Bank Debarment
-        checks.append(cls._check_world_bank(org_name, country, is_flagged))
-        # 5. Registration Verification
+        # Try OpenSanctions API first (covers all lists in one call)
+        os_result = cls._check_opensanctions(org_name, country, schema='LegalEntity')
+        if os_result is not None:
+            checks.extend(cls._decompose_opensanctions(os_result, org_name))
+            logger.info(f"Sanctions screening via OpenSanctions API for '{org_name}'")
+        else:
+            # Fallback: direct list downloads
+            logger.info(f"OpenSanctions unavailable, using direct list downloads for '{org_name}'")
+            checks.append(cls._download_and_check_un(org_name))
+            checks.append(cls._download_and_check_ofac(org_name))
+            checks.append(cls._download_and_check_eu(org_name))
+            checks.append(cls._check_world_bank_fallback(org_name))
+
+        # Supplementary keyword check
+        keyword_flagged = any(kw in org_name.lower() for kw in cls.FLAGGED_KEYWORDS)
+        if keyword_flagged:
+            checks.append({
+                'check_type': 'keyword_screening',
+                'status': 'flagged',
+                'result': {
+                    'list': 'Internal Keyword Screening',
+                    'match_score': 100,
+                    'reason': 'Organization name contains flagged keyword',
+                    'action_required': 'Manual review recommended',
+                    'source': 'keyword',
+                },
+            })
+
+        # Registration format check
         checks.append(cls._check_registration(org_name, country))
 
-        # Screen personnel if provided
+        # Screen personnel
         if personnel:
-            for person in personnel[:10]:  # limit to 10
+            for person in personnel[:10]:
                 person_name = person.get('name', '') if isinstance(person, dict) else str(person)
-                person_flagged = any(kw in person_name.lower() for kw in cls.FLAGGED_KEYWORDS)
-                if person_flagged:
-                    checks.append({
-                        'check_type': 'sanctions_un',
-                        'status': 'flagged',
-                        'result': {
-                            'entity': person_name,
-                            'entity_type': 'individual',
-                            'list': 'UN Security Council Consolidated List',
-                            'match_score': 87,
-                            'reason': 'Potential name match found on sanctions list',
-                            'details': 'Manual review recommended before proceeding',
-                        },
-                    })
+                if not person_name:
+                    continue
+                p_result = cls._check_opensanctions(person_name, country, schema='Person')
+                if p_result and p_result.get('results'):
+                    for match in p_result['results'][:3]:
+                        if match.get('score', 0) >= 0.5:
+                            checks.append({
+                                'check_type': 'sanctions_personnel',
+                                'status': 'flagged',
+                                'result': {
+                                    'entity': person_name,
+                                    'entity_type': 'individual',
+                                    'match_score': int(match['score'] * 100),
+                                    'matched_name': match.get('caption', ''),
+                                    'datasets': match.get('datasets', []),
+                                    'reason': 'Potential personnel match on sanctions list',
+                                    'source': 'opensanctions_api',
+                                },
+                            })
+                else:
+                    # Fallback: check personnel against downloaded UN list
+                    p_check = cls._download_and_check_un(person_name, entity_type='individual')
+                    if p_check['status'] == 'flagged':
+                        p_check['check_type'] = 'sanctions_personnel'
+                        p_check['result']['entity'] = person_name
+                        p_check['result']['entity_type'] = 'individual'
+                        checks.append(p_check)
 
         return checks
 
+    # --- OpenSanctions API (Primary) ---
+
     @classmethod
-    def _check_un_sanctions(cls, org_name, country, is_flagged):
-        if is_flagged:
-            return {
-                'check_type': 'sanctions_un',
-                'status': 'flagged',
-                'result': {
-                    'list': 'UN Security Council Consolidated List',
-                    'match_score': 82,
-                    'matched_entity': f'{org_name} (partial match)',
-                    'reason': 'Partial name match detected against UN consolidated sanctions list',
-                    'reference': 'UNSC/2024/R1287',
-                    'action_required': 'Manual review required. Contact compliance team.',
-                    'checked_against': 'UN Security Council Resolutions 1267, 1373, 1718, 1988, 2253',
-                },
+    def _check_opensanctions(cls, name, country=None, schema='LegalEntity'):
+        """Call OpenSanctions Match API. Returns raw response dict or None."""
+        if not OPENSANCTIONS_API_KEY:
+            return None
+
+        cache_key = f"os|{name}|{country}|{schema}"
+        cached = _sanctions_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            headers = {
+                'Authorization': f'ApiKey {OPENSANCTIONS_API_KEY}',
+                'Content-Type': 'application/json',
             }
+            payload = {
+                'schema': schema,
+                'properties': {'name': [name]},
+            }
+            if country:
+                payload['properties']['country'] = [country]
+
+            resp = requests.post(
+                'https://api.opensanctions.org/match/sanctions',
+                json=payload,
+                headers=headers,
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                _sanctions_cache.set(cache_key, data)
+                return data
+            else:
+                logger.warning(f"OpenSanctions API returned {resp.status_code}: {resp.text[:200]}")
+                return None
+        except Exception as e:
+            logger.error(f"OpenSanctions API call failed: {e}")
+            return None
+
+    @classmethod
+    def _decompose_opensanctions(cls, api_result, org_name):
+        """Convert OpenSanctions unified response into per-list check results."""
+        checks = []
+        results = api_result.get('results', [])
+
+        dataset_map = {
+            'un_sc_sanctions': ('sanctions_un', 'UN Security Council Consolidated List'),
+            'us_ofac_sdn': ('sanctions_ofac', 'OFAC Specially Designated Nationals (SDN)'),
+            'eu_fsf': ('sanctions_eu', 'EU Consolidated Financial Sanctions List'),
+            'worldbank_debarred': ('blacklist', 'World Bank Group Listing of Ineligible Firms & Individuals'),
+        }
+
+        # Group matches by dataset
+        list_matches = {k: [] for k in dataset_map}
+        for match in results:
+            for ds in match.get('datasets', []):
+                if ds in list_matches:
+                    list_matches[ds].append(match)
+
+        for ds_key, (check_type, list_name) in dataset_map.items():
+            matches = list_matches.get(ds_key, [])
+            if matches:
+                best = max(matches, key=lambda m: m.get('score', 0))
+                score = best.get('score', 0)
+                is_match = score >= 0.5
+                checks.append({
+                    'check_type': check_type,
+                    'status': 'flagged' if is_match else 'clear',
+                    'result': {
+                        'list': list_name,
+                        'match_score': int(score * 100),
+                        'matched_entity': best.get('caption', ''),
+                        'reason': f'{"Match" if is_match else "Low-confidence match"} found on {list_name}',
+                        'datasets': best.get('datasets', []),
+                        'properties': best.get('properties', {}),
+                        'source': 'opensanctions_api',
+                        'records_searched': api_result.get('total', {}).get('value', 0),
+                    },
+                })
+            else:
+                checks.append({
+                    'check_type': check_type,
+                    'status': 'clear',
+                    'result': {
+                        'list': list_name,
+                        'match_score': 0,
+                        'message': f'No matches found on {list_name}',
+                        'records_searched': api_result.get('total', {}).get('value', 0),
+                        'source': 'opensanctions_api',
+                    },
+                })
+
+        return checks
+
+    # --- Direct List Downloads (Fallback) ---
+
+    @classmethod
+    def _get_un_entities(cls):
+        """Download and parse UN Security Council consolidated list XML."""
+        cached = _list_cache.get('un_entities')
+        if cached is not None:
+            return cached
+
+        entities = []
+        try:
+            resp = requests.get(
+                'https://scsanctions.un.org/resources/xml/en/consolidated.xml',
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                root = ET.fromstring(resp.content)
+                # Parse entities (not individuals)
+                for entity in root.iter():
+                    if entity.tag.endswith('ENTITY') or entity.tag == 'ENTITY':
+                        first = entity.findtext('.//FIRST_NAME', '') or ''
+                        second = entity.findtext('.//SECOND_NAME', '') or ''
+                        name = f'{first} {second}'.strip()
+                        if name:
+                            entities.append(name)
+                    # Also check INDIVIDUAL for personnel screening
+                    if entity.tag.endswith('INDIVIDUAL') or entity.tag == 'INDIVIDUAL':
+                        first = entity.findtext('.//FIRST_NAME', '') or ''
+                        second = entity.findtext('.//SECOND_NAME', '') or ''
+                        third = entity.findtext('.//THIRD_NAME', '') or ''
+                        name = f'{first} {second} {third}'.strip()
+                        if name:
+                            entities.append(name)
+                    # Check aliases
+                    for alias in entity.findall('.//ALIAS'):
+                        alias_name = alias.findtext('ALIAS_NAME', '')
+                        if alias_name:
+                            entities.append(alias_name)
+
+                logger.info(f"Downloaded UN sanctions list: {len(entities)} entities")
+                _list_cache.set('un_entities', entities)
+        except Exception as e:
+            logger.error(f"Failed to download UN sanctions list: {e}")
+
+        return entities
+
+    @classmethod
+    def _get_ofac_entities(cls):
+        """Download and parse OFAC SDN CSV."""
+        cached = _list_cache.get('ofac_entities')
+        if cached is not None:
+            return cached
+
+        entities = []
+        try:
+            resp = requests.get(
+                'https://www.treasury.gov/ofac/downloads/sdn.csv',
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                reader = csv.reader(io.StringIO(resp.text))
+                for row in reader:
+                    if len(row) >= 2:
+                        name = row[1].strip()  # SDN_Name is column 2
+                        sdn_type = row[2].strip() if len(row) >= 3 else ''
+                        if name and name != '-0-':
+                            entities.append({'name': name, 'type': sdn_type,
+                                             'program': row[3].strip() if len(row) >= 4 else ''})
+
+                logger.info(f"Downloaded OFAC SDN list: {len(entities)} entries")
+                _list_cache.set('ofac_entities', entities)
+        except Exception as e:
+            logger.error(f"Failed to download OFAC SDN list: {e}")
+
+        return entities
+
+    @classmethod
+    def _get_eu_entities(cls):
+        """Download and parse EU sanctions CSV."""
+        cached = _list_cache.get('eu_entities')
+        if cached is not None:
+            return cached
+
+        entities = []
+        try:
+            resp = requests.get(
+                'https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw',
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                reader = csv.DictReader(io.StringIO(resp.text), delimiter=';')
+                for row in reader:
+                    name = row.get('NameAlias_WholeName', '').strip()
+                    if name:
+                        entities.append({
+                            'name': name,
+                            'subject_type': row.get('Entity_SubjectType', ''),
+                            'regulation': row.get('Entity_Regulation_NumberTitle', ''),
+                        })
+
+                logger.info(f"Downloaded EU sanctions list: {len(entities)} entries")
+                _list_cache.set('eu_entities', entities)
+        except Exception as e:
+            logger.error(f"Failed to download EU sanctions list: {e}")
+
+        return entities
+
+    @classmethod
+    def _fuzzy_match(cls, name, entity_name, threshold=None):
+        """Fuzzy name matching using SequenceMatcher."""
+        threshold = threshold or cls.FUZZY_THRESHOLD
+        name_lower = name.lower().strip()
+        entity_lower = entity_name.lower().strip()
+        # Exact match
+        if name_lower == entity_lower:
+            return 1.0
+        # Substring containment
+        if name_lower in entity_lower or entity_lower in name_lower:
+            return 0.9
+        # Fuzzy ratio
+        return SequenceMatcher(None, name_lower, entity_lower).ratio()
+
+    @classmethod
+    def _download_and_check_un(cls, org_name, entity_type='entity'):
+        """Check against downloaded UN sanctions list."""
+        entities = cls._get_un_entities()
+        best_score = 0.0
+        best_match = ''
+
+        for entity_name in entities:
+            score = cls._fuzzy_match(org_name, entity_name)
+            if score > best_score:
+                best_score = score
+                best_match = entity_name
+
+        is_flagged = best_score >= cls.FUZZY_THRESHOLD
         return {
             'check_type': 'sanctions_un',
-            'status': 'clear',
+            'status': 'flagged' if is_flagged else 'clear',
             'result': {
                 'list': 'UN Security Council Consolidated List',
-                'match_score': 0,
-                'message': 'No matches found on UN sanctions lists',
-                'checked_against': 'UN Security Council Resolutions 1267, 1373, 1718, 1988, 2253',
-                'records_searched': 892,
+                'match_score': int(best_score * 100),
+                'matched_entity': best_match if is_flagged else '',
+                'message': f'{"Match found" if is_flagged else "No matches found"} on UN sanctions list',
+                'reason': f'Fuzzy match score: {int(best_score * 100)}%' if is_flagged else '',
+                'records_searched': len(entities),
+                'source': 'un_xml_download',
             },
         }
 
     @classmethod
-    def _check_ofac(cls, org_name, country, is_flagged):
-        if is_flagged:
-            return {
-                'check_type': 'sanctions_ofac',
-                'status': 'flagged',
-                'result': {
-                    'list': 'OFAC Specially Designated Nationals (SDN)',
-                    'match_score': 76,
-                    'matched_entity': f'{org_name} (possible alias match)',
-                    'reason': 'Possible alias match found on OFAC SDN list',
-                    'sdn_type': 'Entity',
-                    'programs': ['SDGT', 'SYRIA'],
-                    'action_required': 'Enhanced due diligence recommended',
-                },
-            }
+    def _download_and_check_ofac(cls, org_name):
+        """Check against downloaded OFAC SDN CSV."""
+        entities = cls._get_ofac_entities()
+        best_score = 0.0
+        best_match = {}
+
+        for entry in entities:
+            score = cls._fuzzy_match(org_name, entry['name'])
+            if score > best_score:
+                best_score = score
+                best_match = entry
+
+        is_flagged = best_score >= cls.FUZZY_THRESHOLD
         return {
             'check_type': 'sanctions_ofac',
-            'status': 'clear',
+            'status': 'flagged' if is_flagged else 'clear',
             'result': {
                 'list': 'OFAC Specially Designated Nationals (SDN)',
-                'match_score': 0,
-                'message': 'No matches found on OFAC SDN or consolidated lists',
-                'records_searched': 11847,
+                'match_score': int(best_score * 100),
+                'matched_entity': best_match.get('name', '') if is_flagged else '',
+                'message': f'{"Match found" if is_flagged else "No matches found"} on OFAC SDN list',
+                'sdn_type': best_match.get('type', '') if is_flagged else '',
+                'programs': [best_match.get('program', '')] if is_flagged else [],
+                'records_searched': len(entities),
+                'source': 'ofac_csv_download',
             },
         }
 
     @classmethod
-    def _check_eu_sanctions(cls, org_name, country, is_flagged):
-        if is_flagged:
-            return {
-                'check_type': 'sanctions_eu',
-                'status': 'flagged',
-                'result': {
-                    'list': 'EU Consolidated Financial Sanctions List',
-                    'match_score': 71,
-                    'matched_entity': org_name,
-                    'reason': 'Name similarity detected with entity on EU restrictive measures list',
-                    'regulation': 'Council Regulation (EC) No 881/2002',
-                    'action_required': 'Verify identity and seek legal guidance',
-                },
-            }
+    def _download_and_check_eu(cls, org_name):
+        """Check against downloaded EU sanctions CSV."""
+        entities = cls._get_eu_entities()
+        best_score = 0.0
+        best_match = {}
+
+        for entry in entities:
+            score = cls._fuzzy_match(org_name, entry['name'])
+            if score > best_score:
+                best_score = score
+                best_match = entry
+
+        is_flagged = best_score >= cls.FUZZY_THRESHOLD
         return {
             'check_type': 'sanctions_eu',
-            'status': 'clear',
+            'status': 'flagged' if is_flagged else 'clear',
             'result': {
                 'list': 'EU Consolidated Financial Sanctions List',
-                'match_score': 0,
-                'message': 'No matches found on EU financial sanctions lists',
-                'records_searched': 2341,
+                'match_score': int(best_score * 100),
+                'matched_entity': best_match.get('name', '') if is_flagged else '',
+                'message': f'{"Match found" if is_flagged else "No matches found"} on EU sanctions list',
+                'regulation': best_match.get('regulation', '') if is_flagged else '',
+                'records_searched': len(entities),
+                'source': 'eu_csv_download',
             },
         }
 
     @classmethod
-    def _check_world_bank(cls, org_name, country, is_flagged):
+    def _check_world_bank_fallback(cls, org_name):
+        """World Bank debarment list — no direct download, OpenSanctions covers it."""
         return {
             'check_type': 'blacklist',
             'status': 'clear',
             'result': {
                 'list': 'World Bank Group Listing of Ineligible Firms & Individuals',
                 'match_score': 0,
-                'message': 'No matches found on World Bank debarment list',
-                'records_searched': 1456,
+                'message': 'World Bank debarment check requires OpenSanctions API or manual verification',
+                'note': 'Visit https://www.worldbank.org/en/projects-operations/procurement/debarred-firms',
+                'source': 'not_available',
             },
         }
+
+    # --- Registration & Persistence ---
 
     @classmethod
     def _check_registration(cls, org_name, country):
@@ -2047,6 +2401,257 @@ class ComplianceService:
             saved.append(check)
         db.session.commit()
         return saved
+
+
+# =============================================================================
+# 8b. REGISTRY VERIFICATION SERVICE
+# =============================================================================
+
+class RegistryService:
+    """
+    Live registration verification against government registries.
+    Country-specific methods try real HTTP calls where APIs/portals exist,
+    falling back to AI certificate analysis + format validation.
+    """
+
+    @classmethod
+    def verify_online(cls, country, reg_number, org_name=None):
+        """
+        Attempt online verification against a government registry.
+        Returns dict with: source, verified, details, registry_url, error
+        """
+        method_map = {
+            'South Africa': cls._verify_south_africa,
+            'Nigeria': cls._verify_nigeria,
+            'Kenya': cls._verify_kenya,
+            'Uganda': cls._verify_uganda,
+            'Tanzania': cls._verify_tanzania,
+        }
+
+        handler = method_map.get(country)
+        if handler and reg_number:
+            try:
+                return handler(reg_number, org_name)
+            except Exception as e:
+                logger.error(f"Registry verification failed for {country}: {e}")
+                return {
+                    'source': 'registry_error',
+                    'verified': None,
+                    'details': f'Online verification attempted but failed: {str(e)}',
+                    'registry_url': cls._get_registry_url(country),
+                    'error': True,
+                }
+
+        # Countries without online registries
+        no_registry = {
+            'Somalia': 'Somalia (MOIFAR) does not have a publicly searchable online NGO registry.',
+            'Ethiopia': 'Ethiopia (ACSO) does not have a publicly searchable online CSO registry.',
+        }
+        if country in no_registry:
+            return {
+                'source': 'not_available',
+                'verified': None,
+                'details': no_registry[country] + ' Manual verification required.',
+                'registry_url': cls._get_registry_url(country),
+                'error': False,
+            }
+
+        return {
+            'source': 'not_available',
+            'verified': None,
+            'details': f'No online registry integration available for {country}. Manual verification required.',
+            'registry_url': cls._get_registry_url(country),
+            'error': False,
+        }
+
+    @classmethod
+    def _get_registry_url(cls, country):
+        urls = {
+            'Kenya': 'https://brs.go.ke/',
+            'Nigeria': 'https://search.cac.gov.ng/',
+            'South Africa': 'https://www.npo.gov.za/',
+            'Uganda': 'https://ngobureau.go.ug/en/updated-national-ngo-register',
+            'Tanzania': 'https://nis.jamii.go.tz/mapping',
+            'Somalia': 'https://moifar.gov.so/en/ngo-registeration/',
+            'Ethiopia': 'https://acso.gov.et/en',
+        }
+        return urls.get(country, '')
+
+    @classmethod
+    def _verify_south_africa(cls, reg_number, org_name=None):
+        """South Africa - DSD NPO Registry (npo.gov.za) and CIPC."""
+        # Clean up NPO number format (remove NPO prefix if present)
+        clean_number = reg_number.replace('NPO', '').replace('npo', '').strip()
+        # Try to strip common SA formats
+        for prefix in ['ZA-NPO-', 'ZA-NPC-', 'NPO-']:
+            clean_number = clean_number.replace(prefix, '')
+
+        try:
+            # Query the DSD NPO search
+            search_url = 'https://www.npo.gov.za/PublicNpo/Npo'
+            resp = requests.get(
+                search_url,
+                params={'NpoRegistrationNumber': clean_number},
+                timeout=15,
+                headers={'User-Agent': 'Kuja-Grant-Verification/1.0'},
+            )
+
+            if resp.status_code == 200 and org_name and org_name.lower() in resp.text.lower():
+                return {
+                    'source': 'registry_web',
+                    'verified': True,
+                    'details': f'Organization name found in South Africa NPO registry search results for registration {clean_number}.',
+                    'registry_url': 'https://www.npo.gov.za/',
+                    'error': False,
+                }
+
+            return {
+                'source': 'registry_web',
+                'verified': None,
+                'details': f'South Africa NPO registry queried for {clean_number}. Please verify manually at https://www.npo.gov.za/ to confirm registration status.',
+                'registry_url': 'https://www.npo.gov.za/',
+                'error': False,
+            }
+        except Exception as e:
+            return {
+                'source': 'registry_web',
+                'verified': None,
+                'details': f'South Africa NPO registry query attempted. Verify at https://www.npo.gov.za/. Error: {str(e)[:100]}',
+                'registry_url': 'https://www.npo.gov.za/',
+                'error': True,
+            }
+
+    @classmethod
+    def _verify_nigeria(cls, reg_number, org_name=None):
+        """Nigeria - Corporate Affairs Commission (CAC) public search."""
+        clean_name = org_name or ''
+        try:
+            # Try the CAC public search API
+            search_url = 'https://search.cac.gov.ng/home'
+            # The CAC search is a web portal; we try a basic request
+            resp = requests.get(
+                search_url,
+                timeout=15,
+                headers={'User-Agent': 'Kuja-Grant-Verification/1.0'},
+            )
+
+            if resp.status_code == 200:
+                # Portal is available
+                return {
+                    'source': 'registry_web',
+                    'verified': None,
+                    'details': f'Nigeria CAC portal is accessible. Search for "{clean_name}" or registration number "{reg_number}" at https://search.cac.gov.ng/ to verify status. CAC also available at https://icrp.cac.gov.ng/public-search/',
+                    'registry_url': 'https://search.cac.gov.ng/',
+                    'portal_accessible': True,
+                    'error': False,
+                }
+
+            return {
+                'source': 'registry_web',
+                'verified': None,
+                'details': f'Nigeria CAC portal returned status {resp.status_code}. Try manual verification at https://search.cac.gov.ng/',
+                'registry_url': 'https://search.cac.gov.ng/',
+                'portal_accessible': False,
+                'error': False,
+            }
+        except Exception as e:
+            return {
+                'source': 'registry_web',
+                'verified': None,
+                'details': f'Nigeria CAC portal unreachable. Verify manually at https://search.cac.gov.ng/. Error: {str(e)[:100]}',
+                'registry_url': 'https://search.cac.gov.ng/',
+                'error': True,
+            }
+
+    @classmethod
+    def _verify_kenya(cls, reg_number, org_name=None):
+        """Kenya - NGO Board / BRS. Limited online access."""
+        try:
+            # Check if BRS portal is accessible
+            resp = requests.get('https://brs.go.ke/', timeout=10,
+                                headers={'User-Agent': 'Kuja-Grant-Verification/1.0'})
+            portal_ok = resp.status_code == 200
+        except Exception:
+            portal_ok = False
+
+        return {
+            'source': 'registry_web_limited',
+            'verified': None,
+            'details': (
+                f'Kenya NGO Board does not have a public search API. '
+                f'Registration number {reg_number} follows the expected format (OP.218/...). '
+                f'BRS portal at https://brs.go.ke/ is {"accessible" if portal_ok else "currently unavailable"}. '
+                f'Kenya is transitioning to the PBO Act (2024). '
+                f'Recommend manual verification via NGO Coordination Board.'
+            ),
+            'registry_url': 'https://brs.go.ke/',
+            'portal_accessible': portal_ok,
+            'error': False,
+        }
+
+    @classmethod
+    def _verify_uganda(cls, reg_number, org_name=None):
+        """Uganda - NGO Bureau Updated National NGO Register."""
+        try:
+            resp = requests.get(
+                'https://ngobureau.go.ug/en/updated-national-ngo-register',
+                timeout=15,
+                headers={'User-Agent': 'Kuja-Grant-Verification/1.0'},
+            )
+            portal_ok = resp.status_code == 200
+            # Check if org name appears in the register page
+            name_found = org_name and org_name.lower() in resp.text.lower() if portal_ok else False
+        except Exception:
+            portal_ok = False
+            name_found = False
+
+        if name_found:
+            return {
+                'source': 'registry_web',
+                'verified': True,
+                'details': f'Organization "{org_name}" found in Uganda NGO Bureau Updated National NGO Register.',
+                'registry_url': 'https://ngobureau.go.ug/en/updated-national-ngo-register',
+                'portal_accessible': True,
+                'error': False,
+            }
+
+        return {
+            'source': 'registry_web_limited',
+            'verified': None,
+            'details': (
+                f'Uganda NGO Bureau register is {"accessible" if portal_ok else "currently unavailable"}. '
+                f'{"Organization not found in initial search. " if portal_ok and not name_found else ""}'
+                f'Verify manually at https://ngobureau.go.ug/en/updated-national-ngo-register'
+            ),
+            'registry_url': 'https://ngobureau.go.ug/en/updated-national-ngo-register',
+            'portal_accessible': portal_ok,
+            'error': False,
+        }
+
+    @classmethod
+    def _verify_tanzania(cls, reg_number, org_name=None):
+        """Tanzania - NiS (NGOs Information System)."""
+        try:
+            resp = requests.get(
+                'https://nis.jamii.go.tz/mapping',
+                timeout=15,
+                headers={'User-Agent': 'Kuja-Grant-Verification/1.0'},
+            )
+            portal_ok = resp.status_code == 200
+        except Exception:
+            portal_ok = False
+
+        return {
+            'source': 'registry_web_limited',
+            'verified': None,
+            'details': (
+                f'Tanzania NiS portal (10,700+ NGOs listed) is {"accessible" if portal_ok else "currently unavailable"}. '
+                f'Search for "{org_name or reg_number}" at https://nis.jamii.go.tz/mapping'
+            ),
+            'registry_url': 'https://nis.jamii.go.tz/mapping',
+            'portal_accessible': portal_ok,
+            'error': False,
+        }
 
 
 # =============================================================================
@@ -3057,9 +3662,23 @@ def api_upload_document():
         mime_type=mime_type,
     )
 
-    # Run AI analysis
+    # Look up donor-specific requirements for this document type
+    donor_requirements = None
+    if application_id:
+        app_record = db.session.get(Application, application_id)
+        if app_record and app_record.grant:
+            doc_reqs = app_record.grant.get_doc_requirements() or []
+            for req in doc_reqs:
+                if req.get('type') == doc_type or req.get('key') == doc_type:
+                    donor_requirements = req
+                    break
+
+    # Run AI analysis (with donor requirements if available)
     try:
-        analysis = AIService.analyze_document(original_filename, doc_type, file_size, file_path=filepath)
+        analysis = AIService.analyze_document(
+            original_filename, doc_type, file_size,
+            file_path=filepath, requirements=donor_requirements,
+        )
         document.set_ai_analysis(analysis)
         document.score = analysis.get('score', 0)
     except Exception as e:
@@ -3402,6 +4021,24 @@ def api_verify_registration():
         reg_number=org.registration_number,
     )
 
+    # Run live registry check
+    registry_check = RegistryService.verify_online(
+        org.country, org.registration_number, org.name
+    )
+    ai_result['registry_check'] = registry_check
+
+    # If registry confirms, boost confidence and add finding
+    if registry_check.get('verified') is True:
+        ai_result['status'] = 'ai_reviewed'
+        ai_result['confidence'] = max(ai_result.get('confidence', 0), 85)
+        ai_result.setdefault('findings', []).append(
+            f'Registration confirmed via {org.country} government registry ({registry_check.get("source", "online")})'
+        )
+    elif registry_check.get('source') == 'not_available':
+        ai_result.setdefault('findings', []).append(
+            f'{registry_check.get("details", "No online registry available for this country.")}'
+        )
+
     # Create or update verification record
     verification = RegistrationVerification(
         org_id=org_id,
@@ -3412,6 +4049,9 @@ def api_verify_registration():
         ai_confidence=ai_result.get('confidence', 0),
         document_id=doc_id,
     )
+
+    # Store registry check result
+    verification.set_registry_check_result(registry_check)
 
     # Parse dates
     ext_data = ai_result.get('extracted_data', {})
@@ -3427,9 +4067,12 @@ def api_verify_registration():
             pass
 
     # Store registry URL if available
-    registry = AIService.GOVERNMENT_REGISTRIES.get(org.country or '', {})
-    if registry:
-        verification.registry_url = registry.get('search_url') or registry.get('url')
+    registry_url = registry_check.get('registry_url') or ''
+    if not registry_url:
+        registry = AIService.GOVERNMENT_REGISTRIES.get(org.country or '', {})
+        if registry:
+            registry_url = registry.get('search_url') or registry.get('url')
+    verification.registry_url = registry_url
 
     verification.set_ai_analysis(ai_result)
     db.session.add(verification)
@@ -3909,6 +4552,221 @@ def api_review_report(report_id):
     return jsonify({'success': True, 'report': report.to_dict()})
 
 
+@app.route('/api/reports/upcoming', methods=['GET'])
+@login_required
+def api_upcoming_reports():
+    """Get upcoming and overdue reports for the current user's grants.
+    For NGOs: reports they need to submit for awarded grants.
+    For Donors: reports they are expecting from grantees.
+    """
+    today = date.today()
+    upcoming = []
+
+    if current_user.role == 'ngo':
+        # Find awarded applications for this NGO's org
+        awarded_apps = Application.query.filter_by(
+            ngo_org_id=current_user.org_id, status='awarded'
+        ).all()
+
+        for app_record in awarded_apps:
+            grant = app_record.grant
+            if not grant:
+                continue
+
+            requirements = grant.get_reporting_requirements()
+            if not requirements:
+                # Generate default requirements from reporting_frequency
+                freq = grant.reporting_frequency or 'quarterly'
+                requirements = [{'type': 'financial', 'frequency': freq, 'due_days_after_period': 30, 'title': f'{freq.title()} Financial Report'},
+                                {'type': 'narrative', 'frequency': freq, 'due_days_after_period': 45, 'title': f'{freq.title()} Narrative Report'}]
+
+            # Calculate next due dates based on grant start (published_at or created_at)
+            grant_start = (grant.published_at or grant.created_at or datetime.utcnow()).date() if hasattr(grant.published_at or grant.created_at, 'date') else today
+
+            # Get existing submitted/accepted reports for this grant + org
+            existing_reports = Report.query.filter_by(
+                grant_id=grant.id, submitted_by_org_id=current_user.org_id
+            ).filter(Report.status.in_(['submitted', 'accepted', 'under_review'])).all()
+            existing_periods = {(r.report_type, r.reporting_period) for r in existing_reports}
+
+            for req in requirements:
+                freq = req.get('frequency', grant.reporting_frequency or 'quarterly')
+                due_days = req.get('due_days_after_period', 30)
+                req_type = req.get('type', 'progress')
+                req_title = req.get('title', f'{req_type.title()} Report')
+
+                # Calculate period intervals
+                if freq == 'monthly':
+                    interval_months = 1
+                elif freq == 'quarterly':
+                    interval_months = 3
+                elif freq == 'semi-annual':
+                    interval_months = 6
+                elif freq == 'annual':
+                    interval_months = 12
+                else:
+                    continue  # Skip final_only - those are created manually
+
+                # Generate next 4 upcoming periods
+                for period_num in range(1, 13):
+                    period_end_month = grant_start.month + (interval_months * period_num) - 1
+                    period_end_year = grant_start.year + (period_end_month - 1) // 12
+                    period_end_month = ((period_end_month - 1) % 12) + 1
+
+                    try:
+                        # Last day of the period end month
+                        if period_end_month == 12:
+                            period_end = date(period_end_year, 12, 31)
+                        else:
+                            period_end = date(period_end_year, period_end_month + 1, 1) - timedelta(days=1)
+                    except (ValueError, OverflowError):
+                        continue
+
+                    due = period_end + timedelta(days=due_days)
+
+                    # Only show reports due within the next 90 days or overdue
+                    if due > today + timedelta(days=90):
+                        break
+                    if due < grant_start:
+                        continue
+
+                    # Determine period label
+                    period_start_month = period_end_month - interval_months + 1
+                    if period_start_month < 1:
+                        period_start_month += 12
+                        period_start_year = period_end_year - 1
+                    else:
+                        period_start_year = period_end_year
+
+                    if interval_months <= 3:
+                        q_num = ((period_end_month - 1) // 3) + 1
+                        period_label = f"Q{q_num} {period_end_year}"
+                    elif interval_months == 6:
+                        h_num = 1 if period_end_month <= 6 else 2
+                        period_label = f"H{h_num} {period_end_year}"
+                    else:
+                        period_label = str(period_end_year)
+
+                    # Skip if already submitted
+                    if (req_type, period_label) in existing_periods:
+                        continue
+
+                    # Check if there's a draft already
+                    draft = Report.query.filter_by(
+                        grant_id=grant.id, submitted_by_org_id=current_user.org_id,
+                        report_type=req_type, reporting_period=period_label
+                    ).filter(Report.status.in_(['draft', 'revision_requested'])).first()
+
+                    days_until = (due - today).days
+                    upcoming.append({
+                        'grant_id': grant.id,
+                        'grant_title': grant.title,
+                        'application_id': app_record.id,
+                        'report_type': req_type,
+                        'requirement_title': req_title,
+                        'reporting_period': period_label,
+                        'due_date': due.isoformat(),
+                        'days_until_due': days_until,
+                        'is_overdue': days_until < 0,
+                        'status': draft.status if draft else 'not_started',
+                        'draft_report_id': draft.id if draft else None,
+                        'donor_org': grant.donor_org.name if grant.donor_org else None,
+                    })
+
+    elif current_user.role == 'donor':
+        # Find grants owned by this donor that are awarded
+        awarded_apps = Application.query.join(Grant).filter(
+            Grant.donor_org_id == current_user.org_id,
+            Application.status == 'awarded'
+        ).all()
+
+        for app_record in awarded_apps:
+            grant = app_record.grant
+            if not grant:
+                continue
+            ngo_org = app_record.ngo_org
+
+            requirements = grant.get_reporting_requirements()
+            if not requirements:
+                freq = grant.reporting_frequency or 'quarterly'
+                requirements = [{'type': 'financial', 'frequency': freq, 'due_days_after_period': 30, 'title': f'{freq.title()} Financial Report'}]
+
+            grant_start = (grant.published_at or grant.created_at or datetime.utcnow()).date() if hasattr(grant.published_at or grant.created_at, 'date') else today
+
+            for req in requirements:
+                freq = req.get('frequency', grant.reporting_frequency or 'quarterly')
+                due_days = req.get('due_days_after_period', 30)
+                req_type = req.get('type', 'progress')
+
+                if freq == 'monthly':
+                    interval_months = 1
+                elif freq == 'quarterly':
+                    interval_months = 3
+                elif freq == 'semi-annual':
+                    interval_months = 6
+                elif freq == 'annual':
+                    interval_months = 12
+                else:
+                    continue
+
+                for period_num in range(1, 13):
+                    period_end_month = grant_start.month + (interval_months * period_num) - 1
+                    period_end_year = grant_start.year + (period_end_month - 1) // 12
+                    period_end_month = ((period_end_month - 1) % 12) + 1
+                    try:
+                        if period_end_month == 12:
+                            period_end = date(period_end_year, 12, 31)
+                        else:
+                            period_end = date(period_end_year, period_end_month + 1, 1) - timedelta(days=1)
+                    except (ValueError, OverflowError):
+                        continue
+
+                    due = period_end + timedelta(days=due_days)
+                    if due > today + timedelta(days=90):
+                        break
+                    if due < grant_start:
+                        continue
+
+                    if interval_months <= 3:
+                        q_num = ((period_end_month - 1) // 3) + 1
+                        period_label = f"Q{q_num} {period_end_year}"
+                    elif interval_months == 6:
+                        h_num = 1 if period_end_month <= 6 else 2
+                        period_label = f"H{h_num} {period_end_year}"
+                    else:
+                        period_label = str(period_end_year)
+
+                    # Check if report exists from this NGO
+                    existing = Report.query.filter_by(
+                        grant_id=grant.id, submitted_by_org_id=app_record.ngo_org_id,
+                        report_type=req_type, reporting_period=period_label
+                    ).first()
+
+                    days_until = (due - today).days
+                    upcoming.append({
+                        'grant_id': grant.id,
+                        'grant_title': grant.title,
+                        'ngo_org_id': app_record.ngo_org_id,
+                        'ngo_org_name': ngo_org.name if ngo_org else None,
+                        'report_type': req_type,
+                        'reporting_period': period_label,
+                        'due_date': due.isoformat(),
+                        'days_until_due': days_until,
+                        'is_overdue': days_until < 0,
+                        'status': existing.status if existing else 'not_submitted',
+                        'report_id': existing.id if existing else None,
+                    })
+
+    # Sort: overdue first, then by due date
+    upcoming.sort(key=lambda x: (not x.get('is_overdue', False), x.get('due_date', '')))
+
+    return jsonify({
+        'upcoming_reports': upcoming,
+        'total': len(upcoming),
+        'overdue_count': sum(1 for r in upcoming if r.get('is_overdue')),
+    })
+
+
 @app.route('/api/grants/<int:grant_id>/upload-grant-doc', methods=['POST'])
 @login_required
 def api_upload_grant_doc(grant_id):
@@ -3959,12 +4817,24 @@ def api_upload_grant_doc(grant_id):
     # AI extracts reporting requirements
     extracted = AIService.extract_reporting_requirements(file_content, grant.title)
 
+    # Auto-save extracted requirements to grant
+    if extracted.get('requirements'):
+        grant.set_reporting_requirements(extracted['requirements'])
+    if extracted.get('reporting_frequency'):
+        grant.reporting_frequency = extracted['reporting_frequency']
+    if extracted.get('template_sections') or extracted.get('indicators'):
+        grant.set_report_template({
+            'template_sections': extracted.get('template_sections', []),
+            'indicators': extracted.get('indicators', []),
+        })
+
     db.session.commit()
 
     return jsonify({
         'success': True,
         'grant_document': stored_filename,
         'extracted_requirements': extracted,
+        'auto_saved': True,
     })
 
 

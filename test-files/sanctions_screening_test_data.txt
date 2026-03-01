@@ -1,0 +1,290 @@
+================================================================================
+KUJA GRANT MANAGEMENT SYSTEM - SANCTIONS SCREENING TEST DATA
+================================================================================
+Purpose: Test data for sanctions screening against global watchlists
+Last Updated: 2026-03-01
+================================================================================
+
+
+================================================================================
+SECTION 1: DATA SOURCES
+================================================================================
+
+--------------------------------------------------------------------------------
+UN Security Council Consolidated List
+--------------------------------------------------------------------------------
+Download XML:  https://scsanctions.un.org/resources/xml/en/consolidated.xml
+RSS Updates:   https://main.un.org/securitycouncil/en/rss-updates-unsc-consolidated-list
+Format:        XML with DATAID, names, aliases, nationality, list type
+API:           No official API; use XML download
+
+
+--------------------------------------------------------------------------------
+US OFAC SDN List
+--------------------------------------------------------------------------------
+Download CSV:  https://www.treasury.gov/ofac/downloads/sdn.csv
+Addresses:     https://www.treasury.gov/ofac/downloads/add.csv
+Aliases:       https://www.treasury.gov/ofac/downloads/alt.csv
+Comments:      https://www.treasury.gov/ofac/downloads/sdn_comments.csv
+Search Tool:   https://sanctionssearch.ofac.treas.gov/
+Format:        CSV with ent_num (primary key), SDN_Name, SDN_Type, Program
+API:           No official API; use CSV download
+
+IMPORTANT:     Join all 4 files via ent_num for complete records
+
+
+--------------------------------------------------------------------------------
+EU Consolidated Financial Sanctions List
+--------------------------------------------------------------------------------
+Download CSV:  https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw
+Download XML:  https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw
+RSS:           https://webgate.ec.europa.eu/fsd/fsf/public/rss
+Search:        https://www.sanctionsmap.eu/
+Token:         dG9rZW4tMjAxNw (base64 for "token-2017", public access)
+
+
+--------------------------------------------------------------------------------
+World Bank Debarment List
+--------------------------------------------------------------------------------
+Web:           https://www.worldbank.org/en/projects-operations/procurement/debarred-firms
+Download:      No CSV/JSON download from WB; use OpenSanctions mirror
+Updates:       Every 3 hours
+Cross-debarment: AfDB, ADB, EBRD, IDB
+
+
+--------------------------------------------------------------------------------
+OpenSanctions (Unified API - Recommended for Implementation)
+--------------------------------------------------------------------------------
+API Base:      https://api.opensanctions.org/
+Match:         POST https://api.opensanctions.org/match/<dataset>
+Search:        GET  https://api.opensanctions.org/search/<dataset>?q=<query>
+Entity:        GET  https://api.opensanctions.org/entities/<id>
+Datasets:      un_sc_sanctions, us_ofac_sdn, eu_fsf,
+               worldbank_debarred, sanctions (all combined)
+Updated:       Daily
+Auth:          API key required (free for non-commercial)
+
+
+================================================================================
+SECTION 2: REAL SANCTIONED ENTITIES - AFRICAN FOCUS
+================================================================================
+
+--------------------------------------------------------------------------------
+UN Security Council Sanctioned Entities
+--------------------------------------------------------------------------------
+
+  1. Al-Shabaab
+     Region:  Somalia
+     Listed:  12 Apr 2010
+     Regime:  Resolution 1844 (2008)
+
+  2. Jama'atu Ahlis Sunna Lidda'awati Wal Jihad (Boko Haram)
+     Region:  Nigeria
+     Listed:  22 May 2014
+     Regime:  ISIL/Al-Qaida
+
+  3. Forces Democratiques de Liberation du Rwanda (FDLR)
+     Region:  DRC
+     Listed:  31 Dec 2012
+     Regime:  Res. 2078
+
+  4. M23 (Mouvement du 23 Mars)
+     Region:  DRC
+     Listed:  31 Dec 2012
+     Regime:  Res. 2078
+
+  5. Allied Democratic Forces (ADF)
+     Region:  DRC/Uganda
+     Listed:  30 Jun 2014
+     Regime:  Res. 2078
+
+  6. Ansar Eddine
+     Region:  Mali
+     Listed:  19 Mar 2013
+     Regime:  ISIL/Al-Qaida
+
+
+--------------------------------------------------------------------------------
+US OFAC SDN Sanctioned Entities
+--------------------------------------------------------------------------------
+
+  1. Al-Shabaab
+     Program: SDGT
+     Type:    Entity
+     Region:  Somalia
+
+  2. Boko Haram
+     Program: SDGT
+     Type:    Entity
+     Region:  Nigeria
+
+  3. ISIS-West Africa
+     Program: SDGT
+     Type:    Entity
+     Region:  Nigeria
+
+  4. JNIM (Jama'at Nasr al-Islam wal Muslimin)
+     Program: SDGT
+     Type:    Entity
+     Region:  Mali
+
+  5. ISIS-Somalia
+     Program: SDGT
+     Type:    Entity
+     Region:  Somalia
+
+
+--------------------------------------------------------------------------------
+EU Financial Sanctions
+--------------------------------------------------------------------------------
+
+  1. Ansar Eddine
+     Region:     Mali
+     Regulation: Regulation (EC) No 881/2002
+
+  2. M23 / Congolese Revolutionary Army (ARC)
+     Region:     DRC
+     Listed:     Jul 2024
+
+  3. Alliance Fleuve Congo (AFC)
+     Region:     DRC
+     Listed:     Jul 2024
+
+  4. Gasabo Gold Refinery
+     Region:     Rwanda/DRC
+     Listed:     Mar 2025
+
+  5. FDLR-FOCA
+     Region:     DRC
+
+
+--------------------------------------------------------------------------------
+World Bank Debarment List
+--------------------------------------------------------------------------------
+
+  1. Gitto Costruzioni Generali Nigeria Limited
+     Region:   Nigeria
+     Grounds:  Fraud/Obstruction
+     Notes:    AfDB cross-debarment
+     Period:   Dec 2022+
+
+  2. Sego Ventures Nigeria Limited
+     Region:   Nigeria
+     Grounds:  Conditional release pending
+     Period:   Jun 2011+
+
+  3. Reef Building Systems Limited
+     Region:   Kenya (Nairobi)
+     Grounds:  Procurement violations
+     Period:   Jul 2013 - Jul 2016
+
+  4. Asbeco Nigeria Limited
+     Region:   Nigeria
+     Grounds:  Corrupt practices
+     Period:   5-year debarment
+
+  5. D.A. Construction Limited
+     Region:   Nigeria (Abuja)
+     Grounds:  Procurement violations
+     Period:   May 2014 - May 2017
+
+
+================================================================================
+SECTION 3: CLEAN ORGANIZATIONS (Negative/Clear Screening Tests)
+================================================================================
+These should all return CLEAR when screened:
+
+  1. Amani Community Development
+     Country: Kenya
+     Note:    Fictional test organization
+
+  2. ActionAid International Kenya
+     Country: Kenya
+     Note:    Real organization, not sanctioned
+
+  3. Gift of the Givers Foundation
+     Country: South Africa
+     Note:    Real organization, not sanctioned
+
+  4. World Vision Kenya
+     Country: Kenya
+     Note:    Real organization, not sanctioned
+
+  5. BRAC Uganda
+     Country: Uganda
+     Note:    Real organization, not sanctioned
+
+
+================================================================================
+SECTION 4: FUZZY MATCH TEST CASES
+================================================================================
+
+  1. Input:    "Al Shabab" (misspelling)
+     Target:   Al-Shabaab
+     Expected: FLAGGED (fuzzy match)
+
+  2. Input:    "Boko Haram Foundation" (name variation)
+     Target:   Boko Haram
+     Expected: FLAGGED for review
+
+  3. Input:    "M-23 Movement" (variation)
+     Target:   M23 (Mouvement du 23 Mars)
+     Expected: FLAGGED (fuzzy match)
+
+  4. Input:    "Amani Relief" (similar to clean org)
+     Target:   N/A (not same as Al-Shabaab)
+     Expected: CLEAR
+
+  5. Input:    "Gitto Construction Nigeria" (variation)
+     Target:   Gitto Costruzioni Generali Nigeria Limited
+     Expected: FLAGGED (fuzzy match)
+
+
+================================================================================
+SECTION 5: TEST SCENARIOS
+================================================================================
+
+Scenario 1 - CLEAR:
+  Action:   Screen "Amani Community Development" against all lists
+  Expected: All clear
+
+Scenario 2 - CLEAR:
+  Action:   Screen "ActionAid International Kenya" against all lists
+  Expected: All clear
+
+Scenario 3 - FLAGGED:
+  Action:   Screen "Al-Shabaab" against all lists
+  Expected: Flagged on UN, OFAC, EU
+
+Scenario 4 - FLAGGED:
+  Action:   Screen "Boko Haram" against all lists
+  Expected: Flagged on UN, OFAC
+
+Scenario 5 - FLAGGED:
+  Action:   Screen "M23" against all lists
+  Expected: Flagged on UN, EU
+
+Scenario 6 - FLAGGED:
+  Action:   Screen "Gitto Costruzioni Generali Nigeria Limited"
+  Expected: Flagged on World Bank debarment list
+
+Scenario 7 - FUZZY:
+  Action:   Screen "Al Shabab" (misspelled) against all lists
+  Expected: Flagged with lower confidence score (fuzzy match)
+
+Scenario 8 - BULK:
+  Action:   Screen all 5 clean NGO test accounts
+  Expected: All should return clear
+
+Scenario 9 - PERSONNEL:
+  Action:   Screen key personnel names from test organizations
+  Expected: All should return clear
+
+Scenario 10 - COMBINED:
+  Action:   Run full compliance check (registration + sanctions)
+            for Amani Community Development
+  Expected: Registration verified + All sanctions clear
+
+================================================================================
+END OF FILE
+================================================================================

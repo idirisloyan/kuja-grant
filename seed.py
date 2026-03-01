@@ -750,47 +750,47 @@ def seed():
                 db.session.add(c)
                 checks.append(c)
 
-        # Amani - all clear
+        # Amani - all clear (live screening format)
         add_checks(orgs[0].id, [
-            ('sanctions', 'clear', {'source': 'UN Sanctions List', 'result': 'No match found', 'checked_date': '2026-02-15'}, dt(2026, 2, 15, 8, 0)),
-            ('registration', 'clear', {'source': 'Kenya NGO Board', 'result': 'Registration confirmed active', 'reg_number': 'NGO/2012/3847'}, dt(2026, 2, 15, 8, 5)),
-            ('terrorist_financing', 'clear', {'source': 'FATF Watch List', 'result': 'No associations found'}, dt(2026, 2, 15, 8, 10)),
-            ('debarment', 'clear', {'source': 'World Bank Debarment List', 'result': 'Not listed'}, dt(2026, 2, 15, 8, 15)),
-            ('media_screening', 'clear', {'source': 'Adverse media check', 'result': 'No negative media coverage identified'}, dt(2026, 2, 15, 8, 20)),
+            ('un_sanctions', 'clear', {'source': 'UN Security Council Consolidated List', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Amani Community Development', 'api_score': 0, 'checked_date': '2026-02-15'}, dt(2026, 2, 15, 8, 0)),
+            ('ofac_sdn', 'clear', {'source': 'US OFAC SDN List', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Amani Community Development', 'api_score': 0}, dt(2026, 2, 15, 8, 2)),
+            ('eu_sanctions', 'clear', {'source': 'EU Financial Sanctions', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Amani Community Development', 'api_score': 0}, dt(2026, 2, 15, 8, 4)),
+            ('world_bank', 'clear', {'source': 'World Bank Debarment List', 'method': 'opensanctions_api', 'result': 'Not listed', 'query': 'Amani Community Development', 'api_score': 0}, dt(2026, 2, 15, 8, 6)),
+            ('keyword_screening', 'clear', {'source': 'Internal keyword screening', 'result': 'No sanctioned keywords found in organization name or description'}, dt(2026, 2, 15, 8, 8)),
         ])
 
-        # Salam - all clear
+        # Salam - all clear (live screening format)
         add_checks(orgs[1].id, [
-            ('sanctions', 'clear', {'source': 'UN Sanctions List', 'result': 'No match found'}, dt(2026, 2, 16, 9, 0)),
-            ('registration', 'clear', {'source': 'Somalia Ministry of Interior', 'result': 'Registration confirmed', 'reg_number': 'SOM/NGO/2015/221'}, dt(2026, 2, 16, 9, 5)),
-            ('terrorist_financing', 'clear', {'source': 'FATF Watch List', 'result': 'No associations found'}, dt(2026, 2, 16, 9, 10)),
-            ('debarment', 'clear', {'source': 'World Bank Debarment List', 'result': 'Not listed'}, dt(2026, 2, 16, 9, 15)),
+            ('un_sanctions', 'clear', {'source': 'UN Security Council Consolidated List', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Salam Relief Foundation'}, dt(2026, 2, 16, 9, 0)),
+            ('ofac_sdn', 'clear', {'source': 'US OFAC SDN List', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Salam Relief Foundation'}, dt(2026, 2, 16, 9, 2)),
+            ('eu_sanctions', 'clear', {'source': 'EU Financial Sanctions', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Salam Relief Foundation'}, dt(2026, 2, 16, 9, 4)),
+            ('world_bank', 'clear', {'source': 'World Bank Debarment List', 'method': 'opensanctions_api', 'result': 'Not listed', 'query': 'Salam Relief Foundation'}, dt(2026, 2, 16, 9, 6)),
         ])
 
-        # Ubuntu - all clear
+        # Ubuntu - all clear (live screening format)
         add_checks(orgs[2].id, [
-            ('sanctions', 'clear', {'source': 'UN Sanctions List', 'result': 'No match found'}, dt(2026, 2, 14, 10, 0)),
-            ('registration', 'clear', {'source': 'SA DSD NPO Register', 'result': 'Active registration confirmed', 'reg_number': 'ZA-NPO-2008-071234'}, dt(2026, 2, 14, 10, 5)),
-            ('terrorist_financing', 'clear', {'source': 'FATF Watch List', 'result': 'No associations found'}, dt(2026, 2, 14, 10, 10)),
-            ('debarment', 'clear', {'source': 'World Bank Debarment List', 'result': 'Not listed'}, dt(2026, 2, 14, 10, 15)),
-            ('media_screening', 'clear', {'source': 'Adverse media check', 'result': 'Positive media coverage noted for education impact'}, dt(2026, 2, 14, 10, 20)),
+            ('un_sanctions', 'clear', {'source': 'UN Security Council Consolidated List', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Ubuntu Education Trust'}, dt(2026, 2, 14, 10, 0)),
+            ('ofac_sdn', 'clear', {'source': 'US OFAC SDN List', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Ubuntu Education Trust'}, dt(2026, 2, 14, 10, 2)),
+            ('eu_sanctions', 'clear', {'source': 'EU Financial Sanctions', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Ubuntu Education Trust'}, dt(2026, 2, 14, 10, 4)),
+            ('world_bank', 'clear', {'source': 'World Bank Debarment List', 'method': 'opensanctions_api', 'result': 'Not listed', 'query': 'Ubuntu Education Trust'}, dt(2026, 2, 14, 10, 6)),
+            ('keyword_screening', 'clear', {'source': 'Internal keyword screening', 'result': 'No sanctioned keywords found'}, dt(2026, 2, 14, 10, 8)),
         ])
 
-        # Hope Bridges - one pending (registration verification)
+        # Hope Bridges - all clear on sanctions, registration pending (Uganda)
         add_checks(orgs[3].id, [
-            ('sanctions', 'clear', {'source': 'UN Sanctions List', 'result': 'No match found'}, dt(2026, 2, 17, 11, 0)),
-            ('registration', 'pending', {'source': 'Uganda NGO Bureau', 'result': 'Verification in progress - awaiting response from district office', 'reg_number': 'UG/CBO/2019/445'}, dt(2026, 2, 17, 11, 5)),
-            ('terrorist_financing', 'clear', {'source': 'FATF Watch List', 'result': 'No associations found'}, dt(2026, 2, 17, 11, 10)),
-            ('debarment', 'clear', {'source': 'World Bank Debarment List', 'result': 'Not listed'}, dt(2026, 2, 17, 11, 15)),
+            ('un_sanctions', 'clear', {'source': 'UN Security Council Consolidated List', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Hope Bridges Initiative'}, dt(2026, 2, 17, 11, 0)),
+            ('ofac_sdn', 'clear', {'source': 'US OFAC SDN List', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Hope Bridges Initiative'}, dt(2026, 2, 17, 11, 2)),
+            ('eu_sanctions', 'clear', {'source': 'EU Financial Sanctions', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Hope Bridges Initiative'}, dt(2026, 2, 17, 11, 4)),
+            ('world_bank', 'clear', {'source': 'World Bank Debarment List', 'method': 'opensanctions_api', 'result': 'Not listed', 'query': 'Hope Bridges Initiative'}, dt(2026, 2, 17, 11, 6)),
         ])
 
-        # Sahel Women - one flagged (sanctions partial name match)
+        # Sahel Women - flagged on sanctions (partial name match demo)
         add_checks(orgs[4].id, [
-            ('sanctions', 'flagged', {'source': 'UN Sanctions List', 'result': 'Partial name match found for network member - likely false positive', 'match_details': "Name 'Bello' matched partial entry - common surname in West Africa", 'risk_level': 'low', 'action_required': 'Manual review recommended'}, dt(2026, 2, 18, 12, 0)),
-            ('registration', 'clear', {'source': 'Nigeria CAC', 'result': 'Registration pending - application submitted and acknowledged'}, dt(2026, 2, 18, 12, 5)),
-            ('terrorist_financing', 'clear', {'source': 'FATF Watch List', 'result': 'No associations found'}, dt(2026, 2, 18, 12, 10)),
-            ('debarment', 'clear', {'source': 'World Bank Debarment List', 'result': 'Not listed'}, dt(2026, 2, 18, 12, 15)),
-            ('media_screening', 'clear', {'source': 'Adverse media check', 'result': 'No negative coverage found'}, dt(2026, 2, 18, 12, 20)),
+            ('un_sanctions', 'flagged', {'source': 'UN Security Council Consolidated List', 'method': 'opensanctions_api', 'result': 'Partial name match found', 'query': 'Sahel Women\'s Network', 'match_details': "Name 'Sahel' partially matched sanctioned entity. Score: 0.42. Likely false positive.", 'api_score': 0.42, 'risk_level': 'low', 'action_required': 'Manual review recommended'}, dt(2026, 2, 18, 12, 0)),
+            ('ofac_sdn', 'clear', {'source': 'US OFAC SDN List', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Sahel Women\'s Network', 'api_score': 0}, dt(2026, 2, 18, 12, 2)),
+            ('eu_sanctions', 'clear', {'source': 'EU Financial Sanctions', 'method': 'opensanctions_api', 'result': 'No match found', 'query': 'Sahel Women\'s Network', 'api_score': 0}, dt(2026, 2, 18, 12, 4)),
+            ('world_bank', 'clear', {'source': 'World Bank Debarment List', 'method': 'opensanctions_api', 'result': 'Not listed', 'query': 'Sahel Women\'s Network', 'api_score': 0}, dt(2026, 2, 18, 12, 6)),
+            ('keyword_screening', 'clear', {'source': 'Internal keyword screening', 'result': 'No sanctioned keywords found in organization name or description'}, dt(2026, 2, 18, 12, 8)),
         ])
 
         db.session.flush()
@@ -824,10 +824,19 @@ def seed():
             'score': 82,
             'completeness_score': 85,
             'quality_score': 78,
+            'compliance_score': 80,
             'findings': ['Budget variance analysis is thorough', 'Expenditure categories are clearly documented', 'Cash flow projection included'],
             'missing_items': ['Disaggregated beneficiary data not included in financial report'],
             'recommendations': ['Include procurement details for items over $5,000', 'Add exchange rate impact analysis'],
-            'summary': 'Solid quarterly financial report with good budget tracking. Minor gaps in procurement documentation.'
+            'requirement_scores': [
+                {'requirement': 'Statement of expenditure by budget line item', 'score': 90, 'addressed': True, 'feedback': 'Expenditure well documented by category with clear budget line items.'},
+                {'requirement': 'Budget vs. actual comparison with variance analysis', 'score': 85, 'addressed': True, 'feedback': 'Good variance analysis showing 87.9% utilization rate.'},
+                {'requirement': 'Bank reconciliation statement', 'score': 75, 'addressed': True, 'feedback': 'Opening and closing balances provided but formal bank reconciliation not attached.'},
+                {'requirement': 'Cash flow projection for next quarter', 'score': 70, 'addressed': True, 'feedback': 'Next steps mentioned but formal cash flow projection could be more detailed.'},
+                {'requirement': 'List of procurements exceeding $5,000', 'score': 60, 'addressed': False, 'feedback': 'Procurement amounts mentioned but no itemized list for items over $5,000.'},
+            ],
+            'summary': 'Solid quarterly financial report with good budget tracking. Minor gaps in procurement documentation.',
+            'risk_flags': ['Procurement documentation incomplete for items over $5,000 threshold'],
         })
         db.session.add(report1)
         reports.append(report1)
@@ -876,10 +885,19 @@ def seed():
             'score': 88,
             'completeness_score': 90,
             'quality_score': 85,
+            'compliance_score': 92,
             'findings': ['All required sections completed', 'Beneficiary data well disaggregated', 'Good use of quantitative indicators'],
             'missing_items': [],
             'recommendations': ['Include success stories for future reports', 'Add comparison with previous quarter'],
-            'summary': 'Excellent progress report with comprehensive data and clear presentation of results.'
+            'requirement_scores': [
+                {'requirement': 'Executive summary of progress', 'score': 90, 'addressed': True, 'feedback': 'Clear and comprehensive executive summary provided.'},
+                {'requirement': 'Activities completed against work plan', 'score': 92, 'addressed': True, 'feedback': 'Activities well documented with specific achievements.'},
+                {'requirement': 'Progress against indicators and targets', 'score': 95, 'addressed': True, 'feedback': 'Excellent quantitative tracking of indicators with target comparisons.'},
+                {'requirement': 'Beneficiary data disaggregated by gender and age', 'score': 88, 'addressed': True, 'feedback': 'Good disaggregation by gender. Age breakdown could be more detailed.'},
+                {'requirement': 'Challenges encountered and mitigation measures', 'score': 75, 'addressed': True, 'feedback': 'Challenges mentioned but mitigation measures could be more specific.'},
+            ],
+            'summary': 'Excellent progress report with comprehensive data and clear presentation of results.',
+            'risk_flags': [],
         })
         db.session.add(report3)
         reports.append(report3)
@@ -981,6 +999,17 @@ def seed():
                 'Schedule re-verification before March 2027 expiry',
             ],
         })
+        v1.set_registry_check_result({
+            'verified': None,
+            'method': 'portal_check',
+            'country': 'Kenya',
+            'registry': 'NGO Coordination Board / Business Registration Service (BRS)',
+            'registry_url': 'https://brs.go.ke/',
+            'portal_accessible': True,
+            'message': 'Kenya BRS portal is accessible. Search for registration number NGO/2012/3847 to verify.',
+            'guidance': 'Manual verification recommended - enter registration number at https://brs.go.ke/ to confirm status.',
+            'checked_at': '2026-02-15T08:12:00',
+        })
         db.session.add(v1)
         verifications.append(v1)
 
@@ -1078,6 +1107,18 @@ def seed():
                 'Registration confirmed - no further action needed',
                 'Continue annual compliance monitoring',
             ],
+        })
+        v3.set_registry_check_result({
+            'verified': True,
+            'method': 'npo_portal_search',
+            'country': 'South Africa',
+            'registry': 'Department of Social Development NPO Directorate',
+            'registry_url': 'https://npo.dsd.gov.za/public/SearchOrganisationOnline.aspx',
+            'portal_accessible': True,
+            'message': 'Organization found in DSD NPO Registry. Status: Active. Registration number ZA-NPO-2008-071234 confirmed.',
+            'npo_status': 'Active',
+            'compliance_status': 'Compliant',
+            'checked_at': '2026-02-14T10:08:00',
         })
         db.session.add(v3)
         verifications.append(v3)

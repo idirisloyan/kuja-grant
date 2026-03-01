@@ -1,0 +1,209 @@
+================================================================================
+KUJA GRANT MANAGEMENT SYSTEM - REGISTRATION VERIFICATION TEST DATA
+================================================================================
+Purpose: Test data for live government registry verification checks
+Last Updated: 2026-03-01
+================================================================================
+
+
+================================================================================
+SECTION 1: REAL REGISTERED ORGANIZATIONS (Positive Verification Tests)
+================================================================================
+
+--------------------------------------------------------------------------------
+KENYA - NGO Coordination Board / Business Registration Service
+--------------------------------------------------------------------------------
+Registry URL:       https://brs.go.ke/ (web portal, no public API)
+eCitizen Portal:    https://brs.ecitizen.go.ke/
+Registration Format: OP.218/051/YYYY/XXXX/XXXX
+
+Organizations:
+
+  1. ActionAid International Kenya
+     Registration Number: OP.218/051/924/84
+     Status:              Active
+     Sectors:             Human Rights, Governance
+
+  2. World Vision Kenya
+     Registration Number: OP.218/051/93114/86
+     Status:              Active
+     Sectors:             Child Protection, Health, Education
+
+  3. CARE Kenya
+     Registration Number: OP.218/051/9384/7
+     Status:              Active
+     Sectors:             Poverty, Gender, Emergency
+
+  4. MSF France (Kenya)
+     Registration Number: OP.218/051/93187/316
+     Status:              Active
+     Sectors:             Health, Emergency
+
+Note: Kenya transitioning to PBO Act (Public Benefit Organizations) since
+      May 2024. New registrations may use PBO format.
+
+
+--------------------------------------------------------------------------------
+NIGERIA - Corporate Affairs Commission (CAC)
+--------------------------------------------------------------------------------
+Registry URL:       https://search.cac.gov.ng/ (FREE searchable public portal)
+Alternative URL:    https://icrp.cac.gov.ng/public-search/
+Registration Format: CAC/IT/NO XXXXX (Incorporated Trustees)
+
+Organizations: (search by name on the portal to get IT numbers)
+
+  1. ActionAid Nigeria
+     Type:   Incorporated Trustees
+     Status: Active
+
+  2. Oxfam Nigeria
+     Type:   Incorporated Trustees
+     Status: Active
+
+  3. Save the Children Nigeria
+     Type:   Incorporated Trustees
+     Status: Active
+
+Third-party API: cac-verify (open source Node.js package on GitHub)
+
+
+--------------------------------------------------------------------------------
+SOUTH AFRICA - Department of Social Development NPO Registry + CIPC
+--------------------------------------------------------------------------------
+NPO Registry URL:  https://www.npo.gov.za/ (searchable web portal)
+CIPC API:          https://apim.cipc.co.za/ (REST API with OAuth 2.0)
+CIPC Docs:         https://guide.cipc.co.za/
+NPO Format:        XXX-XXX (do NOT append "NPO" when searching)
+NPC Format:        YYYY/XXXXXX/08
+
+Organizations:
+
+  1. Gift of the Givers Foundation
+     NPO Number:  032-031
+     PBO Number:  930018993
+     Status:      Active
+     Sectors:     Disaster Relief, Healthcare
+
+  2. Treatment Action Campaign (TAC)
+     NPO Number:  043-770
+     Company:     2000/029181/08
+     Status:      Active
+     Sectors:     Health, HIV/AIDS
+
+  3. Nelson Mandela Foundation
+     NPO Number:  034-681
+     Trust IT:    9259/99
+     Status:      Active
+     Sectors:     Dialogue, Memory, Legacy
+
+Total NPOs registered: ~270,313
+
+
+--------------------------------------------------------------------------------
+UGANDA - NGO Bureau
+--------------------------------------------------------------------------------
+Registry URL:       https://ngobureau.go.ug/en/updated-national-ngo-register
+                    (searchable HTML table)
+Format:             13-15 character registration number, prefix UG-NGO
+
+Organizations:
+
+  1. World Vision Uganda
+     Status: Active since 1986
+     Coverage: 50+ districts
+
+  2. BRAC Uganda
+     Status: Active since 2006
+     Type: International NGO
+
+  3. Oxfam Novib (Uganda)
+     Status: Active since 1960s
+
+Note: Must also register with URSB (Uganda Registration Services Bureau)
+
+
+--------------------------------------------------------------------------------
+TANZANIA - Registrar of NGOs
+--------------------------------------------------------------------------------
+Registry URL:       https://nis.jamii.go.tz/ (NiS portal)
+Mapping:            https://nis.jamii.go.tz/mapping (public, shows 10,767+ NGOs)
+
+Organizations searchable by name, sector, region
+
+
+--------------------------------------------------------------------------------
+SOMALIA - MOIFAR
+--------------------------------------------------------------------------------
+Registry:           https://moifar.gov.so/en/ngo-registeration/
+Status:             NO public searchable database, NO API
+Fragmented:         Federal (MOIFAR), Somaliland (MOPND), Puntland (separate)
+Business portal:    https://ebusiness.gov.so/ (commercial only)
+
+Test Expectation:   System should display:
+                    "No online registry available for Somalia.
+                     Manual verification required."
+
+
+--------------------------------------------------------------------------------
+ETHIOPIA - ACSO
+--------------------------------------------------------------------------------
+Registry:           https://acso.gov.et/en
+eServices:          https://www.eservices.gov.et/
+Status:             NO public searchable database, NO API
+Registered CSOs:    5,568+ since 2019
+
+Test Expectation:   System should display:
+                    "No online registry available for Ethiopia.
+                     Manual verification required."
+
+
+================================================================================
+SECTION 2: FAKE/INVALID REGISTRATION NUMBERS (Negative Verification Tests)
+================================================================================
+
+  1. Kenya:        OP.218/051/FAKE/999       Expected: Not found
+  2. Nigeria:      CAC/IT/NO 99999           Expected: Not found
+  3. South Africa: NPO 999-999              Expected: Not found
+  4. Uganda:       UG-NGO-FAKE-12345         Expected: Not found
+  5. Expired:      Use any valid format but with an organization known
+                   to be dissolved           Expected: Not found / Dissolved
+
+
+================================================================================
+SECTION 3: TEST SCENARIOS
+================================================================================
+
+Scenario 1 - POSITIVE:
+  Action:   Verify ActionAid Kenya (OP.218/051/924/84)
+  Expected: Verified, Active
+
+Scenario 2 - POSITIVE:
+  Action:   Verify Gift of the Givers (NPO 032-031)
+  Expected: Verified, Active
+
+Scenario 3 - NEGATIVE:
+  Action:   Verify fake Kenya reg number (OP.218/051/FAKE/999)
+  Expected: Not Found
+
+Scenario 4 - NEGATIVE:
+  Action:   Verify fake Nigeria IT number (CAC/IT/NO 99999)
+  Expected: Not Found
+
+Scenario 5 - GRACEFUL FAIL:
+  Action:   Verify Somalia organization
+  Expected: "No online registry available for Somalia.
+             Manual verification required."
+
+Scenario 6 - GRACEFUL FAIL:
+  Action:   Verify Ethiopia organization
+  Expected: "No online registry available for Ethiopia.
+             Manual verification required."
+
+Scenario 7 - AI ANALYSIS:
+  Action:   Upload registration_certificate.txt
+  Expected: AI extracts registration number from document,
+            system cross-checks against appropriate registry
+
+================================================================================
+END OF FILE
+================================================================================

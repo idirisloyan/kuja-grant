@@ -1,43 +1,103 @@
-# Kuja Grant Management System - Overview & Testing Guide
+# Kuja Grant Management System -- Overview & Testing Guide
 
-## What is Kuja?
+## What is Kuja Grant?
 
-Kuja is an **end-to-end AI-powered grant management platform** designed specifically for the global south. It connects **donors** with **NGOs** through a single system that handles the entire grant lifecycle:
+Kuja Grant Management System is an **AI-powered end-to-end grant management platform** built for the humanitarian sector -- specifically for **NGOs and Donors operating in Africa**. It is part of the broader **Kuja Link ecosystem** (kuja.org marketplace).
 
-**Donor finds the right NGO** → **NGO is pre-qualified through capacity assessment** → **NGO is matched to grants** → **NGO applies** → **Application is reviewed & scored** → **Grant is awarded** → **NGO reports back to donor** — all within one platform.
+No competitor in the market covers the full grant lifecycle in one platform. Kuja Grant does:
 
-The system uses **real-time AI analysis** (Claude API) to score documents, analyze reports, and extract grant requirements automatically.
+**Discovery** --> **Capacity Assessment** --> **Due Diligence** --> **Grant Matching** --> **Application** --> **Review & Award** --> **Reporting** --> **Compliance**
 
----
-
-## Key Features
-
-| Feature | Description |
-|---------|-------------|
-| **Capacity Assessment** | NGOs complete assessments using 5 industry frameworks (Kuja Standard, STEP, UN HACT, CHS, NUPAS) |
-| **Grant Discovery** | NGOs browse, search, and filter grants by sector, country, and keywords |
-| **Smart Applications** | 4-step application wizard with eligibility checks, proposals, and document uploads |
-| **AI Document Scoring** | Uploaded documents are analyzed and scored in real-time by Claude AI |
-| **Grant Creation** | Donors create grants with a 5-step wizard including AI-powered reporting requirement extraction |
-| **Grant Reporting** | NGOs submit financial, narrative, and impact reports; AI analyzes completeness and quality |
-| **Donor Review** | Donors review AI-analyzed reports and accept or request revisions |
-| **Multi-language** | English, French, Swahili, Arabic, Somali |
-| **Role-based Dashboards** | Customized views for NGOs, Donors, and Reviewers |
-| **AI Assistant** | Chat panel for grant-related questions |
+| | |
+|---|---|
+| **Production URL** | https://web-production-6f8a.up.railway.app |
+| **Local Dev** | http://localhost:5000 |
+| **GitHub** | https://github.com/idirisloyan/kuja-grant |
+| **Stack** | Python/Flask backend, Vanilla JavaScript SPA frontend, SQLite (dev) / PostgreSQL (prod), Claude AI (Anthropic) |
 
 ---
 
-## System URL
+## The Vision
 
-**Production:** https://web-production-6f8a.up.railway.app
+One platform where donors and NGOs work together across the entire grant lifecycle:
 
-**Local (if running on laptop):** http://localhost:5000
+1. **Discovery** -- NGOs register on the Kuja marketplace and are found by donors.
+2. **Capacity Assessment** -- NGOs prove organizational readiness using 5 industry frameworks (Kuja Standard, STEP, UN HACT, CHS, NUPAS).
+3. **Due Diligence** -- Live registration verification against government registries + sanctions screening against UN, OFAC, EU, and World Bank lists.
+4. **Grant Matching** -- AI matches NGOs to relevant grants based on sector, country, and capacity score.
+5. **Application** -- 4-step wizard with eligibility checks, proposals, and document uploads with AI analysis.
+6. **Review & Award** -- Dual scoring (AI + human reviewer), reviewer assignments, and donor decision.
+7. **Reporting** -- NGOs submit financial/narrative/impact reports. AI analyzes reports against donor-specific requirements. Donors review and accept or request revision.
+8. **Compliance** -- Ongoing sanctions monitoring, registration verification, and full audit trail.
+
+---
+
+## Key Features (Detailed)
+
+### For NGOs
+- Complete capacity assessment using 5 industry frameworks
+- Grant discovery with search and filter by sector, country, keywords
+- Smart 4-step application wizard with AI guidance
+- Document upload with real-time AI analysis and scoring
+- Report submission against donor-defined requirements
+- AI chat assistant for role-specific guidance
+- Multi-language support: English, French, Swahili, Arabic, Somali
+
+### For Donors
+- Grant creation wizard (5 steps) with:
+  - Upload actual grant agreement --> AI extracts reporting requirements automatically
+  - Set per-document-type evaluation criteria
+  - Modify or add to AI-extracted requirements before publishing
+- Application review with AI-powered ranking
+- Dual scoring system: AI auto-score + human reviewer score
+- Organization search with capacity scores
+- Compliance dashboard: registration verification + sanctions screening
+- Report review with AI analysis against the specific requirements the donor defined
+
+### For Reviewers
+- Assignment dashboard showing pending reviews
+- Structured scoring rubrics
+- Criterion-level scoring for each application
+
+### AI Features (Live Claude API)
+- Document content analysis with detailed findings and scoring
+- Grant agreement parsing to extract reporting requirements
+- Report evaluation against donor-specific criteria
+- Contextual chat assistance tailored per user role
+- Registration certificate analysis and verification
+- Multi-language document understanding (English, French, Arabic, Swahili, Somali)
+
+---
+
+## Live External Integrations
+
+### Government Registry Verification
+
+| Country | Registry | URL | Type |
+|---------|----------|-----|------|
+| Kenya | NGO Board / BRS | https://brs.go.ke/ | Web portal |
+| Nigeria | CAC | https://search.cac.gov.ng/ | Free searchable |
+| South Africa | DSD NPO + CIPC | https://www.npo.gov.za/ / https://apim.cipc.co.za/ | Web + REST API |
+| Uganda | NGO Bureau | https://ngobureau.go.ug/ | Web table |
+| Tanzania | NiS Registrar | https://nis.jamii.go.tz/ | Web portal |
+| Somalia | MOIFAR | No public registry | Manual only |
+| Ethiopia | ACSO | No public registry | Manual only |
+
+### Sanctions Databases
+
+| List | Source | Format |
+|------|--------|--------|
+| UN Security Council | https://scsanctions.un.org/resources/xml/en/consolidated.xml | XML |
+| US OFAC SDN | https://www.treasury.gov/ofac/downloads/sdn.csv | CSV |
+| EU Financial Sanctions | https://webgate.ec.europa.eu/fsd/fsf | CSV/XML |
+| World Bank Debarment | https://www.worldbank.org/en/projects-operations/procurement/debarred-firms | HTML |
+| OpenSanctions (unified) | https://api.opensanctions.org/ | REST API |
 
 ---
 
 ## Test User Accounts
 
-All passwords are: **`pass123`**
+All passwords are: **pass123**
 
 ### NGO Users
 
@@ -75,12 +135,12 @@ All passwords are: **`pass123`**
 
 ### Grants
 
-| # | Grant Title | Donor | Amount | Status | Eligible Countries |
-|---|------------|-------|--------|--------|--------------------|
-| 1 | Community Health Workers Scale-Up Program | Global Health Fund | $500,000 | Open | Kenya, Somalia, Uganda |
-| 2 | Education Technology for Rural Schools | EA Development Trust | $250,000 | Open | Kenya, Uganda, Tanzania |
-| 3 | Climate Resilience in East Africa | EA Development Trust | $1,000,000 | Draft | Kenya, Somalia, Ethiopia, Uganda |
-| 4 | Women's Protection and Empowerment | Global Health Fund | $350,000 | Open | Nigeria, Niger, Chad, Mali |
+| Grant | Donor | Amount | Status | Countries |
+|-------|-------|--------|--------|-----------|
+| Community Health Workers Scale-Up Program | Global Health Fund | $500,000 | Open | Kenya, Somalia, Uganda |
+| Education Technology for Rural Schools | EA Development Trust | $250,000 | Open | Kenya, Uganda, Tanzania |
+| Climate Resilience in East Africa | EA Development Trust | $1,000,000 | Draft | Kenya, Somalia, Ethiopia, Uganda |
+| Women's Protection and Empowerment | Global Health Fund | $350,000 | Open | Nigeria, Niger, Chad, Mali |
 
 ### Applications
 
@@ -88,19 +148,19 @@ All passwords are: **`pass123`**
 |-----|-------|--------|----------|
 | Amani Community Development | Community Health Workers | Submitted | 78.5% |
 | Salam Relief Foundation | Community Health Workers | Submitted | 62.3% |
-| Ubuntu Education Trust | Education Technology | Draft | - |
+| Ubuntu Education Trust | Education Technology | Draft | -- |
 | Sahel Women's Network | Women's Protection | Submitted | 71.0% |
-| Hope Bridges Initiative | Community Health Workers | Draft (incomplete) | - |
+| Hope Bridges Initiative | Community Health Workers | Draft (incomplete) | -- |
 
-### Reports
+### Reports (Pre-loaded for Amani Community Development)
 
-| Report | NGO | Grant | Type | Status |
-|--------|-----|-------|------|--------|
-| Q1 2026 Financial Report | Amani | Community Health Workers | Financial | Submitted (AI Score: 90) |
-| Annual Progress Report H1 2026 | Amani | Community Health Workers | Narrative | Draft |
-| Test Q2 Financial Report | Amani | Community Health Workers | Financial | Accepted |
-| Annual Impact Report 2025 | Amani | Community Health Workers | Impact | Revision Requested |
-| Under Review Financial Report | Amani | Community Health Workers | Financial | Under Review |
+| Report | Type | Status |
+|--------|------|--------|
+| Q1 2026 Financial Report | Financial | Submitted (AI Score: 90) |
+| Annual Progress Report H1 2026 | Narrative | Draft |
+| Test Q2 Financial Report | Financial | Accepted |
+| Annual Impact Report 2025 | Impact | Revision Requested |
+| Under Review Financial Report | Financial | Under Review |
 
 ### Documents (Amani Community Development)
 
@@ -113,82 +173,112 @@ All passwords are: **`pass123`**
 
 ---
 
-## Assessment Frameworks
+## Real Registration Verification Test Data
 
-NGOs can select from 5 assessment/due diligence frameworks:
+These are real organizations you can use to test live registry lookups:
 
-| Framework | Description | Items | Est. Time |
-|-----------|-------------|-------|-----------|
-| **Kuja Standard** | Default capacity assessment covering 5 organizational domains | 26 | 30-45 min |
-| **STEP** | Strengthening Effective Partner Engagement and Performance | 26 | 45-60 min |
-| **UN HACT** | UN Harmonized Approach to Cash Transfers micro-assessment | 22 | 45-60 min |
-| **CHS** | Core Humanitarian Standard on Quality and Accountability | 27 | 60-90 min |
-| **NUPAS** | Non-profit Unified Performance Assessment System | 27 | 60-90 min |
+| Organization | Country | Reg Number | Registry |
+|-------------|---------|------------|----------|
+| ActionAid International Kenya | Kenya | OP.218/051/924/84 | NGO Board |
+| World Vision Kenya | Kenya | OP.218/051/93114/86 | NGO Board |
+| Gift of the Givers Foundation | South Africa | NPO 032-031 | DSD NPO |
+| Treatment Action Campaign | South Africa | NPO 043-770 | DSD NPO |
+| Nelson Mandela Foundation | South Africa | NPO 034-681 | DSD NPO |
+
+## Real Sanctions Screening Test Data
+
+| Entity | List | Country | Expected Result |
+|--------|------|---------|-----------------|
+| Amani Community Development | All | Kenya | CLEAR (not sanctioned) |
+| Al-Shabaab | UN, OFAC, EU | Somalia | FLAGGED |
+| Boko Haram | UN, OFAC | Nigeria | FLAGGED |
+| M23 | UN, EU | DRC | FLAGGED |
+| FDLR | UN, EU | DRC | FLAGGED |
+| Gitto Costruzioni Generali Nigeria | World Bank | Nigeria | DEBARRED |
 
 ---
 
-## Test Files Available
+## Test Files
 
-The `test-files/` folder contains realistic documents for testing AI upload and analysis:
+The `test-files/` folder contains realistic documents for testing AI upload and analysis.
 
 ### Standard Test Files
+
 | File | Description | Expected AI Score |
 |------|-------------|-------------------|
-| financial_report_q1_2026.txt | Quarterly financial report with budget vs actuals | Medium-High (70-80) |
-| audit_report_2025.txt | Independent external audit report | High (80-90) |
+| financial_report_q1_2026.txt | Quarterly financial report | Medium-High (70-80) |
+| audit_report_2025.txt | Independent external audit | High (80-90) |
 | registration_certificate.txt | NGO registration certificate | High (85-95) |
-| project_proposal.txt | Full project proposal with budget | High (75-85) |
-| impact_report_annual_2025.txt | Annual impact report with metrics | High (80-90) |
+| project_proposal.txt | Full project proposal | High (75-85) |
+| impact_report_annual_2025.txt | Annual impact report | High (80-90) |
 | budget_template.txt | Annual budget with line items | Medium-High (70-80) |
-| compliance_checklist.txt | Completed due diligence checklist | Medium-High (70-80) |
-| grant_agreement_sample.txt | Grant agreement (for AI requirement extraction) | N/A - used for extraction |
+| compliance_checklist.txt | Due diligence checklist | Medium-High (70-80) |
+| grant_agreement_sample.txt | Grant agreement for AI extraction | N/A (used for requirement extraction) |
 
 ### Edge Case Test Files
+
 | File | Description | Expected AI Score |
 |------|-------------|-------------------|
-| poor_quality_report.txt | Deliberately incomplete, vague report | Low (20-40) |
-| excellent_narrative_report.txt | Comprehensive, detailed narrative report | High (85-95) |
-| arabic_grant_agreement.txt | Grant agreement in Arabic | Tests multi-language |
-| french_project_report.txt | WASH project report in French | Tests multi-language |
-| large_budget_detailed.txt | 50+ line item budget for $500K grant | High (80-90) |
-| strategic_plan_2025_2030.txt | 5-year NGO strategic plan | High (80-90) |
-| due_diligence_questionnaire_completed.txt | 30-question completed questionnaire | High (80-90) |
-| empty_template.txt | Template with only headers, no content | Very Low (5-15) |
-| risk_assessment_matrix.txt | 15-risk matrix with mitigations | Medium-High (70-85) |
+| poor_quality_report.txt | Deliberately incomplete report | Low (20-40) |
+| excellent_narrative_report.txt | Comprehensive narrative | High (85-95) |
+| arabic_grant_agreement.txt | Arabic grant agreement | Tests multi-language |
+| french_project_report.txt | French WASH report | Tests multi-language |
+| large_budget_detailed.txt | 50+ line item $500K budget | High (80-90) |
+| strategic_plan_2025_2030.txt | 5-year strategic plan | High (80-90) |
+| due_diligence_questionnaire_completed.txt | 30-question questionnaire | High (80-90) |
+| empty_template.txt | Template with only headers | Very Low (5-15) |
+| risk_assessment_matrix.txt | 15-risk matrix | Medium-High (70-85) |
 | beneficiary_feedback_report.txt | Community accountability report | Medium-High (70-85) |
 
 ---
 
 ## How to Run a Full End-to-End Test
 
-### Scenario: Complete Grant Lifecycle
+### Quick Start
 
-1. **Login as Donor** (sarah@globalhealth.org) → Create a new grant with reporting requirements → Upload `grant_agreement_sample.txt` for AI extraction → Publish grant
+1. Go to https://web-production-6f8a.up.railway.app
+2. Login with any test account (password: **pass123**)
+3. Follow the role-specific scenarios below
 
-2. **Login as NGO** (fatima@amani.org) → Complete STEP assessment → Upload `financial_report_q1_2026.txt` and `audit_report_2025.txt` → Browse grants → Apply to the new grant with full proposal
+### Scenario 1: Complete Grant Lifecycle
 
-3. **Login as Reviewer** (james@reviewer.org) → Review the submitted application → Score it
+1. **Donor** (sarah@globalhealth.org) -- Create grant --> Upload `grant_agreement_sample.txt` --> AI extracts requirements --> Modify if needed --> Publish
+2. **NGO** (fatima@amani.org) -- Complete assessment --> Upload documents (AI analyzes against requirements) --> Browse grants --> Apply
+3. **Reviewer** (james@reviewer.org) -- Review application --> Score it
+4. **Donor** -- Review rankings --> Award grant
+5. **NGO** -- Create report --> Submit --> AI analyzes against donor requirements
+6. **Donor** -- Review report with AI analysis --> Accept or request revision
 
-4. **Login as Donor** (sarah@globalhealth.org) → Review application rankings → Award the grant
+### Scenario 2: Due Diligence & Compliance
 
-5. **Login as NGO** (fatima@amani.org) → Go to Reports → Create new financial report → Submit it
+1. **NGO** (fatima@amani.org) -- Upload registration certificate
+2. **System** -- AI analyzes certificate --> Cross-checks against Kenya NGO Board registry
+3. **Donor** (sarah@globalhealth.org) -- View compliance dashboard --> See registration verification status + sanctions screening results
+4. **System** -- Screens org against UN, OFAC, EU, World Bank lists --> Shows clear/flagged status
 
-6. **Login as Donor** (sarah@globalhealth.org) → Go to Grant Reports → Review the submitted report with AI analysis → Accept or request revision
+### Scenario 3: AI Document Testing
 
-### Scenario: AI Document Testing
-
-1. **Login as NGO** (fatima@amani.org) → Go to My Documents
-2. Upload `excellent_narrative_report.txt` → Expect HIGH AI score (85+)
-3. Upload `poor_quality_report.txt` → Expect LOW AI score (below 40)
-4. Upload `empty_template.txt` → Expect VERY LOW score or error
-5. Upload `french_project_report.txt` → Verify AI handles French content
+1. **NGO** -- Upload `excellent_narrative_report.txt` --> Expect HIGH AI score (85+)
+2. **NGO** -- Upload `poor_quality_report.txt` --> Expect LOW AI score (below 40)
+3. **NGO** -- Upload `empty_template.txt` --> Expect VERY LOW score (5-15)
+4. **NGO** -- Upload `french_project_report.txt` --> Verify AI handles French content
 
 ---
 
 ## Technical Notes
 
-- **Database:** SQLite (resets on each Railway redeploy)
-- **AI Engine:** Claude API (Anthropic) — requires valid API key
-- **File Uploads:** Max 10MB, supports PDF, DOC, DOCX, XLS, XLSX, TXT, CSV
-- **Sessions:** Cookie-based, expire on browser close
-- **No integration with Kuja Link** in this version — that is planned for the next phase
+- **Database:** SQLite in development (resets on each Railway redeploy). PostgreSQL in production.
+- **AI Engine:** Claude API (Anthropic) -- requires valid `ANTHROPIC_API_KEY` environment variable.
+- **File Uploads:** Max 10MB. Supported formats: PDF, DOC, DOCX, XLS, XLSX, TXT, CSV.
+- **Sessions:** Cookie-based, expire on browser close.
+- **Future Integration:** This app will eventually integrate with Kuja Link (kuja.org) as an Odoo 17 module.
+
+## Roadmap
+
+1. **Current** -- Standalone Flask app with live AI and external integrations
+2. **Next** -- Integration with Kuja Link marketplace (Odoo 17)
+3. **Future** -- SSO with Kuja Link, shared PostgreSQL, OWL components
+
+---
+
+*Built for Adeso | March 2026*

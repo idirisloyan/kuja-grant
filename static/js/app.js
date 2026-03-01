@@ -867,6 +867,12 @@ function renderNGODashboard() {
         '</div>' +
         '</div>' +
 
+        // Upcoming Reports
+        '<div style="margin-bottom:32px;">' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCC5 Upcoming Reports</h2>' +
+        '<div id="upcoming-reports">' + renderLoadingTable() + '</div>' +
+        '</div>' +
+
         // Recent Applications
         '<div style="margin-bottom:32px;">' +
         '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCCB Recent Applications</h2>' +
@@ -880,8 +886,54 @@ function renderNGODashboard() {
         '<button class="btn btn-primary" onclick="nav(\'assessment\')">\uD83D\uDCDD Start Assessment</button>' +
         '<button class="btn btn-secondary" onclick="nav(\'grants\')">\uD83D\uDCB0 Browse Grants</button>' +
         '<button class="btn btn-secondary" onclick="nav(\'documents\')">\uD83D\uDCC4 Upload Documents</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'reports\')">\uD83D\uDCC8 My Reports</button>' +
         '</div>' +
         '</div>';
+}
+
+async function loadUpcomingReports() {
+    var res = await api('GET', '/api/reports/upcoming');
+    var el = document.getElementById('upcoming-reports');
+    if (!el) return;
+    if (!res || !res.upcoming_reports || res.upcoming_reports.length === 0) {
+        el.innerHTML = '<div class="card" style="padding:20px;text-align:center;"><p style="color:#94a3b8;">No upcoming reports due. Reports will appear here when you have awarded grants.</p></div>';
+        return;
+    }
+    var reports = res.upcoming_reports;
+    el.innerHTML = '<div class="table-wrapper"><table class="table table-hover"><thead><tr>' +
+        '<th>Report</th><th>Grant</th><th>Due Date</th><th>Status</th><th>Action</th>' +
+        '</tr></thead><tbody>' +
+        reports.slice(0, 8).map(function(r) {
+            var isOverdue = r.is_overdue;
+            var daysText = isOverdue ? Math.abs(r.days_until_due) + ' days overdue' : r.days_until_due + ' days left';
+            var badgeCls = isOverdue ? 'badge-red' : r.days_until_due <= 7 ? 'badge-amber' : 'badge-outline';
+            var statusBadge = r.status === 'not_started' ? '<span class="badge badge-outline">Not Started</span>' :
+                r.status === 'draft' ? '<span class="badge badge-outline">Draft</span>' :
+                '<span class="badge badge-amber">' + esc(r.status).replace(/_/g, ' ') + '</span>';
+            var actionBtn = r.draft_report_id ?
+                '<button class="btn btn-primary btn-sm" onclick="editReport(' + r.draft_report_id + ')">Continue</button>' :
+                '<button class="btn btn-primary btn-sm" onclick="startReportForGrant(' + r.grant_id + ',\'' + esc(r.report_type) + '\',\'' + esc(r.reporting_period) + '\')">Start</button>';
+            return '<tr' + (isOverdue ? ' style="background:#fef2f2;"' : '') + '>' +
+                '<td><strong>' + esc(r.requirement_title || r.report_type) + '</strong><br><span style="font-size:12px;color:#94a3b8;">' + esc(r.reporting_period) + '</span></td>' +
+                '<td>' + esc(r.grant_title || '') + '</td>' +
+                '<td><span class="badge ' + badgeCls + '">' + esc(daysText) + '</span><br><span style="font-size:12px;color:#94a3b8;">' + esc(r.due_date) + '</span></td>' +
+                '<td>' + statusBadge + '</td>' +
+                '<td>' + actionBtn + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        (reports.length > 8 ? '<p style="text-align:center;margin-top:8px;"><a href="#" onclick="nav(\'reports\');return false;" style="color:#2d8f6f;">View all ' + reports.length + ' upcoming reports</a></p>' : '');
+}
+
+async function startReportForGrant(grantId, reportType, period) {
+    var res = await api('POST', '/api/reports', {
+        grant_id: grantId,
+        report_type: reportType,
+        reporting_period: period,
+        title: (reportType.charAt(0).toUpperCase() + reportType.slice(1)) + ' Report - ' + period
+    });
+    if (res && res.report) {
+        editReport(res.report.id);
+    }
 }
 
 // =============================================================================
@@ -1018,6 +1070,8 @@ async function loadDashboardStats() {
             var el2 = document.getElementById('recent-applications');
             if (el2) el2.innerHTML = renderApplicationsTable(aRes.applications.slice(0, 5));
         }
+        // Load upcoming reports
+        loadUpcomingReports();
     } else if (role === 'donor') {
         // Load donor grants
         var gRes2 = await api('GET', '/api/grants');
@@ -1760,14 +1814,53 @@ function renderAIAnalysis(analysis) {
     if (!analysis) return '';
     var score = analysis.score || analysis.quality_score || 0;
     var cls = score >= 70 ? 'pass' : score >= 40 ? 'warning' : 'fail';
+
+    // Per-requirement scores if available
+    var reqScoresHTML = '';
+    if (analysis.requirement_scores && analysis.requirement_scores.length > 0) {
+        reqScoresHTML = '<div style="margin-top:10px;border-top:1px solid rgba(0,0,0,0.1);padding-top:10px;">' +
+            '<strong style="font-size:13px;">Donor Requirement Compliance:</strong>' +
+            analysis.requirement_scores.map(function(rs) {
+                var rScore = rs.score || 0;
+                var rCls = rScore >= 70 ? '#2d8f6f' : rScore >= 40 ? '#f59e0b' : '#ef4444';
+                var icon = rs.addressed ? '\u2705' : '\u274C';
+                return '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;padding:6px 8px;background:rgba(0,0,0,0.03);border-radius:6px;">' +
+                    '<span>' + icon + '</span>' +
+                    '<div style="flex:1;font-size:13px;">' + esc(rs.requirement || 'Requirement') + '</div>' +
+                    '<div style="min-width:48px;text-align:center;font-weight:600;color:' + rCls + ';font-size:13px;">' + rScore + '%</div>' +
+                    '</div>';
+            }).join('') +
+            '</div>';
+    }
+
+    var findingsHTML = '';
+    if (analysis.findings) {
+        if (Array.isArray(analysis.findings)) {
+            findingsHTML = '<div style="margin-top:4px;"><strong>Findings:</strong>' +
+                analysis.findings.map(function(f) { return '<div style="font-size:13px;color:#475569;margin:2px 0;">\u2022 ' + esc(f) + '</div>'; }).join('') + '</div>';
+        } else {
+            findingsHTML = '<div style="margin-top:4px;"><strong>Findings:</strong> ' + esc(analysis.findings) + '</div>';
+        }
+    }
+
+    var recsHTML = '';
+    if (analysis.recommendations) {
+        if (Array.isArray(analysis.recommendations)) {
+            recsHTML = '<div style="margin-top:4px;"><strong>Recommendations:</strong>' +
+                analysis.recommendations.map(function(r) { return '<div style="font-size:13px;color:#475569;margin:2px 0;">\u2022 ' + esc(r) + '</div>'; }).join('') + '</div>';
+        } else {
+            recsHTML = '<div style="margin-top:4px;"><strong>Recommendations:</strong> ' + esc(analysis.recommendations) + '</div>';
+        }
+    }
+
     return '<div class="analysis-result ' + cls + '" style="margin-top:12px;">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
         '<strong>\u2728 AI Document Analysis</strong>' +
         '<span class="badge badge-' + (cls === 'pass' ? 'green' : cls === 'warning' ? 'amber' : 'red') + '">' +
         'Score: ' + score + '%</span>' +
         '</div>' +
-        (analysis.findings ? '<div style="margin-top:4px;"><strong>Findings:</strong> ' + esc(analysis.findings) + '</div>' : '') +
-        (analysis.recommendations ? '<div style="margin-top:4px;"><strong>Recommendations:</strong> ' + esc(analysis.recommendations) + '</div>' : '') +
+        (analysis.summary ? '<div style="margin-top:4px;font-size:13px;color:#334155;">' + esc(analysis.summary) + '</div>' : '') +
+        findingsHTML + recsHTML + reqScoresHTML +
         '</div>';
 }
 
@@ -2449,6 +2542,12 @@ function renderCreateDocRequirements() {
                     'onchange="updateDocReq(\'' + dt.key + '\',\'ai_review\',this.checked);">' +
                     '<span style="font-size:13px;">\u2728 AI Document Review</span></label>' +
                     '</div></div>' +
+                    (existing.ai_review ? '<div class="form-group" style="margin-top:8px;">' +
+                    '<label class="form-label">\u2728 AI Evaluation Criteria</label>' +
+                    '<textarea class="form-control" rows="2" placeholder="What should AI look for? e.g., Must include 3 years audited financials, budget variance under 10%..." ' +
+                    'oninput="updateDocReq(\'' + dt.key + '\',\'ai_criteria\',this.value);">' + esc(existing.ai_criteria || '') + '</textarea>' +
+                    '<p style="font-size:11px;color:#94a3b8;margin-top:4px;">AI will evaluate uploaded documents against these specific criteria.</p>' +
+                    '</div>' : '') +
                     '</div>' : '') +
                 '</div>';
         }).join('') +
@@ -3751,6 +3850,7 @@ async function loadReports() {
 
 function renderReportsPage() {
     loadReports();
+    loadReportsUpcoming();
     var role = (S.user.role || '').toLowerCase();
     var isNGO = role === 'ngo';
 
@@ -3763,7 +3863,59 @@ function renderReportsPage() {
         (isNGO ? '<button class="btn btn-primary" onclick="startNewReport()">+ New Report</button>' : '') +
         '</div></div>' +
 
+        // Upcoming/Expected reports section
+        '<div id="reports-upcoming" style="margin-bottom:24px;"></div>' +
+
+        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">' + (isNGO ? 'Submitted Reports' : 'All Reports') + '</h3>' +
         '<div id="reports-list">' + renderLoadingCards(3) + '</div>';
+}
+
+async function loadReportsUpcoming() {
+    var res = await api('GET', '/api/reports/upcoming');
+    var el = document.getElementById('reports-upcoming');
+    if (!el) return;
+    if (!res || !res.upcoming_reports || res.upcoming_reports.length === 0) {
+        el.innerHTML = '';
+        return;
+    }
+    var reports = res.upcoming_reports;
+    var isNGO = (S.user.role || '').toLowerCase() === 'ngo';
+    var overdueCount = res.overdue_count || 0;
+
+    el.innerHTML = '<div class="card" style="border-left:4px solid ' + (overdueCount > 0 ? '#ef4444' : '#f59e0b') + ';">' +
+        '<div class="card-body">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+        '<h3 style="font-weight:600;">' + (isNGO ? '\uD83D\uDCC5 Upcoming Deadlines' : '\uD83D\uDCC5 Expected Reports') + '</h3>' +
+        (overdueCount > 0 ? '<span class="badge badge-red">' + overdueCount + ' overdue</span>' : '<span class="badge badge-green">All on track</span>') +
+        '</div>' +
+        '<div class="table-wrapper"><table class="table table-hover"><thead><tr>' +
+        '<th>Report</th><th>' + (isNGO ? 'Grant' : 'NGO') + '</th><th>Due</th><th>Status</th><th>Action</th>' +
+        '</tr></thead><tbody>' +
+        reports.map(function(r) {
+            var isOverdue = r.is_overdue;
+            var daysText = isOverdue ? Math.abs(r.days_until_due) + 'd overdue' : r.days_until_due + 'd left';
+            var badgeCls = isOverdue ? 'badge-red' : r.days_until_due <= 7 ? 'badge-amber' : 'badge-outline';
+            var statusBadge = r.status === 'not_started' || r.status === 'not_submitted' ? '<span class="badge badge-outline">Not Started</span>' :
+                '<span class="badge badge-' + (r.status === 'draft' ? 'outline' : r.status === 'submitted' ? 'blue' : 'amber') + '">' + esc(r.status).replace(/_/g, ' ') + '</span>';
+            var actionBtn = '';
+            if (isNGO) {
+                actionBtn = r.draft_report_id ?
+                    '<button class="btn btn-primary btn-sm" onclick="editReport(' + r.draft_report_id + ')">Continue</button>' :
+                    '<button class="btn btn-primary btn-sm" onclick="startReportForGrant(' + r.grant_id + ',\'' + esc(r.report_type) + '\',\'' + esc(r.reporting_period) + '\')">Start</button>';
+            } else {
+                actionBtn = r.report_id ?
+                    '<button class="btn btn-primary btn-sm" onclick="reviewReport(' + r.report_id + ')">Review</button>' :
+                    '<span style="color:#94a3b8;font-size:12px;">Awaiting</span>';
+            }
+            return '<tr' + (isOverdue ? ' style="background:#fef2f2;"' : '') + '>' +
+                '<td><strong>' + esc(r.requirement_title || r.report_type) + '</strong><br><span style="font-size:12px;color:#94a3b8;">' + esc(r.reporting_period) + '</span></td>' +
+                '<td>' + esc(isNGO ? (r.grant_title || '') : (r.ngo_org_name || '')) + '</td>' +
+                '<td><span class="badge ' + badgeCls + '">' + daysText + '</span></td>' +
+                '<td>' + statusBadge + '</td>' +
+                '<td>' + actionBtn + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        '</div></div>';
 }
 
 function renderReportsList(reports) {
@@ -4043,18 +4195,52 @@ function renderReviewReport() {
     var aiHTML = '';
     var ai = r.ai_analysis;
     if (ai && Object.keys(ai).length > 0) {
+        // Per-requirement compliance section
+        var reqScoresHTML = '';
+        if (ai.requirement_scores && ai.requirement_scores.length > 0) {
+            reqScoresHTML = '<div style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px;">' +
+                '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">Donor Requirement Compliance</h4>' +
+                ai.requirement_scores.map(function(rs) {
+                    var rScore = rs.score || 0;
+                    var barColor = rScore >= 70 ? '#2d8f6f' : rScore >= 40 ? '#f59e0b' : '#ef4444';
+                    var icon = rs.addressed ? '\u2705' : '\u274C';
+                    return '<div style="margin-bottom:10px;padding:8px 12px;background:#f8fafc;border-radius:8px;">' +
+                        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
+                        '<span style="font-size:13px;font-weight:500;">' + icon + ' ' + esc(rs.requirement || 'Requirement') + '</span>' +
+                        '<span style="font-weight:600;color:' + barColor + ';">' + rScore + '%</span>' +
+                        '</div>' +
+                        '<div style="height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden;">' +
+                        '<div style="height:100%;width:' + rScore + '%;background:' + barColor + ';border-radius:2px;"></div>' +
+                        '</div>' +
+                        (rs.feedback ? '<p style="font-size:12px;color:#64748b;margin-top:4px;">' + esc(rs.feedback) + '</p>' : '') +
+                        '</div>';
+                }).join('') +
+                '</div>';
+        }
+
+        // Risk flags
+        var riskHTML = '';
+        if (ai.risk_flags && ai.risk_flags.length > 0) {
+            riskHTML = '<div style="margin-top:12px;padding:10px 12px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;">' +
+                '<strong style="font-size:13px;color:#dc2626;">\u26A0\uFE0F Risk Flags:</strong>' +
+                ai.risk_flags.map(function(rf) { return '<p style="font-size:13px;color:#dc2626;margin:2px 0;">\u2022 ' + esc(rf) + '</p>'; }).join('') +
+                '</div>';
+        }
+
         aiHTML = '<div class="card" style="margin-top:16px;border-left:4px solid #2d8f6f;">' +
             '<div class="card-body">' +
             '<h3 style="font-weight:600;margin-bottom:12px;">\u2728 AI Analysis</h3>' +
-            '<div style="display:flex;gap:16px;margin-bottom:12px;">' +
+            '<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">' +
             '<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:#2d8f6f;">' + (ai.score || 0) + '</div><div style="font-size:12px;color:#94a3b8;">Overall</div></div>' +
             '<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:#3b82f6;">' + (ai.completeness_score || 0) + '</div><div style="font-size:12px;color:#94a3b8;">Completeness</div></div>' +
             '<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:#f59e0b;">' + (ai.quality_score || 0) + '</div><div style="font-size:12px;color:#94a3b8;">Quality</div></div>' +
+            (ai.compliance_score != null ? '<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:#8b5cf6;">' + (ai.compliance_score || 0) + '</div><div style="font-size:12px;color:#94a3b8;">Compliance</div></div>' : '') +
             '</div>' +
             (ai.summary ? '<p style="font-size:14px;color:#334155;margin-bottom:12px;"><strong>Summary:</strong> ' + esc(ai.summary) + '</p>' : '') +
             (ai.findings && ai.findings.length ? '<div style="margin-bottom:8px;"><strong style="font-size:13px;">Findings:</strong>' + ai.findings.map(function(f) { return '<p style="font-size:13px;color:#475569;margin:2px 0;">\u2022 ' + esc(f) + '</p>'; }).join('') + '</div>' : '') +
             (ai.missing_items && ai.missing_items.length ? '<div style="margin-bottom:8px;"><strong style="font-size:13px;color:#ef4444;">Missing:</strong>' + ai.missing_items.map(function(m) { return '<p style="font-size:13px;color:#ef4444;margin:2px 0;">\u2022 ' + esc(m) + '</p>'; }).join('') + '</div>' : '') +
             (ai.recommendations && ai.recommendations.length ? '<div><strong style="font-size:13px;">Recommendations:</strong>' + ai.recommendations.map(function(rec) { return '<p style="font-size:13px;color:#475569;margin:2px 0;">\u2022 ' + esc(rec) + '</p>'; }).join('') + '</div>' : '') +
+            reqScoresHTML + riskHTML +
             '</div></div>';
     }
 
