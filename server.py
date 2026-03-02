@@ -4405,9 +4405,16 @@ def api_create_report():
     if not grant:
         return jsonify({'error': 'Grant not found'}), 404
 
+    # Verify the NGO has a valid application for this grant
+    app_id = data.get('application_id')
+    if app_id:
+        application = db.session.get(Application, app_id)
+        if not application or application.ngo_org_id != current_user.org_id:
+            return jsonify({'error': 'Invalid application'}), 400
+
     report = Report(
         grant_id=grant_id,
-        application_id=data.get('application_id'),
+        application_id=app_id,
         submitted_by_org_id=current_user.org_id,
         report_type=data.get('report_type', 'progress'),
         reporting_period=data.get('reporting_period', ''),
@@ -4483,6 +4490,14 @@ def api_update_report(report_id):
         if 'attachments' in data:
             report.set_attachments(data['attachments'])
 
+    elif current_user.role == 'donor':
+        grant = db.session.get(Grant, report.grant_id)
+        if not grant or grant.donor_org_id != current_user.org_id:
+            return jsonify({'error': 'Access denied'}), 403
+        # Donors can add review notes
+        if 'reviewer_notes' in data:
+            report.reviewer_notes = data['reviewer_notes']
+
     db.session.commit()
     return jsonify({'success': True, 'report': report.to_dict()})
 
@@ -4534,6 +4549,10 @@ def api_review_report(report_id):
     grant = db.session.get(Grant, report.grant_id)
     if not grant or (current_user.role == 'donor' and grant.donor_org_id != current_user.org_id):
         return jsonify({'error': 'Access denied'}), 403
+
+    # Only submitted or under_review reports can be reviewed
+    if report.status not in ('submitted', 'under_review'):
+        return jsonify({'error': f'Report in "{report.status}" status cannot be reviewed'}), 400
 
     data = get_request_json()
     action = data.get('action')  # 'accept' or 'request_revision'

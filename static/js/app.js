@@ -3961,26 +3961,48 @@ async function startNewReport() {
     var res = await api('GET', '/api/applications?status=awarded');
     if (res && res.applications && res.applications.length > 0) {
         S.reportGrants = res.applications;
+        var firstApp = res.applications[0];
         S.newReport = {
-            grant_id: res.applications[0].grant_id,
-            application_id: res.applications[0].id,
+            grant_id: firstApp.grant_id,
+            application_id: firstApp.id,
             report_type: 'progress',
             reporting_period: '',
             title: '',
             content: {}
         };
+        // Fetch grant details to get donor-defined reporting requirements and template
+        var grantRes = await api('GET', '/api/grants/' + firstApp.grant_id);
+        if (grantRes && grantRes.grant) {
+            S.currentReport = {
+                grant_reporting_requirements: grantRes.grant.reporting_requirements || [],
+                grant_report_template: grantRes.grant.report_template || {},
+                grant_reporting_frequency: grantRes.grant.reporting_frequency || '',
+                grant_title: grantRes.grant.title
+            };
+        }
         nav('submitreport');
     } else {
-        // If no awarded apps, show grants they can report on
+        // If no awarded apps, check for existing reports to find grants
         var gRes = await api('GET', '/api/reports');
         if (gRes && gRes.reports && gRes.reports.length > 0) {
+            var firstReport = gRes.reports[0];
             S.newReport = {
-                grant_id: gRes.reports[0].grant_id,
+                grant_id: firstReport.grant_id,
                 report_type: 'progress',
                 reporting_period: '',
                 title: '',
                 content: {}
             };
+            // Fetch grant details for donor requirements
+            var grantRes2 = await api('GET', '/api/grants/' + firstReport.grant_id);
+            if (grantRes2 && grantRes2.grant) {
+                S.currentReport = {
+                    grant_reporting_requirements: grantRes2.grant.reporting_requirements || [],
+                    grant_report_template: grantRes2.grant.report_template || {},
+                    grant_reporting_frequency: grantRes2.grant.reporting_frequency || '',
+                    grant_title: grantRes2.grant.title
+                };
+            }
             nav('submitreport');
         } else {
             showToast('No awarded grants found. You need an awarded grant to submit reports.', 'warning');
@@ -4066,9 +4088,25 @@ function renderSubmitReport() {
             '</div></div>';
     }
 
+    // Grant selector for new reports (when user has multiple awarded grants)
+    var grantSelector = '';
+    if (!r.id && S.reportGrants && S.reportGrants.length > 1) {
+        grantSelector = '<div class="card" style="margin-bottom:16px;"><div class="card-body" style="padding:12px 16px;">' +
+            '<label class="form-label" style="font-weight:600;">Select Grant to Report On</label>' +
+            '<select class="form-control" onchange="changeReportGrant(this.value);">' +
+            S.reportGrants.map(function(a) {
+                return '<option value="' + a.grant_id + ':' + a.id + '"' + (r.grant_id == a.grant_id ? ' selected' : '') + '>' +
+                    esc(a.grant_title) + '</option>';
+            }).join('') +
+            '</select></div></div>';
+    } else if (S.currentReport && S.currentReport.grant_title) {
+        grantSelector = '<div style="margin-bottom:12px;color:#64748b;font-size:13px;">Reporting on: <strong>' + esc(S.currentReport.grant_title) + '</strong></div>';
+    }
+
     return '<button class="btn btn-secondary btn-sm" onclick="nav(\'reports\')" style="margin-bottom:16px;">\u2190 Back to Reports</button>' +
         '<div class="page-header"><h1>' + (r.id ? '\u270F\uFE0F Edit Report' : '\uD83D\uDCDD New Report') + '</h1></div>' +
 
+        grantSelector +
         reqsInfo +
 
         '<div class="card"><div class="card-body">' +
@@ -4104,6 +4142,26 @@ function renderSubmitReport() {
         '</div>';
 }
 
+async function changeReportGrant(val) {
+    var parts = val.split(':');
+    var grantId = parseInt(parts[0]);
+    var appId = parts[1] ? parseInt(parts[1]) : null;
+    S.newReport.grant_id = grantId;
+    S.newReport.application_id = appId;
+    S.newReport.content = {};
+    // Fetch new grant's reporting requirements
+    var grantRes = await api('GET', '/api/grants/' + grantId);
+    if (grantRes && grantRes.grant) {
+        S.currentReport = {
+            grant_reporting_requirements: grantRes.grant.reporting_requirements || [],
+            grant_report_template: grantRes.grant.report_template || {},
+            grant_reporting_frequency: grantRes.grant.reporting_frequency || '',
+            grant_title: grantRes.grant.title
+        };
+    }
+    render();
+}
+
 async function saveReportDraft() {
     var r = S.newReport;
     var data = {
@@ -4132,6 +4190,22 @@ async function saveReportDraft() {
 
 async function submitReport() {
     var r = S.newReport;
+
+    // Validate required fields
+    if (!r.title || !r.title.trim()) {
+        showToast('Please enter a report title before submitting.', 'warning');
+        return;
+    }
+    if (!r.reporting_period || !r.reporting_period.trim()) {
+        showToast('Please enter the reporting period before submitting.', 'warning');
+        return;
+    }
+    var content = r.content || {};
+    var filledSections = Object.keys(content).filter(function(k) { return content[k] && content[k].trim(); });
+    if (filledSections.length === 0) {
+        showToast('Please fill in at least one content section before submitting.', 'warning');
+        return;
+    }
 
     // Save first if needed
     if (!r.id) {
@@ -4272,6 +4346,24 @@ function renderReviewReport() {
             '</div></div>';
     }
 
+    // Donor requirements context (show what was expected)
+    var donorReqsHTML = '';
+    var donorReqs = r.grant_reporting_requirements || [];
+    if (donorReqs.length > 0) {
+        donorReqsHTML = '<div class="card" style="margin-top:16px;border-left:4px solid #8b5cf6;">' +
+            '<div class="card-body" style="padding:12px 16px;">' +
+            '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">\uD83D\uDCCB Donor Reporting Requirements</h4>' +
+            donorReqs.map(function(req) {
+                var isMatch = req.type && r.report_type && req.type.toLowerCase() === r.report_type.toLowerCase();
+                return '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px;">' +
+                    (isMatch ? '<span style="color:#2d8f6f;">\u2705</span>' : '<span style="color:#94a3b8;">\u25CB</span>') +
+                    '<div><strong style="font-size:13px;">' + esc(req.title || req.type) + '</strong>' +
+                    (req.frequency ? ' <span style="color:#94a3b8;font-size:12px;">(' + esc(req.frequency) + ')</span>' : '') +
+                    '<br><span style="font-size:12px;color:#64748b;">' + esc(req.description || '') + '</span></div></div>';
+            }).join('') +
+            '</div></div>';
+    }
+
     return '<button class="btn btn-secondary btn-sm" onclick="nav(\'reports\')" style="margin-bottom:16px;">\u2190 Back to Reports</button>' +
         '<div class="card"><div class="card-body">' +
         '<div style="display:flex;justify-content:space-between;align-items:start;">' +
@@ -4286,6 +4378,8 @@ function renderReviewReport() {
         '</div>' +
         '</div>' +
         '</div></div>' +
+
+        donorReqsHTML +
 
         '<div class="card" style="margin-top:16px;"><div class="card-body">' +
         '<h3 style="font-weight:600;margin-bottom:16px;">Report Content</h3>' +
