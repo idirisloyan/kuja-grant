@@ -1886,7 +1886,7 @@ function renderApplyProposal(g) {
     }
 
     return criteria.map(function(c, i) {
-        var key = 'criterion_' + i;
+        var key = c.id || ('criterion_' + i);
         var text = S.applyResponses[key] || '';
         var wc = wordCount(text);
         var maxW = c.max_words || 500;
@@ -2676,7 +2676,9 @@ function renderCreateCriteria() {
 }
 
 function addCriterion() {
+    var idx = S.createData.criteria.length;
     S.createData.criteria.push({
+        id: 'criterion_' + idx,
         label: '', description: '', weight: 0, instructions: '', example: '', max_words: 500
     });
     render();
@@ -2832,6 +2834,11 @@ function renderCreateReporting() {
         // Upload grant document
         '<div style="background:#f0fdf4;border:2px dashed #86efac;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;">' +
         '<p style="font-weight:600;margin-bottom:8px;">' + (d.grant_document ? '\u2705 Grant Document Uploaded' : '\uD83D\uDCC4 Upload Grant Document') + '</p>' +
+        (d.grant_document && d._docOriginalName ? '<p style="font-size:12px;color:#2d8f6f;margin-bottom:4px;"><strong>' + esc(d._docOriginalName) + '</strong>' +
+            (d._docUploadTime ? ' — uploaded at ' + esc(d._docUploadTime) : '') + '</p>' : '') +
+        (d._extractionStatus === 'success' ? '<div style="background:#dcfce7;color:#166534;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px;">\u2705 AI extracted <strong>' + (d._extractedCount || 0) + '</strong> reporting requirements</div>' :
+         d._extractionStatus === 'empty' ? '<div style="background:#fef9c3;color:#854d0e;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px;">\u26A0\uFE0F Document uploaded but no requirements extracted. Add manually below or try a different file.</div>' :
+         d._extractionStatus === 'failed' ? '<div style="background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px;">\u274C Extraction failed. Please try again or add requirements manually.</div>' : '') +
         '<p style="font-size:13px;color:#64748b;margin-bottom:12px;">Upload the grant agreement/document and AI will analyze it to extract reporting requirements</p>' +
         '<input type="file" id="grant-doc-upload" style="display:none;" accept=".pdf,.doc,.docx,.txt" onchange="uploadGrantDoc()">' +
         '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\'grant-doc-upload\').click();">' +
@@ -2962,24 +2969,42 @@ async function uploadGrantDoc() {
 
     if (res && res.success) {
         S.createData.grant_document = res.grant_document;
-        showToast('Grant document uploaded! AI extracted reporting requirements.', 'success');
+        S.createData._docOriginalName = res.original_filename || 'Document';
+        S.createData._docUploadTime = new Date().toLocaleTimeString();
 
         if (res.extracted_requirements) {
             var ext = res.extracted_requirements;
-            if (ext.requirements && ext.requirements.length) {
-                S.createData.reporting_requirements = ext.requirements;
+            // Normalize alternative key names
+            var reqs = ext.requirements || ext.reporting_requirements || [];
+            if (reqs.length) {
+                S.createData.reporting_requirements = reqs;
+                S.createData._extractionStatus = 'success';
+                S.createData._extractedCount = reqs.length;
+            } else {
+                S.createData._extractionStatus = 'empty';
             }
             if (ext.reporting_frequency) {
                 S.createData.reporting_frequency = ext.reporting_frequency;
             }
-            if (ext.template_sections || ext.indicators) {
+            var sections = ext.template_sections || [];
+            var indicators = ext.indicators || [];
+            if (sections.length || indicators.length) {
                 S.createData.report_template = {
-                    template_sections: ext.template_sections || [],
-                    indicators: ext.indicators || []
+                    template_sections: sections,
+                    indicators: indicators
                 };
             }
+        } else {
+            S.createData._extractionStatus = 'empty';
+        }
+
+        if (S.createData._extractionStatus === 'success') {
+            showToast('AI extracted ' + S.createData._extractedCount + ' reporting requirements from your document.', 'success');
+        } else {
+            showToast('Document uploaded but no requirements could be extracted. You can add them manually below.', 'warning');
         }
     } else {
+        S.createData._extractionStatus = 'failed';
         showToast('Failed to upload grant document', 'error');
     }
     render();

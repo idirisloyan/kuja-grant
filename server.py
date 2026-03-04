@@ -65,6 +65,19 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
+# PDF and DOCX text extraction
+try:
+    from PyPDF2 import PdfReader
+    HAS_PYPDF2 = True
+except ImportError:
+    HAS_PYPDF2 = False
+
+try:
+    import docx as python_docx
+    HAS_PYTHON_DOCX = True
+except ImportError:
+    HAS_PYTHON_DOCX = False
+
 
 # =============================================================================
 # RATE LIMITER (in-memory, thread-safe)
@@ -1842,13 +1855,17 @@ class ScoringEngine:
         total_weight = 0
         weighted_sum = 0
 
-        for criterion in criteria:
+        for idx, criterion in enumerate(criteria):
+            # Support both id-based keys and index-based keys (criterion_0, criterion_1, etc.)
             cid = str(criterion.get('id', ''))
+            index_key = f'criterion_{idx}'
             label = criterion.get('label', '')
             desc = criterion.get('desc', '')
             weight = criterion.get('weight', 1)
             max_words = criterion.get('maxWords', 500)
-            response_text = responses.get(cid, '')
+            response_text = responses.get(cid, '') if cid else ''
+            if not response_text:
+                response_text = responses.get(index_key, '')
 
             if not isinstance(response_text, str):
                 response_text = str(response_text) if response_text else ''
@@ -3405,10 +3422,15 @@ def api_submit_application(app_id):
         criteria = grant.get_criteria() or []
         responses = application.get_responses() or {}
         missing = []
-        for criterion in criteria:
+        for idx, criterion in enumerate(criteria):
+            # Support both id-based keys (e.g. "approach") and index-based keys (e.g. "criterion_0")
             cid = str(criterion.get('id', ''))
-            if not responses.get(cid, '').strip():
-                missing.append(criterion.get('label', cid))
+            index_key = f'criterion_{idx}'
+            response_text = responses.get(cid, '') if cid else ''
+            if not response_text:
+                response_text = responses.get(index_key, '')
+            if not str(response_text).strip():
+                missing.append(criterion.get('label', cid or index_key))
         if missing:
             return jsonify({
                 'error': 'Missing required responses',
@@ -4945,9 +4967,32 @@ def api_upload_grant_doc(grant_id):
         elif ext == 'csv':
             with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
                 file_content = f.read()
+        elif ext == 'pdf' and HAS_PYPDF2:
+            try:
+                reader = PdfReader(filepath)
+                pages_text = []
+                for page in reader.pages[:30]:  # Limit to 30 pages
+                    text = page.extract_text()
+                    if text:
+                        pages_text.append(text)
+                file_content = '\n'.join(pages_text)
+                if not file_content.strip():
+                    file_content = f"Grant document: {original_filename} for grant: {grant.title}. {grant.description or ''}"
+            except Exception as pdf_err:
+                logger.error(f"PDF extraction failed: {pdf_err}")
+                file_content = f"Grant document: {original_filename} for grant: {grant.title}. {grant.description or ''}"
+        elif ext in ('docx', 'doc') and HAS_PYTHON_DOCX:
+            try:
+                doc = python_docx.Document(filepath)
+                paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+                file_content = '\n'.join(paragraphs)
+                if not file_content.strip():
+                    file_content = f"Grant document: {original_filename} for grant: {grant.title}. {grant.description or ''}"
+            except Exception as docx_err:
+                logger.error(f"DOCX extraction failed: {docx_err}")
+                file_content = f"Grant document: {original_filename} for grant: {grant.title}. {grant.description or ''}"
         else:
-            # For PDF/DOCX, we can't easily read without extra libs
-            # Use filename and grant context
+            # Fallback for unsupported formats
             file_content = f"Grant document: {original_filename} for grant: {grant.title}. {grant.description or ''}"
     except Exception as e:
         logger.error(f"Failed to read grant document: {e}")
@@ -4956,9 +5001,20 @@ def api_upload_grant_doc(grant_id):
     # AI extracts reporting requirements
     extracted = AIService.extract_reporting_requirements(file_content, grant.title)
 
+    # Guard against None response
+    if not extracted or not isinstance(extracted, dict):
+        extracted = {}
+        logger.warning(f"AI extraction returned no data for grant {grant_id}")
+
+    # Normalize alternative key names from AI responses
+    if 'reporting_requirements' in extracted and 'requirements' not in extracted:
+        extracted['requirements'] = extracted['reporting_requirements']
+
     # Auto-save extracted requirements to grant
+    requirements_saved = False
     if extracted.get('requirements'):
         grant.set_reporting_requirements(extracted['requirements'])
+        requirements_saved = True
     if extracted.get('reporting_frequency'):
         grant.reporting_frequency = extracted['reporting_frequency']
     if extracted.get('template_sections') or extracted.get('indicators'):
@@ -4972,7 +5028,10 @@ def api_upload_grant_doc(grant_id):
     return jsonify({
         'success': True,
         'grant_document': stored_filename,
+        'original_filename': original_filename,
         'extracted_requirements': extracted,
+        'requirements_saved': requirements_saved,
+        'content_extracted': len(file_content) > 100,
         'auto_saved': True,
     })
 
