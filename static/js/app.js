@@ -4866,7 +4866,7 @@ async function loadVerificationData() {
     if (!el) return;
 
     var rows = orgs.map(function(o) {
-        var regNum = o.registration_number || '<span style="color:#dc2626;">Not provided</span>';
+        var regNum = o.registration_number ? esc(o.registration_number) : '<span style="color:#dc2626;">Not provided</span>';
         var registryLink = o.registry_search_url ?
             '<a href="' + esc(o.registry_search_url) + '" target="_blank" style="color:#2563eb;text-decoration:underline;font-size:12px;">Check Registry \u2197</a>' :
             (o.registry_url ? '<a href="' + esc(o.registry_url) + '" target="_blank" style="color:#2563eb;text-decoration:underline;font-size:12px;">Registry \u2197</a>' : '');

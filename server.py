@@ -64,6 +64,7 @@ from flask_login import (
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+import requests  # Used by ComplianceService and RegistryService for HTTP calls
 
 # PDF and DOCX text extraction
 try:
@@ -129,6 +130,7 @@ class RateLimiter:
             return 0
 
 login_limiter = RateLimiter(max_attempts=5, window_seconds=300, lockout_seconds=900)
+ai_limiter = RateLimiter(max_attempts=20, window_seconds=60, lockout_seconds=60)  # 20 AI calls per minute
 
 # Optional: Anthropic SDK for Claude AI integration
 try:
@@ -184,7 +186,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SECURE'] = not os.getenv('FLASK_DEBUG', False)
+app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_DEBUG', '').lower() not in ('1', 'true', 'yes')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
 APP_VERSION = '1.1.0'
 APP_START_TIME = datetime.utcnow()
@@ -199,7 +201,12 @@ OPENSANCTIONS_API_KEY = os.getenv('OPENSANCTIONS_API_KEY', '')
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.session_protection = 'strong'
-CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "*"}})
+_allowed_origins = [
+    'https://web-production-6f8a.up.railway.app',
+    'http://localhost:5000',
+    'http://127.0.0.1:5000',
+]
+CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": _allowed_origins}})
 
 
 # =============================================================================
@@ -214,6 +221,7 @@ def add_security_headers(response):
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.anthropic.com; frame-ancestors 'none'"
     if request.is_secure:
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
@@ -1083,22 +1091,36 @@ class AIService:
         },
     }
 
-    @staticmethod
-    def _call_claude(system_prompt, user_message, max_tokens=1024):
+    # Reusable Anthropic client (created once, not per-call)
+    _anthropic_client = None
+
+    @classmethod
+    def _get_client(cls):
+        if cls._anthropic_client is None and HAS_ANTHROPIC and ANTHROPIC_API_KEY:
+            cls._anthropic_client = anthropic.Anthropic(
+                api_key=ANTHROPIC_API_KEY,
+                timeout=60.0,  # 60 second timeout for all AI calls
+            )
+        return cls._anthropic_client
+
+    @classmethod
+    def _call_claude(cls, system_prompt, user_message, max_tokens=1024):
         """
         Call the Anthropic Claude API. Returns the response text or None on failure.
         """
-        if not ANTHROPIC_API_KEY or not HAS_ANTHROPIC:
+        client = cls._get_client()
+        if not client:
             return None
         try:
-            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
             message = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=max_tokens,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_message}],
             )
-            return message.content[0].text
+            if message.content and len(message.content) > 0:
+                return message.content[0].text
+            return None
         except Exception as e:
             logger.warning(f"Claude API call failed: {e}")
             return None
@@ -1193,9 +1215,25 @@ class AIService:
                 ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
                 if ext in ('txt', 'csv'):
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        file_content = f.read()[:6000]  # Limit to 6000 chars
-                elif ext in ('pdf', 'doc', 'docx'):
-                    file_content = f"[Binary document: {filename}, type: {doc_type}, size: {file_size} bytes]"
+                        file_content = f.read()[:8000]
+                elif ext == 'pdf' and HAS_PYPDF2:
+                    try:
+                        reader = PdfReader(file_path)
+                        pages_text = []
+                        for page in reader.pages[:20]:
+                            text = page.extract_text()
+                            if text:
+                                pages_text.append(text)
+                        file_content = '\n'.join(pages_text)[:8000]
+                    except Exception:
+                        file_content = f"[PDF document: {filename}, type: {doc_type}, size: {file_size} bytes]"
+                elif ext in ('docx', 'doc') and HAS_PYTHON_DOCX:
+                    try:
+                        doc_obj = python_docx.Document(file_path)
+                        paragraphs = [p.text for p in doc_obj.paragraphs if p.text.strip()]
+                        file_content = '\n'.join(paragraphs)[:8000]
+                    except Exception:
+                        file_content = f"[DOCX document: {filename}, type: {doc_type}, size: {file_size} bytes]"
                 else:
                     file_content = f"[File: {filename}, type: {doc_type}, size: {file_size} bytes]"
 
@@ -1249,8 +1287,7 @@ Return ONLY valid JSON."""
                 text = response.content[0].text.strip()
                 if text.startswith('{'):
                     return json.loads(text)
-                import re as _re
-                json_match = _re.search(r'\{[\s\S]*\}', text)
+                json_match = re.search(r'\{[\s\S]*\}', text)
                 if json_match:
                     return json.loads(json_match.group())
             except Exception as e:
@@ -1666,8 +1703,7 @@ Return ONLY valid JSON, no other text."""
                 text = response.content[0].text.strip()
                 if text.startswith('{'):
                     return json.loads(text)
-                import re as _re
-                json_match = _re.search(r'\{[\s\S]*\}', text)
+                json_match = re.search(r'\{[\s\S]*\}', text)
                 if json_match:
                     return json.loads(json_match.group())
             except Exception as e:
@@ -1760,8 +1796,7 @@ Return ONLY valid JSON, no other text."""
                 text = response.content[0].text.strip()
                 if text.startswith('{'):
                     return json.loads(text)
-                import re as _re
-                json_match = _re.search(r'\{[\s\S]*\}', text)
+                json_match = re.search(r'\{[\s\S]*\}', text)
                 if json_match:
                     return json.loads(json_match.group())
             except Exception as e:
@@ -3856,11 +3891,21 @@ def api_get_document(doc_id):
 @login_required
 def api_ai_chat():
     """AI chat endpoint - contextual help for users."""
+    # Rate limit AI calls per user
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return jsonify({'error': 'Too many AI requests. Please wait a moment.', 'success': False}), 429
+    ai_limiter.record_failure(ai_key)
+
     data = get_request_json()
     message = data.get('message', '').strip()
 
     if not message:
         return jsonify({'error': 'Message is required', 'success': False}), 400
+
+    # Limit message length to prevent token abuse
+    if len(message) > 5000:
+        message = message[:5000]
 
     context = data.get('context', {})
     result = AIService.chat(message, context, user_role=current_user.role)
@@ -3881,6 +3926,11 @@ def api_ai_chat():
 @login_required
 def api_ai_guidance():
     """AI guidance endpoint - field-specific writing advice."""
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return jsonify({'error': 'Too many AI requests. Please wait a moment.', 'success': False}), 429
+    ai_limiter.record_failure(ai_key)
+
     data = get_request_json()
     field_name = data.get('field_name', '').strip()
 
@@ -5180,16 +5230,25 @@ TELEMETRY_VALID_EVENTS = frozenset([
 # Simple per-user telemetry rate limiter: max 100 events per minute
 _telemetry_buckets = {}   # user_id -> (window_start, count)
 _telemetry_lock = Lock()
+_telemetry_cleanup_last = 0
 
 @app.route('/api/telemetry', methods=['POST'])
 @login_required
 def api_telemetry():
     """Lightweight telemetry endpoint — logs client events, no DB writes."""
+    global _telemetry_cleanup_last
     uid = current_user.id
 
     # Rate limit: 100 events / 60 s per user
     now = time.time()
     with _telemetry_lock:
+        # Periodic cleanup: remove stale entries every 60 seconds
+        if now - _telemetry_cleanup_last > 60:
+            stale_keys = [k for k, v in _telemetry_buckets.items() if now - v[0] > 120]
+            for k in stale_keys:
+                del _telemetry_buckets[k]
+            _telemetry_cleanup_last = now
+
         bucket = _telemetry_buckets.get(uid, (now, 0))
         if now - bucket[0] > 60:
             bucket = (now, 0)
@@ -5430,7 +5489,23 @@ def api_info():
 @app.route('/uploads/<path:filename>')
 @login_required
 def serve_upload(filename):
-    """Serve uploaded files (authenticated access only)."""
+    """Serve uploaded files with org-level access control."""
+    # Admins can access all files
+    if current_user.role == 'admin':
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    # For other users, verify the file belongs to their org context
+    # Check documents table for org ownership
+    doc = Document.query.filter_by(stored_filename=filename).first()
+    if doc:
+        app_obj = db.session.get(Application, doc.application_id) if doc.application_id else None
+        if app_obj and app_obj.ngo_org_id != current_user.org_id:
+            # Check if the user is a donor for the related grant
+            if not (current_user.role == 'donor' and app_obj.grant and app_obj.grant.donor_org_id == current_user.org_id):
+                return jsonify({'error': 'Access denied'}), 403
+    # Grant documents - check donor ownership
+    grant = Grant.query.filter_by(grant_document=filename).first()
+    if grant and grant.donor_org_id != current_user.org_id and current_user.role != 'reviewer':
+        return jsonify({'error': 'Access denied'}), 403
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
