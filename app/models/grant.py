@@ -17,7 +17,7 @@ class Grant(db.Model):
     donor_org_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
     title = db.Column(db.String(500), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    total_funding = db.Column(db.Float, nullable=True)
+    total_funding = db.Column(db.Numeric(12, 2), nullable=True)
     currency = db.Column(db.String(10), default='USD')
     deadline = db.Column(db.Date, nullable=True)
     status = db.Column(db.String(50), default='draft', index=True)  # draft, open, review, closed, awarded
@@ -31,6 +31,8 @@ class Grant(db.Model):
     report_template = db.Column(db.Text, nullable=True)  # JSON - template structure for NGO reports
     reporting_frequency = db.Column(db.String(50), nullable=True)  # monthly, quarterly, semi-annual, annual, final_only
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
     published_at = db.Column(db.DateTime, nullable=True)
 
     # Relationships
@@ -85,7 +87,7 @@ class Grant(db.Model):
             'donor_org_id': self.donor_org_id,
             'title': self.title,
             'description': self.description,
-            'total_funding': self.total_funding,
+            'total_funding': float(self.total_funding) if self.total_funding else None,
             'currency': self.currency,
             'deadline': self.deadline.isoformat() if self.deadline else None,
             'status': self.status,
@@ -93,6 +95,7 @@ class Grant(db.Model):
             'countries': self.get_countries(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'published_at': self.published_at.isoformat() if self.published_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
         if not summary:
             data['eligibility'] = self.get_eligibility()

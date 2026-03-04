@@ -17,7 +17,7 @@ from app.extensions import db
 
 logger = logging.getLogger('kuja')
 
-APP_VERSION = '2.0.0'
+APP_VERSION = '3.0.0'
 APP_START_TIME = datetime.now(timezone.utc)
 
 
@@ -32,7 +32,7 @@ def register_middleware(app):
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
-        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.anthropic.com; frame-ancestors 'none'"
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.anthropic.com; frame-ancestors 'none'"
         if request.is_secure:
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         return response

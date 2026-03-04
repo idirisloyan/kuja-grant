@@ -244,6 +244,15 @@ class AIService:
         if not client:
             return None
         try:
+            # Inject language instruction for non-English users
+            from app.utils.i18n import get_lang, LANG_NAMES
+            lang = get_lang()
+            if lang != 'en' and lang in LANG_NAMES:
+                system_prompt += (
+                    f"\n\nIMPORTANT: Respond entirely in {LANG_NAMES[lang]}. "
+                    f"All text, headings, bullet points, and recommendations must be in {LANG_NAMES[lang]}."
+                )
+
             message = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=max_tokens,

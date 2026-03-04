@@ -36,6 +36,8 @@ class Organization(db.Model):
     focus_areas = db.Column(db.Text, nullable=True)        # JSON array
     sdg_ids = db.Column(db.Text, nullable=True)            # JSON array
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     grants = db.relationship('Grant', backref='donor_org', lazy='dynamic')
@@ -92,4 +94,5 @@ class Organization(db.Model):
             'focus_areas': self.get_focus_areas(),
             'sdg_ids': self.get_sdg_ids(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

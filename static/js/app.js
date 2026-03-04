@@ -4,6 +4,60 @@
    ============================================================================= */
 
 // =============================================================================
+// 0. Internationalization (i18n)
+// =============================================================================
+
+var _translations = {};
+var _currentLang = 'en';
+
+/**
+ * Translate a key, with optional parameter interpolation.
+ * Falls back: target language -> English -> raw key.
+ * Usage: T('nav.dashboard')  or  T('grant.apps_count', {count: 5})
+ */
+function T(key, params) {
+    var text = (_translations[_currentLang] && _translations[_currentLang][key])
+        || (_translations['en'] && _translations['en'][key])
+        || key;
+    if (params) {
+        Object.keys(params).forEach(function(k) {
+            text = text.replace(new RegExp('\\{' + k + '\\}', 'g'), params[k]);
+        });
+    }
+    return text;
+}
+
+/**
+ * Load a language's translation file (lazy, cached).
+ */
+async function loadTranslations(lang) {
+    if (_translations[lang]) return;
+    try {
+        var res = await fetch('/static/js/translations/' + lang + '.json');
+        if (res.ok) {
+            _translations[lang] = await res.json();
+        }
+    } catch (e) {
+        console.error('Failed to load translations for', lang);
+    }
+}
+
+/**
+ * Switch UI language. Saves preference to backend, re-renders everything.
+ */
+async function setLanguage(lang) {
+    _currentLang = lang;
+    await loadTranslations(lang);
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    // Save preference to backend
+    if (S.user) {
+        api('PUT', '/api/auth/language', { language: lang });
+    }
+    render();
+}
+
+// =============================================================================
 // 1. Global State
 // =============================================================================
 
@@ -335,8 +389,21 @@ function statusBadge(status) {
         rejected: 'badge-rejected', declined: 'badge-rejected', closed: 'badge-gray',
         pending: 'badge-amber', completed: 'badge-green', active: 'badge-green'
     };
+    const labelMap = {
+        draft: T('status.draft'), open: T('status.open'), published: T('status.open'),
+        submitted: T('status.submitted'), in_review: T('status.review'), review: T('status.review'),
+        under_review: T('status.under_review'), scored: T('status.scored'),
+        awarded: T('status.awarded'), approved: T('status.awarded'), accepted: T('status.accepted'),
+        rejected: T('status.rejected'), declined: T('status.rejected'), closed: T('status.closed'),
+        pending: T('status.pending'), completed: T('status.completed'), active: T('status.in_progress'),
+        assigned: T('status.assigned'), clear: T('status.clear'), flagged: T('status.flagged'),
+        error: T('status.error'), unverified: T('status.unverified'), verified: T('status.verified'),
+        expired: T('status.expired'), ai_reviewed: T('status.ai_reviewed'),
+        revision_requested: T('status.revision_requested')
+    };
     const cls = map[status.toLowerCase()] || 'badge-gray';
-    return '<span class="badge ' + cls + '">' + esc(status.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); })) + '</span>';
+    const label = labelMap[status.toLowerCase()] || esc(status.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); }));
+    return '<span class="badge ' + cls + '" role="status">' + esc(label) + '</span>';
 }
 
 function qualityIndicator(wordCount, maxWords) {
@@ -444,7 +511,7 @@ async function api(method, url, data) {
         if (resp.status === 401) {
             S.user = null;
             nav('login');
-            showToast('Session expired. Please log in again.', 'error');
+            showToast(T('auth.session_expired'), 'error');
             return null;
         }
         if (!resp.ok) {
@@ -453,7 +520,7 @@ async function api(method, url, data) {
         }
         return json;
     } catch (e) {
-        showToast('Network error. Please check your connection.', 'error');
+        showToast(T('toast.network_error'), 'error');
         return null;
     }
 }
@@ -588,23 +655,23 @@ function renderLogin() {
         '<circle cx="28" cy="28" r="26" fill="#2d8f6f"/>' +
         '<text x="28" y="36" text-anchor="middle" fill="white" font-size="28" font-family="Inter, Arial" font-weight="bold">K</text>' +
         '</svg>' +
-        '<h1>Kuja Grant Management</h1>' +
-        '<p>AI-Powered Grant Management for Impact</p>' +
+        '<h1>' + T('auth.login_title') + '</h1>' +
+        '<p>' + T('auth.subtitle') + '</p>' +
         '</div>' +
         '<div id="login-error" style="display:none;color:#ef4444;font-size:13px;text-align:center;margin-bottom:12px;"></div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Email</label>' +
-        '<input type="email" id="login-email" class="form-control" placeholder="you@organization.org">' +
+        '<label class="form-label">' + T('auth.email_label') + '</label>' +
+        '<input type="email" id="login-email" class="form-control" placeholder="' + T('auth.email_placeholder') + '">' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Password</label>' +
-        '<input type="password" id="login-pass" class="form-control" placeholder="Enter your password">' +
+        '<label class="form-label">' + T('auth.password_label') + '</label>' +
+        '<input type="password" id="login-pass" class="form-control" placeholder="' + T('auth.password_placeholder') + '">' +
         '</div>' +
         '<button class="btn btn-primary btn-lg" style="width:100%;margin-bottom:24px;" onclick="doLogin()">' +
-        '<span id="login-btn-text">Sign In</span>' +
+        '<span id="login-btn-text">' + T('auth.sign_in') + '</span>' +
         '</button>' +
         '<div style="border-top:1px solid #e2e8f0;padding-top:20px;">' +
-        '<p style="font-size:13px;color:#64748b;text-align:center;margin-bottom:12px;font-weight:600;">Demo Accounts</p>' +
+        '<p style="font-size:13px;color:#64748b;text-align:center;margin-bottom:12px;font-weight:600;">' + T('auth.demo_accounts') + '</p>' +
         '<div class="role-selector">' +
         '<div class="role-card" onclick="fillDemo(\'ngo\')">' +
         '<div class="role-icon">\uD83C\uDFE2</div>' +
@@ -647,23 +714,31 @@ async function doLogin() {
     var email = (document.getElementById('login-email') || {}).value || '';
     var pass = (document.getElementById('login-pass') || {}).value || '';
     if (!email || !pass) {
-        showToast('Please enter email and password.', 'warning');
+        showToast(T('auth.email_password_required'), 'warning');
         return;
     }
     var btn = document.getElementById('login-btn-text');
-    if (btn) btn.innerHTML = '<span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;"></span> Signing in...';
+    if (btn) btn.innerHTML = '<span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;"></span> ' + T('auth.signing_in');
 
     var res = await api('POST', '/api/auth/login', { email: email, password: pass });
     if (res && res.success) {
         S.user = res.user;
-        showToast('Welcome back, ' + (res.user.name || 'User') + '!', 'success');
+        // Load user's saved language preference
+        var userLang = (res.user.language || 'en');
+        if (userLang !== _currentLang) {
+            _currentLang = userLang;
+            await loadTranslations(userLang);
+            document.documentElement.lang = userLang;
+            document.documentElement.dir = userLang === 'ar' ? 'rtl' : 'ltr';
+        }
+        showToast(T('auth.welcome_back', {name: res.user.name || 'User'}), 'success');
         nav('dashboard');
     } else {
-        if (btn) btn.textContent = 'Sign In';
+        if (btn) btn.textContent = T('auth.sign_in');
         var errEl = document.getElementById('login-error');
         if (errEl) {
             errEl.style.display = 'block';
-            errEl.textContent = (res && res.error) || 'Invalid credentials. Please try again.';
+            errEl.textContent = (res && res.error) || T('auth.invalid_credentials');
         }
     }
 }
@@ -677,12 +752,12 @@ function renderShell() {
     var mainHTML = renderPageContent();
 
     return renderHeader() + renderSidebar(role) +
-        '<main class="main-content" id="main-content" style="' +
+        '<main class="main-content" id="main-content" role="main" style="' +
         (S.sidebarCollapsed ? 'margin-left:60px;' : '') +
         (S.aiPanelOpen ? 'margin-right:340px;' : '') +
         '">' + mainHTML + '</main>' +
         renderAIPanel() +
-        '<button class="ai-panel-toggle" onclick="toggleAI()" title="AI Assistant">\u2728</button>';
+        '<button class="ai-panel-toggle" onclick="toggleAI()" title="AI Assistant" aria-label="' + T('ai.panel_title') + '">\u2728</button>';
 }
 
 function renderHeader() {
@@ -693,7 +768,7 @@ function renderHeader() {
     else if (role === 'reviewer') roleBadge = '<span class="badge badge-amber">Reviewer</span>';
     else roleBadge = '<span class="badge badge-gray">' + esc(role) + '</span>';
 
-    return '<header class="header">' +
+    return '<header class="header" role="banner">' +
         '<div class="header-logo" style="cursor:pointer;" onclick="nav(\'dashboard\')">' +
         '<svg width="32" height="32" viewBox="0 0 32 32">' +
         '<circle cx="16" cy="16" r="14" fill="#2d8f6f"/>' +
@@ -710,13 +785,14 @@ function renderHeader() {
         roleBadge +
         '</div>' +
         '<div class="language-switcher">' +
-        '<select onchange="showToast(\'Language: \' + this.value, \'info\')">' +
-        '<option value="en">\uD83C\uDF10 English</option>' +
-        '<option value="fr">\uD83C\uDF10 Fran\u00E7ais</option>' +
-        '<option value="so">\uD83C\uDF10 Somali</option>' +
+        '<select onchange="setLanguage(this.value)" aria-label="Select language">' +
+        '<option value="en"' + (_currentLang === 'en' ? ' selected' : '') + '>\uD83C\uDF10 English</option>' +
+        '<option value="ar"' + (_currentLang === 'ar' ? ' selected' : '') + '>\uD83C\uDF10 \u0627\u0644\u0639\u0631\u0628\u064A\u0629</option>' +
+        '<option value="fr"' + (_currentLang === 'fr' ? ' selected' : '') + '>\uD83C\uDF10 Fran\u00E7ais</option>' +
+        '<option value="es"' + (_currentLang === 'es' ? ' selected' : '') + '>\uD83C\uDF10 Espa\u00F1ol</option>' +
         '</select>' +
         '</div>' +
-        '<button class="btn-logout" onclick="doLogout()">\uD83D\uDEAA Logout</button>' +
+        '<button class="btn-logout" onclick="doLogout()">\uD83D\uDEAA ' + T('auth.logout') + '</button>' +
         '</div>' +
         '</header>';
 }
@@ -725,40 +801,40 @@ function renderSidebar(role) {
     var items = [];
     if (role === 'ngo') {
         items = [
-            { icon: '\uD83D\uDCCA', label: 'Dashboard', page: 'dashboard' },
-            { icon: '\uD83D\uDCDD', label: 'Assessment Hub', page: 'assessment' },
-            { icon: '\uD83D\uDCB0', label: 'Browse Grants', page: 'grants' },
-            { icon: '\uD83D\uDCCB', label: 'My Applications', page: 'applications' },
-            { icon: '\uD83D\uDCC8', label: 'Reports', page: 'reports' },
-            { icon: '\uD83D\uDCC4', label: 'My Documents', page: 'documents' },
-            { icon: '\uD83D\uDC64', label: 'Organization Profile', page: 'orgprofile' }
+            { icon: '\uD83D\uDCCA', label: T('nav.dashboard'), page: 'dashboard' },
+            { icon: '\uD83D\uDCDD', label: T('nav.assessment_hub'), page: 'assessment' },
+            { icon: '\uD83D\uDCB0', label: T('nav.browse_grants'), page: 'grants' },
+            { icon: '\uD83D\uDCCB', label: T('nav.my_applications'), page: 'applications' },
+            { icon: '\uD83D\uDCC8', label: T('nav.reports'), page: 'reports' },
+            { icon: '\uD83D\uDCC4', label: T('nav.my_documents'), page: 'documents' },
+            { icon: '\uD83D\uDC64', label: T('nav.org_profile'), page: 'orgprofile' }
         ];
     } else if (role === 'donor') {
         items = [
-            { icon: '\uD83D\uDCCA', label: 'Dashboard', page: 'dashboard' },
-            { icon: '\u2795', label: 'Create Grant', page: 'creategrant' },
-            { icon: '\uD83D\uDCB0', label: 'My Grants', page: 'mygrants' },
-            { icon: '\u2B50', label: 'Review Applications', page: 'rankings' },
-            { icon: '\uD83D\uDCC8', label: 'Grant Reports', page: 'reports' },
-            { icon: '\uD83D\uDD0D', label: 'Organization Search', page: 'orgsearch' },
-            { icon: '\u2705', label: 'Registration Checks', page: 'verification' },
-            { icon: '\uD83D\uDEE1\uFE0F', label: 'Compliance', page: 'compliance' }
+            { icon: '\uD83D\uDCCA', label: T('nav.dashboard'), page: 'dashboard' },
+            { icon: '\u2795', label: T('nav.create_grant'), page: 'creategrant' },
+            { icon: '\uD83D\uDCB0', label: T('nav.my_grants'), page: 'mygrants' },
+            { icon: '\u2B50', label: T('nav.review_applications'), page: 'rankings' },
+            { icon: '\uD83D\uDCC8', label: T('nav.grant_reports'), page: 'reports' },
+            { icon: '\uD83D\uDD0D', label: T('nav.org_search'), page: 'orgsearch' },
+            { icon: '\u2705', label: T('nav.registration_checks'), page: 'verification' },
+            { icon: '\uD83D\uDEE1\uFE0F', label: T('nav.compliance'), page: 'compliance' }
         ];
     } else if (role === 'reviewer') {
         items = [
-            { icon: '\uD83D\uDCCA', label: 'Dashboard', page: 'dashboard' },
-            { icon: '\uD83D\uDCCB', label: 'My Assignments', page: 'assignments' },
-            { icon: '\u2705', label: 'Completed Reviews', page: 'completedreviews' }
+            { icon: '\uD83D\uDCCA', label: T('nav.dashboard'), page: 'dashboard' },
+            { icon: '\uD83D\uDCCB', label: T('nav.my_assignments'), page: 'assignments' },
+            { icon: '\u2705', label: T('nav.completed_reviews'), page: 'completedreviews' }
         ];
     } else if (role === 'admin') {
         items = [
-            { icon: '\uD83D\uDCCA', label: 'Admin Dashboard', page: 'dashboard' },
-            { icon: '\uD83D\uDCB0', label: 'All Grants', page: 'grants' },
-            { icon: '\uD83D\uDCCB', label: 'All Applications', page: 'applications' },
-            { icon: '\uD83D\uDD0D', label: 'Organization Search', page: 'orgsearch' },
-            { icon: '\u2705', label: 'Registration Checks', page: 'verification' },
-            { icon: '\uD83D\uDEE1\uFE0F', label: 'Compliance', page: 'compliance' },
-            { icon: '\uD83D\uDCC8', label: 'Reports', page: 'reports' }
+            { icon: '\uD83D\uDCCA', label: T('nav.admin_dashboard'), page: 'dashboard' },
+            { icon: '\uD83D\uDCB0', label: T('nav.all_grants'), page: 'grants' },
+            { icon: '\uD83D\uDCCB', label: T('nav.all_applications'), page: 'applications' },
+            { icon: '\uD83D\uDD0D', label: T('nav.org_search'), page: 'orgsearch' },
+            { icon: '\u2705', label: T('nav.registration_checks'), page: 'verification' },
+            { icon: '\uD83D\uDEE1\uFE0F', label: T('nav.compliance'), page: 'compliance' },
+            { icon: '\uD83D\uDCC8', label: T('nav.reports'), page: 'reports' }
         ];
     }
 
@@ -770,7 +846,7 @@ function renderSidebar(role) {
             '</div>';
     }).join('');
 
-    return '<aside class="sidebar' + (S.sidebarCollapsed ? ' collapsed' : '') + '" id="sidebar">' +
+    return '<aside class="sidebar' + (S.sidebarCollapsed ? ' collapsed' : '') + '" id="sidebar" role="navigation" aria-label="' + T('nav.dashboard') + '">' +
         '<nav class="sidebar-nav">' +
         '<div class="sidebar-section">' +
         '<div class="sidebar-section-title">Navigation</div>' +
@@ -778,7 +854,7 @@ function renderSidebar(role) {
         '</div>' +
         '</nav>' +
         '<div class="sidebar-toggle">' +
-        '<button onclick="toggleSidebar()" title="Toggle Sidebar">' +
+        '<button onclick="toggleSidebar()" title="Toggle Sidebar" aria-label="Toggle sidebar navigation">' +
         (S.sidebarCollapsed ? '\u25B6' : '\u25C0') +
         '</button>' +
         '</div>' +
@@ -798,7 +874,7 @@ function toggleAI() {
 async function doLogout() {
     await api('POST', '/api/auth/logout');
     S.user = null;
-    showToast('You have been logged out.', 'info');
+    showToast(T('auth.logged_out'), 'info');
     nav('login');
 }
 
@@ -868,16 +944,16 @@ function renderNGODashboard() {
     var cap = capacityLabel(score);
 
     return '<div class="page-header">' +
-        '<h1>\uD83D\uDC4B Welcome back, ' + esc(S.user.name || 'User') + '</h1>' +
+        '<h1>\uD83D\uDC4B ' + T('dashboard.welcome', {name: S.user.name || 'User'}) + '</h1>' +
         '<p>' + esc(S.user.org_name || 'Your Organization') + '</p>' +
         '</div>' +
 
         // Stat Cards
         '<div id="ngo-stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:32px;">' +
-        renderStatCard('\uD83D\uDCCA', 'Assessment Score', score + '%', 'green') +
-        renderStatCard('\uD83D\uDCCB', 'Active Applications', stats.total_applications || 0, 'blue') +
-        renderStatCard('\uD83D\uDCB0', 'Grants Available', stats.open_grants || 0, 'amber') +
-        renderStatCard('\uD83D\uDCC4', 'Documents Uploaded', stats.documents || 0, 'red') +
+        renderStatCard('\uD83D\uDCCA', T('dashboard.stat.capacity_score'), score + '%', 'green') +
+        renderStatCard('\uD83D\uDCCB', T('dashboard.stat.my_applications'), stats.total_applications || 0, 'blue') +
+        renderStatCard('\uD83D\uDCB0', T('dashboard.stat.open_grants'), stats.open_grants || 0, 'amber') +
+        renderStatCard('\uD83D\uDCC4', T('dashboard.stat.documents'), stats.documents || 0, 'red') +
         '</div>' +
 
         // Capacity Badge
@@ -885,19 +961,19 @@ function renderNGODashboard() {
         '<div class="card-body" style="display:flex;align-items:center;gap:24px;">' +
         scoreRingHTML(score, 80, '%') +
         '<div>' +
-        '<h3 style="font-size:18px;font-weight:600;">Organizational Capacity</h3>' +
-        '<p style="font-size:14px;color:#64748b;margin-top:4px;">Your current capacity level: ' +
+        '<h3 style="font-size:18px;font-weight:600;">' + T('dashboard.stat.capacity_score') + '</h3>' +
+        '<p style="font-size:14px;color:#64748b;margin-top:4px;">' +
         '<span class="badge badge-' + cap.color + '">' + esc(cap.label) + '</span></p>' +
         '</div>' +
         '<div style="margin-left:auto;">' +
-        '<button class="btn btn-secondary btn-sm" onclick="nav(\'assessment\')">View Assessment</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="nav(\'assessment\')">' + T('dashboard.action.start_assessment') + '</button>' +
         '</div>' +
         '</div>' +
         '</div>' +
 
         // Recommended Grants
         '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCA1 Recommended Grants</h2>' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCA1 ' + T('dashboard.action.browse_grants') + '</h2>' +
         '<div id="recommended-grants" class="content-grid">' +
         renderLoadingCards(3) +
         '</div>' +
@@ -905,24 +981,24 @@ function renderNGODashboard() {
 
         // Upcoming Reports
         '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCC5 Upcoming Reports</h2>' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCC5 ' + T('dashboard.stat.reports_due') + '</h2>' +
         '<div id="upcoming-reports">' + renderLoadingTable() + '</div>' +
         '</div>' +
 
         // Recent Applications
         '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCCB Recent Applications</h2>' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCCB ' + T('dashboard.stat.my_applications') + '</h2>' +
         '<div id="recent-applications">' + renderLoadingTable() + '</div>' +
         '</div>' +
 
         // Quick Actions
         '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\u26A1 Quick Actions</h2>' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\u26A1 ' + T('dashboard.quick_actions') + '</h2>' +
         '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
-        '<button class="btn btn-primary" onclick="nav(\'assessment\')">\uD83D\uDCDD Start Assessment</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'grants\')">\uD83D\uDCB0 Browse Grants</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'documents\')">\uD83D\uDCC4 Upload Documents</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'reports\')">\uD83D\uDCC8 My Reports</button>' +
+        '<button class="btn btn-primary" onclick="nav(\'assessment\')">\uD83D\uDCDD ' + T('dashboard.action.start_assessment') + '</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'grants\')">\uD83D\uDCB0 ' + T('dashboard.action.browse_grants') + '</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'documents\')">\uD83D\uDCC4 ' + T('dashboard.action.view_documents') + '</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'reports\')">\uD83D\uDCC8 ' + T('dashboard.action.view_reports') + '</button>' +
         '</div>' +
         '</div>';
 }
@@ -981,36 +1057,36 @@ function renderDonorDashboard() {
     var stats = S.dashboardStats || {};
 
     return '<div class="page-header">' +
-        '<h1>\uD83D\uDC4B Welcome back, ' + esc(S.user.name || 'User') + '</h1>' +
+        '<h1>\uD83D\uDC4B ' + T('dashboard.welcome', {name: S.user.name || 'User'}) + '</h1>' +
         '<p>' + esc(S.user.org_name || 'Your Organization') + '</p>' +
         '</div>' +
 
         '<div id="donor-stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:32px;">' +
-        renderStatCard('\uD83D\uDCB0', 'Total Grants', stats.total_grants || 0, 'green') +
-        renderStatCard('\uD83D\uDCCB', 'Total Applications', stats.total_applications || 0, 'blue') +
-        renderStatCard('\u2B50', 'Pending Review', stats.pending_review || 0, 'amber') +
-        renderStatCard('\uD83C\uDFC6', 'Total Awarded', formatCurrency(stats.total_funding_awarded || 0), 'red') +
-        renderStatCard('\uD83D\uDCCA', 'Reports to Review', stats.pending_report_reviews || 0, 'blue') +
+        renderStatCard('\uD83D\uDCB0', T('dashboard.stat.total_grants'), stats.total_grants || 0, 'green') +
+        renderStatCard('\uD83D\uDCCB', T('dashboard.stat.total_applications'), stats.total_applications || 0, 'blue') +
+        renderStatCard('\u2B50', T('dashboard.stat.pending_reviews'), stats.pending_review || 0, 'amber') +
+        renderStatCard('\uD83C\uDFC6', T('dashboard.stat.total_funding'), formatCurrency(stats.total_funding_awarded || 0), 'red') +
+        renderStatCard('\uD83D\uDCCA', T('dashboard.stat.reports_due'), stats.pending_report_reviews || 0, 'blue') +
         '</div>' +
 
         '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCB0 My Active Grants</h2>' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCB0 ' + T('dashboard.stat.active_grants') + '</h2>' +
         '<div id="active-grants" class="content-grid">' +
         renderLoadingCards(3) +
         '</div>' +
         '</div>' +
 
         '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCCB Recent Applications</h2>' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCCB ' + T('dashboard.stat.total_applications') + '</h2>' +
         '<div id="donor-recent-apps">' + renderLoadingTable() + '</div>' +
         '</div>' +
 
         '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\u26A1 Quick Actions</h2>' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\u26A1 ' + T('dashboard.quick_actions') + '</h2>' +
         '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
-        '<button class="btn btn-primary" onclick="nav(\'creategrant\')">\u2795 Create New Grant</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'rankings\')">\u2B50 Review Applications</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'reports\')">\uD83D\uDCCA Grant Reports</button>' +
+        '<button class="btn btn-primary" onclick="nav(\'creategrant\')">\u2795 ' + T('dashboard.action.create_grant') + '</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'rankings\')">\u2B50 ' + T('dashboard.action.review_apps') + '</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'reports\')">\uD83D\uDCCA ' + T('dashboard.action.view_reports') + '</button>' +
         '</div>' +
         '</div>';
 }
@@ -1024,19 +1100,19 @@ function renderReviewerDashboard() {
     var stats = S.dashboardStats || {};
 
     return '<div class="page-header">' +
-        '<h1>\uD83D\uDC4B Welcome, ' + esc(S.user.name || 'Reviewer') + '</h1>' +
-        '<p>Review Dashboard</p>' +
+        '<h1>\uD83D\uDC4B ' + T('dashboard.welcome', {name: S.user.name || 'Reviewer'}) + '</h1>' +
+        '<p>' + T('nav.dashboard') + '</p>' +
         '</div>' +
 
         '<div id="reviewer-stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:32px;">' +
-        renderStatCard('\uD83D\uDCCB', 'Assigned Reviews', stats.assigned_reviews || 0, 'blue') +
-        renderStatCard('\u23F3', 'In Progress', stats.in_progress_reviews || 0, 'amber') +
-        renderStatCard('\u2705', 'Completed', stats.completed_reviews || 0, 'green') +
-        renderStatCard('\uD83D\uDCC8', 'Avg Score Given', (stats.average_score_given || 0) + '%', 'amber') +
+        renderStatCard('\uD83D\uDCCB', T('dashboard.stat.assigned_reviews'), stats.assigned_reviews || 0, 'blue') +
+        renderStatCard('\u23F3', T('status.in_progress'), stats.in_progress_reviews || 0, 'amber') +
+        renderStatCard('\u2705', T('status.completed'), stats.completed_reviews || 0, 'green') +
+        renderStatCard('\uD83D\uDCC8', T('dashboard.stat.avg_score'), (stats.average_score_given || 0) + '%', 'amber') +
         '</div>' +
 
         '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCCB My Assignments</h2>' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCCB ' + T('review.assignments') + '</h2>' +
         '<div id="reviewer-assignments">' + renderLoadingTable() + '</div>' +
         '</div>';
 }
@@ -1050,8 +1126,8 @@ function renderAdminDashboard() {
     var stats = S.adminStats || {};
 
     return '<div class="page-header">' +
-        '<h1>\uD83D\uDD27 System Administration</h1>' +
-        '<p>Welcome, ' + esc(S.user.name || 'Admin') + ' \u2014 ' +
+        '<h1>\uD83D\uDD27 ' + T('nav.admin_dashboard') + '</h1>' +
+        '<p>' + T('dashboard.welcome', {name: S.user.name || 'Admin'}) + ' \u2014 ' +
         '<span style="font-size:13px;color:#64748b;">v' + esc(stats.app_version || '1.1.0') +
         ' \u2022 Uptime: ' + esc(stats.uptime || '--') +
         ' \u2022 ' + esc(stats.environment || 'production') + '</span></p>' +
@@ -1059,24 +1135,24 @@ function renderAdminDashboard() {
 
         // Top stat cards
         '<div id="admin-stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:32px;">' +
-        renderStatCard('\uD83D\uDC65', 'Total Users', stats.total_users || 0, 'blue') +
-        renderStatCard('\uD83C\uDFE2', 'Organizations', stats.total_organizations || 0, 'green') +
-        renderStatCard('\u2705', 'Verified Orgs', stats.verified_organizations || 0, 'green') +
-        renderStatCard('\uD83D\uDCB0', 'Total Grants', stats.total_grants || 0, 'amber') +
-        renderStatCard('\uD83D\uDCCB', 'Applications', stats.total_applications || 0, 'blue') +
-        renderStatCard('\u26A0\uFE0F', 'Flagged Checks', stats.flagged_compliance || 0, 'red') +
+        renderStatCard('\uD83D\uDC65', T('dashboard.stat.total_users'), stats.total_users || 0, 'blue') +
+        renderStatCard('\uD83C\uDFE2', T('dashboard.stat.total_orgs'), stats.total_organizations || 0, 'green') +
+        renderStatCard('\u2705', T('status.verified'), stats.verified_organizations || 0, 'green') +
+        renderStatCard('\uD83D\uDCB0', T('dashboard.stat.total_grants'), stats.total_grants || 0, 'amber') +
+        renderStatCard('\uD83D\uDCCB', T('dashboard.stat.total_applications'), stats.total_applications || 0, 'blue') +
+        renderStatCard('\u26A0\uFE0F', T('dashboard.stat.compliance_alerts'), stats.flagged_compliance || 0, 'red') +
         '</div>' +
 
         // Two-column layout
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px;">' +
 
         '<div class="card"><div class="card-body">' +
-        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDC65 Users by Role</h3>' +
+        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDC65 ' + T('dashboard.stat.total_users') + '</h3>' +
         '<div id="admin-users-by-role">' + renderAdminRoleBreakdown(stats.users_by_role || {}) + '</div>' +
         '</div></div>' +
 
         '<div class="card"><div class="card-body">' +
-        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83C\uDFE2 Organizations by Type</h3>' +
+        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83C\uDFE2 ' + T('dashboard.stat.total_orgs') + '</h3>' +
         '<div id="admin-orgs-by-type">' + renderAdminOrgBreakdown(stats.orgs_by_type || {}) + '</div>' +
         '</div></div>' +
 
@@ -1084,7 +1160,7 @@ function renderAdminDashboard() {
 
         // Applications by Status
         '<div class="card" style="margin-bottom:32px;"><div class="card-body">' +
-        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDCCB Applications by Status</h3>' +
+        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDCCB ' + T('dashboard.stat.total_applications') + '</h3>' +
         '<div id="admin-apps-by-status">' + renderAdminStatusBreakdown(stats.apps_by_status || {}) + '</div>' +
         '</div></div>' +
 
@@ -1092,15 +1168,15 @@ function renderAdminDashboard() {
         '<div class="card" style="margin-bottom:32px;"><div class="card-body">' +
         '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDCC8 Last 7 Days</h3>' +
         '<div style="display:flex;gap:32px;">' +
-        '<div><span style="font-size:28px;font-weight:700;color:#2d8f6f;">' + (stats.new_users_7d || 0) + '</span><div style="font-size:13px;color:#64748b;">New Users</div></div>' +
-        '<div><span style="font-size:28px;font-weight:700;color:#3b82f6;">' + (stats.new_apps_7d || 0) + '</span><div style="font-size:13px;color:#64748b;">New Applications</div></div>' +
-        '<div><span style="font-size:28px;font-weight:700;color:#f59e0b;">' + (stats.new_orgs_7d || 0) + '</span><div style="font-size:13px;color:#64748b;">New Organizations</div></div>' +
+        '<div><span style="font-size:28px;font-weight:700;color:#2d8f6f;">' + (stats.new_users_7d || 0) + '</span><div style="font-size:13px;color:#64748b;">' + T('dashboard.stat.total_users') + '</div></div>' +
+        '<div><span style="font-size:28px;font-weight:700;color:#3b82f6;">' + (stats.new_apps_7d || 0) + '</span><div style="font-size:13px;color:#64748b;">' + T('dashboard.stat.total_applications') + '</div></div>' +
+        '<div><span style="font-size:28px;font-weight:700;color:#f59e0b;">' + (stats.new_orgs_7d || 0) + '</span><div style="font-size:13px;color:#64748b;">' + T('dashboard.stat.total_orgs') + '</div></div>' +
         '</div>' +
         '</div></div>' +
 
         // Recent Users Table
         '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDC65 Recent Users</h2>' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDC65 ' + T('dashboard.stat.total_users') + '</h2>' +
         '<div id="admin-recent-users">' + renderLoadingTable() + '</div>' +
         '</div>' +
 
@@ -1117,13 +1193,13 @@ function renderAdminDashboard() {
 
         // Quick Actions
         '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\u26A1 Quick Actions</h2>' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\u26A1 ' + T('dashboard.quick_actions') + '</h2>' +
         '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
-        '<button class="btn btn-primary" onclick="nav(\'orgsearch\')">\uD83D\uDD0D Search Organizations</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'grants\')">\uD83D\uDCB0 View All Grants</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'applications\')">\uD83D\uDCCB View Applications</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'compliance\')">\uD83D\uDEE1\uFE0F Compliance Checks</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'verification\')">\u2705 Registration Checks</button>' +
+        '<button class="btn btn-primary" onclick="nav(\'orgsearch\')">\uD83D\uDD0D ' + T('nav.org_search') + '</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'grants\')">\uD83D\uDCB0 ' + T('nav.all_grants') + '</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'applications\')">\uD83D\uDCCB ' + T('nav.all_applications') + '</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'compliance\')">\uD83D\uDEE1\uFE0F ' + T('nav.compliance') + '</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'verification\')">\u2705 ' + T('nav.registration_checks') + '</button>' +
         '</div>' +
         '</div>';
 }
@@ -1343,17 +1419,17 @@ function renderStatCard(icon, label, value, color) {
 function renderLoadingCards(count) {
     var html = '';
     for (var i = 0; i < count; i++) {
-        html += '<div class="card"><div class="card-body" style="text-align:center;padding:40px;">' +
-            '<div class="spinner" style="width:24px;height:24px;border:3px solid #e2e8f0;border-top-color:#2d8f6f;border-radius:50%;animation:spin 0.6s linear infinite;margin:0 auto;"></div>' +
-            '<p style="margin-top:12px;color:#94a3b8;font-size:13px;">Loading...</p>' +
+        html += '<div class="card" aria-busy="true"><div class="card-body" style="text-align:center;padding:40px;">' +
+            '<div class="spinner" style="width:24px;height:24px;border:3px solid #e2e8f0;border-top-color:#2d8f6f;border-radius:50%;animation:spin 0.6s linear infinite;margin:0 auto;" aria-hidden="true"></div>' +
+            '<p style="margin-top:12px;color:#94a3b8;font-size:13px;">' + T('common.loading') + '</p>' +
             '</div></div>';
     }
     return html;
 }
 
 function renderLoadingTable() {
-    return '<div class="card"><div class="card-body" style="text-align:center;padding:40px;">' +
-        '<div class="spinner" style="width:24px;height:24px;border:3px solid #e2e8f0;border-top-color:#2d8f6f;border-radius:50%;animation:spin 0.6s linear infinite;margin:0 auto;"></div>' +
+    return '<div class="card" aria-busy="true"><div class="card-body" style="text-align:center;padding:40px;">' +
+        '<div class="spinner" style="width:24px;height:24px;border:3px solid #e2e8f0;border-top-color:#2d8f6f;border-radius:50%;animation:spin 0.6s linear infinite;margin:0 auto;" aria-hidden="true"></div>' +
         '<p style="margin-top:12px;color:#94a3b8;font-size:13px;">Loading data...</p>' +
         '</div></div>';
 }
@@ -1387,7 +1463,7 @@ function renderGrantCard(g) {
         statusBadge(g.status || 'open') +
         '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();' +
         (deadline === 'Expired' ? 'showToast(\'Deadline has passed\',\'warning\')' : 'startApply(' + g.id + ')') +
-        '">' + (deadline === 'Expired' ? 'Deadline Passed' : 'Apply') + '</button>' +
+        '">' + (deadline === 'Expired' ? T('grant.deadline_passed') : T('grant.apply_now')) + '</button>' +
         '</div>' +
         '</div>';
 }
@@ -1416,13 +1492,13 @@ function renderDonorGrantCard(g) {
 function renderApplicationsTable(apps) {
     if (!apps || !apps.length) {
         return '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-            '<p>\uD83D\uDCCB No applications yet.</p>' +
-            '<button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="nav(\'grants\')">Browse Grants</button>' +
+            '<p>\uD83D\uDCCB ' + T('application.no_applications') + '</p>' +
+            '<button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="nav(\'grants\')">' + T('dashboard.action.browse_grants') + '</button>' +
             '</div></div>';
     }
     return '<div class="table-wrapper"><table class="table table-hover">' +
         '<thead><tr>' +
-        '<th>Grant</th><th>Donor</th><th>Status</th><th>AI Score</th><th>Submitted</th><th></th>' +
+        '<th>' + T('application.grant') + '</th><th>' + T('application.donor') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('application.ai_score') + '</th><th>' + T('application.submitted_at') + '</th><th></th>' +
         '</tr></thead><tbody>' +
         apps.map(function(a) {
             return '<tr style="cursor:pointer;" onclick="viewApplication(' + a.id + ')">' +
@@ -1489,7 +1565,7 @@ function renderBrowseGrants() {
     var filtered = filterGrants();
 
     return '<div class="page-header">' +
-        '<h1>\uD83D\uDCB0 Browse Grants</h1>' +
+        '<h1>\uD83D\uDCB0 ' + T('grant.browse_title') + '</h1>' +
         '<p>Find grants that match your organization\'s mission and capabilities.</p>' +
         '</div>' +
 
@@ -1497,20 +1573,20 @@ function renderBrowseGrants() {
         '<div class="card" style="margin-bottom:24px;">' +
         '<div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">' +
         '<div class="form-group" style="margin:0;flex:1;min-width:200px;">' +
-        '<label class="form-label">\uD83D\uDD0D Search</label>' +
-        '<input type="text" class="form-control" placeholder="Search grants..." value="' + esc(S.grantFilters.search) + '" oninput="S.grantFilters.search=this.value;renderGrantsList();">' +
+        '<label class="form-label">\uD83D\uDD0D ' + T('common.search') + '</label>' +
+        '<input type="text" class="form-control" placeholder="' + T('grant.search_placeholder') + '" value="' + esc(S.grantFilters.search) + '" oninput="S.grantFilters.search=this.value;renderGrantsList();">' +
         '</div>' +
         '<div class="form-group" style="margin:0;min-width:150px;">' +
-        '<label class="form-label">Sector</label>' +
+        '<label class="form-label">' + T('grant.detail.sectors') + '</label>' +
         '<select class="form-control" onchange="S.grantFilters.sector=this.value;renderGrantsList();">' +
-        '<option value="">All Sectors</option>' +
+        '<option value="">' + T('grant.filter_sector') + '</option>' +
         sectors.map(function(s) { return '<option value="' + s.toLowerCase() + '"' + (S.grantFilters.sector === s.toLowerCase() ? ' selected' : '') + '>' + s + '</option>'; }).join('') +
         '</select>' +
         '</div>' +
         '<div class="form-group" style="margin:0;min-width:150px;">' +
-        '<label class="form-label">Country</label>' +
+        '<label class="form-label">' + T('grant.detail.countries') + '</label>' +
         '<select class="form-control" onchange="S.grantFilters.country=this.value;renderGrantsList();">' +
-        '<option value="">All Countries</option>' +
+        '<option value="">' + T('grant.filter_country') + '</option>' +
         countries.map(function(c) { return '<option value="' + c + '"' + (S.grantFilters.country === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
         '</select>' +
         '</div>' +
@@ -1521,7 +1597,7 @@ function renderBrowseGrants() {
         (filtered.length ? filtered.map(function(g) { return renderGrantCard(g); }).join('') :
             '<div style="grid-column:1/-1;text-align:center;padding:48px;color:#94a3b8;">' +
             '<p style="font-size:48px;margin-bottom:12px;">\uD83D\uDD0D</p>' +
-            '<p>No grants found matching your criteria.</p></div>') +
+            '<p>' + T('grant.no_grants') + '</p></div>') +
         '</div>';
 }
 
@@ -1549,7 +1625,7 @@ function renderGrantsList() {
     el.innerHTML = filtered.length ? filtered.map(function(g) { return renderGrantCard(g); }).join('') :
         '<div style="grid-column:1/-1;text-align:center;padding:48px;color:#94a3b8;">' +
         '<p style="font-size:48px;margin-bottom:12px;">\uD83D\uDD0D</p>' +
-        '<p>No grants found matching your criteria.</p></div>';
+        '<p>' + T('grant.no_grants') + '</p></div>';
 }
 
 async function loadGrants() {
@@ -1576,8 +1652,8 @@ function renderMyGrants() {
     loadMyGrants();
     return '<div class="page-header">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-        '<div><h1>\uD83D\uDCB0 My Grants</h1><p>Grants you have created and published.</p></div>' +
-        '<button class="btn btn-primary" onclick="nav(\'creategrant\')">\u2795 Create New Grant</button>' +
+        '<div><h1>\uD83D\uDCB0 ' + T('grant.my_grants') + '</h1></div>' +
+        '<button class="btn btn-primary" onclick="nav(\'creategrant\')">\u2795 ' + T('dashboard.action.create_grant') + '</button>' +
         '</div>' +
         '</div>' +
         '<div id="my-grants-list" class="content-grid">' + renderLoadingCards(3) + '</div>';
@@ -1603,19 +1679,19 @@ async function loadMyGrants() {
 // =============================================================================
 
 function renderGrantDetail() {
-    if (!S.selectedGrant) return '<p>Loading grant details...</p>';
+    if (!S.selectedGrant) return '<p>' + T('common.loading') + '</p>';
     var g = S.selectedGrant;
     var role = (S.user.role || '').toLowerCase();
     var tab = S.grantDetailTab || 'overview';
 
     var tabs = [
-        { key: 'overview', label: 'Overview' },
-        { key: 'eligibility', label: 'Eligibility' },
-        { key: 'criteria', label: 'Criteria' },
-        { key: 'documents', label: 'Documents' }
+        { key: 'overview', label: T('grant.tab.overview') },
+        { key: 'eligibility', label: T('grant.detail.eligibility') },
+        { key: 'criteria', label: T('grant.detail.evaluation_criteria') },
+        { key: 'documents', label: T('grant.tab.documents') }
     ];
     if (role === 'donor') {
-        tabs.push({ key: 'applicants', label: 'Applicants' });
+        tabs.push({ key: 'applicants', label: T('grant.tab.applications') });
     }
 
     var tabContent = '';
@@ -1628,7 +1704,7 @@ function renderGrantDetail() {
         default: tabContent = renderGrantOverview(g);
     }
 
-    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'grants\')" style="margin-bottom:16px;">\u2190 Back to Grants</button>' +
+    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'grants\')" style="margin-bottom:16px;">\u2190 ' + T('common.back') + '</button>' +
 
         '<div class="card" style="margin-bottom:24px;">' +
         '<div class="card-body">' +
@@ -1643,7 +1719,7 @@ function renderGrantDetail() {
         '</div>' +
         '</div>' +
         '<div style="display:flex;gap:16px;margin-top:16px;font-size:14px;color:#64748b;">' +
-        '<span>\uD83D\uDCC5 Deadline: ' + formatDate(g.deadline) + ' (' + timeUntil(g.deadline) + ')</span>' +
+        '<span>\uD83D\uDCC5 ' + T('grant.deadline') + ': ' + formatDate(g.deadline) + ' (' + timeUntil(g.deadline) + ')</span>' +
         '<span>\uD83C\uDF10 ' + esc((g.countries || []).join(', ') || 'Global') + '</span>' +
         '</div>' +
         '</div>' +
@@ -1666,8 +1742,8 @@ function renderGrantDetail() {
         // Action buttons
         '<div style="margin-top:24px;display:flex;gap:12px;">' +
         (role === 'ngo' && g.status !== 'closed' && timeUntil(g.deadline) !== 'Expired' ?
-            '<button class="btn btn-primary btn-lg" onclick="startApply(' + g.id + ')">Apply Now</button>' : '') +
-        (role === 'donor' ? '<button class="btn btn-primary" onclick="editGrant(' + g.id + ')">Edit Grant</button>' : '') +
+            '<button class="btn btn-primary btn-lg" onclick="startApply(' + g.id + ')">' + T('grant.apply_now') + '</button>' : '') +
+        (role === 'donor' ? '<button class="btn btn-primary" onclick="editGrant(' + g.id + ')">' + T('common.edit') + '</button>' : '') +
         '</div>';
 }
 
@@ -1676,10 +1752,10 @@ function renderGrantOverview(g) {
         return '<span class="badge badge-outline badge-green">' + sectorIcon(s) + ' ' + esc(s) + '</span>';
     }).join(' ');
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:12px;">Description</h3>' +
-        '<p style="color:#475569;line-height:1.7;white-space:pre-wrap;">' + esc(g.description || 'No description provided.') + '</p>' +
-        (sectors ? '<div style="margin-top:16px;"><strong>Sectors:</strong> ' + sectors + '</div>' : '') +
-        '<div style="margin-top:12px;"><strong>Countries:</strong> ' + esc((g.countries || []).join(', ') || 'Global') + '</div>' +
+        '<h3 style="font-weight:600;margin-bottom:12px;">' + T('grant.detail.description') + '</h3>' +
+        '<p style="color:#475569;line-height:1.7;white-space:pre-wrap;">' + esc(g.description || T('common.no_data')) + '</p>' +
+        (sectors ? '<div style="margin-top:16px;"><strong>' + T('grant.detail.sectors') + ':</strong> ' + sectors + '</div>' : '') +
+        '<div style="margin-top:12px;"><strong>' + T('grant.detail.countries') + ':</strong> ' + esc((g.countries || []).join(', ') || 'Global') + '</div>' +
         '</div></div>';
 }
 
@@ -1687,7 +1763,7 @@ function renderGrantEligibility(g) {
     var reqs = g.eligibility || [];
     if (!reqs.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No eligibility requirements specified.</p></div></div>';
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Eligibility Requirements</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('grant.detail.eligibility') + '</h3>' +
         reqs.map(function(req) {
             var passed = req.met || req.passed;
             var icon = passed ? '\u2705' : (passed === false ? '\u274C' : '\u2B1C');
@@ -1696,7 +1772,7 @@ function renderGrantEligibility(g) {
                 '<div style="flex:1;">' +
                 '<div style="font-weight:500;">' + esc(req.category || req.name || req.label || 'Requirement') + '</div>' +
                 '<div style="font-size:13px;color:#64748b;margin-top:2px;">' + esc(req.description || req.details || '') + '</div>' +
-                (req.required ? '<span class="badge badge-red" style="margin-top:4px;">Required</span>' : '') +
+                (req.required ? '<span class="badge badge-red" style="margin-top:4px;">' + T('grant.create.required') + '</span>' : '') +
                 '</div>' +
                 '</div>';
         }).join('') +
@@ -1707,12 +1783,12 @@ function renderGrantCriteria(g) {
     var criteria = g.criteria || [];
     if (!criteria.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No scoring criteria defined.</p></div></div>';
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Scoring Criteria</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('grant.detail.evaluation_criteria') + '</h3>' +
         criteria.map(function(c, i) {
             return '<div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:12px;">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;">' +
                 '<h4 style="font-weight:600;">' + (i + 1) + '. ' + esc(c.label || c.name) + '</h4>' +
-                '<span class="badge badge-blue">Weight: ' + (c.weight || 0) + '%</span>' +
+                '<span class="badge badge-blue">' + T('grant.create.weight') + ': ' + (c.weight || 0) + '%</span>' +
                 '</div>' +
                 '<p style="color:#64748b;font-size:13px;margin-top:8px;">' + esc(c.description || '') + '</p>' +
                 (c.instructions ? '<div style="background:#eff6ff;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;">' +
@@ -1731,7 +1807,7 @@ function renderGrantDocuments(g) {
     if (!docs.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No document requirements specified.</p></div></div>';
     var docIcons = { financial_report: '\uD83D\uDCCA', registration: '\uD83D\uDCDC', audit: '\uD83D\uDD0D', psea: '\uD83D\uDEE1\uFE0F', project_report: '\uD83D\uDCC4', budget: '\uD83D\uDCB5', cv: '\uD83D\uDC64', strategic_plan: '\uD83D\uDCCB' };
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Required Documents</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('grant.detail.doc_requirements') + '</h3>' +
         docs.map(function(d) {
             var icon = docIcons[d.type] || '\uD83D\uDCC4';
             return '<div style="display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid #f1f5f9;">' +
@@ -1740,7 +1816,7 @@ function renderGrantDocuments(g) {
                 '<div style="font-weight:500;">' + esc(d.name || d.type || 'Document') + '</div>' +
                 '<div style="font-size:13px;color:#64748b;">' + esc(d.description || d.requirements || '') + '</div>' +
                 '</div>' +
-                (d.required !== false ? '<span class="badge badge-red">Required</span>' : '<span class="badge badge-gray">Optional</span>') +
+                (d.required !== false ? '<span class="badge badge-red">' + T('grant.create.required') + '</span>' : '<span class="badge badge-gray">' + T('grant.create.optional') + '</span>') +
                 '</div>';
         }).join('') +
         '</div></div>';
@@ -1816,14 +1892,14 @@ async function startApply(grantId) {
 }
 
 function renderApplyForm() {
-    if (!S.selectedGrant) return '<p>Loading...</p>';
+    if (!S.selectedGrant) return '<p>' + T('common.loading') + '</p>';
     var g = S.selectedGrant;
     var step = S.applyStep;
     var steps = [
-        { num: 1, label: 'Eligibility' },
-        { num: 2, label: 'Proposal' },
-        { num: 3, label: 'Documents' },
-        { num: 4, label: 'Review' }
+        { num: 1, label: T('apply.step1') },
+        { num: 2, label: T('apply.step2') },
+        { num: 3, label: T('apply.step3') },
+        { num: 4, label: T('apply.step4') }
     ];
 
     var stepContent = '';
@@ -1834,19 +1910,19 @@ function renderApplyForm() {
         case 4: stepContent = renderApplyReview(g); break;
     }
 
-    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'grantdetail\')" style="margin-bottom:16px;">\u2190 Back to Grant</button>' +
-        '<div class="page-header"><h1>Apply: ' + esc(g.title) + '</h1></div>' +
+    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'grantdetail\')" style="margin-bottom:16px;">\u2190 ' + T('common.back') + '</button>' +
+        '<div class="page-header"><h1>' + T('apply.title') + ': ' + esc(g.title) + '</h1></div>' +
 
         renderWizardSteps(steps, step) +
 
         '<div class="wizard-content">' + stepContent + '</div>' +
 
         '<div class="wizard-actions">' +
-        (step > 1 ? '<button class="btn btn-secondary" onclick="S.applyStep--;render();">\u2190 Previous</button>' : '<div></div>') +
+        (step > 1 ? '<button class="btn btn-secondary" onclick="S.applyStep--;render();">\u2190 ' + T('common.previous') + '</button>' : '<div></div>') +
         '<div style="display:flex;gap:8px;">' +
-        '<button class="btn btn-secondary" onclick="saveDraft()">Save Draft</button>' +
-        (step < 4 ? '<button class="btn btn-primary" onclick="S.applyStep++;render();">Next \u2192</button>' :
-            '<button class="btn btn-primary btn-lg" onclick="submitApplication()">Submit Application</button>') +
+        '<button class="btn btn-secondary" onclick="saveDraft()">' + T('apply.save_draft') + '</button>' +
+        (step < 4 ? '<button class="btn btn-primary" onclick="S.applyStep++;render();">' + T('common.next') + ' \u2192</button>' :
+            '<button class="btn btn-primary btn-lg" onclick="submitApplication()">' + T('apply.submit_application') + '</button>') +
         '</div>' +
         '</div>';
 }
@@ -1869,12 +1945,12 @@ function renderApplyEligibility(g) {
     var reqs = g.eligibility || [];
     if (!reqs.length) {
         return '<div class="card"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">Eligibility Check</h3>' +
+            '<h3 style="font-weight:600;margin-bottom:12px;">' + T('apply.eligibility_check') + '</h3>' +
             '<p style="color:#64748b;">This grant has no specific eligibility requirements. You may proceed to the next step.</p>' +
             '</div></div>';
     }
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">Eligibility Check</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('apply.eligibility_check') + '</h3>' +
         '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Confirm that your organization meets each requirement below.</p>' +
         reqs.map(function(req, i) {
             var key = 'elig_' + i;
@@ -1902,7 +1978,7 @@ function renderApplyProposal(g) {
     var criteria = g.criteria || [];
     if (!criteria.length) {
         return '<div class="card"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">Proposal Responses</h3>' +
+            '<h3 style="font-weight:600;margin-bottom:12px;">' + T('application.proposal_responses') + '</h3>' +
             '<p style="color:#64748b;">No specific criteria to respond to. Please describe your proposal below.</p>' +
             '<div class="form-group">' +
             '<textarea class="form-control" rows="8" placeholder="Describe your project proposal..." ' +
@@ -1921,7 +1997,7 @@ function renderApplyProposal(g) {
         return '<div class="card" style="margin-bottom:16px;"><div class="card-body">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;">' +
             '<h3 style="font-weight:600;">' + (i + 1) + '. ' + esc(c.label || c.name) + '</h3>' +
-            '<span class="badge badge-blue">Weight: ' + (c.weight || 0) + '%</span>' +
+            '<span class="badge badge-blue">' + T('grant.create.weight') + ': ' + (c.weight || 0) + '%</span>' +
             '</div>' +
             '<p style="color:#64748b;font-size:13px;margin-top:4px;">' + esc(c.description || '') + '</p>' +
 
@@ -2000,12 +2076,12 @@ function renderApplyDocuments(g) {
     var docs = g.doc_requirements || [];
     if (!docs.length) {
         return '<div class="card"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">Document Upload</h3>' +
+            '<h3 style="font-weight:600;margin-bottom:12px;">' + T('apply.upload_documents') + '</h3>' +
             '<p style="color:#64748b;">No documents required for this application.</p>' +
             '</div></div>';
     }
     var docIcons = { financial_report: '\uD83D\uDCCA', registration: '\uD83D\uDCDC', audit: '\uD83D\uDD0D', psea: '\uD83D\uDEE1\uFE0F', project_report: '\uD83D\uDCC4', budget: '\uD83D\uDCB5', cv: '\uD83D\uDC64', strategic_plan: '\uD83D\uDCCB' };
-    return '<h3 style="font-weight:600;margin-bottom:16px;">Upload Required Documents</h3>' +
+    return '<h3 style="font-weight:600;margin-bottom:16px;">' + T('apply.upload_documents') + '</h3>' +
         docs.map(function(d, i) {
             var key = d.type || ('doc_' + i);
             var uploaded = S.uploadedDocs[key];
@@ -2017,7 +2093,7 @@ function renderApplyDocuments(g) {
                 '<h4 style="font-weight:600;">' + esc(d.name || d.type || 'Document') + '</h4>' +
                 '<p style="font-size:13px;color:#64748b;">' + esc(d.description || d.requirements || '') + '</p>' +
                 '</div>' +
-                (d.required !== false ? '<span class="badge badge-red">Required</span>' : '<span class="badge badge-gray">Optional</span>') +
+                (d.required !== false ? '<span class="badge badge-red">' + T('grant.create.required') + '</span>' : '<span class="badge badge-gray">' + T('grant.create.optional') + '</span>') +
                 '</div>' +
                 (uploaded ?
                     '<div class="upload-file-item">' +
@@ -2144,7 +2220,7 @@ async function uploadFile(file, key) {
             size: (file.size / 1024).toFixed(1) + ' KB',
             ai_analysis: res.ai_analysis || null
         };
-        showToast('Document uploaded successfully!', 'success');
+        showToast(T('toast.uploaded'), 'success');
         render();
     } else {
         if (zone) {
@@ -2178,7 +2254,7 @@ function renderApplyReview(g) {
     });
 
     return '<div class="card" style="margin-bottom:16px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Review & Submit</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('apply.review_submit') + '</h3>' +
 
         (missingItems.length ? '<div style="background:#fef3c7;padding:16px;border-radius:8px;margin-bottom:16px;border-left:4px solid #f59e0b;">' +
             '<strong style="color:#92400e;">\u26A0\uFE0F Missing Items (' + missingItems.length + ')</strong>' +
@@ -2188,7 +2264,7 @@ function renderApplyReview(g) {
             '<strong style="color:#166534;">\u2705 All requirements met! Your application is ready to submit.</strong></div>') +
 
         // Eligibility Summary
-        '<h4 style="font-weight:600;margin:16px 0 8px;">Eligibility Responses</h4>' +
+        '<h4 style="font-weight:600;margin:16px 0 8px;">' + T('application.eligibility_responses') + '</h4>' +
         eligReqs.map(function(r, i) {
             var checked = S.applyEligibility['elig_' + i];
             return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;">' +
@@ -2197,7 +2273,7 @@ function renderApplyReview(g) {
         }).join('') +
 
         // Criteria Responses Summary
-        '<h4 style="font-weight:600;margin:16px 0 8px;">Proposal Responses</h4>' +
+        '<h4 style="font-weight:600;margin:16px 0 8px;">' + T('application.proposal_responses') + '</h4>' +
         criteria.map(function(c, i) {
             var text = S.applyResponses['criterion_' + i] || '';
             var wc = wordCount(text);
@@ -2208,7 +2284,7 @@ function renderApplyReview(g) {
         }).join('') +
 
         // Documents Summary
-        '<h4 style="font-weight:600;margin:16px 0 8px;">Uploaded Documents</h4>' +
+        '<h4 style="font-weight:600;margin:16px 0 8px;">' + T('application.uploaded_documents') + '</h4>' +
         docs.map(function(d, i) {
             var key = d.type || ('doc_' + i);
             var uploaded = S.uploadedDocs[key];
@@ -2233,7 +2309,7 @@ async function saveDraft() {
     };
     var res = await api('POST', '/api/applications', data);
     if (res) {
-        showToast('Draft saved successfully!', 'success');
+        showToast(T('apply.draft_saved'), 'success');
     }
 }
 
@@ -2259,7 +2335,7 @@ async function submitApplication() {
                 var submitData = await submitResp.json();
                 if (submitResp.ok && submitData.success) {
                     telemetry('submit_succeeded', { grant_id: g.id, app_id: appId });
-                    showToast('Application submitted successfully!', 'success');
+                    showToast(T('apply.submitted_success'), 'success');
                     nav('applications');
                     return;
                 }
@@ -2274,11 +2350,11 @@ async function submitApplication() {
                 return;
             } catch (e) {
                 telemetry('submit_failed', { grant_id: g.id, reason: 'network_error' });
-                showToast('Network error during submission', 'error');
+                showToast(T('toast.network_error'), 'error');
                 return;
             }
         }
-        showToast('Application created. Please review and submit.', 'info');
+        showToast(T('toast.app_created_review'), 'info');
         nav('applications');
     } else {
         telemetry('submit_failed', { grant_id: g.id, reason: 'draft_creation_failed' });
@@ -2319,7 +2395,7 @@ function highlightMissingCriteria(grant, missingLabels) {
             firstMissing.focus();
         }
 
-        showToast('Please fill in the highlighted required fields (' + missingLabels.length + ' missing)', 'error');
+        showToast(T('toast.fill_required_fields', {count: missingLabels.length}), 'error');
     }, 200);
 }
 
@@ -2330,8 +2406,7 @@ function highlightMissingCriteria(grant, missingLabels) {
 function renderMyApplications() {
     loadApplications();
     return '<div class="page-header">' +
-        '<h1>\uD83D\uDCCB My Applications</h1>' +
-        '<p>Track and manage your grant applications.</p>' +
+        '<h1>\uD83D\uDCCB ' + T('application.my_applications') + '</h1>' +
         '</div>' +
         '<div id="my-applications-list">' + renderLoadingTable() + '</div>';
 }
@@ -2359,16 +2434,16 @@ async function viewApplication(id) {
 }
 
 function renderApplicationDetail() {
-    if (!S.selectedApplication) return '<p>Loading application...</p>';
+    if (!S.selectedApplication) return '<p>' + T('common.loading') + '</p>';
     var a = S.selectedApplication;
     var tab = S.appDetailTab || 'responses';
     var role = (S.user.role || '').toLowerCase();
 
     var tabs = [
-        { key: 'responses', label: 'Responses' },
-        { key: 'documents', label: 'Documents' },
-        { key: 'scores', label: 'Scores' },
-        { key: 'reviews', label: 'Reviews' }
+        { key: 'responses', label: T('application.tab.responses') },
+        { key: 'documents', label: T('application.tab.documents') },
+        { key: 'scores', label: T('application.score') },
+        { key: 'reviews', label: T('application.tab.review') }
     ];
 
     var tabContent = '';
@@ -2381,7 +2456,7 @@ function renderApplicationDetail() {
 
     var backPage = role === 'ngo' ? 'applications' : (role === 'donor' ? 'rankings' : 'assignments');
 
-    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'' + backPage + '\')" style="margin-bottom:16px;">\u2190 Back</button>' +
+    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'' + backPage + '\')" style="margin-bottom:16px;">\u2190 ' + T('common.back') + '</button>' +
 
         '<div class="card" style="margin-bottom:24px;">' +
         '<div class="card-body">' +
@@ -2425,7 +2500,7 @@ function renderApplicationDetail() {
         (role === 'donor' || role === 'reviewer' ?
             '<div style="margin-top:24px;">' +
             '<button class="btn btn-primary" onclick="nav(\'scoreapp\',{selectedApplication:' +
-            'S.selectedApplication})">Score Application</button></div>' : '');
+            'S.selectedApplication})">' + T('review.submit_review') + '</button></div>' : '');
 }
 
 function renderAppResponses(a) {
@@ -2433,7 +2508,7 @@ function renderAppResponses(a) {
     var keys = Object.keys(responses);
     if (!keys.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No responses submitted.</p></div></div>';
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Application Responses</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('application.application_responses') + '</h3>' +
         keys.map(function(k) {
             var label = k.replace(/_/g, ' ').replace(/criterion /i, 'Criterion ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
             return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f1f5f9;">' +
@@ -2448,7 +2523,7 @@ function renderAppDocuments(a) {
     var docs = a.documents || [];
     if (!docs.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No documents uploaded.</p></div></div>';
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Uploaded Documents</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('application.uploaded_documents') + '</h3>' +
         docs.map(function(d) {
             return '<div class="upload-file-item" style="margin-bottom:8px;">' +
                 '<span class="file-icon">\uD83D\uDCC4</span>' +
@@ -2469,7 +2544,7 @@ function renderAppScores(a) {
     var keys = Object.keys(scores);
     if (!keys.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No scores available yet.</p></div></div>';
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Scoring Breakdown</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('application.scoring_breakdown') + '</h3>' +
         keys.map(function(k) {
             var s = scores[k];
             var val = typeof s === 'object' ? (s.score || 0) : s;
@@ -2488,7 +2563,7 @@ function renderAppReviews(a) {
     var reviews = a.reviews || [];
     if (!reviews.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No reviews completed yet.</p></div></div>';
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Reviews</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('application.reviews') + '</h3>' +
         reviews.map(function(r) {
             return '<div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:12px;">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;">' +
@@ -2514,11 +2589,11 @@ function renderCreateGrant() {
     var stepNames = ['', 'basic_info', 'eligibility', 'criteria', 'documents', 'reporting', 'review'];
     telemetry('wizard_step_enter', { step: step, step_name: stepNames[step] || 'unknown' });
     var steps = [
-        { num: 1, label: 'Basic Info' },
-        { num: 2, label: 'Eligibility' },
-        { num: 3, label: 'Criteria' },
-        { num: 4, label: 'Documents' },
-        { num: 5, label: 'Reporting' }
+        { num: 1, label: T('grant.create.step1') },
+        { num: 2, label: T('grant.create.step2') },
+        { num: 3, label: T('grant.create.step3') },
+        { num: 4, label: T('grant.create.step4') },
+        { num: 5, label: T('grant.create.step5') }
     ];
 
     var stepContent = '';
@@ -2531,7 +2606,7 @@ function renderCreateGrant() {
         case 6: stepContent = renderCreateReview(); break;
     }
 
-    return '<div class="page-header"><h1>' + (S.createData.id ? '\u270F\uFE0F Edit Grant' : '\u2795 Create New Grant') + '</h1></div>' +
+    return '<div class="page-header"><h1>' + (S.createData.id ? '\u270F\uFE0F ' + T('common.edit') : '\u2795 ' + T('grant.create.title')) + '</h1></div>' +
 
         renderWizardSteps(steps, Math.min(step, 5)) +
 
@@ -2539,13 +2614,13 @@ function renderCreateGrant() {
 
         '<div class="wizard-actions">' +
         (S._extractingReqs ? '<div style="color:#6366f1;font-size:13px;font-weight:500;">AI analyzing document\u2026 Please wait.</div>' :
-        (step > 1 ? '<button class="btn btn-secondary" onclick="S.createStep--;render();">\u2190 Previous</button>' : '<div></div>')) +
+        (step > 1 ? '<button class="btn btn-secondary" onclick="S.createStep--;render();">\u2190 ' + T('common.previous') + '</button>' : '<div></div>')) +
         '<div style="display:flex;gap:8px;">' +
         (S._extractingReqs ? '' :
         (step === 6 ?
-            '<button class="btn btn-secondary" onclick="saveGrantDraft()">Save as Draft</button>' +
-            '<button class="btn btn-primary btn-lg" onclick="publishGrant()">\uD83D\uDE80 Publish Grant</button>' :
-            '<button class="btn btn-primary" onclick="' + (step === 5 ? 'S.createStep=6;render();' : 'S.createStep++;render();') + '">Next \u2192</button>')) +
+            '<button class="btn btn-secondary" onclick="saveGrantDraft()">' + T('grant.create.save_draft') + '</button>' +
+            '<button class="btn btn-primary btn-lg" onclick="publishGrant()">\uD83D\uDE80 ' + T('grant.create.publish') + '</button>' :
+            '<button class="btn btn-primary" onclick="' + (step === 5 ? 'S.createStep=6;render();' : 'S.createStep++;render();') + '">' + T('common.next') + ' \u2192</button>')) +
         '</div>' +
         '</div>';
 }
@@ -2557,37 +2632,37 @@ function renderCreateBasicInfo() {
     var currencies = ['USD', 'EUR', 'GBP', 'KES', 'CHF'];
 
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Basic Information</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('grant.create.step1') + '</h3>' +
         '<div class="form-group">' +
-        '<label class="form-label">Grant Title <span class="required">*</span></label>' +
-        '<input type="text" class="form-control" placeholder="e.g., Community Health Program - East Africa" ' +
+        '<label class="form-label">' + T('grant.create.grant_title') + ' <span class="required">*</span></label>' +
+        '<input type="text" class="form-control" placeholder="' + T('grant.create.grant_title_placeholder') + '" ' +
         'value="' + esc(d.title) + '" oninput="S.createData.title=this.value;">' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Description <span class="required">*</span></label>' +
-        '<textarea class="form-control" rows="5" placeholder="Describe the purpose and goals of this grant..." ' +
+        '<label class="form-label">' + T('grant.create.description') + ' <span class="required">*</span></label>' +
+        '<textarea class="form-control" rows="5" placeholder="' + T('grant.create.description_placeholder') + '" ' +
         'oninput="S.createData.description=this.value;">' + esc(d.description) + '</textarea>' +
         '</div>' +
         '<div class="form-row">' +
         '<div class="form-group">' +
-        '<label class="form-label">Total Funding <span class="required">*</span></label>' +
+        '<label class="form-label">' + T('grant.create.total_funding') + ' <span class="required">*</span></label>' +
         '<input type="number" class="form-control" placeholder="500000" ' +
         'value="' + esc(d.total_funding) + '" oninput="S.createData.total_funding=this.value;">' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Currency</label>' +
+        '<label class="form-label">' + T('grant.create.currency') + '</label>' +
         '<select class="form-control" onchange="S.createData.currency=this.value;">' +
         currencies.map(function(c) { return '<option value="' + c + '"' + (d.currency === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
         '</select>' +
         '</div>' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Application Deadline <span class="required">*</span></label>' +
+        '<label class="form-label">' + T('grant.create.deadline') + ' <span class="required">*</span></label>' +
         '<input type="date" class="form-control" min="' + todayStr() + '" ' +
         'value="' + esc(d.deadline) + '" oninput="S.createData.deadline=this.value;">' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Sectors</label>' +
+        '<label class="form-label">' + T('grant.create.sectors') + '</label>' +
         '<div style="display:flex;flex-wrap:wrap;gap:8px;">' +
         sectors.map(function(s) {
             var active = d.sectors.indexOf(s) >= 0;
@@ -2596,7 +2671,7 @@ function renderCreateBasicInfo() {
         }).join('') +
         '</div></div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Target Countries</label>' +
+        '<label class="form-label">' + T('grant.create.countries') + '</label>' +
         '<div style="display:flex;flex-wrap:wrap;gap:8px;">' +
         countries.map(function(c) {
             var active = d.countries.indexOf(c) >= 0;
@@ -2628,7 +2703,7 @@ function renderCreateEligibility() {
     var currentElig = S.createData.eligibility || [];
 
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">Eligibility Requirements</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('grant.detail.eligibility') + '</h3>' +
         '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Define who can apply for this grant.</p>' +
 
         categories.map(function(cat) {
@@ -2673,7 +2748,7 @@ function renderCreateEligibility() {
         }).join('') +
 
         '<button class="btn btn-secondary btn-sm" style="margin-top:12px;" ' +
-        'onclick="addCustomEligibility()">\u2795 Add Custom Requirement</button>' +
+        'onclick="addCustomEligibility()">\u2795 ' + T('grant.create.add_eligibility') + '</button>' +
 
         '<div style="background:#eff6ff;padding:12px;border-radius:6px;margin-top:16px;font-size:13px;border-left:3px solid #3b82f6;">' +
         '\uD83D\uDCA1 <strong>AI Tip:</strong> Consider including geographic requirements to target specific communities, ' +
@@ -2717,7 +2792,7 @@ function renderCreateCriteria() {
     return '<div class="card"><div class="card-body">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
         '<div>' +
-        '<h3 style="font-weight:600;">Scoring Criteria</h3>' +
+        '<h3 style="font-weight:600;">' + T('grant.detail.evaluation_criteria') + '</h3>' +
         '<p style="font-size:13px;color:#64748b;">Define how applications will be evaluated.</p>' +
         '</div>' +
         '<div style="text-align:right;">' +
@@ -2768,7 +2843,7 @@ function renderCreateCriteria() {
         }).join('') +
 
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
-        '<button class="btn btn-secondary" onclick="addCriterion()">\u2795 Add Criterion</button>' +
+        '<button class="btn btn-secondary" onclick="addCriterion()">\u2795 ' + T('grant.create.add_criterion') + '</button>' +
         '<button class="btn btn-sm" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;" ' +
         'onclick="suggestCriteria()">\u2728 AI Suggest Criteria</button>' +
         '</div>' +
@@ -2786,15 +2861,15 @@ function addCriterion() {
 }
 
 async function suggestCriteria() {
-    showToast('Generating AI criteria suggestions...', 'info');
+    showToast(T('toast.ai_criteria_generating'), 'info');
     var res = await api('POST', '/api/ai/chat', {
         message: 'Suggest 4 scoring criteria for a grant about: ' + (S.createData.title || 'general development') +
             ' in sectors: ' + (S.createData.sectors.join(', ') || 'general'),
         context: { page: 'create_grant', grant_data: S.createData }
     });
     if (res && res.response) {
-        showModal('AI Suggested Criteria', '<div style="font-size:14px;">' + renderMarkdown(res.response) + '</div>', [
-            { label: 'Close', onclick: 'closeModal()', cls: 'btn-secondary' }
+        showModal(T('grant.create.ai_suggested_criteria'), '<div style="font-size:14px;">' + renderMarkdown(res.response) + '</div>', [
+            { label: T('common.close'), onclick: 'closeModal()', cls: 'btn-secondary' }
         ]);
     }
 }
@@ -2814,7 +2889,7 @@ function renderCreateDocRequirements() {
     var currentDocs = S.createData.doc_requirements || [];
 
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">Document Requirements</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('grant.detail.doc_requirements') + '</h3>' +
         '<p style="font-size:13px;color:#64748b;margin-bottom:16px;">Select which documents applicants must submit.</p>' +
 
         docTypes.map(function(dt) {
@@ -2884,11 +2959,11 @@ function updateDocReq(key, field, value) {
 function renderCreateReporting() {
     var d = S.createData;
     var frequencies = [
-        {value: 'monthly', label: 'Monthly'},
-        {value: 'quarterly', label: 'Quarterly'},
-        {value: 'semi-annual', label: 'Semi-Annual'},
-        {value: 'annual', label: 'Annual'},
-        {value: 'final_only', label: 'Final Report Only'}
+        {value: 'monthly', label: T('frequency.monthly')},
+        {value: 'quarterly', label: T('frequency.quarterly')},
+        {value: 'semi-annual', label: T('frequency.semi_annual')},
+        {value: 'annual', label: T('frequency.annual')},
+        {value: 'final_only', label: T('frequency.final_only')}
     ];
     var reportTypes = ['financial', 'narrative', 'impact', 'progress', 'final'];
 
@@ -2906,18 +2981,18 @@ function renderCreateReporting() {
                 '<button class="btn btn-sm" style="color:#ef4444;padding:2px 8px;" onclick="removeReportingReq(' + i + ')">x</button>' +
                 '</div>' +
                 '<p style="font-size:13px;color:#64748b;margin-top:4px;">' + esc(req.description || '') + '</p>' +
-                (req.due_days_after_period ? '<p style="font-size:12px;color:#94a3b8;margin-top:4px;">Due: ' + req.due_days_after_period + ' days after period end</p>' : '') +
+                (req.due_days_after_period ? '<p style="font-size:12px;color:#94a3b8;margin-top:4px;">' + T('grant.create.due_days', {days: req.due_days_after_period}) + '</p>' : '') +
                 '</div></div>';
         }).join('');
     } else {
-        reqsHTML = '<p style="color:#94a3b8;padding:16px;text-align:center;">No reporting requirements added yet. Upload a grant document for AI to extract them, or add manually below.</p>';
+        reqsHTML = '<p style="color:#94a3b8;padding:16px;text-align:center;">' + T('grant.create.no_reqs_yet') + '</p>';
     }
 
     var templateHTML = '';
     var tmpl = d.report_template;
     if (tmpl && tmpl.template_sections && tmpl.template_sections.length > 0) {
         templateHTML = '<div style="margin-top:16px;">' +
-            '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">Report Template Sections</h4>' +
+            '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">' + T('grant.create.report_template_sections') + '</h4>' +
             tmpl.template_sections.map(function(s, i) {
                 return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;">' +
                     '<span style="color:#2d8f6f;font-weight:600;">' + (i+1) + '.</span>' +
@@ -2929,49 +3004,49 @@ function renderCreateReporting() {
     }
 
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">Reporting Requirements</h3>' +
-        '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Define what reports grantees must submit. Upload your grant document and AI will extract requirements automatically.</p>' +
+        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('grant.create.reporting_requirements') + '</h3>' +
+        '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">' + T('grant.create.reporting_requirements_desc') + '</p>' +
 
         // Upload grant document
         '<div style="background:#f0fdf4;border:2px dashed #86efac;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;">' +
-        '<p style="font-weight:600;margin-bottom:8px;">' + (d.grant_document ? '\u2705 Grant Document Uploaded' : '\uD83D\uDCC4 Upload Grant Document') + '</p>' +
+        '<p style="font-weight:600;margin-bottom:8px;">' + (d.grant_document ? '\u2705 ' + T('grant.create.grant_doc_uploaded') : '\uD83D\uDCC4 ' + T('grant.create.upload_grant_doc')) + '</p>' +
         (d.grant_document && d._docOriginalName ? '<p style="font-size:12px;color:#2d8f6f;margin-bottom:4px;"><strong>' + esc(d._docOriginalName) + '</strong>' +
-            (d._docUploadTime ? ' — uploaded at ' + esc(d._docUploadTime) : '') + '</p>' : '') +
+            (d._docUploadTime ? ' — ' + T('grant.create.uploaded_at') + ' ' + esc(d._docUploadTime) : '') + '</p>' : '') +
         (d._extractionStatus === 'success' ? '<div id="extraction-result" style="background:#dcfce7;color:#166534;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #22c55e;box-shadow:0 2px 8px rgba(34,197,94,0.15);">' +
-            '<div style="font-size:16px;margin-bottom:4px;">\u2705 AI Extraction Complete</div>' +
-            '<div>Extracted <strong>' + (d._extractedCount || 0) + '</strong> reporting requirements' +
-            (d.report_template && d.report_template.template_sections ? ', <strong>' + d.report_template.template_sections.length + '</strong> template sections' : '') +
-            (d.report_template && d.report_template.indicators ? ', <strong>' + d.report_template.indicators.length + '</strong> indicators' : '') +
+            '<div style="font-size:16px;margin-bottom:4px;">\u2705 ' + T('grant.create.ai_extraction_complete') + '</div>' +
+            '<div>' + T('grant.create.extracted_count') + ' <strong>' + (d._extractedCount || 0) + '</strong> ' + T('grant.create.reporting_requirements').toLowerCase() +
+            (d.report_template && d.report_template.template_sections ? ', <strong>' + d.report_template.template_sections.length + '</strong> ' + T('grant.create.template_sections') : '') +
+            (d.report_template && d.report_template.indicators ? ', <strong>' + d.report_template.indicators.length + '</strong> ' + T('grant.create.indicators') : '') +
             '</div>' +
-            (d._docUploadTime ? '<div style="font-size:12px;color:#15803d;font-weight:400;margin-top:4px;">Processed at ' + esc(d._docUploadTime) + '</div>' : '') +
+            (d._docUploadTime ? '<div style="font-size:12px;color:#15803d;font-weight:400;margin-top:4px;">' + T('grant.create.processed_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
             '</div>' :
          d._extractionStatus === 'empty' ? '<div id="extraction-result" style="background:#fef9c3;color:#854d0e;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #f59e0b;box-shadow:0 2px 8px rgba(245,158,11,0.12);">' +
-            '<div style="font-size:16px;margin-bottom:4px;">\u26A0\uFE0F Document Uploaded - No Requirements Found</div>' +
-            '<div>The document was uploaded but AI could not extract specific reporting requirements. Add them manually below or try a different file.</div>' +
-            (d._docUploadTime ? '<div style="font-size:12px;font-weight:400;margin-top:4px;">Attempted at ' + esc(d._docUploadTime) + '</div>' : '') +
-            '<button class="btn btn-sm" style="margin-top:8px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 Retry with Different File</button>' +
+            '<div style="font-size:16px;margin-bottom:4px;">\u26A0\uFE0F ' + T('grant.create.no_reqs_found') + '</div>' +
+            '<div>' + T('grant.create.no_reqs_found_desc') + '</div>' +
+            (d._docUploadTime ? '<div style="font-size:12px;font-weight:400;margin-top:4px;">' + T('grant.create.attempted_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
+            '<button class="btn btn-sm" style="margin-top:8px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 ' + T('grant.create.retry_file') + '</button>' +
             '</div>' :
          d._extractionStatus === 'failed' ? '<div id="extraction-result" style="background:#fee2e2;color:#991b1b;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #ef4444;box-shadow:0 2px 8px rgba(239,68,68,0.12);">' +
-            '<div style="font-size:16px;margin-bottom:4px;">\u274C Extraction Failed</div>' +
-            '<div>Something went wrong during AI analysis. Please try again or add requirements manually below.</div>' +
-            (d._docUploadTime ? '<div style="font-size:12px;font-weight:400;margin-top:4px;">Failed at ' + esc(d._docUploadTime) + '</div>' : '') +
-            '<button class="btn btn-sm" style="margin-top:8px;background:#fee2e2;border:1px solid #ef4444;color:#991b1b;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 Retry Upload</button>' +
+            '<div style="font-size:16px;margin-bottom:4px;">\u274C ' + T('grant.create.extraction_failed') + '</div>' +
+            '<div>' + T('grant.create.extraction_failed_desc') + '</div>' +
+            (d._docUploadTime ? '<div style="font-size:12px;font-weight:400;margin-top:4px;">' + T('grant.create.failed_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
+            '<button class="btn btn-sm" style="margin-top:8px;background:#fee2e2;border:1px solid #ef4444;color:#991b1b;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 ' + T('grant.create.retry_upload') + '</button>' +
             '</div>' : '') +
-        (d._extractionStatus ? '' : '<p style="font-size:13px;color:#64748b;margin-bottom:12px;">Upload the grant agreement/document and AI will analyze it to extract reporting requirements</p>') +
+        (d._extractionStatus ? '' : '<p style="font-size:13px;color:#64748b;margin-bottom:12px;">' + T('grant.create.upload_doc_desc') + '</p>') +
         '<input type="file" id="grant-doc-upload" style="display:none;" accept=".pdf,.doc,.docx,.txt" onchange="uploadGrantDoc()">' +
         (!d._extractionStatus ? '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\'grant-doc-upload\').click();">' +
-            (d.grant_document ? 'Replace Document' : 'Choose File') + '</button>' : '') +
-        (d._extractionStatus === 'success' ? '<button class="btn btn-sm" style="margin-top:8px;background:#f0fdf4;border:1px solid #86efac;color:#166534;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 Upload Different Document</button>' : '') +
+            (d.grant_document ? T('grant.create.replace_document') : T('grant.create.choose_file')) + '</button>' : '') +
+        (d._extractionStatus === 'success' ? '<button class="btn btn-sm" style="margin-top:8px;background:#f0fdf4;border:1px solid #86efac;color:#166534;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 ' + T('grant.create.upload_different_doc') + '</button>' : '') +
         (S._extractingReqs ? '<div class="ai-analyzing" style="margin-top:16px;padding:16px;background:#eff6ff;border-radius:10px;border:2px solid #93c5fd;text-align:center;">' +
             '<div class="dot-pulse" style="margin-bottom:8px;"><span></span><span></span><span></span></div>' +
-            '<div style="font-size:14px;font-weight:600;color:#1e40af;">AI is analyzing your document\u2026</div>' +
-            '<div style="font-size:12px;color:#3b82f6;margin-top:4px;">This may take 15\u201330 seconds. Please do not navigate away.</div>' +
+            '<div style="font-size:14px;font-weight:600;color:#1e40af;">' + T('grant.create.ai_analyzing') + '</div>' +
+            '<div style="font-size:12px;color:#3b82f6;margin-top:4px;">' + T('grant.create.ai_analyzing_wait') + '</div>' +
             '</div>' : '') +
         '</div>' +
 
         // Reporting frequency
         '<div class="form-group">' +
-        '<label class="form-label">Default Reporting Frequency</label>' +
+        '<label class="form-label">' + T('grant.create.default_reporting_freq') + '</label>' +
         '<select class="form-control" onchange="S.createData.reporting_frequency=this.value;">' +
         frequencies.map(function(f) {
             return '<option value="' + f.value + '"' + (d.reporting_frequency === f.value ? ' selected' : '') + '>' + f.label + '</option>';
@@ -2981,42 +3056,42 @@ function renderCreateReporting() {
 
         // Current requirements list
         '<div style="margin-top:16px;">' +
-        '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">Required Reports</h4>' +
+        '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">' + T('grant.create.required_reports') + '</h4>' +
         reqsHTML +
         '</div>' +
 
         // Add requirement manually
         '<div style="margin-top:16px;padding:16px;background:#f8fafc;border-radius:8px;">' +
-        '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">Add Requirement Manually</h4>' +
+        '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">' + T('grant.create.add_req_manually') + '</h4>' +
         '<div class="form-row">' +
         '<div class="form-group">' +
-        '<label class="form-label">Report Type</label>' +
+        '<label class="form-label">' + T('report.type') + '</label>' +
         '<select class="form-control" id="new-req-type">' +
         reportTypes.map(function(t) { return '<option value="' + t + '">' + t.charAt(0).toUpperCase() + t.slice(1) + '</option>'; }).join('') +
         '</select>' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Title</label>' +
+        '<label class="form-label">' + T('grant.create.title_label') + '</label>' +
         '<input type="text" class="form-control" id="new-req-title" placeholder="e.g., Quarterly Financial Report">' +
         '</div>' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Description</label>' +
+        '<label class="form-label">' + T('grant.create.description_label') + '</label>' +
         '<textarea class="form-control" rows="2" id="new-req-desc" placeholder="Describe what should be included in this report..."></textarea>' +
         '</div>' +
         '<div class="form-row">' +
         '<div class="form-group">' +
-        '<label class="form-label">Frequency</label>' +
+        '<label class="form-label">' + T('grant.create.frequency_label') + '</label>' +
         '<select class="form-control" id="new-req-freq">' +
         frequencies.map(function(f) { return '<option value="' + f.value + '">' + f.label + '</option>'; }).join('') +
         '</select>' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Days Due After Period</label>' +
+        '<label class="form-label">' + T('grant.create.days_due_after_period') + '</label>' +
         '<input type="number" class="form-control" id="new-req-days" value="30" min="1" max="180">' +
         '</div>' +
         '</div>' +
-        '<button class="btn btn-secondary btn-sm" onclick="addReportingReq()">+ Add Requirement</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="addReportingReq()">' + T('grant.create.add_requirement') + '</button>' +
         '</div>' +
 
         // Template preview
@@ -3032,7 +3107,7 @@ function addReportingReq() {
     var freq = document.getElementById('new-req-freq').value;
     var days = parseInt(document.getElementById('new-req-days').value) || 30;
 
-    if (!title) { showToast('Please enter a title', 'warning'); return; }
+    if (!title) { showToast(T('toast.please_enter_title'), 'warning'); return; }
 
     S.createData.reporting_requirements.push({
         type: type,
@@ -3085,7 +3160,7 @@ async function uploadGrantDoc() {
             S._extractingReqs = false;
             S.createData._extractionStatus = 'failed';
             S.createData._docUploadTime = new Date().toLocaleTimeString();
-            showToast('Failed to save grant draft before upload', 'error');
+            showToast(T('toast.error'), 'error');
             telemetry('extraction_failed', { filename: file.name, reason: 'draft_save_failed' });
             render();
             return;
@@ -3133,16 +3208,16 @@ async function uploadGrantDoc() {
         }
 
         if (S.createData._extractionStatus === 'success') {
-            showToast('AI extracted ' + S.createData._extractedCount + ' reporting requirements from your document.', 'success');
+            showToast(T('toast.ai_extracted_reqs', {count: S.createData._extractedCount}), 'success');
         } else {
-            showToast('Document uploaded but no requirements could be extracted. You can add them manually below.', 'warning');
+            showToast(T('toast.doc_uploaded_no_reqs'), 'warning');
         }
         telemetry('upload_completed', { filename: file.name, extracted: S.createData._extractionStatus === 'success', req_count: (S.createData._extractedCount || 0) });
     } else {
         S.createData._extractionStatus = 'failed';
         S.createData._extractedCount = 0;
         S.createData._docUploadTime = new Date().toLocaleTimeString();
-        showToast('Failed to upload grant document. Please try again.', 'error');
+        showToast(T('toast.error'), 'error');
         telemetry('extraction_failed', { filename: file.name });
     }
 
@@ -3156,43 +3231,43 @@ function renderCreateReview() {
     var totalWeight = (d.criteria || []).reduce(function(sum, c) { return sum + (Number(c.weight) || 0); }, 0);
 
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Review & Publish</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('grant.create.review_publish') + '</h3>' +
 
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">' +
         '<div>' +
-        '<h4 style="font-weight:600;margin-bottom:8px;">Basic Information</h4>' +
+        '<h4 style="font-weight:600;margin-bottom:8px;">' + T('grant.create.basic_information') + '</h4>' +
         '<div style="font-size:14px;">' +
-        '<p><strong>Title:</strong> ' + esc(d.title || 'Not set') + '</p>' +
-        '<p><strong>Funding:</strong> ' + formatCurrency(d.total_funding, d.currency) + '</p>' +
-        '<p><strong>Deadline:</strong> ' + formatDate(d.deadline) + '</p>' +
-        '<p><strong>Sectors:</strong> ' + esc((d.sectors || []).join(', ') || 'None') + '</p>' +
-        '<p><strong>Countries:</strong> ' + esc((d.countries || []).join(', ') || 'None') + '</p>' +
+        '<p><strong>' + T('grant.create.review_title') + '</strong> ' + esc(d.title || 'Not set') + '</p>' +
+        '<p><strong>' + T('grant.create.review_funding') + '</strong> ' + formatCurrency(d.total_funding, d.currency) + '</p>' +
+        '<p><strong>' + T('grant.create.review_deadline') + '</strong> ' + formatDate(d.deadline) + '</p>' +
+        '<p><strong>' + T('grant.create.review_sectors') + '</strong> ' + esc((d.sectors || []).join(', ') || 'None') + '</p>' +
+        '<p><strong>' + T('grant.create.review_countries') + '</strong> ' + esc((d.countries || []).join(', ') || 'None') + '</p>' +
         '</div>' +
         '</div>' +
         '<div>' +
-        '<h4 style="font-weight:600;margin-bottom:8px;">Configuration</h4>' +
+        '<h4 style="font-weight:600;margin-bottom:8px;">' + T('grant.create.configuration') + '</h4>' +
         '<div style="font-size:14px;">' +
-        '<p><strong>Eligibility Requirements:</strong> ' + (d.eligibility || []).length + '</p>' +
-        '<p><strong>Scoring Criteria:</strong> ' + (d.criteria || []).length +
-        ' (Total Weight: ' + totalWeight + '%' + (totalWeight === 100 ? ' \u2713' : ' \u26A0\uFE0F') + ')</p>' +
-        '<p><strong>Document Requirements:</strong> ' + (d.doc_requirements || []).length + '</p>' +
-        '<p><strong>Reporting Requirements:</strong> ' + (d.reporting_requirements || []).length + '</p>' +
-        '<p><strong>Reporting Frequency:</strong> ' + esc(d.reporting_frequency || 'quarterly') + '</p>' +
+        '<p><strong>' + T('grant.create.review_eligibility') + '</strong> ' + (d.eligibility || []).length + '</p>' +
+        '<p><strong>' + T('grant.create.review_criteria') + '</strong> ' + (d.criteria || []).length +
+        ' (' + T('grant.create.review_total_weight') + ' ' + totalWeight + '%' + (totalWeight === 100 ? ' \u2713' : ' \u26A0\uFE0F') + ')</p>' +
+        '<p><strong>' + T('grant.create.review_doc_reqs') + '</strong> ' + (d.doc_requirements || []).length + '</p>' +
+        '<p><strong>' + T('grant.create.review_reporting_reqs') + '</strong> ' + (d.reporting_requirements || []).length + '</p>' +
+        '<p><strong>' + T('grant.create.review_reporting_freq') + '</strong> ' + esc(d.reporting_frequency || 'quarterly') + '</p>' +
         '</div>' +
         '</div>' +
         '</div>' +
 
         ((!d.title || !d.total_funding || !d.deadline) ?
             '<div style="background:#fef3c7;padding:12px;border-radius:6px;margin-top:16px;border-left:3px solid #f59e0b;">' +
-            '<strong style="color:#92400e;">\u26A0\uFE0F Please fill in all required fields before publishing:</strong>' +
-            (!d.title ? '<br>- Grant Title' : '') +
-            (!d.total_funding ? '<br>- Total Funding' : '') +
-            (!d.deadline ? '<br>- Deadline' : '') +
+            '<strong style="color:#92400e;">\u26A0\uFE0F ' + T('grant.create.fill_required_warning') + '</strong>' +
+            (!d.title ? '<br>- ' + T('grant.create.grant_title') : '') +
+            (!d.total_funding ? '<br>- ' + T('grant.create.total_funding') : '') +
+            (!d.deadline ? '<br>- ' + T('grant.create.deadline') : '') +
             '</div>' : '') +
 
         (totalWeight !== 100 && (d.criteria || []).length > 0 ?
             '<div style="background:#fef3c7;padding:12px;border-radius:6px;margin-top:12px;border-left:3px solid #f59e0b;">' +
-            '<strong style="color:#92400e;">\u26A0\uFE0F Criteria weights must total 100% (currently ' + totalWeight + '%)</strong>' +
+            '<strong style="color:#92400e;">\u26A0\uFE0F ' + T('grant.create.criteria_weight_warning', {weight: totalWeight}) + '</strong>' +
             '</div>' : '') +
 
         '</div></div>';
@@ -3216,14 +3291,14 @@ async function saveGrantDraft() {
     });
     if (res) {
         S.createData.id = (res.grant || res).id || d.id;
-        showToast('Grant saved as draft.', 'success');
+        showToast(T('grant.create.draft_saved'), 'success');
     }
 }
 
 async function publishGrant() {
     var d = S.createData;
     if (!d.title || !d.total_funding || !d.deadline) {
-        showToast('Please fill in all required fields.', 'warning');
+        showToast(T('common.required_field'), 'warning');
         return;
     }
     var method = d.id ? 'PUT' : 'POST';
@@ -3245,7 +3320,7 @@ async function publishGrant() {
         if (grantId) {
             var pubRes = await api('POST', '/api/grants/' + grantId + '/publish');
             if (pubRes) {
-                showToast('Grant published successfully!', 'success');
+                showToast(T('grant.create.published_success'), 'success');
                 S.createStep = 1;
                 S.createData = {
                     title: '', description: '', total_funding: '', currency: 'USD',
@@ -3260,7 +3335,7 @@ async function publishGrant() {
                 return;
             }
         }
-        showToast('Grant created. You can publish it later.', 'info');
+        showToast(T('toast.grant_created_publish_later'), 'info');
         nav('mygrants');
     }
 }
@@ -3276,8 +3351,7 @@ function renderApplicantRankings() {
     }).join('');
 
     return '<div class="page-header">' +
-        '<h1>\u2B50 Review Applications</h1>' +
-        '<p>View and score applications across your grants.</p>' +
+        '<h1>\u2B50 ' + T('dashboard.action.review_apps') + '</h1>' +
         '</div>' +
 
         '<div class="card" style="margin-bottom:24px;">' +
@@ -3359,7 +3433,7 @@ async function viewAndScore(appId) {
 async function awardGrant(appId) {
     var res = await api('PUT', '/api/applications/' + appId, { status: 'awarded' });
     if (res) {
-        showToast('Grant awarded!', 'success');
+        showToast(T('toast.saved'), 'success');
         if (S._rankingsGrantId) loadRankingsByGrant(S._rankingsGrantId);
     }
 }
@@ -3370,7 +3444,7 @@ async function awardGrant(appId) {
 
 function renderScoreApp() {
     var a = S.selectedApplication;
-    if (!a) return '<div class="page-header"><h1>Score Application</h1><p>Loading application...</p></div>';
+    if (!a) return '<div class="page-header"><h1>' + T('review.submit_review') + '</h1><p>' + T('common.loading') + '</p></div>';
 
     var responses = a.responses || {};
     var criteria = a.grant_criteria || a.criteria || [];
@@ -3397,7 +3471,7 @@ function renderScoreApp() {
     var role = (S.user.role || '').toLowerCase();
     var backPage = role === 'reviewer' ? 'assignments' : 'rankings';
 
-    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'' + backPage + '\')" style="margin-bottom:16px;">\u2190 Back</button>' +
+    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'' + backPage + '\')" style="margin-bottom:16px;">\u2190 ' + T('common.back') + '</button>' +
 
         '<div class="card" style="margin-bottom:24px;">' +
         '<div class="card-body" style="display:flex;justify-content:space-between;align-items:center;">' +
@@ -3424,7 +3498,7 @@ function renderScoreApp() {
                 '<div style="flex:1;min-width:300px;">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
                 '<h3 style="font-weight:600;">' + esc(c.label || c.name || 'Criterion') + '</h3>' +
-                '<span class="badge badge-blue">Weight: ' + (c.weight || 0) + '%</span>' +
+                '<span class="badge badge-blue">' + T('grant.create.weight') + ': ' + (c.weight || 0) + '%</span>' +
                 '</div>' +
                 '<div style="background:#f8fafc;padding:12px;border-radius:6px;font-size:14px;color:#475569;max-height:300px;overflow-y:auto;white-space:pre-wrap;">' +
                 esc(responseText || 'No response provided.') +
@@ -3453,7 +3527,7 @@ function renderScoreApp() {
 
         // Document Scores
         (a.documents && a.documents.length ? '<div class="card" style="margin-bottom:16px;"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">Document Analysis</h3>' +
+            '<h3 style="font-weight:600;margin-bottom:12px;">' + T('application.document_analysis') + '</h3>' +
             a.documents.map(function(d) {
                 return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #f1f5f9;">' +
                     '<span>\uD83D\uDCC4</span>' +
@@ -3464,7 +3538,7 @@ function renderScoreApp() {
             '</div></div>' : '') +
 
         '<div style="display:flex;gap:12px;margin-top:24px;">' +
-        '<button class="btn btn-primary btn-lg" onclick="submitScores()">Submit Scores</button>' +
+        '<button class="btn btn-primary btn-lg" onclick="submitScores()">' + T('review.submit_review') + '</button>' +
         '<button class="btn btn-secondary" onclick="aiScoreApplication();">\u2728 AI Auto-Score</button>' +
         '</div>';
 }
@@ -3482,7 +3556,7 @@ async function submitScores() {
         });
         if (res) {
             await api('POST', '/api/reviews/' + reviewId + '/complete');
-            showToast('Review submitted!', 'success');
+            showToast(T('review.submitted_success'), 'success');
             nav('assignments');
             return;
         }
@@ -3493,7 +3567,7 @@ async function submitScores() {
             status: 'scored'
         });
         if (res2) {
-            showToast('Scores submitted!', 'success');
+            showToast(T('toast.saved'), 'success');
             nav('rankings');
             return;
         }
@@ -3503,11 +3577,11 @@ async function submitScores() {
 async function aiScoreApplication() {
     var a = S.selectedApplication;
     if (!a) return;
-    showToast('Running AI scoring...', 'info');
+    showToast(T('toast.ai_scoring'), 'info');
     var res = await api('POST', '/api/ai/score-application', { application_id: a.id });
     if (res && res.scores) {
         S.scoreData = res.scores;
-        showToast('AI scoring complete!', 'success');
+        showToast(T('toast.saved'), 'success');
         render();
     }
 }
@@ -3524,8 +3598,7 @@ function renderAssessmentHub() {
     var categories = stats.category_scores || {};
 
     return '<div class="page-header">' +
-        '<h1>\uD83D\uDCDD Assessment Hub</h1>' +
-        '<p>Your organizational capacity assessment and due diligence status.</p>' +
+        '<h1>\uD83D\uDCDD ' + T('assessment.title') + '</h1>' +
         '</div>' +
 
         '<div class="card" style="margin-bottom:24px;">' +
@@ -3534,7 +3607,7 @@ function renderAssessmentHub() {
         scoreRingHTML(score, 120, '%') +
         '</div>' +
         '<div style="flex:1;">' +
-        '<h2 style="font-size:22px;font-weight:700;">Capacity Assessment</h2>' +
+        '<h2 style="font-size:22px;font-weight:700;">' + T('dashboard.stat.capacity_score') + '</h2>' +
         '<p style="margin-top:4px;font-size:16px;">Level: <span class="badge badge-' + cap.color + '" style="font-size:14px;">' + esc(cap.label) + '</span></p>' +
         '<div style="margin-top:16px;">' +
         Object.keys(categories).map(function(k) {
@@ -3551,25 +3624,25 @@ function renderAssessmentHub() {
         '</div></div>' +
 
         '<div style="margin-bottom:24px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">Assessment History</h2>' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">' + T('assessment.previous_assessments') + '</h2>' +
         '<div id="assessment-history">' + renderLoadingTable() + '</div>' +
         '</div>' +
 
         // Framework selection cards
         '<div style="margin-top:24px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">Start New Assessment</h2>' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">' + T('assessment.start_new') + '</h2>' +
         '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Choose an assessment framework that best fits your needs and donor requirements.</p>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">' +
 
-        renderFrameworkCard('kuja', 'Kuja Standard', 'Standard capacity assessment covering 5 key organizational domains.', '26 items', '30-45 min') +
-        renderFrameworkCard('step', 'STEP', 'Strengthening Effective Partner Engagement and Performance assessment.', '26 items', '45-60 min') +
-        renderFrameworkCard('un_hact', 'UN HACT', 'UN Harmonized Approach to Cash Transfers micro-assessment.', '22 items', '45-60 min') +
-        renderFrameworkCard('chs', 'CHS Self-Assessment', 'Core Humanitarian Standard on Quality and Accountability.', '27 items', '60-90 min') +
-        renderFrameworkCard('nupas', 'NUPAS', 'Non-profit Unified Performance Assessment System.', '27 items', '60-90 min') +
+        renderFrameworkCard('kuja', T('assessment.framework.kuja'), T('assessment.framework.kuja_desc'), '26 items', '30-45 min') +
+        renderFrameworkCard('step', T('assessment.framework.step'), T('assessment.framework.step_desc'), '26 items', '45-60 min') +
+        renderFrameworkCard('un_hact', T('assessment.framework.un_hact'), T('assessment.framework.un_hact_desc'), '22 items', '45-60 min') +
+        renderFrameworkCard('chs', T('assessment.framework.chs'), T('assessment.framework.chs_desc'), '27 items', '60-90 min') +
+        renderFrameworkCard('nupas', T('assessment.framework.nupas'), T('assessment.framework.nupas_desc'), '27 items', '60-90 min') +
 
         '</div>' +
         '<button class="btn btn-primary btn-lg" style="margin-top:16px;" onclick="startAssessment()">' +
-        (score > 0 ? '\uD83D\uDD04 Update Assessment' : '\uD83D\uDCDD Start Assessment') +
+        (score > 0 ? '\uD83D\uDD04 ' + T('assessment.start_new') : '\uD83D\uDCDD ' + T('assessment.start_new')) +
         '</button>' +
         '</div>';
 }
@@ -3610,7 +3683,7 @@ async function loadAssessments() {
                     '</tbody></table></div>';
             } else {
                 el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-                    '<p>No assessments completed yet.</p></div></div>';
+                    '<p>' + T('assessment.no_assessments') + '</p></div></div>';
             }
         }
     }
@@ -3623,10 +3696,10 @@ async function loadAssessments() {
 function renderAssessmentWizard() {
     var step = S.assessStep;
     var steps = [
-        { num: 1, label: 'Profile' },
-        { num: 2, label: 'Checklist' },
-        { num: 3, label: 'Documents' },
-        { num: 4, label: 'Results' }
+        { num: 1, label: T('assessment.step1') },
+        { num: 2, label: T('assessment.step2') },
+        { num: 3, label: T('assessment.step3') },
+        { num: 4, label: T('assessment.step4') }
     ];
 
     var stepContent = '';
@@ -3637,42 +3710,42 @@ function renderAssessmentWizard() {
         case 4: stepContent = renderAssessResults(); break;
     }
 
-    return '<div class="page-header"><h1>\uD83D\uDCDD Capacity Assessment</h1></div>' +
+    return '<div class="page-header"><h1>\uD83D\uDCDD ' + T('assessment.title') + '</h1></div>' +
         renderWizardSteps(steps, step) +
         '<div class="wizard-content">' + stepContent + '</div>' +
         '<div class="wizard-actions">' +
-        (step > 1 && step < 4 ? '<button class="btn btn-secondary" onclick="S.assessStep--;render();">\u2190 Previous</button>' : '<div></div>') +
-        (step < 3 ? '<button class="btn btn-primary" onclick="S.assessStep++;render();">Next \u2192</button>' :
-            step === 3 ? '<button class="btn btn-primary btn-lg" onclick="submitAssessment()">Submit Assessment</button>' :
-                '<button class="btn btn-primary" onclick="nav(\'assessment\')">Back to Assessment Hub</button>') +
+        (step > 1 && step < 4 ? '<button class="btn btn-secondary" onclick="S.assessStep--;render();">\u2190 ' + T('common.previous') + '</button>' : '<div></div>') +
+        (step < 3 ? '<button class="btn btn-primary" onclick="S.assessStep++;render();">' + T('common.next') + ' \u2192</button>' :
+            step === 3 ? '<button class="btn btn-primary btn-lg" onclick="submitAssessment()">' + T('assessment.complete') + '</button>' :
+                '<button class="btn btn-primary" onclick="nav(\'assessment\')">' + T('common.back') + '</button>') +
         '</div>';
 }
 
 function renderAssessProfile() {
     var p = S.assessOrgProfile;
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">Organization Profile</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('assessment.step1') + '</h3>' +
         '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Review and confirm your organization details.</p>' +
         '<div class="form-group">' +
-        '<label class="form-label">Organization Name</label>' +
+        '<label class="form-label">' + T('org.name') + '</label>' +
         '<input type="text" class="form-control" value="' + esc(p.name || S.user.org_name || '') + '" ' +
         'oninput="S.assessOrgProfile.name=this.value;">' +
         '</div>' +
         '<div class="form-row">' +
         '<div class="form-group">' +
-        '<label class="form-label">Country</label>' +
+        '<label class="form-label">' + T('org.country') + '</label>' +
         '<input type="text" class="form-control" value="' + esc(p.country || '') + '" ' +
         'oninput="S.assessOrgProfile.country=this.value;">' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Year Established</label>' +
+        '<label class="form-label">' + T('org.year_established') + '</label>' +
         '<input type="number" class="form-control" value="' + esc(p.year_established || '') + '" ' +
         'oninput="S.assessOrgProfile.year_established=this.value;">' +
         '</div>' +
         '</div>' +
         '<div class="form-row">' +
         '<div class="form-group">' +
-        '<label class="form-label">Annual Budget</label>' +
+        '<label class="form-label">' + T('org.annual_budget') + '</label>' +
         '<input type="text" class="form-control" value="' + esc(p.annual_budget || '') + '" placeholder="e.g., $500,000" ' +
         'oninput="S.assessOrgProfile.annual_budget=this.value;">' +
         '</div>' +
@@ -3700,7 +3773,7 @@ function renderAssessChecklist() {
     var categories = FRAMEWORK_CHECKLISTS[framework] || FRAMEWORK_CHECKLISTS['kuja'];
 
     var html = '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">Assessment Checklist</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('assessment.step2') + '</h3>' +
         '<p style="color:#64748b;font-size:13px;margin-bottom:4px;">Framework: <strong>' + esc(framework.toUpperCase().replace(/_/g, ' ')) + '</strong></p>' +
         '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Check each item that your organization has in place.</p>';
 
@@ -3734,7 +3807,7 @@ function renderAssessDocUpload() {
     ];
 
     return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">Supporting Documents</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('assessment.step3') + '</h3>' +
         '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Upload documents to support your assessment.</p>' +
 
         docTypes.map(function(dt) {
@@ -3777,7 +3850,7 @@ async function handleAssessUpload(e, key) {
     var res = await api('POST', '/api/documents/upload', fd);
     if (res) {
         S.assessDocuments[key] = { id: res.id, name: file.name, ai_analysis: res.ai_analysis };
-        showToast('Document uploaded!', 'success');
+        showToast(T('toast.uploaded'), 'success');
         render();
     }
 }
@@ -3792,7 +3865,7 @@ async function startAssessment() {
 }
 
 async function submitAssessment() {
-    showToast('Submitting assessment...', 'info');
+    showToast(T('assessment.completing'), 'info');
     var res = await api('POST', '/api/assessments', {
         assess_type: 'free',
         framework: S.selectedFramework || 'kuja',
@@ -3823,12 +3896,12 @@ function renderAssessResults() {
         '<div style="margin-bottom:16px;">' +
         scoreRingHTML(score, 120, '%') +
         '</div>' +
-        '<h2 style="font-size:24px;font-weight:700;margin-bottom:4px;">Assessment Complete</h2>' +
+        '<h2 style="font-size:24px;font-weight:700;margin-bottom:4px;">' + T('assessment.completed_success') + '</h2>' +
         '<p style="font-size:16px;margin-bottom:12px;">Capacity Level: <span class="badge badge-' + cap.color + '" style="font-size:14px;">' + esc(cap.label) + '</span></p>' +
         '</div></div>' +
 
         (Object.keys(categories).length ? '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:16px;">Category Breakdown</h3>' +
+            '<h3 style="font-weight:600;margin-bottom:16px;">' + T('assessment.category_scores') + '</h3>' +
             Object.keys(categories).map(function(k) {
                 var val = categories[k] || 0;
                 return '<div style="margin-bottom:12px;">' +
@@ -3841,7 +3914,7 @@ function renderAssessResults() {
             '</div></div>' : '') +
 
         (gaps.length ? '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">\u26A0\uFE0F Identified Gaps</h3>' +
+            '<h3 style="font-weight:600;margin-bottom:12px;">\u26A0\uFE0F ' + T('assessment.gaps_identified') + '</h3>' +
             '<ul style="list-style:disc;padding-left:20px;">' +
             gaps.map(function(g) { return '<li style="margin-bottom:4px;color:#475569;">' + esc(g) + '</li>'; }).join('') +
             '</ul></div></div>' : '') +
@@ -3862,32 +3935,31 @@ function renderOrgProfile() {
     var org = S.selectedOrg || {};
 
     return '<div class="page-header">' +
-        '<h1>\uD83D\uDC64 Organization Profile</h1>' +
-        '<p>View and update your organization details.</p>' +
+        '<h1>\uD83D\uDC64 ' + T('org.title') + '</h1>' +
         '</div>' +
 
         '<div id="org-profile-content">' +
         '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Organization Details</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('org.details') + '</h3>' +
         '<div class="form-group">' +
-        '<label class="form-label">Organization Name</label>' +
+        '<label class="form-label">' + T('org.name') + '</label>' +
         '<input type="text" class="form-control" value="' + esc(org.name || S.user.org_name || '') + '" ' +
         'oninput="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.name=this.value;">' +
         '</div>' +
         '<div class="form-row">' +
         '<div class="form-group">' +
-        '<label class="form-label">Country</label>' +
+        '<label class="form-label">' + T('org.country') + '</label>' +
         '<input type="text" class="form-control" value="' + esc(org.country || '') + '" ' +
         'oninput="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.country=this.value;">' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Year Established</label>' +
+        '<label class="form-label">' + T('org.year_established') + '</label>' +
         '<input type="number" class="form-control" value="' + esc(org.year_established || '') + '" ' +
         'oninput="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.year_established=this.value;">' +
         '</div></div>' +
         '<div class="form-row">' +
         '<div class="form-group">' +
-        '<label class="form-label">Type</label>' +
+        '<label class="form-label">' + T('org.type') + '</label>' +
         '<select class="form-control" onchange="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.type=this.value;">' +
         '<option value="">Select type...</option>' +
         ['NGO', 'CBO', 'INGO', 'Government', 'UN Agency', 'Other'].map(function(t) {
@@ -3896,38 +3968,38 @@ function renderOrgProfile() {
         '</select>' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Annual Budget</label>' +
+        '<label class="form-label">' + T('org.annual_budget') + '</label>' +
         '<input type="text" class="form-control" value="' + esc(org.annual_budget || '') + '" placeholder="e.g., $500,000" ' +
         'oninput="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.annual_budget=this.value;">' +
         '</div></div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Description</label>' +
+        '<label class="form-label">' + T('org.description') + '</label>' +
         '<textarea class="form-control" rows="4" ' +
         'oninput="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.description=this.value;">' + esc(org.description || '') + '</textarea>' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Sectors</label>' +
+        '<label class="form-label">' + T('grant.create.sectors') + '</label>' +
         '<input type="text" class="form-control" value="' + esc((org.sectors || []).join(', ')) + '" placeholder="Health, Education, etc." ' +
         'oninput="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.sectors_text=this.value;">' +
         '</div>' +
-        '<button class="btn btn-primary" onclick="saveOrgProfile()">Save Changes</button>' +
+        '<button class="btn btn-primary" onclick="saveOrgProfile()">' + T('org.save_profile') + '</button>' +
         '</div></div>' +
 
         // Registration Verification Status
         '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">\u2705 Registration Verification</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">\u2705 ' + T('verification.title') + '</h3>' +
         '<div id="org-verification-status">' + renderLoadingTable() + '</div>' +
         '</div></div>' +
 
         // Compliance
         '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">\uD83D\uDEE1\uFE0F Compliance Status</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">\uD83D\uDEE1\uFE0F ' + T('compliance.title') + '</h3>' +
         '<div id="org-compliance">' + renderLoadingTable() + '</div>' +
         '</div></div>' +
 
         // Assessment History
         '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">\uD83D\uDCDD Assessment History</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">\uD83D\uDCDD ' + T('assessment.previous_assessments') + '</h3>' +
         '<div id="org-assessments">' + renderLoadingTable() + '</div>' +
         '</div></div>' +
         '</div>';
@@ -3964,7 +4036,7 @@ async function loadOrgProfile() {
 
 async function saveOrgProfile() {
     if (!S.selectedOrg) return;
-    showToast('Profile saved!', 'success');
+    showToast(T('org.saved_success'), 'success');
 }
 
 // =============================================================================
@@ -3974,15 +4046,14 @@ async function saveOrgProfile() {
 function renderMyDocuments() {
     loadMyDocuments();
     return '<div class="page-header">' +
-        '<h1>\uD83D\uDCC4 My Documents</h1>' +
-        '<p>Manage your organization\'s uploaded documents.</p>' +
+        '<h1>\uD83D\uDCC4 ' + T('document.title') + '</h1>' +
         '</div>' +
 
         '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Upload New Document</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('document.upload') + '</h3>' +
         '<div class="form-row" style="margin-bottom:12px;">' +
         '<div class="form-group">' +
-        '<label class="form-label">Document Type</label>' +
+        '<label class="form-label">' + T('document.type') + '</label>' +
         '<select class="form-control" id="doc-upload-type">' +
         '<option value="financial_report">Financial Report</option>' +
         '<option value="registration">Registration Certificate</option>' +
@@ -4016,7 +4087,7 @@ async function uploadGeneralDoc(e) {
     fd.append('type', type);
     var res = await api('POST', '/api/documents/upload', fd);
     if (res) {
-        showToast('Document uploaded!', 'success');
+        showToast(T('toast.uploaded'), 'success');
         render();
     }
 }
@@ -4037,7 +4108,7 @@ async function loadMyDocuments() {
                 '</tr>';
         }).join('');
         el.innerHTML = '<div class="table-wrapper"><table class="table">' +
-            '<thead><tr><th>Filename</th><th>Type</th><th>Size</th><th>AI Score</th><th>Uploaded</th></tr></thead>' +
+            '<thead><tr><th>' + T('document.filename') + '</th><th>' + T('document.type') + '</th><th>' + T('document.size') + '</th><th>' + T('document.ai_score') + '</th><th>' + T('document.uploaded_at') + '</th></tr></thead>' +
             '<tbody>' + rows + '</tbody></table></div>';
     } else {
         el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
@@ -4052,8 +4123,7 @@ async function loadMyDocuments() {
 function renderCompliance() {
     loadComplianceData();
     return '<div class="page-header">' +
-        '<h1>\uD83D\uDEE1\uFE0F Compliance & Due Diligence</h1>' +
-        '<p>Monitor compliance status across partner organizations.</p>' +
+        '<h1>\uD83D\uDEE1\uFE0F ' + T('compliance.title') + '</h1>' +
         '</div>' +
         '<div id="compliance-content">' + renderLoadingTable() + '</div>';
 }
@@ -4085,12 +4155,11 @@ async function loadComplianceData() {
 
 function renderOrgSearch() {
     return '<div class="page-header">' +
-        '<h1>\uD83D\uDD0D Organization Search</h1>' +
-        '<p>Search for and discover partner organizations.</p>' +
+        '<h1>\uD83D\uDD0D ' + T('org.search_title') + '</h1>' +
         '</div>' +
         '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
         '<div class="form-group" style="margin:0;">' +
-        '<input type="text" class="form-control" placeholder="Search organizations by name, country, or sector..." ' +
+        '<input type="text" class="form-control" placeholder="' + T('org.search_placeholder') + '" ' +
         'id="org-search-input" oninput="searchOrgs(this.value);">' +
         '</div>' +
         '</div></div>' +
@@ -4142,8 +4211,7 @@ function searchOrgs(q) {
 function renderAssignments() {
     loadReviewerAssignments();
     return '<div class="page-header">' +
-        '<h1>\uD83D\uDCCB My Assignments</h1>' +
-        '<p>Applications assigned to you for review.</p>' +
+        '<h1>\uD83D\uDCCB ' + T('review.assignments') + '</h1>' +
         '</div>' +
         '<div id="assignments-list">' + renderLoadingTable() + '</div>';
 }
@@ -4161,8 +4229,7 @@ async function loadReviewerAssignments() {
 function renderCompletedReviews() {
     loadCompletedReviews();
     return '<div class="page-header">' +
-        '<h1>\u2705 Completed Reviews</h1>' +
-        '<p>Reviews you have completed.</p>' +
+        '<h1>\u2705 ' + T('review.completed') + '</h1>' +
         '</div>' +
         '<div id="completed-reviews-list">' + renderLoadingTable() + '</div>';
 }
@@ -4230,10 +4297,9 @@ function renderReportsPage() {
     return '<div class="page-header">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;">' +
         '<div>' +
-        '<h1>\uD83D\uDCC8 ' + (isNGO ? 'My Reports' : 'Grant Reports') + '</h1>' +
-        '<p style="color:#64748b;">' + (isNGO ? 'Submit and track your grant reports.' : 'Review reports submitted by grantees.') + '</p>' +
+        '<h1>\uD83D\uDCC8 ' + T('report.title') + '</h1>' +
         '</div>' +
-        (isNGO ? '<button class="btn btn-primary" onclick="startNewReport()">+ New Report</button>' : '') +
+        (isNGO ? '<button class="btn btn-primary" onclick="startNewReport()">+ ' + T('report.submit_new') + '</button>' : '') +
         '</div></div>' +
 
         // Upcoming/Expected reports section
@@ -4294,7 +4360,7 @@ async function loadReportsUpcoming() {
 function renderReportsList(reports) {
     if (!reports || !reports.length) {
         return '<div class="card" style="padding:32px;text-align:center;">' +
-            '<p style="color:#94a3b8;font-size:16px;">No reports yet.</p>' +
+            '<p style="color:#94a3b8;font-size:16px;">' + T('report.no_reports') + '</p>' +
             '</div>';
     }
 
@@ -4304,7 +4370,7 @@ function renderReportsList(reports) {
     };
 
     return '<div class="table-wrapper"><table class="table table-hover"><thead><tr>' +
-        '<th>Report</th><th>Grant</th><th>Type</th><th>Period</th><th>Status</th><th>Action</th>' +
+        '<th>' + T('report.title') + '</th><th>' + T('report.grant') + '</th><th>' + T('report.type') + '</th><th>' + T('report.period') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('common.actions') + '</th>' +
         '</tr></thead><tbody>' +
         reports.map(function(r) {
             var badge = statusColors[r.status] || 'badge-outline';
@@ -4378,7 +4444,7 @@ async function startNewReport() {
             }
             nav('submitreport');
         } else {
-            showToast('No awarded grants found. You need an awarded grant to submit reports.', 'warning');
+            showToast(T('toast.no_awarded_grants'), 'warning');
         }
     }
 }
@@ -4476,8 +4542,8 @@ function renderSubmitReport() {
         grantSelector = '<div style="margin-bottom:12px;color:#64748b;font-size:13px;">Reporting on: <strong>' + esc(S.currentReport.grant_title) + '</strong></div>';
     }
 
-    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'reports\')" style="margin-bottom:16px;">\u2190 Back to Reports</button>' +
-        '<div class="page-header"><h1>' + (r.id ? '\u270F\uFE0F Edit Report' : '\uD83D\uDCDD New Report') + '</h1></div>' +
+    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'reports\')" style="margin-bottom:16px;">\u2190 ' + T('common.back') + '</button>' +
+        '<div class="page-header"><h1>' + (r.id ? '\u270F\uFE0F ' + T('common.edit') : '\uD83D\uDCDD ' + T('report.submit_new')) + '</h1></div>' +
 
         grantSelector +
         reqsInfo +
@@ -4485,13 +4551,13 @@ function renderSubmitReport() {
         '<div class="card"><div class="card-body">' +
         '<div class="form-row">' +
         '<div class="form-group">' +
-        '<label class="form-label">Report Type</label>' +
+        '<label class="form-label">' + T('report.type') + '</label>' +
         '<select class="form-control" onchange="S.newReport.report_type=this.value;">' +
         reportTypes.map(function(t) { return '<option value="' + t + '"' + (r.report_type === t ? ' selected' : '') + '>' + t.charAt(0).toUpperCase() + t.slice(1) + '</option>'; }).join('') +
         '</select>' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Reporting Period</label>' +
+        '<label class="form-label">' + T('report.reporting_period') + '</label>' +
         '<input type="text" class="form-control" placeholder="e.g., Q1 2026, Jan-Mar 2026" ' +
         'value="' + esc(r.reporting_period) + '" oninput="S.newReport.reporting_period=this.value;">' +
         '</div>' +
@@ -4504,14 +4570,14 @@ function renderSubmitReport() {
         '</div></div>' +
 
         '<div class="card" style="margin-top:16px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Report Content</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('report.content') + '</h3>' +
         '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Complete each section below. The AI will help format and validate your report.</p>' +
         contentFields +
         '</div></div>' +
 
         '<div style="display:flex;gap:12px;margin-top:20px;">' +
-        '<button class="btn btn-secondary" onclick="saveReportDraft()">Save Draft</button>' +
-        '<button class="btn btn-primary btn-lg" onclick="submitReport()">\uD83D\uDE80 Submit Report</button>' +
+        '<button class="btn btn-secondary" onclick="saveReportDraft()">' + T('grant.create.save_draft') + '</button>' +
+        '<button class="btn btn-primary btn-lg" onclick="submitReport()">\uD83D\uDE80 ' + T('report.submit') + '</button>' +
         '</div>';
 }
 
@@ -4555,9 +4621,9 @@ async function saveReportDraft() {
 
     if (res && res.success) {
         if (res.report) S.newReport.id = res.report.id;
-        showToast('Report draft saved!', 'success');
+        showToast(T('toast.saved'), 'success');
     } else {
-        showToast('Failed to save report', 'error');
+        showToast(T('toast.error'), 'error');
     }
 }
 
@@ -4566,17 +4632,17 @@ async function submitReport() {
 
     // Validate required fields
     if (!r.title || !r.title.trim()) {
-        showToast('Please enter a report title before submitting.', 'warning');
+        showToast(T('toast.enter_report_title'), 'warning');
         return;
     }
     if (!r.reporting_period || !r.reporting_period.trim()) {
-        showToast('Please enter the reporting period before submitting.', 'warning');
+        showToast(T('toast.enter_reporting_period'), 'warning');
         return;
     }
     var content = r.content || {};
     var filledSections = Object.keys(content).filter(function(k) { return content[k] && content[k].trim(); });
     if (filledSections.length === 0) {
-        showToast('Please fill in at least one content section before submitting.', 'warning');
+        showToast(T('toast.fill_content_section'), 'warning');
         return;
     }
 
@@ -4594,7 +4660,7 @@ async function submitReport() {
         if (saveRes && saveRes.report) {
             r.id = saveRes.report.id;
         } else {
-            showToast('Failed to save report', 'error');
+            showToast(T('toast.error'), 'error');
             return;
         }
     } else {
@@ -4610,16 +4676,16 @@ async function submitReport() {
     // Submit
     var res = await api('POST', '/api/reports/' + r.id + '/submit');
     if (res && res.success) {
-        showToast('Report submitted successfully! AI analysis complete.', 'success');
+        showToast(T('report.submitted_success'), 'success');
         nav('reports');
     } else {
-        showToast('Failed to submit report', 'error');
+        showToast(T('toast.error'), 'error');
     }
 }
 
 function renderReviewReport() {
     var r = S.currentReport;
-    if (!r) return '<p>Loading report...</p>';
+    if (!r) return '<p>' + T('common.loading') + '</p>';
 
     var isDonor = (S.user.role || '').toLowerCase() === 'donor';
     var canReview = isDonor && r.status === 'submitted';
@@ -4646,7 +4712,7 @@ function renderReviewReport() {
         var reqScoresHTML = '';
         if (ai.requirement_scores && ai.requirement_scores.length > 0) {
             reqScoresHTML = '<div style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px;">' +
-                '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">Donor Requirement Compliance</h4>' +
+                '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">' + T('application.donor_req_compliance') + '</h4>' +
                 ai.requirement_scores.map(function(rs) {
                     var rScore = rs.score || 0;
                     var barColor = rScore >= 70 ? '#2d8f6f' : rScore >= 40 ? '#f59e0b' : '#ef4444';
@@ -4676,7 +4742,7 @@ function renderReviewReport() {
 
         aiHTML = '<div class="card" style="margin-top:16px;border-left:4px solid #2d8f6f;">' +
             '<div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">\u2728 AI Analysis</h3>' +
+            '<h3 style="font-weight:600;margin-bottom:12px;">\u2728 ' + T('report.ai_analysis') + '</h3>' +
             '<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">' +
             '<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:#2d8f6f;">' + (ai.score || 0) + '</div><div style="font-size:12px;color:#94a3b8;">Overall</div></div>' +
             '<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:#3b82f6;">' + (ai.completeness_score || 0) + '</div><div style="font-size:12px;color:#94a3b8;">Completeness</div></div>' +
@@ -4702,8 +4768,8 @@ function renderReviewReport() {
             '<textarea class="form-control" rows="3" id="review-notes" placeholder="Add feedback or notes for the grantee..."></textarea>' +
             '</div>' +
             '<div style="display:flex;gap:12px;">' +
-            '<button class="btn btn-primary btn-lg" onclick="acceptReport(' + r.id + ')">\u2705 Accept Report</button>' +
-            '<button class="btn btn-secondary" onclick="requestRevision(' + r.id + ')">\u21A9\uFE0F Request Revision</button>' +
+            '<button class="btn btn-primary btn-lg" onclick="acceptReport(' + r.id + ')">\u2705 ' + T('report.accept') + '</button>' +
+            '<button class="btn btn-secondary" onclick="requestRevision(' + r.id + ')">\u21A9\uFE0F ' + T('report.request_revision') + '</button>' +
             '</div>' +
             '</div></div>';
     }
@@ -4713,7 +4779,7 @@ function renderReviewReport() {
     if (r.reviewer_notes) {
         notesHTML = '<div class="card" style="margin-top:16px;border-left:4px solid #3b82f6;">' +
             '<div class="card-body">' +
-            '<h4 style="font-weight:600;margin-bottom:8px;">Reviewer Notes</h4>' +
+            '<h4 style="font-weight:600;margin-bottom:8px;">' + T('report.reviewer_notes') + '</h4>' +
             '<p style="color:#475569;">' + esc(r.reviewer_notes) + '</p>' +
             '<p style="font-size:12px;color:#94a3b8;margin-top:4px;">Reviewed: ' + (r.reviewed_at ? new Date(r.reviewed_at).toLocaleDateString() : 'N/A') + '</p>' +
             '</div></div>';
@@ -4737,7 +4803,7 @@ function renderReviewReport() {
             '</div></div>';
     }
 
-    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'reports\')" style="margin-bottom:16px;">\u2190 Back to Reports</button>' +
+    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'reports\')" style="margin-bottom:16px;">\u2190 ' + T('common.back') + '</button>' +
         '<div class="card"><div class="card-body">' +
         '<div style="display:flex;justify-content:space-between;align-items:start;">' +
         '<div>' +
@@ -4755,7 +4821,7 @@ function renderReviewReport() {
         donorReqsHTML +
 
         '<div class="card" style="margin-top:16px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">Report Content</h3>' +
+        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('report.content') + '</h3>' +
         contentHTML +
         '</div></div>' +
 
@@ -4771,17 +4837,17 @@ async function acceptReport(id) {
         notes: notes
     });
     if (res && res.success) {
-        showToast('Report accepted!', 'success');
+        showToast(T('toast.saved'), 'success');
         nav('reports');
     } else {
-        showToast('Failed to review report', 'error');
+        showToast(T('toast.error'), 'error');
     }
 }
 
 async function requestRevision(id) {
     var notes = document.getElementById('review-notes') ? document.getElementById('review-notes').value : '';
     if (!notes) {
-        showToast('Please add notes explaining what revisions are needed.', 'warning');
+        showToast(T('toast.add_revision_notes'), 'warning');
         return;
     }
     var res = await api('POST', '/api/reports/' + id + '/review', {
@@ -4789,10 +4855,10 @@ async function requestRevision(id) {
         notes: notes
     });
     if (res && res.success) {
-        showToast('Revision requested. The grantee will be notified.', 'info');
+        showToast(T('toast.revision_requested'), 'info');
         nav('reports');
     } else {
-        showToast('Failed to review report', 'error');
+        showToast(T('toast.error'), 'error');
     }
 }
 
@@ -4802,15 +4868,15 @@ async function requestRevision(id) {
 
 function verificationStatusBadge(status) {
     var map = {
-        'verified': { color: 'green', icon: '\u2705', label: 'Verified' },
-        'ai_reviewed': { color: 'blue', icon: '\uD83E\uDD16', label: 'AI Reviewed' },
-        'pending': { color: 'amber', icon: '\u23F3', label: 'Pending' },
-        'flagged': { color: 'red', icon: '\u26A0\uFE0F', label: 'Flagged' },
-        'expired': { color: 'red', icon: '\u274C', label: 'Expired' },
-        'unverified': { color: 'outline', icon: '\u2753', label: 'Unverified' },
+        'verified': { color: 'green', icon: '\u2705', label: T('status.verified') },
+        'ai_reviewed': { color: 'blue', icon: '\uD83E\uDD16', label: T('status.ai_reviewed') },
+        'pending': { color: 'amber', icon: '\u23F3', label: T('status.pending') },
+        'flagged': { color: 'red', icon: '\u26A0\uFE0F', label: T('status.flagged') },
+        'expired': { color: 'red', icon: '\u274C', label: T('status.expired') },
+        'unverified': { color: 'outline', icon: '\u2753', label: T('status.unverified') },
     };
     var s = map[status] || map['unverified'];
-    return '<span class="badge badge-' + s.color + '">' + s.icon + ' ' + s.label + '</span>';
+    return '<span class="badge badge-' + s.color + '" role="status">' + s.icon + ' ' + s.label + '</span>';
 }
 
 function renderVerificationDashboard() {
@@ -4818,19 +4884,18 @@ function renderVerificationDashboard() {
     return '<div class="page-header">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;">' +
         '<div>' +
-        '<h1>\u2705 Registration Verification</h1>' +
-        '<p style="color:#64748b;">Verify NGO registrations against government registries. AI-powered analysis with manual verification workflow.</p>' +
+        '<h1>\u2705 ' + T('verification.title') + '</h1>' +
         '</div>' +
         '<button class="btn btn-secondary" onclick="loadRegistryDirectory()">\uD83C\uDF10 Government Registries</button>' +
         '</div></div>' +
 
         // Summary stat cards
         '<div id="verification-stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:24px;">' +
-        renderStatCard('\u2705', 'Verified', '-', 'green') +
-        renderStatCard('\uD83E\uDD16', 'AI Reviewed', '-', 'blue') +
-        renderStatCard('\u23F3', 'Pending', '-', 'amber') +
-        renderStatCard('\u26A0\uFE0F', 'Flagged', '-', 'red') +
-        renderStatCard('\u2753', 'Unverified', '-', 'outline') +
+        renderStatCard('\u2705', T('status.verified'), '-', 'green') +
+        renderStatCard('\uD83E\uDD16', T('status.ai_reviewed'), '-', 'blue') +
+        renderStatCard('\u23F3', T('status.pending'), '-', 'amber') +
+        renderStatCard('\u26A0\uFE0F', T('status.flagged'), '-', 'red') +
+        renderStatCard('\u2753', T('status.unverified'), '-', 'outline') +
         '</div>' +
 
         // Registry directory (hidden by default)
@@ -4862,11 +4927,11 @@ async function loadVerificationData() {
     var statsEl = document.getElementById('verification-stats');
     if (statsEl) {
         statsEl.innerHTML =
-            renderStatCard('\u2705', 'Verified', counts.verified, 'green') +
-            renderStatCard('\uD83E\uDD16', 'AI Reviewed', counts.ai_reviewed, 'blue') +
-            renderStatCard('\u23F3', 'Pending', counts.pending + counts.expired, 'amber') +
-            renderStatCard('\u26A0\uFE0F', 'Flagged', counts.flagged, 'red') +
-            renderStatCard('\u2753', 'Unverified', counts.unverified, 'outline');
+            renderStatCard('\u2705', T('status.verified'), counts.verified, 'green') +
+            renderStatCard('\uD83E\uDD16', T('status.ai_reviewed'), counts.ai_reviewed, 'blue') +
+            renderStatCard('\u23F3', T('status.pending'), counts.pending + counts.expired, 'amber') +
+            renderStatCard('\u26A0\uFE0F', T('status.flagged'), counts.flagged, 'red') +
+            renderStatCard('\u2753', T('status.unverified'), counts.unverified, 'outline');
     }
 
     // Render table
@@ -4908,26 +4973,26 @@ async function loadVerificationData() {
 
     el.innerHTML = '<div class="table-wrapper"><table class="table">' +
         '<thead><tr>' +
-        '<th>Organization</th>' +
-        '<th>Reg. Number</th>' +
-        '<th>Authority</th>' +
-        '<th>Status</th>' +
-        '<th>AI Confidence</th>' +
-        '<th>Actions</th>' +
+        '<th>' + T('verification.organization') + '</th>' +
+        '<th>' + T('verification.reg_number') + '</th>' +
+        '<th>' + T('verification.authority') + '</th>' +
+        '<th>' + T('application.tab.status') + '</th>' +
+        '<th>' + T('verification.ai_confidence') + '</th>' +
+        '<th>' + T('common.actions') + '</th>' +
         '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 async function runVerification(orgId) {
-    showToast('\uD83D\uDD0D Running AI registration verification...', 'info');
+    showToast(T('toast.running_verification'), 'info');
     var res = await api('POST', '/api/verification/verify', { org_id: orgId });
     if (res && res.success) {
         var conf = res.verification.ai_confidence || 0;
         var status = res.verification.status;
-        showToast('AI verification complete: ' + status + ' (confidence: ' + Math.round(conf) + '%)', conf >= 70 ? 'success' : 'warning');
+        showToast(T('toast.verification_complete', {status: status, confidence: Math.round(conf)}), conf >= 70 ? 'success' : 'warning');
         loadVerificationData();
         viewVerificationDetail(orgId);
     } else {
-        showToast('Verification failed: ' + (res ? res.error : 'Unknown error'), 'error');
+        showToast(T('toast.verification_failed', {error: (res ? res.error : 'Unknown error')}), 'error');
     }
 }
 
@@ -4945,8 +5010,8 @@ async function viewVerificationDetail(orgId) {
 
     var html = '<div class="card"><div class="card-body">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
-        '<h3 style="font-weight:600;">\uD83D\uDCC4 Verification Details: ' + esc(res.org_name) + '</h3>' +
-        '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'verification-detail\').style.display=\'none\';">\u2715 Close</button>' +
+        '<h3 style="font-weight:600;">\uD83D\uDCC4 ' + T('verification.detail_title') + ' ' + esc(res.org_name) + '</h3>' +
+        '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'verification-detail\').style.display=\'none\';">\u2715 ' + T('common.close') + '</button>' +
         '</div>';
 
     // Registration info
@@ -4954,27 +5019,27 @@ async function viewVerificationDetail(orgId) {
 
     // Left: Org Registration Details
     html += '<div>' +
-        '<h4 style="font-weight:600;margin-bottom:12px;font-size:14px;color:#475569;">Registration Information</h4>' +
+        '<h4 style="font-weight:600;margin-bottom:12px;font-size:14px;color:#475569;">' + T('verification.registration_info') + '</h4>' +
         '<table style="width:100%;font-size:14px;border-collapse:collapse;">' +
-        '<tr><td style="padding:6px 12px 6px 0;color:#64748b;width:40%;">Country</td><td style="padding:6px 0;font-weight:500;">' + esc(res.org_country || '-') + '</td></tr>' +
-        '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">Reg. Number</td><td style="padding:6px 0;font-family:monospace;font-weight:500;">' + esc(res.registration_number || 'Not provided') + '</td></tr>' +
-        '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">Status</td><td style="padding:6px 0;">' + verificationStatusBadge(res.overall_status) + '</td></tr>';
+        '<tr><td style="padding:6px 12px 6px 0;color:#64748b;width:40%;">' + T('verification.country') + '</td><td style="padding:6px 0;font-weight:500;">' + esc(res.org_country || '-') + '</td></tr>' +
+        '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('verification.reg_number') + '</td><td style="padding:6px 0;font-family:monospace;font-weight:500;">' + esc(res.registration_number || 'Not provided') + '</td></tr>' +
+        '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('application.tab.status') + '</td><td style="padding:6px 0;">' + verificationStatusBadge(res.overall_status) + '</td></tr>';
 
     if (v) {
-        html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">Authority</td><td style="padding:6px 0;">' + esc(v.registration_authority || '-') + '</td></tr>';
-        if (v.registration_date) html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">Registered</td><td style="padding:6px 0;">' + formatDate(v.registration_date) + '</td></tr>';
-        if (v.expiry_date) html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">Expires</td><td style="padding:6px 0;' + (new Date(v.expiry_date) < new Date() ? 'color:#dc2626;font-weight:600;' : '') + '">' + formatDate(v.expiry_date) + (new Date(v.expiry_date) < new Date() ? ' (EXPIRED)' : '') + '</td></tr>';
-        html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">AI Confidence</td><td style="padding:6px 0;">' +
+        html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('verification.authority') + '</td><td style="padding:6px 0;">' + esc(v.registration_authority || '-') + '</td></tr>';
+        if (v.registration_date) html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('verification.registered') + '</td><td style="padding:6px 0;">' + formatDate(v.registration_date) + '</td></tr>';
+        if (v.expiry_date) html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('verification.expires') + '</td><td style="padding:6px 0;' + (new Date(v.expiry_date) < new Date() ? 'color:#dc2626;font-weight:600;' : '') + '">' + formatDate(v.expiry_date) + (new Date(v.expiry_date) < new Date() ? ' (' + T('verification.expired_label') + ')' : '') + '</td></tr>';
+        html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('verification.ai_confidence') + '</td><td style="padding:6px 0;">' +
             '<span style="color:' + (v.ai_confidence >= 80 ? '#16a34a' : v.ai_confidence >= 50 ? '#d97706' : '#dc2626') + ';font-weight:600;">' + Math.round(v.ai_confidence || 0) + '%</span></td></tr>';
         if (v.verified_by_name) {
-            html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">Verified By</td><td style="padding:6px 0;">' + esc(v.verified_by_name) + ' on ' + formatDate(v.verified_at) + '</td></tr>';
+            html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('verification.verified_by') + '</td><td style="padding:6px 0;">' + esc(v.verified_by_name) + ' on ' + formatDate(v.verified_at) + '</td></tr>';
         }
     }
     html += '</table></div>';
 
     // Right: Government Registry Info
     html += '<div>' +
-        '<h4 style="font-weight:600;margin-bottom:12px;font-size:14px;color:#475569;">Government Registry</h4>';
+        '<h4 style="font-weight:600;margin-bottom:12px;font-size:14px;color:#475569;">' + T('verification.government_registry') + '</h4>';
     if (reg) {
         html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;font-size:14px;">' +
             '<div style="font-weight:600;margin-bottom:8px;">\uD83C\uDFDB\uFE0F ' + esc(reg.authority) + '</div>' +
@@ -5069,7 +5134,7 @@ async function confirmVerification(orgId) {
     if (res && res.verifications && res.verifications.length) {
         await confirmVerificationById(res.verifications[0].id, orgId);
     } else {
-        showToast('No verification record found. Run verification first.', 'warning');
+        showToast(T('toast.no_verification_record'), 'warning');
     }
 }
 
@@ -5079,11 +5144,11 @@ async function confirmVerificationById(vId, orgId) {
         notes: 'Manually verified by donor after reviewing AI analysis and government registry.'
     });
     if (res && res.success) {
-        showToast('\u2705 Registration marked as verified!', 'success');
+        showToast(T('toast.registration_verified'), 'success');
         loadVerificationData();
         viewVerificationDetail(orgId);
     } else {
-        showToast('Failed to update verification', 'error');
+        showToast(T('toast.error'), 'error');
     }
 }
 
@@ -5092,7 +5157,7 @@ async function flagVerification(orgId) {
     if (res && res.verifications && res.verifications.length) {
         await flagVerificationById(res.verifications[0].id, orgId);
     } else {
-        showToast('No verification record found. Run verification first.', 'warning');
+        showToast(T('toast.no_verification_record'), 'warning');
     }
 }
 
@@ -5102,11 +5167,11 @@ async function flagVerificationById(vId, orgId) {
         notes: 'Flagged for further review. Manual verification with government registry required.'
     });
     if (res && res.success) {
-        showToast('\u26A0\uFE0F Registration flagged for review.', 'warning');
+        showToast(T('toast.registration_flagged'), 'warning');
         loadVerificationData();
         viewVerificationDetail(orgId);
     } else {
-        showToast('Failed to update verification', 'error');
+        showToast(T('toast.error'), 'error');
     }
 }
 
@@ -5216,26 +5281,27 @@ function renderAIPanel() {
     if (S.aiLoading) {
         messagesHTML += '<div class="ai-analyzing">' +
             '<div class="dot-pulse"><span></span><span></span><span></span></div>' +
-            '<span>Thinking...</span></div>';
+            '<span>' + T('ai.thinking') + '</span></div>';
     }
 
     if (!S.aiMessages.length) {
         messagesHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">' +
             '<p style="font-size:32px;margin-bottom:8px;">\u2728</p>' +
-            '<p>Hi! I\'m the Kuja AI Assistant. Ask me anything about grants, applications, or your organization.</p>' +
+            '<p>' + T('ai.welcome') + '</p>' +
             '</div>';
     }
 
-    return '<div class="ai-panel' + (S.aiPanelOpen ? '' : ' collapsed') + '" id="ai-panel">' +
+    return '<div class="ai-panel' + (S.aiPanelOpen ? '' : ' collapsed') + '" id="ai-panel" role="complementary" aria-label="' + T('ai.panel_title') + '">' +
         '<div class="ai-panel-header">' +
-        '<h3>\u2728 Kuja AI Assistant</h3>' +
-        '<button class="ai-panel-close" onclick="toggleAI()">\u00D7</button>' +
+        '<h3>\u2728 ' + T('ai.panel_title') + '</h3>' +
+        '<button class="ai-panel-close" onclick="toggleAI()" aria-label="Close AI panel">\u00D7</button>' +
         '</div>' +
         '<div class="ai-messages" id="ai-messages">' + messagesHTML + '</div>' +
         '<div class="ai-input">' +
-        '<input type="text" id="ai-input-field" placeholder="Ask me anything..." ' +
+        '<input type="text" id="ai-input-field" placeholder="' + T('ai.placeholder') + '" ' +
+        'aria-label="' + T('ai.placeholder') + '" ' +
         'onkeydown="if(event.key===\'Enter\')sendAIMessage();">' +
-        '<button onclick="sendAIMessage()">Send</button>' +
+        '<button onclick="sendAIMessage()">' + T('ai.send') + '</button>' +
         '</div>' +
         '</div>';
 }
@@ -5326,12 +5392,23 @@ function refreshAIPanel() {
         '}';
     document.head.appendChild(styleEl);
 
+    // Load English translations first (always needed as fallback)
+    await loadTranslations('en');
+
     // Check for existing cookie session via server
     try {
         var res = await api('GET', '/api/auth/me');
         if (res && res.user) {
             S.user = res.user;
             S.page = 'dashboard';
+            // Load user's saved language preference
+            var userLang = res.user.language || 'en';
+            if (userLang !== 'en') {
+                _currentLang = userLang;
+                await loadTranslations(userLang);
+                document.documentElement.lang = userLang;
+                document.documentElement.dir = userLang === 'ar' ? 'rtl' : 'ltr';
+            }
         } else {
             S.user = null;
             S.page = 'login';

@@ -52,13 +52,10 @@ def create_app(config_name=None):
     migrate.init_app(app, db)
 
     # -----------------------------------------------------------------
-    # CORS - locked to specific origins
+    # CORS - origins from environment (comma-separated) or defaults
     # -----------------------------------------------------------------
-    _allowed_origins = [
-        'https://web-production-6f8a.up.railway.app',
-        'http://localhost:5000',
-        'http://127.0.0.1:5000',
-    ]
+    _default_origins = 'https://web-production-6f8a.up.railway.app,http://localhost:5000,http://127.0.0.1:5000'
+    _allowed_origins = [o.strip() for o in os.getenv('CORS_ORIGINS', _default_origins).split(',') if o.strip()]
     CORS(app, supports_credentials=True,
          resources={r"/api/*": {"origins": _allowed_origins}})
 
@@ -123,6 +120,12 @@ def create_app(config_name=None):
     with app.app_context():
         from app import models  # noqa: F401 — ensure all models registered with SQLAlchemy
 
+    # -----------------------------------------------------------------
+    # Load i18n translation files
+    # -----------------------------------------------------------------
+    from app.utils.i18n import _load_translations
+    _load_translations()
+
     return app
 
 
@@ -186,7 +189,7 @@ def _register_spa_routes(app):
         from flask import jsonify
         return jsonify({
             'name': 'Kuja Grant Management API',
-            'version': '2.0.0',
+            'version': '3.0.0',
             'description': 'REST API for the Kuja Grant Management System',
         })
 

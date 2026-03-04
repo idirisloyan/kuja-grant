@@ -31,6 +31,8 @@ class Report(db.Model):
     reviewer_notes = db.Column(db.Text, nullable=True)
     ai_analysis = db.Column(db.Text, nullable=True)  # JSON - AI review of the report
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     grant = db.relationship('Grant', backref=db.backref('reports', lazy='dynamic'))
@@ -74,6 +76,7 @@ class Report(db.Model):
             'reviewer_notes': self.reviewer_notes,
             'ai_analysis': self.get_ai_analysis(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'grant_title': self.grant.title if self.grant else None,
             'org_name': self.submitted_by_org.name if self.submitted_by_org else None,
         }

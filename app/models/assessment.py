@@ -21,6 +21,8 @@ class Assessment(db.Model):
     gaps = db.Column(db.Text, nullable=True)                  # JSON array
     completed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     documents = db.relationship('Document', backref='assessment', lazy='dynamic', cascade='all, delete-orphan')
@@ -57,5 +59,6 @@ class Assessment(db.Model):
             'gaps': self.get_gaps(),
             'completed_at': self.completed_at.isoformat() if self.completed_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'org_name': self.organization.name if self.organization else None,
         }

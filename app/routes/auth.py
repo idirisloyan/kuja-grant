@@ -66,3 +66,17 @@ def api_logout():
 def api_me():
     """Return current authenticated user info."""
     return jsonify({'user': current_user.to_dict(include_org=True)})
+
+
+@auth_bp.route('/language', methods=['PUT'])
+@login_required
+def api_set_language():
+    """Update the current user's preferred language."""
+    data = get_request_json()
+    lang = data.get('language', 'en')
+    if lang not in ('en', 'ar', 'fr', 'es'):
+        return jsonify({'success': False, 'error': 'Unsupported language'}), 400
+    current_user.language = lang
+    db.session.commit()
+    logger.info(f"User {current_user.email} changed language to {lang}")
+    return jsonify({'success': True, 'language': lang})

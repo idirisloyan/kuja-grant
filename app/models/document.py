@@ -24,6 +24,8 @@ class Document(db.Model):
     ai_analysis = db.Column(db.Text, nullable=True)  # JSON with score, findings, recommendations
     score = db.Column(db.Float, nullable=True)
     uploaded_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
 
     # --- JSON helpers ---
     def get_ai_analysis(self):
@@ -45,4 +47,5 @@ class Document(db.Model):
             'ai_analysis': self.get_ai_analysis(),
             'score': self.score,
             'uploaded_at': self.uploaded_at.isoformat() if self.uploaded_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

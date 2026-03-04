@@ -20,6 +20,8 @@ class ComplianceCheck(db.Model):
     status = db.Column(db.String(50), default='pending')  # clear, flagged, pending, error
     result = db.Column(db.Text, nullable=True)  # JSON
     checked_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
 
     # --- JSON helpers ---
     def get_result(self):
