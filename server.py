@@ -49,6 +49,9 @@ from difflib import SequenceMatcher
 from datetime import datetime, date, timedelta
 from functools import wraps
 
+from collections import defaultdict
+from threading import Lock
+
 from flask import (
     Flask, request, jsonify, session, send_from_directory,
     abort, current_app, g
@@ -61,6 +64,58 @@ from flask_login import (
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+
+
+# =============================================================================
+# RATE LIMITER (in-memory, thread-safe)
+# =============================================================================
+
+class RateLimiter:
+    """Simple in-memory rate limiter for login attempts."""
+    def __init__(self, max_attempts=5, window_seconds=300, lockout_seconds=900):
+        self.max_attempts = max_attempts       # max failures within window
+        self.window_seconds = window_seconds   # 5-minute rolling window
+        self.lockout_seconds = lockout_seconds # 15-minute lockout after max failures
+        self._attempts = defaultdict(list)     # key -> [timestamps]
+        self._lockouts = {}                    # key -> lockout_until timestamp
+        self._lock = Lock()
+
+    def is_locked(self, key: str) -> bool:
+        with self._lock:
+            lockout_until = self._lockouts.get(key)
+            if lockout_until and time.time() < lockout_until:
+                return True
+            elif lockout_until:
+                del self._lockouts[key]
+            return False
+
+    def record_failure(self, key: str) -> int:
+        """Record a failed attempt. Returns remaining attempts before lockout."""
+        now = time.time()
+        with self._lock:
+            cutoff = now - self.window_seconds
+            self._attempts[key] = [t for t in self._attempts[key] if t > cutoff]
+            self._attempts[key].append(now)
+            count = len(self._attempts[key])
+            if count >= self.max_attempts:
+                self._lockouts[key] = now + self.lockout_seconds
+                self._attempts[key] = []
+            return max(0, self.max_attempts - count)
+
+    def reset(self, key: str):
+        with self._lock:
+            self._attempts.pop(key, None)
+            self._lockouts.pop(key, None)
+
+    def lockout_remaining(self, key: str) -> int:
+        """Seconds remaining in lockout."""
+        with self._lock:
+            lockout_until = self._lockouts.get(key)
+            if lockout_until:
+                return max(0, int(lockout_until - time.time()))
+            return 0
+
+login_limiter = RateLimiter(max_attempts=5, window_seconds=300, lockout_seconds=900)
 
 # Optional: Anthropic SDK for Claude AI integration
 try:
@@ -116,6 +171,10 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SECURE'] = not os.getenv('FLASK_DEBUG', False)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
+APP_VERSION = '1.1.0'
+APP_START_TIME = datetime.utcnow()
 
 # Anthropic API key
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
@@ -128,6 +187,34 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.session_protection = 'strong'
 CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "*"}})
+
+
+# =============================================================================
+# SECURITY HEADERS & AUDIT LOGGING
+# =============================================================================
+
+@app.after_request
+def add_security_headers(response):
+    """Add enterprise security headers to every response."""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    if request.is_secure:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
+
+@app.before_request
+def audit_log_request():
+    """Log API requests for audit trail (non-static only)."""
+    if request.path.startswith('/api/') and request.method in ('POST', 'PUT', 'DELETE', 'PATCH'):
+        user_info = current_user.email if hasattr(current_user, 'email') and current_user.is_authenticated else 'anonymous'
+        logger.info(
+            f"AUDIT: {request.method} {request.path} by {user_info} "
+            f"from {request.remote_addr}"
+        )
 
 
 # =============================================================================
@@ -2660,7 +2747,7 @@ class RegistryService:
 
 @app.route('/api/auth/login', methods=['POST'])
 def api_login():
-    """Authenticate user with email and password."""
+    """Authenticate user with email and password. Rate-limited."""
     data = get_request_json()
     email = data.get('email', '').strip().lower()
     password = data.get('password', '')
@@ -2668,15 +2755,34 @@ def api_login():
     if not email or not password:
         return jsonify({'success': False, 'error': 'Email and password are required'}), 400
 
+    # Rate limit by IP + email combo
+    rate_key = f"{request.remote_addr}:{email}"
+
+    if login_limiter.is_locked(rate_key):
+        remaining = login_limiter.lockout_remaining(rate_key)
+        logger.warning(f"Login locked out: {email} from {request.remote_addr} ({remaining}s remaining)")
+        return jsonify({
+            'success': False,
+            'error': f'Too many failed attempts. Account locked for {remaining // 60} minutes. Try again later.',
+        }), 429
+
     user = User.query.filter_by(email=email).first()
     if not user or not user.check_password(password):
-        return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
+        remaining = login_limiter.record_failure(rate_key)
+        logger.warning(f"Failed login: {email} from {request.remote_addr} ({remaining} attempts left)")
+        msg = 'Invalid email or password'
+        if remaining <= 2 and remaining > 0:
+            msg += f'. {remaining} attempt(s) remaining before lockout.'
+        return jsonify({'success': False, 'error': msg}), 401
 
     if not user.is_active:
         return jsonify({'success': False, 'error': 'Account is deactivated'}), 403
 
+    # Success — reset rate limiter and log in
+    login_limiter.reset(rate_key)
+    session.permanent = True
     login_user(user, remember=True)
-    logger.info(f"User logged in: {user.email} (role: {user.role})")
+    logger.info(f"User logged in: {user.email} (role: {user.role}) from {request.remote_addr}")
     return jsonify({'success': True, 'user': user.to_dict(include_org=True)})
 
 
@@ -3737,10 +3843,15 @@ def api_ai_chat():
     context = data.get('context', {})
     result = AIService.chat(message, context, user_role=current_user.role)
 
+    source = result.get('source', 'unknown')
     return jsonify({
         'success': True,
         'response': result['response'],
-        'source': result.get('source', 'unknown'),
+        'source': source,
+        'ai_transparency': {
+            'engine': 'Claude AI' if source == 'claude' else 'Rule-based heuristics',
+            'disclaimer': 'AI-generated content — verify important details independently.',
+        },
     })
 
 
@@ -3759,11 +3870,16 @@ def api_ai_guidance():
 
     result = AIService.guidance(field_name, grant_criteria, current_text)
 
+    source = result.get('source', 'unknown')
     return jsonify({
         'success': True,
         'guidance': result['guidance'],
         'quality_score': result.get('quality_score', 0),
-        'source': result.get('source', 'unknown'),
+        'source': source,
+        'ai_transparency': {
+            'engine': 'Claude AI' if source == 'claude' else 'Rule-based heuristics',
+            'disclaimer': 'AI-generated guidance — always apply professional judgment.',
+        },
     })
 
 
@@ -3806,6 +3922,10 @@ def api_ai_score_application():
         'success': True,
         'scores': score_result,
         'application_id': application_id,
+        'ai_transparency': {
+            'engine': 'Kuja Scoring Engine (rule-based + AI)',
+            'disclaimer': 'Automated scoring — human review is recommended for final decisions.',
+        },
     })
 
 
@@ -4893,6 +5013,10 @@ def api_ai_analyze_report():
     return jsonify({
         'success': True,
         'analysis': analysis,
+        'ai_transparency': {
+            'engine': 'Claude AI' if (HAS_ANTHROPIC and ANTHROPIC_API_KEY) else 'Rule-based heuristics',
+            'disclaimer': 'AI-generated analysis — cross-check findings against original documents.',
+        },
     })
 
 
@@ -4932,7 +5056,124 @@ def api_ai_extract_reporting_requirements():
     return jsonify({
         'success': True,
         'extracted': extracted,
+        'ai_transparency': {
+            'engine': 'Claude AI' if (HAS_ANTHROPIC and ANTHROPIC_API_KEY) else 'Rule-based heuristics',
+            'disclaimer': 'AI-extracted requirements — review against the original grant agreement.',
+        },
     })
+
+
+# =============================================================================
+# 19a. OPERATIONAL ENDPOINTS (Health, Version, Readiness)
+# =============================================================================
+
+@app.route('/api/health', methods=['GET'])
+def api_health():
+    """Health check endpoint for load balancers and monitoring."""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
+    })
+
+
+@app.route('/api/version', methods=['GET'])
+def api_version():
+    """Version information for the deployed application."""
+    uptime_seconds = int((datetime.utcnow() - APP_START_TIME).total_seconds())
+    return jsonify({
+        'version': APP_VERSION,
+        'name': 'Kuja Grant Management System',
+        'environment': 'production' if os.getenv('DATABASE_URL') else 'development',
+        'uptime_seconds': uptime_seconds,
+        'started_at': APP_START_TIME.isoformat() + 'Z',
+    })
+
+
+@app.route('/api/ready', methods=['GET'])
+def api_ready():
+    """Readiness probe — verifies the database is reachable."""
+    try:
+        db.session.execute(db.text('SELECT 1'))
+        db_ok = True
+    except Exception as e:
+        logger.error(f"Readiness check failed: {e}")
+        db_ok = False
+
+    ai_configured = bool(ANTHROPIC_API_KEY and HAS_ANTHROPIC)
+
+    status_code = 200 if db_ok else 503
+    return jsonify({
+        'ready': db_ok,
+        'checks': {
+            'database': 'ok' if db_ok else 'unavailable',
+            'ai_service': 'configured' if ai_configured else 'not_configured',
+        },
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
+    }), status_code
+
+
+@app.route('/api/admin/stats', methods=['GET'])
+@login_required
+def api_admin_stats():
+    """Comprehensive admin statistics for the admin dashboard."""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    stats = {}
+
+    # System overview
+    stats['total_users'] = User.query.count()
+    stats['active_users'] = User.query.filter_by(is_active=True).count()
+    stats['total_organizations'] = Organization.query.count()
+    stats['verified_organizations'] = Organization.query.filter_by(verified=True).count()
+    stats['total_grants'] = Grant.query.count()
+    stats['open_grants'] = Grant.query.filter_by(status='open').count()
+    stats['total_applications'] = Application.query.count()
+    stats['total_reviews'] = Review.query.count()
+    stats['total_assessments'] = Assessment.query.count()
+
+    # Compliance overview
+    total_checks = ComplianceCheck.query.count()
+    flagged_checks = ComplianceCheck.query.filter_by(status='flagged').count()
+    stats['total_compliance_checks'] = total_checks
+    stats['flagged_compliance'] = flagged_checks
+
+    # Users by role
+    stats['users_by_role'] = {}
+    for r in ['ngo', 'donor', 'reviewer', 'admin']:
+        stats['users_by_role'][r] = User.query.filter_by(role=r).count()
+
+    # Orgs by type
+    stats['orgs_by_type'] = {}
+    for t in ['ngo', 'donor', 'ingo', 'cbo', 'network']:
+        stats['orgs_by_type'][t] = Organization.query.filter_by(org_type=t).count()
+
+    # Applications by status
+    stats['apps_by_status'] = {}
+    for s in ['draft', 'submitted', 'under_review', 'scored', 'approved', 'rejected']:
+        stats['apps_by_status'][s] = Application.query.filter_by(status=s).count()
+
+    # Recent activity (last 7 days)
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    stats['new_users_7d'] = User.query.filter(User.created_at >= week_ago).count()
+    stats['new_apps_7d'] = Application.query.filter(Application.created_at >= week_ago).count()
+    stats['new_orgs_7d'] = Organization.query.filter(Organization.created_at >= week_ago).count()
+
+    # Recent users
+    recent_users = User.query.order_by(User.created_at.desc()).limit(10).all()
+    stats['recent_users'] = [{'id': u.id, 'name': u.name, 'email': u.email,
+                              'role': u.role, 'is_active': u.is_active,
+                              'created_at': u.created_at.isoformat() if u.created_at else None}
+                             for u in recent_users]
+
+    # System info
+    stats['app_version'] = APP_VERSION
+    uptime = int((datetime.utcnow() - APP_START_TIME).total_seconds())
+    stats['uptime'] = f"{uptime // 3600}h {(uptime % 3600) // 60}m"
+    stats['environment'] = 'production' if os.getenv('DATABASE_URL') else 'development'
+    stats['ai_enabled'] = bool(ANTHROPIC_API_KEY and HAS_ANTHROPIC)
+
+    return jsonify({'stats': stats})
 
 
 # =============================================================================

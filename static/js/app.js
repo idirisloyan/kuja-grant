@@ -722,6 +722,16 @@ function renderSidebar(role) {
             { icon: '\uD83D\uDCCB', label: 'My Assignments', page: 'assignments' },
             { icon: '\u2705', label: 'Completed Reviews', page: 'completedreviews' }
         ];
+    } else if (role === 'admin') {
+        items = [
+            { icon: '\uD83D\uDCCA', label: 'Admin Dashboard', page: 'dashboard' },
+            { icon: '\uD83D\uDCB0', label: 'All Grants', page: 'grants' },
+            { icon: '\uD83D\uDCCB', label: 'All Applications', page: 'applications' },
+            { icon: '\uD83D\uDD0D', label: 'Organization Search', page: 'orgsearch' },
+            { icon: '\u2705', label: 'Registration Checks', page: 'verification' },
+            { icon: '\uD83D\uDEE1\uFE0F', label: 'Compliance', page: 'compliance' },
+            { icon: '\uD83D\uDCC8', label: 'Reports', page: 'reports' }
+        ];
     }
 
     var navHTML = items.map(function(it) {
@@ -793,6 +803,7 @@ function renderPageContent() {
             if (role === 'ngo') return renderNGODashboard();
             if (role === 'donor') return renderDonorDashboard();
             if (role === 'reviewer') return renderReviewerDashboard();
+            if (role === 'admin') return renderAdminDashboard();
             return renderNGODashboard();
         case 'grants': return renderBrowseGrants();
         case 'mygrants': return renderMyGrants();
@@ -1004,6 +1015,196 @@ function renderReviewerDashboard() {
         '<div id="reviewer-assignments">' + renderLoadingTable() + '</div>' +
         '</div>';
 }
+
+// =============================================================================
+// 14b. Admin Dashboard
+// =============================================================================
+
+function renderAdminDashboard() {
+    loadAdminStats();
+    var stats = S.adminStats || {};
+
+    return '<div class="page-header">' +
+        '<h1>\uD83D\uDD27 System Administration</h1>' +
+        '<p>Welcome, ' + esc(S.user.name || 'Admin') + ' \u2014 ' +
+        '<span style="font-size:13px;color:#64748b;">v' + esc(stats.app_version || '1.1.0') +
+        ' \u2022 Uptime: ' + esc(stats.uptime || '--') +
+        ' \u2022 ' + esc(stats.environment || 'production') + '</span></p>' +
+        '</div>' +
+
+        // Top stat cards
+        '<div id="admin-stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:32px;">' +
+        renderStatCard('\uD83D\uDC65', 'Total Users', stats.total_users || 0, 'blue') +
+        renderStatCard('\uD83C\uDFE2', 'Organizations', stats.total_organizations || 0, 'green') +
+        renderStatCard('\u2705', 'Verified Orgs', stats.verified_organizations || 0, 'green') +
+        renderStatCard('\uD83D\uDCB0', 'Total Grants', stats.total_grants || 0, 'amber') +
+        renderStatCard('\uD83D\uDCCB', 'Applications', stats.total_applications || 0, 'blue') +
+        renderStatCard('\u26A0\uFE0F', 'Flagged Checks', stats.flagged_compliance || 0, 'red') +
+        '</div>' +
+
+        // Two-column layout
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px;">' +
+
+        '<div class="card"><div class="card-body">' +
+        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDC65 Users by Role</h3>' +
+        '<div id="admin-users-by-role">' + renderAdminRoleBreakdown(stats.users_by_role || {}) + '</div>' +
+        '</div></div>' +
+
+        '<div class="card"><div class="card-body">' +
+        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83C\uDFE2 Organizations by Type</h3>' +
+        '<div id="admin-orgs-by-type">' + renderAdminOrgBreakdown(stats.orgs_by_type || {}) + '</div>' +
+        '</div></div>' +
+
+        '</div>' +
+
+        // Applications by Status
+        '<div class="card" style="margin-bottom:32px;"><div class="card-body">' +
+        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDCCB Applications by Status</h3>' +
+        '<div id="admin-apps-by-status">' + renderAdminStatusBreakdown(stats.apps_by_status || {}) + '</div>' +
+        '</div></div>' +
+
+        // Activity last 7 days
+        '<div class="card" style="margin-bottom:32px;"><div class="card-body">' +
+        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDCC8 Last 7 Days</h3>' +
+        '<div style="display:flex;gap:32px;">' +
+        '<div><span style="font-size:28px;font-weight:700;color:#2d8f6f;">' + (stats.new_users_7d || 0) + '</span><div style="font-size:13px;color:#64748b;">New Users</div></div>' +
+        '<div><span style="font-size:28px;font-weight:700;color:#3b82f6;">' + (stats.new_apps_7d || 0) + '</span><div style="font-size:13px;color:#64748b;">New Applications</div></div>' +
+        '<div><span style="font-size:28px;font-weight:700;color:#f59e0b;">' + (stats.new_orgs_7d || 0) + '</span><div style="font-size:13px;color:#64748b;">New Organizations</div></div>' +
+        '</div>' +
+        '</div></div>' +
+
+        // Recent Users Table
+        '<div style="margin-bottom:32px;">' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDC65 Recent Users</h2>' +
+        '<div id="admin-recent-users">' + renderLoadingTable() + '</div>' +
+        '</div>' +
+
+        // System Info
+        '<div class="card" style="margin-bottom:32px;"><div class="card-body">' +
+        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\u2699\uFE0F System Information</h3>' +
+        '<div style="display:grid;grid-template-columns:auto 1fr;gap:8px 24px;font-size:14px;">' +
+        '<strong>AI Service:</strong><span>' + (stats.ai_enabled ? '\u2705 Enabled (Claude AI)' : '\u274C Not configured') + '</span>' +
+        '<strong>Database:</strong><span>' + esc(stats.environment === 'production' ? 'PostgreSQL' : 'SQLite') + '</span>' +
+        '<strong>Total Reviews:</strong><span>' + (stats.total_reviews || 0) + '</span>' +
+        '<strong>Total Assessments:</strong><span>' + (stats.total_assessments || 0) + '</span>' +
+        '</div>' +
+        '</div></div>' +
+
+        // Quick Actions
+        '<div style="margin-bottom:32px;">' +
+        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\u26A1 Quick Actions</h2>' +
+        '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
+        '<button class="btn btn-primary" onclick="nav(\'orgsearch\')">\uD83D\uDD0D Search Organizations</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'grants\')">\uD83D\uDCB0 View All Grants</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'applications\')">\uD83D\uDCCB View Applications</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'compliance\')">\uD83D\uDEE1\uFE0F Compliance Checks</button>' +
+        '<button class="btn btn-secondary" onclick="nav(\'verification\')">\u2705 Registration Checks</button>' +
+        '</div>' +
+        '</div>';
+}
+
+function renderAdminRoleBreakdown(byRole) {
+    var roles = ['ngo', 'donor', 'reviewer', 'admin'];
+    var colors = { ngo: '#2d8f6f', donor: '#3b82f6', reviewer: '#f59e0b', admin: '#ef4444' };
+    var labels = { ngo: 'NGO', donor: 'Donor', reviewer: 'Reviewer', admin: 'Admin' };
+    var total = roles.reduce(function(acc, r) { return acc + (byRole[r] || 0); }, 0) || 1;
+    return roles.map(function(r) {
+        var count = byRole[r] || 0;
+        var pct = Math.round((count / total) * 100);
+        return '<div style="display:flex;align-items:center;gap:12px;margin:8px 0;">' +
+            '<div style="width:80px;font-size:13px;font-weight:600;">' + labels[r] + '</div>' +
+            '<div style="flex:1;height:22px;background:#f1f5f9;border-radius:6px;overflow:hidden;">' +
+            '<div style="height:100%;width:' + pct + '%;background:' + colors[r] + ';border-radius:6px;transition:width 0.5s;"></div>' +
+            '</div>' +
+            '<div style="min-width:50px;font-size:13px;text-align:right;">' + count + ' (' + pct + '%)</div>' +
+            '</div>';
+    }).join('');
+}
+
+function renderAdminOrgBreakdown(byType) {
+    var types = ['ngo', 'donor', 'ingo', 'cbo', 'network'];
+    var labels = { ngo: 'NGO', donor: 'Donor', ingo: 'INGO', cbo: 'CBO', network: 'Network' };
+    var colors = { ngo: '#2d8f6f', donor: '#3b82f6', ingo: '#8b5cf6', cbo: '#f59e0b', network: '#06b6d4' };
+    var total = types.reduce(function(acc, t) { return acc + (byType[t] || 0); }, 0) || 1;
+    return types.map(function(t) {
+        var count = byType[t] || 0;
+        var pct = Math.round((count / total) * 100);
+        return '<div style="display:flex;align-items:center;gap:12px;margin:8px 0;">' +
+            '<div style="width:80px;font-size:13px;font-weight:600;">' + labels[t] + '</div>' +
+            '<div style="flex:1;height:22px;background:#f1f5f9;border-radius:6px;overflow:hidden;">' +
+            '<div style="height:100%;width:' + pct + '%;background:' + colors[t] + ';border-radius:6px;transition:width 0.5s;"></div>' +
+            '</div>' +
+            '<div style="min-width:50px;font-size:13px;text-align:right;">' + count + ' (' + pct + '%)</div>' +
+            '</div>';
+    }).join('');
+}
+
+function renderAdminStatusBreakdown(byStatus) {
+    var statuses = ['draft', 'submitted', 'under_review', 'scored', 'approved', 'rejected'];
+    var labels = { draft: 'Draft', submitted: 'Submitted', under_review: 'Under Review',
+                   scored: 'Scored', approved: 'Approved', rejected: 'Rejected' };
+    var colors = { draft: '#94a3b8', submitted: '#3b82f6', under_review: '#f59e0b',
+                   scored: '#8b5cf6', approved: '#2d8f6f', rejected: '#ef4444' };
+    return '<div style="display:flex;gap:16px;flex-wrap:wrap;">' +
+        statuses.map(function(s) {
+            var count = byStatus[s] || 0;
+            return '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid ' + colors[s] + ';">' +
+                '<div style="font-size:24px;font-weight:700;color:' + colors[s] + ';">' + count + '</div>' +
+                '<div style="font-size:12px;color:#64748b;margin-top:2px;">' + labels[s] + '</div>' +
+                '</div>';
+        }).join('') +
+        '</div>';
+}
+
+async function loadAdminStats() {
+    if (S._adminLoading) return;
+    S._adminLoading = true;
+    var res = await api('GET', '/api/admin/stats');
+    S._adminLoading = false;
+    if (!res || !res.stats) return;
+    S.adminStats = res.stats;
+    var stats = S.adminStats;
+
+    // Refresh stat cards
+    var sc = document.getElementById('admin-stat-cards');
+    if (sc) {
+        sc.innerHTML =
+            renderStatCard('\uD83D\uDC65', 'Total Users', stats.total_users || 0, 'blue') +
+            renderStatCard('\uD83C\uDFE2', 'Organizations', stats.total_organizations || 0, 'green') +
+            renderStatCard('\u2705', 'Verified Orgs', stats.verified_organizations || 0, 'green') +
+            renderStatCard('\uD83D\uDCB0', 'Total Grants', stats.total_grants || 0, 'amber') +
+            renderStatCard('\uD83D\uDCCB', 'Applications', stats.total_applications || 0, 'blue') +
+            renderStatCard('\u26A0\uFE0F', 'Flagged Checks', stats.flagged_compliance || 0, 'red');
+    }
+
+    // Refresh breakdowns
+    var ur = document.getElementById('admin-users-by-role');
+    if (ur) ur.innerHTML = renderAdminRoleBreakdown(stats.users_by_role || {});
+    var ob = document.getElementById('admin-orgs-by-type');
+    if (ob) ob.innerHTML = renderAdminOrgBreakdown(stats.orgs_by_type || {});
+    var as2 = document.getElementById('admin-apps-by-status');
+    if (as2) as2.innerHTML = renderAdminStatusBreakdown(stats.apps_by_status || {});
+
+    // Recent users table
+    var ru = document.getElementById('admin-recent-users');
+    if (ru && stats.recent_users) {
+        var html = '<div class="card"><table class="data-table" style="width:100%;">' +
+            '<thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th></tr></thead><tbody>';
+        stats.recent_users.forEach(function(u) {
+            html += '<tr>' +
+                '<td>' + esc(u.name) + '</td>' +
+                '<td>' + esc(u.email) + '</td>' +
+                '<td><span class="badge badge-' + (u.role === 'admin' ? 'red' : u.role === 'donor' ? 'blue' : u.role === 'reviewer' ? 'amber' : 'green') + '">' +
+                esc(u.role.toUpperCase()) + '</span></td>' +
+                '<td>' + (u.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Inactive</span>') + '</td>' +
+                '<td style="font-size:13px;color:#64748b;">' + (u.created_at ? new Date(u.created_at).toLocaleDateString() : '--') + '</td>' +
+                '</tr>';
+        });
+        html += '</tbody></table></div>';
+        ru.innerHTML = html;
+    }
+}
+
 
 // =============================================================================
 // 14. Dashboard Data Loading
@@ -1853,14 +2054,20 @@ function renderAIAnalysis(analysis) {
         }
     }
 
+    var aiSource = analysis.source || 'ai';
+    var transparencyBadge = aiSource === 'claude'
+        ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#7c3aed;background:#f5f3ff;padding:2px 8px;border-radius:10px;margin-left:8px;">\uD83E\uDD16 Claude AI</span>'
+        : '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#0369a1;background:#f0f9ff;padding:2px 8px;border-radius:10px;margin-left:8px;">\u2699\uFE0F Rule-based</span>';
+
     return '<div class="analysis-result ' + cls + '" style="margin-top:12px;">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
-        '<strong>\u2728 AI Document Analysis</strong>' +
+        '<div><strong>\u2728 AI Document Analysis</strong>' + transparencyBadge + '</div>' +
         '<span class="badge badge-' + (cls === 'pass' ? 'green' : cls === 'warning' ? 'amber' : 'red') + '">' +
         'Score: ' + score + '%</span>' +
         '</div>' +
         (analysis.summary ? '<div style="margin-top:4px;font-size:13px;color:#334155;">' + esc(analysis.summary) + '</div>' : '') +
         findingsHTML + recsHTML + reqScoresHTML +
+        '<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.06);font-size:11px;color:#94a3b8;font-style:italic;">AI-generated analysis \u2014 verify important details against original documents.</div>' +
         '</div>';
 }
 
@@ -4833,8 +5040,10 @@ async function loadOrgVerificationStatus() {
 
 function renderAIPanel() {
     var messagesHTML = S.aiMessages.map(function(m) {
+        var sourceTag = (m.role === 'assistant' && m.source) ?
+            '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">' + esc(m.source) + '</div>' : '';
         return '<div class="ai-bubble ' + (m.role === 'user' ? 'user' : 'assistant') + '">' +
-            esc(m.content) + '</div>';
+            esc(m.content) + sourceTag + '</div>';
     }).join('');
 
     if (S.aiLoading) {
@@ -4885,7 +5094,9 @@ async function sendAIMessage() {
     var res = await api('POST', '/api/ai/chat', { message: text, context: context });
     S.aiLoading = false;
     if (res) {
-        S.aiMessages.push({ role: 'assistant', content: res.response || res.message || 'I\'m here to help!' });
+        var source = res.source || 'unknown';
+        var sourceLabel = source === 'claude' ? '\uD83E\uDD16 Claude AI' : '\u2699\uFE0F Rule-based';
+        S.aiMessages.push({ role: 'assistant', content: res.response || res.message || 'I\'m here to help!', source: sourceLabel });
     } else {
         S.aiMessages.push({ role: 'assistant', content: 'Sorry, I encountered an issue. Please try again.' });
     }
