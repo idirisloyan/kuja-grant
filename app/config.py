@@ -44,12 +44,11 @@ class ProductionConfig(BaseConfig):
         'pool_timeout': 30,
     }
 
-    @property
-    def SQLALCHEMY_DATABASE_URI(self):
-        url = os.getenv('DATABASE_URL', '')
-        if url.startswith('postgres://'):
-            url = url.replace('postgres://', 'postgresql://', 1)
-        return url
+    # Fix postgres:// → postgresql:// for Railway PostgreSQL URLs
+    _db_url = os.getenv('DATABASE_URL', '')
+    if _db_url.startswith('postgres://'):
+        _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+    SQLALCHEMY_DATABASE_URI = _db_url
 
 
 class TestConfig(BaseConfig):
