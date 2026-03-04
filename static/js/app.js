@@ -451,6 +451,31 @@ async function api(method, url, data) {
 }
 
 // =============================================================================
+// 3b. Telemetry - fire-and-forget, never blocks UI
+// =============================================================================
+
+var _telemetryCorrelation = null;
+function telemetry(event, data) {
+    if (!S.user) return;
+    try {
+        fetch('/api/telemetry', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                event: event,
+                data: data || {},
+                correlation_id: _telemetryCorrelation || '',
+                timestamp: new Date().toISOString()
+            })
+        }).catch(function() {}); // silent fail
+    } catch(e) {}
+}
+function newTelemetrySession() {
+    _telemetryCorrelation = 'wiz_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+    return _telemetryCorrelation;
+}
+
+// =============================================================================
 // 4. Toast Notifications
 // =============================================================================
 
@@ -1752,6 +1777,7 @@ async function editGrant(id) {
     if (res) {
         var g = res.grant || res;
         S.createStep = 1;
+        newTelemetrySession();
         S.createData = {
             id: g.id,
             title: g.title || '',
@@ -2206,6 +2232,7 @@ async function saveDraft() {
 async function submitApplication() {
     var g = S.selectedGrant;
     if (!g) return;
+    telemetry('submit_started', { grant_id: g.id });
     var data = {
         grant_id: g.id,
         responses: S.applyResponses,
@@ -2215,16 +2242,77 @@ async function submitApplication() {
     if (res) {
         var appId = res.id || (res.application && res.application.id);
         if (appId) {
-            var submitRes = await api('POST', '/api/applications/' + appId + '/submit');
-            if (submitRes) {
-                showToast('Application submitted successfully!', 'success');
-                nav('applications');
+            // Use raw fetch for submit so we can capture structured errors
+            try {
+                var submitResp = await fetch('/api/applications/' + appId + '/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                var submitData = await submitResp.json();
+                if (submitResp.ok && submitData.success) {
+                    telemetry('submit_succeeded', { grant_id: g.id, app_id: appId });
+                    showToast('Application submitted successfully!', 'success');
+                    nav('applications');
+                    return;
+                }
+                // Handle structured submit error
+                if (submitData.missing_criteria && submitData.missing_criteria.length > 0) {
+                    telemetry('submit_failed', { grant_id: g.id, reason: 'missing_criteria', count: submitData.missing_criteria.length });
+                    highlightMissingCriteria(g, submitData.missing_criteria);
+                    return;
+                }
+                telemetry('submit_failed', { grant_id: g.id, reason: submitData.error });
+                showToast(submitData.error || 'Submission failed', 'error');
+                return;
+            } catch (e) {
+                telemetry('submit_failed', { grant_id: g.id, reason: 'network_error' });
+                showToast('Network error during submission', 'error');
                 return;
             }
         }
         showToast('Application created. Please review and submit.', 'info');
         nav('applications');
+    } else {
+        telemetry('submit_failed', { grant_id: g.id, reason: 'draft_creation_failed' });
     }
+}
+
+function highlightMissingCriteria(grant, missingLabels) {
+    // Navigate to the proposal step to show the missing fields
+    S.applyStep = 2; // Proposal/criteria step
+    render();
+
+    // Wait for DOM to render, then highlight missing fields
+    setTimeout(function() {
+        var criteria = grant.criteria || [];
+        var missingSet = {};
+        missingLabels.forEach(function(label) { missingSet[label] = true; });
+
+        var firstMissing = null;
+        criteria.forEach(function(c, i) {
+            var label = c.label || c.name || ('Criterion ' + (i + 1));
+            var textarea = document.getElementById('apply-textarea-' + i);
+            if (textarea && missingSet[label]) {
+                textarea.style.border = '2px solid #ef4444';
+                textarea.style.background = '#fef2f2';
+                textarea.placeholder = 'Required - please provide your response for: ' + label;
+                if (!firstMissing) firstMissing = textarea;
+                // Add error label above textarea
+                var errDiv = document.createElement('div');
+                errDiv.className = 'criterion-error-label';
+                errDiv.style.cssText = 'color:#dc2626;font-size:12px;font-weight:600;margin-bottom:4px;';
+                errDiv.textContent = '\u26A0 Required response missing';
+                textarea.parentNode.insertBefore(errDiv, textarea);
+            }
+        });
+
+        if (firstMissing) {
+            firstMissing.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            firstMissing.focus();
+        }
+
+        showToast('Please fill in the highlighted required fields (' + missingLabels.length + ' missing)', 'error');
+    }, 200);
 }
 
 // =============================================================================
@@ -2414,6 +2502,9 @@ function renderAppReviews(a) {
 
 function renderCreateGrant() {
     var step = S.createStep;
+    if (step === 1 && !_telemetryCorrelation) newTelemetrySession();
+    var stepNames = ['', 'basic_info', 'eligibility', 'criteria', 'documents', 'reporting', 'review'];
+    telemetry('wizard_step_enter', { step: step, step_name: stepNames[step] || 'unknown' });
     var steps = [
         { num: 1, label: 'Basic Info' },
         { num: 2, label: 'Eligibility' },
@@ -2836,9 +2927,9 @@ function renderCreateReporting() {
         '<p style="font-weight:600;margin-bottom:8px;">' + (d.grant_document ? '\u2705 Grant Document Uploaded' : '\uD83D\uDCC4 Upload Grant Document') + '</p>' +
         (d.grant_document && d._docOriginalName ? '<p style="font-size:12px;color:#2d8f6f;margin-bottom:4px;"><strong>' + esc(d._docOriginalName) + '</strong>' +
             (d._docUploadTime ? ' — uploaded at ' + esc(d._docUploadTime) : '') + '</p>' : '') +
-        (d._extractionStatus === 'success' ? '<div style="background:#dcfce7;color:#166534;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px;">\u2705 AI extracted <strong>' + (d._extractedCount || 0) + '</strong> reporting requirements</div>' :
-         d._extractionStatus === 'empty' ? '<div style="background:#fef9c3;color:#854d0e;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px;">\u26A0\uFE0F Document uploaded but no requirements extracted. Add manually below or try a different file.</div>' :
-         d._extractionStatus === 'failed' ? '<div style="background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px;">\u274C Extraction failed. Please try again or add requirements manually.</div>' : '') +
+        (d._extractionStatus === 'success' ? '<div style="background:#dcfce7;color:#166534;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:500;margin-bottom:10px;border:1px solid #86efac;">\u2705 AI extracted <strong>' + (d._extractedCount || 0) + '</strong> reporting requirements' + (d._docUploadTime ? ' <span style="font-size:12px;color:#15803d;font-weight:400;margin-left:8px;">at ' + esc(d._docUploadTime) + '</span>' : '') + '</div>' :
+         d._extractionStatus === 'empty' ? '<div style="background:#fef9c3;color:#854d0e;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:500;margin-bottom:10px;border:1px solid #fde68a;">\u26A0\uFE0F Document uploaded but no requirements extracted. Add manually below or try a different file.' + (d._docUploadTime ? ' <span style="font-size:12px;font-weight:400;margin-left:8px;">(' + esc(d._docUploadTime) + ')</span>' : '') + '</div>' :
+         d._extractionStatus === 'failed' ? '<div style="background:#fee2e2;color:#991b1b;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:500;margin-bottom:10px;border:1px solid #fca5a5;">\u274C Extraction failed. Please try again or add requirements manually.' + (d._docUploadTime ? ' <span style="font-size:12px;font-weight:400;margin-left:8px;">(' + esc(d._docUploadTime) + ')</span>' : '') + '</div>' : '') +
         '<p style="font-size:13px;color:#64748b;margin-bottom:12px;">Upload the grant agreement/document and AI will analyze it to extract reporting requirements</p>' +
         '<input type="file" id="grant-doc-upload" style="display:none;" accept=".pdf,.doc,.docx,.txt" onchange="uploadGrantDoc()">' +
         '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\'grant-doc-upload\').click();">' +
@@ -2930,9 +3021,11 @@ async function uploadGrantDoc() {
     var input = document.getElementById('grant-doc-upload');
     if (!input || !input.files.length) return;
 
+    var file = input.files[0];
     var formData = new FormData();
-    formData.append('file', input.files[0]);
+    formData.append('file', file);
 
+    telemetry('upload_started', { filename: file.name, size: file.size });
     S._extractingReqs = true;
     render();
 
@@ -3003,9 +3096,11 @@ async function uploadGrantDoc() {
         } else {
             showToast('Document uploaded but no requirements could be extracted. You can add them manually below.', 'warning');
         }
+        telemetry('upload_completed', { filename: file.name, extracted: S.createData._extractionStatus === 'success', req_count: (S.createData._extractedCount || 0) });
     } else {
         S.createData._extractionStatus = 'failed';
         showToast('Failed to upload grant document', 'error');
+        telemetry('extraction_failed', { filename: file.name });
     }
     render();
 }

@@ -5171,6 +5171,48 @@ def api_ready():
     }), status_code
 
 
+TELEMETRY_VALID_EVENTS = frozenset([
+    'wizard_step_enter', 'upload_started', 'upload_completed',
+    'extraction_applied', 'extraction_failed', 'submit_started',
+    'submit_succeeded', 'submit_failed', 'application_created',
+])
+
+# Simple per-user telemetry rate limiter: max 100 events per minute
+_telemetry_buckets = {}   # user_id -> (window_start, count)
+_telemetry_lock = Lock()
+
+@app.route('/api/telemetry', methods=['POST'])
+@login_required
+def api_telemetry():
+    """Lightweight telemetry endpoint — logs client events, no DB writes."""
+    uid = current_user.id
+
+    # Rate limit: 100 events / 60 s per user
+    now = time.time()
+    with _telemetry_lock:
+        bucket = _telemetry_buckets.get(uid, (now, 0))
+        if now - bucket[0] > 60:
+            bucket = (now, 0)
+        if bucket[1] >= 100:
+            return jsonify({'success': False, 'error': 'rate_limited'}), 429
+        _telemetry_buckets[uid] = (bucket[0], bucket[1] + 1)
+
+    body = request.get_json(silent=True) or {}
+    event = body.get('event', '')
+    if event not in TELEMETRY_VALID_EVENTS:
+        return jsonify({'success': False, 'error': 'invalid_event'}), 400
+
+    data = body.get('data', {})
+    correlation_id = body.get('correlation_id', '')
+    ts = body.get('timestamp', '')
+
+    logger.info(
+        f"TELEMETRY uid={uid} event={event} corr={correlation_id} "
+        f"ts={ts} data={data}"
+    )
+    return jsonify({'success': True})
+
+
 @app.route('/api/admin/stats', methods=['GET'])
 @login_required
 def api_admin_stats():
