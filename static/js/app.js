@@ -2530,12 +2530,14 @@ function renderCreateGrant() {
         '<div class="wizard-content">' + stepContent + '</div>' +
 
         '<div class="wizard-actions">' +
-        (step > 1 ? '<button class="btn btn-secondary" onclick="S.createStep--;render();">\u2190 Previous</button>' : '<div></div>') +
+        (S._extractingReqs ? '<div style="color:#6366f1;font-size:13px;font-weight:500;">AI analyzing document\u2026 Please wait.</div>' :
+        (step > 1 ? '<button class="btn btn-secondary" onclick="S.createStep--;render();">\u2190 Previous</button>' : '<div></div>')) +
         '<div style="display:flex;gap:8px;">' +
+        (S._extractingReqs ? '' :
         (step === 6 ?
             '<button class="btn btn-secondary" onclick="saveGrantDraft()">Save as Draft</button>' +
             '<button class="btn btn-primary btn-lg" onclick="publishGrant()">\uD83D\uDE80 Publish Grant</button>' :
-            '<button class="btn btn-primary" onclick="' + (step === 5 ? 'S.createStep=6;render();' : 'S.createStep++;render();') + '">Next \u2192</button>') +
+            '<button class="btn btn-primary" onclick="' + (step === 5 ? 'S.createStep=6;render();' : 'S.createStep++;render();') + '">Next \u2192</button>')) +
         '</div>' +
         '</div>';
 }
@@ -2927,14 +2929,36 @@ function renderCreateReporting() {
         '<p style="font-weight:600;margin-bottom:8px;">' + (d.grant_document ? '\u2705 Grant Document Uploaded' : '\uD83D\uDCC4 Upload Grant Document') + '</p>' +
         (d.grant_document && d._docOriginalName ? '<p style="font-size:12px;color:#2d8f6f;margin-bottom:4px;"><strong>' + esc(d._docOriginalName) + '</strong>' +
             (d._docUploadTime ? ' — uploaded at ' + esc(d._docUploadTime) : '') + '</p>' : '') +
-        (d._extractionStatus === 'success' ? '<div style="background:#dcfce7;color:#166534;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:500;margin-bottom:10px;border:1px solid #86efac;">\u2705 AI extracted <strong>' + (d._extractedCount || 0) + '</strong> reporting requirements' + (d._docUploadTime ? ' <span style="font-size:12px;color:#15803d;font-weight:400;margin-left:8px;">at ' + esc(d._docUploadTime) + '</span>' : '') + '</div>' :
-         d._extractionStatus === 'empty' ? '<div style="background:#fef9c3;color:#854d0e;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:500;margin-bottom:10px;border:1px solid #fde68a;">\u26A0\uFE0F Document uploaded but no requirements extracted. Add manually below or try a different file.' + (d._docUploadTime ? ' <span style="font-size:12px;font-weight:400;margin-left:8px;">(' + esc(d._docUploadTime) + ')</span>' : '') + '</div>' :
-         d._extractionStatus === 'failed' ? '<div style="background:#fee2e2;color:#991b1b;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:500;margin-bottom:10px;border:1px solid #fca5a5;">\u274C Extraction failed. Please try again or add requirements manually.' + (d._docUploadTime ? ' <span style="font-size:12px;font-weight:400;margin-left:8px;">(' + esc(d._docUploadTime) + ')</span>' : '') + '</div>' : '') +
-        '<p style="font-size:13px;color:#64748b;margin-bottom:12px;">Upload the grant agreement/document and AI will analyze it to extract reporting requirements</p>' +
+        (d._extractionStatus === 'success' ? '<div id="extraction-result" style="background:#dcfce7;color:#166534;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #22c55e;box-shadow:0 2px 8px rgba(34,197,94,0.15);">' +
+            '<div style="font-size:16px;margin-bottom:4px;">\u2705 AI Extraction Complete</div>' +
+            '<div>Extracted <strong>' + (d._extractedCount || 0) + '</strong> reporting requirements' +
+            (d.report_template && d.report_template.template_sections ? ', <strong>' + d.report_template.template_sections.length + '</strong> template sections' : '') +
+            (d.report_template && d.report_template.indicators ? ', <strong>' + d.report_template.indicators.length + '</strong> indicators' : '') +
+            '</div>' +
+            (d._docUploadTime ? '<div style="font-size:12px;color:#15803d;font-weight:400;margin-top:4px;">Processed at ' + esc(d._docUploadTime) + '</div>' : '') +
+            '</div>' :
+         d._extractionStatus === 'empty' ? '<div id="extraction-result" style="background:#fef9c3;color:#854d0e;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #f59e0b;box-shadow:0 2px 8px rgba(245,158,11,0.12);">' +
+            '<div style="font-size:16px;margin-bottom:4px;">\u26A0\uFE0F Document Uploaded - No Requirements Found</div>' +
+            '<div>The document was uploaded but AI could not extract specific reporting requirements. Add them manually below or try a different file.</div>' +
+            (d._docUploadTime ? '<div style="font-size:12px;font-weight:400;margin-top:4px;">Attempted at ' + esc(d._docUploadTime) + '</div>' : '') +
+            '<button class="btn btn-sm" style="margin-top:8px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 Retry with Different File</button>' +
+            '</div>' :
+         d._extractionStatus === 'failed' ? '<div id="extraction-result" style="background:#fee2e2;color:#991b1b;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #ef4444;box-shadow:0 2px 8px rgba(239,68,68,0.12);">' +
+            '<div style="font-size:16px;margin-bottom:4px;">\u274C Extraction Failed</div>' +
+            '<div>Something went wrong during AI analysis. Please try again or add requirements manually below.</div>' +
+            (d._docUploadTime ? '<div style="font-size:12px;font-weight:400;margin-top:4px;">Failed at ' + esc(d._docUploadTime) + '</div>' : '') +
+            '<button class="btn btn-sm" style="margin-top:8px;background:#fee2e2;border:1px solid #ef4444;color:#991b1b;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 Retry Upload</button>' +
+            '</div>' : '') +
+        (d._extractionStatus ? '' : '<p style="font-size:13px;color:#64748b;margin-bottom:12px;">Upload the grant agreement/document and AI will analyze it to extract reporting requirements</p>') +
         '<input type="file" id="grant-doc-upload" style="display:none;" accept=".pdf,.doc,.docx,.txt" onchange="uploadGrantDoc()">' +
-        '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\'grant-doc-upload\').click();">' +
-        (d.grant_document ? 'Replace Document' : 'Choose File') + '</button>' +
-        (S._extractingReqs ? '<div class="ai-analyzing" style="margin-top:12px;"><div class="dot-pulse"><span></span><span></span><span></span></div><span>AI analyzing document...</span></div>' : '') +
+        (!d._extractionStatus ? '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\'grant-doc-upload\').click();">' +
+            (d.grant_document ? 'Replace Document' : 'Choose File') + '</button>' : '') +
+        (d._extractionStatus === 'success' ? '<button class="btn btn-sm" style="margin-top:8px;background:#f0fdf4;border:1px solid #86efac;color:#166534;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 Upload Different Document</button>' : '') +
+        (S._extractingReqs ? '<div class="ai-analyzing" style="margin-top:16px;padding:16px;background:#eff6ff;border-radius:10px;border:2px solid #93c5fd;text-align:center;">' +
+            '<div class="dot-pulse" style="margin-bottom:8px;"><span></span><span></span><span></span></div>' +
+            '<div style="font-size:14px;font-weight:600;color:#1e40af;">AI is analyzing your document\u2026</div>' +
+            '<div style="font-size:12px;color:#3b82f6;margin-top:4px;">This may take 15\u201330 seconds. Please do not navigate away.</div>' +
+            '</div>' : '') +
         '</div>' +
 
         // Reporting frequency
@@ -3051,44 +3075,53 @@ async function uploadGrantDoc() {
             S.createData.id = grantId;
         } else {
             S._extractingReqs = false;
-            showToast('Failed to save grant draft', 'error');
+            S.createData._extractionStatus = 'failed';
+            S.createData._docUploadTime = new Date().toLocaleTimeString();
+            showToast('Failed to save grant draft before upload', 'error');
+            telemetry('extraction_failed', { filename: file.name, reason: 'draft_save_failed' });
             render();
             return;
         }
     }
 
-    var res = await api('POST', '/api/grants/' + grantId + '/upload-grant-doc', formData);
+    var res = null;
+    try {
+        res = await api('POST', '/api/grants/' + grantId + '/upload-grant-doc', formData);
+    } catch (uploadErr) {
+        // Catch any unexpected errors from the upload
+    }
     S._extractingReqs = false;
 
     if (res && res.success) {
-        S.createData.grant_document = res.grant_document;
-        S.createData._docOriginalName = res.original_filename || 'Document';
+        S.createData.grant_document = res.grant_document || S.createData.grant_document;
+        S.createData._docOriginalName = res.original_filename || file.name || 'Document';
         S.createData._docUploadTime = new Date().toLocaleTimeString();
 
-        if (res.extracted_requirements) {
-            var ext = res.extracted_requirements;
-            // Normalize alternative key names
-            var reqs = ext.requirements || ext.reporting_requirements || [];
-            if (reqs.length) {
-                S.createData.reporting_requirements = reqs;
-                S.createData._extractionStatus = 'success';
-                S.createData._extractedCount = reqs.length;
-            } else {
-                S.createData._extractionStatus = 'empty';
-            }
-            if (ext.reporting_frequency) {
-                S.createData.reporting_frequency = ext.reporting_frequency;
-            }
-            var sections = ext.template_sections || [];
-            var indicators = ext.indicators || [];
-            if (sections.length || indicators.length) {
-                S.createData.report_template = {
-                    template_sections: sections,
-                    indicators: indicators
-                };
-            }
+        // Robustly extract requirements from any response shape
+        var ext = res.extracted_requirements || {};
+        if (typeof ext !== 'object') ext = {};
+        var reqs = ext.requirements || ext.reporting_requirements || [];
+        if (!Array.isArray(reqs)) reqs = [];
+
+        if (reqs.length > 0) {
+            S.createData.reporting_requirements = reqs;
+            S.createData._extractionStatus = 'success';
+            S.createData._extractedCount = reqs.length;
         } else {
             S.createData._extractionStatus = 'empty';
+            S.createData._extractedCount = 0;
+        }
+
+        if (ext.reporting_frequency) {
+            S.createData.reporting_frequency = ext.reporting_frequency;
+        }
+        var sections = Array.isArray(ext.template_sections) ? ext.template_sections : [];
+        var indicators = Array.isArray(ext.indicators) ? ext.indicators : [];
+        if (sections.length || indicators.length) {
+            S.createData.report_template = {
+                template_sections: sections,
+                indicators: indicators
+            };
         }
 
         if (S.createData._extractionStatus === 'success') {
@@ -3099,9 +3132,14 @@ async function uploadGrantDoc() {
         telemetry('upload_completed', { filename: file.name, extracted: S.createData._extractionStatus === 'success', req_count: (S.createData._extractedCount || 0) });
     } else {
         S.createData._extractionStatus = 'failed';
-        showToast('Failed to upload grant document', 'error');
+        S.createData._extractedCount = 0;
+        S.createData._docUploadTime = new Date().toLocaleTimeString();
+        showToast('Failed to upload grant document. Please try again.', 'error');
         telemetry('extraction_failed', { filename: file.name });
     }
+
+    // Force wizard back to Reporting step so extraction status is always visible
+    S.createStep = 5;
     render();
 }
 
