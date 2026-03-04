@@ -10,7 +10,7 @@
 const S = {
     page: 'login',
     user: null,
-    token: localStorage.getItem('kuja_token') || null,
+    // token field removed - app uses Flask-Login cookie sessions, not JWT
     sidebarCollapsed: false,
     aiPanelOpen: false,
     aiMessages: [],
@@ -409,6 +409,18 @@ function debounce(fn, delay) {
     };
 }
 
+function renderMarkdown(text) {
+    if (!text) return '';
+    return esc(text)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^(\d+)\.\s+(.+)$/gm, '<li>$2</li>')
+        .replace(/^[\-\*]\s+(.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
+}
+
 // =============================================================================
 // 3. API Helper
 // =============================================================================
@@ -418,9 +430,8 @@ async function api(method, url, data) {
         method: method,
         headers: {}
     };
-    if (S.token) {
-        opts.headers['Authorization'] = 'Bearer ' + S.token;
-    }
+    // CSRF protection: always send X-Requested-With header
+    opts.headers['X-Requested-With'] = 'XMLHttpRequest';
     if (data && !(data instanceof FormData)) {
         opts.headers['Content-Type'] = 'application/json';
         opts.body = JSON.stringify(data);
@@ -432,9 +443,6 @@ async function api(method, url, data) {
         var json = await resp.json();
         if (resp.status === 401) {
             S.user = null;
-            S.token = null;
-            localStorage.removeItem('kuja_token');
-            localStorage.removeItem('kuja_user');
             nav('login');
             showToast('Session expired. Please log in again.', 'error');
             return null;
@@ -460,7 +468,7 @@ function telemetry(event, data) {
     try {
         fetch('/api/telemetry', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             body: JSON.stringify({
                 event: event,
                 data: data || {},
@@ -648,11 +656,6 @@ async function doLogin() {
     var res = await api('POST', '/api/auth/login', { email: email, password: pass });
     if (res && res.success) {
         S.user = res.user;
-        S.token = res.token || S.token;
-        if (res.token) {
-            localStorage.setItem('kuja_token', res.token);
-        }
-        localStorage.setItem('kuja_user', JSON.stringify(res.user));
         showToast('Welcome back, ' + (res.user.name || 'User') + '!', 'success');
         nav('dashboard');
     } else {
@@ -795,9 +798,6 @@ function toggleAI() {
 async function doLogout() {
     await api('POST', '/api/auth/logout');
     S.user = null;
-    S.token = null;
-    localStorage.removeItem('kuja_token');
-    localStorage.removeItem('kuja_user');
     showToast('You have been logged out.', 'info');
     nav('login');
 }
@@ -1959,7 +1959,15 @@ function updateWordCount(idx, maxWords) {
     el.querySelector('span').style.color = qi.color;
 }
 
-async function getAIGuidance(idx, fieldName) {
+var _guidanceTimer = null;
+function getAIGuidance(idx, fieldName) {
+    clearTimeout(_guidanceTimer);
+    _guidanceTimer = setTimeout(function() {
+        _getAIGuidanceImpl(idx, fieldName);
+    }, 1500);
+}
+
+async function _getAIGuidanceImpl(idx, fieldName) {
     var key = 'criterion_' + idx;
     var text = S.applyResponses[key] || '';
     var g = S.selectedGrant;
@@ -1980,7 +1988,7 @@ async function getAIGuidance(idx, fieldName) {
         el.innerHTML = '<div style="background:#eff6ff;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;border-left:3px solid #3b82f6;">' +
             '<strong style="color:#1e40af;">\u2728 AI Guidance</strong>' +
             (res.quality_score != null ? ' <span class="badge badge-blue">Quality: ' + res.quality_score + '%</span>' : '') +
-            '<p style="margin-top:8px;color:#475569;white-space:pre-wrap;">' + esc(res.guidance || res.response || 'No guidance available.') + '</p>' +
+            '<div style="margin-top:8px;color:#475569;">' + renderMarkdown(res.guidance || res.response || 'No guidance available.') + '</div>' +
             '</div>';
     } else {
         el.innerHTML = '<div style="background:#fef2f2;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;color:#991b1b;">' +
@@ -2785,7 +2793,7 @@ async function suggestCriteria() {
         context: { page: 'create_grant', grant_data: S.createData }
     });
     if (res && res.response) {
-        showModal('AI Suggested Criteria', '<div style="white-space:pre-wrap;font-size:14px;">' + esc(res.response) + '</div>', [
+        showModal('AI Suggested Criteria', '<div style="font-size:14px;">' + renderMarkdown(res.response) + '</div>', [
             { label: 'Close', onclick: 'closeModal()', cls: 'btn-secondary' }
         ]);
     }
@@ -5200,8 +5208,9 @@ function renderAIPanel() {
     var messagesHTML = S.aiMessages.map(function(m) {
         var sourceTag = (m.role === 'assistant' && m.source) ?
             '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">' + esc(m.source) + '</div>' : '';
+        var content = m.role === 'assistant' ? renderMarkdown(m.content) : esc(m.content);
         return '<div class="ai-bubble ' + (m.role === 'user' ? 'user' : 'assistant') + '">' +
-            esc(m.content) + sourceTag + '</div>';
+            content + sourceTag + '</div>';
     }).join('');
 
     if (S.aiLoading) {
@@ -5266,8 +5275,9 @@ function refreshAIPanel() {
     if (!container) return;
 
     var messagesHTML = S.aiMessages.map(function(m) {
+        var content = m.role === 'assistant' ? renderMarkdown(m.content) : esc(m.content);
         return '<div class="ai-bubble ' + (m.role === 'user' ? 'user' : 'assistant') + '">' +
-            esc(m.content) + '</div>';
+            content + '</div>';
     }).join('');
 
     if (S.aiLoading) {
@@ -5316,29 +5326,18 @@ function refreshAIPanel() {
         '}';
     document.head.appendChild(styleEl);
 
-    // Check for saved session
-    var savedUser = localStorage.getItem('kuja_user');
-    if (savedUser && S.token) {
-        try {
-            S.user = JSON.parse(savedUser);
-            // Validate with server
-            var res = await api('GET', '/api/auth/me');
-            if (res && res.user) {
-                S.user = res.user;
-                localStorage.setItem('kuja_user', JSON.stringify(res.user));
-                S.page = 'dashboard';
-            } else {
-                S.user = null;
-                S.token = null;
-                localStorage.removeItem('kuja_token');
-                localStorage.removeItem('kuja_user');
-                S.page = 'login';
-            }
-        } catch (e) {
+    // Check for existing cookie session via server
+    try {
+        var res = await api('GET', '/api/auth/me');
+        if (res && res.user) {
+            S.user = res.user;
+            S.page = 'dashboard';
+        } else {
             S.user = null;
             S.page = 'login';
         }
-    } else {
+    } catch (e) {
+        S.user = null;
         S.page = 'login';
     }
 
