@@ -11,12 +11,16 @@ import json
 from datetime import datetime, date, timedelta
 from werkzeug.security import generate_password_hash
 
-# Don't override DATABASE_URL - let server.py set the default
-from server import (
-    app, db, User, Organization, Grant, Application,
+# Import from the modular app package
+from app import create_app
+from app.extensions import db
+from app.models import (
+    User, Organization, Grant, Application,
     Assessment, Document, Review, ComplianceCheck, Report,
-    RegistrationVerification
+    RegistrationVerification,
 )
+
+app = create_app()
 
 # ---------------------------------------------------------------------------
 # Helpers
