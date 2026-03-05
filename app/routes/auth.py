@@ -1,3 +1,5 @@
+import threading
+from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 
 from flask import Blueprint, request, jsonify, session
@@ -15,6 +17,32 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_WINDOW_MINUTES = 5       # Rolling window for counting failures
 LOCKOUT_DURATION_MINUTES = 15    # How long the lockout lasts
+
+# ---------- IP-based rate limiting (works for all emails, existing or not) ----------
+# In-memory per-process; with gthread workers all threads share this dict.
+# Provides defense-in-depth alongside the per-account DB lockout.
+IP_RATE_LIMIT_WINDOW = 300       # 5-minute sliding window
+IP_RATE_LIMIT_MAX = 20           # max login attempts per IP in the window
+_ip_attempts = defaultdict(list) # {ip: [timestamp, ...]}
+_ip_lock = threading.Lock()
+
+
+def _check_ip_rate_limit(ip):
+    """Return True if the IP has exceeded the login attempt threshold."""
+    now = datetime.now(timezone.utc).timestamp()
+    cutoff = now - IP_RATE_LIMIT_WINDOW
+    with _ip_lock:
+        attempts = _ip_attempts[ip]
+        # Prune old entries
+        _ip_attempts[ip] = [t for t in attempts if t > cutoff]
+        return len(_ip_attempts[ip]) >= IP_RATE_LIMIT_MAX
+
+
+def _record_ip_attempt(ip):
+    """Record a login attempt for this IP address."""
+    now = datetime.now(timezone.utc).timestamp()
+    with _ip_lock:
+        _ip_attempts[ip].append(now)
 
 
 def _has_lockout_columns():
@@ -63,6 +91,17 @@ def api_login():
 
     if not email or not password:
         return jsonify({'success': False, 'error': 'Email and password are required'}), 400
+
+    # --- IP-based rate limiting (catches brute-force against ANY email, existing or not) ---
+    client_ip = request.remote_addr or '0.0.0.0'
+    if _check_ip_rate_limit(client_ip):
+        logger.warning(f"IP rate limit exceeded: {client_ip} (>{IP_RATE_LIMIT_MAX} attempts in {IP_RATE_LIMIT_WINDOW}s)")
+        return jsonify({
+            'success': False,
+            'error': 'Too many login attempts from this address. Please wait a few minutes before trying again.',
+        }), 429
+
+    _record_ip_attempt(client_ip)
 
     user = User.query.filter_by(email=email).first()
 

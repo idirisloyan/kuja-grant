@@ -1881,6 +1881,7 @@ async function editGrant(id) {
 // =============================================================================
 
 async function startApply(grantId) {
+    showToast(T('common.loading') || 'Loading grant details...', 'info');
     var res = await api('GET', '/api/grants/' + grantId);
     if (res) {
         S.selectedGrant = res.grant || res;
@@ -1889,6 +1890,8 @@ async function startApply(grantId) {
         S.applyEligibility = {};
         S.uploadedDocs = {};
         nav('apply');
+    } else {
+        showToast(T('grant.apply_load_error') || 'Could not load grant details. Please try again.', 'error');
     }
 }
 
@@ -2624,6 +2627,7 @@ function renderCreateGrant() {
         (step === 6 ?
             '<button class="btn btn-secondary" onclick="saveGrantDraft()">' + T('grant.create.save_draft') + '</button>' +
             '<button class="btn btn-primary btn-lg" onclick="publishGrant()">\uD83D\uDE80 ' + T('grant.create.publish') + '</button>' :
+            '<button class="btn btn-outline" style="font-size:13px;" onclick="saveGrantDraft()">' + T('grant.create.save_draft') + '</button>' +
             '<button class="btn btn-primary" onclick="' + (step === 5 ? 'S.createStep=6;render();' : 'S.createStep++;render();') + '">' + T('common.next') + ' \u2192</button>')) +
         '</div>' +
         '</div>';
@@ -3219,11 +3223,16 @@ async function uploadGrantDoc() {
     var res = null;
     var uploadError = null;
     try {
+        // AbortController for 120s timeout (AI extraction can take 30-60s)
+        var controller = new AbortController();
+        var timeoutId = setTimeout(function() { controller.abort(); }, 120000);
         var resp = await fetch('/api/grants/' + grantId + '/upload-grant-doc', {
             method: 'POST',
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            body: formData
+            body: formData,
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
         var json = await resp.json();
         if (resp.status === 401) {
             S.user = null;
@@ -3241,7 +3250,11 @@ async function uploadGrantDoc() {
             res = json;
         }
     } catch (uploadErr) {
-        uploadError = T('toast.network_error') || 'Network error — please check your connection and try again';
+        if (uploadErr && uploadErr.name === 'AbortError') {
+            uploadError = T('toast.upload_timeout') || 'Upload timed out. The file may be too large or the server is busy. Please try again.';
+        } else {
+            uploadError = T('toast.network_error') || 'Network error -- please check your connection and try again';
+        }
         res = null;
     }
 
@@ -3359,6 +3372,10 @@ function renderCreateReview() {
 
 async function saveGrantDraft() {
     var d = S.createData;
+    if (!d.title) {
+        showToast(T('grant.create.title_required') || 'Please enter a grant title before saving.', 'warning');
+        return;
+    }
     var method = d.id ? 'PUT' : 'POST';
     var url = d.id ? '/api/grants/' + d.id : '/api/grants';
     var res = await api(method, url, {
@@ -3375,7 +3392,9 @@ async function saveGrantDraft() {
     });
     if (res) {
         S.createData.id = (res.grant || res).id || d.id;
-        showToast(T('grant.create.draft_saved'), 'success');
+        showToast(T('grant.create.draft_saved') || 'Draft saved successfully.', 'success');
+    } else {
+        showToast(T('grant.create.draft_save_error') || 'Failed to save draft. Please try again.', 'error');
     }
 }
 
