@@ -554,11 +554,19 @@ print("CLEANUP")
 print("=" * 70)
 
 def test_cleanup():
-    s = login_ok(DONOR2)
+    # After IP rate limit test, our IP may be blocked. Try to login,
+    # but don't fail the test suite if cleanup can't proceed.
+    s, r = login(DONOR2)
+    if r.status_code == 429:
+        print("    [WARN] IP rate-limited — cleanup skipped (test grants will expire)")
+        return
+    assert r.status_code == 200, f"Login failed for {DONOR2}: {r.status_code}"
     for gid in [test_grant_id, test_apply_grant_id]:
         if gid:
-            s.put(f"{BASE}/api/grants/{gid}", json={"status": "draft"}, timeout=10)
-            s.delete(f"{BASE}/api/grants/{gid}", timeout=10)
+            try:
+                s.put(f"{BASE}/api/grants/{gid}", json={"status": "draft"}, timeout=10)
+                s.delete(f"{BASE}/api/grants/{gid}", timeout=10)
+            except: pass
 
 run("CLEANUP: Remove test grants", test_cleanup)
 
