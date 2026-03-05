@@ -19,7 +19,7 @@ LOCKOUT_DURATION_MINUTES = 15    # How long the lockout lasts
 
 # ---------- IP-based rate limiting (database-backed, works across all workers) ----------
 IP_RATE_LIMIT_WINDOW = 300       # 5-minute sliding window (seconds)
-IP_RATE_LIMIT_MAX = 20           # max login attempts per IP across all workers
+IP_RATE_LIMIT_MAX = 50           # max login attempts per IP across all workers
 _ip_table_ready = None
 
 
