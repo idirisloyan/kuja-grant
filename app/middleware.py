@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 
 from flask import request, jsonify, send_from_directory
 from flask_login import current_user
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.extensions import db
@@ -119,6 +120,11 @@ def register_error_handlers(app):
 
     @app.errorhandler(413)
     def request_entity_too_large(error):
+        return jsonify({'error': 'File too large. Maximum size is 16 MB.', 'success': False}), 413
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def werkzeug_entity_too_large(error):
+        """Catch werkzeug's RequestEntityTooLarge directly (raised by Flask's MAX_CONTENT_LENGTH)."""
         return jsonify({'error': 'File too large. Maximum size is 16 MB.', 'success': False}), 413
 
     @app.errorhandler(500)

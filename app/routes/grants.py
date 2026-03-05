@@ -239,15 +239,32 @@ def api_upload_grant_doc(grant_id):
 
     original_filename = secure_filename(file.filename)
     ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else ''
+
+    # Validate file extension
+    allowed_extensions = {'pdf', 'doc', 'docx', 'txt', 'csv'}
+    if ext not in allowed_extensions:
+        return jsonify({'error': f'Unsupported file type (.{ext}). Allowed: PDF, DOC, DOCX, TXT, CSV.', 'success': False}), 400
+
     stored_filename = f"grant_doc_{grant_id}_{uuid.uuid4().hex}.{ext}"
 
     filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], stored_filename)
     file.save(filepath)
 
+    # Check minimum file size — empty or near-empty files cannot contain real content
+    file_size = os.path.getsize(filepath)
+    if file_size < 100:
+        os.remove(filepath)
+        logger.warning(f"Rejected empty/tiny file: {original_filename} ({file_size} bytes)")
+        return jsonify({
+            'error': 'File is empty or too small to contain valid content. Please upload a proper document.',
+            'success': False,
+        }), 400
+
     grant.grant_document = stored_filename
 
     # Try to read file content for AI analysis
     file_content = ''
+    extraction_error = None
     try:
         if ext == 'txt':
             with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
@@ -258,33 +275,51 @@ def api_upload_grant_doc(grant_id):
         elif ext == 'pdf' and HAS_PYPDF2:
             try:
                 reader = PdfReader(filepath)
-                pages_text = []
-                for page in reader.pages[:30]:  # Limit to 30 pages
-                    text = page.extract_text()
-                    if text:
-                        pages_text.append(text)
-                file_content = '\n'.join(pages_text)
-                if not file_content.strip():
-                    file_content = f"Grant document: {original_filename} for grant: {grant.title}. {grant.description or ''}"
+                if len(reader.pages) == 0:
+                    extraction_error = 'PDF has no pages. Please upload a valid PDF document.'
+                else:
+                    pages_text = []
+                    for page in reader.pages[:30]:  # Limit to 30 pages
+                        text = page.extract_text()
+                        if text:
+                            pages_text.append(text)
+                    file_content = '\n'.join(pages_text)
             except Exception as pdf_err:
                 logger.error(f"PDF extraction failed: {pdf_err}")
-                file_content = f"Grant document: {original_filename} for grant: {grant.title}. {grant.description or ''}"
+                extraction_error = 'Could not read the PDF file. It may be corrupted or password-protected.'
         elif ext in ('docx', 'doc') and HAS_PYTHON_DOCX:
             try:
                 doc = python_docx.Document(filepath)
                 paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
                 file_content = '\n'.join(paragraphs)
-                if not file_content.strip():
-                    file_content = f"Grant document: {original_filename} for grant: {grant.title}. {grant.description or ''}"
             except Exception as docx_err:
                 logger.error(f"DOCX extraction failed: {docx_err}")
-                file_content = f"Grant document: {original_filename} for grant: {grant.title}. {grant.description or ''}"
-        else:
-            # Fallback for unsupported formats
-            file_content = f"Grant document: {original_filename} for grant: {grant.title}. {grant.description or ''}"
+                extraction_error = 'Could not read the Word document. It may be corrupted.'
+        elif ext == 'pdf' and not HAS_PYPDF2:
+            extraction_error = 'PDF processing is not available on this server. Please upload a DOC, DOCX, or TXT file.'
+        elif ext in ('docx', 'doc') and not HAS_PYTHON_DOCX:
+            extraction_error = 'Word document processing is not available on this server. Please upload a PDF or TXT file.'
     except Exception as e:
         logger.error(f"Failed to read grant document: {e}")
-        file_content = f"Grant document: {original_filename} for grant: {grant.title}"
+        extraction_error = 'Failed to read the uploaded document.'
+
+    # Reject files with extraction errors
+    if extraction_error:
+        os.remove(filepath)
+        grant.grant_document = None
+        db.session.commit()
+        return jsonify({'error': extraction_error, 'success': False}), 400
+
+    # Reject files with no extractable text content
+    if not file_content.strip() or len(file_content.strip()) < 50:
+        os.remove(filepath)
+        grant.grant_document = None
+        db.session.commit()
+        logger.warning(f"Rejected file with no extractable content: {original_filename}")
+        return jsonify({
+            'error': 'No readable text found in the uploaded file. The document may be empty, scanned (image-only), or corrupted. Please upload a text-based document.',
+            'success': False,
+        }), 400
 
     # AI extracts reporting requirements
     extracted = AIService.extract_reporting_requirements(file_content, grant.title)

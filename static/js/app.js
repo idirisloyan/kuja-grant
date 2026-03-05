@@ -3210,9 +3210,31 @@ async function uploadGrantDoc() {
     render();
 
     var res = null;
+    var uploadError = null;
     try {
-        res = await api('POST', '/api/grants/' + grantId + '/upload-grant-doc', formData);
+        var resp = await fetch('/api/grants/' + grantId + '/upload-grant-doc', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        var json = await resp.json();
+        if (resp.status === 401) {
+            S.user = null;
+            nav('login');
+            showToast(T('auth.session_expired'), 'error');
+            S._extractingReqs = false;
+            S._uploadPhase = '';
+            render();
+            return;
+        }
+        if (!resp.ok) {
+            uploadError = json.error || 'Upload failed';
+            res = null;
+        } else {
+            res = json;
+        }
     } catch (uploadErr) {
+        uploadError = T('toast.network_error') || 'Network error — please check your connection and try again';
         res = null;
     }
 
@@ -3261,10 +3283,10 @@ async function uploadGrantDoc() {
     } else {
         S.createData._extractionStatus = 'failed';
         S.createData._extractedCount = 0;
-        S.createData._extractionError = T('toast.upload_failed') || 'Upload failed — please try again';
+        S.createData._extractionError = uploadError || T('toast.upload_failed') || 'Upload failed — please try again';
         S.createData._docUploadTime = new Date().toLocaleTimeString();
-        showToast(T('toast.upload_failed') || 'Upload failed', 'error');
-        telemetry('extraction_failed', { filename: file.name });
+        showToast(S.createData._extractionError, 'error');
+        telemetry('extraction_failed', { filename: file.name, error: uploadError });
     }
 
     // Force wizard back to Reporting step so extraction status is always visible
