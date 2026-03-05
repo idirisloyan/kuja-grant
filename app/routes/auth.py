@@ -149,7 +149,7 @@ def api_login():
         client_ip = xff.split(',')[0].strip()
     else:
         client_ip = request.remote_addr or '0.0.0.0'
-    logger.warning(f"Login IP: XFF={xff!r}, remote_addr={request.remote_addr}, client_ip={client_ip}")
+    logger.info(f"Login IP: XFF={xff!r}, client_ip={client_ip}")
     if _check_ip_rate_limit(client_ip):
         logger.warning(f"IP rate limit exceeded: {client_ip} (>{IP_RATE_LIMIT_MAX} attempts in {IP_RATE_LIMIT_WINDOW}s)")
         return jsonify({
@@ -176,7 +176,7 @@ def api_login():
                     remaining_seconds = int((locked_until - now).total_seconds())
                     remaining_minutes = max(1, remaining_seconds // 60)
                     logger.warning(
-                        f"Login locked out: {email} from {request.remote_addr} "
+                        f"Login locked out: {email} from {client_ip} "
                         f"({remaining_seconds}s remaining)"
                     )
                     return jsonify({
@@ -216,7 +216,7 @@ def api_login():
                     user.locked_until = now + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
                     db.session.commit()
                     logger.warning(
-                        f"Account locked: {email} from {request.remote_addr} "
+                        f"Account locked: {email} from {client_ip} "
                         f"after {user.failed_login_count} failures"
                     )
                     return jsonify({
@@ -230,7 +230,7 @@ def api_login():
                 if remaining <= 2 and remaining > 0:
                     msg += f'. {remaining} attempt(s) remaining before lockout.'
                 logger.warning(
-                    f"Failed login: {email} from {request.remote_addr} "
+                    f"Failed login: {email} from {client_ip} "
                     f"({remaining} attempts left)"
                 )
             except Exception as e:
@@ -239,7 +239,7 @@ def api_login():
                 msg = 'Invalid email or password'
         else:
             if not user:
-                logger.warning(f"Failed login (unknown email): {email} from {request.remote_addr}")
+                logger.warning(f"Failed login (unknown email): {email} from {client_ip}")
             msg = 'Invalid email or password'
 
         return jsonify({'success': False, 'error': msg}), 401
@@ -260,7 +260,7 @@ def api_login():
 
     session.permanent = True
     login_user(user, remember=True)
-    logger.info(f"User logged in: {user.email} (role: {user.role}) from {request.remote_addr}")
+    logger.info(f"User logged in: {user.email} (role: {user.role}) from {client_ip}")
     return jsonify({'success': True, 'user': user.to_dict(include_org=True)})
 
 
