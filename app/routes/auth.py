@@ -1,6 +1,5 @@
-import threading
-from collections import defaultdict
 from datetime import datetime, timezone, timedelta
+from sqlalchemy import text
 
 from flask import Blueprint, request, jsonify, session
 from flask_login import login_required, login_user, logout_user, current_user
@@ -18,32 +17,81 @@ MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_WINDOW_MINUTES = 5       # Rolling window for counting failures
 LOCKOUT_DURATION_MINUTES = 15    # How long the lockout lasts
 
-# ---------- IP-based rate limiting (works for all emails, existing or not) ----------
-# In-memory per-process; with gthread workers all threads share this dict.
-# Provides defense-in-depth alongside the per-account DB lockout.
-IP_RATE_LIMIT_WINDOW = 300       # 5-minute sliding window
-IP_RATE_LIMIT_MAX = 10           # max login attempts per IP per worker process
-                                 # With N gunicorn workers, effective global limit is ~N*10
-_ip_attempts = defaultdict(list) # {ip: [timestamp, ...]}
-_ip_lock = threading.Lock()
+# ---------- IP-based rate limiting (database-backed, works across all workers) ----------
+IP_RATE_LIMIT_WINDOW = 300       # 5-minute sliding window (seconds)
+IP_RATE_LIMIT_MAX = 20           # max login attempts per IP across all workers
+_ip_table_ready = None
+
+
+def _ensure_ip_table():
+    """Create login_attempts table if it doesn't exist (auto-migrate)."""
+    global _ip_table_ready
+    if _ip_table_ready:
+        return True
+    try:
+        db.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS login_attempts (
+                id SERIAL PRIMARY KEY,
+                ip VARCHAR(45) NOT NULL,
+                attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        # Index for fast lookups by IP + time
+        db.session.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_time
+            ON login_attempts (ip, attempted_at)
+        """))
+        db.session.commit()
+        _ip_table_ready = True
+        logger.info("login_attempts table ready for IP rate limiting")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to create login_attempts table: {e}")
+        db.session.rollback()
+        _ip_table_ready = False
+        return False
 
 
 def _check_ip_rate_limit(ip):
-    """Return True if the IP has exceeded the login attempt threshold."""
-    now = datetime.now(timezone.utc).timestamp()
-    cutoff = now - IP_RATE_LIMIT_WINDOW
-    with _ip_lock:
-        attempts = _ip_attempts[ip]
-        # Prune old entries
-        _ip_attempts[ip] = [t for t in attempts if t > cutoff]
-        return len(_ip_attempts[ip]) >= IP_RATE_LIMIT_MAX
+    """Check if IP has exceeded login attempt threshold (database-backed)."""
+    if not _ensure_ip_table():
+        return False  # Fail open if table isn't ready
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=IP_RATE_LIMIT_WINDOW)
+        result = db.session.execute(
+            text("SELECT COUNT(*) FROM login_attempts WHERE ip = :ip AND attempted_at > :cutoff"),
+            {"ip": ip, "cutoff": cutoff}
+        )
+        count = result.scalar() or 0
+        return count >= IP_RATE_LIMIT_MAX
+    except Exception as e:
+        logger.error(f"IP rate limit check failed: {e}")
+        db.session.rollback()
+        return False
 
 
 def _record_ip_attempt(ip):
-    """Record a login attempt for this IP address."""
-    now = datetime.now(timezone.utc).timestamp()
-    with _ip_lock:
-        _ip_attempts[ip].append(now)
+    """Record a login attempt for this IP (database-backed)."""
+    if not _ensure_ip_table():
+        return
+    try:
+        db.session.execute(
+            text("INSERT INTO login_attempts (ip, attempted_at) VALUES (:ip, :ts)"),
+            {"ip": ip, "ts": datetime.now(timezone.utc)}
+        )
+        db.session.commit()
+        # Prune old records periodically (every ~50 inserts, clean entries > 10 min old)
+        import random
+        if random.random() < 0.02:
+            cutoff = datetime.now(timezone.utc) - timedelta(seconds=IP_RATE_LIMIT_WINDOW * 2)
+            db.session.execute(
+                text("DELETE FROM login_attempts WHERE attempted_at < :cutoff"),
+                {"cutoff": cutoff}
+            )
+            db.session.commit()
+    except Exception as e:
+        logger.error(f"IP attempt recording failed: {e}")
+        db.session.rollback()
 
 
 def _has_lockout_columns():
