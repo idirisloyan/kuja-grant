@@ -577,7 +577,7 @@ function showToast(message, type) {
             toast.style.animation = 'fadeOut 0.3s ease forwards';
             setTimeout(function() { if (toast.parentElement) toast.remove(); }, 300);
         }
-    }, 4000);
+    }, 8000);
 }
 
 // =============================================================================

@@ -19,8 +19,16 @@ from app.extensions import db
 
 logger = logging.getLogger('kuja')
 
-APP_VERSION = '3.0.0'
+APP_VERSION = '3.1.0'
 APP_START_TIME = datetime.now(timezone.utc)
+
+# Git commit hash for build verification (set at build time)
+import subprocess as _sp
+try:
+    APP_BUILD = _sp.check_output(['git', 'rev-parse', '--short', 'HEAD'],
+                                  stderr=_sp.DEVNULL, timeout=2).decode().strip()
+except Exception:
+    APP_BUILD = os.getenv('RAILWAY_GIT_COMMIT_SHA', 'unknown')[:8]
 
 
 def register_middleware(app):

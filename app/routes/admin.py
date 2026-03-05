@@ -27,7 +27,7 @@ from app.models import (
     User, Organization, Grant, Application, Assessment,
     Review, ComplianceCheck,
 )
-from app.middleware import APP_VERSION, APP_START_TIME
+from app.middleware import APP_VERSION, APP_START_TIME, APP_BUILD
 
 logger = logging.getLogger('kuja')
 
@@ -81,6 +81,7 @@ def api_version():
     uptime_seconds = int((datetime.now(timezone.utc) - APP_START_TIME).total_seconds())
     return jsonify({
         'version': APP_VERSION,
+        'build': APP_BUILD,
         'name': 'Kuja Grant Management System',
         'environment': 'production' if os.getenv('DATABASE_URL') else 'development',
         'uptime_seconds': uptime_seconds,
