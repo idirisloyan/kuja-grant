@@ -61,6 +61,14 @@ def api_list_documents():
 @login_required
 def api_upload_document():
     """Upload a document and trigger AI analysis."""
+    # Early Content-Length check before reading body (prevents 503 from proxy)
+    content_length = request.content_length
+    if content_length and content_length > 16 * 1024 * 1024:
+        return jsonify({
+            'error': f'File too large ({content_length / (1024*1024):.1f} MB). Maximum size is 16 MB.',
+            'success': False,
+        }), 413
+
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided', 'success': False}), 400
 
@@ -82,6 +90,15 @@ def api_upload_document():
     filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], stored_filename)
     file.save(filepath)
     file_size = os.path.getsize(filepath)
+
+    # Reject empty/tiny files (< 100 bytes cannot contain valid content)
+    if file_size < 100:
+        os.remove(filepath)
+        logger.warning(f"Rejected empty/tiny document: {original_filename} ({file_size} bytes)")
+        return jsonify({
+            'error': 'File is empty or too small to contain valid content. Please upload a proper document.',
+            'success': False,
+        }), 400
 
     # Determine MIME type
     mime_map = {
@@ -118,6 +135,41 @@ def api_upload_document():
                     'error': f'File content does not match .{ext} format',
                     'success': False,
                 }), 400
+
+    # For text-extractable types, verify the file has readable content
+    text_types = {'pdf', 'doc', 'docx', 'txt', 'csv'}
+    if ext in text_types:
+        try:
+            if ext == 'pdf':
+                import PyPDF2
+                with open(filepath, 'rb') as f:
+                    reader = PyPDF2.PdfReader(f)
+                    text = ''
+                    for page in reader.pages[:5]:
+                        text += (page.extract_text() or '')
+                    if len(text.strip()) < 20:
+                        os.remove(filepath)
+                        logger.warning(f"Rejected PDF with no extractable text: {original_filename}")
+                        return jsonify({
+                            'error': 'PDF has no readable text content. Please upload a valid document.',
+                            'success': False,
+                        }), 400
+            elif ext == 'txt' or ext == 'csv':
+                with open(filepath, 'r', errors='ignore') as f:
+                    text = f.read(2000)
+                if len(text.strip()) < 20:
+                    os.remove(filepath)
+                    return jsonify({
+                        'error': 'File has no readable content. Please upload a valid document.',
+                        'success': False,
+                    }), 400
+        except Exception as e:
+            logger.warning(f"Content validation failed for {original_filename}: {e}")
+            os.remove(filepath)
+            return jsonify({
+                'error': 'Could not read file content. The file may be corrupted.',
+                'success': False,
+            }), 400
 
     # Create document record
     document = Document(

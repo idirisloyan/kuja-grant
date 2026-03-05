@@ -1881,16 +1881,25 @@ async function editGrant(id) {
 // =============================================================================
 
 async function startApply(grantId) {
+    if (!grantId) {
+        showToast('Grant not found. Please select a valid grant.', 'error');
+        return;
+    }
     showToast(T('common.loading') || 'Loading grant details...', 'info');
-    var res = await api('GET', '/api/grants/' + grantId);
-    if (res) {
-        S.selectedGrant = res.grant || res;
-        S.applyStep = 1;
-        S.applyResponses = {};
-        S.applyEligibility = {};
-        S.uploadedDocs = {};
-        nav('apply');
-    } else {
+    try {
+        var res = await api('GET', '/api/grants/' + grantId);
+        var grant = res && (res.grant || res);
+        if (grant && grant.id) {
+            S.selectedGrant = grant;
+            S.applyStep = 1;
+            S.applyResponses = {};
+            S.applyEligibility = {};
+            S.uploadedDocs = {};
+            nav('apply');
+        } else {
+            showToast(T('grant.apply_load_error') || 'Could not load grant details. Please try again.', 'error');
+        }
+    } catch (err) {
         showToast(T('grant.apply_load_error') || 'Could not load grant details. Please try again.', 'error');
     }
 }
@@ -2205,6 +2214,16 @@ function handleFileSelect(e, key) {
 }
 
 async function uploadFile(file, key) {
+    // Client-side file validation
+    if (!file || file.size === 0 || file.size < 100) {
+        showToast('File is empty or too small. Please upload a valid document.', 'error');
+        return;
+    }
+    if (file.size > 16 * 1024 * 1024) {
+        showToast('File too large (' + (file.size / (1024 * 1024)).toFixed(1) + ' MB). Maximum size is 16 MB.', 'error');
+        return;
+    }
+
     var zone = document.getElementById('upload-zone-' + key);
     if (zone) {
         zone.innerHTML = '<div style="display:flex;align-items:center;gap:8px;justify-content:center;">' +
@@ -2215,21 +2234,31 @@ async function uploadFile(file, key) {
     fd.append('file', file);
     fd.append('type', key);
     if (S.selectedGrant) fd.append('grant_id', S.selectedGrant.id);
-    var res = await api('POST', '/api/documents/upload', fd);
-    if (res) {
-        S.uploadedDocs[key] = {
-            id: res.id || res.document_id,
-            filename: file.name,
-            name: file.name,
-            size: (file.size / 1024).toFixed(1) + ' KB',
-            ai_analysis: res.ai_analysis || null
-        };
-        showToast(T('toast.uploaded'), 'success');
-        render();
-    } else {
+    try {
+        var res = await api('POST', '/api/documents/upload', fd);
+        if (res && res.success !== false) {
+            S.uploadedDocs[key] = {
+                id: (res.document && res.document.id) || res.id || res.document_id,
+                filename: file.name,
+                name: file.name,
+                size: (file.size / 1024).toFixed(1) + ' KB',
+                ai_analysis: (res.document && res.document.ai_analysis) || res.ai_analysis || null
+            };
+            showToast(T('toast.uploaded') || 'File uploaded successfully.', 'success');
+            render();
+        } else {
+            var errMsg = (res && res.error) || T('common.upload_failed') || 'Upload failed. Please try again.';
+            showToast(errMsg, 'error');
+            if (zone) {
+                zone.innerHTML = '<div class="upload-icon">\uD83D\uDCCE</div>' +
+                    '<div class="upload-text">' + esc(errMsg) + ' <strong>' + (T('common.click_to_retry') || 'Click to retry') + '</strong></div>';
+            }
+        }
+    } catch (uploadErr) {
+        showToast(T('toast.network_error') || 'Network error. Please check your connection.', 'error');
         if (zone) {
             zone.innerHTML = '<div class="upload-icon">\uD83D\uDCCE</div>' +
-                '<div class="upload-text">' + T('common.upload_failed') + ' <strong>' + T('common.click_to_retry') + '</strong></div>';
+                '<div class="upload-text">' + (T('common.upload_failed') || 'Upload failed') + ' <strong>' + (T('common.click_to_retry') || 'Click to retry') + '</strong></div>';
         }
     }
 }
@@ -2304,16 +2333,25 @@ function renderApplyReview(g) {
 
 async function saveDraft() {
     var g = S.selectedGrant;
-    if (!g) return;
+    if (!g) {
+        showToast('No grant selected. Please try again.', 'warning');
+        return;
+    }
     var data = {
         grant_id: g.id,
         responses: S.applyResponses,
         eligibility: S.applyEligibility,
         status: 'draft'
     };
-    var res = await api('POST', '/api/applications', data);
-    if (res) {
-        showToast(T('apply.draft_saved'), 'success');
+    try {
+        var res = await api('POST', '/api/applications', data);
+        if (res) {
+            showToast(T('apply.draft_saved') || 'Application draft saved successfully.', 'success');
+        } else {
+            showToast('Failed to save draft. Please try again.', 'error');
+        }
+    } catch (err) {
+        showToast('Failed to save draft. Please check your connection.', 'error');
     }
 }
 
@@ -3295,9 +3333,9 @@ async function uploadGrantDoc() {
 
         S.createData._extractionError = '';
         if (S.createData._extractionStatus === 'success') {
-            showToast(T('toast.ai_extracted_reqs', {count: S.createData._extractedCount}), 'success');
+            showToast(T('toast.ai_extracted_reqs', {count: S.createData._extractedCount}) || ('AI extracted ' + S.createData._extractedCount + ' reporting requirements.'), 'success');
         } else {
-            showToast(T('toast.doc_uploaded_no_reqs'), 'warning');
+            showToast(T('toast.doc_uploaded_no_reqs') || 'Document uploaded but no requirements could be extracted. You can add them manually.', 'warning');
         }
         telemetry('upload_completed', { filename: file.name, extracted: S.createData._extractionStatus === 'success', req_count: (S.createData._extractedCount || 0) });
     } else {

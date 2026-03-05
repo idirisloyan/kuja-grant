@@ -220,6 +220,14 @@ def api_publish_grant(grant_id):
 @login_required
 def api_upload_grant_doc(grant_id):
     """Upload the actual grant document for a grant. AI extracts reporting requirements."""
+    # Early Content-Length check before reading body (prevents 503 from proxy)
+    content_length = request.content_length
+    if content_length and content_length > 16 * 1024 * 1024:
+        return jsonify({
+            'error': f'File too large ({content_length / (1024*1024):.1f} MB). Maximum size is 16 MB.',
+            'success': False,
+        }), 413
+
     grant = db.session.get(Grant, grant_id)
     if not grant:
         return jsonify({'error': 'Grant not found'}), 404

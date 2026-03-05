@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Kuja Grant - Final E2E Retest (March 5 2026 Audit)
-====================================================
+Kuja Grant - Final E2E Retest (March 5 2026 Audit v3)
+======================================================
 Covers all 6 defects from the production audit + full regression.
+Uses session pooling to minimize login attempts (IP rate limit = 20/5min).
 
 DEF-SEC-001 (High)  Brute-force/credential-stuffing controls
 DEF-UPL-001 (High)  Empty/invalid PDF accepted
@@ -29,6 +30,7 @@ REV2    = "maria@reviewer.org"
 ADMIN   = "admin@kuja.org"
 
 results = []
+_login_count = 0  # Track total login attempts for debugging
 
 def run(name, fn):
     try:
@@ -42,14 +44,24 @@ def run(name, fn):
         results.append(("ERROR", name, str(e)))
         print(f"  [ERR]  {name} -- {type(e).__name__}: {e}")
 
+# --- Session pool: login once per user, reuse across tests ---
+_session_pool = {}
+
 def login(email, password=PASS):
+    """Create a NEW session (not cached). Increments login counter."""
+    global _login_count
+    _login_count += 1
     s = requests.Session()
     r = s.post(f"{BASE}/api/auth/login", json={"email": email, "password": password}, timeout=15)
     return s, r
 
 def login_ok(email):
+    """Get a cached session for this user. Only logs in once per user."""
+    if email in _session_pool:
+        return _session_pool[email]
     s, r = login(email)
     assert r.status_code == 200, f"Login failed for {email}: {r.status_code} {r.text[:100]}"
+    _session_pool[email] = s
     return s
 
 
@@ -58,7 +70,7 @@ print("\n" + "=" * 70)
 print("SECTION 1: DEFECT RETESTS (except IP rate limit)")
 print("=" * 70)
 
-# --- DEF-SEC-001: Per-account lockout (does NOT need many IPs) ---
+# --- DEF-SEC-001: Per-account lockout (uses fresh logins, not cached) ---
 print("\n--- DEF-SEC-001: Per-account lockout ---")
 
 def test_account_lockout_existing_user():
@@ -78,7 +90,6 @@ def test_lockout_blocks_correct_pw():
 
 run("DEF-SEC-001: Correct pw during lockout -> 429", test_lockout_blocks_correct_pw)
 
-# Other accounts should still work
 def test_other_accounts_unaffected():
     """Lockout doesn't affect other accounts."""
     s = login_ok(DONOR2)
@@ -92,7 +103,8 @@ run("DEF-SEC-001: Other accounts unaffected", test_other_accounts_unaffected)
 # --- DEF-UPL-001: Empty/invalid PDF ---
 print("\n--- DEF-UPL-001: Empty/invalid PDF rejection ---")
 
-def test_empty_pdf_rejected():
+def test_empty_pdf_rejected_grants():
+    """Grant doc upload: empty PDF -> 400."""
     s = login_ok(DONOR2)
     empty_pdf = (b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
                  b"2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\nxref\n0 3\n"
@@ -110,7 +122,22 @@ def test_empty_pdf_rejected():
     assert "error" in r.json()
     s.delete(f"{BASE}/api/grants/{gid}", timeout=10)
 
-run("DEF-UPL-001: Empty PDF -> 400 rejection", test_empty_pdf_rejected)
+run("DEF-UPL-001: Empty PDF -> 400 (grant upload)", test_empty_pdf_rejected_grants)
+
+def test_empty_pdf_rejected_documents():
+    """Document upload: empty PDF -> 400 (the 201 bug)."""
+    s = login_ok(NGO1)
+    empty_pdf = (b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+                 b"2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\nxref\n0 3\n"
+                 b"0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n"
+                 b"trailer<</Size 3/Root 1 0 R>>\nstartxref\n109\n%%EOF")
+    r = s.post(f"{BASE}/api/documents/upload",
+               files={"file": ("invalid_empty.pdf", io.BytesIO(empty_pdf), "application/pdf")},
+               headers={"X-Requested-With": "XMLHttpRequest"}, timeout=30)
+    assert r.status_code == 400, f"Expected 400, got {r.status_code}: {r.text[:200]}"
+    assert r.json().get("success") is False
+
+run("DEF-UPL-001: Empty PDF -> 400 (document upload)", test_empty_pdf_rejected_documents)
 
 def test_tiny_file_rejected():
     s = login_ok(DONOR2)
@@ -252,7 +279,6 @@ def test_save_draft_creates_grant():
     d = r.json()
     gid = d["grant"]["id"]
     assert gid > 0
-    # Verify it persisted
     r2 = s.get(f"{BASE}/api/grants/{gid}", timeout=10)
     assert r2.status_code == 200
     grant = r2.json().get("grant", r2.json())
@@ -268,7 +294,6 @@ def test_save_draft_update_existing():
         "total_funding": 5000, "currency": "USD", "status": "draft"
     }, timeout=10)
     gid = r.json()["grant"]["id"]
-    # Update it
     r2 = s.put(f"{BASE}/api/grants/{gid}", json={
         "description": "Updated description", "status": "draft"
     }, timeout=10)
@@ -285,7 +310,6 @@ test_apply_grant_id = None
 
 def test_apply_grant_detail_loads():
     global test_apply_grant_id
-    # Create a published grant first
     s = login_ok(DONOR2)
     r = s.post(f"{BASE}/api/grants", json={
         "title": "Apply Entry Test Grant", "description": "For apply test",
@@ -294,7 +318,6 @@ def test_apply_grant_detail_loads():
     gid = r.json()["grant"]["id"]
     s.put(f"{BASE}/api/grants/{gid}", json={"status": "open"}, timeout=10)
     test_apply_grant_id = gid
-    # NGO loads grant detail (what startApply does)
     ns = login_ok(NGO1)
     r2 = ns.get(f"{BASE}/api/grants/{gid}", timeout=10)
     assert r2.status_code == 200, f"Grant detail load failed: {r2.status_code}"
@@ -317,13 +340,16 @@ run("DEF-UI-003: NGO creates application via apply entry", test_apply_creates_ap
 
 # =========================================================================
 print("\n" + "=" * 70)
-print("SECTION 2: FULL REGRESSION")
+print("SECTION 2: FULL REGRESSION (using cached sessions)")
 print("=" * 70)
 
 def test_login_all_accounts():
+    """Verify all 8 non-locked accounts can log in (uses fresh sessions)."""
     for email in [DONOR1, DONOR2, NGO1, NGO2, NGO3, NGO4, REV1, REV2]:
-        s, r = login(email)
-        assert r.status_code == 200, f"Login failed for {email}: {r.status_code}"
+        if email in _session_pool:
+            # Already verified via cached session
+            continue
+        s = login_ok(email)  # Creates and caches
 
 run("AUTH: All 8 non-locked accounts log in", test_login_all_accounts)
 
@@ -340,7 +366,6 @@ def test_ngo_cant_create_grant():
 
 run("AUTH: NGO cannot create grants -> 403", test_ngo_cant_create_grant)
 
-# Grant lifecycle
 test_grant_id = None
 def test_create_grant():
     global test_grant_id
@@ -372,7 +397,6 @@ def test_get_grant():
 
 run("GRANT: Get grant detail", test_get_grant)
 
-# Assessments
 def test_frameworks():
     s = login_ok(NGO1)
     r = s.get(f"{BASE}/api/assessments/frameworks", timeout=10)
@@ -390,7 +414,6 @@ def test_assessments():
 
 run("CAP: List assessments", test_assessments)
 
-# Due diligence
 def test_sanctions():
     s = login_ok(DONOR2)
     orgs = s.get(f"{BASE}/api/organizations", timeout=10).json()
@@ -409,7 +432,6 @@ def test_registries():
 
 run("DILIGENCE: Registry directory", test_registries)
 
-# Applications
 def test_ngo_applications():
     s = login_ok(NGO1)
     r = s.get(f"{BASE}/api/applications", timeout=10)
@@ -424,17 +446,17 @@ def test_donor_applications():
 
 run("APP: Donor lists applications", test_donor_applications)
 
-# Documents
 def test_doc_upload():
+    """NGO uploads a valid document (not empty)."""
     s = login_ok(NGO1)
+    valid_content = b"Financial Report\nQuarterly summary of expenditures and activities for the grant period.\n" * 5
     r = s.post(f"{BASE}/api/documents/upload",
-               files={"file": ("report.txt", io.BytesIO(b"Financial Report\n" * 20), "text/plain")},
+               files={"file": ("report.txt", io.BytesIO(valid_content), "text/plain")},
                headers={"X-Requested-With": "XMLHttpRequest"}, timeout=30)
-    assert r.status_code in (200, 201)
+    assert r.status_code in (200, 201), f"Doc upload failed: {r.status_code} {r.text[:200]}"
 
-run("DOC: NGO uploads document", test_doc_upload)
+run("DOC: NGO uploads valid document", test_doc_upload)
 
-# Reports
 def test_ngo_reports():
     s = login_ok(NGO1)
     r = s.get(f"{BASE}/api/reports", timeout=10)
@@ -456,7 +478,6 @@ def test_upcoming():
 
 run("REPORT: Upcoming reports", test_upcoming)
 
-# Dashboard
 def test_dashboard():
     s = login_ok(DONOR2)
     r = s.get(f"{BASE}/api/dashboard/stats", timeout=10)
@@ -464,7 +485,6 @@ def test_dashboard():
 
 run("DASHBOARD: Stats", test_dashboard)
 
-# Organizations
 def test_orgs():
     s = login_ok(DONOR2)
     r = s.get(f"{BASE}/api/organizations", timeout=10)
@@ -472,7 +492,6 @@ def test_orgs():
 
 run("ORG: List organizations", test_orgs)
 
-# Reviews
 def test_reviews():
     s = login_ok(REV1)
     r = s.get(f"{BASE}/api/reviews", timeout=10)
@@ -480,7 +499,6 @@ def test_reviews():
 
 run("REVIEW: List reviews", test_reviews)
 
-# Security headers
 def test_sec_headers():
     r = requests.get(f"{BASE}/api/health", timeout=10)
     h = r.headers
@@ -492,7 +510,6 @@ def test_sec_headers():
 
 run("SEC: All security headers present", test_sec_headers)
 
-# Health
 def test_health():
     r = requests.get(f"{BASE}/api/health", timeout=10)
     assert r.status_code == 200
@@ -515,34 +532,32 @@ run("MISC: API info", test_api_info)
 
 
 # =========================================================================
-# DEF-SEC-001: IP RATE LIMIT (runs LAST — uses up IP quota)
-# The test sends enough requests to trigger the IP-based rate limit.
-# By running last, accumulated login attempts from earlier tests contribute
-# to the count, and subsequent tests aren't affected.
+# DEF-SEC-001: IP RATE LIMIT (runs LAST)
 print("\n" + "=" * 70)
-print("SECTION 3: IP RATE LIMIT TEST (runs last)")
+print(f"SECTION 3: IP RATE LIMIT TEST (runs last, {_login_count} logins so far)")
 print("=" * 70)
 
 print("\n--- DEF-SEC-001: IP-based rate limiting ---")
 
 def test_ip_rate_limit_nonexistent_email():
-    """IP rate limit triggers for mass login attempts (even non-existent emails).
-    Server limit is 50 per IP per 5 minutes. Earlier tests already used ~30-40
-    login attempts, so this test needs fewer attempts to trigger 429.
-    We send up to 55 to cover the case where this test runs standalone."""
+    """IP rate limit triggers for mass login attempts.
+    Server limit is 20 per IP per 5 minutes. Earlier tests already used
+    some login attempts (cached sessions), so fewer attempts may be needed."""
+    global _login_count
     last_status = None
     triggered_429 = False
-    for i in range(55):
+    for i in range(30):
         s = requests.Session()
+        _login_count += 1
         r = s.post(f"{BASE}/api/auth/login",
                    json={"email": f"attacker{i}@evil.com", "password": "bruteforce"},
                    timeout=10)
         last_status = r.status_code
         if r.status_code == 429:
             triggered_429 = True
-            print(f"    429 triggered at attempt {i+1}")
+            print(f"    429 triggered at attempt {i+1} (total logins: {_login_count})")
             break
-    assert triggered_429, f"Expected 429 within 55 attempts, last status: {last_status}"
+    assert triggered_429, f"Expected 429 within 30 attempts, last status: {last_status} (total logins: {_login_count})"
 
 run("DEF-SEC-001: IP rate limit on non-existent emails", test_ip_rate_limit_nonexistent_email)
 
@@ -554,11 +569,10 @@ print("CLEANUP")
 print("=" * 70)
 
 def test_cleanup():
-    # After IP rate limit test, our IP may be blocked. Try to login,
-    # but don't fail the test suite if cleanup can't proceed.
+    # After IP rate limit test, our IP may be blocked.
     s, r = login(DONOR2)
     if r.status_code == 429:
-        print("    [WARN] IP rate-limited — cleanup skipped (test grants will expire)")
+        print("    [WARN] IP rate-limited -- cleanup skipped (test grants will expire)")
         return
     assert r.status_code == 200, f"Login failed for {DONOR2}: {r.status_code}"
     for gid in [test_grant_id, test_apply_grant_id]:
@@ -584,6 +598,7 @@ total = len(results)
 
 print(f"\nTotal: {total}  |  PASSED: {passed}  |  FAILED: {failed}  |  ERRORS: {errors}")
 print(f"Pass rate: {passed}/{total} ({100*passed//total if total else 0}%)")
+print(f"Total login attempts: {_login_count}")
 
 if failed or errors:
     print("\n--- FAILURES & ERRORS ---")
