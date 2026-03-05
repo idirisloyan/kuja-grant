@@ -113,6 +113,82 @@ def api_ready():
     }), status_code
 
 
+@admin_bp.route('/admin/canary', methods=['GET'])
+@login_required
+def api_admin_canary():
+    """Canary health checks for external dependencies.
+    Tests connectivity to OpenSanctions API and government registries."""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    import requests as ext_requests
+
+    checks = {}
+
+    # OpenSanctions API
+    try:
+        opensanctions_key = os.getenv('OPENSANCTIONS_API_KEY', '')
+        headers = {'Authorization': f'ApiKey {opensanctions_key}'} if opensanctions_key else {}
+        r = ext_requests.get('https://api.opensanctions.org/health', headers=headers, timeout=10)
+        checks['opensanctions'] = {
+            'status': 'ok' if r.status_code == 200 else 'degraded',
+            'http_code': r.status_code,
+            'latency_ms': int(r.elapsed.total_seconds() * 1000),
+        }
+    except Exception as e:
+        checks['opensanctions'] = {'status': 'down', 'error': str(e)[:100]}
+
+    # Government registries (quick connectivity test)
+    registry_urls = {
+        'kenya_brs': 'https://brs.go.ke/',
+        'nigeria_cac': 'https://search.cac.gov.ng/',
+        'south_africa_npo': 'https://www.npo.gov.za/',
+        'uganda_ngo': 'https://ngobureau.go.ug/',
+        'tanzania_nis': 'https://nis.jamii.go.tz/',
+    }
+    checks['registries'] = {}
+    for name, url in registry_urls.items():
+        try:
+            r = ext_requests.head(url, timeout=8, allow_redirects=True,
+                                  headers={'User-Agent': 'Kuja-Grant-Canary/1.0'})
+            checks['registries'][name] = {
+                'status': 'ok' if r.status_code < 500 else 'degraded',
+                'http_code': r.status_code,
+                'latency_ms': int(r.elapsed.total_seconds() * 1000),
+            }
+        except Exception as e:
+            checks['registries'][name] = {'status': 'down', 'error': str(e)[:80]}
+
+    # Anthropic AI API
+    try:
+        if ANTHROPIC_API_KEY:
+            r = ext_requests.get('https://api.anthropic.com/', timeout=8,
+                                 headers={'x-api-key': ANTHROPIC_API_KEY[:10] + '...'})
+            checks['anthropic'] = {
+                'status': 'ok' if r.status_code < 500 else 'degraded',
+                'http_code': r.status_code,
+                'latency_ms': int(r.elapsed.total_seconds() * 1000),
+            }
+        else:
+            checks['anthropic'] = {'status': 'not_configured'}
+    except Exception as e:
+        checks['anthropic'] = {'status': 'down', 'error': str(e)[:80]}
+
+    # Overall status
+    all_ok = all(
+        c.get('status') == 'ok'
+        for c in checks.values()
+        if isinstance(c, dict) and 'status' in c
+    )
+
+    return jsonify({
+        'success': True,
+        'overall': 'healthy' if all_ok else 'degraded',
+        'checks': checks,
+        'timestamp': datetime.now(timezone.utc).isoformat() + 'Z',
+    })
+
+
 # =============================================================================
 # TELEMETRY
 # =============================================================================
@@ -220,6 +296,9 @@ def api_admin_stats():
 
     # --- Document / Upload Metrics ---
     stats['documents'] = _get_document_metrics()
+
+    # --- SLO / Alert Thresholds ---
+    stats['alerts'] = _check_slo_alerts(stats['security'], stats['documents'])
 
     # System info
     stats['app_version'] = APP_VERSION
@@ -372,6 +451,57 @@ def _get_document_metrics():
         logger.warning(f"Document metrics query failed: {e}")
 
     return metrics
+
+
+# SLO thresholds — configurable via environment variables
+AUTH_ABUSE_SLO_1H = int(os.getenv('AUTH_ABUSE_SLO_1H', '100'))    # Max login attempts per hour
+AUTH_ABUSE_SLO_LOCKED = int(os.getenv('AUTH_ABUSE_SLO_LOCKED', '3'))  # Max simultaneously locked accounts
+UPLOAD_ABUSE_SLO_LOW_SCORE = int(os.getenv('UPLOAD_ABUSE_SLO_LOW_SCORE', '10'))  # Max low-score docs
+
+
+def _check_slo_alerts(security, documents):
+    """Check SLO thresholds and generate alert list."""
+    alerts = []
+    if security.get('login_attempts_1h', 0) > AUTH_ABUSE_SLO_1H:
+        alerts.append({
+            'level': 'critical',
+            'type': 'auth_abuse',
+            'message': f"Login attempts in last hour ({security['login_attempts_1h']}) exceed SLO threshold ({AUTH_ABUSE_SLO_1H})",
+            'metric': 'login_attempts_1h',
+            'value': security['login_attempts_1h'],
+            'threshold': AUTH_ABUSE_SLO_1H,
+        })
+    if security.get('currently_locked', 0) > AUTH_ABUSE_SLO_LOCKED:
+        alerts.append({
+            'level': 'warning',
+            'type': 'auth_lockout',
+            'message': f"{security['currently_locked']} accounts currently locked (threshold: {AUTH_ABUSE_SLO_LOCKED})",
+            'metric': 'currently_locked',
+            'value': security['currently_locked'],
+            'threshold': AUTH_ABUSE_SLO_LOCKED,
+        })
+    low_docs = len(documents.get('low_score_docs', []))
+    if low_docs > UPLOAD_ABUSE_SLO_LOW_SCORE:
+        alerts.append({
+            'level': 'warning',
+            'type': 'upload_quality',
+            'message': f"{low_docs} low-quality documents detected (threshold: {UPLOAD_ABUSE_SLO_LOW_SCORE})",
+            'metric': 'low_score_docs',
+            'value': low_docs,
+            'threshold': UPLOAD_ABUSE_SLO_LOW_SCORE,
+        })
+    # High-risk IP alert
+    for ip_info in security.get('top_ips_24h', []):
+        if ip_info.get('attempts', 0) >= 50:
+            alerts.append({
+                'level': 'critical',
+                'type': 'brute_force',
+                'message': f"IP {ip_info['ip']} has {ip_info['attempts']} login attempts in 24h",
+                'metric': 'ip_attempts',
+                'value': ip_info['attempts'],
+                'threshold': 50,
+            })
+    return alerts
 
 
 @admin_bp.route('/admin/security-events', methods=['GET'])

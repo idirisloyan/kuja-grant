@@ -1134,6 +1134,9 @@ function renderAdminDashboard() {
         ' \u2022 ' + esc(stats.environment || 'production') + '</span></p>' +
         '</div>' +
 
+        // SLO Alert Banner
+        '<div id="admin-alerts">' + renderAlertBanner(stats.alerts || []) + '</div>' +
+
         // Top stat cards
         '<div id="admin-stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:32px;">' +
         renderStatCard('\uD83D\uDC65', T('dashboard.stat.total_users'), stats.total_users || 0, 'blue') +
@@ -1268,6 +1271,25 @@ function renderAdminStatusBreakdown(byStatus) {
                 '</div>';
         }).join('') +
         '</div>';
+}
+
+function renderAlertBanner(alerts) {
+    if (!alerts || !alerts.length) return '';
+    return alerts.map(function(a) {
+        var bgColor = a.level === 'critical' ? '#fee2e2' : '#fef3c7';
+        var borderColor = a.level === 'critical' ? '#ef4444' : '#f59e0b';
+        var textColor = a.level === 'critical' ? '#991b1b' : '#92400e';
+        var icon = a.level === 'critical' ? '\uD83D\uDEA8' : '\u26A0\uFE0F';
+        return '<div data-alert-type="' + esc(a.type) + '" data-alert-level="' + esc(a.level) + '" ' +
+            'style="background:' + bgColor + ';border:1px solid ' + borderColor + ';border-left:4px solid ' + borderColor + ';' +
+            'padding:12px 16px;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;gap:12px;">' +
+            '<span style="font-size:20px;">' + icon + '</span>' +
+            '<div>' +
+            '<div style="font-weight:600;font-size:14px;color:' + textColor + ';">' +
+            (a.level === 'critical' ? 'CRITICAL' : 'WARNING') + ': ' + esc(a.type.replace('_', ' ').toUpperCase()) + '</div>' +
+            '<div style="font-size:13px;color:' + textColor + ';">' + esc(a.message) + '</div>' +
+            '</div></div>';
+    }).join('');
 }
 
 function renderSecurityMetrics(sec) {
@@ -1411,6 +1433,10 @@ async function loadAdminStats() {
         html += '</tbody></table></div>';
         ru.innerHTML = html;
     }
+
+    // Refresh alerts banner
+    var alertsEl = document.getElementById('admin-alerts');
+    if (alertsEl) alertsEl.innerHTML = renderAlertBanner(stats.alerts || []);
 
     // Refresh security metrics
     var secEl = document.getElementById('admin-security-metrics');
@@ -2490,6 +2516,8 @@ async function saveDraft() {
         showToast('No grant selected. Please try again.', 'warning');
         return;
     }
+    S._applySaving = true;
+    render();
     var data = {
         grant_id: g.id,
         responses: S.applyResponses,
@@ -2498,14 +2526,19 @@ async function saveDraft() {
     };
     try {
         var res = await api('POST', '/api/applications', data);
+        S._applySaving = false;
         if (res) {
+            S._applyLastSaved = new Date().toLocaleTimeString();
+            S._applyLastSavedIso = new Date().toISOString();
             showToast(T('apply.draft_saved') || 'Application draft saved successfully.', 'success');
         } else {
             showToast('Failed to save draft. Please try again.', 'error');
         }
     } catch (err) {
+        S._applySaving = false;
         showToast('Failed to save draft. Please check your connection.', 'error');
     }
+    render();
 }
 
 async function submitApplication() {
@@ -2801,7 +2834,17 @@ function renderCreateGrant() {
         case 6: stepContent = renderCreateReview(); break;
     }
 
-    return '<div class="page-header"><h1>' + (S.createData.id ? '\u270F\uFE0F ' + T('common.edit') : '\u2795 ' + T('grant.create.title')) + '</h1></div>' +
+    // Persisted-state indicator
+    var draftIndicator = '';
+    if (S.createData._draftSaving) {
+        draftIndicator = '<span data-draft-state="saving" style="font-size:12px;color:#6366f1;margin-left:12px;"><span class="spinner" style="width:12px;height:12px;border:2px solid #e0e7ff;border-top-color:#6366f1;border-radius:50%;animation:spin 0.6s linear infinite;display:inline-block;vertical-align:middle;margin-right:4px;"></span>Saving\u2026</span>';
+    } else if (S.createData._lastSavedAt) {
+        draftIndicator = '<span data-draft-state="saved" data-saved-time="' + (S.createData._lastSavedIso || '') + '" style="font-size:12px;color:#15803d;margin-left:12px;">\u2705 Saved at ' + esc(S.createData._lastSavedAt) + '</span>';
+    } else if (S.createData.id) {
+        draftIndicator = '<span data-draft-state="persisted" style="font-size:12px;color:#64748b;margin-left:12px;">\uD83D\uDCBE Draft (ID: ' + S.createData.id + ')</span>';
+    }
+
+    return '<div class="page-header"><h1>' + (S.createData.id ? '\u270F\uFE0F ' + T('common.edit') : '\u2795 ' + T('grant.create.title')) + draftIndicator + '</h1></div>' +
 
         renderWizardSteps(steps, Math.min(step, 5)) +
 
@@ -3211,7 +3254,7 @@ function renderCreateReporting() {
         '<p style="font-weight:600;margin-bottom:8px;">' + (d.grant_document ? '\u2705 ' + T('grant.create.grant_doc_uploaded') : '\uD83D\uDCC4 ' + T('grant.create.upload_grant_doc')) + '</p>' +
         (d.grant_document && d._docOriginalName ? '<p style="font-size:12px;color:#2d8f6f;margin-bottom:4px;"><strong>' + esc(d._docOriginalName) + '</strong>' +
             (d._docUploadTime ? ' — ' + T('grant.create.uploaded_at') + ' ' + esc(d._docUploadTime) : '') + '</p>' : '') +
-        (d._extractionStatus === 'success' ? '<div id="extraction-result" data-extraction-status="success" data-extraction-count="' + (d._extractedCount || 0) + '" style="background:#dcfce7;color:#166534;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #22c55e;box-shadow:0 2px 8px rgba(34,197,94,0.15);">' +
+        (d._extractionStatus === 'success' ? '<div id="extraction-result" data-extraction-status="success" data-extraction-count="' + (d._extractedCount || 0) + '" data-extraction-time="' + (d._extractionTimestamp || '') + '" style="background:#dcfce7;color:#166534;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #22c55e;box-shadow:0 2px 8px rgba(34,197,94,0.15);">' +
             '<div style="font-size:16px;margin-bottom:4px;">\u2705 ' + T('grant.create.ai_extraction_complete') + '</div>' +
             '<div>' + T('grant.create.extracted_count') + ' <strong>' + (d._extractedCount || 0) + '</strong> ' + T('grant.create.reporting_requirements').toLowerCase() +
             (d.report_template && d.report_template.template_sections ? ', <strong>' + d.report_template.template_sections.length + '</strong> ' + T('grant.create.template_sections') : '') +
@@ -3219,13 +3262,13 @@ function renderCreateReporting() {
             '</div>' +
             (d._docUploadTime ? '<div style="font-size:12px;color:#15803d;font-weight:400;margin-top:4px;">' + T('grant.create.processed_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
             '</div>' :
-         d._extractionStatus === 'empty' ? '<div id="extraction-result" data-extraction-status="empty" style="background:#fef9c3;color:#854d0e;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #f59e0b;box-shadow:0 2px 8px rgba(245,158,11,0.12);">' +
+         d._extractionStatus === 'empty' ? '<div id="extraction-result" data-extraction-status="empty" data-extraction-time="' + (d._extractionTimestamp || '') + '" style="background:#fef9c3;color:#854d0e;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #f59e0b;box-shadow:0 2px 8px rgba(245,158,11,0.12);">' +
             '<div style="font-size:16px;margin-bottom:4px;">\u26A0\uFE0F ' + T('grant.create.no_reqs_found') + '</div>' +
             '<div>' + T('grant.create.no_reqs_found_desc') + '</div>' +
             (d._docUploadTime ? '<div style="font-size:12px;font-weight:400;margin-top:4px;">' + T('grant.create.attempted_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
             '<button class="btn btn-sm" style="margin-top:8px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 ' + T('grant.create.retry_file') + '</button>' +
             '</div>' :
-         d._extractionStatus === 'failed' ? '<div id="extraction-result" data-extraction-status="failed" style="background:#fee2e2;color:#991b1b;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #ef4444;box-shadow:0 2px 8px rgba(239,68,68,0.12);">' +
+         d._extractionStatus === 'failed' ? '<div id="extraction-result" data-extraction-status="failed" data-extraction-time="' + (d._extractionTimestamp || '') + '" style="background:#fee2e2;color:#991b1b;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #ef4444;box-shadow:0 2px 8px rgba(239,68,68,0.12);">' +
             '<div style="font-size:16px;margin-bottom:4px;">\u274C ' + T('grant.create.extraction_failed') + '</div>' +
             '<div>' + T('grant.create.extraction_failed_desc') + '</div>' +
             (d._docUploadTime ? '<div style="font-size:12px;font-weight:400;margin-top:4px;">' + T('grant.create.failed_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
@@ -3484,6 +3527,7 @@ async function uploadGrantDoc() {
             };
         }
 
+        S.createData._extractionTimestamp = new Date().toISOString();
         S.createData._extractionError = '';
         if (S.createData._extractionStatus === 'success') {
             showToast(T('toast.ai_extracted_reqs', {count: S.createData._extractedCount}) || ('AI extracted ' + S.createData._extractedCount + ' reporting requirements.'), 'success');
@@ -3494,6 +3538,7 @@ async function uploadGrantDoc() {
     } else {
         S.createData._extractionStatus = 'failed';
         S.createData._extractedCount = 0;
+        S.createData._extractionTimestamp = new Date().toISOString();
         S.createData._extractionError = uploadError || T('toast.upload_failed') || 'Upload failed — please try again';
         S.createData._docUploadTime = new Date().toLocaleTimeString();
         showToast(S.createData._extractionError, 'error');
@@ -3567,26 +3612,38 @@ async function saveGrantDraft() {
         showToast(T('grant.create.title_required') || 'Please enter a grant title before saving.', 'warning');
         return;
     }
+    // Show saving state
+    S.createData._draftSaving = true;
+    render();
     var method = d.id ? 'PUT' : 'POST';
     var url = d.id ? '/api/grants/' + d.id : '/api/grants';
-    var res = await api(method, url, {
-        title: d.title, description: d.description,
-        total_funding: Number(d.total_funding) || 0,
-        currency: d.currency, deadline: d.deadline,
-        sectors: d.sectors, countries: d.countries,
-        eligibility: d.eligibility, criteria: d.criteria,
-        doc_requirements: d.doc_requirements,
-        reporting_requirements: d.reporting_requirements,
-        reporting_frequency: d.reporting_frequency,
-        report_template: d.report_template,
-        status: 'draft'
-    });
-    if (res) {
-        S.createData.id = (res.grant || res).id || d.id;
-        showToast(T('grant.create.draft_saved') || 'Draft saved successfully.', 'success');
-    } else {
-        showToast(T('grant.create.draft_save_error') || 'Failed to save draft. Please try again.', 'error');
+    try {
+        var res = await api(method, url, {
+            title: d.title, description: d.description,
+            total_funding: Number(d.total_funding) || 0,
+            currency: d.currency, deadline: d.deadline,
+            sectors: d.sectors, countries: d.countries,
+            eligibility: d.eligibility, criteria: d.criteria,
+            doc_requirements: d.doc_requirements,
+            reporting_requirements: d.reporting_requirements,
+            reporting_frequency: d.reporting_frequency,
+            report_template: d.report_template,
+            status: 'draft'
+        });
+        S.createData._draftSaving = false;
+        if (res) {
+            S.createData.id = (res.grant || res).id || d.id;
+            S.createData._lastSavedAt = new Date().toLocaleTimeString();
+            S.createData._lastSavedIso = new Date().toISOString();
+            showToast(T('grant.create.draft_saved') || 'Draft saved successfully.', 'success');
+        } else {
+            showToast(T('grant.create.draft_save_error') || 'Failed to save draft. Please try again.', 'error');
+        }
+    } catch (err) {
+        S.createData._draftSaving = false;
+        showToast(T('grant.create.draft_save_error') || 'Failed to save draft. Please check your connection.', 'error');
     }
+    render();
 }
 
 async function publishGrant() {

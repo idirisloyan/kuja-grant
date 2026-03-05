@@ -19,7 +19,7 @@ from app.extensions import db
 
 logger = logging.getLogger('kuja')
 
-APP_VERSION = '3.2.0'
+APP_VERSION = '3.3.0'
 APP_START_TIME = datetime.now(timezone.utc)
 
 # Git commit hash for build verification (set at build time)
@@ -50,7 +50,19 @@ def register_middleware(app):
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
-        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.anthropic.com; frame-ancestors 'none'"
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "img-src 'self' data:; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "connect-src 'self' https://api.anthropic.com; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'; "
+            "object-src 'none'; "
+            "upgrade-insecure-requests"
+        )
         # HSTS: always set in production (Railway terminates TLS at proxy)
         if is_production or request.is_secure:
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
@@ -59,12 +71,18 @@ def register_middleware(app):
     @app.before_request
     def check_content_length():
         """Reject oversized requests early with a clear 413 response.
-        Prevents backend 503 errors from Gunicorn/proxy for large payloads."""
+        Prevents backend 503 errors from Gunicorn/proxy for large payloads.
+        Defence layers: 1) this hook, 2) Flask MAX_CONTENT_LENGTH, 3) gunicorn --limit-request-body."""
         max_size = app.config.get('MAX_CONTENT_LENGTH', 16 * 1024 * 1024)
         content_length = request.content_length
         if content_length and content_length > max_size:
             size_mb = content_length / (1024 * 1024)
             max_mb = max_size / (1024 * 1024)
+            user_info = current_user.email if hasattr(current_user, 'email') and current_user.is_authenticated else 'anonymous'
+            logger.warning(
+                f"UPLOAD_REJECT: oversized request ({size_mb:.1f} MB > {max_mb:.0f} MB) "
+                f"from {request.remote_addr} by {user_info} to {request.path}"
+            )
             return jsonify({
                 'error': f'File too large ({size_mb:.1f} MB). Maximum size is {max_mb:.0f} MB.',
                 'success': False,
@@ -140,3 +158,14 @@ def register_error_handlers(app):
         db.session.rollback()
         logger.error(f"Internal server error: {error}")
         return jsonify({'error': 'Internal server error', 'success': False}), 500
+
+    @app.errorhandler(503)
+    def service_unavailable(error):
+        """Catch 503 errors (e.g. proxy kill on oversized upload) and return controlled JSON."""
+        if '/upload' in request.path or '/upload-grant-doc' in request.path:
+            logger.warning(f"503 on upload path {request.path} — likely oversized payload killed by proxy")
+            return jsonify({
+                'error': 'Upload too large or connection interrupted. Maximum file size is 16 MB.',
+                'success': False,
+            }), 413
+        return jsonify({'error': 'Service temporarily unavailable', 'success': False}), 503
