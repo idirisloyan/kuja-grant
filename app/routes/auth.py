@@ -22,7 +22,8 @@ LOCKOUT_DURATION_MINUTES = 15    # How long the lockout lasts
 # In-memory per-process; with gthread workers all threads share this dict.
 # Provides defense-in-depth alongside the per-account DB lockout.
 IP_RATE_LIMIT_WINDOW = 300       # 5-minute sliding window
-IP_RATE_LIMIT_MAX = 20           # max login attempts per IP in the window
+IP_RATE_LIMIT_MAX = 10           # max login attempts per IP per worker process
+                                 # With N gunicorn workers, effective global limit is ~N*10
 _ip_attempts = defaultdict(list) # {ip: [timestamp, ...]}
 _ip_lock = threading.Lock()
 
