@@ -149,7 +149,7 @@ def api_login():
         client_ip = xff.split(',')[0].strip()
     else:
         client_ip = request.remote_addr or '0.0.0.0'
-    logger.debug(f"Login attempt: XFF={xff!r}, remote_addr={request.remote_addr}, client_ip={client_ip}")
+    logger.warning(f"Login IP: XFF={xff!r}, remote_addr={request.remote_addr}, client_ip={client_ip}")
     if _check_ip_rate_limit(client_ip):
         logger.warning(f"IP rate limit exceeded: {client_ip} (>{IP_RATE_LIMIT_MAX} attempts in {IP_RATE_LIMIT_WINDOW}s)")
         return jsonify({
