@@ -1192,6 +1192,18 @@ function renderAdminDashboard() {
         '</div>' +
         '</div></div>' +
 
+        // Security & Audit Dashboard
+        '<div class="card" style="margin-bottom:32px;border-left:4px solid #ef4444;"><div class="card-body">' +
+        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDD12 Security & Audit</h3>' +
+        '<div id="admin-security-metrics">' + renderSecurityMetrics(stats.security || {}) + '</div>' +
+        '</div></div>' +
+
+        // Document Metrics
+        '<div class="card" style="margin-bottom:32px;border-left:4px solid #8b5cf6;"><div class="card-body">' +
+        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDCC4 Upload & Document Metrics</h3>' +
+        '<div id="admin-document-metrics">' + renderDocumentMetrics(stats.documents || {}) + '</div>' +
+        '</div></div>' +
+
         // Quick Actions
         '<div style="margin-bottom:32px;">' +
         '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\u26A1 ' + T('dashboard.quick_actions') + '</h2>' +
@@ -1258,6 +1270,100 @@ function renderAdminStatusBreakdown(byStatus) {
         '</div>';
 }
 
+function renderSecurityMetrics(sec) {
+    if (!sec || (!sec.login_attempts_24h && !sec.currently_locked)) {
+        return '<div style="color:#64748b;font-size:13px;padding:8px 0;">No security events recorded.</div>';
+    }
+    var html = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">' +
+        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid ' +
+        (sec.login_attempts_1h > 20 ? '#ef4444' : '#2d8f6f') + ';">' +
+        '<div style="font-size:24px;font-weight:700;color:' + (sec.login_attempts_1h > 20 ? '#ef4444' : '#2d8f6f') + ';">' + (sec.login_attempts_1h || 0) + '</div>' +
+        '<div style="font-size:12px;color:#64748b;">Login Attempts (1h)</div></div>' +
+
+        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid ' +
+        (sec.login_attempts_24h > 100 ? '#ef4444' : '#3b82f6') + ';">' +
+        '<div style="font-size:24px;font-weight:700;color:' + (sec.login_attempts_24h > 100 ? '#ef4444' : '#3b82f6') + ';">' + (sec.login_attempts_24h || 0) + '</div>' +
+        '<div style="font-size:12px;color:#64748b;">Login Attempts (24h)</div></div>' +
+
+        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid #f59e0b;">' +
+        '<div style="font-size:24px;font-weight:700;color:#f59e0b;">' + (sec.unique_ips_24h || 0) + '</div>' +
+        '<div style="font-size:12px;color:#64748b;">Unique IPs (24h)</div></div>' +
+
+        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid ' +
+        (sec.currently_locked > 0 ? '#ef4444' : '#94a3b8') + ';">' +
+        '<div style="font-size:24px;font-weight:700;color:' + (sec.currently_locked > 0 ? '#ef4444' : '#94a3b8') + ';">' + (sec.currently_locked || 0) + '</div>' +
+        '<div style="font-size:12px;color:#64748b;">Locked Accounts</div></div>' +
+        '</div>';
+
+    // Top IPs table (potential brute-force indicators)
+    if (sec.top_ips_24h && sec.top_ips_24h.length) {
+        html += '<div style="margin-top:12px;">' +
+            '<strong style="font-size:13px;color:#1e293b;">Top Login IPs (24h)</strong>' +
+            '<table class="data-table" style="width:100%;margin-top:8px;font-size:13px;">' +
+            '<thead><tr><th style="text-align:left;">IP Address</th><th style="text-align:right;">Attempts</th><th style="text-align:center;">Risk</th></tr></thead><tbody>';
+        sec.top_ips_24h.forEach(function(row) {
+            var risk = row.attempts >= 20 ? '\u26A0\uFE0F High' : row.attempts >= 10 ? '\u26A0 Medium' : '\u2705 Low';
+            var riskColor = row.attempts >= 20 ? '#ef4444' : row.attempts >= 10 ? '#f59e0b' : '#2d8f6f';
+            html += '<tr>' +
+                '<td style="font-family:monospace;">' + esc(row.ip) + '</td>' +
+                '<td style="text-align:right;font-weight:600;">' + row.attempts + '</td>' +
+                '<td style="text-align:center;color:' + riskColor + ';font-weight:500;">' + risk + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+    }
+
+    // Locked accounts
+    if (sec.locked_accounts && sec.locked_accounts.length) {
+        html += '<div style="margin-top:12px;">' +
+            '<strong style="font-size:13px;color:#991b1b;">\uD83D\uDD12 Currently Locked Accounts</strong>';
+        sec.locked_accounts.forEach(function(a) {
+            html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;">' +
+                '<span class="badge badge-red">LOCKED</span>' +
+                '<span>' + esc(a.email) + '</span>' +
+                '<span style="color:#64748b;">until ' + (a.locked_until ? new Date(a.locked_until).toLocaleTimeString() : '--') + '</span></div>';
+        });
+        html += '</div>';
+    }
+    return html;
+}
+
+function renderDocumentMetrics(docs) {
+    if (!docs || !docs.total_documents) {
+        return '<div style="color:#64748b;font-size:13px;padding:8px 0;">No documents uploaded yet.</div>';
+    }
+    var html = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">' +
+        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid #3b82f6;">' +
+        '<div style="font-size:24px;font-weight:700;color:#3b82f6;">' + (docs.total_documents || 0) + '</div>' +
+        '<div style="font-size:12px;color:#64748b;">Total Documents</div></div>' +
+
+        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid #2d8f6f;">' +
+        '<div style="font-size:24px;font-weight:700;color:#2d8f6f;">' + (docs.documents_7d || 0) + '</div>' +
+        '<div style="font-size:12px;color:#64748b;">Uploads (7d)</div></div>' +
+
+        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid ' +
+        (docs.avg_score >= 60 ? '#2d8f6f' : docs.avg_score >= 40 ? '#f59e0b' : '#ef4444') + ';">' +
+        '<div style="font-size:24px;font-weight:700;color:' + (docs.avg_score >= 60 ? '#2d8f6f' : docs.avg_score >= 40 ? '#f59e0b' : '#ef4444') + ';">' + (docs.avg_score || 0) + '%</div>' +
+        '<div style="font-size:12px;color:#64748b;">Avg AI Score</div></div>' +
+        '</div>';
+
+    // Low-score documents (quality concern)
+    if (docs.low_score_docs && docs.low_score_docs.length) {
+        html += '<div style="margin-top:12px;">' +
+            '<strong style="font-size:13px;color:#b91c1c;">\u26A0\uFE0F Low Quality Documents (Score &lt; 40%)</strong>' +
+            '<table class="data-table" style="width:100%;margin-top:8px;font-size:13px;">' +
+            '<thead><tr><th>Filename</th><th>Type</th><th>Score</th><th>Uploaded</th></tr></thead><tbody>';
+        docs.low_score_docs.forEach(function(d) {
+            html += '<tr>' +
+                '<td>' + esc(d.filename || '--') + '</td>' +
+                '<td><span class="badge badge-gray">' + esc(d.type || 'general') + '</span></td>' +
+                '<td style="color:#ef4444;font-weight:600;">' + (d.score || 0) + '%</td>' +
+                '<td style="font-size:12px;color:#64748b;">' + (d.uploaded ? new Date(d.uploaded).toLocaleDateString() : '--') + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+    }
+    return html;
+}
+
 async function loadAdminStats() {
     if (S._adminLoading) return;
     S._adminLoading = true;
@@ -1305,6 +1411,14 @@ async function loadAdminStats() {
         html += '</tbody></table></div>';
         ru.innerHTML = html;
     }
+
+    // Refresh security metrics
+    var secEl = document.getElementById('admin-security-metrics');
+    if (secEl) secEl.innerHTML = renderSecurityMetrics(stats.security || {});
+
+    // Refresh document metrics
+    var docEl = document.getElementById('admin-document-metrics');
+    if (docEl) docEl.innerHTML = renderDocumentMetrics(stats.documents || {});
 }
 
 
@@ -2225,17 +2339,35 @@ async function uploadFile(file, key) {
     }
 
     var zone = document.getElementById('upload-zone-' + key);
+
+    // --- Phase 1: Uploading ---
     if (zone) {
-        zone.innerHTML = '<div style="display:flex;align-items:center;gap:8px;justify-content:center;">' +
-            '<span class="spinner" style="width:20px;height:20px;border:2px solid #e2e8f0;border-top-color:#2d8f6f;border-radius:50%;animation:spin 0.6s linear infinite;display:inline-block;"></span>' +
-            '<span style="color:#64748b;">Uploading and analyzing ' + esc(file.name) + '...</span></div>';
+        zone.innerHTML = '<div data-upload-phase="uploading" style="padding:16px;text-align:center;">' +
+            '<div class="dot-pulse" style="margin-bottom:8px;justify-content:center;"><span></span><span></span><span></span></div>' +
+            '<div style="font-size:14px;font-weight:600;color:#1e40af;">' + (T('upload.uploading') || 'Uploading document\u2026') + '</div>' +
+            '<div style="font-size:12px;color:#3b82f6;margin-top:4px;">' + (T('upload.transferring') || 'Transferring file to server\u2026') + '</div>' +
+            '<div style="font-size:11px;color:#64748b;margin-top:6px;">\uD83D\uDCC4 ' + esc(file.name) + '</div></div>';
     }
     var fd = new FormData();
     fd.append('file', file);
     fd.append('type', key);
     if (S.selectedGrant) fd.append('grant_id', S.selectedGrant.id);
+
+    // --- Phase 2: Analyzing ---
+    // Show analyzing phase after a short delay (upload usually fast, analysis takes time)
+    var phaseTimer = setTimeout(function() {
+        if (zone) {
+            zone.innerHTML = '<div data-upload-phase="analyzing" style="padding:16px;text-align:center;">' +
+                '<div class="dot-pulse" style="margin-bottom:8px;justify-content:center;"><span></span><span></span><span></span></div>' +
+                '<div style="font-size:14px;font-weight:600;color:#1e40af;">' + (T('upload.ai_analyzing') || 'AI analyzing document\u2026') + '</div>' +
+                '<div style="font-size:12px;color:#3b82f6;margin-top:4px;">' + (T('upload.analyzing_content') || 'Evaluating document quality and compliance\u2026') + '</div>' +
+                '<div style="font-size:11px;color:#64748b;margin-top:6px;">\uD83D\uDCC4 ' + esc(file.name) + '</div></div>';
+        }
+    }, 2000);
+
     try {
         var res = await api('POST', '/api/documents/upload', fd);
+        clearTimeout(phaseTimer);
         if (res && res.success !== false) {
             S.uploadedDocs[key] = {
                 id: (res.document && res.document.id) || res.id || res.document_id,
@@ -2244,21 +2376,42 @@ async function uploadFile(file, key) {
                 size: (file.size / 1024).toFixed(1) + ' KB',
                 ai_analysis: (res.document && res.document.ai_analysis) || res.ai_analysis || null
             };
-            showToast(T('toast.uploaded') || 'File uploaded successfully.', 'success');
-            render();
+            // --- Phase 3a: Success ---
+            var score = (res.document && res.document.ai_analysis && res.document.ai_analysis.score) || 0;
+            if (zone) {
+                zone.innerHTML = '<div data-upload-phase="success" style="padding:16px;text-align:center;background:#dcfce7;border-radius:8px;border:2px solid #22c55e;">' +
+                    '<div style="font-size:20px;margin-bottom:4px;">\u2705</div>' +
+                    '<div style="font-size:14px;font-weight:600;color:#166534;">' + (T('upload.success') || 'Upload & analysis complete') + '</div>' +
+                    '<div style="font-size:12px;color:#15803d;margin-top:4px;">' + esc(file.name) +
+                    (score ? ' \u2014 Score: ' + score + '%' : '') + '</div></div>';
+            }
+            showToast(T('toast.uploaded') || 'File uploaded and analyzed successfully.', 'success');
+            // Re-render after short delay to show final uploaded state
+            setTimeout(function() { render(); }, 1500);
         } else {
+            // --- Phase 3b: Failure (server rejected) ---
             var errMsg = (res && res.error) || T('common.upload_failed') || 'Upload failed. Please try again.';
             showToast(errMsg, 'error');
             if (zone) {
-                zone.innerHTML = '<div class="upload-icon">\uD83D\uDCCE</div>' +
-                    '<div class="upload-text">' + esc(errMsg) + ' <strong>' + (T('common.click_to_retry') || 'Click to retry') + '</strong></div>';
+                zone.innerHTML = '<div data-upload-phase="failed" style="padding:16px;text-align:center;background:#fee2e2;border-radius:8px;border:2px solid #ef4444;">' +
+                    '<div style="font-size:20px;margin-bottom:4px;">\u274C</div>' +
+                    '<div style="font-size:14px;font-weight:600;color:#991b1b;">' + (T('upload.failed') || 'Upload failed') + '</div>' +
+                    '<div style="font-size:12px;color:#b91c1c;margin-top:4px;">' + esc(errMsg) + '</div>' +
+                    '<button class="btn btn-sm" style="margin-top:8px;background:#fee2e2;border:1px solid #ef4444;color:#991b1b;" ' +
+                    'onclick="triggerUpload(\'' + key + '\')">\uD83D\uDD04 ' + (T('common.click_to_retry') || 'Retry upload') + '</button></div>';
             }
         }
     } catch (uploadErr) {
+        clearTimeout(phaseTimer);
+        // --- Phase 3c: Network error ---
         showToast(T('toast.network_error') || 'Network error. Please check your connection.', 'error');
         if (zone) {
-            zone.innerHTML = '<div class="upload-icon">\uD83D\uDCCE</div>' +
-                '<div class="upload-text">' + (T('common.upload_failed') || 'Upload failed') + ' <strong>' + (T('common.click_to_retry') || 'Click to retry') + '</strong></div>';
+            zone.innerHTML = '<div data-upload-phase="failed" style="padding:16px;text-align:center;background:#fee2e2;border-radius:8px;border:2px solid #ef4444;">' +
+                '<div style="font-size:20px;margin-bottom:4px;">\u274C</div>' +
+                '<div style="font-size:14px;font-weight:600;color:#991b1b;">' + (T('upload.network_error') || 'Upload failed') + '</div>' +
+                '<div style="font-size:12px;color:#b91c1c;margin-top:4px;">' + (T('toast.network_error') || 'Network error \u2014 check your connection') + '</div>' +
+                '<button class="btn btn-sm" style="margin-top:8px;background:#fee2e2;border:1px solid #ef4444;color:#991b1b;" ' +
+                'onclick="triggerUpload(\'' + key + '\')">\uD83D\uDD04 ' + (T('common.click_to_retry') || 'Retry upload') + '</button></div>';
         }
     }
 }

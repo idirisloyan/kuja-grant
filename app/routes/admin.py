@@ -21,11 +21,12 @@ from threading import Lock
 
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
+from sqlalchemy import text
 
 from app.extensions import db
 from app.models import (
     User, Organization, Grant, Application, Assessment,
-    Review, ComplianceCheck,
+    Review, ComplianceCheck, Document,
 )
 from app.middleware import APP_VERSION, APP_START_TIME, APP_BUILD
 
@@ -214,6 +215,12 @@ def api_admin_stats():
                               'created_at': u.created_at.isoformat() if u.created_at else None}
                              for u in recent_users]
 
+    # --- Security & Audit Metrics ---
+    stats['security'] = _get_security_metrics()
+
+    # --- Document / Upload Metrics ---
+    stats['documents'] = _get_document_metrics()
+
     # System info
     stats['app_version'] = APP_VERSION
     uptime = int((datetime.now(timezone.utc) - APP_START_TIME).total_seconds())
@@ -222,3 +229,160 @@ def api_admin_stats():
     stats['ai_enabled'] = bool(ANTHROPIC_API_KEY and HAS_ANTHROPIC)
 
     return jsonify({'stats': stats})
+
+
+# =============================================================================
+# SECURITY & AUDIT
+# =============================================================================
+
+def _get_security_metrics():
+    """Gather security metrics from login_attempts table and user lockout state."""
+    metrics = {
+        'login_attempts_1h': 0,
+        'login_attempts_24h': 0,
+        'unique_ips_1h': 0,
+        'unique_ips_24h': 0,
+        'currently_locked': 0,
+        'top_ips_24h': [],
+        'recent_attempts': [],
+    }
+    try:
+        # Check if login_attempts table exists
+        result = db.session.execute(text(
+            "SELECT EXISTS (SELECT FROM information_schema.tables "
+            "WHERE table_name = 'login_attempts')"
+        ))
+        if not result.scalar():
+            return metrics
+
+        now = datetime.now(timezone.utc)
+        h1_ago = now - timedelta(hours=1)
+        h24_ago = now - timedelta(hours=24)
+
+        # Attempts in last hour
+        r = db.session.execute(text(
+            "SELECT COUNT(*) FROM login_attempts WHERE attempted_at > :cutoff"
+        ), {"cutoff": h1_ago})
+        metrics['login_attempts_1h'] = r.scalar() or 0
+
+        # Attempts in last 24h
+        r = db.session.execute(text(
+            "SELECT COUNT(*) FROM login_attempts WHERE attempted_at > :cutoff"
+        ), {"cutoff": h24_ago})
+        metrics['login_attempts_24h'] = r.scalar() or 0
+
+        # Unique IPs in last hour
+        r = db.session.execute(text(
+            "SELECT COUNT(DISTINCT ip) FROM login_attempts WHERE attempted_at > :cutoff"
+        ), {"cutoff": h1_ago})
+        metrics['unique_ips_1h'] = r.scalar() or 0
+
+        # Unique IPs in last 24h
+        r = db.session.execute(text(
+            "SELECT COUNT(DISTINCT ip) FROM login_attempts WHERE attempted_at > :cutoff"
+        ), {"cutoff": h24_ago})
+        metrics['unique_ips_24h'] = r.scalar() or 0
+
+        # Top IPs in last 24h (potential brute-force)
+        r = db.session.execute(text(
+            "SELECT ip, COUNT(*) as cnt FROM login_attempts "
+            "WHERE attempted_at > :cutoff GROUP BY ip ORDER BY cnt DESC LIMIT 10"
+        ), {"cutoff": h24_ago})
+        metrics['top_ips_24h'] = [{'ip': row[0], 'attempts': row[1]} for row in r.fetchall()]
+
+        # Recent login attempts (last 20)
+        r = db.session.execute(text(
+            "SELECT ip, attempted_at FROM login_attempts "
+            "ORDER BY attempted_at DESC LIMIT 20"
+        ))
+        metrics['recent_attempts'] = [
+            {'ip': row[0], 'time': row[1].isoformat() + 'Z' if row[1] else None}
+            for row in r.fetchall()
+        ]
+
+    except Exception as e:
+        logger.warning(f"Security metrics query failed: {e}")
+        db.session.rollback()
+
+    # Currently locked accounts
+    try:
+        now = datetime.now(timezone.utc)
+        locked_users = User.query.filter(
+            User.locked_until.isnot(None),
+            User.locked_until > now
+        ).all()
+        metrics['currently_locked'] = len(locked_users)
+        metrics['locked_accounts'] = [
+            {'email': u.email, 'locked_until': u.locked_until.isoformat() + 'Z' if u.locked_until else None}
+            for u in locked_users
+        ]
+    except Exception as e:
+        logger.warning(f"Locked accounts query failed: {e}")
+        metrics['currently_locked'] = 0
+        metrics['locked_accounts'] = []
+
+    return metrics
+
+
+def _get_document_metrics():
+    """Gather document upload metrics."""
+    metrics = {
+        'total_documents': 0,
+        'documents_7d': 0,
+        'avg_score': 0,
+        'by_type': {},
+        'low_score_docs': [],
+    }
+    try:
+        metrics['total_documents'] = Document.query.count()
+
+        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        metrics['documents_7d'] = Document.query.filter(
+            Document.uploaded_at >= week_ago
+        ).count()
+
+        # Average AI score
+        from sqlalchemy import func
+        avg = db.session.query(func.avg(Document.score)).filter(
+            Document.score.isnot(None), Document.score > 0
+        ).scalar()
+        metrics['avg_score'] = round(float(avg), 1) if avg else 0
+
+        # Documents by type
+        type_counts = db.session.query(
+            Document.doc_type, func.count(Document.id)
+        ).group_by(Document.doc_type).all()
+        metrics['by_type'] = {t: c for t, c in type_counts}
+
+        # Recent low-scoring documents (score < 40, last 10)
+        low_docs = Document.query.filter(
+            Document.score < 40, Document.score > 0
+        ).order_by(Document.uploaded_at.desc()).limit(10).all()
+        metrics['low_score_docs'] = [
+            {
+                'id': d.id,
+                'filename': d.original_filename,
+                'score': d.score,
+                'type': d.doc_type,
+                'uploaded': d.uploaded_at.isoformat() + 'Z' if d.uploaded_at else None,
+            }
+            for d in low_docs
+        ]
+    except Exception as e:
+        logger.warning(f"Document metrics query failed: {e}")
+
+    return metrics
+
+
+@admin_bp.route('/admin/security-events', methods=['GET'])
+@login_required
+def api_admin_security_events():
+    """Detailed security event log for admin audit dashboard."""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    hours = request.args.get('hours', 24, type=int)
+    hours = min(hours, 168)  # Cap at 7 days
+
+    events = _get_security_metrics()
+    return jsonify({'success': True, 'security': events, 'window_hours': hours})

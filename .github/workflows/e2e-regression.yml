@@ -1,0 +1,72 @@
+name: E2E Regression Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target URL to test against'
+        required: false
+        default: 'https://web-production-6f8a.up.railway.app'
+
+env:
+  KUJA_URL: ${{ github.event.inputs.target_url || 'https://web-production-6f8a.up.railway.app' }}
+
+jobs:
+  e2e-regression:
+    name: E2E Regression Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: pip install requests
+
+      - name: Wait for deployment (push to main only)
+        if: github.event_name == 'push'
+        run: |
+          echo "Waiting 60s for Railway deployment to complete..."
+          sleep 60
+          # Verify the server is up
+          for i in {1..10}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$KUJA_URL/api/health" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "Server is healthy"
+              break
+            fi
+            echo "Attempt $i: status=$STATUS, retrying in 10s..."
+            sleep 10
+          done
+
+      - name: Verify deployment build
+        run: |
+          echo "Checking deployed version..."
+          curl -s "$KUJA_URL/api/version" | python -m json.tool
+          echo ""
+          DEPLOYED_BUILD=$(curl -s "$KUJA_URL/api/version" | python -c "import sys,json; print(json.load(sys.stdin).get('build','unknown'))")
+          echo "Deployed build: $DEPLOYED_BUILD"
+          echo "Expected commit: ${GITHUB_SHA:0:8}"
+
+      - name: Run E2E regression tests
+        run: python test_e2e_final.py
+        env:
+          KUJA_URL: ${{ env.KUJA_URL }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: test_e2e_final.py
+          retention-days: 30

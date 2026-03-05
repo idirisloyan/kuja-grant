@@ -532,6 +532,223 @@ run("MISC: API info", test_api_info)
 
 
 # =========================================================================
+print("\n" + "=" * 70)
+print("SECTION 2b: REGRESSION GATE (Localization + Donor Wizard + NGO Apply)")
+print("=" * 70)
+
+# --- Localization ---
+print("\n--- LOCALIZATION ---")
+
+def test_translation_files():
+    """Translation JSON files load for all supported languages."""
+    for lang in ['en', 'ar', 'fr', 'es']:
+        r = requests.get(f"{BASE}/static/js/translations/{lang}.json", timeout=10)
+        assert r.status_code == 200, f"Translation file {lang}.json failed: {r.status_code}"
+        data = r.json()
+        assert len(data) >= 10, f"{lang}.json has too few keys: {len(data)}"
+
+run("I18N: Translation files load (en/ar/fr/es)", test_translation_files)
+
+def test_language_switch():
+    """Language preference can be set and retrieved."""
+    s = login_ok(NGO1)
+    for lang in ['fr', 'ar', 'en']:
+        r = s.put(f"{BASE}/api/auth/language", json={"language": lang}, timeout=10)
+        assert r.status_code == 200, f"Set language '{lang}' failed: {r.status_code}"
+    # Invalid language rejected
+    r = s.put(f"{BASE}/api/auth/language", json={"language": "xx"}, timeout=10)
+    assert r.status_code == 400, f"Invalid language should be 400, got {r.status_code}"
+
+run("I18N: Language preference set/get", test_language_switch)
+
+# --- Donor Wizard Full Lifecycle ---
+print("\n--- DONOR WIZARD LIFECYCLE ---")
+
+_wizard_grant_id = None
+
+def test_wizard_step1_create():
+    """Wizard Step 1: Create grant with basic info."""
+    global _wizard_grant_id
+    s = login_ok(DONOR1)
+    r = s.post(f"{BASE}/api/grants", json={
+        "title": "Wizard E2E Grant",
+        "description": "End-to-end test of the 5-step donor wizard flow.",
+        "total_funding": 250000,
+        "currency": "USD",
+        "deadline": "2026-12-31",
+        "sectors": ["health", "education"],
+        "countries": ["KE", "UG"],
+        "status": "draft"
+    }, timeout=10)
+    assert r.status_code in (200, 201), f"Create grant failed: {r.status_code}"
+    _wizard_grant_id = r.json()["grant"]["id"]
+    assert _wizard_grant_id > 0
+
+run("WIZARD: Step 1 - Create grant draft", test_wizard_step1_create)
+
+def test_wizard_step2_criteria():
+    """Wizard Step 2: Add evaluation criteria."""
+    if not _wizard_grant_id: raise AssertionError("No wizard grant")
+    s = login_ok(DONOR1)
+    r = s.put(f"{BASE}/api/grants/{_wizard_grant_id}", json={
+        "criteria": [
+            {"label": "Technical approach", "weight": 40, "description": "Quality of methodology"},
+            {"label": "Organizational capacity", "weight": 30, "description": "Track record"},
+            {"label": "Budget reasonableness", "weight": 30, "description": "Cost effectiveness"}
+        ]
+    }, timeout=10)
+    assert r.status_code == 200, f"Add criteria failed: {r.status_code}"
+
+run("WIZARD: Step 2 - Add evaluation criteria", test_wizard_step2_criteria)
+
+def test_wizard_step3_docs():
+    """Wizard Step 3: Configure required documents."""
+    if not _wizard_grant_id: raise AssertionError("No wizard grant")
+    s = login_ok(DONOR1)
+    r = s.put(f"{BASE}/api/grants/{_wizard_grant_id}", json={
+        "doc_requirements": [
+            {"type": "financial_report", "name": "Annual Financial Report", "required": True,
+             "description": "Audited financials for the last fiscal year"},
+            {"type": "proposal", "name": "Project Proposal", "required": True,
+             "description": "Detailed project description with budget"}
+        ]
+    }, timeout=10)
+    assert r.status_code == 200, f"Add docs failed: {r.status_code}"
+
+run("WIZARD: Step 3 - Configure required documents", test_wizard_step3_docs)
+
+def test_wizard_step4_upload():
+    """Wizard Step 4: Upload grant agreement + AI extraction."""
+    if not _wizard_grant_id: raise AssertionError("No wizard grant")
+    s = login_ok(DONOR1)
+    content = (
+        "Grant Agreement - Reporting Requirements\n\n"
+        "1. Quarterly Financial Report: Due within 30 days of quarter end.\n"
+        "2. Annual Narrative Report: Due within 60 days of fiscal year.\n"
+        "3. Final Evaluation Report: Due within 90 days of project completion.\n"
+    )
+    r = s.post(f"{BASE}/api/grants/{_wizard_grant_id}/upload-grant-doc",
+               files={"file": ("wizard_agreement.txt", io.BytesIO(content.encode()), "text/plain")},
+               headers={"X-Requested-With": "XMLHttpRequest"}, timeout=90)
+    assert r.status_code == 200, f"Upload failed: {r.status_code}: {r.text[:200]}"
+    d = r.json()
+    assert d.get("success") is True
+    assert d.get("content_extracted") is True
+
+run("WIZARD: Step 4 - Upload agreement + AI extraction", test_wizard_step4_upload)
+
+def test_wizard_step5_publish():
+    """Wizard Step 5: Publish grant (draft -> open)."""
+    if not _wizard_grant_id: raise AssertionError("No wizard grant")
+    s = login_ok(DONOR1)
+    r = s.put(f"{BASE}/api/grants/{_wizard_grant_id}", json={"status": "open"}, timeout=10)
+    assert r.status_code == 200, f"Publish failed: {r.status_code}"
+    # Verify it's open
+    r2 = s.get(f"{BASE}/api/grants/{_wizard_grant_id}", timeout=10)
+    grant = r2.json().get("grant", r2.json())
+    assert grant.get("status") == "open"
+
+run("WIZARD: Step 5 - Publish grant", test_wizard_step5_publish)
+
+# --- NGO Apply Full Lifecycle ---
+print("\n--- NGO APPLY LIFECYCLE ---")
+
+def test_apply_browse_open():
+    """NGO can browse and find the wizard-published grant."""
+    if not _wizard_grant_id: raise AssertionError("No wizard grant")
+    s = login_ok(NGO2)
+    r = s.get(f"{BASE}/api/grants", timeout=10)
+    assert r.status_code == 200
+    data = r.json()
+    grants = data if isinstance(data, list) else data.get("grants", [])
+    found = any(g.get("id") == _wizard_grant_id for g in grants)
+    assert found, f"Wizard grant {_wizard_grant_id} not found in open grants list"
+
+run("APPLY: NGO browses and finds open grant", test_apply_browse_open)
+
+def test_apply_load_details():
+    """NGO loads grant details to start application."""
+    if not _wizard_grant_id: raise AssertionError("No wizard grant")
+    s = login_ok(NGO2)
+    r = s.get(f"{BASE}/api/grants/{_wizard_grant_id}", timeout=10)
+    assert r.status_code == 200
+    g = r.json().get("grant", r.json())
+    assert g.get("title") == "Wizard E2E Grant"
+    assert len(g.get("criteria", [])) >= 3
+    assert len(g.get("doc_requirements", [])) >= 2
+
+run("APPLY: Load grant details with criteria + docs", test_apply_load_details)
+
+def test_apply_create_application():
+    """NGO creates application for the wizard grant."""
+    if not _wizard_grant_id: raise AssertionError("No wizard grant")
+    s = login_ok(NGO2)
+    r = s.post(f"{BASE}/api/applications", json={
+        "grant_id": _wizard_grant_id
+    }, timeout=15)
+    assert r.status_code in (200, 201), f"Create app failed: {r.status_code}: {r.text[:200]}"
+
+run("APPLY: Create application", test_apply_create_application)
+
+def test_apply_upload_doc():
+    """NGO uploads required document for application."""
+    s = login_ok(NGO2)
+    content = b"Annual Financial Report\nTotal Revenue: $500,000\nTotal Expenses: $480,000\nNet Income: $20,000\n" * 5
+    r = s.post(f"{BASE}/api/documents/upload",
+               files={"file": ("financials.txt", io.BytesIO(content), "text/plain")},
+               data={"doc_type": "financial_report"},
+               headers={"X-Requested-With": "XMLHttpRequest"}, timeout=30)
+    assert r.status_code in (200, 201), f"Doc upload failed: {r.status_code}"
+    assert r.json().get("success") is not False
+
+run("APPLY: Upload required document", test_apply_upload_doc)
+
+# --- Admin Audit Dashboard ---
+print("\n--- ADMIN AUDIT DASHBOARD ---")
+
+def test_admin_stats_has_security():
+    """Admin stats include security and document metrics."""
+    s = login_ok(ADMIN)
+    r = s.get(f"{BASE}/api/admin/stats", timeout=10)
+    assert r.status_code == 200
+    stats = r.json().get("stats", {})
+    assert "security" in stats, "Missing 'security' in admin stats"
+    sec = stats["security"]
+    assert "login_attempts_24h" in sec
+    assert "unique_ips_24h" in sec
+    assert "currently_locked" in sec
+    assert "top_ips_24h" in sec
+    assert "documents" in stats, "Missing 'documents' in admin stats"
+    docs = stats["documents"]
+    assert "total_documents" in docs
+    assert "avg_score" in docs
+
+run("AUDIT: Admin stats include security+document metrics", test_admin_stats_has_security)
+
+def test_admin_security_events():
+    """Admin security-events endpoint returns data."""
+    s = login_ok(ADMIN)
+    r = s.get(f"{BASE}/api/admin/security-events", timeout=10)
+    assert r.status_code == 200
+    d = r.json()
+    assert d.get("success") is True
+    assert "security" in d
+
+run("AUDIT: Security events endpoint accessible", test_admin_security_events)
+
+# Cleanup wizard grant
+def _cleanup_wizard():
+    if _wizard_grant_id:
+        try:
+            s = login_ok(DONOR1)
+            s.put(f"{BASE}/api/grants/{_wizard_grant_id}", json={"status": "draft"}, timeout=10)
+            s.delete(f"{BASE}/api/grants/{_wizard_grant_id}", timeout=10)
+        except: pass
+
+_cleanup_wizard()
+
+
+# =========================================================================
 # DEF-SEC-001: IP RATE LIMIT (runs LAST)
 print("\n" + "=" * 70)
 print(f"SECTION 3: IP RATE LIMIT TEST (runs last, {_login_count} logins so far)")
@@ -624,6 +841,30 @@ for did, statuses in defect_map.items():
     else:
         fails = sum(1 for s in statuses if s != "PASS")
         print(f"  {did}: NEEDS WORK ({fails}/{len(statuses)} failed)")
+
+print("\n--- P1 REGRESSION GATE SUMMARY ---")
+gate_map = {"I18N": [], "WIZARD": [], "APPLY": [], "AUDIT": []}
+for r in results:
+    for gid in gate_map:
+        if r[1].startswith(gid + ":"):
+            gate_map[gid].append(r[0])
+
+all_gate_pass = True
+for gid, statuses in gate_map.items():
+    if not statuses:
+        print(f"  {gid}: NOT TESTED")
+        all_gate_pass = False
+    elif all(s == "PASS" for s in statuses):
+        print(f"  {gid}: PASS ({len(statuses)}/{len(statuses)})")
+    else:
+        fails = sum(1 for s in statuses if s != "PASS")
+        print(f"  {gid}: FAIL ({fails}/{len(statuses)} failed)")
+        all_gate_pass = False
+
+if all_gate_pass:
+    print("\n  >>> REGRESSION GATE: PASS (safe to deploy)")
+else:
+    print("\n  >>> REGRESSION GATE: FAIL (do NOT deploy)")
 
 print()
 sys.exit(1 if (failed + errors) > 0 else 0)
