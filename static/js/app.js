@@ -112,6 +112,7 @@ const S = {
     },
 
     _extractingReqs: false,
+    _uploadPhase: '',   // '', 'saving_draft', 'uploading', 'analyzing'
 
     // Application form
     applyStep: 1,
@@ -928,8 +929,8 @@ function renderPageContent() {
         case 'submitreport': return renderSubmitReport();
         case 'reviewreport': return renderReviewReport();
         case 'verification': return renderVerificationDashboard();
-        default: return '<div class="page-header"><h1>Page Not Found</h1><p>The page you are looking for does not exist.</p></div>' +
-            '<button class="btn btn-primary" onclick="nav(\'dashboard\')">Go to Dashboard</button>';
+        default: return '<div class="page-header"><h1>' + T('common.page_not_found') + '</h1><p>' + T('common.page_not_found_desc') + '</p></div>' +
+            '<button class="btn btn-primary" onclick="nav(\'dashboard\')">' + T('common.go_to_dashboard') + '</button>';
     }
 }
 
@@ -1013,13 +1014,13 @@ async function loadUpcomingReports() {
     }
     var reports = res.upcoming_reports;
     el.innerHTML = '<div class="table-wrapper"><table class="table table-hover"><thead><tr>' +
-        '<th>Report</th><th>Grant</th><th>Due Date</th><th>Status</th><th>Action</th>' +
+        '<th>' + T('report.title') + '</th><th>' + T('report.grant') + '</th><th>' + T('common.due_date') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('common.actions') + '</th>' +
         '</tr></thead><tbody>' +
         reports.slice(0, 8).map(function(r) {
             var isOverdue = r.is_overdue;
             var daysText = isOverdue ? Math.abs(r.days_until_due) + ' days overdue' : r.days_until_due + ' days left';
             var badgeCls = isOverdue ? 'badge-red' : r.days_until_due <= 7 ? 'badge-amber' : 'badge-outline';
-            var statusBadge = r.status === 'not_started' ? '<span class="badge badge-outline">Not Started</span>' :
+            var statusBadge = r.status === 'not_started' ? '<span class="badge badge-outline">' + T('common.not_started') + '</span>' :
                 r.status === 'draft' ? '<span class="badge badge-outline">Draft</span>' :
                 '<span class="badge badge-amber">' + esc(r.status).replace(/_/g, ' ') + '</span>';
             var actionBtn = r.draft_report_id ?
@@ -1337,10 +1338,10 @@ async function loadDashboardStats() {
             if (ringEl) ringEl.parentElement.parentElement.innerHTML =
                 '<div class="card-body" style="display:flex;align-items:center;gap:24px;">' +
                 scoreRingHTML(score, 80, '%') +
-                '<div><h3 style="font-size:18px;font-weight:600;">Organizational Capacity</h3>' +
+                '<div><h3 style="font-size:18px;font-weight:600;">' + T('assessment.org_capacity') + '</h3>' +
                 '<p style="font-size:14px;color:#64748b;margin-top:4px;">Your current capacity level: ' +
                 '<span class="badge badge-' + cap.color + '">' + esc(cap.label) + '</span></p></div>' +
-                '<div style="margin-left:auto;"><button class="btn btn-secondary btn-sm" onclick="nav(\'assessment\')">View Assessment</button></div></div>';
+                '<div style="margin-left:auto;"><button class="btn btn-secondary btn-sm" onclick="nav(\'assessment\')">' + T('assessment.view_assessment') + '</button></div></div>';
         }
     } else if (role === 'donor') {
         var dc = document.getElementById('donor-stat-cards');
@@ -1520,7 +1521,7 @@ function renderDonorApplicationsTable(apps) {
             '<p>No applications received yet.</p></div></div>';
     }
     return '<div class="table-wrapper"><table class="table table-hover">' +
-        '<thead><tr><th>Applicant</th><th>Grant</th><th>Status</th><th>AI Score</th><th>Submitted</th><th></th></tr></thead><tbody>' +
+        '<thead><tr><th>' + T('ranking.applicant') + '</th><th>' + T('report.grant') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('application.ai_score') + '</th><th>' + T('application.submitted') + '</th><th></th></tr></thead><tbody>' +
         apps.map(function(a) {
             return '<tr style="cursor:pointer;" onclick="viewApplication(' + a.id + ')">' +
                 '<td style="font-weight:500;">' + esc(a.org_name || a.applicant_name || '') + '</td>' +
@@ -1540,7 +1541,7 @@ function renderReviewsTable(reviews) {
             '<p>No assignments pending.</p></div></div>';
     }
     return '<div class="table-wrapper"><table class="table table-hover">' +
-        '<thead><tr><th>Application</th><th>Grant</th><th>Status</th><th>Due Date</th><th></th></tr></thead><tbody>' +
+        '<thead><tr><th>' + T('nav.all_applications') + '</th><th>' + T('report.grant') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('common.due_date') + '</th><th></th></tr></thead><tbody>' +
         reviews.map(function(r) {
             return '<tr style="cursor:pointer;" onclick="openReview(' + r.id + ')">' +
                 '<td style="font-weight:500;">' + esc(r.org_name || r.application_name || 'Application #' + r.application_id) + '</td>' +
@@ -1669,7 +1670,7 @@ async function loadMyGrants() {
                 S.grants.map(function(g) { return renderDonorGrantCard(g); }).join('') :
                 '<div style="grid-column:1/-1;text-align:center;padding:48px;color:#94a3b8;">' +
                 '<p>No grants created yet.</p>' +
-                '<button class="btn btn-primary" style="margin-top:12px;" onclick="nav(\'creategrant\')">Create Your First Grant</button></div>';
+                '<button class="btn btn-primary" style="margin-top:12px;" onclick="nav(\'creategrant\')">' + T('grant.create_first') + '</button></div>';
         }
     }
 }
@@ -1793,7 +1794,7 @@ function renderGrantCriteria(g) {
                 '<p style="color:#64748b;font-size:13px;margin-top:8px;">' + esc(c.description || '') + '</p>' +
                 (c.instructions ? '<div style="background:#eff6ff;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;">' +
                     '<strong style="color:#1e40af;">Instructions:</strong> ' + esc(c.instructions) + '</div>' : '') +
-                (c.example ? '<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:13px;color:#2d8f6f;font-weight:500;">View Example Response</summary>' +
+                (c.example ? '<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:13px;color:#2d8f6f;font-weight:500;">' + T('grant.create.view_example_response') + '</summary>' +
                     '<div style="background:#f8fafc;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;color:#475569;">' +
                     esc(c.example) + '</div></details>' : '') +
                 (c.max_words ? '<div style="font-size:12px;color:#94a3b8;margin-top:8px;">Maximum ' + c.max_words + ' words</div>' : '') +
@@ -2225,7 +2226,7 @@ async function uploadFile(file, key) {
     } else {
         if (zone) {
             zone.innerHTML = '<div class="upload-icon">\uD83D\uDCCE</div>' +
-                '<div class="upload-text">Upload failed. <strong>Click to try again</strong></div>';
+                '<div class="upload-text">' + T('common.upload_failed') + ' <strong>' + T('common.click_to_retry') + '</strong></div>';
         }
     }
 }
@@ -2613,7 +2614,10 @@ function renderCreateGrant() {
         '<div class="wizard-content">' + stepContent + '</div>' +
 
         '<div class="wizard-actions">' +
-        (S._extractingReqs ? '<div style="color:#6366f1;font-size:13px;font-weight:500;">AI analyzing document\u2026 Please wait.</div>' :
+        (S._extractingReqs ? '<div data-upload-active="true" style="color:#6366f1;font-size:13px;font-weight:500;">' +
+            (S._uploadPhase === 'saving_draft' ? T('grant.create.saving_draft') || 'Saving draft…' :
+             S._uploadPhase === 'uploading' ? T('grant.create.uploading_doc') || 'Uploading…' :
+             T('grant.create.ai_analyzing') || 'AI analyzing document…') + ' ' + T('common.please_wait') + '</div>' :
         (step > 1 ? '<button class="btn btn-secondary" onclick="S.createStep--;render();">\u2190 ' + T('common.previous') + '</button>' : '<div></div>')) +
         '<div style="display:flex;gap:8px;">' +
         (S._extractingReqs ? '' :
@@ -2741,7 +2745,7 @@ function renderCreateEligibility() {
                     '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:8px;">' +
                     '<input type="checkbox" ' + (existing.required ? 'checked' : '') + ' ' +
                     'onchange="updateEligibility(\'' + cat.key + '\',\'required\',this.checked);">' +
-                    '<span style="font-size:13px;">Must meet this requirement</span></label>' +
+                    '<span style="font-size:13px;">' + T('grant.create.must_meet_requirement') + '</span></label>' +
                     '</div></div>' +
                     '</div>' : '') +
                 '</div>';
@@ -2823,18 +2827,18 @@ function renderCreateCriteria() {
                 'oninput="S.createData.criteria[' + i + '].description=this.value;">' + esc(c.description || '') + '</textarea>' +
                 '</div>' +
                 '<div class="form-group">' +
-                '<label class="form-label">Instructions for Applicants</label>' +
+                '<label class="form-label">' + T('grant.create.instructions_for_applicants') + '</label>' +
                 '<textarea class="form-control" rows="2" placeholder="Guidance for writing a strong response..." ' +
                 'oninput="S.createData.criteria[' + i + '].instructions=this.value;">' + esc(c.instructions || '') + '</textarea>' +
                 '</div>' +
                 '<div class="form-row">' +
                 '<div class="form-group">' +
-                '<label class="form-label">Example Response</label>' +
+                '<label class="form-label">' + T('grant.create.example_response') + '</label>' +
                 '<textarea class="form-control" rows="2" placeholder="Provide a sample response..." ' +
                 'oninput="S.createData.criteria[' + i + '].example=this.value;">' + esc(c.example || '') + '</textarea>' +
                 '</div>' +
                 '<div class="form-group" style="max-width:120px;">' +
-                '<label class="form-label">Max Words</label>' +
+                '<label class="form-label">' + T('grant.create.max_words') + '</label>' +
                 '<input type="number" class="form-control" value="' + (c.max_words || 500) + '" min="50" ' +
                 'oninput="S.createData.criteria[' + i + '].max_words=Number(this.value);">' +
                 '</div>' +
@@ -2909,7 +2913,7 @@ function renderCreateDocRequirements() {
                 '</div>' +
                 (enabled ? '<div class="eligibility-section-body">' +
                     '<div class="form-group">' +
-                    '<label class="form-label">Specific Requirements</label>' +
+                    '<label class="form-label">' + T('grant.create.specific_requirements') + '</label>' +
                     '<input type="text" class="form-control" placeholder="Any specific requirements for this document..." ' +
                     'value="' + esc(existing.requirements || existing.description || '') + '" ' +
                     'oninput="updateDocReq(\'' + dt.key + '\',\'requirements\',this.value);">' +
@@ -2919,7 +2923,7 @@ function renderCreateDocRequirements() {
                     '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">' +
                     '<input type="checkbox" ' + (existing.required !== false ? 'checked' : '') + ' ' +
                     'onchange="updateDocReq(\'' + dt.key + '\',\'required\',this.checked);">' +
-                    '<span style="font-size:13px;">Required document</span></label>' +
+                    '<span style="font-size:13px;">' + T('grant.create.required_document') + '</span></label>' +
                     '</div>' +
                     '<div class="form-group">' +
                     '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">' +
@@ -3012,7 +3016,7 @@ function renderCreateReporting() {
         '<p style="font-weight:600;margin-bottom:8px;">' + (d.grant_document ? '\u2705 ' + T('grant.create.grant_doc_uploaded') : '\uD83D\uDCC4 ' + T('grant.create.upload_grant_doc')) + '</p>' +
         (d.grant_document && d._docOriginalName ? '<p style="font-size:12px;color:#2d8f6f;margin-bottom:4px;"><strong>' + esc(d._docOriginalName) + '</strong>' +
             (d._docUploadTime ? ' — ' + T('grant.create.uploaded_at') + ' ' + esc(d._docUploadTime) : '') + '</p>' : '') +
-        (d._extractionStatus === 'success' ? '<div id="extraction-result" style="background:#dcfce7;color:#166534;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #22c55e;box-shadow:0 2px 8px rgba(34,197,94,0.15);">' +
+        (d._extractionStatus === 'success' ? '<div id="extraction-result" data-extraction-status="success" data-extraction-count="' + (d._extractedCount || 0) + '" style="background:#dcfce7;color:#166534;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #22c55e;box-shadow:0 2px 8px rgba(34,197,94,0.15);">' +
             '<div style="font-size:16px;margin-bottom:4px;">\u2705 ' + T('grant.create.ai_extraction_complete') + '</div>' +
             '<div>' + T('grant.create.extracted_count') + ' <strong>' + (d._extractedCount || 0) + '</strong> ' + T('grant.create.reporting_requirements').toLowerCase() +
             (d.report_template && d.report_template.template_sections ? ', <strong>' + d.report_template.template_sections.length + '</strong> ' + T('grant.create.template_sections') : '') +
@@ -3020,13 +3024,13 @@ function renderCreateReporting() {
             '</div>' +
             (d._docUploadTime ? '<div style="font-size:12px;color:#15803d;font-weight:400;margin-top:4px;">' + T('grant.create.processed_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
             '</div>' :
-         d._extractionStatus === 'empty' ? '<div id="extraction-result" style="background:#fef9c3;color:#854d0e;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #f59e0b;box-shadow:0 2px 8px rgba(245,158,11,0.12);">' +
+         d._extractionStatus === 'empty' ? '<div id="extraction-result" data-extraction-status="empty" style="background:#fef9c3;color:#854d0e;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #f59e0b;box-shadow:0 2px 8px rgba(245,158,11,0.12);">' +
             '<div style="font-size:16px;margin-bottom:4px;">\u26A0\uFE0F ' + T('grant.create.no_reqs_found') + '</div>' +
             '<div>' + T('grant.create.no_reqs_found_desc') + '</div>' +
             (d._docUploadTime ? '<div style="font-size:12px;font-weight:400;margin-top:4px;">' + T('grant.create.attempted_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
             '<button class="btn btn-sm" style="margin-top:8px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 ' + T('grant.create.retry_file') + '</button>' +
             '</div>' :
-         d._extractionStatus === 'failed' ? '<div id="extraction-result" style="background:#fee2e2;color:#991b1b;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #ef4444;box-shadow:0 2px 8px rgba(239,68,68,0.12);">' +
+         d._extractionStatus === 'failed' ? '<div id="extraction-result" data-extraction-status="failed" style="background:#fee2e2;color:#991b1b;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #ef4444;box-shadow:0 2px 8px rgba(239,68,68,0.12);">' +
             '<div style="font-size:16px;margin-bottom:4px;">\u274C ' + T('grant.create.extraction_failed') + '</div>' +
             '<div>' + T('grant.create.extraction_failed_desc') + '</div>' +
             (d._docUploadTime ? '<div style="font-size:12px;font-weight:400;margin-top:4px;">' + T('grant.create.failed_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
@@ -3037,10 +3041,17 @@ function renderCreateReporting() {
         (!d._extractionStatus ? '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\'grant-doc-upload\').click();">' +
             (d.grant_document ? T('grant.create.replace_document') : T('grant.create.choose_file')) + '</button>' : '') +
         (d._extractionStatus === 'success' ? '<button class="btn btn-sm" style="margin-top:8px;background:#f0fdf4;border:1px solid #86efac;color:#166534;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 ' + T('grant.create.upload_different_doc') + '</button>' : '') +
-        (S._extractingReqs ? '<div class="ai-analyzing" style="margin-top:16px;padding:16px;background:#eff6ff;border-radius:10px;border:2px solid #93c5fd;text-align:center;">' +
+        (S._extractingReqs ? '<div id="extraction-result" class="ai-analyzing" data-upload-phase="' + (S._uploadPhase || 'processing') + '" style="margin-top:16px;padding:16px;background:#eff6ff;border-radius:10px;border:2px solid #93c5fd;text-align:center;">' +
             '<div class="dot-pulse" style="margin-bottom:8px;"><span></span><span></span><span></span></div>' +
-            '<div style="font-size:14px;font-weight:600;color:#1e40af;">' + T('grant.create.ai_analyzing') + '</div>' +
-            '<div style="font-size:12px;color:#3b82f6;margin-top:4px;">' + T('grant.create.ai_analyzing_wait') + '</div>' +
+            '<div style="font-size:14px;font-weight:600;color:#1e40af;">' +
+            (S._uploadPhase === 'saving_draft' ? (T('grant.create.saving_draft') || 'Saving draft…') :
+             S._uploadPhase === 'uploading' ? (T('grant.create.uploading_doc') || 'Uploading document…') :
+             T('grant.create.ai_analyzing')) + '</div>' +
+            '<div style="font-size:12px;color:#3b82f6;margin-top:4px;">' +
+            (S._uploadPhase === 'saving_draft' ? (T('grant.create.saving_draft_wait') || 'Please wait while we save your grant…') :
+             S._uploadPhase === 'uploading' ? (T('grant.create.uploading_wait') || 'Transferring file to server…') :
+             T('grant.create.ai_analyzing_wait')) + '</div>' +
+            (S.createData._docOriginalName ? '<div style="font-size:11px;color:#64748b;margin-top:6px;">📄 ' + esc(S.createData._docOriginalName) + '</div>' : '') +
             '</div>' : '') +
         '</div>' +
 
@@ -3132,48 +3143,81 @@ async function uploadGrantDoc() {
     var formData = new FormData();
     formData.append('file', file);
 
+    // File size check (client-side guard for 16MB limit)
+    if (file.size > 16 * 1024 * 1024) {
+        showToast(T('toast.file_too_large') || 'File too large. Maximum size is 16 MB.', 'error');
+        return;
+    }
+
     telemetry('upload_started', { filename: file.name, size: file.size });
+
+    // Immediately show the file name and uploading phase
+    S.createData._docOriginalName = file.name;
+    S.createData._docUploadTime = new Date().toLocaleTimeString();
     S._extractingReqs = true;
+    S._uploadPhase = 'uploading';
+    S.createStep = 5;
     render();
 
-    // Need the grant ID - if editing, use it; otherwise upload to a temp endpoint
+    // Need the grant ID - if editing, use it; otherwise save draft first
     var grantId = S.createData.id;
     if (!grantId) {
-        // Save as draft first
-        var saveRes = await api('POST', '/api/grants', {
-            title: S.createData.title || 'Draft Grant',
-            description: S.createData.description || '',
-            total_funding: parseFloat(S.createData.total_funding) || 0,
-            currency: S.createData.currency || 'USD',
-            deadline: S.createData.deadline || null,
-            sectors: S.createData.sectors,
-            countries: S.createData.countries,
-            eligibility: S.createData.eligibility,
-            criteria: S.createData.criteria,
-            doc_requirements: S.createData.doc_requirements,
-            status: 'draft'
-        });
-        if (saveRes && saveRes.grant) {
-            grantId = saveRes.grant.id;
-            S.createData.id = grantId;
-        } else {
+        S._uploadPhase = 'saving_draft';
+        render();
+        try {
+            var saveRes = await api('POST', '/api/grants', {
+                title: S.createData.title || 'Draft Grant',
+                description: S.createData.description || '',
+                total_funding: parseFloat(S.createData.total_funding) || 0,
+                currency: S.createData.currency || 'USD',
+                deadline: S.createData.deadline || null,
+                sectors: S.createData.sectors,
+                countries: S.createData.countries,
+                eligibility: S.createData.eligibility,
+                criteria: S.createData.criteria,
+                doc_requirements: S.createData.doc_requirements,
+                status: 'draft'
+            });
+            if (saveRes && saveRes.grant) {
+                grantId = saveRes.grant.id;
+                S.createData.id = grantId;
+            } else {
+                S._extractingReqs = false;
+                S._uploadPhase = '';
+                S.createData._extractionStatus = 'failed';
+                S.createData._extractionError = T('toast.draft_save_failed') || 'Failed to save draft before upload';
+                showToast(T('toast.draft_save_failed') || 'Failed to save draft', 'error');
+                telemetry('extraction_failed', { filename: file.name, reason: 'draft_save_failed' });
+                render();
+                _scrollToExtractionResult();
+                return;
+            }
+        } catch (draftErr) {
             S._extractingReqs = false;
+            S._uploadPhase = '';
             S.createData._extractionStatus = 'failed';
-            S.createData._docUploadTime = new Date().toLocaleTimeString();
-            showToast(T('toast.error'), 'error');
-            telemetry('extraction_failed', { filename: file.name, reason: 'draft_save_failed' });
+            S.createData._extractionError = T('toast.draft_save_failed') || 'Failed to save draft';
+            showToast(T('toast.draft_save_failed') || 'Failed to save draft', 'error');
+            telemetry('extraction_failed', { filename: file.name, reason: 'draft_exception' });
             render();
+            _scrollToExtractionResult();
             return;
         }
     }
+
+    // Upload the document + AI extraction
+    S._uploadPhase = 'analyzing';
+    render();
 
     var res = null;
     try {
         res = await api('POST', '/api/grants/' + grantId + '/upload-grant-doc', formData);
     } catch (uploadErr) {
-        // Catch any unexpected errors from the upload
+        res = null;
     }
+
     S._extractingReqs = false;
+    S._uploadPhase = '';
 
     if (res && res.success) {
         S.createData.grant_document = res.grant_document || S.createData.grant_document;
@@ -3207,6 +3251,7 @@ async function uploadGrantDoc() {
             };
         }
 
+        S.createData._extractionError = '';
         if (S.createData._extractionStatus === 'success') {
             showToast(T('toast.ai_extracted_reqs', {count: S.createData._extractedCount}), 'success');
         } else {
@@ -3216,14 +3261,24 @@ async function uploadGrantDoc() {
     } else {
         S.createData._extractionStatus = 'failed';
         S.createData._extractedCount = 0;
+        S.createData._extractionError = T('toast.upload_failed') || 'Upload failed — please try again';
         S.createData._docUploadTime = new Date().toLocaleTimeString();
-        showToast(T('toast.error'), 'error');
+        showToast(T('toast.upload_failed') || 'Upload failed', 'error');
         telemetry('extraction_failed', { filename: file.name });
     }
 
     // Force wizard back to Reporting step so extraction status is always visible
     S.createStep = 5;
     render();
+    _scrollToExtractionResult();
+}
+
+function _scrollToExtractionResult() {
+    // Scroll to extraction result after DOM update
+    setTimeout(function() {
+        var el = document.getElementById('extraction-result');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
 }
 
 function renderCreateReview() {
@@ -3357,7 +3412,7 @@ function renderApplicantRankings() {
         '<div class="card" style="margin-bottom:24px;">' +
         '<div class="card-body" style="display:flex;gap:16px;align-items:end;">' +
         '<div class="form-group" style="margin:0;flex:1;">' +
-        '<label class="form-label">Select Grant</label>' +
+        '<label class="form-label">' + T('ranking.select_grant') + '</label>' +
         '<select class="form-control" onchange="loadRankingsByGrant(this.value);">' +
         '<option value="">-- Select a Grant --</option>' +
         grantOptions +
@@ -3381,7 +3436,7 @@ function renderRankingsTable(apps) {
     var sorted = apps.slice().sort(function(a, b) { return (b.final_score || b.ai_score || 0) - (a.final_score || a.ai_score || 0); });
 
     return '<div class="table-wrapper"><table class="table table-hover">' +
-        '<thead><tr><th>#</th><th>Organization</th><th>Country</th><th>Capacity</th><th>AI Score</th><th>Human Score</th><th>Final Score</th><th>Status</th><th></th></tr></thead>' +
+        '<thead><tr><th>#</th><th>' + T('verification.organization') + '</th><th>' + T('verification.country') + '</th><th>' + T('dashboard.stat.capacity_score') + '</th><th>' + T('ranking.ai_score') + '</th><th>' + T('ranking.human_score') + '</th><th>' + T('ranking.final_score') + '</th><th>' + T('application.tab.status') + '</th><th></th></tr></thead>' +
         '<tbody>' +
         sorted.map(function(a, i) {
             return '<tr style="cursor:pointer;" onclick="viewApplication(' + a.id + ')">' +
@@ -3750,18 +3805,18 @@ function renderAssessProfile() {
         'oninput="S.assessOrgProfile.annual_budget=this.value;">' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Number of Staff</label>' +
+        '<label class="form-label">' + T('assessment.number_of_staff') + '</label>' +
         '<input type="number" class="form-control" value="' + esc(p.staff_count || '') + '" ' +
         'oninput="S.assessOrgProfile.staff_count=this.value;">' +
         '</div>' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Mission Statement</label>' +
+        '<label class="form-label">' + T('assessment.mission_statement') + '</label>' +
         '<textarea class="form-control" rows="3" ' +
         'oninput="S.assessOrgProfile.mission=this.value;">' + esc(p.mission || '') + '</textarea>' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Key Sectors</label>' +
+        '<label class="form-label">' + T('assessment.key_sectors') + '</label>' +
         '<input type="text" class="form-control" value="' + esc(p.sectors || '') + '" placeholder="Health, Education, etc." ' +
         'oninput="S.assessOrgProfile.sectors=this.value;">' +
         '</div>' +
@@ -3824,7 +3879,7 @@ function renderAssessDocUpload() {
                     '<div class="file-info"><div class="file-name">' + esc(uploaded.name) + '</div></div>' +
                     '</div>' :
                     '<div class="upload-zone" style="padding:20px;" onclick="triggerAssessUpload(\'' + dt.key + '\')">' +
-                    '<div class="upload-text"><strong>Click to upload</strong> ' + esc(dt.label) + '</div>' +
+                    '<div class="upload-text"><strong>' + T('common.click_to_upload') + '</strong> ' + esc(dt.label) + '</div>' +
                     '</div>' +
                     '<input type="file" id="assess-file-' + dt.key + '" style="display:none;" ' +
                     'accept=".pdf,.doc,.docx" onchange="handleAssessUpload(event,\'' + dt.key + '\')">'
@@ -4055,15 +4110,15 @@ function renderMyDocuments() {
         '<div class="form-group">' +
         '<label class="form-label">' + T('document.type') + '</label>' +
         '<select class="form-control" id="doc-upload-type">' +
-        '<option value="financial_report">Financial Report</option>' +
-        '<option value="registration">Registration Certificate</option>' +
-        '<option value="audit">Audit Report</option>' +
-        '<option value="psea">PSEA Policy</option>' +
-        '<option value="project_report">Project Report</option>' +
-        '<option value="budget">Budget Detail</option>' +
-        '<option value="cv">Staff CVs</option>' +
-        '<option value="strategic_plan">Strategic Plan</option>' +
-        '<option value="other">Other</option>' +
+        '<option value="financial_report">' + T('document.type.financial_report') + '</option>' +
+        '<option value="registration">' + T('document.type.registration_certificate') + '</option>' +
+        '<option value="audit">' + T('document.type.audit_report') + '</option>' +
+        '<option value="psea">' + T('document.type.psea_policy') + '</option>' +
+        '<option value="project_report">' + T('document.type.project_report') + '</option>' +
+        '<option value="budget">' + T('document.type.budget_detail') + '</option>' +
+        '<option value="cv">' + T('document.type.staff_cvs') + '</option>' +
+        '<option value="strategic_plan">' + T('document.type.strategic_plan') + '</option>' +
+        '<option value="other">' + T('document.type.other') + '</option>' +
         '</select>' +
         '</div>' +
         '</div>' +
@@ -4135,7 +4190,7 @@ async function loadComplianceData() {
     if (!el) return;
     if (res && res.checks && res.checks.length) {
         el.innerHTML = '<div class="table-wrapper"><table class="table">' +
-            '<thead><tr><th>Check</th><th>Description</th><th>Status</th><th>Last Updated</th></tr></thead><tbody>' +
+            '<thead><tr><th>' + T('compliance.check_type') + '</th><th>' + T('grant.create.description') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('common.last_updated') + '</th></tr></thead><tbody>' +
             res.checks.map(function(c) {
                 return '<tr><td style="font-weight:500;">' + esc(c.name || c.check) + '</td>' +
                     '<td style="color:#64748b;">' + esc(c.description || '') + '</td>' +
@@ -4325,7 +4380,7 @@ async function loadReportsUpcoming() {
         '<div class="card-body">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
         '<h3 style="font-weight:600;">' + (isNGO ? '\uD83D\uDCC5 Upcoming Deadlines' : '\uD83D\uDCC5 Expected Reports') + '</h3>' +
-        (overdueCount > 0 ? '<span class="badge badge-red">' + overdueCount + ' overdue</span>' : '<span class="badge badge-green">All on track</span>') +
+        (overdueCount > 0 ? '<span class="badge badge-red">' + overdueCount + ' ' + T('report.overdue').toLowerCase() + '</span>' : '<span class="badge badge-green">' + T('report.all_on_track') + '</span>') +
         '</div>' +
         '<div class="table-wrapper"><table class="table table-hover"><thead><tr>' +
         '<th>Report</th><th>' + (isNGO ? 'Grant' : 'NGO') + '</th><th>Due</th><th>Status</th><th>Action</th>' +
@@ -4334,7 +4389,7 @@ async function loadReportsUpcoming() {
             var isOverdue = r.is_overdue;
             var daysText = isOverdue ? Math.abs(r.days_until_due) + 'd overdue' : r.days_until_due + 'd left';
             var badgeCls = isOverdue ? 'badge-red' : r.days_until_due <= 7 ? 'badge-amber' : 'badge-outline';
-            var statusBadge = r.status === 'not_started' || r.status === 'not_submitted' ? '<span class="badge badge-outline">Not Started</span>' :
+            var statusBadge = r.status === 'not_started' || r.status === 'not_submitted' ? '<span class="badge badge-outline">' + T('common.not_started') + '</span>' :
                 '<span class="badge badge-' + (r.status === 'draft' ? 'outline' : r.status === 'submitted' ? 'blue' : 'amber') + '">' + esc(r.status).replace(/_/g, ' ') + '</span>';
             var actionBtn = '';
             if (isNGO) {
@@ -4531,7 +4586,7 @@ function renderSubmitReport() {
     var grantSelector = '';
     if (!r.id && S.reportGrants && S.reportGrants.length > 1) {
         grantSelector = '<div class="card" style="margin-bottom:16px;"><div class="card-body" style="padding:12px 16px;">' +
-            '<label class="form-label" style="font-weight:600;">Select Grant to Report On</label>' +
+            '<label class="form-label" style="font-weight:600;">' + T('report.select_grant_to_report') + '</label>' +
             '<select class="form-control" onchange="changeReportGrant(this.value);">' +
             S.reportGrants.map(function(a) {
                 return '<option value="' + a.grant_id + ':' + a.id + '"' + (r.grant_id == a.grant_id ? ' selected' : '') + '>' +
@@ -4563,7 +4618,7 @@ function renderSubmitReport() {
         '</div>' +
         '</div>' +
         '<div class="form-group">' +
-        '<label class="form-label">Report Title</label>' +
+        '<label class="form-label">' + T('report.report_title') + '</label>' +
         '<input type="text" class="form-control" placeholder="e.g., Q1 2026 Progress Report" ' +
         'value="' + esc(r.title) + '" oninput="S.newReport.title=this.value;">' +
         '</div>' +
@@ -4764,7 +4819,7 @@ function renderReviewReport() {
             '<div class="card-body">' +
             '<h3 style="font-weight:600;margin-bottom:12px;">\uD83D\uDD0D Review Actions</h3>' +
             '<div class="form-group">' +
-            '<label class="form-label">Review Notes</label>' +
+            '<label class="form-label">' + T('report.review_notes') + '</label>' +
             '<textarea class="form-control" rows="3" id="review-notes" placeholder="Add feedback or notes for the grantee..."></textarea>' +
             '</div>' +
             '<div style="display:flex;gap:12px;">' +
@@ -4939,7 +4994,7 @@ async function loadVerificationData() {
     if (!el) return;
 
     var rows = orgs.map(function(o) {
-        var regNum = o.registration_number ? esc(o.registration_number) : '<span style="color:#dc2626;">Not provided</span>';
+        var regNum = o.registration_number ? esc(o.registration_number) : '<span style="color:#dc2626;">' + T('common.not_provided') + '</span>';
         var registryLink = o.registry_search_url ?
             '<a href="' + esc(o.registry_search_url) + '" target="_blank" style="color:#2563eb;text-decoration:underline;font-size:12px;">Check Registry \u2197</a>' :
             (o.registry_url ? '<a href="' + esc(o.registry_url) + '" target="_blank" style="color:#2563eb;text-decoration:underline;font-size:12px;">Registry \u2197</a>' : '');
@@ -5192,14 +5247,14 @@ async function loadRegistryDirectory() {
         '<h3 style="font-weight:600;margin-bottom:16px;">\uD83C\uDF10 Government NGO Registries Directory</h3>' +
         '<p style="color:#64748b;margin-bottom:16px;">Direct links to government registries where you can manually verify NGO registrations. Use these for cross-referencing AI verification results.</p>' +
         '<div class="table-wrapper"><table class="table"><thead><tr>' +
-        '<th>Country</th><th>Registration Authority</th><th>Expected Format</th><th>Links</th>' +
+        '<th>' + T('verification.country') + '</th><th>' + T('verification.registration_authority') + '</th><th>' + T('verification.expected_format') + '</th><th>' + T('common.actions') + '</th>' +
         '</tr></thead><tbody>' +
         countries.map(function(c) {
             var r = res.registries[c];
             var links = '';
             if (r.search_url) links += '<a href="' + esc(r.search_url) + '" target="_blank" class="btn btn-primary btn-sm" style="margin-right:4px;">\uD83D\uDD0D Search</a>';
             if (r.url) links += '<a href="' + esc(r.url) + '" target="_blank" class="btn btn-secondary btn-sm">\uD83C\uDF10 Website</a>';
-            if (!r.search_url && !r.url) links = '<span style="color:#94a3b8;font-size:12px;">No online portal available</span>';
+            if (!r.search_url && !r.url) links = '<span style="color:#94a3b8;font-size:12px;">' + T('verification.no_online_portal') + '</span>';
             return '<tr>' +
                 '<td style="font-weight:600;">\uD83C\uDFF3\uFE0F ' + esc(c) + '</td>' +
                 '<td style="font-size:13px;">' + esc(r.authority) + '<br><span style="font-size:11px;color:#94a3b8;">' + esc(r.notes || '') + '</span></td>' +

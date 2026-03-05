@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 
 from flask import request, jsonify, send_from_directory
 from flask_login import current_user
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.extensions import db
 
@@ -24,6 +25,14 @@ APP_START_TIME = datetime.now(timezone.utc)
 def register_middleware(app):
     """Register all middleware (before/after request hooks) with the Flask app."""
 
+    # Trust reverse proxy headers (Railway, Heroku, etc.) so request.is_secure works
+    # x_for=1: trust X-Forwarded-For (1 proxy hop)
+    # x_proto=1: trust X-Forwarded-Proto (critical for HSTS)
+    # x_host=1: trust X-Forwarded-Host
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+    is_production = os.getenv('DATABASE_URL') is not None
+
     @app.after_request
     def add_security_headers(response):
         """Add enterprise security headers to every response."""
@@ -33,9 +42,24 @@ def register_middleware(app):
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
         response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.anthropic.com; frame-ancestors 'none'"
-        if request.is_secure:
+        # HSTS: always set in production (Railway terminates TLS at proxy)
+        if is_production or request.is_secure:
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         return response
+
+    @app.before_request
+    def check_content_length():
+        """Reject oversized requests early with a clear 413 response.
+        Prevents backend 503 errors from Gunicorn/proxy for large payloads."""
+        max_size = app.config.get('MAX_CONTENT_LENGTH', 16 * 1024 * 1024)
+        content_length = request.content_length
+        if content_length and content_length > max_size:
+            size_mb = content_length / (1024 * 1024)
+            max_mb = max_size / (1024 * 1024)
+            return jsonify({
+                'error': f'File too large ({size_mb:.1f} MB). Maximum size is {max_mb:.0f} MB.',
+                'success': False,
+            }), 413
 
     @app.before_request
     def csrf_protect():

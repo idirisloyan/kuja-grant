@@ -29,6 +29,11 @@ class User(UserMixin, db.Model):
                            onupdate=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, default=True)
 
+    # Brute-force lockout fields (database-backed, works across Gunicorn workers)
+    failed_login_count = db.Column(db.Integer, default=0)
+    last_failed_login = db.Column(db.DateTime, nullable=True)
+    locked_until = db.Column(db.DateTime, nullable=True)
+
     # Relationships
     organization = db.relationship('Organization', backref=db.backref('users', lazy='dynamic'))
     reviews = db.relationship('Review', backref='reviewer', lazy='dynamic')

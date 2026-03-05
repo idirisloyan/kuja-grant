@@ -18,9 +18,7 @@
   "auth.logout": "Logout",
   "auth.session_expired": "Session expired. Please log in again.",
   "auth.logged_out": "You have been logged out.",
-
   "header.kuja_grant": "Kuja Grant",
-
   "nav.dashboard": "Dashboard",
   "nav.assessment_hub": "Assessment Hub",
   "nav.browse_grants": "Browse Grants",
@@ -40,7 +38,6 @@
   "nav.admin_dashboard": "Admin Dashboard",
   "nav.all_grants": "All Grants",
   "nav.all_applications": "All Applications",
-
   "dashboard.welcome": "Welcome, {name}",
   "dashboard.quick_actions": "Quick Actions",
   "dashboard.recent_activity": "Recent Activity",
@@ -67,7 +64,6 @@
   "dashboard.action.view_reports": "View Reports",
   "dashboard.action.review_apps": "Review Applications",
   "dashboard.no_activity": "No recent activity to display.",
-
   "grant.title": "Grants",
   "grant.browse_title": "Browse Open Grants",
   "grant.my_grants": "My Grants",
@@ -98,7 +94,6 @@
   "grant.detail.published": "Published",
   "grant.detail.currency": "Currency",
   "grant.detail.reporting_frequency": "Reporting Frequency",
-
   "grant.create.title": "Create New Grant",
   "grant.create.step1": "Basic Information",
   "grant.create.step2": "Eligibility & Criteria",
@@ -132,7 +127,6 @@
   "grant.create.publishing": "Publishing...",
   "grant.create.published_success": "Grant published successfully!",
   "grant.create.draft_saved": "Draft saved successfully.",
-
   "application.title": "Applications",
   "application.my_applications": "My Applications",
   "application.no_applications": "No applications yet.",
@@ -147,7 +141,6 @@
   "application.donor": "Donor",
   "application.ai_score": "AI Score",
   "application.submitted_at": "Submitted",
-
   "apply.title": "Apply for Grant",
   "apply.step1": "Eligibility",
   "apply.step2": "Responses",
@@ -167,7 +160,6 @@
   "apply.submitted_success": "Application submitted successfully!",
   "apply.save_draft": "Save Draft",
   "apply.draft_saved": "Draft saved.",
-
   "assessment.title": "Assessment Hub",
   "assessment.start_new": "Start New Assessment",
   "assessment.select_framework": "Select Framework",
@@ -199,7 +191,6 @@
   "assessment.score_adequate": "Adequate",
   "assessment.score_needs_improvement": "Needs Improvement",
   "assessment.score_critical": "Critical",
-
   "assessment.checklist.board_exists": "Board of directors in place and active",
   "assessment.checklist.board_meets_regularly": "Regular board meetings documented",
   "assessment.checklist.strategic_plan": "Written strategic plan exists",
@@ -226,7 +217,6 @@
   "assessment.checklist.indicator_tracking": "Indicator tracking system",
   "assessment.checklist.evaluation_reports": "Evaluation reports produced",
   "assessment.checklist.learning_integration": "Learning integrated into programs",
-
   "assessment.checklist.legal_registration": "Current legal registration and compliance",
   "assessment.checklist.governing_body": "Active and effective governing body",
   "assessment.checklist.strategic_direction": "Clear strategic direction and plans",
@@ -253,7 +243,6 @@
   "assessment.checklist.monitoring_systems": "Monitoring systems in place",
   "assessment.checklist.reporting_quality": "Quality reporting to stakeholders",
   "assessment.checklist.sustainability_planning": "Sustainability and exit planning",
-
   "assessment.checklist.legal_status": "Legal status and registration verified",
   "assessment.checklist.governance_structure": "Governance structure documented",
   "assessment.checklist.mandate_alignment": "Mandate aligns with program objectives",
@@ -276,7 +265,6 @@
   "assessment.checklist.procurement_documentation": "Procurement documentation maintained",
   "assessment.checklist.contract_management": "Contract management procedures",
   "assessment.checklist.supplier_management": "Supplier management and evaluation",
-
   "assessment.checklist.needs_based_response": "Response is based on assessed needs",
   "assessment.checklist.timeliness": "Timely response to humanitarian needs",
   "assessment.checklist.appropriate_response": "Response is appropriate and relevant",
@@ -304,7 +292,6 @@
   "assessment.checklist.evaluation_practice": "Regular evaluation practice",
   "assessment.checklist.knowledge_sharing": "Knowledge sharing mechanisms",
   "assessment.checklist.continuous_improvement": "Continuous improvement processes",
-
   "assessment.checklist.legal_framework": "Legal framework and compliance",
   "assessment.checklist.board_effectiveness": "Board effectiveness and oversight",
   "assessment.checklist.leadership_quality": "Leadership quality and vision",
@@ -331,7 +318,6 @@
   "assessment.checklist.knowledge_management": "Knowledge management",
   "assessment.checklist.adaptive_programming": "Adaptive programming approaches",
   "assessment.checklist.impact_measurement": "Impact measurement and reporting",
-
   "assessment.category.governance_leadership": "Governance & Leadership",
   "assessment.category.financial_management": "Financial Management",
   "assessment.category.program_management": "Program Management",
@@ -358,7 +344,6 @@
   "assessment.category.program_delivery": "Program Delivery",
   "assessment.category.people_culture": "People & Culture",
   "assessment.category.learning_adaptation": "Learning & Adaptation",
-
   "report.title": "Reports",
   "report.submit_new": "Submit New Report",
   "report.no_reports": "No reports found.",
@@ -387,7 +372,6 @@
   "report.accept": "Accept Report",
   "report.request_revision": "Request Revision",
   "report.revision_notes": "Revision Notes",
-
   "compliance.title": "Compliance Screening",
   "compliance.run_screening": "Run Screening",
   "compliance.screening_results": "Screening Results",
@@ -400,7 +384,6 @@
   "compliance.check_type.registration": "Registration Check",
   "compliance.org_name": "Organization",
   "compliance.checked_at": "Checked At",
-
   "verification.title": "Registration Verification",
   "verification.run_check": "Run Verification",
   "verification.no_results": "No verification checks found.",
@@ -414,7 +397,6 @@
   "verification.verify": "Verify",
   "verification.flag": "Flag",
   "verification.verified_by": "Verified By",
-
   "document.title": "Documents",
   "document.upload": "Upload Document",
   "document.no_documents": "No documents uploaded.",
@@ -426,7 +408,6 @@
   "document.view_analysis": "View Analysis",
   "document.analyzing": "Analyzing...",
   "document.analysis_complete": "Analysis complete.",
-
   "org.title": "Organization Profile",
   "org.edit_profile": "Edit Profile",
   "org.save_profile": "Save Profile",
@@ -449,7 +430,6 @@
   "org.search_placeholder": "Search organizations...",
   "org.no_results": "No organizations found.",
   "org.capacity_score": "Capacity Score",
-
   "review.title": "Review",
   "review.assignments": "My Assignments",
   "review.no_assignments": "No assignments found.",
@@ -463,7 +443,6 @@
   "review.comments": "Comments",
   "review.score_label": "Score (0-100)",
   "review.completed": "Completed Reviews",
-
   "ranking.title": "Application Rankings",
   "ranking.rank": "Rank",
   "ranking.applicant": "Applicant",
@@ -472,7 +451,6 @@
   "ranking.final_score": "Final Score",
   "ranking.award": "Award",
   "ranking.reject": "Reject",
-
   "ai.panel_title": "Kuja AI Assistant",
   "ai.placeholder": "Ask about grant writing, compliance, reporting...",
   "ai.send": "Send",
@@ -480,7 +458,6 @@
   "ai.welcome": "Hi! I'm the Kuja AI Assistant. Ask me anything about grants, applications, or your organization.",
   "ai.error": "AI service temporarily unavailable. Please try again.",
   "ai.clear_chat": "Clear Chat",
-
   "common.loading": "Loading...",
   "common.save": "Save",
   "common.cancel": "Cancel",
@@ -514,7 +491,6 @@
   "common.per_page": "per page",
   "common.total": "Total",
   "common.refresh": "Refresh",
-
   "status.draft": "Draft",
   "status.open": "Open",
   "status.submitted": "Submitted",
@@ -537,13 +513,11 @@
   "status.ai_reviewed": "AI Reviewed",
   "status.verified": "Verified",
   "status.expired": "Expired",
-
   "frequency.monthly": "Monthly",
   "frequency.quarterly": "Quarterly",
   "frequency.semi_annual": "Semi-Annual",
   "frequency.annual": "Annual",
   "frequency.final_only": "Final Only",
-
   "toast.saved": "Changes saved successfully.",
   "toast.error": "Something went wrong. Please try again.",
   "toast.copied": "Copied to clipboard.",
@@ -570,7 +544,6 @@
   "toast.no_verification_record": "No verification record found. Run verification first.",
   "toast.registration_verified": "Registration marked as verified!",
   "toast.registration_flagged": "Registration flagged for review.",
-
   "grant.create.reporting_requirements": "Reporting Requirements",
   "grant.create.reporting_requirements_desc": "Define what reports grantees must submit. Upload your grant document and AI will extract requirements automatically.",
   "grant.create.upload_grant_doc": "Upload Grant Document",
@@ -593,8 +566,8 @@
   "grant.create.replace_document": "Replace Document",
   "grant.create.choose_file": "Choose File",
   "grant.create.upload_different_doc": "Upload Different Document",
-  "grant.create.ai_analyzing": "AI is analyzing your document\u2026",
-  "grant.create.ai_analyzing_wait": "This may take 15\u201330 seconds. Please do not navigate away.",
+  "grant.create.ai_analyzing": "AI is analyzing your document…",
+  "grant.create.ai_analyzing_wait": "This may take 15–30 seconds. Please do not navigate away.",
   "grant.create.default_reporting_freq": "Default Reporting Frequency",
   "grant.create.required_reports": "Required Reports",
   "grant.create.no_reqs_yet": "No reporting requirements added yet. Upload a grant document for AI to extract them, or add manually below.",
@@ -606,7 +579,6 @@
   "grant.create.add_requirement": "+ Add Requirement",
   "grant.create.due_days": "Due: {days} days after period end",
   "grant.create.report_template_sections": "Report Template Sections",
-
   "grant.create.review_publish": "Review & Publish",
   "grant.create.basic_information": "Basic Information",
   "grant.create.configuration": "Configuration",
@@ -623,16 +595,13 @@
   "grant.create.review_reporting_freq": "Reporting Frequency:",
   "grant.create.fill_required_warning": "Please fill in all required fields before publishing:",
   "grant.create.criteria_weight_warning": "Criteria weights must total 100% (currently {weight}%)",
-
   "grant.create.ai_suggested_criteria": "AI Suggested Criteria",
-
   "verification.detail_title": "Verification Details:",
   "verification.registration_info": "Registration Information",
   "verification.registered": "Registered",
   "verification.expires": "Expires",
   "verification.expired_label": "EXPIRED",
   "verification.government_registry": "Government Registry",
-
   "application.proposal_responses": "Proposal Responses",
   "application.eligibility_responses": "Eligibility Responses",
   "application.uploaded_documents": "Uploaded Documents",
@@ -641,14 +610,10 @@
   "application.reviews": "Reviews",
   "application.document_analysis": "Document Analysis",
   "application.donor_req_compliance": "Donor Requirement Compliance",
-
   "org.details": "Organization Details",
-
   "wizard.step": "Step {current} of {total}",
-
   "table.no_results": "No results found.",
   "table.showing": "Showing {start} to {end} of {total}",
-
   "sector.health": "Health",
   "sector.education": "Education",
   "sector.wash": "WASH",
@@ -660,5 +625,53 @@
   "sector.gender": "Gender Equality",
   "sector.environment": "Environment",
   "sector.governance": "Governance",
-  "sector.peacebuilding": "Peacebuilding"
+  "sector.peacebuilding": "Peacebuilding",
+  "grant.create.saving_draft": "Saving draft…",
+  "grant.create.saving_draft_wait": "Please wait while we save your grant…",
+  "grant.create.uploading_doc": "Uploading document…",
+  "grant.create.uploading_wait": "Transferring file to server…",
+  "toast.draft_save_failed": "Failed to save draft before upload",
+  "toast.upload_failed": "Upload failed — please try again",
+  "toast.file_too_large": "File too large. Maximum size is 16 MB.",
+  "common.please_wait": "Please wait.",
+  "common.page_not_found": "Page Not Found",
+  "common.page_not_found_desc": "The page you are looking for does not exist.",
+  "common.go_to_dashboard": "Go to Dashboard",
+  "common.due_date": "Due Date",
+  "common.not_started": "Not Started",
+  "common.last_updated": "Last Updated",
+  "common.upload_failed": "Upload failed.",
+  "common.click_to_retry": "Click to try again",
+  "common.click_to_upload": "Click to upload",
+  "common.not_provided": "Not provided",
+  "assessment.org_capacity": "Organizational Capacity",
+  "assessment.view_assessment": "View Assessment",
+  "assessment.number_of_staff": "Number of Staff",
+  "assessment.mission_statement": "Mission Statement",
+  "assessment.key_sectors": "Key Sectors",
+  "grant.create_first": "Create Your First Grant",
+  "grant.create.view_example_response": "View Example Response",
+  "grant.create.must_meet_requirement": "Must meet this requirement",
+  "grant.create.instructions_for_applicants": "Instructions for Applicants",
+  "grant.create.example_response": "Example Response",
+  "grant.create.max_words": "Max Words",
+  "grant.create.specific_requirements": "Specific Requirements",
+  "grant.create.required_document": "Required document",
+  "ranking.select_grant": "Select Grant",
+  "document.type.financial_report": "Financial Report",
+  "document.type.registration_certificate": "Registration Certificate",
+  "document.type.audit_report": "Audit Report",
+  "document.type.psea_policy": "PSEA Policy",
+  "document.type.project_report": "Project Report",
+  "document.type.budget_detail": "Budget Detail",
+  "document.type.staff_cvs": "Staff CVs",
+  "document.type.strategic_plan": "Strategic Plan",
+  "document.type.other": "Other",
+  "report.all_on_track": "All on track",
+  "report.select_grant_to_report": "Select Grant to Report On",
+  "report.report_title": "Report Title",
+  "report.review_notes": "Review Notes",
+  "verification.registration_authority": "Registration Authority",
+  "verification.expected_format": "Expected Format",
+  "verification.no_online_portal": "No online portal available"
 }

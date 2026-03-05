@@ -41,8 +41,9 @@ def main():
                 if rows:
                     current = rows[0][0]
                     print(f"pre_deploy: Current alembic revision: {current}")
-                    # If revision is NOT our new combined one, clear it
-                    if current != 'v300_combined':
+                    # Known valid revisions (cumulative migration chain)
+                    valid_revisions = {'v300_combined', 'v301_lockout'}
+                    if current not in valid_revisions:
                         conn.execute(sqlalchemy.text(
                             "DELETE FROM alembic_version"
                         ))

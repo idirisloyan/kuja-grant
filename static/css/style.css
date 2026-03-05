@@ -2034,6 +2034,49 @@ a:focus-visible {
   direction: ltr; /* keep score bars left-to-right */
 }
 
+/* Extraction result + upload feedback RTL */
+[dir="rtl"] .ai-analyzing {
+  text-align: center;
+  direction: rtl;
+}
+
+[dir="rtl"] #extraction-result {
+  text-align: right;
+  direction: rtl;
+}
+
+/* Wizard actions RTL */
+[dir="rtl"] .wizard-actions {
+  flex-direction: row-reverse;
+}
+
+/* Quick action cards RTL */
+[dir="rtl"] .quick-action {
+  text-align: right;
+}
+
+/* Assessment framework tabs RTL */
+[dir="rtl"] .framework-tabs {
+  flex-direction: row-reverse;
+}
+
+/* Inline flex row-reverse for RTL */
+[dir="rtl"] .flex-row {
+  flex-direction: row-reverse;
+}
+
+/* Report cards and compliance items RTL */
+[dir="rtl"] .report-card,
+[dir="rtl"] .compliance-item {
+  text-align: right;
+}
+
+/* Search input RTL */
+[dir="rtl"] input[type="search"],
+[dir="rtl"] input[type="text"] {
+  text-align: right;
+}
+
 /* Mobile responsive RTL */
 @media (max-width: 768px) {
   [dir="rtl"] .main-content {
