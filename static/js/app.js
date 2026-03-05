@@ -3143,9 +3143,16 @@ async function uploadGrantDoc() {
     var formData = new FormData();
     formData.append('file', file);
 
-    // File size check (client-side guard for 16MB limit)
+    // Client-side validations — reject before wasting bandwidth
+    if (file.size === 0 || file.size < 100) {
+        showToast(T('toast.file_empty') || 'File is empty or too small. Please upload a valid document.', 'error');
+        input.value = '';
+        return;
+    }
     if (file.size > 16 * 1024 * 1024) {
-        showToast(T('toast.file_too_large') || 'File too large. Maximum size is 16 MB.', 'error');
+        var sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+        showToast((T('toast.file_too_large') || 'File too large') + ' (' + sizeMB + ' MB). Maximum size is 16 MB.', 'error');
+        input.value = '';
         return;
     }
 
