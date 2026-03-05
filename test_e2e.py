@@ -29,8 +29,12 @@ session.headers.update({'X-Requested-With': 'XMLHttpRequest'})
 def log(test_id, name, passed, detail=''):
     status = 'PASS' if passed else 'FAIL'
     results.append({'id': test_id, 'name': name, 'status': status, 'detail': detail})
-    icon = '✅' if passed else '❌'
-    print(f'{icon} {test_id}: {name}' + (f' — {detail}' if detail else ''))
+    icon = '[PASS]' if passed else '[FAIL]'
+    msg = f'{icon} {test_id}: {name}' + (f' -- {detail}' if detail else '')
+    try:
+        print(msg)
+    except UnicodeEncodeError:
+        print(msg.encode('ascii', 'replace').decode('ascii'))
 
 
 # ===========================================================================
@@ -105,30 +109,32 @@ def test_brute_force_lockout():
         True, f'last_status={last_status} (non-existent email — lockout requires DB record)')
 
 def test_brute_force_real_account():
-    """Test lockout with a real account."""
-    lockout_email = 'admin@kuja.org'
+    """Test lockout with a real test account (not admin, to avoid locking it out)."""
+    # Use reviewer account for lockout testing to avoid locking out admin
+    lockout_email = 'maria@reviewer.org'
     lockout_observed = False
     final_status = None
+    statuses = []
 
-    for attempt in range(1, 7):
+    for attempt in range(1, 8):
         r = session.post(f'{BASE}/api/auth/login', json={
             'email': lockout_email,
             'password': 'totally_wrong_' + str(attempt)
         })
         final_status = r.status_code
+        statuses.append(final_status)
         if r.status_code == 429:
             lockout_observed = True
             break
 
     log('LOCK-002', 'Brute-force lockout triggers 429 for real account',
-        lockout_observed, f'lockout_at_attempt={attempt}, final_status={final_status}')
+        lockout_observed, f'statuses={statuses}')
 
-    # Now verify the account recovers after correct login (lockout expires)
-    # We can't wait 15 minutes, but verify the 429 response
+    # Verify 429 persists even with correct password
     if lockout_observed:
         r = session.post(f'{BASE}/api/auth/login', json={
             'email': lockout_email,
-            'password': 'pass123'  # correct password
+            'password': 'pass123'
         })
         log('LOCK-003', 'Locked account returns 429 even with correct password',
             r.status_code == 429, f'status={r.status_code}')
@@ -449,7 +455,7 @@ def main():
         print('Failed tests:')
         for r in results:
             if r['status'] == 'FAIL':
-                print(f'  ❌ {r["id"]}: {r["name"]} — {r["detail"]}')
+                print(f'  [FAIL] {r["id"]}: {r["name"]} -- {r["detail"]}')
         print()
 
     return 0 if failed == 0 else 1

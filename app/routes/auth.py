@@ -17,6 +17,43 @@ LOCKOUT_WINDOW_MINUTES = 5       # Rolling window for counting failures
 LOCKOUT_DURATION_MINUTES = 15    # How long the lockout lasts
 
 
+def _has_lockout_columns():
+    """Check whether the users table has lockout columns (migration may be pending)."""
+    try:
+        inspector = db.inspect(db.engine)
+        columns = [c['name'] for c in inspector.get_columns('users')]
+        return 'failed_login_count' in columns and 'locked_until' in columns
+    except Exception:
+        return False
+
+
+# Cache the check so we don't inspect every request
+_lockout_ready = None
+
+
+def _lockout_enabled():
+    global _lockout_ready
+    if _lockout_ready is None:
+        try:
+            _lockout_ready = _has_lockout_columns()
+            if _lockout_ready:
+                logger.info("Database lockout columns available — brute-force protection active")
+            else:
+                logger.warning("Database lockout columns not found — brute-force protection inactive (run migration)")
+        except Exception:
+            _lockout_ready = False
+    return _lockout_ready
+
+
+def _safe_get(user, attr, default=None):
+    """Safely access a lockout attribute that may not exist in the database."""
+    try:
+        val = getattr(user, attr, default)
+        return val if val is not None else default
+    except Exception:
+        return default
+
+
 @auth_bp.route('/login', methods=['POST'])
 def api_login():
     """Authenticate user with email and password. Database-backed rate limiting."""
@@ -29,65 +66,85 @@ def api_login():
 
     user = User.query.filter_by(email=email).first()
 
+    lockout_active = _lockout_enabled()
+
     # --- Database-backed lockout check (works across all Gunicorn workers) ---
-    if user and user.locked_until:
-        now = datetime.now(timezone.utc)
-        if now < user.locked_until:
-            remaining_seconds = int((user.locked_until - now).total_seconds())
-            remaining_minutes = max(1, remaining_seconds // 60)
-            logger.warning(
-                f"Login locked out: {email} from {request.remote_addr} "
-                f"({remaining_seconds}s remaining)"
-            )
-            return jsonify({
-                'success': False,
-                'error': f'Too many failed attempts. Account locked for {remaining_minutes} minute(s). Try again later.',
-            }), 429
-        else:
-            # Lockout expired — reset
-            user.failed_login_count = 0
-            user.locked_until = None
-            db.session.commit()
+    if lockout_active and user:
+        try:
+            locked_until = _safe_get(user, 'locked_until')
+            if locked_until:
+                now = datetime.now(timezone.utc)
+                # Handle timezone-naive timestamps from DB
+                if locked_until.tzinfo is None:
+                    locked_until = locked_until.replace(tzinfo=timezone.utc)
+                if now < locked_until:
+                    remaining_seconds = int((locked_until - now).total_seconds())
+                    remaining_minutes = max(1, remaining_seconds // 60)
+                    logger.warning(
+                        f"Login locked out: {email} from {request.remote_addr} "
+                        f"({remaining_seconds}s remaining)"
+                    )
+                    return jsonify({
+                        'success': False,
+                        'error': f'Too many failed attempts. Account locked for {remaining_minutes} minute(s). Try again later.',
+                    }), 429
+                else:
+                    # Lockout expired — reset
+                    user.failed_login_count = 0
+                    user.locked_until = None
+                    db.session.commit()
+        except Exception as e:
+            logger.error(f"Lockout check failed: {e}")
+            db.session.rollback()
 
     # --- Validate credentials ---
     if not user or not user.check_password(password):
-        if user:
-            now = datetime.now(timezone.utc)
-            window_start = now - timedelta(minutes=LOCKOUT_WINDOW_MINUTES)
+        if lockout_active and user:
+            try:
+                now = datetime.now(timezone.utc)
+                window_start = now - timedelta(minutes=LOCKOUT_WINDOW_MINUTES)
 
-            # Reset counter if last failure was outside the window
-            if user.last_failed_login and user.last_failed_login < window_start:
-                user.failed_login_count = 0
+                # Reset counter if last failure was outside the window
+                last_failed = _safe_get(user, 'last_failed_login')
+                if last_failed:
+                    if last_failed.tzinfo is None:
+                        last_failed = last_failed.replace(tzinfo=timezone.utc)
+                    if last_failed < window_start:
+                        user.failed_login_count = 0
 
-            user.failed_login_count = (user.failed_login_count or 0) + 1
-            user.last_failed_login = now
+                user.failed_login_count = (_safe_get(user, 'failed_login_count', 0)) + 1
+                user.last_failed_login = now
 
-            remaining = max(0, MAX_LOGIN_ATTEMPTS - user.failed_login_count)
+                remaining = max(0, MAX_LOGIN_ATTEMPTS - user.failed_login_count)
 
-            if user.failed_login_count >= MAX_LOGIN_ATTEMPTS:
-                user.locked_until = now + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+                if user.failed_login_count >= MAX_LOGIN_ATTEMPTS:
+                    user.locked_until = now + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+                    db.session.commit()
+                    logger.warning(
+                        f"Account locked: {email} from {request.remote_addr} "
+                        f"after {user.failed_login_count} failures"
+                    )
+                    return jsonify({
+                        'success': False,
+                        'error': f'Too many failed attempts. Account locked for {LOCKOUT_DURATION_MINUTES} minutes.',
+                    }), 429
+
                 db.session.commit()
+
+                msg = 'Invalid email or password'
+                if remaining <= 2 and remaining > 0:
+                    msg += f'. {remaining} attempt(s) remaining before lockout.'
                 logger.warning(
-                    f"Account locked: {email} from {request.remote_addr} "
-                    f"after {user.failed_login_count} failures"
+                    f"Failed login: {email} from {request.remote_addr} "
+                    f"({remaining} attempts left)"
                 )
-                return jsonify({
-                    'success': False,
-                    'error': f'Too many failed attempts. Account locked for {LOCKOUT_DURATION_MINUTES} minutes.',
-                }), 429
-
-            db.session.commit()
-
-            msg = 'Invalid email or password'
-            if remaining <= 2 and remaining > 0:
-                msg += f'. {remaining} attempt(s) remaining before lockout.'
-            logger.warning(
-                f"Failed login: {email} from {request.remote_addr} "
-                f"({remaining} attempts left)"
-            )
+            except Exception as e:
+                logger.error(f"Lockout recording failed: {e}")
+                db.session.rollback()
+                msg = 'Invalid email or password'
         else:
-            # Don't reveal whether email exists
-            logger.warning(f"Failed login (unknown email): {email} from {request.remote_addr}")
+            if not user:
+                logger.warning(f"Failed login (unknown email): {email} from {request.remote_addr}")
             msg = 'Invalid email or password'
 
         return jsonify({'success': False, 'error': msg}), 401
@@ -96,10 +153,15 @@ def api_login():
         return jsonify({'success': False, 'error': 'Account is deactivated'}), 403
 
     # --- Success — reset lockout state and log in ---
-    user.failed_login_count = 0
-    user.last_failed_login = None
-    user.locked_until = None
-    db.session.commit()
+    if lockout_active:
+        try:
+            user.failed_login_count = 0
+            user.last_failed_login = None
+            user.locked_until = None
+            db.session.commit()
+        except Exception as e:
+            logger.error(f"Lockout reset failed: {e}")
+            db.session.rollback()
 
     session.permanent = True
     login_user(user, remember=True)

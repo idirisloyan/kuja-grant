@@ -121,6 +121,24 @@ def create_app(config_name=None):
         from app import models  # noqa: F401 — ensure all models registered with SQLAlchemy
 
     # -----------------------------------------------------------------
+    # Ensure lockout columns exist (safety net for migration timing)
+    # -----------------------------------------------------------------
+    with app.app_context():
+        try:
+            from sqlalchemy import text
+            with db.engine.connect() as conn:
+                for col_sql in [
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_count INTEGER DEFAULT 0",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_failed_login TIMESTAMP",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP",
+                ]:
+                    conn.execute(text(col_sql))
+                conn.commit()
+                app.logger.info("Lockout columns verified/created in users table")
+        except Exception as e:
+            app.logger.warning(f"Could not verify lockout columns (non-PostgreSQL or migration pending): {e}")
+
+    # -----------------------------------------------------------------
     # Load i18n translation files
     # -----------------------------------------------------------------
     from app.utils.i18n import _load_translations
