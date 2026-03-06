@@ -6,6 +6,7 @@ Before/after request hooks, teardown handlers, and error handlers.
 Extracted from the monolithic server.py during modularisation.
 """
 
+import json
 import os
 import logging
 from datetime import datetime, timezone
@@ -19,7 +20,7 @@ from app.extensions import db
 
 logger = logging.getLogger('kuja')
 
-APP_VERSION = '3.3.1'
+APP_VERSION = '3.3.2'
 APP_START_TIME = datetime.now(timezone.utc)
 
 # Git commit hash for build verification (set at build time)
@@ -31,8 +32,76 @@ except Exception:
     APP_BUILD = os.getenv('RAILWAY_GIT_COMMIT_SHA', 'unknown')[:8]
 
 
+class OversizedUploadGuard:
+    """WSGI middleware that rejects oversized uploads with a clean 413 JSON response.
+
+    Why this exists (and why Flask-level checks don't work):
+    When Flask rejects a large upload via before_request or MAX_CONTENT_LENGTH,
+    the client is still streaming the request body. Flask closes the connection,
+    the OS TCP stack sends RST (because there's unread data in the buffer),
+    and the client sees ConnectionError instead of the 413 response.
+
+    This middleware sits BELOW Flask at the WSGI level. It:
+    1. Reads the Content-Length header before Flask processes the request
+    2. If oversized, DRAINS the incoming body (up to a safe cap) so TCP can close cleanly
+    3. Returns a proper 413 JSON response that the client actually receives
+    """
+
+    MAX_BODY = 16 * 1024 * 1024       # 16 MB — matches Flask MAX_CONTENT_LENGTH
+    MAX_DRAIN = 50 * 1024 * 1024      # Drain up to 50 MB to prevent DoS
+    CHUNK_SIZE = 65536                 # 64 KB read chunks
+
+    def __init__(self, app):
+        self.app = app
+
+    def __call__(self, environ, start_response):
+        content_length_str = environ.get('CONTENT_LENGTH', '')
+        if not content_length_str:
+            return self.app(environ, start_response)
+
+        try:
+            content_length = int(content_length_str)
+        except (ValueError, TypeError):
+            return self.app(environ, start_response)
+
+        if content_length <= self.MAX_BODY:
+            return self.app(environ, start_response)
+
+        # --- Oversized request detected — drain body, then send 413 ---
+        wsgi_input = environ.get('wsgi.input')
+        if wsgi_input:
+            drained = 0
+            drain_limit = min(content_length, self.MAX_DRAIN)
+            try:
+                while drained < drain_limit:
+                    to_read = min(self.CHUNK_SIZE, drain_limit - drained)
+                    chunk = wsgi_input.read(to_read)
+                    if not chunk:
+                        break
+                    drained += len(chunk)
+            except Exception:
+                pass
+
+        size_mb = content_length / (1024 * 1024)
+        body = json.dumps({
+            'error': f'File too large ({size_mb:.1f} MB). Maximum size is 16 MB.',
+            'success': False,
+        }).encode('utf-8')
+
+        start_response('413 Request Entity Too Large', [
+            ('Content-Type', 'application/json'),
+            ('Content-Length', str(len(body))),
+            ('Connection', 'close'),
+        ])
+        return [body]
+
+
 def register_middleware(app):
     """Register all middleware (before/after request hooks) with the Flask app."""
+
+    # WSGI-level oversized upload guard (must be outermost middleware)
+    # Drains the body before rejecting so the 413 reaches the client cleanly.
+    app.wsgi_app = OversizedUploadGuard(app.wsgi_app)
 
     # Trust reverse proxy headers (Railway, Heroku, etc.) so request.is_secure works
     # x_for=1: trust X-Forwarded-For (1 proxy hop)
