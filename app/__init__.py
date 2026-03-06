@@ -54,7 +54,10 @@ def create_app(config_name=None):
     # -----------------------------------------------------------------
     # CORS - origins from environment (comma-separated) or defaults
     # -----------------------------------------------------------------
-    _default_origins = 'https://web-production-6f8a.up.railway.app,http://localhost:5000,http://127.0.0.1:5000'
+    # Production: only the Railway domain. Development: add localhost for convenience.
+    _prod_origins = 'https://web-production-6f8a.up.railway.app'
+    _dev_origins = 'https://web-production-6f8a.up.railway.app,http://localhost:5000,http://127.0.0.1:5000'
+    _default_origins = _prod_origins if config_name == 'production' else _dev_origins
     _allowed_origins = [o.strip() for o in os.getenv('CORS_ORIGINS', _default_origins).split(',') if o.strip()]
     CORS(app, supports_credentials=True,
          resources={r"/api/*": {"origins": _allowed_origins}})

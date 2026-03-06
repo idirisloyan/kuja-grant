@@ -1,5 +1,6 @@
 #!/bin/bash
-BASE="https://web-production-6f8a.up.railway.app"
+# Quick smoke test — for the canonical release gate use: python test_e2e_final.py
+BASE="${KUJA_URL:-https://web-production-6f8a.up.railway.app}"
 PASS=0
 FAIL=0
 TOTAL=0

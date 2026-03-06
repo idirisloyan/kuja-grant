@@ -19,7 +19,7 @@ import requests
 import concurrent.futures
 
 # Base URL from env or default to production
-BASE = os.getenv('KUJA_TEST_URL', 'https://web-production-6f8a.up.railway.app')
+BASE = os.getenv('KUJA_URL', os.getenv('KUJA_TEST_URL', 'https://web-production-6f8a.up.railway.app'))
 
 results = []
 session = requests.Session()
