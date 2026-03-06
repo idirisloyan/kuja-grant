@@ -1603,7 +1603,7 @@ function renderGrantCard(g) {
         '<div class="card-footer">' +
         statusBadge(g.status || 'open') +
         '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();' +
-        (deadline === 'Expired' ? 'showToast(\'Deadline has passed\',\'warning\')' : 'startApply(' + g.id + ')') +
+        (deadline === 'Expired' ? 'showToast(\'Deadline has passed\',\'warning\')' : 'safeStartApply(' + g.id + ')') +
         '">' + (deadline === 'Expired' ? T('grant.deadline_passed') : T('grant.apply_now')) + '</button>' +
         '</div>' +
         '</div>';
@@ -1800,18 +1800,32 @@ function renderMyGrants() {
         '<div id="my-grants-list" class="content-grid">' + renderLoadingCards(3) + '</div>';
 }
 
-async function loadMyGrants() {
+async function loadMyGrants(retryCount) {
+    retryCount = retryCount || 0;
     var res = await api('GET', '/api/grants');
     if (res && res.grants) {
         S.grants = res.grants;
-        var el = document.getElementById('my-grants-list');
-        if (el) {
-            el.innerHTML = S.grants.length ?
-                S.grants.map(function(g) { return renderDonorGrantCard(g); }).join('') :
-                '<div style="grid-column:1/-1;text-align:center;padding:48px;color:#94a3b8;">' +
-                '<p>No grants created yet.</p>' +
-                '<button class="btn btn-primary" style="margin-top:12px;" onclick="nav(\'creategrant\')">' + T('grant.create_first') + '</button></div>';
+        // After a publish, retry once if list might be stale (DB propagation)
+        if (S._justPublished && retryCount === 0) {
+            S._justPublished = false;
+            // If the list came back, render it immediately then do a background refresh
+            _renderMyGrantsList();
+            setTimeout(function() { loadMyGrants(1); }, 800);
+            return;
         }
+        S._justPublished = false;
+        _renderMyGrantsList();
+    }
+}
+
+function _renderMyGrantsList() {
+    var el = document.getElementById('my-grants-list');
+    if (el) {
+        el.innerHTML = S.grants.length ?
+            S.grants.map(function(g) { return renderDonorGrantCard(g); }).join('') :
+            '<div style="grid-column:1/-1;text-align:center;padding:48px;color:#94a3b8;">' +
+            '<p>No grants created yet.</p>' +
+            '<button class="btn btn-primary" style="margin-top:12px;" onclick="nav(\'creategrant\')">' + T('grant.create_first') + '</button></div>';
     }
 }
 
@@ -1883,7 +1897,7 @@ function renderGrantDetail() {
         // Action buttons
         '<div style="margin-top:24px;display:flex;gap:12px;">' +
         (role === 'ngo' && g.status !== 'closed' && timeUntil(g.deadline) !== 'Expired' ?
-            '<button class="btn btn-primary btn-lg" onclick="startApply(' + g.id + ')">' + T('grant.apply_now') + '</button>' : '') +
+            '<button class="btn btn-primary btn-lg" onclick="safeStartApply(' + g.id + ')">' + T('grant.apply_now') + '</button>' : '') +
         (role === 'donor' ? '<button class="btn btn-primary" onclick="editGrant(' + g.id + ')">' + T('common.edit') + '</button>' : '') +
         '</div>';
 }
@@ -2021,8 +2035,8 @@ async function editGrant(id) {
 // =============================================================================
 
 async function startApply(grantId) {
-    if (!grantId) {
-        showToast('Grant not found. Please select a valid grant.', 'error');
+    if (!grantId && grantId !== 0) {
+        showToast(T('grant.apply_load_error') || 'Grant not found. Please select a valid grant.', 'error');
         return;
     }
     showToast(T('common.loading') || 'Loading grant details...', 'info');
@@ -2042,6 +2056,15 @@ async function startApply(grantId) {
     } catch (err) {
         showToast(T('grant.apply_load_error') || 'Could not load grant details. Please try again.', 'error');
     }
+}
+
+// Safe wrapper for inline onclick — if startApply isn't ready, shows a useful error
+function safeStartApply(grantId) {
+    if (typeof startApply !== 'function') {
+        showToast('Application module loading. Please try again.', 'warning');
+        return;
+    }
+    startApply(grantId);
 }
 
 function renderApplyForm() {
@@ -2839,7 +2862,7 @@ function renderCreateGrant() {
     if (S.createData._draftSaving) {
         draftIndicator = '<span data-draft-state="saving" style="font-size:12px;color:#6366f1;margin-left:12px;"><span class="spinner" style="width:12px;height:12px;border:2px solid #e0e7ff;border-top-color:#6366f1;border-radius:50%;animation:spin 0.6s linear infinite;display:inline-block;vertical-align:middle;margin-right:4px;"></span>Saving\u2026</span>';
     } else if (S.createData._lastSavedAt) {
-        draftIndicator = '<span data-draft-state="saved" data-saved-time="' + (S.createData._lastSavedIso || '') + '" style="font-size:12px;color:#15803d;margin-left:12px;">\u2705 Saved at ' + esc(S.createData._lastSavedAt) + '</span>';
+        draftIndicator = '<span data-draft-state="saved" data-draft-save-success="' + (S.createData._draftSaveSuccess ? 'true' : 'false') + '" data-saved-time="' + (S.createData._lastSavedIso || '') + '" style="font-size:12px;color:#15803d;margin-left:12px;">\u2705 Saved at ' + esc(S.createData._lastSavedAt) + '</span>';
     } else if (S.createData.id) {
         draftIndicator = '<span data-draft-state="persisted" style="font-size:12px;color:#64748b;margin-left:12px;">\uD83D\uDCBE Draft (ID: ' + S.createData.id + ')</span>';
     }
@@ -3552,11 +3575,11 @@ async function uploadGrantDoc() {
 }
 
 function _scrollToExtractionResult() {
-    // Scroll to extraction result after DOM update
+    // Scroll to extraction result after DOM update (350ms to ensure render completes)
     setTimeout(function() {
         var el = document.getElementById('extraction-result');
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
+    }, 350);
 }
 
 function renderCreateReview() {
@@ -3635,12 +3658,15 @@ async function saveGrantDraft() {
             S.createData.id = (res.grant || res).id || d.id;
             S.createData._lastSavedAt = new Date().toLocaleTimeString();
             S.createData._lastSavedIso = new Date().toISOString();
+            S.createData._draftSaveSuccess = true;
             showToast(T('grant.create.draft_saved') || 'Draft saved successfully.', 'success');
         } else {
+            S.createData._draftSaveSuccess = false;
             showToast(T('grant.create.draft_save_error') || 'Failed to save draft. Please try again.', 'error');
         }
     } catch (err) {
         S.createData._draftSaving = false;
+        S.createData._draftSaveSuccess = false;
         showToast(T('grant.create.draft_save_error') || 'Failed to save draft. Please check your connection.', 'error');
     }
     render();
@@ -3682,12 +3708,16 @@ async function publishGrant() {
                     report_template: {},
                     grant_document: null
                 };
-                nav('mygrants');
+                // Flag for loadMyGrants to retry if list is stale
+                S._justPublished = true;
+                // Brief delay so DB commit is visible before grants list fetch
+                setTimeout(function() { nav('mygrants'); }, 400);
                 return;
             }
         }
         showToast(T('toast.grant_created_publish_later'), 'info');
-        nav('mygrants');
+        S._justPublished = true;
+        setTimeout(function() { nav('mygrants'); }, 400);
     }
 }
 
