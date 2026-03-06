@@ -20,7 +20,7 @@ from app.extensions import db
 
 logger = logging.getLogger('kuja')
 
-APP_VERSION = '3.3.2'
+APP_VERSION = '3.3.3'
 APP_START_TIME = datetime.now(timezone.utc)
 
 # Git commit hash for build verification (set at build time)

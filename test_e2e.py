@@ -88,25 +88,25 @@ def test_csp_header():
 # ===========================================================================
 
 def test_brute_force_lockout():
-    """Send 6 invalid login attempts and verify lockout on 6th."""
+    """Send 7 invalid login attempts against NON-EXISTENT email and verify lockout.
+    Per-email lockout must work for ALL emails (existing or not) to prevent
+    email enumeration and brute-force against unknown accounts."""
     lockout_email = 'bruteforce_test@kuja.org'
     lockout_observed = False
-    last_status = None
+    statuses = []
 
-    for attempt in range(1, 7):
+    for attempt in range(1, 8):
         r = session.post(f'{BASE}/api/auth/login', json={
             'email': lockout_email,
             'password': 'wrong_password_' + str(attempt)
         })
-        last_status = r.status_code
+        statuses.append(r.status_code)
         if r.status_code == 429:
             lockout_observed = True
             break
 
-    # Note: if the test email doesn't exist in the DB, lockout won't trigger (by design)
-    # We test with a real account to verify
     log('LOCK-001', 'Brute-force returns 429 after max attempts (non-existent email)',
-        True, f'last_status={last_status} (non-existent email — lockout requires DB record)')
+        lockout_observed, f'statuses={statuses}')
 
 def test_brute_force_real_account():
     """Test lockout with a real test account (not admin, to avoid locking it out)."""

@@ -24,7 +24,8 @@ _ip_table_ready = None
 
 
 def _ensure_ip_table():
-    """Create login_attempts table if it doesn't exist (auto-migrate)."""
+    """Create login_attempts table if it doesn't exist (auto-migrate).
+    Includes email column for per-email lockout (works for non-existent accounts)."""
     global _ip_table_ready
     if _ip_table_ready:
         return True
@@ -33,17 +34,33 @@ def _ensure_ip_table():
             CREATE TABLE IF NOT EXISTS login_attempts (
                 id SERIAL PRIMARY KEY,
                 ip VARCHAR(45) NOT NULL,
+                email VARCHAR(255),
                 attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """))
-        # Index for fast lookups by IP + time
+        db.session.commit()
+
+        # Auto-migrate: add email column if table existed before this change
+        try:
+            db.session.execute(text(
+                "ALTER TABLE login_attempts ADD COLUMN email VARCHAR(255)"
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()  # Column already exists — safe to ignore
+
+        # Indexes for fast lookups
         db.session.execute(text("""
             CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_time
             ON login_attempts (ip, attempted_at)
         """))
+        db.session.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_login_attempts_email_time
+            ON login_attempts (email, attempted_at)
+        """))
         db.session.commit()
         _ip_table_ready = True
-        logger.info("login_attempts table ready for IP rate limiting")
+        logger.info("login_attempts table ready for IP + email rate limiting")
         return True
     except Exception as e:
         logger.error(f"Failed to create login_attempts table: {e}")
@@ -70,20 +87,23 @@ def _check_ip_rate_limit(ip):
         return False
 
 
-def _record_ip_attempt(ip):
-    """Record a login attempt for this IP (database-backed)."""
+def _record_ip_attempt(ip, email=None):
+    """Record a login attempt for this IP and email (database-backed)."""
     if not _ensure_ip_table():
         return
     try:
         db.session.execute(
-            text("INSERT INTO login_attempts (ip, attempted_at) VALUES (:ip, :ts)"),
-            {"ip": ip, "ts": datetime.now(timezone.utc)}
+            text("INSERT INTO login_attempts (ip, email, attempted_at) VALUES (:ip, :email, :ts)"),
+            {"ip": ip, "email": email, "ts": datetime.now(timezone.utc)}
         )
         db.session.commit()
-        # Prune old records periodically (every ~50 inserts, clean entries > 10 min old)
+        # Prune old records periodically (every ~50 inserts)
+        # Cutoff must cover the longest window: LOCKOUT_DURATION_MINUTES (15 min)
         import random
         if random.random() < 0.02:
-            cutoff = datetime.now(timezone.utc) - timedelta(seconds=IP_RATE_LIMIT_WINDOW * 2)
+            cutoff = datetime.now(timezone.utc) - timedelta(
+                seconds=max(IP_RATE_LIMIT_WINDOW * 2, LOCKOUT_DURATION_MINUTES * 60 * 2)
+            )
             db.session.execute(
                 text("DELETE FROM login_attempts WHERE attempted_at < :cutoff"),
                 {"cutoff": cutoff}
@@ -92,6 +112,33 @@ def _record_ip_attempt(ip):
     except Exception as e:
         logger.error(f"IP attempt recording failed: {e}")
         db.session.rollback()
+
+
+def _check_email_lockout(email):
+    """Check if email has exceeded login attempt threshold (database-backed).
+
+    Works for BOTH existing and non-existing accounts, preventing:
+    - Brute force against any email address
+    - Email enumeration via lockout behavior differences
+
+    Uses a rolling window of LOCKOUT_DURATION_MINUTES (15 min).
+    Once MAX_LOGIN_ATTEMPTS (5) are recorded, the email stays locked
+    until the oldest relevant attempt ages out of the window.
+    """
+    if not _ensure_ip_table():
+        return False
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+        result = db.session.execute(
+            text("SELECT COUNT(*) FROM login_attempts WHERE email = :email AND attempted_at > :cutoff"),
+            {"email": email, "cutoff": cutoff}
+        )
+        count = result.scalar() or 0
+        return count >= MAX_LOGIN_ATTEMPTS
+    except Exception as e:
+        logger.error(f"Email lockout check failed: {e}")
+        db.session.rollback()
+        return False
 
 
 def _lockout_enabled():
@@ -138,7 +185,17 @@ def api_login():
             'error': 'Too many login attempts from this address. Please wait a few minutes before trying again.',
         }), 429
 
-    _record_ip_attempt(client_ip)
+    # --- Per-email lockout (catches brute-force against ANY email, existing or not) ---
+    # This prevents email enumeration: both existing and non-existing emails lock at the same threshold.
+    if _check_email_lockout(email):
+        logger.warning(f"Email lockout: {email} from {client_ip} (>={MAX_LOGIN_ATTEMPTS} attempts in {LOCKOUT_DURATION_MINUTES}min)")
+        _record_ip_attempt(client_ip, email)
+        return jsonify({
+            'success': False,
+            'error': f'Too many failed attempts. Account locked for {LOCKOUT_DURATION_MINUTES} minutes.',
+        }), 429
+
+    _record_ip_attempt(client_ip, email)
 
     user = User.query.filter_by(email=email).first()
 
@@ -264,6 +321,17 @@ def api_login():
         except Exception as e:
             logger.error(f"Lockout reset failed: {e}")
             db.session.rollback()
+
+    # Clear email lockout records on successful login so legitimate users aren't blocked
+    try:
+        db.session.execute(
+            text("DELETE FROM login_attempts WHERE email = :email"),
+            {"email": email}
+        )
+        db.session.commit()
+    except Exception as e:
+        logger.error(f"Email lockout cleanup failed: {e}")
+        db.session.rollback()
 
     session.permanent = True
     login_user(user, remember=True)
