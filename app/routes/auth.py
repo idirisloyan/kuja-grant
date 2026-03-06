@@ -94,8 +94,10 @@ def _record_ip_attempt(ip):
         db.session.rollback()
 
 
-def _has_lockout_columns():
-    """Check whether the users table has lockout columns (migration may be pending)."""
+def _lockout_enabled():
+    """Check whether the users table has lockout columns (migration may be pending).
+    No caching — SQLAlchemy's inspector caches internally, and stale cache
+    caused lockout to be permanently disabled in some workers."""
     try:
         inspector = db.inspect(db.engine)
         columns = [c['name'] for c in inspector.get_columns('users')]
@@ -104,36 +106,15 @@ def _has_lockout_columns():
         return False
 
 
-# Cache the check so we don't inspect every request
-_lockout_ready = None
-
-
-def _lockout_enabled():
-    global _lockout_ready
-    if _lockout_ready is None:
-        try:
-            _lockout_ready = _has_lockout_columns()
-            if _lockout_ready:
-                logger.info("Database lockout columns available — brute-force protection active")
-            else:
-                logger.warning("Database lockout columns not found — brute-force protection inactive (run migration)")
-        except Exception:
-            _lockout_ready = False
-    return _lockout_ready
-
-
-def _safe_get(user, attr, default=None):
-    """Safely access a lockout attribute that may not exist in the database."""
-    try:
-        val = getattr(user, attr, default)
-        return val if val is not None else default
-    except Exception:
-        return default
-
-
 @auth_bp.route('/login', methods=['POST'])
 def api_login():
-    """Authenticate user with email and password. Database-backed rate limiting."""
+    """Authenticate user with email and password.
+
+    Lockout uses ATOMIC SQL (not ORM read-then-write) to prevent race conditions
+    across Gunicorn's 4 workers × 4 threads. Every counter increment is a single
+    UPDATE ... SET failed_login_count = failed_login_count + 1 statement — the
+    database guarantees no lost increments under concurrency.
+    """
     data = get_request_json()
     email = data.get('email', '').strip().lower()
     password = data.get('password', '')
@@ -166,7 +147,12 @@ def api_login():
     # --- Database-backed lockout check (works across all Gunicorn workers) ---
     if lockout_active and user:
         try:
-            locked_until = _safe_get(user, 'locked_until')
+            # Read lockout state directly from DB (bypass ORM cache)
+            row = db.session.execute(
+                text("SELECT locked_until FROM users WHERE id = :id"),
+                {"id": user.id}
+            ).fetchone()
+            locked_until = row[0] if row else None
             if locked_until:
                 now = datetime.now(timezone.utc)
                 # Handle timezone-naive timestamps from DB
@@ -184,9 +170,12 @@ def api_login():
                         'error': f'Too many failed attempts. Account locked for {remaining_minutes} minute(s). Try again later.',
                     }), 429
                 else:
-                    # Lockout expired — reset
-                    user.failed_login_count = 0
-                    user.locked_until = None
+                    # Lockout expired — atomic reset
+                    db.session.execute(
+                        text("UPDATE users SET failed_login_count = 0, locked_until = NULL "
+                             "WHERE id = :id"),
+                        {"id": user.id}
+                    )
                     db.session.commit()
         except Exception as e:
             logger.error(f"Lockout check failed: {e}")
@@ -199,32 +188,48 @@ def api_login():
                 now = datetime.now(timezone.utc)
                 window_start = now - timedelta(minutes=LOCKOUT_WINDOW_MINUTES)
 
-                # Reset counter if last failure was outside the window
-                last_failed = _safe_get(user, 'last_failed_login')
-                if last_failed:
-                    if last_failed.tzinfo is None:
-                        last_failed = last_failed.replace(tzinfo=timezone.utc)
-                    if last_failed < window_start:
-                        user.failed_login_count = 0
+                # Atomic: if last failure was outside the rolling window, reset counter to 1.
+                # Otherwise, increment counter by 1. Both are single SQL statements.
+                reset_result = db.session.execute(
+                    text("UPDATE users SET failed_login_count = 1, last_failed_login = :now "
+                         "WHERE id = :id AND (last_failed_login IS NULL OR last_failed_login < :window_start)"),
+                    {"id": user.id, "now": now, "window_start": window_start}
+                )
 
-                user.failed_login_count = (_safe_get(user, 'failed_login_count', 0)) + 1
-                user.last_failed_login = now
+                if reset_result.rowcount == 0:
+                    # Last failure IS within window — atomic increment
+                    db.session.execute(
+                        text("UPDATE users SET failed_login_count = failed_login_count + 1, "
+                             "last_failed_login = :now WHERE id = :id"),
+                        {"id": user.id, "now": now}
+                    )
 
-                remaining = max(0, MAX_LOGIN_ATTEMPTS - user.failed_login_count)
+                db.session.commit()
 
-                if user.failed_login_count >= MAX_LOGIN_ATTEMPTS:
-                    user.locked_until = now + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+                # Read back the authoritative count from DB (not stale ORM cache)
+                count_row = db.session.execute(
+                    text("SELECT failed_login_count FROM users WHERE id = :id"),
+                    {"id": user.id}
+                ).fetchone()
+                new_count = count_row[0] if count_row else 0
+                remaining = max(0, MAX_LOGIN_ATTEMPTS - new_count)
+
+                if new_count >= MAX_LOGIN_ATTEMPTS:
+                    # Atomic lockout
+                    lockout_until = now + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+                    db.session.execute(
+                        text("UPDATE users SET locked_until = :lockout_until WHERE id = :id"),
+                        {"id": user.id, "lockout_until": lockout_until}
+                    )
                     db.session.commit()
                     logger.warning(
                         f"Account locked: {email} from {client_ip} "
-                        f"after {user.failed_login_count} failures"
+                        f"after {new_count} failures"
                     )
                     return jsonify({
                         'success': False,
                         'error': f'Too many failed attempts. Account locked for {LOCKOUT_DURATION_MINUTES} minutes.',
                     }), 429
-
-                db.session.commit()
 
                 msg = 'Invalid email or password'
                 if remaining <= 2 and remaining > 0:
@@ -247,12 +252,14 @@ def api_login():
     if not user.is_active:
         return jsonify({'success': False, 'error': 'Account is deactivated'}), 403
 
-    # --- Success — reset lockout state and log in ---
+    # --- Success — atomic reset of lockout state and log in ---
     if lockout_active:
         try:
-            user.failed_login_count = 0
-            user.last_failed_login = None
-            user.locked_until = None
+            db.session.execute(
+                text("UPDATE users SET failed_login_count = 0, last_failed_login = NULL, "
+                     "locked_until = NULL WHERE id = :id"),
+                {"id": user.id}
+            )
             db.session.commit()
         except Exception as e:
             logger.error(f"Lockout reset failed: {e}")
