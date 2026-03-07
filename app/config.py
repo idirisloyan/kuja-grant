@@ -36,6 +36,16 @@ class ProductionConfig(BaseConfig):
     DEBUG = False
     SESSION_COOKIE_SECURE = True
     UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads'))
+
+    @classmethod
+    def init_app(cls, app):
+        """Fail-fast if SECRET_KEY is missing or still the dev default."""
+        key = app.config.get('SECRET_KEY', '')
+        if not key or key == 'kuja-dev-secret-key-change-in-production':
+            raise RuntimeError(
+                'SECRET_KEY environment variable must be set in production. '
+                'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'
+            )
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
         'pool_size': 10,

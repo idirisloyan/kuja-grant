@@ -37,6 +37,8 @@ def create_app(config_name=None):
     if config_cls is None:
         raise ValueError(f"Unknown config: {config_name}. Use: {list(config_map.keys())}")
     app.config.from_object(config_cls)
+    if hasattr(config_cls, 'init_app'):
+        config_cls.init_app(app)
 
     # Ensure upload directory exists
     upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads'))
