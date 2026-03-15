@@ -529,27 +529,11 @@ def api_admin_reseed():
 
     def do_seed():
         try:
-            import sys as _sys, importlib
-            from flask import current_app
-            app = current_app._get_current_object()
-            if '--force' not in _sys.argv:
-                _sys.argv.append('--force')
-            with app.app_context():
-                # Fast cleanup: TRUNCATE CASCADE all tables
-                from sqlalchemy import text
-                tables = 'documents, reviews, reports, compliance_checks, '
-                tables += 'registration_verifications, applications, assessments, '
-                tables += 'grants, users, organizations'
-                db.session.execute(text(f'TRUNCATE TABLE {tables} CASCADE'))
-                db.session.commit()
-                logger.info("All tables truncated for reseed")
-
-                # Now run seed (it will see no users and proceed without --force)
-                seed_mod = importlib.import_module('seed')
-                importlib.reload(seed_mod)
-                _sys.argv = [a for a in _sys.argv if a != '--force']
-                seed_mod.seed()
-                logger.info("Reseed completed successfully")
+            import importlib
+            seed_mod = importlib.import_module('seed')
+            importlib.reload(seed_mod)
+            seed_mod.seed(force=True)
+            logger.info("Reseed completed successfully")
         except Exception as e:
             logger.error(f"Background reseed failed: {e}")
 

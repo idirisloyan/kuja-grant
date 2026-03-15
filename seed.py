@@ -497,13 +497,14 @@ def make_assessment(org_id, score, created_at):
 # Main seed function
 # ---------------------------------------------------------------------------
 
-def seed():
+def seed(force=False):
     with app.app_context():
         db.create_all()
 
+        force = force or '--force' in sys.argv
         if User.query.first():
             print('Database already seeded. Use --force to re-seed.')
-            if '--force' not in sys.argv:
+            if not force:
                 return
             print('Dropping all tables and re-creating ...')
             db.drop_all()
