@@ -526,17 +526,49 @@ def api_admin_reseed():
         return jsonify({'error': 'Admin access required'}), 403
 
     import threading
+    from app.models import (
+        User, Organization, Grant, Application,
+        Assessment, Document, Review, ComplianceCheck, Report,
+        RegistrationVerification,
+    )
 
     def do_seed():
-        try:
-            import importlib
-            seed_mod = importlib.import_module('seed')
-            importlib.reload(seed_mod)
-            seed_mod.seed(force=True)
-            logger.info("Reseed completed successfully")
-        except Exception as e:
-            logger.error(f"Background reseed failed: {e}")
+        from app import create_app
+        seed_app = create_app()
+        with seed_app.app_context():
+            try:
+                logger.info("Reseed: deleting all existing data...")
+                # Delete in FK-safe order (children first, parents last)
+                db.session.execute(text("DELETE FROM reviews"))
+                db.session.execute(text("DELETE FROM documents"))
+                db.session.execute(text("DELETE FROM reports"))
+                db.session.execute(text("DELETE FROM compliance_checks"))
+                db.session.execute(text("DELETE FROM registration_verifications"))
+                db.session.execute(text("DELETE FROM applications"))
+                db.session.execute(text("DELETE FROM assessments"))
+                db.session.execute(text("DELETE FROM grants"))
+                db.session.execute(text("DELETE FROM users"))
+                db.session.execute(text("DELETE FROM organizations"))
+                # Clear login attempts (brute-force lockout table)
+                try:
+                    db.session.execute(text("DELETE FROM login_attempts"))
+                except Exception:
+                    pass  # Table might not exist yet
+                db.session.commit()
+                logger.info("Reseed: all data cleared successfully")
+
+                # Now run seed logic — seed() will see no users and insert fresh data
+                import importlib
+                seed_mod = importlib.import_module('seed')
+                importlib.reload(seed_mod)
+                seed_mod.seed(force=False)
+                logger.info("Reseed completed successfully")
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Background reseed failed: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
 
     t = threading.Thread(target=do_seed, daemon=True)
     t.start()
-    return jsonify({'success': True, 'message': 'Re-seed started in background. Check logs for progress.'})
+    return jsonify({'success': True, 'message': 'Re-seed started in background. Data will be ready in ~30 seconds.'})
