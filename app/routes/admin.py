@@ -516,3 +516,21 @@ def api_admin_security_events():
 
     events = _get_security_metrics()
     return jsonify({'success': True, 'security': events, 'window_hours': hours})
+
+
+@admin_bp.route('/admin/reseed', methods=['POST'])
+@login_required
+def api_admin_reseed():
+    """Re-seed the database with demo data (admin only, production)."""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    try:
+        # Import and run seed function
+        import importlib
+        seed_mod = importlib.import_module('seed')
+        seed_mod.seed()
+        return jsonify({'success': True, 'message': 'Database re-seeded successfully'})
+    except Exception as e:
+        logger.error(f"Re-seed failed: {e}")
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
