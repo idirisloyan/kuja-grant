@@ -52,4 +52,8 @@ class Review(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'reviewer_name': self.reviewer.name if self.reviewer else None,
             'application_title': self.application.grant.title if self.application and self.application.grant else None,
+            'grant_title': self.application.grant.title if self.application and self.application.grant else None,
+            'org_name': self.application.ngo_org.name if self.application and self.application.ngo_org else None,
+            'application_name': f'Application #{self.application_id}',
+            'score': self.overall_score,
         }

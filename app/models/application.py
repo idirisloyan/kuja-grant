@@ -68,4 +68,6 @@ class Application(db.Model):
             data['grant_title'] = self.grant.title
         if self.ngo_org:
             data['ngo_org_name'] = self.ngo_org.name
+            data['org_name'] = self.ngo_org.name      # alias for frontend
+            data['country'] = self.ngo_org.country     # needed for donor NGO listing
         return data

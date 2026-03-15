@@ -1057,7 +1057,7 @@ async function loadUpcomingReports() {
 }
 
 async function startReportForGrant(grantId, reportType, period) {
-    var res = await api('POST', '/api/reports', {
+    var res = await api('POST', '/api/reports/', {
         grant_id: grantId,
         report_type: reportType,
         reporting_period: period,
@@ -1519,14 +1519,14 @@ async function loadDashboardStats() {
 
     if (role === 'ngo') {
         // Load recommended grants
-        var gRes = await api('GET', '/api/grants?status=open');
+        var gRes = await api('GET', '/api/grants/?status=open');
         if (gRes && gRes.grants) {
             var html = gRes.grants.slice(0, 3).map(function(g) { return renderGrantCard(g); }).join('');
             var el = document.getElementById('recommended-grants');
             if (el) el.innerHTML = html || '<p style="color:#94a3b8;">No grants available at this time.</p>';
         }
         // Load recent applications
-        var aRes = await api('GET', '/api/applications');
+        var aRes = await api('GET', '/api/applications/');
         if (aRes && aRes.applications) {
             S.applications = aRes.applications;
             var el2 = document.getElementById('recent-applications');
@@ -1536,7 +1536,7 @@ async function loadDashboardStats() {
         loadUpcomingReports();
     } else if (role === 'donor') {
         // Load donor grants
-        var gRes2 = await api('GET', '/api/grants');
+        var gRes2 = await api('GET', '/api/grants/');
         if (gRes2 && gRes2.grants) {
             S.grants = gRes2.grants;
             var activeGrants = gRes2.grants.filter(function(g) { return g.status !== 'closed'; });
@@ -1545,7 +1545,7 @@ async function loadDashboardStats() {
                 '<p style="color:#94a3b8;">No active grants.</p>';
         }
         // Load recent applications
-        var aRes2 = await api('GET', '/api/applications');
+        var aRes2 = await api('GET', '/api/applications/');
         if (aRes2 && aRes2.applications) {
             S.applications = aRes2.applications;
             var el4 = document.getElementById('donor-recent-apps');
@@ -1553,7 +1553,7 @@ async function loadDashboardStats() {
         }
     } else if (role === 'reviewer') {
         // Load reviewer assignments
-        var rRes = await api('GET', '/api/reviews');
+        var rRes = await api('GET', '/api/reviews/');
         if (rRes && rRes.reviews) {
             S.reviews = rRes.reviews;
             var el5 = document.getElementById('reviewer-assignments');
@@ -1813,7 +1813,7 @@ async function loadGrants() {
     if (S.grantFilters.status) params.push('status=' + S.grantFilters.status);
     if (S.grantFilters.sector) params.push('sector=' + S.grantFilters.sector);
     if (S.grantFilters.country) params.push('country=' + S.grantFilters.country);
-    var url = '/api/grants' + (params.length ? '?' + params.join('&') : '');
+    var url = '/api/grants/' + (params.length ? '?' + params.join('&') : '');
     var res = await api('GET', url);
     S._grantsLoading = false;
     if (res && res.grants) {
@@ -1839,7 +1839,7 @@ function renderMyGrants() {
 
 async function loadMyGrants(retryCount) {
     retryCount = retryCount || 0;
-    var res = await api('GET', '/api/grants');
+    var res = await api('GET', '/api/grants/');
     if (res && res.grants) {
         S.grants = res.grants;
         // After a publish, retry once if list might be stale (DB propagation)
@@ -2020,7 +2020,7 @@ function renderGrantApplicants(g) {
 }
 
 async function loadGrantApplicants(grantId) {
-    var res = await api('GET', '/api/applications?grant_id=' + grantId);
+    var res = await api('GET', '/api/applications/?grant_id=' + grantId);
     var el = document.getElementById('grant-applicants');
     if (!el) return;
     if (res && res.applications && res.applications.length) {
@@ -2090,7 +2090,7 @@ async function startApply(grantId) {
 
             // Check for existing draft and pre-load data
             try {
-                var appsRes = await api('GET', '/api/applications?grant_id=' + grantId + '&status=draft');
+                var appsRes = await api('GET', '/api/applications/?grant_id=' + grantId + '&status=draft');
                 if (appsRes && appsRes.applications && appsRes.applications.length > 0) {
                     var draft = appsRes.applications[0];
                     S._currentApplicationId = draft.id;
@@ -2688,13 +2688,13 @@ async function saveDraft(silent) {
             res = await api('PUT', '/api/applications/' + S._currentApplicationId, data);
         } else {
             // Create new draft via POST
-            res = await api('POST', '/api/applications', data);
+            res = await api('POST', '/api/applications/', data);
             if (res && (res.id || (res.application && res.application.id))) {
                 S._currentApplicationId = res.id || res.application.id;
             } else if (!res) {
                 // POST failed — might be 409 (already exists). Try to find and update existing.
                 try {
-                    var appsRes = await api('GET', '/api/applications?grant_id=' + g.id + '&status=draft');
+                    var appsRes = await api('GET', '/api/applications/?grant_id=' + g.id + '&status=draft');
                     if (appsRes && appsRes.applications && appsRes.applications.length > 0) {
                         S._currentApplicationId = appsRes.applications[0].id;
                         res = await api('PUT', '/api/applications/' + S._currentApplicationId, data);
@@ -2757,7 +2757,7 @@ async function submitApplication() {
         }
     } else {
         // Create new then submit
-        res = await api('POST', '/api/applications', data);
+        res = await api('POST', '/api/applications/', data);
         if (res) {
             appId = res.id || (res.application && res.application.id);
         }
@@ -2852,7 +2852,7 @@ function renderMyApplications() {
 }
 
 async function loadApplications() {
-    var res = await api('GET', '/api/applications');
+    var res = await api('GET', '/api/applications/');
     if (res && res.applications) {
         S.applications = res.applications;
         var el = document.getElementById('my-applications-list');
@@ -3622,7 +3622,7 @@ async function uploadGrantDoc() {
         S._uploadPhase = 'saving_draft';
         render();
         try {
-            var saveRes = await api('POST', '/api/grants', {
+            var saveRes = await api('POST', '/api/grants/', {
                 title: S.createData.title || 'Draft Grant',
                 description: S.createData.description || '',
                 total_funding: parseFloat(S.createData.total_funding) || 0,
@@ -3828,7 +3828,7 @@ async function saveGrantDraft() {
     S.createData._draftSaving = true;
     render();
     var method = d.id ? 'PUT' : 'POST';
-    var url = d.id ? '/api/grants/' + d.id : '/api/grants';
+    var url = d.id ? '/api/grants/' + d.id : '/api/grants/';
     try {
         var res = await api(method, url, {
             title: d.title, description: d.description,
@@ -3868,7 +3868,7 @@ async function publishGrant() {
         return;
     }
     var method = d.id ? 'PUT' : 'POST';
-    var url = d.id ? '/api/grants/' + d.id : '/api/grants';
+    var url = d.id ? '/api/grants/' + d.id : '/api/grants/';
     var res = await api(method, url, {
         title: d.title, description: d.description,
         total_funding: Number(d.total_funding) || 0,
@@ -3974,7 +3974,7 @@ function renderRankingsTable(apps) {
 async function loadRankingsData() {
     if (S._rankingsLoading) return;
     S._rankingsLoading = true;
-    var res = await api('GET', '/api/grants');
+    var res = await api('GET', '/api/grants/');
     S._rankingsLoading = false;
     if (res && res.grants) S.grants = res.grants;
 }
@@ -3982,7 +3982,7 @@ async function loadRankingsData() {
 async function loadRankingsByGrant(grantId) {
     if (!grantId) { S._rankingsApps = []; render(); return; }
     S._rankingsGrantId = grantId;
-    var res = await api('GET', '/api/applications?grant_id=' + grantId);
+    var res = await api('GET', '/api/applications/?grant_id=' + grantId);
     if (res && res.applications) {
         S._rankingsApps = res.applications;
         var el = document.getElementById('rankings-table');
@@ -4163,7 +4163,7 @@ async function aiScoreApplication() {
 function renderAssessmentHub() {
     loadAssessments();
     var stats = S.dashboardStats || {};
-    var score = stats.assessment_score || 0;
+    var score = stats.assessment_score || stats.average_score || stats.capacity_score || 0;
     var cap = capacityLabel(score);
     var categories = stats.category_scores || {};
 
@@ -4246,7 +4246,7 @@ async function loadAssessments() {
         }
     }, 15000);
 
-    var res = await api('GET', '/api/assessments');
+    var res = await api('GET', '/api/assessments/');
     clearTimeout(timeout);
     var el = document.getElementById('assessment-history');
     if (!el) return;
@@ -4257,10 +4257,11 @@ async function loadAssessments() {
             el.innerHTML = '<div class="table-wrapper"><table class="table">' +
                 '<thead><tr><th>' + T('common.date') + '</th><th>' + T('assessment.framework_label') + '</th><th>' + T('assessment.score') + '</th><th>' + T('assessment.level') + '</th><th>' + T('application.tab.status') + '</th></tr></thead><tbody>' +
                 S.assessments.map(function(a) {
-                    var c = capacityLabel(a.score || 0);
+                    var sc = a.overall_score || a.score || 0;
+                    var c = capacityLabel(sc);
                     return '<tr><td>' + formatDate(a.created_at || a.date) + '</td>' +
                         '<td>' + esc((a.framework || 'kuja').toUpperCase()) + '</td>' +
-                        '<td style="font-weight:600;">' + (a.score || 0) + '%</td>' +
+                        '<td style="font-weight:600;">' + sc + '%</td>' +
                         '<td><span class="badge badge-' + c.color + '">' + esc(c.label) + '</span></td>' +
                         '<td>' + statusBadge(a.status || 'completed') + '</td></tr>';
                 }).join('') +
@@ -4454,7 +4455,7 @@ async function startAssessment() {
 
 async function submitAssessment() {
     showToast(T('assessment.completing'), 'info');
-    var res = await api('POST', '/api/assessments', {
+    var res = await api('POST', '/api/assessments/', {
         assess_type: 'free',
         framework: S.selectedFramework || 'kuja',
         checklist: S.assessChecklist,
@@ -4686,7 +4687,7 @@ async function uploadGeneralDoc(e) {
 }
 
 async function loadMyDocuments() {
-    var res = await api('GET', '/api/documents');
+    var res = await api('GET', '/api/documents/');
     var el = document.getElementById('my-docs-list');
     if (!el) return;
     if (res && res.documents && res.documents.length) {
@@ -4783,7 +4784,7 @@ function searchOrgs(q) {
         if (!q || q.length < 2) return;
         var el = document.getElementById('org-search-results');
         if (el) el.innerHTML = renderLoadingTable();
-        var res = await api('GET', '/api/applications?search=' + encodeURIComponent(q));
+        var res = await api('GET', '/api/applications/?search=' + encodeURIComponent(q));
         if (el) {
             if (res && res.applications && res.applications.length) {
                 var orgs = {};
@@ -4823,7 +4824,7 @@ function renderAssignments() {
 }
 
 async function loadReviewerAssignments() {
-    var res = await api('GET', '/api/reviews');
+    var res = await api('GET', '/api/reviews/');
     if (res && res.reviews) {
         S.reviews = res.reviews;
         var pending = res.reviews.filter(function(r) { return r.status !== 'completed'; });
@@ -4841,7 +4842,7 @@ function renderCompletedReviews() {
 }
 
 async function loadCompletedReviews() {
-    var res = await api('GET', '/api/reviews');
+    var res = await api('GET', '/api/reviews/');
     if (res && res.reviews) {
         var completed = res.reviews.filter(function(r) { return r.status === 'completed'; });
         var el = document.getElementById('completed-reviews-list');
@@ -4865,7 +4866,7 @@ async function loadCompletedReviews() {
 }
 
 async function openReview(reviewId) {
-    var res = await api('GET', '/api/reviews');
+    var res = await api('GET', '/api/reviews/');
     if (res && res.reviews) {
         var review = res.reviews.find(function(r) { return r.id === reviewId; });
         if (review && review.application_id) {
@@ -4886,7 +4887,7 @@ async function openReview(reviewId) {
 // =============================================================================
 
 async function loadReports() {
-    var res = await api('GET', '/api/reports');
+    var res = await api('GET', '/api/reports/');
     if (res && res.reports) {
         S.reports = res.reports;
         var el = document.getElementById('reports-list');
@@ -5039,7 +5040,7 @@ function renderReportsTableFlat(reports, statusColors, isNGO, isDonor) {
 
 async function startNewReport() {
     // Get the user's awarded applications/grants
-    var res = await api('GET', '/api/applications?status=awarded');
+    var res = await api('GET', '/api/applications/?status=awarded');
     if (res && res.applications && res.applications.length > 0) {
         S.reportGrants = res.applications;
         var firstApp = res.applications[0];
@@ -5064,7 +5065,7 @@ async function startNewReport() {
         nav('submitreport');
     } else {
         // If no awarded apps, check for existing reports to find grants
-        var gRes = await api('GET', '/api/reports');
+        var gRes = await api('GET', '/api/reports/');
         if (gRes && gRes.reports && gRes.reports.length > 0) {
             var firstReport = gRes.reports[0];
             S.newReport = {
@@ -5258,7 +5259,7 @@ async function saveReportDraft() {
     if (r.id) {
         res = await api('PUT', '/api/reports/' + r.id, data);
     } else {
-        res = await api('POST', '/api/reports', data);
+        res = await api('POST', '/api/reports/', data);
     }
 
     if (res && res.success) {
@@ -5298,7 +5299,7 @@ async function submitReport() {
             title: r.title,
             content: r.content || {}
         };
-        var saveRes = await api('POST', '/api/reports', data);
+        var saveRes = await api('POST', '/api/reports/', data);
         if (saveRes && saveRes.report) {
             r.id = saveRes.report.id;
         } else {

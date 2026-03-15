@@ -61,6 +61,17 @@ def api_list_grants():
 
     grants_data = [g.to_dict(summary=True) for g in pagination.items]
 
+    # For donors, include application count per grant
+    if current_user.role in ('donor', 'admin'):
+        grant_ids = [g.id for g in pagination.items]
+        if grant_ids:
+            counts = db.session.query(
+                Application.grant_id, db.func.count(Application.id)
+            ).filter(Application.grant_id.in_(grant_ids)).group_by(Application.grant_id).all()
+            count_map = dict(counts)
+            for gd in grants_data:
+                gd['application_count'] = count_map.get(gd['id'], 0)
+
     # For NGOs, include their application status for each grant (Issue #8)
     if current_user.role == 'ngo' and current_user.org_id:
         grant_ids = [g.id for g in pagination.items]

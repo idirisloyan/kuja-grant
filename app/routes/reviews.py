@@ -36,6 +36,7 @@ def api_list_reviews():
     # Eager-load relationships to avoid N+1 in to_dict()
     query = Review.query.options(
         db.joinedload(Review.application).joinedload(Application.grant),
+        db.joinedload(Review.application).joinedload(Application.ngo_org),
         db.joinedload(Review.reviewer),
     )
 
