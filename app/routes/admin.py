@@ -526,9 +526,12 @@ def api_admin_reseed():
         return jsonify({'error': 'Admin access required'}), 403
 
     try:
-        # Import and run seed function
-        import importlib
+        # Import and run seed function with --force flag
+        import sys, importlib
+        if '--force' not in sys.argv:
+            sys.argv.append('--force')
         seed_mod = importlib.import_module('seed')
+        importlib.reload(seed_mod)  # ensure fresh module
         seed_mod.seed()
         return jsonify({'success': True, 'message': 'Database re-seeded successfully'})
     except Exception as e:
