@@ -525,15 +525,37 @@ def api_admin_reseed():
     if current_user.role != 'admin':
         return jsonify({'error': 'Admin access required'}), 403
 
-    try:
-        # Import and run seed function with --force flag
-        import sys, importlib
-        if '--force' not in sys.argv:
-            sys.argv.append('--force')
-        seed_mod = importlib.import_module('seed')
-        importlib.reload(seed_mod)  # ensure fresh module
-        seed_mod.seed()
-        return jsonify({'success': True, 'message': 'Database re-seeded successfully'})
-    except Exception as e:
-        logger.error(f"Re-seed failed: {e}")
-        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+    import threading
+
+    def do_seed():
+        try:
+            import sys as _sys, importlib
+            from flask import current_app
+            app = current_app._get_current_object()
+            if '--force' not in _sys.argv:
+                _sys.argv.append('--force')
+            with app.app_context():
+                # Fast cleanup: truncate all tables instead of drop_all
+                from app.models import (Document, Review, Report, ComplianceCheck,
+                                        RegistrationVerification, Application, Assessment,
+                                        Grant, User, Organization)
+                for model in [Document, Review, Report, ComplianceCheck,
+                              RegistrationVerification, Application, Assessment,
+                              Grant, User, Organization]:
+                    db.session.execute(model.__table__.delete())
+                db.session.commit()
+                logger.info("All tables truncated for reseed")
+
+                # Now run seed (it will see no users and proceed)
+                seed_mod = importlib.import_module('seed')
+                importlib.reload(seed_mod)
+                # Override the seed check since we already cleaned
+                _sys.argv = [a for a in _sys.argv if a != '--force']
+                seed_mod.seed()
+                logger.info("Reseed completed successfully")
+        except Exception as e:
+            logger.error(f"Background reseed failed: {e}")
+
+    t = threading.Thread(target=do_seed, daemon=True)
+    t.start()
+    return jsonify({'success': True, 'message': 'Re-seed started in background. Check logs for progress.'})
