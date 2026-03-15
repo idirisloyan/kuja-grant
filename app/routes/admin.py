@@ -535,21 +535,18 @@ def api_admin_reseed():
             if '--force' not in _sys.argv:
                 _sys.argv.append('--force')
             with app.app_context():
-                # Fast cleanup: truncate all tables instead of drop_all
-                from app.models import (Document, Review, Report, ComplianceCheck,
-                                        RegistrationVerification, Application, Assessment,
-                                        Grant, User, Organization)
-                for model in [Document, Review, Report, ComplianceCheck,
-                              RegistrationVerification, Application, Assessment,
-                              Grant, User, Organization]:
-                    db.session.execute(model.__table__.delete())
+                # Fast cleanup: TRUNCATE CASCADE all tables
+                from sqlalchemy import text
+                tables = 'documents, reviews, reports, compliance_checks, '
+                tables += 'registration_verifications, applications, assessments, '
+                tables += 'grants, users, organizations'
+                db.session.execute(text(f'TRUNCATE TABLE {tables} CASCADE'))
                 db.session.commit()
                 logger.info("All tables truncated for reseed")
 
-                # Now run seed (it will see no users and proceed)
+                # Now run seed (it will see no users and proceed without --force)
                 seed_mod = importlib.import_module('seed')
                 importlib.reload(seed_mod)
-                # Override the seed check since we already cleaned
                 _sys.argv = [a for a in _sys.argv if a != '--force']
                 seed_mod.seed()
                 logger.info("Reseed completed successfully")
