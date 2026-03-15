@@ -673,5 +673,16 @@
   "report.review_notes": "Review Notes",
   "verification.registration_authority": "Registration Authority",
   "verification.expected_format": "Expected Format",
-  "verification.no_online_portal": "No online portal available"
+  "verification.no_online_portal": "No online portal available",
+  "apply.continue_draft": "Continue Draft",
+  "apply.draft_loaded": "Existing draft loaded. You can continue where you left off.",
+  "common.unsaved_warning": "You have unsaved changes. Are you sure you want to leave?",
+  "common.load_timeout": "Loading timed out. Please try again.",
+  "common.load_error": "Failed to load data. Please try again.",
+  "common.date": "Date",
+  "assessment.framework_label": "Framework",
+  "assessment.score": "Score",
+  "assessment.level": "Level",
+  "report.submitted_reports": "Submitted Reports",
+  "report.all_reports": "All Reports"
 }

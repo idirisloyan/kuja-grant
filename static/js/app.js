@@ -50,6 +50,8 @@ async function setLanguage(lang) {
     await loadTranslations(lang);
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    // Issue #25: Persist language preference in localStorage
+    try { localStorage.setItem('kuja_lang', lang); } catch(e) {}
     // Save preference to backend
     if (S.user) {
         api('PUT', '/api/auth/language', { language: lang });
@@ -119,6 +121,7 @@ const S = {
     applyResponses: {},
     applyEligibility: {},
     uploadedDocs: {},
+    _currentApplicationId: null,
 
     // Assessment wizard
     assessStep: 1,
@@ -614,6 +617,20 @@ function closeModal(e) {
 // =============================================================================
 
 function nav(page, params) {
+    // Issue #2: Warn about unsaved changes when leaving apply/assessment wizards
+    var leavingApply = S.page === 'apply' && page !== 'apply';
+    var leavingAssess = S.page === 'assesswizard' && page !== 'assesswizard';
+    if (leavingApply || leavingAssess) {
+        var hasData = leavingApply
+            ? (Object.keys(S.applyResponses).length > 0 || Object.keys(S.applyEligibility).length > 0)
+            : (Object.keys(S.assessChecklist).length > 0);
+        if (hasData && !S._navConfirmed) {
+            if (!confirm(T('common.unsaved_warning') || 'You have unsaved changes. Are you sure you want to leave?')) {
+                return;
+            }
+        }
+    }
+    S._navConfirmed = false;
     S.page = page;
     if (params) {
         Object.keys(params).forEach(function(k) { S[k] = params[k]; });
@@ -752,11 +769,13 @@ function renderShell() {
     var role = (S.user.role || '').toLowerCase();
     var mainHTML = renderPageContent();
 
+    // Issue #14/#24: Use CSS classes instead of inline styles for margins
+    var mainClasses = 'main-content';
+    if (S.sidebarCollapsed) mainClasses += ' sidebar-collapsed';
+    if (S.aiPanelOpen) mainClasses += ' ai-panel-open';
+
     return renderHeader() + renderSidebar(role) +
-        '<main class="main-content" id="main-content" role="main" style="' +
-        (S.sidebarCollapsed ? 'margin-left:60px;' : '') +
-        (S.aiPanelOpen ? 'margin-right:340px;' : '') +
-        '">' + mainHTML + '</main>' +
+        '<main class="' + mainClasses + '" id="main-content" role="main">' + mainHTML + '</main>' +
         renderAIPanel() +
         '<button class="ai-panel-toggle" onclick="toggleAI()" title="AI Assistant" aria-label="' + T('ai.panel_title') + '">\u2728</button>';
 }
@@ -1034,7 +1053,7 @@ async function loadUpcomingReports() {
                 '<td>' + actionBtn + '</td></tr>';
         }).join('') +
         '</tbody></table></div>' +
-        (reports.length > 8 ? '<p style="text-align:center;margin-top:8px;"><a href="#" onclick="nav(\'reports\');return false;" style="color:#2d8f6f;">View all ' + reports.length + ' upcoming reports</a></p>' : '');
+        '<p style="text-align:center;margin-top:12px;"><a href="#" onclick="nav(\'reports\');return false;" style="color:#2d8f6f;font-weight:500;">\uD83D\uDCC4 ' + T('dashboard.action.view_reports') + ' \u2192</a></p>';
 }
 
 async function startReportForGrant(grantId, reportType, period) {
@@ -1586,11 +1605,31 @@ function renderGrantCard(g) {
         return '<span class="badge badge-outline badge-green" style="font-size:11px;">' + sectorIcon(s) + ' ' + esc(s) + '</span>';
     }).join(' ');
 
+    // Issue #8: Show application status badge for NGOs
+    var appStatusBadge = '';
+    var applyBtn = '';
+    if (g.user_application_status) {
+        var ast = g.user_application_status;
+        appStatusBadge = '<span class="badge badge-' +
+            (ast === 'submitted' ? 'blue' : ast === 'awarded' ? 'green' : ast === 'draft' ? 'amber' : ast === 'rejected' ? 'red' : 'blue') +
+            '" style="font-size:11px;">\uD83D\uDCCB ' + esc(ast.charAt(0).toUpperCase() + ast.slice(1)) + '</span>';
+        if (ast === 'draft') {
+            applyBtn = '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();safeStartApply(' + g.id + ')">' + T('apply.continue_draft') + '</button>';
+        } else {
+            applyBtn = '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();viewGrant(' + g.id + ')">' + T('common.view') + '</button>';
+        }
+    } else {
+        applyBtn = '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();' +
+            (deadline === 'Expired' ? 'showToast(\'Deadline has passed\',\'warning\')' : 'safeStartApply(' + g.id + ')') +
+            '">' + (deadline === 'Expired' ? T('grant.deadline_passed') : T('grant.apply_now')) + '</button>';
+    }
+
     return '<div class="card grant-card" style="cursor:pointer;" onclick="viewGrant(' + g.id + ')">' +
         '<div class="card-body">' +
         '<div style="display:flex;justify-content:space-between;align-items:start;">' +
         '<h3 style="font-size:16px;font-weight:600;flex:1;">' + esc(g.title) + '</h3>' +
         (g.match_score ? '<span class="badge badge-green" style="margin-left:8px;">' + g.match_score + '% Match</span>' : '') +
+        appStatusBadge +
         '</div>' +
         '<p style="font-size:13px;color:#64748b;margin-top:4px;">' + esc(g.donor_name || g.organization_name || '') + '</p>' +
         '<div class="grant-amount" style="margin-top:12px;">' + formatCurrency(g.total_funding, g.currency) + '</div>' +
@@ -1602,9 +1641,7 @@ function renderGrantCard(g) {
         '</div>' +
         '<div class="card-footer">' +
         statusBadge(g.status || 'open') +
-        '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();' +
-        (deadline === 'Expired' ? 'showToast(\'Deadline has passed\',\'warning\')' : 'safeStartApply(' + g.id + ')') +
-        '">' + (deadline === 'Expired' ? T('grant.deadline_passed') : T('grant.apply_now')) + '</button>' +
+        applyBtn +
         '</div>' +
         '</div>';
 }
@@ -1649,7 +1686,7 @@ function renderApplicationsTable(apps) {
                 '<td>' + (a.ai_score != null ? '<span style="font-weight:600;color:' +
                 (a.ai_score >= 70 ? '#10b981' : a.ai_score >= 50 ? '#f59e0b' : '#ef4444') + ';">' + a.ai_score + '%</span>' : '-') + '</td>' +
                 '<td>' + formatDate(a.submitted_at || a.created_at) + '</td>' +
-                '<td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();viewApplication(' + a.id + ')">View</button></td>' +
+                '<td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();viewApplication(' + a.id + ')">' + T('common.view') + '</button></td>' +
                 '</tr>';
         }).join('') +
         '</tbody></table></div>';
@@ -1669,7 +1706,7 @@ function renderDonorApplicationsTable(apps) {
                 '<td>' + statusBadge(a.status) + '</td>' +
                 '<td>' + (a.ai_score != null ? a.ai_score + '%' : '-') + '</td>' +
                 '<td>' + formatDate(a.submitted_at || a.created_at) + '</td>' +
-                '<td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();viewApplication(' + a.id + ')">View</button></td>' +
+                '<td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();viewApplication(' + a.id + ')">' + T('common.view') + '</button></td>' +
                 '</tr>';
         }).join('') +
         '</tbody></table></div>';
@@ -2049,6 +2086,40 @@ async function startApply(grantId) {
             S.applyResponses = {};
             S.applyEligibility = {};
             S.uploadedDocs = {};
+            S._currentApplicationId = null;
+
+            // Check for existing draft and pre-load data
+            try {
+                var appsRes = await api('GET', '/api/applications?grant_id=' + grantId + '&status=draft');
+                if (appsRes && appsRes.applications && appsRes.applications.length > 0) {
+                    var draft = appsRes.applications[0];
+                    S._currentApplicationId = draft.id;
+                    // Load full application detail to get responses
+                    var detailRes = await api('GET', '/api/applications/' + draft.id);
+                    if (detailRes && detailRes.application) {
+                        var app = detailRes.application;
+                        S.applyResponses = app.responses || {};
+                        S.applyEligibility = app.eligibility_responses || {};
+                        // Restore uploaded docs info
+                        if (app.documents && app.documents.length) {
+                            app.documents.forEach(function(doc) {
+                                if (doc.doc_type) {
+                                    S.uploadedDocs[doc.doc_type] = {
+                                        filename: doc.filename || doc.original_filename,
+                                        name: doc.filename || doc.original_filename,
+                                        id: doc.id
+                                    };
+                                }
+                            });
+                        }
+                        showToast(T('apply.draft_loaded') || 'Existing draft loaded. You can continue where you left off.', 'info');
+                    }
+                }
+            } catch (draftErr) {
+                // No existing draft — that's fine, start fresh
+                console.log('No existing draft found, starting fresh application.');
+            }
+
             nav('apply');
         } else {
             showToast(T('grant.apply_load_error') || 'Could not load grant details. Please try again.', 'error');
@@ -2065,6 +2136,68 @@ function safeStartApply(grantId) {
         return;
     }
     startApply(grantId);
+}
+
+/**
+ * Auto-save draft, then advance to the next wizard step.
+ * Fixes Issue #3/#15: Draft not saved on Next click.
+ */
+async function applyNext() {
+    if (S.applyStep >= 4) return;
+    // Save draft silently before advancing
+    await saveDraft(true);
+    S.applyStep++;
+    render();
+    window.scrollTo(0, 0);
+}
+
+/**
+ * Go back to the previous wizard step with scroll reset.
+ */
+function applyPrev() {
+    if (S.applyStep <= 1) return;
+    S.applyStep--;
+    render();
+    window.scrollTo(0, 0);
+}
+
+/**
+ * Reusable validation: returns array of missing items for the application.
+ * Used by renderApplyReview() and submitApplication().
+ * Fixes Issue #7a: strengthened validation with word count checks.
+ */
+function getApplyMissingItems(g) {
+    var criteria = g.criteria || [];
+    var docs = g.doc_requirements || [];
+    var eligReqs = g.eligibility || [];
+    var missingItems = [];
+
+    eligReqs.forEach(function(r, i) {
+        if (r.required && !S.applyEligibility['elig_' + i]) {
+            missingItems.push('Eligibility: ' + (r.category || r.name || 'Requirement ' + (i + 1)));
+        }
+    });
+
+    criteria.forEach(function(c, i) {
+        var key = c.id || ('criterion_' + i);
+        var text = (S.applyResponses[key] || '').trim();
+        var wc = wordCount(text);
+        var minWords = 20; // Minimum meaningful response
+        if (!text) {
+            missingItems.push('Response: ' + (c.label || c.name || 'Criterion ' + (i + 1)) + ' (empty)');
+        } else if (wc < minWords) {
+            missingItems.push('Response: ' + (c.label || c.name || 'Criterion ' + (i + 1)) + ' (' + wc + ' words — minimum ' + minWords + ' recommended)');
+        }
+    });
+
+    docs.forEach(function(d, i) {
+        var key = d.type || ('doc_' + i);
+        if (d.required !== false && !S.uploadedDocs[key]) {
+            missingItems.push('Document: ' + (d.name || d.type || 'Required Document'));
+        }
+    });
+
+    return missingItems;
 }
 
 function renderApplyForm() {
@@ -2094,10 +2227,10 @@ function renderApplyForm() {
         '<div class="wizard-content">' + stepContent + '</div>' +
 
         '<div class="wizard-actions">' +
-        (step > 1 ? '<button class="btn btn-secondary" onclick="S.applyStep--;render();">\u2190 ' + T('common.previous') + '</button>' : '<div></div>') +
+        (step > 1 ? '<button class="btn btn-secondary" onclick="applyPrev()">\u2190 ' + T('common.previous') + '</button>' : '<div></div>') +
         '<div style="display:flex;gap:8px;">' +
         '<button class="btn btn-secondary" onclick="saveDraft()">' + T('apply.save_draft') + '</button>' +
-        (step < 4 ? '<button class="btn btn-primary" onclick="S.applyStep++;render();">' + T('common.next') + ' \u2192</button>' :
+        (step < 4 ? '<button class="btn btn-primary" onclick="applyNext()">' + T('common.next') + ' \u2192</button>' :
             '<button class="btn btn-primary btn-lg" onclick="submitApplication()">' + T('apply.submit_application') + '</button>') +
         '</div>' +
         '</div>';
@@ -2190,7 +2323,7 @@ function renderApplyProposal(g) {
             'oninput="S.applyResponses[\'' + key + '\']=this.value;updateWordCount(' + i + ',' + maxW + ');">' +
             esc(text) + '</textarea>' +
             '<div id="wc-' + i + '" style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px;">' +
-            '<span style="color:' + qi.color + ';">' + wc + ' / ' + maxW + ' words - ' + qi.label + '</span>' +
+            '<span style="color:' + qi.color + ';">' + wc + ' words (recommended: ~' + maxW + ') \u2014 ' + qi.label + '</span>' +
             '<button class="btn btn-sm" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;" ' +
             'onclick="getAIGuidance(' + i + ',\'' + esc(c.label || '') + '\')">\u2728 AI Help</button>' +
             '</div>' +
@@ -2207,7 +2340,7 @@ function updateWordCount(idx, maxWords) {
     var text = textarea.value;
     var wc = wordCount(text);
     var qi = qualityIndicator(wc, maxWords);
-    el.querySelector('span').innerHTML = wc + ' / ' + maxWords + ' words - ' + qi.label;
+    el.querySelector('span').innerHTML = wc + ' words (recommended: ~' + maxWords + ') \u2014 ' + qi.label;
     el.querySelector('span').style.color = qi.color;
 }
 
@@ -2237,13 +2370,22 @@ async function _getAIGuidanceImpl(idx, fieldName) {
         current_text: text
     });
     if (res) {
-        el.innerHTML = '<div style="background:#eff6ff;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;border-left:3px solid #3b82f6;">' +
-            '<strong style="color:#1e40af;">\u2728 AI Guidance</strong>' +
-            (res.quality_score != null ? ' <span class="badge badge-blue">Quality: ' + res.quality_score + '%</span>' : '') +
+        el.innerHTML = '<div style="background:#eff6ff;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;border-left:3px solid #3b82f6;position:relative;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+            '<div><strong style="color:#1e40af;">\u2728 AI Guidance</strong>' +
+            (res.quality_score != null ? ' <span class="badge badge-blue">Quality: ' + res.quality_score + '%</span>' : '') + '</div>' +
+            '<div style="display:flex;gap:4px;">' +
+            '<button class="btn btn-sm" style="background:transparent;color:#3b82f6;border:1px solid #bfdbfe;padding:2px 8px;font-size:11px;" ' +
+            'onclick="getAIGuidance(' + idx + ',\'' + esc(fieldName) + '\')" title="Refresh">\uD83D\uDD04 Refresh</button>' +
+            '<button class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid #e2e8f0;padding:2px 8px;font-size:11px;" ' +
+            'onclick="document.getElementById(\'ai-guidance-' + idx + '\').style.display=\'none\';" title="Close">\u2716</button>' +
+            '</div></div>' +
             '<div style="margin-top:8px;color:#475569;">' + renderMarkdown(res.guidance || res.response || 'No guidance available.') + '</div>' +
             '</div>';
     } else {
-        el.innerHTML = '<div style="background:#fef2f2;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;color:#991b1b;">' +
+        el.innerHTML = '<div style="background:#fef2f2;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;color:#991b1b;position:relative;">' +
+            '<button class="btn btn-sm" style="position:absolute;top:8px;right:8px;background:transparent;color:#991b1b;border:none;font-size:14px;cursor:pointer;" ' +
+            'onclick="document.getElementById(\'ai-guidance-' + idx + '\').style.display=\'none\';">\u2716</button>' +
             'Unable to get AI guidance. Please try again.</div>';
     }
 }
@@ -2470,23 +2612,8 @@ function renderApplyReview(g) {
     var docs = g.doc_requirements || [];
     var eligReqs = g.eligibility || [];
 
-    var missingItems = [];
-    eligReqs.forEach(function(r, i) {
-        if (r.required && !S.applyEligibility['elig_' + i]) {
-            missingItems.push('Eligibility: ' + (r.category || r.name || 'Requirement ' + (i + 1)));
-        }
-    });
-    criteria.forEach(function(c, i) {
-        if (!S.applyResponses['criterion_' + i]) {
-            missingItems.push('Response: ' + (c.label || c.name || 'Criterion ' + (i + 1)));
-        }
-    });
-    docs.forEach(function(d, i) {
-        var key = d.type || ('doc_' + i);
-        if (d.required !== false && !S.uploadedDocs[key]) {
-            missingItems.push('Document: ' + (d.name || d.type || 'Required Document'));
-        }
-    });
+    // Use shared validation function (Issue #7a fix)
+    var missingItems = getApplyMissingItems(g);
 
     return '<div class="card" style="margin-bottom:16px;"><div class="card-body">' +
         '<h3 style="font-weight:600;margin-bottom:16px;">' + T('apply.review_submit') + '</h3>' +
@@ -2533,49 +2660,111 @@ function renderApplyReview(g) {
         '</div></div>';
 }
 
-async function saveDraft() {
+/**
+ * Save application draft. Uses PUT if draft already exists, POST to create new.
+ * @param {boolean} silent - if true, suppress success toast (used by applyNext auto-save)
+ * Fixes Issue #7b: draft save failure / "already applied" error.
+ */
+async function saveDraft(silent) {
     var g = S.selectedGrant;
     if (!g) {
         showToast('No grant selected. Please try again.', 'warning');
         return;
     }
     S._applySaving = true;
-    render();
+    if (!silent) render();
+
     var data = {
         grant_id: g.id,
         responses: S.applyResponses,
-        eligibility: S.applyEligibility,
+        eligibility_responses: S.applyEligibility,
         status: 'draft'
     };
+
     try {
-        var res = await api('POST', '/api/applications', data);
+        var res;
+        if (S._currentApplicationId) {
+            // Update existing draft via PUT
+            res = await api('PUT', '/api/applications/' + S._currentApplicationId, data);
+        } else {
+            // Create new draft via POST
+            res = await api('POST', '/api/applications', data);
+            if (res && (res.id || (res.application && res.application.id))) {
+                S._currentApplicationId = res.id || res.application.id;
+            } else if (!res) {
+                // POST failed — might be 409 (already exists). Try to find and update existing.
+                try {
+                    var appsRes = await api('GET', '/api/applications?grant_id=' + g.id + '&status=draft');
+                    if (appsRes && appsRes.applications && appsRes.applications.length > 0) {
+                        S._currentApplicationId = appsRes.applications[0].id;
+                        res = await api('PUT', '/api/applications/' + S._currentApplicationId, data);
+                    }
+                } catch (lookupErr) {
+                    // Could not recover
+                }
+            }
+        }
+
         S._applySaving = false;
         if (res) {
             S._applyLastSaved = new Date().toLocaleTimeString();
             S._applyLastSavedIso = new Date().toISOString();
-            showToast(T('apply.draft_saved') || 'Application draft saved successfully.', 'success');
+            if (!silent) {
+                showToast(T('apply.draft_saved') || 'Application draft saved successfully.', 'success');
+            }
         } else {
-            showToast('Failed to save draft. Please try again.', 'error');
+            if (!silent) {
+                showToast('Failed to save draft. Please try again.', 'error');
+            }
         }
     } catch (err) {
         S._applySaving = false;
-        showToast('Failed to save draft. Please check your connection.', 'error');
+        if (!silent) {
+            showToast('Failed to save draft. Please check your connection.', 'error');
+        }
     }
-    render();
+    if (!silent) render();
 }
 
 async function submitApplication() {
     var g = S.selectedGrant;
     if (!g) return;
+
+    // Validate before submitting (Issue #7a: prevent submit when incomplete)
+    var missing = getApplyMissingItems(g);
+    if (missing.length > 0) {
+        showToast(T('toast.fill_required_fields', {count: missing.length}) || 'Please complete all required fields before submitting.', 'error');
+        S.applyStep = 4; // Stay on review page to show missing items
+        render();
+        return;
+    }
+
     telemetry('submit_started', { grant_id: g.id });
     var data = {
         grant_id: g.id,
         responses: S.applyResponses,
-        eligibility: S.applyEligibility
+        eligibility_responses: S.applyEligibility
     };
-    var res = await api('POST', '/api/applications', data);
+
+    var appId = S._currentApplicationId;
+    var res;
+
+    if (appId) {
+        // Update existing draft before submitting
+        res = await api('PUT', '/api/applications/' + appId, data);
+        if (res) {
+            res = { application: res.application || res, id: appId };
+        }
+    } else {
+        // Create new then submit
+        res = await api('POST', '/api/applications', data);
+        if (res) {
+            appId = res.id || (res.application && res.application.id);
+        }
+    }
+
     if (res) {
-        var appId = res.id || (res.application && res.application.id);
+        if (!appId) appId = res.id || (res.application && res.application.id);
         if (appId) {
             // Use raw fetch for submit so we can capture structured errors
             try {
@@ -4046,27 +4235,45 @@ function renderFrameworkCard(id, name, desc, items, time) {
 }
 
 async function loadAssessments() {
+    // Issue #11: Add timeout + error state instead of infinite loading
+    var timeout = setTimeout(function() {
+        var el = document.getElementById('assessment-history');
+        if (el && el.innerHTML.indexOf('spinner') > -1) {
+            el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
+                '<p>\u26A0\uFE0F ' + (T('common.load_timeout') || 'Loading timed out. Please try again.') + '</p>' +
+                '<button class="btn btn-secondary btn-sm" style="margin-top:8px;" onclick="loadAssessments()">\uD83D\uDD04 Retry</button>' +
+                '</div></div>';
+        }
+    }, 15000);
+
     var res = await api('GET', '/api/assessments');
+    clearTimeout(timeout);
+    var el = document.getElementById('assessment-history');
+    if (!el) return;
+
     if (res && res.assessments) {
         S.assessments = res.assessments;
-        var el = document.getElementById('assessment-history');
-        if (el) {
-            if (S.assessments.length) {
-                el.innerHTML = '<div class="table-wrapper"><table class="table">' +
-                    '<thead><tr><th>Date</th><th>Score</th><th>Level</th><th>Status</th></tr></thead><tbody>' +
-                    S.assessments.map(function(a) {
-                        var c = capacityLabel(a.score || 0);
-                        return '<tr><td>' + formatDate(a.created_at || a.date) + '</td>' +
-                            '<td style="font-weight:600;">' + (a.score || 0) + '%</td>' +
-                            '<td><span class="badge badge-' + c.color + '">' + esc(c.label) + '</span></td>' +
-                            '<td>' + statusBadge(a.status || 'completed') + '</td></tr>';
-                    }).join('') +
-                    '</tbody></table></div>';
-            } else {
-                el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-                    '<p>' + T('assessment.no_assessments') + '</p></div></div>';
-            }
+        if (S.assessments.length) {
+            el.innerHTML = '<div class="table-wrapper"><table class="table">' +
+                '<thead><tr><th>' + T('common.date') + '</th><th>' + T('assessment.framework_label') + '</th><th>' + T('assessment.score') + '</th><th>' + T('assessment.level') + '</th><th>' + T('application.tab.status') + '</th></tr></thead><tbody>' +
+                S.assessments.map(function(a) {
+                    var c = capacityLabel(a.score || 0);
+                    return '<tr><td>' + formatDate(a.created_at || a.date) + '</td>' +
+                        '<td>' + esc((a.framework || 'kuja').toUpperCase()) + '</td>' +
+                        '<td style="font-weight:600;">' + (a.score || 0) + '%</td>' +
+                        '<td><span class="badge badge-' + c.color + '">' + esc(c.label) + '</span></td>' +
+                        '<td>' + statusBadge(a.status || 'completed') + '</td></tr>';
+                }).join('') +
+                '</tbody></table></div>';
+        } else {
+            el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
+                '<p>' + T('assessment.no_assessments') + '</p></div></div>';
         }
+    } else {
+        el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
+            '<p>\u26A0\uFE0F ' + (T('common.load_error') || 'Failed to load assessments.') + '</p>' +
+            '<button class="btn btn-secondary btn-sm" style="margin-top:8px;" onclick="loadAssessments()">\uD83D\uDD04 Retry</button>' +
+            '</div></div>';
     }
 }
 
@@ -4095,8 +4302,8 @@ function renderAssessmentWizard() {
         renderWizardSteps(steps, step) +
         '<div class="wizard-content">' + stepContent + '</div>' +
         '<div class="wizard-actions">' +
-        (step > 1 && step < 4 ? '<button class="btn btn-secondary" onclick="S.assessStep--;render();">\u2190 ' + T('common.previous') + '</button>' : '<div></div>') +
-        (step < 3 ? '<button class="btn btn-primary" onclick="S.assessStep++;render();">' + T('common.next') + ' \u2192</button>' :
+        (step > 1 && step < 4 ? '<button class="btn btn-secondary" onclick="S.assessStep--;render();window.scrollTo(0,0);">\u2190 ' + T('common.previous') + '</button>' : '<div></div>') +
+        (step < 3 ? '<button class="btn btn-primary" onclick="S.assessStep++;render();window.scrollTo(0,0);">' + T('common.next') + ' \u2192</button>' :
             step === 3 ? '<button class="btn btn-primary btn-lg" onclick="submitAssessment()">' + T('assessment.complete') + '</button>' :
                 '<button class="btn btn-primary" onclick="nav(\'assessment\')">' + T('common.back') + '</button>') +
         '</div>';
@@ -4258,8 +4465,13 @@ async function submitAssessment() {
         S.assessResults = res;
         S.assessStep = 4;
         if (res.score != null) {
+            // Issue #20: Update ALL score references in dashboard stats
             S.dashboardStats.assessment_score = res.score;
+            S.dashboardStats.average_score = res.score;
+            S.dashboardStats.capacity_score = res.score;
         }
+        // Force dashboard stats to reload on next visit
+        S._dashboardLoading = false;
         render();
     }
 }
@@ -4518,7 +4730,20 @@ async function loadComplianceData() {
         el.innerHTML = '<div class="table-wrapper"><table class="table">' +
             '<thead><tr><th>' + T('compliance.check_type') + '</th><th>' + T('grant.create.description') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('common.last_updated') + '</th></tr></thead><tbody>' +
             res.checks.map(function(c) {
-                return '<tr><td style="font-weight:500;">' + esc(c.name || c.check) + '</td>' +
+                // Issue #10: Human-readable compliance check labels
+                var checkLabel = c.name || c.check || '';
+                var readableLabels = {
+                    'sanctions_un': 'UN Sanctions List',
+                    'sanctions_ofac': 'OFAC SDN List',
+                    'sanctions_eu': 'EU Sanctions List',
+                    'sanctions': 'Sanctions Screening',
+                    'blacklist': 'Blacklist Check',
+                    'world_bank': 'World Bank Debarment',
+                    'registration': 'Registration Verification',
+                    'opensanctions': 'OpenSanctions Database'
+                };
+                var displayLabel = readableLabels[checkLabel.toLowerCase()] || T('compliance.check_type.' + checkLabel.toLowerCase()) || checkLabel;
+                return '<tr><td style="font-weight:500;">' + esc(displayLabel) + '</td>' +
                     '<td style="color:#64748b;">' + esc(c.description || '') + '</td>' +
                     '<td>' + (c.passed ? '<span class="badge badge-green">\u2705 Passed</span>' : '<span class="badge badge-red">\u274C Failed</span>') + '</td>' +
                     '<td>' + formatDate(c.updated_at || c.date) + '</td></tr>';
@@ -4686,7 +4911,7 @@ function renderReportsPage() {
         // Upcoming/Expected reports section
         '<div id="reports-upcoming" style="margin-bottom:24px;"></div>' +
 
-        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">' + (isNGO ? 'Submitted Reports' : 'All Reports') + '</h3>' +
+        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">' + T(isNGO ? 'report.submitted_reports' : 'report.all_reports') + '</h3>' +
         '<div id="reports-list">' + renderLoadingCards(3) + '</div>';
 }
 
@@ -4750,24 +4975,60 @@ function renderReportsList(reports) {
         'accepted': 'badge-green', 'revision_requested': 'badge-red'
     };
 
+    // Phase 6: Group reports by grant
+    var isNGO = (S.user.role || '').toLowerCase() === 'ngo';
+    var isDonor = (S.user.role || '').toLowerCase() === 'donor';
+    var grouped = {};
+    var grantOrder = [];
+    reports.forEach(function(r) {
+        var grantKey = r.grant_title || 'Other';
+        if (!grouped[grantKey]) {
+            grouped[grantKey] = [];
+            grantOrder.push(grantKey);
+        }
+        grouped[grantKey].push(r);
+    });
+
+    // If only one grant, no need for grouping headers
+    if (grantOrder.length <= 1) {
+        return renderReportsTableFlat(reports, statusColors, isNGO, isDonor);
+    }
+
+    // Multiple grants: render collapsible sections
+    return grantOrder.map(function(grantTitle) {
+        var grantReports = grouped[grantTitle];
+        var overdueCount = grantReports.filter(function(r) { return r.status === 'revision_requested'; }).length;
+        return '<div class="card" style="margin-bottom:16px;">' +
+            '<div class="card-body" style="padding-bottom:0;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+            '<h4 style="font-weight:600;">\uD83D\uDCBC ' + esc(grantTitle) + '</h4>' +
+            '<span class="badge badge-outline">' + grantReports.length + ' ' + T('report.title').toLowerCase() + '</span>' +
+            '</div>' +
+            renderReportsTableFlat(grantReports, statusColors, isNGO, isDonor) +
+            '</div></div>';
+    }).join('');
+}
+
+function renderReportsTableFlat(reports, statusColors, isNGO, isDonor) {
     return '<div class="table-wrapper"><table class="table table-hover"><thead><tr>' +
-        '<th>' + T('report.title') + '</th><th>' + T('report.grant') + '</th><th>' + T('report.type') + '</th><th>' + T('report.period') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('common.actions') + '</th>' +
+        '<th>' + T('report.title') + '</th>' +
+        (isDonor ? '<th>NGO</th>' : '') +
+        '<th>' + T('report.type') + '</th><th>' + T('report.period') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('common.actions') + '</th>' +
         '</tr></thead><tbody>' +
         reports.map(function(r) {
             var badge = statusColors[r.status] || 'badge-outline';
-            var isNGO = (S.user.role || '').toLowerCase() === 'ngo';
             var actionBtn = '';
             if (isNGO && (r.status === 'draft' || r.status === 'revision_requested')) {
-                actionBtn = '<button class="btn btn-primary btn-sm" onclick="editReport(' + r.id + ')">Edit</button>';
+                actionBtn = '<button class="btn btn-primary btn-sm" onclick="editReport(' + r.id + ')">' + T('common.edit') + '</button>';
             } else if (!isNGO && r.status === 'submitted') {
                 actionBtn = '<button class="btn btn-primary btn-sm" onclick="reviewReport(' + r.id + ')">Review</button>';
             } else {
-                actionBtn = '<button class="btn btn-secondary btn-sm" onclick="viewReport(' + r.id + ')">View</button>';
+                actionBtn = '<button class="btn btn-secondary btn-sm" onclick="viewReport(' + r.id + ')">' + T('common.view') + '</button>';
             }
 
             return '<tr>' +
                 '<td><strong>' + esc(r.title || 'Report #' + r.id) + '</strong></td>' +
-                '<td>' + esc(r.grant_title || '') + '</td>' +
+                (isDonor ? '<td>' + esc(r.ngo_org_name || r.org_name || '') + '</td>' : '') +
                 '<td><span class="badge badge-outline">' + esc(r.report_type || '') + '</span></td>' +
                 '<td>' + esc(r.reporting_period || '-') + '</td>' +
                 '<td><span class="badge ' + badge + '">' + esc(r.status || 'draft').replace(/_/g, ' ') + '</span></td>' +
@@ -5776,15 +6037,25 @@ function refreshAIPanel() {
     // Load English translations first (always needed as fallback)
     await loadTranslations('en');
 
+    // Issue #25: Restore language from localStorage before first render
+    var savedLang = null;
+    try { savedLang = localStorage.getItem('kuja_lang'); } catch(e) {}
+    if (savedLang && savedLang !== 'en') {
+        _currentLang = savedLang;
+        await loadTranslations(savedLang);
+        document.documentElement.lang = savedLang;
+        document.documentElement.dir = savedLang === 'ar' ? 'rtl' : 'ltr';
+    }
+
     // Check for existing cookie session via server
     try {
         var res = await api('GET', '/api/auth/me');
         if (res && res.user) {
             S.user = res.user;
             S.page = 'dashboard';
-            // Load user's saved language preference
-            var userLang = res.user.language || 'en';
-            if (userLang !== 'en') {
+            // Load user's saved language preference (server overrides local)
+            var userLang = res.user.language || savedLang || 'en';
+            if (userLang !== _currentLang) {
                 _currentLang = userLang;
                 await loadTranslations(userLang);
                 document.documentElement.lang = userLang;

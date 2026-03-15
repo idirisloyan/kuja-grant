@@ -133,8 +133,10 @@ def api_create_application():
 
     if data.get('responses'):
         application.set_responses(data['responses'])
-    if data.get('eligibility_responses'):
-        application.set_eligibility_responses(data['eligibility_responses'])
+    # Accept both 'eligibility_responses' (correct) and 'eligibility' (legacy)
+    elig_data = data.get('eligibility_responses') or data.get('eligibility')
+    if elig_data:
+        application.set_eligibility_responses(elig_data)
 
     db.session.add(application)
     db.session.commit()
@@ -164,8 +166,10 @@ def api_update_application(app_id):
 
     if 'responses' in data:
         application.set_responses(data['responses'])
-    if 'eligibility_responses' in data:
-        application.set_eligibility_responses(data['eligibility_responses'])
+    # Accept both 'eligibility_responses' (correct) and 'eligibility' (legacy)
+    elig_data = data.get('eligibility_responses') or data.get('eligibility')
+    if elig_data:
+        application.set_eligibility_responses(elig_data)
     if 'status' in data and current_user.role in ('donor', 'admin'):
         application.status = data['status']
     if 'ai_score' in data:

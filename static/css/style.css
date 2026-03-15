@@ -53,15 +53,21 @@
   --sidebar-collapsed: 60px;
   --ai-panel-width: 340px;
 
-  /* Borders & Shadows */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  /* Borders & Shadows — Phase 7: Enhanced for modern look */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --radius-full: 9999px;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12);
-  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.14);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 12px 32px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+
+  /* Gradients — Phase 7 */
+  --gradient-primary: linear-gradient(135deg, #2d8f6f 0%, #34a87d 100%);
+  --gradient-primary-dark: linear-gradient(135deg, #1a5c47 0%, #2d8f6f 100%);
+  --gradient-blue: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  --gradient-card-accent: linear-gradient(135deg, rgba(45, 143, 111, 0.05) 0%, rgba(59, 130, 246, 0.03) 100%);
 
   /* Transitions */
   --transition-fast: 0.15s ease;
@@ -135,7 +141,7 @@ ul, ol {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 50%, #34a87d 100%);
+  background: linear-gradient(135deg, #0f2b1e 0%, var(--color-primary-dark) 30%, var(--color-primary) 60%, #34a87d 100%);
   background-size: 400% 400%;
   animation: gradientShift 12s ease infinite;
   padding: var(--space-lg);
@@ -147,8 +153,9 @@ ul, ol {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.06) 0%, transparent 50%),
-                     radial-gradient(circle at 80% 20%, rgba(255,255,255,0.04) 0%, transparent 40%);
+  background-image: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08) 0%, transparent 50%),
+                     radial-gradient(circle at 80% 20%, rgba(255,255,255,0.06) 0%, transparent 40%),
+                     radial-gradient(circle at 50% 80%, rgba(45, 143, 111, 0.15) 0%, transparent 60%);
 }
 
 @keyframes gradientShift {
@@ -157,15 +164,18 @@ ul, ol {
 }
 
 .login-card {
-  background: var(--color-card);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1);
   padding: var(--space-2xl);
   width: 100%;
   max-width: 440px;
   position: relative;
   z-index: 1;
   animation: fadeInUp 0.5s ease;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .login-logo {
@@ -205,6 +215,7 @@ ul, ol {
   cursor: pointer;
   transition: all var(--transition-base);
   background: var(--color-card);
+  min-width: 0; /* Issue #1: Prevent overflow in Safari */
 }
 
 .role-card:hover {
@@ -321,7 +332,7 @@ ul, ol {
   left: 0;
   bottom: 0;
   width: var(--sidebar-width);
-  background: var(--color-primary-dark);
+  background: linear-gradient(180deg, #1a5c47 0%, #143d31 100%);
   color: #ffffff;
   overflow-y: auto;
   overflow-x: hidden;
@@ -383,8 +394,9 @@ ul, ol {
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
+  border-radius: 0 8px 8px 0;
 }
 
 .nav-item.active {
@@ -438,8 +450,13 @@ ul, ol {
   transition: margin-left var(--transition-slow);
 }
 
-.sidebar.collapsed ~ .main-content {
+.sidebar.collapsed ~ .main-content,
+.main-content.sidebar-collapsed {
   margin-left: var(--sidebar-collapsed);
+}
+
+.main-content.ai-panel-open {
+  margin-right: var(--ai-panel-width);
 }
 
 .page-header {
@@ -470,14 +487,15 @@ ul, ol {
   background: var(--color-card);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  border: 1px solid var(--color-border);
-  transition: transform var(--transition-base), box-shadow var(--transition-base);
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
   overflow: hidden;
 }
 
 .card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: var(--shadow-card-hover);
+  border-color: rgba(45, 143, 111, 0.15);
 }
 
 .card-header {
@@ -507,29 +525,51 @@ ul, ol {
   gap: var(--space-sm);
 }
 
-/* Stat Cards */
+/* Stat Cards — Phase 7: Modern with gradient accent */
 .stat-card {
   display: flex;
   align-items: center;
   gap: var(--space-lg);
   padding: var(--space-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
 }
 
 .stat-card .stat-icon {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-size-xl);
+  font-size: 22px;
   flex-shrink: 0;
 }
 
-.stat-card .stat-icon.green  { background: var(--color-primary-light); color: var(--color-primary); }
-.stat-card .stat-icon.blue   { background: #eff6ff; color: var(--color-secondary); }
-.stat-card .stat-icon.amber  { background: #fffbeb; color: var(--color-accent); }
-.stat-card .stat-icon.red    { background: #fef2f2; color: var(--color-danger); }
+.stat-card .stat-icon.green  { background: linear-gradient(135deg, #e8f5f0, #d1fae5); color: var(--color-primary); }
+.stat-card .stat-icon.blue   { background: linear-gradient(135deg, #eff6ff, #dbeafe); color: var(--color-secondary); }
+.stat-card .stat-icon.amber  { background: linear-gradient(135deg, #fffbeb, #fef3c7); color: var(--color-accent); }
+.stat-card .stat-icon.red    { background: linear-gradient(135deg, #fef2f2, #fee2e2); color: var(--color-danger); }
+
+/* Stat card accent bars match icon color */
+.card:has(.stat-icon.green) .stat-card::before,
+.stat-card:has(.stat-icon.green)::before { background: var(--gradient-primary); }
+.card:has(.stat-icon.blue) .stat-card::before,
+.stat-card:has(.stat-icon.blue)::before { background: var(--gradient-blue); }
+.card:has(.stat-icon.amber) .stat-card::before,
+.stat-card:has(.stat-icon.amber)::before { background: linear-gradient(to bottom, #f59e0b, #fbbf24); }
+.card:has(.stat-icon.red) .stat-card::before,
+.stat-card:has(.stat-icon.red)::before { background: linear-gradient(to bottom, #ef4444, #f87171); }
 
 .stat-card .stat-value {
   font-size: var(--font-size-3xl);
@@ -598,14 +638,22 @@ ul, ol {
 }
 
 .btn-primary {
-  background: var(--color-primary);
+  background: var(--gradient-primary);
   color: #ffffff;
-  border-color: var(--color-primary);
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(45, 143, 111, 0.25);
 }
 
 .btn-primary:hover {
-  background: var(--color-primary-dark);
-  border-color: var(--color-primary-dark);
+  background: var(--gradient-primary-dark);
+  border-color: transparent;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(45, 143, 111, 0.35);
+}
+
+.btn-primary:active {
+  transform: translateY(0px);
+  box-shadow: 0 1px 4px rgba(45, 143, 111, 0.2);
 }
 
 .btn-secondary {
@@ -616,6 +664,7 @@ ul, ol {
 
 .btn-secondary:hover {
   background: var(--color-primary-light);
+  transform: translateY(-1px);
 }
 
 .btn-danger {
@@ -775,8 +824,8 @@ select.form-control {
 }
 
 .wizard-step .step-number {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   border: 2px solid var(--color-border);
   display: flex;
@@ -790,14 +839,15 @@ select.form-control {
 }
 
 .wizard-step.active .step-number {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--gradient-primary);
+  border-color: transparent;
   color: #ffffff;
+  box-shadow: 0 2px 8px rgba(45, 143, 111, 0.3);
 }
 
 .wizard-step.completed .step-number {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--gradient-primary);
+  border-color: transparent;
   color: #ffffff;
 }
 
@@ -839,6 +889,16 @@ select.form-control {
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background: var(--color-card);
+  /* Issue #9: Scroll shadow indicators */
+  background-image:
+    linear-gradient(to right, var(--color-card), var(--color-card)),
+    linear-gradient(to right, var(--color-card), var(--color-card)),
+    linear-gradient(to right, rgba(0,0,0,0.08), rgba(255,255,255,0)),
+    linear-gradient(to left, rgba(0,0,0,0.08), rgba(255,255,255,0));
+  background-position: left center, right center, left center, right center;
+  background-repeat: no-repeat;
+  background-size: 20px 100%, 20px 100%, 10px 100%, 10px 100%;
+  background-attachment: local, local, scroll, scroll;
 }
 
 .table {
@@ -848,7 +908,7 @@ select.form-control {
 }
 
 .table th {
-  background: var(--color-bg);
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
   padding: 12px 16px;
   text-align: left;
   font-weight: 600;
@@ -856,7 +916,7 @@ select.form-control {
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 2px solid var(--color-border);
   white-space: nowrap;
 }
 
@@ -1515,6 +1575,7 @@ select.form-control {
   border-left: 4px solid;
   animation: slideInRight 0.3s ease, fadeOut 0.3s ease 4.7s forwards;
   font-size: var(--font-size-sm);
+  word-break: break-word; /* Issue #26: Prevent toast text truncation */
 }
 
 .toast-success { border-color: var(--color-success); }
@@ -1602,6 +1663,71 @@ select.form-control {
 .hidden { display: none !important; }
 
 /* =============================================================================
+   22b. Phase 7 — Micro-Animations & Enhanced UI
+   ============================================================================= */
+
+/* Staggered card entrance animation */
+.content-grid .card,
+#ngo-stat-cards > .card,
+#donor-stat-cards > .card,
+#reviewer-stat-cards > .card {
+  animation: fadeInUp 0.4s ease backwards;
+}
+.content-grid .card:nth-child(1) { animation-delay: 0.05s; }
+.content-grid .card:nth-child(2) { animation-delay: 0.10s; }
+.content-grid .card:nth-child(3) { animation-delay: 0.15s; }
+.content-grid .card:nth-child(4) { animation-delay: 0.20s; }
+.content-grid .card:nth-child(5) { animation-delay: 0.25s; }
+.content-grid .card:nth-child(6) { animation-delay: 0.30s; }
+
+/* Table row hover — directional */
+.table-hover tr {
+  transition: background-color var(--transition-fast);
+}
+.table-hover tr:hover td {
+  background: linear-gradient(90deg, rgba(45, 143, 111, 0.04), rgba(45, 143, 111, 0.02));
+}
+
+/* Enhanced form focus */
+.form-control:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(45, 143, 111, 0.12);
+}
+
+/* Page header gradient underline */
+.page-header h1 {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 4px;
+}
+
+/* Badge enhancements */
+.badge {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* Enhanced header */
+.header {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* Score ring pulse on hover */
+.score-ring-container:hover svg circle:last-child {
+  filter: drop-shadow(0 0 4px rgba(45, 143, 111, 0.4));
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* =============================================================================
    23. Responsive Design
    ============================================================================= */
 
@@ -1621,9 +1747,14 @@ select.form-control {
     padding: 0;
   }
 
-  .main-content {
+  .main-content,
+  .main-content.sidebar-collapsed {
     margin-left: var(--sidebar-collapsed);
     padding: var(--space-lg);
+  }
+
+  .main-content.ai-panel-open {
+    margin-right: var(--ai-panel-width);
   }
 
   .ai-panel {
@@ -1666,9 +1797,13 @@ select.form-control {
     transform: translateX(0);
   }
 
-  .main-content {
+  .main-content,
+  .main-content.sidebar-collapsed,
+  .main-content.ai-panel-open {
     margin-left: 0;
+    margin-right: 0; /* Issue #14/#24: Override all inline/class margins on mobile */
     padding: var(--space-md);
+    overflow-x: hidden; /* Prevent horizontal scroll */
   }
 
   .header {
@@ -1703,6 +1838,7 @@ select.form-control {
 
   .role-selector {
     grid-template-columns: 1fr;
+    gap: var(--space-xs); /* Issue #1: Reduce gap on mobile */
   }
 
   .stat-card {
@@ -1725,6 +1861,30 @@ select.form-control {
 
   .table-wrapper {
     border-radius: var(--radius-md);
+  }
+
+  /* Issue #16: Stack wizard action buttons vertically on mobile */
+  .wizard-actions {
+    flex-direction: column;
+    gap: var(--space-sm);
+    align-items: stretch;
+  }
+
+  .wizard-actions > div {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .wizard-actions .btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  /* Issue #18: Assessment hub stacked layout on mobile */
+  .assessment-hub-score {
+    flex-direction: column !important;
+    gap: var(--space-md) !important;
+    text-align: center;
   }
 }
 
@@ -2080,7 +2240,7 @@ a:focus-visible {
 /* Mobile responsive RTL */
 @media (max-width: 768px) {
   [dir="rtl"] .main-content {
-    margin-right: 0;
+    margin-right: var(--sidebar-collapsed);
   }
 
   [dir="rtl"] .sidebar {
@@ -2090,6 +2250,30 @@ a:focus-visible {
 
   [dir="rtl"] .sidebar.mobile-open {
     right: 0;
+  }
+}
+
+/* Issue #21: RTL mobile — no empty space */
+@media (max-width: 480px) {
+  [dir="rtl"] .main-content,
+  [dir="rtl"] .main-content.sidebar-collapsed,
+  [dir="rtl"] .main-content.ai-panel-open {
+    margin-right: 0;
+    margin-left: 0;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Issue #23: RTL tables — ensure minimum column widths */
+  [dir="rtl"] .table th,
+  [dir="rtl"] .table td {
+    min-width: 60px;
+    white-space: nowrap;
+  }
+
+  [dir="rtl"] .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

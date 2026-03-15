@@ -59,8 +59,22 @@ def api_list_grants():
     query = query.order_by(Grant.created_at.desc())
     pagination = paginate_query(query)
 
+    grants_data = [g.to_dict(summary=True) for g in pagination.items]
+
+    # For NGOs, include their application status for each grant (Issue #8)
+    if current_user.role == 'ngo' and current_user.org_id:
+        grant_ids = [g.id for g in pagination.items]
+        if grant_ids:
+            user_apps = Application.query.filter(
+                Application.grant_id.in_(grant_ids),
+                Application.ngo_org_id == current_user.org_id
+            ).all()
+            app_status_map = {a.grant_id: a.status for a in user_apps}
+            for gd in grants_data:
+                gd['user_application_status'] = app_status_map.get(gd['id'])
+
     return jsonify({
-        'grants': [g.to_dict(summary=True) for g in pagination.items],
+        'grants': grants_data,
         'total': pagination.total,
         'page': pagination.page,
         'pages': pagination.pages,
