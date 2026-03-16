@@ -1,6 +1,6 @@
 /* =============================================================================
    Kuja Grant Management System - Single Page Application
-   Version: 1.0.0
+   Version: 4.0.0 — Tailwind CSS + Lucide Icons + Chart.js UI Redesign
    ============================================================================= */
 
 // =============================================================================
@@ -385,15 +385,30 @@ function capacityLabel(score) {
 
 function statusBadge(status) {
     if (!status) return '';
-    const map = {
-        draft: 'badge-draft', open: 'badge-open', published: 'badge-open',
-        submitted: 'badge-submitted', in_review: 'badge-review', review: 'badge-review',
-        under_review: 'badge-review', scored: 'badge-scored',
-        awarded: 'badge-awarded', approved: 'badge-awarded', accepted: 'badge-awarded',
-        rejected: 'badge-rejected', declined: 'badge-rejected', closed: 'badge-gray',
-        pending: 'badge-amber', completed: 'badge-green', active: 'badge-green'
+    var colorMap = {
+        draft: 'bg-slate-100 text-slate-600', open: 'bg-blue-50 text-blue-700', published: 'bg-blue-50 text-blue-700',
+        submitted: 'bg-indigo-50 text-indigo-700', in_review: 'bg-amber-50 text-amber-700', review: 'bg-amber-50 text-amber-700',
+        under_review: 'bg-amber-50 text-amber-700', scored: 'bg-pink-50 text-pink-700',
+        awarded: 'bg-emerald-50 text-emerald-700', approved: 'bg-emerald-50 text-emerald-700', accepted: 'bg-emerald-50 text-emerald-700',
+        rejected: 'bg-rose-50 text-rose-700', declined: 'bg-rose-50 text-rose-700', closed: 'bg-slate-100 text-slate-600',
+        pending: 'bg-amber-50 text-amber-700', completed: 'bg-emerald-50 text-emerald-700', active: 'bg-emerald-50 text-emerald-700',
+        assigned: 'bg-blue-50 text-blue-700', clear: 'bg-emerald-50 text-emerald-700', flagged: 'bg-rose-50 text-rose-700',
+        verified: 'bg-emerald-50 text-emerald-700', unverified: 'bg-slate-100 text-slate-600',
+        error: 'bg-rose-50 text-rose-700', expired: 'bg-slate-100 text-slate-600',
+        ai_reviewed: 'bg-violet-50 text-violet-700', revision_requested: 'bg-rose-50 text-rose-700',
+        in_progress: 'bg-blue-50 text-blue-700', overdue: 'bg-rose-50 text-rose-700'
     };
-    const labelMap = {
+    var dotMap = {
+        draft: 'bg-slate-400', open: 'bg-blue-500', published: 'bg-blue-500',
+        submitted: 'bg-indigo-500', in_review: 'bg-amber-500', review: 'bg-amber-500',
+        awarded: 'bg-emerald-500', approved: 'bg-emerald-500', accepted: 'bg-emerald-500',
+        rejected: 'bg-rose-500', declined: 'bg-rose-500', pending: 'bg-amber-500',
+        completed: 'bg-emerald-500', active: 'bg-emerald-500', clear: 'bg-emerald-500',
+        flagged: 'bg-rose-500', verified: 'bg-emerald-500', error: 'bg-rose-500',
+        ai_reviewed: 'bg-violet-500', revision_requested: 'bg-rose-500',
+        in_progress: 'bg-blue-500', overdue: 'bg-rose-500'
+    };
+    var labelMap = {
         draft: T('status.draft'), open: T('status.open'), published: T('status.open'),
         submitted: T('status.submitted'), in_review: T('status.review'), review: T('status.review'),
         under_review: T('status.under_review'), scored: T('status.scored'),
@@ -403,11 +418,14 @@ function statusBadge(status) {
         assigned: T('status.assigned'), clear: T('status.clear'), flagged: T('status.flagged'),
         error: T('status.error'), unverified: T('status.unverified'), verified: T('status.verified'),
         expired: T('status.expired'), ai_reviewed: T('status.ai_reviewed'),
-        revision_requested: T('status.revision_requested')
+        revision_requested: T('status.revision_requested'), in_progress: T('status.in_progress'), overdue: 'Overdue'
     };
-    const cls = map[status.toLowerCase()] || 'badge-gray';
-    const label = labelMap[status.toLowerCase()] || esc(status.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); }));
-    return '<span class="badge ' + cls + '" role="status">' + esc(label) + '</span>';
+    var sk = status.toLowerCase();
+    var cls = colorMap[sk] || 'bg-slate-100 text-slate-600';
+    var dot = dotMap[sk] || 'bg-slate-400';
+    var label = labelMap[sk] || esc(status.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); }));
+    return '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold rounded-full ' + cls + '" role="status">' +
+        '<span class="w-1.5 h-1.5 rounded-full ' + dot + '"></span>' + esc(label) + '</span>';
 }
 
 function qualityIndicator(wordCount, maxWords) {
@@ -437,27 +455,29 @@ function scoreRingHTML(score, size, label) {
     var r = (size / 2) - 6;
     var c = 2 * Math.PI * r;
     var offset = c - (score / 100) * c;
-    var col = scoreColor(score);
-    return '<div class="score-ring" style="width:' + size + 'px;height:' + size + 'px;">' +
-        '<svg viewBox="0 0 ' + size + ' ' + size + '" style="width:' + size + 'px;height:' + size + 'px;">' +
-        '<circle class="ring-bg" cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + r + '"/>' +
-        '<circle class="ring-fill ' + col + '" cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + r + '" ' +
-        'stroke-dasharray="' + c + '" stroke-dashoffset="' + offset + '"/>' +
+    var colors = { green: '#10b981', amber: '#f59e0b', red: '#f43f5e' };
+    var col = colors[scoreColor(score)] || colors.green;
+    return '<div class="relative inline-flex items-center justify-center" style="width:' + size + 'px;height:' + size + 'px;">' +
+        '<svg viewBox="0 0 ' + size + ' ' + size + '" class="transform -rotate-90" style="width:' + size + 'px;height:' + size + 'px;">' +
+        '<circle cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + r + '" fill="none" stroke="#e2e8f0" stroke-width="5"/>' +
+        '<circle cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + r + '" fill="none" stroke="' + col + '" stroke-width="5" ' +
+        'stroke-dasharray="' + c + '" stroke-dashoffset="' + offset + '" stroke-linecap="round" class="transition-all duration-1000"/>' +
         '</svg>' +
-        '<div class="score-value">' +
-        '<span class="score-number">' + score + '</span>' +
-        (label ? '<span class="score-label">' + esc(label) + '</span>' : '') +
+        '<div class="absolute inset-0 flex flex-col items-center justify-center">' +
+        '<span class="text-lg font-bold text-slate-900">' + score + '</span>' +
+        (label ? '<span class="text-[10px] text-slate-500">' + esc(label) + '</span>' : '') +
         '</div></div>';
 }
 
 function sectorIcon(sector) {
     var icons = {
-        health: '\uD83C\uDFE5', education: '\uD83D\uDCDA', climate: '\uD83C\uDF0D',
-        protection: '\uD83D\uDEE1\uFE0F', nutrition: '\uD83C\uDF4E', wash: '\uD83D\uDCA7',
-        livelihoods: '\uD83D\uDCB5', governance: '\u2696\uFE0F', agriculture: '\uD83C\uDF3E',
-        environment: '\uD83C\uDF3F', humanitarian: '\u2764\uFE0F', gender: '\u2640\uFE0F'
+        health: 'heart-pulse', education: 'graduation-cap', climate: 'globe-2',
+        protection: 'shield', nutrition: 'apple', wash: 'droplets',
+        livelihoods: 'banknote', governance: 'scale', agriculture: 'sprout',
+        environment: 'leaf', humanitarian: 'heart', gender: 'users',
+        technology: 'cpu', infrastructure: 'building', youth: 'smile'
     };
-    return icons[(sector || '').toLowerCase()] || '\uD83D\uDCCC';
+    return icon(icons[(sector || '').toLowerCase()] || 'map-pin', 14);
 }
 
 function truncate(str, max) {
@@ -490,6 +510,23 @@ function renderMarkdown(text) {
         .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/\n/g, '<br>');
+}
+
+// Lucide icon helper — renders an inline SVG icon placeholder
+function icon(name, size, cls) {
+    size = size || 20;
+    cls = cls || '';
+    return '<i data-lucide="' + name + '" class="inline-block shrink-0 ' + cls + '" style="width:' + size + 'px;height:' + size + 'px;"></i>';
+}
+
+// Chart.js instance manager — destroys previous chart before creating new one
+var _chartInstances = {};
+function createChart(canvasId, config) {
+    if (_chartInstances[canvasId]) { _chartInstances[canvasId].destroy(); }
+    var canvas = document.getElementById(canvasId);
+    if (!canvas) return null;
+    _chartInstances[canvasId] = new Chart(canvas, config);
+    return _chartInstances[canvasId];
 }
 
 // =============================================================================
@@ -562,22 +599,20 @@ function showToast(message, type) {
     type = type || 'success';
     var container = document.getElementById('toast-container');
     if (!container) return;
-    var icons = { success: '\u2705', error: '\u274C', warning: '\u26A0\uFE0F', info: '\u2139\uFE0F' };
+    var iconNames = { success: 'check-circle', error: 'x-circle', warning: 'alert-triangle', info: 'info' };
+    var colors = { success: 'border-emerald-500', error: 'border-rose-500', warning: 'border-amber-500', info: 'border-brand-500' };
+    var iconCls = { success: 'text-emerald-500', error: 'text-rose-500', warning: 'text-amber-500', info: 'text-brand-500' };
     var toast = document.createElement('div');
-    toast.className = 'toast toast-' + type;
-    toast.innerHTML = '<span class="toast-icon">' + (icons[type] || '') + '</span>' +
-        '<span class="toast-message">' + esc(message) + '</span>' +
-        '<button class="toast-close" onclick="this.parentElement.remove()">\u00D7</button>';
-    toast.style.cssText = 'display:flex;align-items:center;gap:8px;padding:12px 16px;' +
-        'background:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);' +
-        'margin-bottom:8px;font-size:14px;min-width:280px;max-width:420px;' +
-        'animation:slideInRight 0.3s ease;border-left:4px solid ' +
-        (type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#3b82f6') + ';';
-    container.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;';
+    toast.className = 'flex items-start gap-3 p-4 bg-white rounded-xl shadow-lg border-l-4 ' + (colors[type] || colors.info) + ' min-w-[280px] max-w-[420px] animate-slide-in-right';
+    toast.innerHTML = '<span class="' + (iconCls[type] || iconCls.info) + ' shrink-0 mt-0.5">' + icon(iconNames[type] || 'info', 18) + '</span>' +
+        '<span class="text-sm text-slate-700 flex-1">' + esc(message) + '</span>' +
+        '<button class="text-slate-400 hover:text-slate-600 shrink-0" onclick="this.parentElement.remove()">' + icon('x', 16) + '</button>';
     container.appendChild(toast);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
     setTimeout(function() {
         if (toast.parentElement) {
-            toast.style.animation = 'fadeOut 0.3s ease forwards';
+            toast.style.opacity = '0'; toast.style.transform = 'translateX(40px)';
+            toast.style.transition = 'all 0.3s ease';
             setTimeout(function() { if (toast.parentElement) toast.remove(); }, 300);
         }
     }, 8000);
@@ -593,17 +628,24 @@ function showModal(title, contentHTML, buttons) {
     if (!overlay || !mc) return;
     var btnsHTML = '';
     if (buttons && buttons.length) {
-        btnsHTML = '<div class="modal-footer">' +
+        btnsHTML = '<div class="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50/50 rounded-b-2xl">' +
             buttons.map(function(b) {
-                return '<button class="btn ' + (b.cls || 'btn-secondary') + '" onclick="' + esc(b.onclick) + '">' + esc(b.label) + '</button>';
+                var cls = 'px-4 py-2 text-sm font-medium rounded-lg transition-all ';
+                if (b.cls === 'btn-primary') cls += 'text-white bg-brand-600 hover:bg-brand-700 shadow-sm';
+                else if (b.cls === 'btn-danger') cls += 'text-white bg-rose-500 hover:bg-rose-600';
+                else cls += 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50';
+                return '<button class="' + cls + '" onclick="' + esc(b.onclick) + '">' + esc(b.label) + '</button>';
             }).join('') + '</div>';
     }
-    mc.innerHTML = '<div class="modal">' +
-        '<div class="modal-header"><h2>' + esc(title) + '</h2>' +
-        '<button class="modal-close" onclick="closeModal()">\u00D7</button></div>' +
-        '<div class="modal-body">' + contentHTML + '</div>' +
+    mc.innerHTML = '<div class="bg-white rounded-2xl shadow-2xl max-h-[85vh] flex flex-col animate-slide-in-up overflow-hidden">' +
+        '<div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">' +
+        '<h2 class="text-lg font-semibold text-slate-900">' + esc(title) + '</h2>' +
+        '<button class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" onclick="closeModal()">' + icon('x', 18) + '</button>' +
+        '</div>' +
+        '<div class="px-6 py-5 overflow-y-auto flex-1">' + contentHTML + '</div>' +
         btnsHTML + '</div>';
     overlay.classList.remove('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function closeModal(e) {
@@ -635,7 +677,11 @@ function nav(page, params) {
     if (params) {
         Object.keys(params).forEach(function(k) { S[k] = params[k]; });
     }
+    var main = document.getElementById('main-content');
+    if (main) { main.style.opacity = '0'; main.style.transition = 'opacity 0.15s ease'; }
     render();
+    var newMain = document.getElementById('main-content');
+    if (newMain) { requestAnimationFrame(function() { newMain.style.opacity = '1'; }); }
     window.scrollTo(0, 0);
 }
 
@@ -649,6 +695,7 @@ function render() {
 
     if (S.page === 'login') {
         app.innerHTML = renderLogin();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
         return;
     }
 
@@ -659,6 +706,7 @@ function render() {
 
     app.innerHTML = renderShell();
     bindShellEvents();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // =============================================================================
@@ -666,49 +714,55 @@ function render() {
 // =============================================================================
 
 function renderLogin() {
-    return '<div class="login-page">' +
-        '<div class="login-card">' +
-        '<div class="login-logo">' +
-        '<svg width="56" height="56" viewBox="0 0 56 56" style="margin:0 auto 12px;">' +
-        '<circle cx="28" cy="28" r="26" fill="#2d8f6f"/>' +
-        '<text x="28" y="36" text-anchor="middle" fill="white" font-size="28" font-family="Inter, Arial" font-weight="bold">K</text>' +
-        '</svg>' +
-        '<h1>' + T('auth.login_title') + '</h1>' +
-        '<p>' + T('auth.subtitle') + '</p>' +
+    return '<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-brand-900 to-brand-800 p-6 relative overflow-hidden">' +
+        '<div class="absolute inset-0 pointer-events-none">' +
+        '<div class="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl"></div>' +
+        '<div class="absolute bottom-1/4 right-1/4 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl"></div>' +
+        '<div class="absolute top-1/2 right-1/3 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl"></div>' +
         '</div>' +
-        '<div id="login-error" style="display:none;color:#ef4444;font-size:13px;text-align:center;margin-bottom:12px;"></div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('auth.email_label') + '</label>' +
-        '<input type="email" id="login-email" class="form-control" placeholder="' + T('auth.email_placeholder') + '">' +
+        '<div class="relative z-10 w-full max-w-md animate-fade-in-up">' +
+        '<div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 p-8">' +
+        '<div class="text-center mb-8">' +
+        '<div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-brand-600 to-brand-700 rounded-2xl flex items-center justify-center shadow-lg shadow-brand-500/25 transform hover:scale-105 transition-transform">' +
+        '<span class="text-white text-2xl font-bold">K</span>' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('auth.password_label') + '</label>' +
-        '<input type="password" id="login-pass" class="form-control" placeholder="' + T('auth.password_placeholder') + '">' +
+        '<h1 class="text-2xl font-bold text-slate-900">' + T('auth.login_title') + '</h1>' +
+        '<p class="text-sm text-slate-500 mt-1">' + T('auth.subtitle') + '</p>' +
         '</div>' +
-        '<button class="btn btn-primary btn-lg" style="width:100%;margin-bottom:24px;" onclick="doLogin()">' +
+        '<div id="login-error" class="hidden text-sm text-rose-600 text-center mb-4 p-3 bg-rose-50 rounded-lg"></div>' +
+        '<div class="space-y-4 mb-6">' +
+        '<div>' +
+        '<label class="block text-sm font-medium text-slate-700 mb-1.5">' + T('auth.email_label') + '</label>' +
+        '<div class="relative">' +
+        '<span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">' + icon('mail', 18) + '</span>' +
+        '<input type="email" id="login-email" class="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none" placeholder="' + T('auth.email_placeholder') + '" onkeydown="if(event.key===\'Enter\')doLogin()">' +
+        '</div></div>' +
+        '<div>' +
+        '<label class="block text-sm font-medium text-slate-700 mb-1.5">' + T('auth.password_label') + '</label>' +
+        '<div class="relative">' +
+        '<span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">' + icon('lock', 18) + '</span>' +
+        '<input type="password" id="login-pass" class="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none" placeholder="' + T('auth.password_placeholder') + '" onkeydown="if(event.key===\'Enter\')doLogin()">' +
+        '</div></div>' +
+        '</div>' +
+        '<button class="w-full py-3 px-4 text-sm font-semibold text-white bg-gradient-to-r from-brand-600 to-brand-700 rounded-lg hover:from-brand-700 hover:to-brand-800 shadow-lg shadow-brand-500/25 transition-all hover:-translate-y-0.5 active:translate-y-0" onclick="doLogin()">' +
         '<span id="login-btn-text">' + T('auth.sign_in') + '</span>' +
         '</button>' +
-        '<div style="border-top:1px solid #e2e8f0;padding-top:20px;">' +
-        '<p style="font-size:13px;color:#64748b;text-align:center;margin-bottom:12px;font-weight:600;">' + T('auth.demo_accounts') + '</p>' +
-        '<div class="role-selector">' +
-        '<div class="role-card" onclick="fillDemo(\'ngo\')">' +
-        '<div class="role-icon">\uD83C\uDFE2</div>' +
-        '<div class="role-label">NGO</div>' +
-        '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">fatima@amani.org</div>' +
-        '</div>' +
-        '<div class="role-card" onclick="fillDemo(\'donor\')">' +
-        '<div class="role-icon">\uD83D\uDCB0</div>' +
-        '<div class="role-label">Donor</div>' +
-        '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">sarah@globalhealth.org</div>' +
-        '</div>' +
-        '<div class="role-card" onclick="fillDemo(\'reviewer\')">' +
-        '<div class="role-icon">\u2B50</div>' +
-        '<div class="role-label">Reviewer</div>' +
-        '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">james@reviewer.org</div>' +
-        '</div>' +
-        '</div>' +
-        '</div>' +
-        '</div>' +
+        '<div class="mt-6 pt-6 border-t border-slate-200">' +
+        '<p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-center mb-4">' + T('auth.demo_accounts') + '</p>' +
+        '<div class="grid grid-cols-3 gap-3">' +
+        loginRoleCard('ngo', 'building-2', 'NGO', 'fatima@amani.org') +
+        loginRoleCard('donor', 'wallet', 'Donor', 'sarah@globalhealth.org') +
+        loginRoleCard('reviewer', 'star', 'Reviewer', 'james@reviewer.org') +
+        '</div></div>' +
+        '</div></div></div>';
+}
+
+function loginRoleCard(role, iconName, label, email) {
+    return '<div class="group p-3 border-2 border-slate-200 rounded-xl text-center cursor-pointer hover:border-brand-500 hover:bg-brand-50 transition-all" onclick="fillDemo(\'' + role + '\')">' +
+        '<div class="w-10 h-10 mx-auto mb-2 rounded-lg bg-slate-100 group-hover:bg-brand-100 flex items-center justify-center text-slate-500 group-hover:text-brand-600 transition-colors">' +
+        icon(iconName, 20) + '</div>' +
+        '<div class="text-sm font-semibold text-slate-700">' + label + '</div>' +
+        '<div class="text-[10px] text-slate-400 mt-1 truncate">' + esc(email) + '</div>' +
         '</div>';
 }
 
@@ -724,8 +778,6 @@ function fillDemo(role) {
     var passEl = document.getElementById('login-pass');
     if (emailEl) emailEl.value = c.email;
     if (passEl) passEl.value = c.pass;
-    document.querySelectorAll('.role-card').forEach(function(el) { el.classList.remove('active'); });
-    event.currentTarget.classList.add('active');
 }
 
 async function doLogin() {
@@ -736,7 +788,7 @@ async function doLogin() {
         return;
     }
     var btn = document.getElementById('login-btn-text');
-    if (btn) btn.innerHTML = '<span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;"></span> ' + T('auth.signing_in');
+    if (btn) btn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin-slow"></span> ' + T('auth.signing_in');
 
     var res = await api('POST', '/api/auth/login', { email: email, password: pass });
     if (res && res.success) {
@@ -768,51 +820,47 @@ async function doLogin() {
 function renderShell() {
     var role = (S.user.role || '').toLowerCase();
     var mainHTML = renderPageContent();
-
-    // Issue #14/#24: Use CSS classes instead of inline styles for margins
-    var mainClasses = 'main-content';
-    if (S.sidebarCollapsed) mainClasses += ' sidebar-collapsed';
-    if (S.aiPanelOpen) mainClasses += ' ai-panel-open';
+    var sidebarW = S.sidebarCollapsed ? '60px' : '250px';
+    var aiMr = S.aiPanelOpen ? 'margin-right:340px;' : '';
 
     return renderHeader() + renderSidebar(role) +
-        '<main class="' + mainClasses + '" id="main-content" role="main">' + mainHTML + '</main>' +
+        '<main class="mt-[60px] min-h-[calc(100vh-60px)] p-6 transition-all duration-300" style="margin-left:' + sidebarW + ';' + aiMr + '" id="main-content" role="main">' + mainHTML + '</main>' +
         renderAIPanel() +
-        '<button class="ai-panel-toggle" onclick="toggleAI()" title="AI Assistant" aria-label="' + T('ai.panel_title') + '">\u2728</button>';
+        '<button class="fixed right-5 bottom-5 w-12 h-12 bg-gradient-to-br from-brand-600 to-brand-700 text-white rounded-full shadow-lg shadow-brand-500/25 flex items-center justify-center z-[85] hover:scale-110 active:scale-95 transition-transform" onclick="toggleAI()" title="AI Assistant" aria-label="' + T('ai.panel_title') + '">' + icon('sparkles', 20) + '</button>';
 }
 
 function renderHeader() {
     var role = (S.user.role || '').replace(/_/g, ' ');
-    var roleBadge = '';
-    if (role === 'ngo') roleBadge = '<span class="badge badge-green">NGO</span>';
-    else if (role === 'donor') roleBadge = '<span class="badge badge-blue">Donor</span>';
-    else if (role === 'reviewer') roleBadge = '<span class="badge badge-amber">Reviewer</span>';
-    else roleBadge = '<span class="badge badge-gray">' + esc(role) + '</span>';
+    var roleBadgeColors = {
+        ngo: 'bg-emerald-50 text-emerald-700', donor: 'bg-blue-50 text-blue-700',
+        reviewer: 'bg-amber-50 text-amber-700', admin: 'bg-slate-100 text-slate-700'
+    };
+    var roleBadge = '<span class="px-2 py-0.5 text-[10px] font-semibold rounded-full ' + (roleBadgeColors[role] || roleBadgeColors.admin) + '">' + esc(role.toUpperCase()) + '</span>';
 
-    return '<header class="header" role="banner">' +
-        '<div class="header-logo" style="cursor:pointer;" onclick="nav(\'dashboard\')">' +
-        '<svg width="32" height="32" viewBox="0 0 32 32">' +
-        '<circle cx="16" cy="16" r="14" fill="#2d8f6f"/>' +
-        '<text x="16" y="22" text-anchor="middle" fill="white" font-size="16" font-family="Inter, Arial" font-weight="bold">K</text>' +
-        '</svg>' +
-        '<span>Kuja Grant</span>' +
+    return '<header class="fixed top-0 left-0 right-0 h-[60px] bg-white/90 backdrop-blur-xl border-b border-slate-200/80 flex items-center justify-between px-6 z-[100]" role="banner">' +
+        '<div class="flex items-center gap-3 cursor-pointer" onclick="nav(\'dashboard\')">' +
+        '<div class="w-8 h-8 bg-gradient-to-br from-brand-600 to-brand-700 rounded-lg flex items-center justify-center shadow-sm">' +
+        '<span class="text-white text-sm font-bold">K</span></div>' +
+        '<span class="text-lg font-bold text-slate-900 hidden sm:inline">Kuja Grant</span>' +
         '</div>' +
-        '<div class="header-actions">' +
-        '<div class="header-user">' +
-        '<div style="width:32px;height:32px;border-radius:50%;background:#2d8f6f;color:white;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;">' +
+        '<div class="flex items-center gap-3">' +
+        '<button class="md:hidden w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" onclick="toggleSidebar()">' + icon('menu', 20) + '</button>' +
+        '<div class="flex items-center gap-2.5">' +
+        '<div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-600 to-brand-700 text-white flex items-center justify-center text-xs font-semibold">' +
         esc((S.user.name || 'U').charAt(0).toUpperCase()) +
         '</div>' +
-        '<span>' + esc(S.user.name || 'User') + '</span>' +
+        '<span class="text-sm font-medium text-slate-700 hidden md:inline">' + esc(S.user.name || 'User') + '</span>' +
         roleBadge +
         '</div>' +
-        '<div class="language-switcher">' +
-        '<select onchange="setLanguage(this.value)" aria-label="Select language">' +
-        '<option value="en"' + (_currentLang === 'en' ? ' selected' : '') + '>\uD83C\uDF10 English</option>' +
-        '<option value="ar"' + (_currentLang === 'ar' ? ' selected' : '') + '>\uD83C\uDF10 \u0627\u0644\u0639\u0631\u0628\u064A\u0629</option>' +
-        '<option value="fr"' + (_currentLang === 'fr' ? ' selected' : '') + '>\uD83C\uDF10 Fran\u00E7ais</option>' +
-        '<option value="es"' + (_currentLang === 'es' ? ' selected' : '') + '>\uD83C\uDF10 Espa\u00F1ol</option>' +
-        '</select>' +
-        '</div>' +
-        '<button class="btn-logout" onclick="doLogout()">\uD83D\uDEAA ' + T('auth.logout') + '</button>' +
+        '<div class="relative">' +
+        '<select class="text-sm border border-slate-200 rounded-lg px-2 py-1.5 bg-white cursor-pointer appearance-none pr-7 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none" onchange="setLanguage(this.value)" aria-label="Select language">' +
+        '<option value="en"' + (_currentLang === 'en' ? ' selected' : '') + '>EN</option>' +
+        '<option value="ar"' + (_currentLang === 'ar' ? ' selected' : '') + '>AR</option>' +
+        '<option value="fr"' + (_currentLang === 'fr' ? ' selected' : '') + '>FR</option>' +
+        '<option value="es"' + (_currentLang === 'es' ? ' selected' : '') + '>ES</option>' +
+        '</select></div>' +
+        '<button class="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-500 border border-slate-200 rounded-lg hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 transition-all" onclick="doLogout()">' +
+        icon('log-out', 16) + '<span class="hidden sm:inline">' + T('auth.logout') + '</span></button>' +
         '</div>' +
         '</header>';
 }
@@ -821,64 +869,65 @@ function renderSidebar(role) {
     var items = [];
     if (role === 'ngo') {
         items = [
-            { icon: '\uD83D\uDCCA', label: T('nav.dashboard'), page: 'dashboard' },
-            { icon: '\uD83D\uDCDD', label: T('nav.assessment_hub'), page: 'assessment' },
-            { icon: '\uD83D\uDCB0', label: T('nav.browse_grants'), page: 'grants' },
-            { icon: '\uD83D\uDCCB', label: T('nav.my_applications'), page: 'applications' },
-            { icon: '\uD83D\uDCC8', label: T('nav.reports'), page: 'reports' },
-            { icon: '\uD83D\uDCC4', label: T('nav.my_documents'), page: 'documents' },
-            { icon: '\uD83D\uDC64', label: T('nav.org_profile'), page: 'orgprofile' }
+            { ic: 'layout-dashboard', label: T('nav.dashboard'), page: 'dashboard' },
+            { ic: 'clipboard-check', label: T('nav.assessment_hub'), page: 'assessment' },
+            { ic: 'wallet', label: T('nav.browse_grants'), page: 'grants' },
+            { ic: 'file-text', label: T('nav.my_applications'), page: 'applications' },
+            { ic: 'bar-chart-3', label: T('nav.reports'), page: 'reports' },
+            { ic: 'folder-open', label: T('nav.my_documents'), page: 'documents' },
+            { ic: 'building-2', label: T('nav.org_profile'), page: 'orgprofile' }
         ];
     } else if (role === 'donor') {
         items = [
-            { icon: '\uD83D\uDCCA', label: T('nav.dashboard'), page: 'dashboard' },
-            { icon: '\u2795', label: T('nav.create_grant'), page: 'creategrant' },
-            { icon: '\uD83D\uDCB0', label: T('nav.my_grants'), page: 'mygrants' },
-            { icon: '\u2B50', label: T('nav.review_applications'), page: 'rankings' },
-            { icon: '\uD83D\uDCC8', label: T('nav.grant_reports'), page: 'reports' },
-            { icon: '\uD83D\uDD0D', label: T('nav.org_search'), page: 'orgsearch' },
-            { icon: '\u2705', label: T('nav.registration_checks'), page: 'verification' },
-            { icon: '\uD83D\uDEE1\uFE0F', label: T('nav.compliance'), page: 'compliance' }
+            { ic: 'layout-dashboard', label: T('nav.dashboard'), page: 'dashboard' },
+            { ic: 'plus-circle', label: T('nav.create_grant'), page: 'creategrant' },
+            { ic: 'briefcase', label: T('nav.my_grants'), page: 'mygrants' },
+            { ic: 'star', label: T('nav.review_applications'), page: 'rankings' },
+            { ic: 'bar-chart-3', label: T('nav.grant_reports'), page: 'reports' },
+            { ic: 'search', label: T('nav.org_search'), page: 'orgsearch' },
+            { ic: 'shield-check', label: T('nav.registration_checks'), page: 'verification' },
+            { ic: 'shield', label: T('nav.compliance'), page: 'compliance' }
         ];
     } else if (role === 'reviewer') {
         items = [
-            { icon: '\uD83D\uDCCA', label: T('nav.dashboard'), page: 'dashboard' },
-            { icon: '\uD83D\uDCCB', label: T('nav.my_assignments'), page: 'assignments' },
-            { icon: '\u2705', label: T('nav.completed_reviews'), page: 'completedreviews' }
+            { ic: 'layout-dashboard', label: T('nav.dashboard'), page: 'dashboard' },
+            { ic: 'clipboard-list', label: T('nav.my_assignments'), page: 'assignments' },
+            { ic: 'check-circle', label: T('nav.completed_reviews'), page: 'completedreviews' }
         ];
     } else if (role === 'admin') {
         items = [
-            { icon: '\uD83D\uDCCA', label: T('nav.admin_dashboard'), page: 'dashboard' },
-            { icon: '\uD83D\uDCB0', label: T('nav.all_grants'), page: 'grants' },
-            { icon: '\uD83D\uDCCB', label: T('nav.all_applications'), page: 'applications' },
-            { icon: '\uD83D\uDD0D', label: T('nav.org_search'), page: 'orgsearch' },
-            { icon: '\u2705', label: T('nav.registration_checks'), page: 'verification' },
-            { icon: '\uD83D\uDEE1\uFE0F', label: T('nav.compliance'), page: 'compliance' },
-            { icon: '\uD83D\uDCC8', label: T('nav.reports'), page: 'reports' }
+            { ic: 'layout-dashboard', label: T('nav.admin_dashboard'), page: 'dashboard' },
+            { ic: 'wallet', label: T('nav.all_grants'), page: 'grants' },
+            { ic: 'file-text', label: T('nav.all_applications'), page: 'applications' },
+            { ic: 'search', label: T('nav.org_search'), page: 'orgsearch' },
+            { ic: 'shield-check', label: T('nav.registration_checks'), page: 'verification' },
+            { ic: 'shield', label: T('nav.compliance'), page: 'compliance' },
+            { ic: 'bar-chart-3', label: T('nav.reports'), page: 'reports' }
         ];
     }
 
     var navHTML = items.map(function(it) {
-        var active = S.page === it.page ? ' active' : '';
-        return '<div class="nav-item' + active + '" onclick="nav(\'' + it.page + '\')">' +
-            '<span class="nav-icon">' + it.icon + '</span>' +
-            '<span>' + esc(it.label) + '</span>' +
-            '</div>';
+        var isActive = S.page === it.page;
+        return '<a class="flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 ' +
+            (isActive ? 'bg-white/15 text-white shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/10') +
+            '" onclick="nav(\'' + it.page + '\')">' +
+            '<span class="shrink-0 w-5">' + icon(it.ic, 18) + '</span>' +
+            '<span class="truncate' + (S.sidebarCollapsed ? ' hidden' : '') + '">' + esc(it.label) + '</span>' +
+            (isActive && !S.sidebarCollapsed ? '<span class="ml-auto w-1.5 h-1.5 rounded-full bg-white"></span>' : '') +
+            '</a>';
     }).join('');
 
-    return '<aside class="sidebar' + (S.sidebarCollapsed ? ' collapsed' : '') + '" id="sidebar" role="navigation" aria-label="' + T('nav.dashboard') + '">' +
-        '<nav class="sidebar-nav">' +
-        '<div class="sidebar-section">' +
-        '<div class="sidebar-section-title">Navigation</div>' +
+    return '<aside class="fixed top-[60px] left-0 bottom-0 bg-gradient-to-b from-slate-900 to-slate-800 text-white overflow-y-auto overflow-x-hidden transition-all duration-300 z-[90] flex flex-col ' +
+        (S.sidebarCollapsed ? 'w-[60px]' : 'w-[250px]') + '" id="sidebar" role="navigation" aria-label="Main navigation">' +
+        '<nav class="flex-1 py-4 space-y-1">' +
+        '<div class="px-4 mb-4' + (S.sidebarCollapsed ? ' hidden' : '') + '">' +
+        '<span class="text-[10px] uppercase tracking-widest text-white/30 font-semibold">Navigation</span></div>' +
         navHTML +
-        '</div>' +
         '</nav>' +
-        '<div class="sidebar-toggle">' +
-        '<button onclick="toggleSidebar()" title="Toggle Sidebar" aria-label="Toggle sidebar navigation">' +
-        (S.sidebarCollapsed ? '\u25B6' : '\u25C0') +
-        '</button>' +
-        '</div>' +
-        '</aside>';
+        '<div class="p-3 border-t border-white/10">' +
+        '<button class="w-full flex items-center justify-center h-8 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 transition-all" onclick="toggleSidebar()" title="Toggle Sidebar" aria-label="Toggle sidebar navigation">' +
+        icon(S.sidebarCollapsed ? 'chevron-right' : 'chevron-left', 16) +
+        '</button></div></aside>';
 }
 
 function toggleSidebar() {
@@ -948,8 +997,12 @@ function renderPageContent() {
         case 'submitreport': return renderSubmitReport();
         case 'reviewreport': return renderReviewReport();
         case 'verification': return renderVerificationDashboard();
-        default: return '<div class="page-header"><h1>' + T('common.page_not_found') + '</h1><p>' + T('common.page_not_found_desc') + '</p></div>' +
-            '<button class="btn btn-primary" onclick="nav(\'dashboard\')">' + T('common.go_to_dashboard') + '</button>';
+        default: return '<div class="flex flex-col items-center justify-center py-20 text-center">' +
+            '<div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">' + icon('compass', 28, 'text-slate-400') + '</div>' +
+            '<h1 class="text-xl font-bold text-slate-900 mb-2">' + T('common.page_not_found') + '</h1>' +
+            '<p class="text-slate-500 mb-6">' + T('common.page_not_found_desc') + '</p>' +
+            '<button class="px-5 py-2.5 bg-brand-600 text-white font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="nav(\'dashboard\')">' + T('common.go_to_dashboard') + '</button>' +
+            '</div>';
     }
 }
 
@@ -963,64 +1016,66 @@ function renderNGODashboard() {
     var score = stats.average_score || 0;
     var cap = capacityLabel(score);
 
-    return '<div class="page-header">' +
-        '<h1>\uD83D\uDC4B ' + T('dashboard.welcome', {name: S.user.name || 'User'}) + '</h1>' +
-        '<p>' + esc(S.user.org_name || 'Your Organization') + '</p>' +
+    return '<div class="mb-8 animate-fade-in">' +
+        '<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">' +
+        '<div>' +
+        '<h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('hand-metal', 24, 'text-brand-500') + ' ' + T('dashboard.welcome', {name: S.user.name || 'User'}) + '</h1>' +
+        '<p class="text-slate-500 mt-1">' + esc(S.user.org_name || 'Your Organization') + '</p>' +
         '</div>' +
+        '<div class="flex gap-2">' +
+        '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="nav(\'assessment\')">' + icon('clipboard-check', 16) + ' ' + T('dashboard.action.start_assessment') + '</button>' +
+        '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'grants\')">' + icon('search', 16) + ' ' + T('dashboard.action.browse_grants') + '</button>' +
+        '</div></div></div>' +
 
         // Stat Cards
-        '<div id="ngo-stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:32px;">' +
-        renderStatCard('\uD83D\uDCCA', T('dashboard.stat.capacity_score'), score + '%', 'green') +
-        renderStatCard('\uD83D\uDCCB', T('dashboard.stat.my_applications'), stats.total_applications || 0, 'blue') +
-        renderStatCard('\uD83D\uDCB0', T('dashboard.stat.open_grants'), stats.open_grants || 0, 'amber') +
-        renderStatCard('\uD83D\uDCC4', T('dashboard.stat.documents'), stats.documents || 0, 'red') +
+        '<div id="ngo-stat-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8" data-stagger>' +
+        renderStatCard('bar-chart-3', T('dashboard.stat.capacity_score'), score + '%', 'green') +
+        renderStatCard('file-text', T('dashboard.stat.my_applications'), stats.total_applications || 0, 'blue') +
+        renderStatCard('coins', T('dashboard.stat.open_grants'), stats.open_grants || 0, 'amber') +
+        renderStatCard('folder-open', T('dashboard.stat.documents'), stats.documents || 0, 'purple') +
         '</div>' +
 
-        // Capacity Badge
-        '<div class="card" style="margin-bottom:24px;">' +
-        '<div class="card-body" style="display:flex;align-items:center;gap:24px;">' +
-        scoreRingHTML(score, 80, '%') +
-        '<div>' +
-        '<h3 style="font-size:18px;font-weight:600;">' + T('dashboard.stat.capacity_score') + '</h3>' +
-        '<p style="font-size:14px;color:#64748b;margin-top:4px;">' +
-        '<span class="badge badge-' + cap.color + '">' + esc(cap.label) + '</span></p>' +
+        // Capacity Card with Chart
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-6 mb-8">' +
+        '<div class="flex flex-col sm:flex-row items-center gap-6">' +
+        '<div class="shrink-0">' + scoreRingHTML(score, 80, '%') + '</div>' +
+        '<div class="flex-1 text-center sm:text-left">' +
+        '<h3 class="text-lg font-semibold text-slate-900">' + T('dashboard.stat.capacity_score') + '</h3>' +
+        '<p class="text-sm text-slate-500 mt-1">Your current capacity level: ' + statusBadge(cap.label, cap.color) + '</p>' +
         '</div>' +
-        '<div style="margin-left:auto;">' +
-        '<button class="btn btn-secondary btn-sm" onclick="nav(\'assessment\')">' + T('dashboard.action.start_assessment') + '</button>' +
+        '<div class="shrink-0">' +
+        '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'assessment\')">' + icon('arrow-right', 16) + ' ' + T('dashboard.action.start_assessment') + '</button>' +
         '</div>' +
-        '</div>' +
-        '</div>' +
+        '</div></div>' +
 
         // Recommended Grants
-        '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCA1 ' + T('dashboard.action.browse_grants') + '</h2>' +
-        '<div id="recommended-grants" class="content-grid">' +
+        '<div class="mb-8">' +
+        '<h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('lightbulb', 20, 'text-amber-500') + ' ' + T('dashboard.action.browse_grants') + '</h2>' +
+        '<div id="recommended-grants" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">' +
         renderLoadingCards(3) +
-        '</div>' +
-        '</div>' +
+        '</div></div>' +
 
         // Upcoming Reports
-        '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCC5 ' + T('dashboard.stat.reports_due') + '</h2>' +
+        '<div class="mb-8">' +
+        '<h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('calendar-clock', 20, 'text-blue-500') + ' ' + T('dashboard.stat.reports_due') + '</h2>' +
         '<div id="upcoming-reports">' + renderLoadingTable() + '</div>' +
         '</div>' +
 
         // Recent Applications
-        '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCCB ' + T('dashboard.stat.my_applications') + '</h2>' +
+        '<div class="mb-8">' +
+        '<h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('file-text', 20, 'text-brand-500') + ' ' + T('dashboard.stat.my_applications') + '</h2>' +
         '<div id="recent-applications">' + renderLoadingTable() + '</div>' +
         '</div>' +
 
         // Quick Actions
-        '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\u26A1 ' + T('dashboard.quick_actions') + '</h2>' +
-        '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
-        '<button class="btn btn-primary" onclick="nav(\'assessment\')">\uD83D\uDCDD ' + T('dashboard.action.start_assessment') + '</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'grants\')">\uD83D\uDCB0 ' + T('dashboard.action.browse_grants') + '</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'documents\')">\uD83D\uDCC4 ' + T('dashboard.action.view_documents') + '</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'reports\')">\uD83D\uDCC8 ' + T('dashboard.action.view_reports') + '</button>' +
-        '</div>' +
-        '</div>';
+        '<div class="mb-8">' +
+        '<h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('zap', 20, 'text-amber-500') + ' ' + T('dashboard.quick_actions') + '</h2>' +
+        '<div class="flex flex-wrap gap-3">' +
+        '<button class="px-4 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="nav(\'assessment\')">' + icon('clipboard-check', 16) + ' ' + T('dashboard.action.start_assessment') + '</button>' +
+        '<button class="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'grants\')">' + icon('coins', 16) + ' ' + T('dashboard.action.browse_grants') + '</button>' +
+        '<button class="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'documents\')">' + icon('folder-open', 16) + ' ' + T('dashboard.action.view_documents') + '</button>' +
+        '<button class="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'reports\')">' + icon('bar-chart-2', 16) + ' ' + T('dashboard.action.view_reports') + '</button>' +
+        '</div></div>';
 }
 
 async function loadUpcomingReports() {
@@ -1028,32 +1083,37 @@ async function loadUpcomingReports() {
     var el = document.getElementById('upcoming-reports');
     if (!el) return;
     if (!res || !res.upcoming_reports || res.upcoming_reports.length === 0) {
-        el.innerHTML = '<div class="card" style="padding:20px;text-align:center;"><p style="color:#94a3b8;">No upcoming reports due. Reports will appear here when you have awarded grants.</p></div>';
+        el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center"><p class="text-slate-400 text-sm">No upcoming reports due. Reports will appear here when you have awarded grants.</p></div>';
         return;
     }
     var reports = res.upcoming_reports;
-    el.innerHTML = '<div class="table-wrapper"><table class="table table-hover"><thead><tr>' +
-        '<th>' + T('report.title') + '</th><th>' + T('report.grant') + '</th><th>' + T('common.due_date') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('common.actions') + '</th>' +
-        '</tr></thead><tbody>' +
+    el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden"><table class="w-full"><thead>' +
+        '<tr class="bg-slate-50 border-b border-slate-200">' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('report.title') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('report.grant') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('common.due_date') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.tab.status') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('common.actions') + '</th>' +
+        '</tr></thead><tbody class="divide-y divide-slate-100">' +
         reports.slice(0, 8).map(function(r) {
             var isOverdue = r.is_overdue;
             var daysText = isOverdue ? Math.abs(r.days_until_due) + ' days overdue' : r.days_until_due + ' days left';
-            var badgeCls = isOverdue ? 'badge-red' : r.days_until_due <= 7 ? 'badge-amber' : 'badge-outline';
-            var statusBadge = r.status === 'not_started' ? '<span class="badge badge-outline">' + T('common.not_started') + '</span>' :
-                r.status === 'draft' ? '<span class="badge badge-outline">Draft</span>' :
-                '<span class="badge badge-amber">' + esc(r.status).replace(/_/g, ' ') + '</span>';
+            var urgBadge = isOverdue ? statusBadge(daysText, 'red') : r.days_until_due <= 7 ? statusBadge(daysText, 'amber') : statusBadge(daysText, 'blue');
+            var sBadge = r.status === 'not_started' ? statusBadge(T('common.not_started'), 'gray') :
+                r.status === 'draft' ? statusBadge('Draft', 'gray') :
+                statusBadge(esc(r.status).replace(/_/g, ' '), 'amber');
             var actionBtn = r.draft_report_id ?
-                '<button class="btn btn-primary btn-sm" onclick="editReport(' + r.draft_report_id + ')">Continue</button>' :
-                '<button class="btn btn-primary btn-sm" onclick="startReportForGrant(' + r.grant_id + ',\'' + esc(r.report_type) + '\',\'' + esc(r.reporting_period) + '\')">Start</button>';
-            return '<tr' + (isOverdue ? ' style="background:#fef2f2;"' : '') + '>' +
-                '<td><strong>' + esc(r.requirement_title || r.report_type) + '</strong><br><span style="font-size:12px;color:#94a3b8;">' + esc(r.reporting_period) + '</span></td>' +
-                '<td>' + esc(r.grant_title || '') + '</td>' +
-                '<td><span class="badge ' + badgeCls + '">' + esc(daysText) + '</span><br><span style="font-size:12px;color:#94a3b8;">' + esc(r.due_date) + '</span></td>' +
-                '<td>' + statusBadge + '</td>' +
-                '<td>' + actionBtn + '</td></tr>';
+                '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="editReport(' + r.draft_report_id + ')">Continue</button>' :
+                '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="startReportForGrant(' + r.grant_id + ',\'' + esc(r.report_type) + '\',\'' + esc(r.reporting_period) + '\')">Start</button>';
+            return '<tr class="hover:bg-slate-50/80 transition-colors' + (isOverdue ? ' bg-rose-50/50' : '') + '">' +
+                '<td class="px-4 py-3.5"><div class="font-medium text-slate-900 text-sm">' + esc(r.requirement_title || r.report_type) + '</div><div class="text-xs text-slate-400 mt-0.5">' + esc(r.reporting_period) + '</div></td>' +
+                '<td class="px-4 py-3.5 text-sm text-slate-600">' + esc(r.grant_title || '') + '</td>' +
+                '<td class="px-4 py-3.5">' + urgBadge + '<div class="text-xs text-slate-400 mt-1">' + esc(r.due_date) + '</div></td>' +
+                '<td class="px-4 py-3.5">' + sBadge + '</td>' +
+                '<td class="px-4 py-3.5">' + actionBtn + '</td></tr>';
         }).join('') +
         '</tbody></table></div>' +
-        '<p style="text-align:center;margin-top:12px;"><a href="#" onclick="nav(\'reports\');return false;" style="color:#2d8f6f;font-weight:500;">\uD83D\uDCC4 ' + T('dashboard.action.view_reports') + ' \u2192</a></p>';
+        '<p class="text-center mt-3"><a href="#" onclick="nav(\'reports\');return false;" class="text-brand-600 hover:text-brand-700 text-sm font-medium inline-flex items-center gap-1">' + icon('file-text', 14) + ' ' + T('dashboard.action.view_reports') + ' &rarr;</a></p>';
 }
 
 async function startReportForGrant(grantId, reportType, period) {
@@ -1076,39 +1136,41 @@ function renderDonorDashboard() {
     loadDashboardStats();
     var stats = S.dashboardStats || {};
 
-    return '<div class="page-header">' +
-        '<h1>\uD83D\uDC4B ' + T('dashboard.welcome', {name: S.user.name || 'User'}) + '</h1>' +
-        '<p>' + esc(S.user.org_name || 'Your Organization') + '</p>' +
+    return '<div class="mb-8 animate-fade-in">' +
+        '<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">' +
+        '<div>' +
+        '<h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('hand-metal', 24, 'text-brand-500') + ' ' + T('dashboard.welcome', {name: S.user.name || 'User'}) + '</h1>' +
+        '<p class="text-slate-500 mt-1">' + esc(S.user.org_name || 'Your Organization') + '</p>' +
+        '</div>' +
+        '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="nav(\'creategrant\')">' + icon('plus', 16) + ' ' + T('dashboard.action.create_grant') + '</button>' +
+        '</div></div>' +
+
+        '<div id="donor-stat-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8" data-stagger>' +
+        renderStatCard('coins', T('dashboard.stat.total_grants'), stats.total_grants || 0, 'green') +
+        renderStatCard('file-text', T('dashboard.stat.total_applications'), stats.total_applications || 0, 'blue') +
+        renderStatCard('star', T('dashboard.stat.pending_reviews'), stats.pending_review || 0, 'amber') +
+        renderStatCard('trophy', T('dashboard.stat.total_funding'), formatCurrency(stats.total_funding_awarded || 0), 'red') +
+        renderStatCard('bar-chart-2', T('dashboard.stat.reports_due'), stats.pending_report_reviews || 0, 'purple') +
         '</div>' +
 
-        '<div id="donor-stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:32px;">' +
-        renderStatCard('\uD83D\uDCB0', T('dashboard.stat.total_grants'), stats.total_grants || 0, 'green') +
-        renderStatCard('\uD83D\uDCCB', T('dashboard.stat.total_applications'), stats.total_applications || 0, 'blue') +
-        renderStatCard('\u2B50', T('dashboard.stat.pending_reviews'), stats.pending_review || 0, 'amber') +
-        renderStatCard('\uD83C\uDFC6', T('dashboard.stat.total_funding'), formatCurrency(stats.total_funding_awarded || 0), 'red') +
-        renderStatCard('\uD83D\uDCCA', T('dashboard.stat.reports_due'), stats.pending_report_reviews || 0, 'blue') +
-        '</div>' +
-
-        '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCB0 ' + T('dashboard.stat.active_grants') + '</h2>' +
-        '<div id="active-grants" class="content-grid">' +
+        '<div class="mb-8">' +
+        '<h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('wallet', 20, 'text-emerald-500') + ' ' + T('dashboard.stat.active_grants') + '</h2>' +
+        '<div id="active-grants" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">' +
         renderLoadingCards(3) +
-        '</div>' +
-        '</div>' +
+        '</div></div>' +
 
-        '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCCB ' + T('dashboard.stat.total_applications') + '</h2>' +
+        '<div class="mb-8">' +
+        '<h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('file-text', 20, 'text-blue-500') + ' ' + T('dashboard.stat.total_applications') + '</h2>' +
         '<div id="donor-recent-apps">' + renderLoadingTable() + '</div>' +
         '</div>' +
 
-        '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\u26A1 ' + T('dashboard.quick_actions') + '</h2>' +
-        '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
-        '<button class="btn btn-primary" onclick="nav(\'creategrant\')">\u2795 ' + T('dashboard.action.create_grant') + '</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'rankings\')">\u2B50 ' + T('dashboard.action.review_apps') + '</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'reports\')">\uD83D\uDCCA ' + T('dashboard.action.view_reports') + '</button>' +
-        '</div>' +
-        '</div>';
+        '<div class="mb-8">' +
+        '<h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('zap', 20, 'text-amber-500') + ' ' + T('dashboard.quick_actions') + '</h2>' +
+        '<div class="flex flex-wrap gap-3">' +
+        '<button class="px-4 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="nav(\'creategrant\')">' + icon('plus', 16) + ' ' + T('dashboard.action.create_grant') + '</button>' +
+        '<button class="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'rankings\')">' + icon('star', 16) + ' ' + T('dashboard.action.review_apps') + '</button>' +
+        '<button class="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'reports\')">' + icon('bar-chart-2', 16) + ' ' + T('dashboard.action.view_reports') + '</button>' +
+        '</div></div>';
 }
 
 // =============================================================================
@@ -1119,20 +1181,20 @@ function renderReviewerDashboard() {
     loadDashboardStats();
     var stats = S.dashboardStats || {};
 
-    return '<div class="page-header">' +
-        '<h1>\uD83D\uDC4B ' + T('dashboard.welcome', {name: S.user.name || 'Reviewer'}) + '</h1>' +
-        '<p>' + T('nav.dashboard') + '</p>' +
+    return '<div class="mb-8 animate-fade-in">' +
+        '<h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('hand-metal', 24, 'text-brand-500') + ' ' + T('dashboard.welcome', {name: S.user.name || 'Reviewer'}) + '</h1>' +
+        '<p class="text-slate-500 mt-1">' + T('nav.dashboard') + '</p>' +
         '</div>' +
 
-        '<div id="reviewer-stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:32px;">' +
-        renderStatCard('\uD83D\uDCCB', T('dashboard.stat.assigned_reviews'), stats.assigned_reviews || 0, 'blue') +
-        renderStatCard('\u23F3', T('status.in_progress'), stats.in_progress_reviews || 0, 'amber') +
-        renderStatCard('\u2705', T('status.completed'), stats.completed_reviews || 0, 'green') +
-        renderStatCard('\uD83D\uDCC8', T('dashboard.stat.avg_score'), (stats.average_score_given || 0) + '%', 'amber') +
+        '<div id="reviewer-stat-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8" data-stagger>' +
+        renderStatCard('file-text', T('dashboard.stat.assigned_reviews'), stats.assigned_reviews || 0, 'blue') +
+        renderStatCard('clock', T('status.in_progress'), stats.in_progress_reviews || 0, 'amber') +
+        renderStatCard('check-circle-2', T('status.completed'), stats.completed_reviews || 0, 'green') +
+        renderStatCard('trending-up', T('dashboard.stat.avg_score'), (stats.average_score_given || 0) + '%', 'purple') +
         '</div>' +
 
-        '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDCCB ' + T('review.assignments') + '</h2>' +
+        '<div class="mb-8">' +
+        '<h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('clipboard-list', 20, 'text-blue-500') + ' ' + T('review.assignments') + '</h2>' +
         '<div id="reviewer-assignments">' + renderLoadingTable() + '</div>' +
         '</div>';
 }
@@ -1145,114 +1207,113 @@ function renderAdminDashboard() {
     loadAdminStats();
     var stats = S.adminStats || {};
 
-    return '<div class="page-header">' +
-        '<h1>\uD83D\uDD27 ' + T('nav.admin_dashboard') + '</h1>' +
-        '<p>' + T('dashboard.welcome', {name: S.user.name || 'Admin'}) + ' \u2014 ' +
-        '<span style="font-size:13px;color:#64748b;">v' + esc(stats.app_version || '1.1.0') +
-        ' \u2022 Uptime: ' + esc(stats.uptime || '--') +
-        ' \u2022 ' + esc(stats.environment || 'production') + '</span></p>' +
-        '</div>' +
+    return '<div class="mb-8 animate-fade-in">' +
+        '<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">' +
+        '<div>' +
+        '<h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('settings', 24, 'text-brand-500') + ' ' + T('nav.admin_dashboard') + '</h1>' +
+        '<p class="text-slate-500 mt-1">' + T('dashboard.welcome', {name: S.user.name || 'Admin'}) + ' &mdash; ' +
+        '<span class="text-xs text-slate-400">v' + esc(stats.app_version || '1.1.0') +
+        ' &bull; Uptime: ' + esc(stats.uptime || '--') +
+        ' &bull; ' + esc(stats.environment || 'production') + '</span></p>' +
+        '</div></div></div>' +
 
         // SLO Alert Banner
         '<div id="admin-alerts">' + renderAlertBanner(stats.alerts || []) + '</div>' +
 
         // Top stat cards
-        '<div id="admin-stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:32px;">' +
-        renderStatCard('\uD83D\uDC65', T('dashboard.stat.total_users'), stats.total_users || 0, 'blue') +
-        renderStatCard('\uD83C\uDFE2', T('dashboard.stat.total_orgs'), stats.total_organizations || 0, 'green') +
-        renderStatCard('\u2705', T('status.verified'), stats.verified_organizations || 0, 'green') +
-        renderStatCard('\uD83D\uDCB0', T('dashboard.stat.total_grants'), stats.total_grants || 0, 'amber') +
-        renderStatCard('\uD83D\uDCCB', T('dashboard.stat.total_applications'), stats.total_applications || 0, 'blue') +
-        renderStatCard('\u26A0\uFE0F', T('dashboard.stat.compliance_alerts'), stats.flagged_compliance || 0, 'red') +
+        '<div id="admin-stat-cards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8" data-stagger>' +
+        renderStatCard('users', T('dashboard.stat.total_users'), stats.total_users || 0, 'blue') +
+        renderStatCard('building-2', T('dashboard.stat.total_orgs'), stats.total_organizations || 0, 'green') +
+        renderStatCard('badge-check', T('status.verified'), stats.verified_organizations || 0, 'green') +
+        renderStatCard('coins', T('dashboard.stat.total_grants'), stats.total_grants || 0, 'amber') +
+        renderStatCard('file-text', T('dashboard.stat.total_applications'), stats.total_applications || 0, 'purple') +
+        renderStatCard('alert-triangle', T('dashboard.stat.compliance_alerts'), stats.flagged_compliance || 0, 'red') +
         '</div>' +
 
-        // Two-column layout
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px;">' +
+        // Two-column breakdowns
+        '<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">' +
 
-        '<div class="card"><div class="card-body">' +
-        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDC65 ' + T('dashboard.stat.total_users') + '</h3>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('users', 16, 'text-blue-500') + ' ' + T('dashboard.stat.total_users') + '</h3>' +
         '<div id="admin-users-by-role">' + renderAdminRoleBreakdown(stats.users_by_role || {}) + '</div>' +
-        '</div></div>' +
+        '</div>' +
 
-        '<div class="card"><div class="card-body">' +
-        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83C\uDFE2 ' + T('dashboard.stat.total_orgs') + '</h3>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('building-2', 16, 'text-emerald-500') + ' ' + T('dashboard.stat.total_orgs') + '</h3>' +
         '<div id="admin-orgs-by-type">' + renderAdminOrgBreakdown(stats.orgs_by_type || {}) + '</div>' +
-        '</div></div>' +
+        '</div>' +
 
         '</div>' +
 
         // Applications by Status
-        '<div class="card" style="margin-bottom:32px;"><div class="card-body">' +
-        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDCCB ' + T('dashboard.stat.total_applications') + '</h3>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-8">' +
+        '<h3 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('file-text', 16, 'text-brand-500') + ' ' + T('dashboard.stat.total_applications') + '</h3>' +
         '<div id="admin-apps-by-status">' + renderAdminStatusBreakdown(stats.apps_by_status || {}) + '</div>' +
-        '</div></div>' +
+        '</div>' +
 
         // Activity last 7 days
-        '<div class="card" style="margin-bottom:32px;"><div class="card-body">' +
-        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDCC8 Last 7 Days</h3>' +
-        '<div style="display:flex;gap:32px;">' +
-        '<div><span style="font-size:28px;font-weight:700;color:#2d8f6f;">' + (stats.new_users_7d || 0) + '</span><div style="font-size:13px;color:#64748b;">' + T('dashboard.stat.total_users') + '</div></div>' +
-        '<div><span style="font-size:28px;font-weight:700;color:#3b82f6;">' + (stats.new_apps_7d || 0) + '</span><div style="font-size:13px;color:#64748b;">' + T('dashboard.stat.total_applications') + '</div></div>' +
-        '<div><span style="font-size:28px;font-weight:700;color:#f59e0b;">' + (stats.new_orgs_7d || 0) + '</span><div style="font-size:13px;color:#64748b;">' + T('dashboard.stat.total_orgs') + '</div></div>' +
-        '</div>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-8">' +
+        '<h3 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('trending-up', 16, 'text-emerald-500') + ' Last 7 Days</h3>' +
+        '<div class="flex flex-wrap gap-8">' +
+        '<div><span class="text-3xl font-bold text-emerald-600">' + (stats.new_users_7d || 0) + '</span><div class="text-xs text-slate-500 mt-1">' + T('dashboard.stat.total_users') + '</div></div>' +
+        '<div><span class="text-3xl font-bold text-blue-600">' + (stats.new_apps_7d || 0) + '</span><div class="text-xs text-slate-500 mt-1">' + T('dashboard.stat.total_applications') + '</div></div>' +
+        '<div><span class="text-3xl font-bold text-amber-500">' + (stats.new_orgs_7d || 0) + '</span><div class="text-xs text-slate-500 mt-1">' + T('dashboard.stat.total_orgs') + '</div></div>' +
         '</div></div>' +
 
         // Recent Users Table
-        '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\uD83D\uDC65 ' + T('dashboard.stat.total_users') + '</h2>' +
+        '<div class="mb-8">' +
+        '<h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('users', 20, 'text-blue-500') + ' ' + T('dashboard.stat.total_users') + '</h2>' +
         '<div id="admin-recent-users">' + renderLoadingTable() + '</div>' +
         '</div>' +
 
         // System Info
-        '<div class="card" style="margin-bottom:32px;"><div class="card-body">' +
-        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\u2699\uFE0F System Information</h3>' +
-        '<div style="display:grid;grid-template-columns:auto 1fr;gap:8px 24px;font-size:14px;">' +
-        '<strong>AI Service:</strong><span>' + (stats.ai_enabled ? '\u2705 Enabled (Claude AI)' : '\u274C Not configured') + '</span>' +
-        '<strong>Database:</strong><span>' + esc(stats.environment === 'production' ? 'PostgreSQL' : 'SQLite') + '</span>' +
-        '<strong>Total Reviews:</strong><span>' + (stats.total_reviews || 0) + '</span>' +
-        '<strong>Total Assessments:</strong><span>' + (stats.total_assessments || 0) + '</span>' +
-        '</div>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-8">' +
+        '<h3 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('cpu', 16, 'text-slate-500') + ' System Information</h3>' +
+        '<div class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">' +
+        '<span class="font-medium text-slate-700">AI Service:</span><span class="text-slate-600">' + (stats.ai_enabled ? icon('check-circle-2', 14, 'text-emerald-500') + ' Enabled (Claude AI)' : icon('x-circle', 14, 'text-rose-500') + ' Not configured') + '</span>' +
+        '<span class="font-medium text-slate-700">Database:</span><span class="text-slate-600">' + esc(stats.environment === 'production' ? 'PostgreSQL' : 'SQLite') + '</span>' +
+        '<span class="font-medium text-slate-700">Total Reviews:</span><span class="text-slate-600">' + (stats.total_reviews || 0) + '</span>' +
+        '<span class="font-medium text-slate-700">Total Assessments:</span><span class="text-slate-600">' + (stats.total_assessments || 0) + '</span>' +
         '</div></div>' +
 
-        // Security & Audit Dashboard
-        '<div class="card" style="margin-bottom:32px;border-left:4px solid #ef4444;"><div class="card-body">' +
-        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDD12 Security & Audit</h3>' +
+        // Security & Audit
+        '<div class="bg-white rounded-xl border border-slate-200/60 border-l-4 border-l-rose-500 p-5 mb-8">' +
+        '<h3 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('shield', 16, 'text-rose-500') + ' Security & Audit</h3>' +
         '<div id="admin-security-metrics">' + renderSecurityMetrics(stats.security || {}) + '</div>' +
-        '</div></div>' +
+        '</div>' +
 
         // Document Metrics
-        '<div class="card" style="margin-bottom:32px;border-left:4px solid #8b5cf6;"><div class="card-body">' +
-        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">\uD83D\uDCC4 Upload & Document Metrics</h3>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 border-l-4 border-l-violet-500 p-5 mb-8">' +
+        '<h3 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('folder-open', 16, 'text-violet-500') + ' Upload & Document Metrics</h3>' +
         '<div id="admin-document-metrics">' + renderDocumentMetrics(stats.documents || {}) + '</div>' +
-        '</div></div>' +
+        '</div>' +
 
         // Quick Actions
-        '<div style="margin-bottom:32px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">\u26A1 ' + T('dashboard.quick_actions') + '</h2>' +
-        '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
-        '<button class="btn btn-primary" onclick="nav(\'orgsearch\')">\uD83D\uDD0D ' + T('nav.org_search') + '</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'grants\')">\uD83D\uDCB0 ' + T('nav.all_grants') + '</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'applications\')">\uD83D\uDCCB ' + T('nav.all_applications') + '</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'compliance\')">\uD83D\uDEE1\uFE0F ' + T('nav.compliance') + '</button>' +
-        '<button class="btn btn-secondary" onclick="nav(\'verification\')">\u2705 ' + T('nav.registration_checks') + '</button>' +
-        '</div>' +
-        '</div>';
+        '<div class="mb-8">' +
+        '<h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('zap', 20, 'text-amber-500') + ' ' + T('dashboard.quick_actions') + '</h2>' +
+        '<div class="flex flex-wrap gap-3">' +
+        '<button class="px-4 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="nav(\'orgsearch\')">' + icon('search', 16) + ' ' + T('nav.org_search') + '</button>' +
+        '<button class="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'grants\')">' + icon('coins', 16) + ' ' + T('nav.all_grants') + '</button>' +
+        '<button class="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'applications\')">' + icon('file-text', 16) + ' ' + T('nav.all_applications') + '</button>' +
+        '<button class="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'compliance\')">' + icon('shield-check', 16) + ' ' + T('nav.compliance') + '</button>' +
+        '<button class="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'verification\')">' + icon('badge-check', 16) + ' ' + T('nav.registration_checks') + '</button>' +
+        '</div></div>';
 }
 
 function renderAdminRoleBreakdown(byRole) {
     var roles = ['ngo', 'donor', 'reviewer', 'admin'];
-    var colors = { ngo: '#2d8f6f', donor: '#3b82f6', reviewer: '#f59e0b', admin: '#ef4444' };
+    var barColors = { ngo: 'bg-emerald-500', donor: 'bg-blue-500', reviewer: 'bg-amber-500', admin: 'bg-rose-500' };
     var labels = { ngo: 'NGO', donor: 'Donor', reviewer: 'Reviewer', admin: 'Admin' };
     var total = roles.reduce(function(acc, r) { return acc + (byRole[r] || 0); }, 0) || 1;
     return roles.map(function(r) {
         var count = byRole[r] || 0;
         var pct = Math.round((count / total) * 100);
-        return '<div style="display:flex;align-items:center;gap:12px;margin:8px 0;">' +
-            '<div style="width:80px;font-size:13px;font-weight:600;">' + labels[r] + '</div>' +
-            '<div style="flex:1;height:22px;background:#f1f5f9;border-radius:6px;overflow:hidden;">' +
-            '<div style="height:100%;width:' + pct + '%;background:' + colors[r] + ';border-radius:6px;transition:width 0.5s;"></div>' +
+        return '<div class="flex items-center gap-3 py-1.5">' +
+            '<div class="w-20 text-xs font-semibold text-slate-600">' + labels[r] + '</div>' +
+            '<div class="flex-1 h-5 bg-slate-100 rounded-full overflow-hidden">' +
+            '<div class="h-full ' + barColors[r] + ' rounded-full transition-all duration-500" style="width:' + pct + '%;"></div>' +
             '</div>' +
-            '<div style="min-width:50px;font-size:13px;text-align:right;">' + count + ' (' + pct + '%)</div>' +
+            '<div class="w-16 text-xs text-slate-500 text-right">' + count + ' (' + pct + '%)</div>' +
             '</div>';
     }).join('');
 }
@@ -1260,17 +1321,17 @@ function renderAdminRoleBreakdown(byRole) {
 function renderAdminOrgBreakdown(byType) {
     var types = ['ngo', 'donor', 'ingo', 'cbo', 'network'];
     var labels = { ngo: 'NGO', donor: 'Donor', ingo: 'INGO', cbo: 'CBO', network: 'Network' };
-    var colors = { ngo: '#2d8f6f', donor: '#3b82f6', ingo: '#8b5cf6', cbo: '#f59e0b', network: '#06b6d4' };
+    var barColors = { ngo: 'bg-emerald-500', donor: 'bg-blue-500', ingo: 'bg-violet-500', cbo: 'bg-amber-500', network: 'bg-cyan-500' };
     var total = types.reduce(function(acc, t) { return acc + (byType[t] || 0); }, 0) || 1;
     return types.map(function(t) {
         var count = byType[t] || 0;
         var pct = Math.round((count / total) * 100);
-        return '<div style="display:flex;align-items:center;gap:12px;margin:8px 0;">' +
-            '<div style="width:80px;font-size:13px;font-weight:600;">' + labels[t] + '</div>' +
-            '<div style="flex:1;height:22px;background:#f1f5f9;border-radius:6px;overflow:hidden;">' +
-            '<div style="height:100%;width:' + pct + '%;background:' + colors[t] + ';border-radius:6px;transition:width 0.5s;"></div>' +
+        return '<div class="flex items-center gap-3 py-1.5">' +
+            '<div class="w-20 text-xs font-semibold text-slate-600">' + labels[t] + '</div>' +
+            '<div class="flex-1 h-5 bg-slate-100 rounded-full overflow-hidden">' +
+            '<div class="h-full ' + barColors[t] + ' rounded-full transition-all duration-500" style="width:' + pct + '%;"></div>' +
             '</div>' +
-            '<div style="min-width:50px;font-size:13px;text-align:right;">' + count + ' (' + pct + '%)</div>' +
+            '<div class="w-16 text-xs text-slate-500 text-right">' + count + ' (' + pct + '%)</div>' +
             '</div>';
     }).join('');
 }
@@ -1279,14 +1340,15 @@ function renderAdminStatusBreakdown(byStatus) {
     var statuses = ['draft', 'submitted', 'under_review', 'scored', 'approved', 'rejected'];
     var labels = { draft: 'Draft', submitted: 'Submitted', under_review: 'Under Review',
                    scored: 'Scored', approved: 'Approved', rejected: 'Rejected' };
-    var colors = { draft: '#94a3b8', submitted: '#3b82f6', under_review: '#f59e0b',
-                   scored: '#8b5cf6', approved: '#2d8f6f', rejected: '#ef4444' };
-    return '<div style="display:flex;gap:16px;flex-wrap:wrap;">' +
+    var colorMap = { draft: 'text-slate-400 border-slate-300', submitted: 'text-blue-600 border-blue-400', under_review: 'text-amber-500 border-amber-400',
+                   scored: 'text-violet-600 border-violet-400', approved: 'text-emerald-600 border-emerald-400', rejected: 'text-rose-500 border-rose-400' };
+    return '<div class="flex flex-wrap gap-3">' +
         statuses.map(function(s) {
             var count = byStatus[s] || 0;
-            return '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid ' + colors[s] + ';">' +
-                '<div style="font-size:24px;font-weight:700;color:' + colors[s] + ';">' + count + '</div>' +
-                '<div style="font-size:12px;color:#64748b;margin-top:2px;">' + labels[s] + '</div>' +
+            var cls = colorMap[s] || 'text-slate-500 border-slate-300';
+            return '<div class="text-center px-5 py-3 bg-slate-50/80 rounded-xl border-l-4 ' + cls + '">' +
+                '<div class="text-2xl font-bold">' + count + '</div>' +
+                '<div class="text-xs text-slate-500 mt-0.5">' + labels[s] + '</div>' +
                 '</div>';
         }).join('') +
         '</div>';
@@ -1295,73 +1357,67 @@ function renderAdminStatusBreakdown(byStatus) {
 function renderAlertBanner(alerts) {
     if (!alerts || !alerts.length) return '';
     return alerts.map(function(a) {
-        var bgColor = a.level === 'critical' ? '#fee2e2' : '#fef3c7';
-        var borderColor = a.level === 'critical' ? '#ef4444' : '#f59e0b';
-        var textColor = a.level === 'critical' ? '#991b1b' : '#92400e';
-        var icon = a.level === 'critical' ? '\uD83D\uDEA8' : '\u26A0\uFE0F';
+        var isCritical = a.level === 'critical';
+        var cls = isCritical ? 'bg-rose-50 border-rose-200 border-l-rose-500' : 'bg-amber-50 border-amber-200 border-l-amber-500';
+        var textCls = isCritical ? 'text-rose-800' : 'text-amber-800';
+        var iconName = isCritical ? 'siren' : 'alert-triangle';
+        var iconCls = isCritical ? 'text-rose-500' : 'text-amber-500';
         return '<div data-alert-type="' + esc(a.type) + '" data-alert-level="' + esc(a.level) + '" ' +
-            'style="background:' + bgColor + ';border:1px solid ' + borderColor + ';border-left:4px solid ' + borderColor + ';' +
-            'padding:12px 16px;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;gap:12px;">' +
-            '<span style="font-size:20px;">' + icon + '</span>' +
+            'class="flex items-center gap-3 px-4 py-3 rounded-xl border border-l-4 mb-3 ' + cls + '">' +
+            icon(iconName, 20, iconCls) +
             '<div>' +
-            '<div style="font-weight:600;font-size:14px;color:' + textColor + ';">' +
-            (a.level === 'critical' ? 'CRITICAL' : 'WARNING') + ': ' + esc(a.type.replace('_', ' ').toUpperCase()) + '</div>' +
-            '<div style="font-size:13px;color:' + textColor + ';">' + esc(a.message) + '</div>' +
+            '<div class="font-semibold text-sm ' + textCls + '">' +
+            (isCritical ? 'CRITICAL' : 'WARNING') + ': ' + esc(a.type.replace('_', ' ').toUpperCase()) + '</div>' +
+            '<div class="text-xs ' + textCls + ' opacity-80">' + esc(a.message) + '</div>' +
             '</div></div>';
     }).join('');
 }
 
 function renderSecurityMetrics(sec) {
     if (!sec || (!sec.login_attempts_24h && !sec.currently_locked)) {
-        return '<div style="color:#64748b;font-size:13px;padding:8px 0;">No security events recorded.</div>';
+        return '<p class="text-slate-400 text-xs py-2">No security events recorded.</p>';
     }
-    var html = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">' +
-        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid ' +
-        (sec.login_attempts_1h > 20 ? '#ef4444' : '#2d8f6f') + ';">' +
-        '<div style="font-size:24px;font-weight:700;color:' + (sec.login_attempts_1h > 20 ? '#ef4444' : '#2d8f6f') + ';">' + (sec.login_attempts_1h || 0) + '</div>' +
-        '<div style="font-size:12px;color:#64748b;">Login Attempts (1h)</div></div>' +
+    var html = '<div class="flex flex-wrap gap-3 mb-4">' +
+        '<div class="text-center px-5 py-3 bg-slate-50/80 rounded-xl border-l-4 ' + (sec.login_attempts_1h > 20 ? 'border-l-rose-500' : 'border-l-emerald-500') + '">' +
+        '<div class="text-2xl font-bold ' + (sec.login_attempts_1h > 20 ? 'text-rose-600' : 'text-emerald-600') + '">' + (sec.login_attempts_1h || 0) + '</div>' +
+        '<div class="text-xs text-slate-500 mt-0.5">Login Attempts (1h)</div></div>' +
 
-        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid ' +
-        (sec.login_attempts_24h > 100 ? '#ef4444' : '#3b82f6') + ';">' +
-        '<div style="font-size:24px;font-weight:700;color:' + (sec.login_attempts_24h > 100 ? '#ef4444' : '#3b82f6') + ';">' + (sec.login_attempts_24h || 0) + '</div>' +
-        '<div style="font-size:12px;color:#64748b;">Login Attempts (24h)</div></div>' +
+        '<div class="text-center px-5 py-3 bg-slate-50/80 rounded-xl border-l-4 ' + (sec.login_attempts_24h > 100 ? 'border-l-rose-500' : 'border-l-blue-500') + '">' +
+        '<div class="text-2xl font-bold ' + (sec.login_attempts_24h > 100 ? 'text-rose-600' : 'text-blue-600') + '">' + (sec.login_attempts_24h || 0) + '</div>' +
+        '<div class="text-xs text-slate-500 mt-0.5">Login Attempts (24h)</div></div>' +
 
-        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid #f59e0b;">' +
-        '<div style="font-size:24px;font-weight:700;color:#f59e0b;">' + (sec.unique_ips_24h || 0) + '</div>' +
-        '<div style="font-size:12px;color:#64748b;">Unique IPs (24h)</div></div>' +
+        '<div class="text-center px-5 py-3 bg-slate-50/80 rounded-xl border-l-4 border-l-amber-500">' +
+        '<div class="text-2xl font-bold text-amber-500">' + (sec.unique_ips_24h || 0) + '</div>' +
+        '<div class="text-xs text-slate-500 mt-0.5">Unique IPs (24h)</div></div>' +
 
-        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid ' +
-        (sec.currently_locked > 0 ? '#ef4444' : '#94a3b8') + ';">' +
-        '<div style="font-size:24px;font-weight:700;color:' + (sec.currently_locked > 0 ? '#ef4444' : '#94a3b8') + ';">' + (sec.currently_locked || 0) + '</div>' +
-        '<div style="font-size:12px;color:#64748b;">Locked Accounts</div></div>' +
+        '<div class="text-center px-5 py-3 bg-slate-50/80 rounded-xl border-l-4 ' + (sec.currently_locked > 0 ? 'border-l-rose-500' : 'border-l-slate-300') + '">' +
+        '<div class="text-2xl font-bold ' + (sec.currently_locked > 0 ? 'text-rose-600' : 'text-slate-400') + '">' + (sec.currently_locked || 0) + '</div>' +
+        '<div class="text-xs text-slate-500 mt-0.5">Locked Accounts</div></div>' +
         '</div>';
 
-    // Top IPs table (potential brute-force indicators)
     if (sec.top_ips_24h && sec.top_ips_24h.length) {
-        html += '<div style="margin-top:12px;">' +
-            '<strong style="font-size:13px;color:#1e293b;">Top Login IPs (24h)</strong>' +
-            '<table class="data-table" style="width:100%;margin-top:8px;font-size:13px;">' +
-            '<thead><tr><th style="text-align:left;">IP Address</th><th style="text-align:right;">Attempts</th><th style="text-align:center;">Risk</th></tr></thead><tbody>';
+        html += '<div class="mt-3">' +
+            '<div class="text-xs font-semibold text-slate-700 mb-2">Top Login IPs (24h)</div>' +
+            '<div class="bg-slate-50 rounded-lg overflow-hidden"><table class="w-full text-xs">' +
+            '<thead><tr class="border-b border-slate-200"><th class="px-3 py-2 text-left font-semibold text-slate-500">IP Address</th><th class="px-3 py-2 text-right font-semibold text-slate-500">Attempts</th><th class="px-3 py-2 text-center font-semibold text-slate-500">Risk</th></tr></thead><tbody class="divide-y divide-slate-100">';
         sec.top_ips_24h.forEach(function(row) {
-            var risk = row.attempts >= 20 ? '\u26A0\uFE0F High' : row.attempts >= 10 ? '\u26A0 Medium' : '\u2705 Low';
-            var riskColor = row.attempts >= 20 ? '#ef4444' : row.attempts >= 10 ? '#f59e0b' : '#2d8f6f';
-            html += '<tr>' +
-                '<td style="font-family:monospace;">' + esc(row.ip) + '</td>' +
-                '<td style="text-align:right;font-weight:600;">' + row.attempts + '</td>' +
-                '<td style="text-align:center;color:' + riskColor + ';font-weight:500;">' + risk + '</td></tr>';
+            var riskBadge = row.attempts >= 20 ? statusBadge('High', 'red') : row.attempts >= 10 ? statusBadge('Medium', 'amber') : statusBadge('Low', 'green');
+            html += '<tr class="hover:bg-white transition-colors">' +
+                '<td class="px-3 py-2 font-mono text-slate-700">' + esc(row.ip) + '</td>' +
+                '<td class="px-3 py-2 text-right font-semibold text-slate-900">' + row.attempts + '</td>' +
+                '<td class="px-3 py-2 text-center">' + riskBadge + '</td></tr>';
         });
-        html += '</tbody></table></div>';
+        html += '</tbody></table></div></div>';
     }
 
-    // Locked accounts
     if (sec.locked_accounts && sec.locked_accounts.length) {
-        html += '<div style="margin-top:12px;">' +
-            '<strong style="font-size:13px;color:#991b1b;">\uD83D\uDD12 Currently Locked Accounts</strong>';
+        html += '<div class="mt-3">' +
+            '<div class="text-xs font-semibold text-rose-700 mb-2 flex items-center gap-1">' + icon('lock', 12) + ' Currently Locked Accounts</div>';
         sec.locked_accounts.forEach(function(a) {
-            html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;">' +
-                '<span class="badge badge-red">LOCKED</span>' +
-                '<span>' + esc(a.email) + '</span>' +
-                '<span style="color:#64748b;">until ' + (a.locked_until ? new Date(a.locked_until).toLocaleTimeString() : '--') + '</span></div>';
+            html += '<div class="flex items-center gap-2 py-1.5 text-xs">' +
+                statusBadge('LOCKED', 'red') +
+                '<span class="text-slate-700">' + esc(a.email) + '</span>' +
+                '<span class="text-slate-400">until ' + (a.locked_until ? new Date(a.locked_until).toLocaleTimeString() : '--') + '</span></div>';
         });
         html += '</div>';
     }
@@ -1370,37 +1426,36 @@ function renderSecurityMetrics(sec) {
 
 function renderDocumentMetrics(docs) {
     if (!docs || !docs.total_documents) {
-        return '<div style="color:#64748b;font-size:13px;padding:8px 0;">No documents uploaded yet.</div>';
+        return '<p class="text-slate-400 text-xs py-2">No documents uploaded yet.</p>';
     }
-    var html = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">' +
-        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid #3b82f6;">' +
-        '<div style="font-size:24px;font-weight:700;color:#3b82f6;">' + (docs.total_documents || 0) + '</div>' +
-        '<div style="font-size:12px;color:#64748b;">Total Documents</div></div>' +
+    var scoreColor = docs.avg_score >= 60 ? 'text-emerald-600 border-l-emerald-500' : docs.avg_score >= 40 ? 'text-amber-500 border-l-amber-500' : 'text-rose-500 border-l-rose-500';
+    var html = '<div class="flex flex-wrap gap-3 mb-4">' +
+        '<div class="text-center px-5 py-3 bg-slate-50/80 rounded-xl border-l-4 border-l-blue-500">' +
+        '<div class="text-2xl font-bold text-blue-600">' + (docs.total_documents || 0) + '</div>' +
+        '<div class="text-xs text-slate-500 mt-0.5">Total Documents</div></div>' +
 
-        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid #2d8f6f;">' +
-        '<div style="font-size:24px;font-weight:700;color:#2d8f6f;">' + (docs.documents_7d || 0) + '</div>' +
-        '<div style="font-size:12px;color:#64748b;">Uploads (7d)</div></div>' +
+        '<div class="text-center px-5 py-3 bg-slate-50/80 rounded-xl border-l-4 border-l-emerald-500">' +
+        '<div class="text-2xl font-bold text-emerald-600">' + (docs.documents_7d || 0) + '</div>' +
+        '<div class="text-xs text-slate-500 mt-0.5">Uploads (7d)</div></div>' +
 
-        '<div style="text-align:center;padding:12px 20px;background:#f8fafc;border-radius:8px;border-left:4px solid ' +
-        (docs.avg_score >= 60 ? '#2d8f6f' : docs.avg_score >= 40 ? '#f59e0b' : '#ef4444') + ';">' +
-        '<div style="font-size:24px;font-weight:700;color:' + (docs.avg_score >= 60 ? '#2d8f6f' : docs.avg_score >= 40 ? '#f59e0b' : '#ef4444') + ';">' + (docs.avg_score || 0) + '%</div>' +
-        '<div style="font-size:12px;color:#64748b;">Avg AI Score</div></div>' +
+        '<div class="text-center px-5 py-3 bg-slate-50/80 rounded-xl border-l-4 ' + scoreColor + '">' +
+        '<div class="text-2xl font-bold">' + (docs.avg_score || 0) + '%</div>' +
+        '<div class="text-xs text-slate-500 mt-0.5">Avg AI Score</div></div>' +
         '</div>';
 
-    // Low-score documents (quality concern)
     if (docs.low_score_docs && docs.low_score_docs.length) {
-        html += '<div style="margin-top:12px;">' +
-            '<strong style="font-size:13px;color:#b91c1c;">\u26A0\uFE0F Low Quality Documents (Score &lt; 40%)</strong>' +
-            '<table class="data-table" style="width:100%;margin-top:8px;font-size:13px;">' +
-            '<thead><tr><th>Filename</th><th>Type</th><th>Score</th><th>Uploaded</th></tr></thead><tbody>';
+        html += '<div class="mt-3">' +
+            '<div class="text-xs font-semibold text-rose-700 mb-2 flex items-center gap-1">' + icon('alert-triangle', 12) + ' Low Quality Documents (Score &lt; 40%)</div>' +
+            '<div class="bg-slate-50 rounded-lg overflow-hidden"><table class="w-full text-xs">' +
+            '<thead><tr class="border-b border-slate-200"><th class="px-3 py-2 text-left font-semibold text-slate-500">Filename</th><th class="px-3 py-2 text-left font-semibold text-slate-500">Type</th><th class="px-3 py-2 text-left font-semibold text-slate-500">Score</th><th class="px-3 py-2 text-left font-semibold text-slate-500">Uploaded</th></tr></thead><tbody class="divide-y divide-slate-100">';
         docs.low_score_docs.forEach(function(d) {
-            html += '<tr>' +
-                '<td>' + esc(d.filename || '--') + '</td>' +
-                '<td><span class="badge badge-gray">' + esc(d.type || 'general') + '</span></td>' +
-                '<td style="color:#ef4444;font-weight:600;">' + (d.score || 0) + '%</td>' +
-                '<td style="font-size:12px;color:#64748b;">' + (d.uploaded ? new Date(d.uploaded).toLocaleDateString() : '--') + '</td></tr>';
+            html += '<tr class="hover:bg-white transition-colors">' +
+                '<td class="px-3 py-2 text-slate-700">' + esc(d.filename || '--') + '</td>' +
+                '<td class="px-3 py-2">' + statusBadge(esc(d.type || 'general'), 'gray') + '</td>' +
+                '<td class="px-3 py-2 text-rose-500 font-semibold">' + (d.score || 0) + '%</td>' +
+                '<td class="px-3 py-2 text-slate-400">' + (d.uploaded ? new Date(d.uploaded).toLocaleDateString() : '--') + '</td></tr>';
         });
-        html += '</tbody></table></div>';
+        html += '</tbody></table></div></div>';
     }
     return html;
 }
@@ -1418,12 +1473,13 @@ async function loadAdminStats() {
     var sc = document.getElementById('admin-stat-cards');
     if (sc) {
         sc.innerHTML =
-            renderStatCard('\uD83D\uDC65', 'Total Users', stats.total_users || 0, 'blue') +
-            renderStatCard('\uD83C\uDFE2', 'Organizations', stats.total_organizations || 0, 'green') +
-            renderStatCard('\u2705', 'Verified Orgs', stats.verified_organizations || 0, 'green') +
-            renderStatCard('\uD83D\uDCB0', 'Total Grants', stats.total_grants || 0, 'amber') +
-            renderStatCard('\uD83D\uDCCB', 'Applications', stats.total_applications || 0, 'blue') +
-            renderStatCard('\u26A0\uFE0F', 'Flagged Checks', stats.flagged_compliance || 0, 'red');
+            renderStatCard('users', 'Total Users', stats.total_users || 0, 'blue') +
+            renderStatCard('building-2', 'Organizations', stats.total_organizations || 0, 'green') +
+            renderStatCard('badge-check', 'Verified Orgs', stats.verified_organizations || 0, 'green') +
+            renderStatCard('coins', 'Total Grants', stats.total_grants || 0, 'amber') +
+            renderStatCard('file-text', 'Applications', stats.total_applications || 0, 'purple') +
+            renderStatCard('alert-triangle', 'Flagged Checks', stats.flagged_compliance || 0, 'red');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     // Refresh breakdowns
@@ -1437,20 +1493,27 @@ async function loadAdminStats() {
     // Recent users table
     var ru = document.getElementById('admin-recent-users');
     if (ru && stats.recent_users) {
-        var html = '<div class="card"><table class="data-table" style="width:100%;">' +
-            '<thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th></tr></thead><tbody>';
+        var html = '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden"><table class="w-full">' +
+            '<thead><tr class="bg-slate-50 border-b border-slate-200">' +
+            '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>' +
+            '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</th>' +
+            '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</th>' +
+            '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>' +
+            '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Created</th>' +
+            '</tr></thead><tbody class="divide-y divide-slate-100">';
         stats.recent_users.forEach(function(u) {
-            html += '<tr>' +
-                '<td>' + esc(u.name) + '</td>' +
-                '<td>' + esc(u.email) + '</td>' +
-                '<td><span class="badge badge-' + (u.role === 'admin' ? 'red' : u.role === 'donor' ? 'blue' : u.role === 'reviewer' ? 'amber' : 'green') + '">' +
-                esc(u.role.toUpperCase()) + '</span></td>' +
-                '<td>' + (u.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Inactive</span>') + '</td>' +
-                '<td style="font-size:13px;color:#64748b;">' + (u.created_at ? new Date(u.created_at).toLocaleDateString() : '--') + '</td>' +
+            var roleBadge = statusBadge(u.role.toUpperCase(), u.role === 'admin' ? 'red' : u.role === 'donor' ? 'blue' : u.role === 'reviewer' ? 'amber' : 'green');
+            html += '<tr class="hover:bg-slate-50/80 transition-colors">' +
+                '<td class="px-4 py-3.5 text-sm font-medium text-slate-900">' + esc(u.name) + '</td>' +
+                '<td class="px-4 py-3.5 text-sm text-slate-600">' + esc(u.email) + '</td>' +
+                '<td class="px-4 py-3.5">' + roleBadge + '</td>' +
+                '<td class="px-4 py-3.5">' + (u.is_active ? statusBadge('Active', 'green') : statusBadge('Inactive', 'red')) + '</td>' +
+                '<td class="px-4 py-3.5 text-xs text-slate-400">' + (u.created_at ? new Date(u.created_at).toLocaleDateString() : '--') + '</td>' +
                 '</tr>';
         });
         html += '</tbody></table></div>';
         ru.innerHTML = html;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     // Refresh alerts banner
@@ -1487,34 +1550,41 @@ async function loadDashboardStats() {
         var sc = document.getElementById('ngo-stat-cards');
         if (sc) {
             var score = stats.average_score || 0;
-            sc.innerHTML = renderStatCard('\uD83D\uDCCA', 'Assessment Score', score + '%', 'green') +
-                renderStatCard('\uD83D\uDCCB', 'Active Applications', stats.total_applications || 0, 'blue') +
-                renderStatCard('\uD83D\uDCB0', 'Grants Available', stats.open_grants || 0, 'amber') +
-                renderStatCard('\uD83D\uDCC4', 'Documents Uploaded', stats.documents || 0, 'red');
+            sc.innerHTML = renderStatCard('bar-chart-3', 'Assessment Score', score + '%', 'green') +
+                renderStatCard('file-text', 'Active Applications', stats.total_applications || 0, 'blue') +
+                renderStatCard('coins', 'Grants Available', stats.open_grants || 0, 'amber') +
+                renderStatCard('folder-open', 'Documents Uploaded', stats.documents || 0, 'purple');
             // Update capacity badge too
             var cap = capacityLabel(score);
             var ringEl = document.querySelector('.score-ring-container');
             if (ringEl) ringEl.parentElement.parentElement.innerHTML =
-                '<div class="card-body" style="display:flex;align-items:center;gap:24px;">' +
+                '<div class="flex flex-col sm:flex-row items-center gap-6 p-6">' +
                 scoreRingHTML(score, 80, '%') +
-                '<div><h3 style="font-size:18px;font-weight:600;">' + T('assessment.org_capacity') + '</h3>' +
-                '<p style="font-size:14px;color:#64748b;margin-top:4px;">Your current capacity level: ' +
-                '<span class="badge badge-' + cap.color + '">' + esc(cap.label) + '</span></p></div>' +
-                '<div style="margin-left:auto;"><button class="btn btn-secondary btn-sm" onclick="nav(\'assessment\')">' + T('assessment.view_assessment') + '</button></div></div>';
+                '<div class="flex-1 text-center sm:text-left"><h3 class="text-lg font-semibold text-slate-900">' + T('assessment.org_capacity') + '</h3>' +
+                '<p class="text-sm text-slate-500 mt-1">Your current capacity level: ' +
+                statusBadge(cap.label, cap.color) + '</p></div>' +
+                '<div class="shrink-0"><button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'assessment\')">' + icon('arrow-right', 16) + ' ' + T('assessment.view_assessment') + '</button></div></div>';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     } else if (role === 'donor') {
         var dc = document.getElementById('donor-stat-cards');
-        if (dc) dc.innerHTML = renderStatCard('\uD83D\uDCB0', 'Total Grants', stats.total_grants || 0, 'green') +
-            renderStatCard('\uD83D\uDCCB', 'Total Applications', stats.total_applications || 0, 'blue') +
-            renderStatCard('\u2B50', 'Pending Review', stats.pending_review || 0, 'amber') +
-            renderStatCard('\uD83C\uDFC6', 'Total Awarded', formatCurrency(stats.total_funding_awarded || 0), 'red') +
-            renderStatCard('\uD83D\uDCCA', 'Reports to Review', stats.pending_report_reviews || 0, 'blue');
+        if (dc) {
+            dc.innerHTML = renderStatCard('coins', 'Total Grants', stats.total_grants || 0, 'green') +
+                renderStatCard('file-text', 'Total Applications', stats.total_applications || 0, 'blue') +
+                renderStatCard('star', 'Pending Review', stats.pending_review || 0, 'amber') +
+                renderStatCard('trophy', 'Total Awarded', formatCurrency(stats.total_funding_awarded || 0), 'red') +
+                renderStatCard('bar-chart-2', 'Reports to Review', stats.pending_report_reviews || 0, 'purple');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
     } else if (role === 'reviewer') {
         var rc = document.getElementById('reviewer-stat-cards');
-        if (rc) rc.innerHTML = renderStatCard('\uD83D\uDCCB', 'Assigned Reviews', stats.assigned_reviews || 0, 'blue') +
-            renderStatCard('\u23F3', 'In Progress', stats.in_progress_reviews || 0, 'amber') +
-            renderStatCard('\u2705', 'Completed', stats.completed_reviews || 0, 'green') +
-            renderStatCard('\uD83D\uDCC8', 'Avg Score Given', (stats.average_score_given || 0) + '%', 'amber');
+        if (rc) {
+            rc.innerHTML = renderStatCard('file-text', 'Assigned Reviews', stats.assigned_reviews || 0, 'blue') +
+                renderStatCard('clock', 'In Progress', stats.in_progress_reviews || 0, 'amber') +
+                renderStatCard('check-circle-2', 'Completed', stats.completed_reviews || 0, 'green') +
+                renderStatCard('trending-up', 'Avg Score Given', (stats.average_score_given || 0) + '%', 'purple');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
     }
 
     if (role === 'ngo') {
@@ -1523,7 +1593,7 @@ async function loadDashboardStats() {
         if (gRes && gRes.grants) {
             var html = gRes.grants.slice(0, 3).map(function(g) { return renderGrantCard(g); }).join('');
             var el = document.getElementById('recommended-grants');
-            if (el) el.innerHTML = html || '<p style="color:#94a3b8;">No grants available at this time.</p>';
+            if (el) { el.innerHTML = html || '<p class="text-slate-400 text-sm py-4 text-center">No grants available at this time.</p>'; if (typeof lucide !== 'undefined') lucide.createIcons(); }
         }
         // Load recent applications
         var aRes = await api('GET', '/api/applications/');
@@ -1541,8 +1611,8 @@ async function loadDashboardStats() {
             S.grants = gRes2.grants;
             var activeGrants = gRes2.grants.filter(function(g) { return g.status !== 'closed'; });
             var el3 = document.getElementById('active-grants');
-            if (el3) el3.innerHTML = activeGrants.slice(0, 6).map(function(g) { return renderDonorGrantCard(g); }).join('') ||
-                '<p style="color:#94a3b8;">No active grants.</p>';
+            if (el3) { el3.innerHTML = activeGrants.slice(0, 6).map(function(g) { return renderDonorGrantCard(g); }).join('') ||
+                '<p class="text-slate-400 text-sm py-4 text-center">No active grants.</p>'; if (typeof lucide !== 'undefined') lucide.createIcons(); }
         }
         // Load recent applications
         var aRes2 = await api('GET', '/api/applications/');
@@ -1566,31 +1636,51 @@ async function loadDashboardStats() {
 // 15. Stat Card Component
 // =============================================================================
 
-function renderStatCard(icon, label, value, color) {
-    return '<div class="card"><div class="stat-card">' +
-        '<div class="stat-icon ' + (color || 'green') + '">' + icon + '</div>' +
-        '<div>' +
-        '<div class="stat-value">' + esc(String(value)) + '</div>' +
-        '<div class="stat-label">' + esc(label) + '</div>' +
+function renderStatCard(iconName, label, value, color) {
+    var colorMap = {
+        green:  { bg: 'bg-emerald-50',  text: 'text-emerald-600', icon: 'text-emerald-500' },
+        blue:   { bg: 'bg-blue-50',     text: 'text-blue-600',    icon: 'text-blue-500' },
+        amber:  { bg: 'bg-amber-50',    text: 'text-amber-600',   icon: 'text-amber-500' },
+        red:    { bg: 'bg-rose-50',      text: 'text-rose-600',    icon: 'text-rose-500' },
+        purple: { bg: 'bg-violet-50',   text: 'text-violet-600',  icon: 'text-violet-500' },
+        brand:  { bg: 'bg-brand-50',    text: 'text-brand-600',   icon: 'text-brand-500' }
+    };
+    var c = colorMap[color] || colorMap.green;
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5 hover:shadow-md transition-all duration-200">' +
+        '<div class="flex items-center gap-4">' +
+        '<div class="w-12 h-12 rounded-xl ' + c.bg + ' flex items-center justify-center shrink-0">' +
+        icon(iconName, 22, c.icon) +
         '</div>' +
-        '</div></div>';
+        '<div class="min-w-0">' +
+        '<div class="text-2xl font-bold text-slate-900 truncate">' + esc(String(value)) + '</div>' +
+        '<div class="text-sm text-slate-500 truncate">' + esc(label) + '</div>' +
+        '</div>' +
+        '</div>' +
+        '</div>';
 }
 
 function renderLoadingCards(count) {
     var html = '';
     for (var i = 0; i < count; i++) {
-        html += '<div class="card" aria-busy="true"><div class="card-body" style="text-align:center;padding:40px;">' +
-            '<div class="spinner" style="width:24px;height:24px;border:3px solid #e2e8f0;border-top-color:#2d8f6f;border-radius:50%;animation:spin 0.6s linear infinite;margin:0 auto;" aria-hidden="true"></div>' +
-            '<p style="margin-top:12px;color:#94a3b8;font-size:13px;">' + T('common.loading') + '</p>' +
-            '</div></div>';
+        html += '<div class="bg-white rounded-xl border border-slate-200/60 p-5" aria-busy="true">' +
+            '<div class="flex items-center gap-4">' +
+            '<div class="w-12 h-12 rounded-xl skeleton shrink-0"></div>' +
+            '<div class="flex-1 space-y-2">' +
+            '<div class="h-6 w-20 skeleton"></div>' +
+            '<div class="h-4 w-32 skeleton"></div>' +
+            '</div></div></div>';
     }
     return html;
 }
 
 function renderLoadingTable() {
-    return '<div class="card" aria-busy="true"><div class="card-body" style="text-align:center;padding:40px;">' +
-        '<div class="spinner" style="width:24px;height:24px;border:3px solid #e2e8f0;border-top-color:#2d8f6f;border-radius:50%;animation:spin 0.6s linear infinite;margin:0 auto;" aria-hidden="true"></div>' +
-        '<p style="margin-top:12px;color:#94a3b8;font-size:13px;">Loading data...</p>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden" aria-busy="true">' +
+        '<div class="p-4 space-y-3">' +
+        '<div class="h-8 skeleton w-full"></div>' +
+        '<div class="h-6 skeleton w-full"></div>' +
+        '<div class="h-6 skeleton w-5/6"></div>' +
+        '<div class="h-6 skeleton w-4/6"></div>' +
+        '<div class="h-6 skeleton w-5/6"></div>' +
         '</div></div>';
 }
 
@@ -1600,67 +1690,63 @@ function renderLoadingTable() {
 
 function renderGrantCard(g) {
     var deadline = timeUntil(g.deadline);
-    var deadlineClass = deadline === 'Expired' ? 'color:#ef4444;' : '';
+    var isExpired = deadline === 'Expired';
     var sectors = (g.sectors || []).map(function(s) {
-        return '<span class="badge badge-outline badge-green" style="font-size:11px;">' + sectorIcon(s) + ' ' + esc(s) + '</span>';
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full">' + sectorIcon(s) + ' ' + esc(s) + '</span>';
     }).join(' ');
 
-    // Issue #8: Show application status badge for NGOs
-    var appStatusBadge = '';
+    var appStatusBdg = '';
     var applyBtn = '';
     if (g.user_application_status) {
         var ast = g.user_application_status;
-        appStatusBadge = '<span class="badge badge-' +
-            (ast === 'submitted' ? 'blue' : ast === 'awarded' ? 'green' : ast === 'draft' ? 'amber' : ast === 'rejected' ? 'red' : 'blue') +
-            '" style="font-size:11px;">\uD83D\uDCCB ' + esc(ast.charAt(0).toUpperCase() + ast.slice(1)) + '</span>';
+        appStatusBdg = statusBadge(ast.charAt(0).toUpperCase() + ast.slice(1), ast === 'submitted' ? 'blue' : ast === 'awarded' ? 'green' : ast === 'draft' ? 'amber' : ast === 'rejected' ? 'red' : 'blue');
         if (ast === 'draft') {
-            applyBtn = '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();safeStartApply(' + g.id + ')">' + T('apply.continue_draft') + '</button>';
+            applyBtn = '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="event.stopPropagation();safeStartApply(' + g.id + ')">' + T('apply.continue_draft') + '</button>';
         } else {
-            applyBtn = '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();viewGrant(' + g.id + ')">' + T('common.view') + '</button>';
+            applyBtn = '<button class="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors" onclick="event.stopPropagation();viewGrant(' + g.id + ')">' + T('common.view') + '</button>';
         }
     } else {
-        applyBtn = '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();' +
-            (deadline === 'Expired' ? 'showToast(\'Deadline has passed\',\'warning\')' : 'safeStartApply(' + g.id + ')') +
-            '">' + (deadline === 'Expired' ? T('grant.deadline_passed') : T('grant.apply_now')) + '</button>';
+        applyBtn = '<button class="px-3 py-1.5 ' + (isExpired ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-brand-600 text-white hover:bg-brand-700') + ' text-xs font-medium rounded-lg transition-colors" onclick="event.stopPropagation();' +
+            (isExpired ? 'showToast(\'Deadline has passed\',\'warning\')' : 'safeStartApply(' + g.id + ')') +
+            '">' + (isExpired ? T('grant.deadline_passed') : T('grant.apply_now')) + '</button>';
     }
 
-    return '<div class="card grant-card" style="cursor:pointer;" onclick="viewGrant(' + g.id + ')">' +
-        '<div class="card-body">' +
-        '<div style="display:flex;justify-content:space-between;align-items:start;">' +
-        '<h3 style="font-size:16px;font-weight:600;flex:1;">' + esc(g.title) + '</h3>' +
-        (g.match_score ? '<span class="badge badge-green" style="margin-left:8px;">' + g.match_score + '% Match</span>' : '') +
-        appStatusBadge +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group" onclick="viewGrant(' + g.id + ')">' +
+        '<div class="h-1 bg-gradient-to-r from-brand-500 to-brand-400"></div>' +
+        '<div class="p-5">' +
+        '<div class="flex justify-between items-start gap-2">' +
+        '<h3 class="text-sm font-semibold text-slate-900 group-hover:text-brand-600 transition-colors line-clamp-2">' + esc(g.title) + '</h3>' +
+        '<div class="flex gap-1.5 shrink-0">' +
+        (g.match_score ? statusBadge(g.match_score + '% Match', 'green') : '') +
+        appStatusBdg +
+        '</div></div>' +
+        '<p class="text-xs text-slate-500 mt-1">' + esc(g.donor_name || g.organization_name || '') + '</p>' +
+        '<div class="text-lg font-bold text-brand-600 mt-3">' + formatCurrency(g.total_funding, g.currency) + '</div>' +
+        '<div class="flex items-center gap-4 mt-3 text-xs text-slate-500">' +
+        '<span class="inline-flex items-center gap-1">' + icon('calendar', 12) + ' <span class="' + (isExpired ? 'text-rose-500 font-medium' : '') + '">' + esc(deadline) + '</span></span>' +
+        '<span class="inline-flex items-center gap-1">' + icon('globe', 12) + ' ' + esc((g.countries || []).join(', ') || 'Global') + '</span>' +
         '</div>' +
-        '<p style="font-size:13px;color:#64748b;margin-top:4px;">' + esc(g.donor_name || g.organization_name || '') + '</p>' +
-        '<div class="grant-amount" style="margin-top:12px;">' + formatCurrency(g.total_funding, g.currency) + '</div>' +
-        '<div class="grant-meta">' +
-        '<span>\uD83D\uDCC5 <span style="' + deadlineClass + '">' + esc(deadline) + '</span></span>' +
-        '<span>\uD83C\uDF10 ' + esc((g.countries || []).join(', ') || 'Global') + '</span>' +
+        '<div class="flex flex-wrap gap-1.5 mt-3">' + sectors + '</div>' +
         '</div>' +
-        '<div class="sector-tags">' + sectors + '</div>' +
-        '</div>' +
-        '<div class="card-footer">' +
+        '<div class="px-5 py-3 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">' +
         statusBadge(g.status || 'open') +
         applyBtn +
-        '</div>' +
-        '</div>';
+        '</div></div>';
 }
 
 function renderDonorGrantCard(g) {
-    return '<div class="card" style="cursor:pointer;" onclick="viewGrant(' + g.id + ')">' +
-        '<div class="card-body">' +
-        '<div style="display:flex;justify-content:space-between;align-items:start;">' +
-        '<h3 style="font-size:16px;font-weight:600;flex:1;">' + esc(g.title) + '</h3>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group" onclick="viewGrant(' + g.id + ')">' +
+        '<div class="h-1 bg-gradient-to-r from-emerald-500 to-emerald-400"></div>' +
+        '<div class="p-5">' +
+        '<div class="flex justify-between items-start gap-2">' +
+        '<h3 class="text-sm font-semibold text-slate-900 group-hover:text-brand-600 transition-colors line-clamp-2 flex-1">' + esc(g.title) + '</h3>' +
         statusBadge(g.status || 'draft') +
         '</div>' +
-        '<div style="margin-top:8px;font-size:18px;font-weight:700;color:#2d8f6f;">' +
-        formatCurrency(g.total_funding, g.currency) + '</div>' +
-        '<div class="grant-meta">' +
-        '<span>\uD83D\uDCC5 ' + esc(timeUntil(g.deadline)) + '</span>' +
-        '<span>\uD83D\uDCCB ' + (g.application_count || 0) + ' applications</span>' +
-        '</div>' +
-        '</div>' +
-        '</div>';
+        '<div class="text-lg font-bold text-brand-600 mt-2">' + formatCurrency(g.total_funding, g.currency) + '</div>' +
+        '<div class="flex items-center gap-4 mt-3 text-xs text-slate-500">' +
+        '<span class="inline-flex items-center gap-1">' + icon('calendar', 12) + ' ' + esc(timeUntil(g.deadline)) + '</span>' +
+        '<span class="inline-flex items-center gap-1">' + icon('file-text', 12) + ' ' + (g.application_count || 0) + ' applications</span>' +
+        '</div></div></div>';
 }
 
 // =============================================================================
@@ -1669,24 +1755,30 @@ function renderDonorGrantCard(g) {
 
 function renderApplicationsTable(apps) {
     if (!apps || !apps.length) {
-        return '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-            '<p>\uD83D\uDCCB ' + T('application.no_applications') + '</p>' +
-            '<button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="nav(\'grants\')">' + T('dashboard.action.browse_grants') + '</button>' +
-            '</div></div>';
+        return '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center">' +
+            '<div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">' + icon('file-text', 22, 'text-slate-400') + '</div>' +
+            '<p class="text-sm text-slate-500">' + T('application.no_applications') + '</p>' +
+            '<button class="mt-3 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="nav(\'grants\')">' + T('dashboard.action.browse_grants') + '</button>' +
+            '</div>';
     }
-    return '<div class="table-wrapper"><table class="table table-hover">' +
-        '<thead><tr>' +
-        '<th>' + T('application.grant') + '</th><th>' + T('application.donor') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('application.ai_score') + '</th><th>' + T('application.submitted_at') + '</th><th></th>' +
-        '</tr></thead><tbody>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden overflow-x-auto"><table class="w-full">' +
+        '<thead><tr class="bg-slate-50 border-b border-slate-200">' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.grant') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.donor') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.tab.status') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.ai_score') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.submitted_at') + '</th>' +
+        '<th class="px-4 py-3"></th>' +
+        '</tr></thead><tbody class="divide-y divide-slate-100">' +
         apps.map(function(a) {
-            return '<tr style="cursor:pointer;" onclick="viewApplication(' + a.id + ')">' +
-                '<td style="font-weight:500;">' + esc(a.grant_title || a.grant_name || 'Grant #' + a.grant_id) + '</td>' +
-                '<td>' + esc(a.donor_name || '') + '</td>' +
-                '<td>' + statusBadge(a.status) + '</td>' +
-                '<td>' + (a.ai_score != null ? '<span style="font-weight:600;color:' +
-                (a.ai_score >= 70 ? '#10b981' : a.ai_score >= 50 ? '#f59e0b' : '#ef4444') + ';">' + a.ai_score + '%</span>' : '-') + '</td>' +
-                '<td>' + formatDate(a.submitted_at || a.created_at) + '</td>' +
-                '<td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();viewApplication(' + a.id + ')">' + T('common.view') + '</button></td>' +
+            var scoreColor = a.ai_score >= 70 ? 'text-emerald-600' : a.ai_score >= 50 ? 'text-amber-500' : 'text-rose-500';
+            return '<tr class="hover:bg-slate-50/80 transition-colors cursor-pointer" onclick="viewApplication(' + a.id + ')">' +
+                '<td class="px-4 py-3.5 text-sm font-medium text-slate-900">' + esc(a.grant_title || a.grant_name || 'Grant #' + a.grant_id) + '</td>' +
+                '<td class="px-4 py-3.5 text-sm text-slate-600">' + esc(a.donor_name || '') + '</td>' +
+                '<td class="px-4 py-3.5">' + statusBadge(a.status) + '</td>' +
+                '<td class="px-4 py-3.5">' + (a.ai_score != null ? '<span class="font-semibold ' + scoreColor + '">' + a.ai_score + '%</span>' : '<span class="text-slate-300">-</span>') + '</td>' +
+                '<td class="px-4 py-3.5 text-xs text-slate-500">' + formatDate(a.submitted_at || a.created_at) + '</td>' +
+                '<td class="px-4 py-3.5"><button class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors" onclick="event.stopPropagation();viewApplication(' + a.id + ')">' + T('common.view') + '</button></td>' +
                 '</tr>';
         }).join('') +
         '</tbody></table></div>';
@@ -1694,19 +1786,25 @@ function renderApplicationsTable(apps) {
 
 function renderDonorApplicationsTable(apps) {
     if (!apps || !apps.length) {
-        return '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-            '<p>No applications received yet.</p></div></div>';
+        return '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center"><p class="text-sm text-slate-400">No applications received yet.</p></div>';
     }
-    return '<div class="table-wrapper"><table class="table table-hover">' +
-        '<thead><tr><th>' + T('ranking.applicant') + '</th><th>' + T('report.grant') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('application.ai_score') + '</th><th>' + T('application.submitted') + '</th><th></th></tr></thead><tbody>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden overflow-x-auto"><table class="w-full">' +
+        '<thead><tr class="bg-slate-50 border-b border-slate-200">' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('ranking.applicant') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('report.grant') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.tab.status') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.ai_score') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.submitted') + '</th>' +
+        '<th class="px-4 py-3"></th>' +
+        '</tr></thead><tbody class="divide-y divide-slate-100">' +
         apps.map(function(a) {
-            return '<tr style="cursor:pointer;" onclick="viewApplication(' + a.id + ')">' +
-                '<td style="font-weight:500;">' + esc(a.org_name || a.applicant_name || '') + '</td>' +
-                '<td>' + esc(a.grant_title || '') + '</td>' +
-                '<td>' + statusBadge(a.status) + '</td>' +
-                '<td>' + (a.ai_score != null ? a.ai_score + '%' : '-') + '</td>' +
-                '<td>' + formatDate(a.submitted_at || a.created_at) + '</td>' +
-                '<td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();viewApplication(' + a.id + ')">' + T('common.view') + '</button></td>' +
+            return '<tr class="hover:bg-slate-50/80 transition-colors cursor-pointer" onclick="viewApplication(' + a.id + ')">' +
+                '<td class="px-4 py-3.5 text-sm font-medium text-slate-900">' + esc(a.org_name || a.applicant_name || '') + '</td>' +
+                '<td class="px-4 py-3.5 text-sm text-slate-600">' + esc(a.grant_title || '') + '</td>' +
+                '<td class="px-4 py-3.5">' + statusBadge(a.status) + '</td>' +
+                '<td class="px-4 py-3.5 text-sm">' + (a.ai_score != null ? '<span class="font-semibold">' + a.ai_score + '%</span>' : '<span class="text-slate-300">-</span>') + '</td>' +
+                '<td class="px-4 py-3.5 text-xs text-slate-500">' + formatDate(a.submitted_at || a.created_at) + '</td>' +
+                '<td class="px-4 py-3.5"><button class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors" onclick="event.stopPropagation();viewApplication(' + a.id + ')">' + T('common.view') + '</button></td>' +
                 '</tr>';
         }).join('') +
         '</tbody></table></div>';
@@ -1714,18 +1812,23 @@ function renderDonorApplicationsTable(apps) {
 
 function renderReviewsTable(reviews) {
     if (!reviews || !reviews.length) {
-        return '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-            '<p>No assignments pending.</p></div></div>';
+        return '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center"><p class="text-sm text-slate-400">No assignments pending.</p></div>';
     }
-    return '<div class="table-wrapper"><table class="table table-hover">' +
-        '<thead><tr><th>' + T('nav.all_applications') + '</th><th>' + T('report.grant') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('common.due_date') + '</th><th></th></tr></thead><tbody>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden overflow-x-auto"><table class="w-full">' +
+        '<thead><tr class="bg-slate-50 border-b border-slate-200">' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('nav.all_applications') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('report.grant') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.tab.status') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('common.due_date') + '</th>' +
+        '<th class="px-4 py-3"></th>' +
+        '</tr></thead><tbody class="divide-y divide-slate-100">' +
         reviews.map(function(r) {
-            return '<tr style="cursor:pointer;" onclick="openReview(' + r.id + ')">' +
-                '<td style="font-weight:500;">' + esc(r.org_name || r.application_name || 'Application #' + r.application_id) + '</td>' +
-                '<td>' + esc(r.grant_title || '') + '</td>' +
-                '<td>' + statusBadge(r.status) + '</td>' +
-                '<td>' + formatDate(r.due_date) + '</td>' +
-                '<td><button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openReview(' + r.id + ')">Review</button></td>' +
+            return '<tr class="hover:bg-slate-50/80 transition-colors cursor-pointer" onclick="openReview(' + r.id + ')">' +
+                '<td class="px-4 py-3.5 text-sm font-medium text-slate-900">' + esc(r.org_name || r.application_name || 'Application #' + r.application_id) + '</td>' +
+                '<td class="px-4 py-3.5 text-sm text-slate-600">' + esc(r.grant_title || '') + '</td>' +
+                '<td class="px-4 py-3.5">' + statusBadge(r.status) + '</td>' +
+                '<td class="px-4 py-3.5 text-xs text-slate-500">' + formatDate(r.due_date) + '</td>' +
+                '<td class="px-4 py-3.5"><button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="event.stopPropagation();openReview(' + r.id + ')">Review</button></td>' +
                 '</tr>';
         }).join('') +
         '</tbody></table></div>';
@@ -1742,40 +1845,37 @@ function renderBrowseGrants() {
 
     var filtered = filterGrants();
 
-    return '<div class="page-header">' +
-        '<h1>\uD83D\uDCB0 ' + T('grant.browse_title') + '</h1>' +
-        '<p>Find grants that match your organization\'s mission and capabilities.</p>' +
+    return '<div class="mb-8 animate-fade-in">' +
+        '<h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('coins', 24, 'text-brand-500') + ' ' + T('grant.browse_title') + '</h1>' +
+        '<p class="text-slate-500 mt-1">Find grants that match your organization\'s mission and capabilities.</p>' +
         '</div>' +
 
         // Filter bar
-        '<div class="card" style="margin-bottom:24px;">' +
-        '<div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">' +
-        '<div class="form-group" style="margin:0;flex:1;min-width:200px;">' +
-        '<label class="form-label">\uD83D\uDD0D ' + T('common.search') + '</label>' +
-        '<input type="text" class="form-control" placeholder="' + T('grant.search_placeholder') + '" value="' + esc(S.grantFilters.search) + '" oninput="S.grantFilters.search=this.value;renderGrantsList();">' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-4 mb-6">' +
+        '<div class="flex flex-col sm:flex-row gap-3 items-end">' +
+        '<div class="flex-1 min-w-[200px]">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + icon('search', 12, 'inline') + ' ' + T('common.search') + '</label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" placeholder="' + T('grant.search_placeholder') + '" value="' + esc(S.grantFilters.search) + '" oninput="S.grantFilters.search=this.value;renderGrantsList();">' +
         '</div>' +
-        '<div class="form-group" style="margin:0;min-width:150px;">' +
-        '<label class="form-label">' + T('grant.detail.sectors') + '</label>' +
-        '<select class="form-control" onchange="S.grantFilters.sector=this.value;renderGrantsList();">' +
+        '<div class="min-w-[150px]">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.detail.sectors') + '</label>' +
+        '<select class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors bg-white" onchange="S.grantFilters.sector=this.value;renderGrantsList();">' +
         '<option value="">' + T('grant.filter_sector') + '</option>' +
         sectors.map(function(s) { return '<option value="' + s.toLowerCase() + '"' + (S.grantFilters.sector === s.toLowerCase() ? ' selected' : '') + '>' + s + '</option>'; }).join('') +
-        '</select>' +
-        '</div>' +
-        '<div class="form-group" style="margin:0;min-width:150px;">' +
-        '<label class="form-label">' + T('grant.detail.countries') + '</label>' +
-        '<select class="form-control" onchange="S.grantFilters.country=this.value;renderGrantsList();">' +
+        '</select></div>' +
+        '<div class="min-w-[150px]">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.detail.countries') + '</label>' +
+        '<select class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors bg-white" onchange="S.grantFilters.country=this.value;renderGrantsList();">' +
         '<option value="">' + T('grant.filter_country') + '</option>' +
         countries.map(function(c) { return '<option value="' + c + '"' + (S.grantFilters.country === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
-        '</select>' +
-        '</div>' +
-        '</div>' +
-        '</div>' +
+        '</select></div>' +
+        '</div></div>' +
 
-        '<div id="grants-list" class="content-grid">' +
+        '<div id="grants-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">' +
         (filtered.length ? filtered.map(function(g) { return renderGrantCard(g); }).join('') :
-            '<div style="grid-column:1/-1;text-align:center;padding:48px;color:#94a3b8;">' +
-            '<p style="font-size:48px;margin-bottom:12px;">\uD83D\uDD0D</p>' +
-            '<p>' + T('grant.no_grants') + '</p></div>') +
+            '<div class="col-span-full text-center py-12">' +
+            '<div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">' + icon('search', 24, 'text-slate-400') + '</div>' +
+            '<p class="text-sm text-slate-500">' + T('grant.no_grants') + '</p></div>') +
         '</div>';
 }
 
@@ -1801,9 +1901,10 @@ function renderGrantsList() {
     if (!el) return;
     var filtered = filterGrants();
     el.innerHTML = filtered.length ? filtered.map(function(g) { return renderGrantCard(g); }).join('') :
-        '<div style="grid-column:1/-1;text-align:center;padding:48px;color:#94a3b8;">' +
-        '<p style="font-size:48px;margin-bottom:12px;">\uD83D\uDD0D</p>' +
-        '<p>' + T('grant.no_grants') + '</p></div>';
+        '<div class="col-span-full text-center py-12">' +
+        '<div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">' + icon('search', 24, 'text-slate-400') + '</div>' +
+        '<p class="text-sm text-slate-500">' + T('grant.no_grants') + '</p></div>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 async function loadGrants() {
@@ -1828,13 +1929,12 @@ async function loadGrants() {
 
 function renderMyGrants() {
     loadMyGrants();
-    return '<div class="page-header">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-        '<div><h1>\uD83D\uDCB0 ' + T('grant.my_grants') + '</h1></div>' +
-        '<button class="btn btn-primary" onclick="nav(\'creategrant\')">\u2795 ' + T('dashboard.action.create_grant') + '</button>' +
-        '</div>' +
-        '</div>' +
-        '<div id="my-grants-list" class="content-grid">' + renderLoadingCards(3) + '</div>';
+    return '<div class="mb-8 animate-fade-in">' +
+        '<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">' +
+        '<h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('coins', 24, 'text-brand-500') + ' ' + T('grant.my_grants') + '</h1>' +
+        '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="nav(\'creategrant\')">' + icon('plus', 16) + ' ' + T('dashboard.action.create_grant') + '</button>' +
+        '</div></div>' +
+        '<div id="my-grants-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">' + renderLoadingCards(3) + '</div>';
 }
 
 async function loadMyGrants(retryCount) {
@@ -1860,9 +1960,11 @@ function _renderMyGrantsList() {
     if (el) {
         el.innerHTML = S.grants.length ?
             S.grants.map(function(g) { return renderDonorGrantCard(g); }).join('') :
-            '<div style="grid-column:1/-1;text-align:center;padding:48px;color:#94a3b8;">' +
-            '<p>No grants created yet.</p>' +
-            '<button class="btn btn-primary" style="margin-top:12px;" onclick="nav(\'creategrant\')">' + T('grant.create_first') + '</button></div>';
+            '<div class="col-span-full text-center py-12">' +
+            '<div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">' + icon('coins', 24, 'text-slate-400') + '</div>' +
+            '<p class="text-sm text-slate-500 mb-3">No grants created yet.</p>' +
+            '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="nav(\'creategrant\')">' + T('grant.create_first') + '</button></div>';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
 
@@ -1896,99 +1998,91 @@ function renderGrantDetail() {
         default: tabContent = renderGrantOverview(g);
     }
 
-    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'grants\')" style="margin-bottom:16px;">\u2190 ' + T('common.back') + '</button>' +
+    return '<button class="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 mb-4 transition-colors" onclick="nav(\'grants\')">' + icon('arrow-left', 16) + ' ' + T('common.back') + '</button>' +
 
-        '<div class="card" style="margin-bottom:24px;">' +
-        '<div class="card-body">' +
-        '<div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:16px;">' +
-        '<div style="flex:1;">' +
-        '<h1 style="font-size:24px;font-weight:700;">' + esc(g.title) + '</h1>' +
-        '<p style="color:#64748b;margin-top:4px;">' + esc(g.donor_name || g.organization_name || '') + '</p>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-6 mb-6">' +
+        '<div class="flex flex-col sm:flex-row justify-between items-start gap-4">' +
+        '<div class="flex-1">' +
+        '<h1 class="text-xl font-bold text-slate-900">' + esc(g.title) + '</h1>' +
+        '<p class="text-sm text-slate-500 mt-1">' + esc(g.donor_name || g.organization_name || '') + '</p>' +
         '</div>' +
-        '<div style="text-align:right;">' +
-        '<div style="font-size:28px;font-weight:700;color:#2d8f6f;">' + formatCurrency(g.total_funding, g.currency) + '</div>' +
-        '<div style="margin-top:4px;">' + statusBadge(g.status) + '</div>' +
-        '</div>' +
-        '</div>' +
-        '<div style="display:flex;gap:16px;margin-top:16px;font-size:14px;color:#64748b;">' +
-        '<span>\uD83D\uDCC5 ' + T('grant.deadline') + ': ' + formatDate(g.deadline) + ' (' + timeUntil(g.deadline) + ')</span>' +
-        '<span>\uD83C\uDF10 ' + esc((g.countries || []).join(', ') || 'Global') + '</span>' +
-        '</div>' +
-        '</div>' +
-        '</div>' +
+        '<div class="text-right shrink-0">' +
+        '<div class="text-2xl font-bold text-brand-600">' + formatCurrency(g.total_funding, g.currency) + '</div>' +
+        '<div class="mt-1">' + statusBadge(g.status) + '</div>' +
+        '</div></div>' +
+        '<div class="flex flex-wrap gap-4 mt-4 text-sm text-slate-500">' +
+        '<span class="inline-flex items-center gap-1">' + icon('calendar', 14) + ' ' + T('grant.deadline') + ': ' + formatDate(g.deadline) + ' (' + timeUntil(g.deadline) + ')</span>' +
+        '<span class="inline-flex items-center gap-1">' + icon('globe', 14) + ' ' + esc((g.countries || []).join(', ') || 'Global') + '</span>' +
+        '</div></div>' +
 
         // Tabs
-        '<div style="display:flex;gap:4px;margin-bottom:24px;border-bottom:2px solid #e2e8f0;padding-bottom:0;">' +
+        '<div class="flex gap-1 mb-6 border-b-2 border-slate-200">' +
         tabs.map(function(t) {
             var active = tab === t.key;
-            return '<button class="btn btn-sm" style="border:none;border-bottom:2px solid ' +
-                (active ? '#2d8f6f' : 'transparent') + ';border-radius:0;color:' +
-                (active ? '#2d8f6f' : '#64748b') + ';font-weight:' +
-                (active ? '600' : '400') + ';padding:8px 16px;margin-bottom:-2px;" ' +
+            return '<button class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-[2px] transition-colors ' +
+                (active ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700') + '" ' +
                 'onclick="S.grantDetailTab=\'' + t.key + '\';render();">' + esc(t.label) + '</button>';
         }).join('') +
         '</div>' +
 
         tabContent +
 
-        // Action buttons
-        '<div style="margin-top:24px;display:flex;gap:12px;">' +
+        '<div class="mt-6 flex gap-3">' +
         (role === 'ngo' && g.status !== 'closed' && timeUntil(g.deadline) !== 'Expired' ?
-            '<button class="btn btn-primary btn-lg" onclick="safeStartApply(' + g.id + ')">' + T('grant.apply_now') + '</button>' : '') +
-        (role === 'donor' ? '<button class="btn btn-primary" onclick="editGrant(' + g.id + ')">' + T('common.edit') + '</button>' : '') +
+            '<button class="px-6 py-3 bg-brand-600 text-white font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="safeStartApply(' + g.id + ')">' + icon('send', 16) + ' ' + T('grant.apply_now') + '</button>' : '') +
+        (role === 'donor' ? '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="editGrant(' + g.id + ')">' + icon('pencil', 16) + ' ' + T('common.edit') + '</button>' : '') +
         '</div>';
 }
 
 function renderGrantOverview(g) {
     var sectors = (g.sectors || []).map(function(s) {
-        return '<span class="badge badge-outline badge-green">' + sectorIcon(s) + ' ' + esc(s) + '</span>';
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full">' + sectorIcon(s) + ' ' + esc(s) + '</span>';
     }).join(' ');
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:12px;">' + T('grant.detail.description') + '</h3>' +
-        '<p style="color:#475569;line-height:1.7;white-space:pre-wrap;">' + esc(g.description || T('common.no_data')) + '</p>' +
-        (sectors ? '<div style="margin-top:16px;"><strong>' + T('grant.detail.sectors') + ':</strong> ' + sectors + '</div>' : '') +
-        '<div style="margin-top:12px;"><strong>' + T('grant.detail.countries') + ':</strong> ' + esc((g.countries || []).join(', ') || 'Global') + '</div>' +
-        '</div></div>';
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-3">' + T('grant.detail.description') + '</h3>' +
+        '<p class="text-slate-600 leading-relaxed whitespace-pre-wrap text-sm">' + esc(g.description || T('common.no_data')) + '</p>' +
+        (sectors ? '<div class="mt-4 flex flex-wrap items-center gap-2"><span class="text-sm font-medium text-slate-700">' + T('grant.detail.sectors') + ':</span> ' + sectors + '</div>' : '') +
+        '<div class="mt-3 text-sm"><span class="font-medium text-slate-700">' + T('grant.detail.countries') + ':</span> <span class="text-slate-600">' + esc((g.countries || []).join(', ') || 'Global') + '</span></div>' +
+        '</div>';
 }
 
 function renderGrantEligibility(g) {
     var reqs = g.eligibility || [];
-    if (!reqs.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No eligibility requirements specified.</p></div></div>';
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('grant.detail.eligibility') + '</h3>' +
+    if (!reqs.length) return '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center"><p class="text-sm text-slate-400">No eligibility requirements specified.</p></div>';
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-4">' + T('grant.detail.eligibility') + '</h3>' +
+        '<div class="divide-y divide-slate-100">' +
         reqs.map(function(req) {
             var passed = req.met || req.passed;
-            var icon = passed ? '\u2705' : (passed === false ? '\u274C' : '\u2B1C');
-            return '<div style="display:flex;align-items:start;gap:12px;padding:12px;border-bottom:1px solid #f1f5f9;">' +
-                '<span style="font-size:18px;">' + icon + '</span>' +
-                '<div style="flex:1;">' +
-                '<div style="font-weight:500;">' + esc(req.category || req.name || req.label || 'Requirement') + '</div>' +
-                '<div style="font-size:13px;color:#64748b;margin-top:2px;">' + esc(req.description || req.details || '') + '</div>' +
-                (req.required ? '<span class="badge badge-red" style="margin-top:4px;">' + T('grant.create.required') + '</span>' : '') +
-                '</div>' +
-                '</div>';
+            var reqIcon = passed ? icon('check-circle-2', 18, 'text-emerald-500') : (passed === false ? icon('x-circle', 18, 'text-rose-500') : icon('circle', 18, 'text-slate-300'));
+            return '<div class="flex items-start gap-3 py-3">' +
+                '<div class="shrink-0 mt-0.5">' + reqIcon + '</div>' +
+                '<div class="flex-1">' +
+                '<div class="text-sm font-medium text-slate-900">' + esc(req.category || req.name || req.label || 'Requirement') + '</div>' +
+                '<div class="text-xs text-slate-500 mt-0.5">' + esc(req.description || req.details || '') + '</div>' +
+                (req.required ? '<span class="mt-1 inline-block">' + statusBadge(T('grant.create.required'), 'red') + '</span>' : '') +
+                '</div></div>';
         }).join('') +
         '</div></div>';
 }
 
 function renderGrantCriteria(g) {
     var criteria = g.criteria || [];
-    if (!criteria.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No scoring criteria defined.</p></div></div>';
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('grant.detail.evaluation_criteria') + '</h3>' +
+    if (!criteria.length) return '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center"><p class="text-sm text-slate-400">No scoring criteria defined.</p></div>';
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-4">' + T('grant.detail.evaluation_criteria') + '</h3>' +
+        '<div class="space-y-3">' +
         criteria.map(function(c, i) {
-            return '<div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:12px;">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                '<h4 style="font-weight:600;">' + (i + 1) + '. ' + esc(c.label || c.name) + '</h4>' +
-                '<span class="badge badge-blue">' + T('grant.create.weight') + ': ' + (c.weight || 0) + '%</span>' +
+            return '<div class="p-4 border border-slate-200 rounded-xl">' +
+                '<div class="flex justify-between items-center">' +
+                '<h4 class="font-semibold text-slate-900 text-sm">' + (i + 1) + '. ' + esc(c.label || c.name) + '</h4>' +
+                statusBadge(T('grant.create.weight') + ': ' + (c.weight || 0) + '%', 'blue') +
                 '</div>' +
-                '<p style="color:#64748b;font-size:13px;margin-top:8px;">' + esc(c.description || '') + '</p>' +
-                (c.instructions ? '<div style="background:#eff6ff;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;">' +
-                    '<strong style="color:#1e40af;">Instructions:</strong> ' + esc(c.instructions) + '</div>' : '') +
-                (c.example ? '<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:13px;color:#2d8f6f;font-weight:500;">' + T('grant.create.view_example_response') + '</summary>' +
-                    '<div style="background:#f8fafc;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;color:#475569;">' +
-                    esc(c.example) + '</div></details>' : '') +
-                (c.max_words ? '<div style="font-size:12px;color:#94a3b8;margin-top:8px;">Maximum ' + c.max_words + ' words</div>' : '') +
+                '<p class="text-xs text-slate-500 mt-2">' + esc(c.description || '') + '</p>' +
+                (c.instructions ? '<div class="bg-blue-50 p-3 rounded-lg mt-2 text-xs"><span class="font-semibold text-blue-800">Instructions:</span> <span class="text-blue-700">' + esc(c.instructions) + '</span></div>' : '') +
+                (c.example ? '<details class="mt-2"><summary class="cursor-pointer text-xs text-brand-600 font-medium hover:text-brand-700">' + T('grant.create.view_example_response') + '</summary>' +
+                    '<div class="bg-slate-50 p-3 rounded-lg mt-2 text-xs text-slate-600">' + esc(c.example) + '</div></details>' : '') +
+                (c.max_words ? '<div class="text-xs text-slate-400 mt-2">Maximum ' + c.max_words + ' words</div>' : '') +
                 '</div>';
         }).join('') +
         '</div></div>';
@@ -1996,19 +2090,20 @@ function renderGrantCriteria(g) {
 
 function renderGrantDocuments(g) {
     var docs = g.doc_requirements || [];
-    if (!docs.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No document requirements specified.</p></div></div>';
-    var docIcons = { financial_report: '\uD83D\uDCCA', registration: '\uD83D\uDCDC', audit: '\uD83D\uDD0D', psea: '\uD83D\uDEE1\uFE0F', project_report: '\uD83D\uDCC4', budget: '\uD83D\uDCB5', cv: '\uD83D\uDC64', strategic_plan: '\uD83D\uDCCB' };
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('grant.detail.doc_requirements') + '</h3>' +
+    if (!docs.length) return '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center"><p class="text-sm text-slate-400">No document requirements specified.</p></div>';
+    var docIconMap = { financial_report: 'bar-chart-3', registration: 'scroll', audit: 'search', psea: 'shield-check', project_report: 'file-text', budget: 'banknote', cv: 'user', strategic_plan: 'clipboard-list' };
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-4">' + T('grant.detail.doc_requirements') + '</h3>' +
+        '<div class="divide-y divide-slate-100">' +
         docs.map(function(d) {
-            var icon = docIcons[d.type] || '\uD83D\uDCC4';
-            return '<div style="display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid #f1f5f9;">' +
-                '<span style="font-size:24px;">' + icon + '</span>' +
-                '<div style="flex:1;">' +
-                '<div style="font-weight:500;">' + esc(d.name || d.type || 'Document') + '</div>' +
-                '<div style="font-size:13px;color:#64748b;">' + esc(d.description || d.requirements || '') + '</div>' +
+            var dIcon = docIconMap[d.type] || 'file-text';
+            return '<div class="flex items-center gap-3 py-3">' +
+                '<div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">' + icon(dIcon, 18, 'text-brand-500') + '</div>' +
+                '<div class="flex-1">' +
+                '<div class="text-sm font-medium text-slate-900">' + esc(d.name || d.type || 'Document') + '</div>' +
+                '<div class="text-xs text-slate-500 mt-0.5">' + esc(d.description || d.requirements || '') + '</div>' +
                 '</div>' +
-                (d.required !== false ? '<span class="badge badge-red">' + T('grant.create.required') + '</span>' : '<span class="badge badge-gray">' + T('grant.create.optional') + '</span>') +
+                (d.required !== false ? statusBadge(T('grant.create.required'), 'red') : statusBadge(T('grant.create.optional'), 'gray')) +
                 '</div>';
         }).join('') +
         '</div></div>';
@@ -2026,8 +2121,7 @@ async function loadGrantApplicants(grantId) {
     if (res && res.applications && res.applications.length) {
         el.innerHTML = renderDonorApplicationsTable(res.applications);
     } else {
-        el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-            '<p>No applications received yet.</p></div></div>';
+        el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center"><p class="text-sm text-slate-400">No applications received yet.</p></div>';
     }
 }
 
@@ -2219,32 +2313,40 @@ function renderApplyForm() {
         case 4: stepContent = renderApplyReview(g); break;
     }
 
-    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'grantdetail\')" style="margin-bottom:16px;">\u2190 ' + T('common.back') + '</button>' +
-        '<div class="page-header"><h1>' + T('apply.title') + ': ' + esc(g.title) + '</h1></div>' +
+    return '<button class="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 mb-4 transition-colors" onclick="nav(\'grantdetail\')">' + icon('arrow-left', 16) + ' ' + T('common.back') + '</button>' +
+        '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('file-text', 24) + ' ' + T('apply.title') + ': ' + esc(g.title) + '</h1></div>' +
 
         renderWizardSteps(steps, step) +
 
-        '<div class="wizard-content">' + stepContent + '</div>' +
+        '<div class="mb-6">' + stepContent + '</div>' +
 
-        '<div class="wizard-actions">' +
-        (step > 1 ? '<button class="btn btn-secondary" onclick="applyPrev()">\u2190 ' + T('common.previous') + '</button>' : '<div></div>') +
-        '<div style="display:flex;gap:8px;">' +
-        '<button class="btn btn-secondary" onclick="saveDraft()">' + T('apply.save_draft') + '</button>' +
-        (step < 4 ? '<button class="btn btn-primary" onclick="applyNext()">' + T('common.next') + ' \u2192</button>' :
-            '<button class="btn btn-primary btn-lg" onclick="submitApplication()">' + T('apply.submit_application') + '</button>') +
+        '<div class="flex items-center justify-between pt-4 border-t border-slate-200/60">' +
+        (step > 1 ? '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="applyPrev()">' + icon('arrow-left', 16) + ' ' + T('common.previous') + '</button>' : '<div></div>') +
+        '<div class="flex items-center gap-2">' +
+        '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="saveDraft()">' + icon('save', 16) + ' ' + T('apply.save_draft') + '</button>' +
+        (step < 4 ? '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="applyNext()">' + T('common.next') + ' ' + icon('arrow-right', 16) + '</button>' :
+            '<button class="px-5 py-2.5 bg-brand-600 text-white text-sm font-semibold rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2 shadow-sm" onclick="submitApplication()">' + icon('send', 16) + ' ' + T('apply.submit_application') + '</button>') +
         '</div>' +
         '</div>';
 }
 
 function renderWizardSteps(steps, current) {
-    return '<div class="wizard-steps">' +
+    return '<div class="flex items-center justify-between mb-8">' +
         steps.map(function(s, i) {
-            var cls = s.num === current ? 'active' : (s.num < current ? 'completed' : '');
-            var connector = i < steps.length - 1 ?
-                '<div class="wizard-connector' + (s.num < current ? ' completed' : '') + '"></div>' : '';
-            return '<div class="wizard-step ' + cls + '">' +
-                '<span class="step-number">' + (s.num < current ? '\u2713' : s.num) + '</span>' +
-                '<span class="step-label">' + esc(s.label) + '</span>' +
+            var isCompleted = s.num < current;
+            var isActive = s.num === current;
+            var circleClasses = isCompleted
+                ? 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold bg-emerald-500 text-white shadow-sm'
+                : isActive
+                    ? 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold bg-brand-600 text-white ring-4 ring-brand-100 shadow-sm'
+                    : 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold bg-slate-100 text-slate-400 border-2 border-slate-200';
+            var labelClasses = isActive ? 'text-xs font-medium text-brand-700 mt-1.5' : isCompleted ? 'text-xs font-medium text-emerald-600 mt-1.5' : 'text-xs font-medium text-slate-400 mt-1.5';
+            var connector = i < steps.length - 1
+                ? '<div class="flex-1 h-0.5 mx-2 ' + (isCompleted ? 'bg-emerald-400' : 'bg-slate-200') + '"></div>'
+                : '';
+            return '<div class="flex flex-col items-center shrink-0">' +
+                '<div class="' + circleClasses + '">' + (isCompleted ? icon('check', 16) : s.num) + '</div>' +
+                '<span class="' + labelClasses + ' hidden sm:block">' + esc(s.label) + '</span>' +
                 '</div>' + connector;
         }).join('') +
         '</div>';
@@ -2253,47 +2355,47 @@ function renderWizardSteps(steps, current) {
 function renderApplyEligibility(g) {
     var reqs = g.eligibility || [];
     if (!reqs.length) {
-        return '<div class="card"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">' + T('apply.eligibility_check') + '</h3>' +
-            '<p style="color:#64748b;">This grant has no specific eligibility requirements. You may proceed to the next step.</p>' +
-            '</div></div>';
+        return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+            '<h3 class="text-base font-semibold text-slate-900 mb-3">' + T('apply.eligibility_check') + '</h3>' +
+            '<p class="text-sm text-slate-500">This grant has no specific eligibility requirements. You may proceed to the next step.</p>' +
+            '</div>';
     }
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('apply.eligibility_check') + '</h3>' +
-        '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Confirm that your organization meets each requirement below.</p>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="text-base font-semibold text-slate-900 mb-1">' + T('apply.eligibility_check') + '</h3>' +
+        '<p class="text-sm text-slate-500 mb-4">Confirm that your organization meets each requirement below.</p>' +
         reqs.map(function(req, i) {
             var key = 'elig_' + i;
             var checked = S.applyEligibility[key];
-            return '<div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:12px;">' +
-                '<div style="display:flex;align-items:center;gap:12px;">' +
-                '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">' +
-                '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="S.applyEligibility[\'' + key + '\']=this.checked;">' +
-                '<span style="font-weight:500;">' + esc(req.category || req.name || req.label || 'Requirement ' + (i + 1)) + '</span>' +
+            return '<div class="p-4 border border-slate-200 rounded-lg mb-3">' +
+                '<div class="flex items-center gap-3">' +
+                '<label class="flex items-center gap-2 cursor-pointer">' +
+                '<input type="checkbox" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500/20" ' + (checked ? 'checked' : '') + ' onchange="S.applyEligibility[\'' + key + '\']=this.checked;">' +
+                '<span class="font-medium text-slate-900">' + esc(req.category || req.name || req.label || 'Requirement ' + (i + 1)) + '</span>' +
                 '</label>' +
-                (req.required ? '<span class="badge badge-red">Required</span>' : '') +
+                (req.required ? '<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-rose-50 text-rose-700">Required</span>' : '') +
                 '</div>' +
-                '<p style="color:#64748b;font-size:13px;margin-top:4px;margin-left:28px;">' + esc(req.description || '') + '</p>' +
-                '<div style="margin-top:8px;margin-left:28px;">' +
-                '<input type="text" class="form-control" placeholder="Provide evidence or explanation..." ' +
+                '<p class="text-sm text-slate-500 mt-1 ml-7">' + esc(req.description || '') + '</p>' +
+                '<div class="mt-2 ml-7">' +
+                '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" placeholder="Provide evidence or explanation..." ' +
                 'value="' + esc(S.applyEligibility[key + '_evidence'] || '') + '" ' +
                 'oninput="S.applyEligibility[\'' + key + '_evidence\']=this.value;">' +
                 '</div>' +
                 '</div>';
         }).join('') +
-        '</div></div>';
+        '</div>';
 }
 
 function renderApplyProposal(g) {
     var criteria = g.criteria || [];
     if (!criteria.length) {
-        return '<div class="card"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">' + T('application.proposal_responses') + '</h3>' +
-            '<p style="color:#64748b;">No specific criteria to respond to. Please describe your proposal below.</p>' +
-            '<div class="form-group">' +
-            '<textarea class="form-control" rows="8" placeholder="Describe your project proposal..." ' +
+        return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+            '<h3 class="text-base font-semibold text-slate-900 mb-3">' + T('application.proposal_responses') + '</h3>' +
+            '<p class="text-sm text-slate-500 mb-3">No specific criteria to respond to. Please describe your proposal below.</p>' +
+            '<div>' +
+            '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="8" placeholder="Describe your project proposal..." ' +
             'data-bind="applyResponses.general" oninput="S.applyResponses.general=this.value;">' +
             esc(S.applyResponses.general || '') + '</textarea>' +
-            '</div></div></div>';
+            '</div></div>';
     }
 
     return criteria.map(function(c, i) {
@@ -2303,33 +2405,33 @@ function renderApplyProposal(g) {
         var maxW = c.max_words || 500;
         var qi = qualityIndicator(wc, maxW);
 
-        return '<div class="card" style="margin-bottom:16px;"><div class="card-body">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-            '<h3 style="font-weight:600;">' + (i + 1) + '. ' + esc(c.label || c.name) + '</h3>' +
-            '<span class="badge badge-blue">' + T('grant.create.weight') + ': ' + (c.weight || 0) + '%</span>' +
+        return '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-4">' +
+            '<div class="flex justify-between items-center">' +
+            '<h3 class="text-base font-semibold text-slate-900">' + (i + 1) + '. ' + esc(c.label || c.name) + '</h3>' +
+            '<span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700">' + T('grant.create.weight') + ': ' + (c.weight || 0) + '%</span>' +
             '</div>' +
-            '<p style="color:#64748b;font-size:13px;margin-top:4px;">' + esc(c.description || '') + '</p>' +
+            '<p class="text-sm text-slate-500 mt-1">' + esc(c.description || '') + '</p>' +
 
-            (c.instructions ? '<div style="background:#eff6ff;padding:12px;border-radius:6px;margin-top:12px;font-size:13px;border-left:3px solid #3b82f6;">' +
-                '<strong style="color:#1e40af;">\uD83D\uDCA1 Instructions:</strong> ' + esc(c.instructions) + '</div>' : '') +
+            (c.instructions ? '<div class="bg-blue-50 p-3 rounded-lg mt-3 text-sm border-l-[3px] border-blue-500">' +
+                '<span class="font-semibold text-blue-800">' + icon('lightbulb', 14, 'text-blue-600 inline') + ' Instructions:</span> ' + esc(c.instructions) + '</div>' : '') +
 
-            (c.example ? '<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:13px;color:#2d8f6f;font-weight:500;">\uD83D\uDC41\uFE0F View Example Response</summary>' +
-                '<div style="background:#f8fafc;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;color:#475569;">' +
+            (c.example ? '<details class="mt-2"><summary class="cursor-pointer text-sm text-brand-600 font-medium">' + icon('eye', 14, 'inline') + ' View Example Response</summary>' +
+                '<div class="bg-slate-50 p-3 rounded-lg mt-2 text-sm text-slate-600">' +
                 esc(c.example) + '</div></details>' : '') +
 
-            '<div style="margin-top:12px;">' +
-            '<textarea class="form-control" rows="6" placeholder="Write your response here..." ' +
+            '<div class="mt-3">' +
+            '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="6" placeholder="Write your response here..." ' +
             'id="apply-textarea-' + i + '" ' +
             'oninput="S.applyResponses[\'' + key + '\']=this.value;updateWordCount(' + i + ',' + maxW + ');">' +
             esc(text) + '</textarea>' +
-            '<div id="wc-' + i + '" style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px;">' +
+            '<div id="wc-' + i + '" class="flex justify-between items-center mt-1.5 text-xs">' +
             '<span style="color:' + qi.color + ';">' + wc + ' words (recommended: ~' + maxW + ') \u2014 ' + qi.label + '</span>' +
-            '<button class="btn btn-sm" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;" ' +
-            'onclick="getAIGuidance(' + i + ',\'' + esc(c.label || '') + '\')">\u2728 AI Help</button>' +
+            '<button class="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-medium rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors inline-flex items-center gap-1" ' +
+            'onclick="getAIGuidance(' + i + ',\'' + esc(c.label || '') + '\')">' + icon('sparkles', 14) + ' AI Help</button>' +
             '</div>' +
-            '<div id="ai-guidance-' + i + '" style="display:none;"></div>' +
+            '<div id="ai-guidance-' + i + '" class="hidden"></div>' +
             '</div>' +
-            '</div></div>';
+            '</div>';
     }).join('');
 }
 
@@ -2358,10 +2460,11 @@ async function _getAIGuidanceImpl(idx, fieldName) {
     var g = S.selectedGrant;
     var el = document.getElementById('ai-guidance-' + idx);
     if (!el) return;
+    el.className = '';
     el.style.display = 'block';
-    el.innerHTML = '<div style="background:#eff6ff;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;">' +
-        '<div style="display:flex;align-items:center;gap:8px;color:#3b82f6;">' +
-        '<span class="spinner" style="width:14px;height:14px;border:2px solid #bfdbfe;border-top-color:#3b82f6;border-radius:50%;animation:spin 0.6s linear infinite;display:inline-block;"></span>' +
+    el.innerHTML = '<div class="bg-blue-50 p-3 rounded-lg mt-2 text-sm">' +
+        '<div class="flex items-center gap-2 text-blue-500">' +
+        '<span class="w-3.5 h-3.5 border-2 border-blue-200 border-t-blue-500 rounded-full animate-spin inline-block"></span>' +
         'Getting AI guidance...</div></div>';
 
     var res = await api('POST', '/api/ai/guidance', {
@@ -2370,22 +2473,22 @@ async function _getAIGuidanceImpl(idx, fieldName) {
         current_text: text
     });
     if (res) {
-        el.innerHTML = '<div style="background:#eff6ff;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;border-left:3px solid #3b82f6;position:relative;">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-            '<div><strong style="color:#1e40af;">\u2728 AI Guidance</strong>' +
-            (res.quality_score != null ? ' <span class="badge badge-blue">Quality: ' + res.quality_score + '%</span>' : '') + '</div>' +
-            '<div style="display:flex;gap:4px;">' +
-            '<button class="btn btn-sm" style="background:transparent;color:#3b82f6;border:1px solid #bfdbfe;padding:2px 8px;font-size:11px;" ' +
-            'onclick="getAIGuidance(' + idx + ',\'' + esc(fieldName) + '\')" title="Refresh">\uD83D\uDD04 Refresh</button>' +
-            '<button class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid #e2e8f0;padding:2px 8px;font-size:11px;" ' +
-            'onclick="document.getElementById(\'ai-guidance-' + idx + '\').style.display=\'none\';" title="Close">\u2716</button>' +
+        el.innerHTML = '<div class="bg-blue-50 p-3 rounded-lg mt-2 text-sm border-l-[3px] border-blue-500 relative">' +
+            '<div class="flex justify-between items-center">' +
+            '<div class="flex items-center gap-2"><span class="font-semibold text-blue-800">' + icon('sparkles', 14, 'text-blue-600') + ' AI Guidance</span>' +
+            (res.quality_score != null ? ' <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">Quality: ' + res.quality_score + '%</span>' : '') + '</div>' +
+            '<div class="flex gap-1">' +
+            '<button class="px-2 py-0.5 text-[11px] text-blue-600 border border-blue-200 rounded hover:bg-blue-100 transition-colors inline-flex items-center gap-1" ' +
+            'onclick="getAIGuidance(' + idx + ',\'' + esc(fieldName) + '\')" title="Refresh">' + icon('refresh-cw', 12) + ' Refresh</button>' +
+            '<button class="px-2 py-0.5 text-[11px] text-slate-400 border border-slate-200 rounded hover:bg-slate-100 transition-colors" ' +
+            'onclick="document.getElementById(\'ai-guidance-' + idx + '\').style.display=\'none\';" title="Close">' + icon('x', 12) + '</button>' +
             '</div></div>' +
-            '<div style="margin-top:8px;color:#475569;">' + renderMarkdown(res.guidance || res.response || 'No guidance available.') + '</div>' +
+            '<div class="mt-2 text-slate-600">' + renderMarkdown(res.guidance || res.response || 'No guidance available.') + '</div>' +
             '</div>';
     } else {
-        el.innerHTML = '<div style="background:#fef2f2;padding:12px;border-radius:6px;margin-top:8px;font-size:13px;color:#991b1b;position:relative;">' +
-            '<button class="btn btn-sm" style="position:absolute;top:8px;right:8px;background:transparent;color:#991b1b;border:none;font-size:14px;cursor:pointer;" ' +
-            'onclick="document.getElementById(\'ai-guidance-' + idx + '\').style.display=\'none\';">\u2716</button>' +
+        el.innerHTML = '<div class="bg-red-50 p-3 rounded-lg mt-2 text-sm text-red-800 relative">' +
+            '<button class="absolute top-2 right-2 text-red-400 hover:text-red-600 transition-colors" ' +
+            'onclick="document.getElementById(\'ai-guidance-' + idx + '\').style.display=\'none\';">' + icon('x', 14) + '</button>' +
             'Unable to get AI guidance. Please try again.</div>';
     }
 }
@@ -2393,49 +2496,49 @@ async function _getAIGuidanceImpl(idx, fieldName) {
 function renderApplyDocuments(g) {
     var docs = g.doc_requirements || [];
     if (!docs.length) {
-        return '<div class="card"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">' + T('apply.upload_documents') + '</h3>' +
-            '<p style="color:#64748b;">No documents required for this application.</p>' +
-            '</div></div>';
+        return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+            '<h3 class="text-base font-semibold text-slate-900 mb-3">' + T('apply.upload_documents') + '</h3>' +
+            '<p class="text-sm text-slate-500">No documents required for this application.</p>' +
+            '</div>';
     }
-    var docIcons = { financial_report: '\uD83D\uDCCA', registration: '\uD83D\uDCDC', audit: '\uD83D\uDD0D', psea: '\uD83D\uDEE1\uFE0F', project_report: '\uD83D\uDCC4', budget: '\uD83D\uDCB5', cv: '\uD83D\uDC64', strategic_plan: '\uD83D\uDCCB' };
-    return '<h3 style="font-weight:600;margin-bottom:16px;">' + T('apply.upload_documents') + '</h3>' +
+    var docIconMap = { financial_report: 'bar-chart-3', registration: 'scroll-text', audit: 'search', psea: 'shield', project_report: 'file-text', budget: 'banknote', cv: 'user', strategic_plan: 'clipboard-list' };
+    return '<h3 class="text-base font-semibold text-slate-900 mb-4">' + T('apply.upload_documents') + '</h3>' +
         docs.map(function(d, i) {
             var key = d.type || ('doc_' + i);
             var uploaded = S.uploadedDocs[key];
-            var icon = docIcons[d.type] || '\uD83D\uDCC4';
-            return '<div class="card" style="margin-bottom:16px;"><div class="card-body">' +
-                '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">' +
-                '<span style="font-size:24px;">' + icon + '</span>' +
-                '<div>' +
-                '<h4 style="font-weight:600;">' + esc(d.name || d.type || 'Document') + '</h4>' +
-                '<p style="font-size:13px;color:#64748b;">' + esc(d.description || d.requirements || '') + '</p>' +
+            var docIcon = docIconMap[d.type] || 'file-text';
+            return '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-4">' +
+                '<div class="flex items-center gap-3 mb-3">' +
+                '<div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">' + icon(docIcon, 20, 'text-slate-500') + '</div>' +
+                '<div class="flex-1 min-w-0">' +
+                '<h4 class="font-semibold text-slate-900">' + esc(d.name || d.type || 'Document') + '</h4>' +
+                '<p class="text-sm text-slate-500 truncate">' + esc(d.description || d.requirements || '') + '</p>' +
                 '</div>' +
-                (d.required !== false ? '<span class="badge badge-red">' + T('grant.create.required') + '</span>' : '<span class="badge badge-gray">' + T('grant.create.optional') + '</span>') +
+                (d.required !== false ? '<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-rose-50 text-rose-700 shrink-0">' + T('grant.create.required') + '</span>' : '<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600 shrink-0">' + T('grant.create.optional') + '</span>') +
                 '</div>' +
                 (uploaded ?
-                    '<div class="upload-file-item">' +
-                    '<span class="file-icon">\uD83D\uDCC4</span>' +
-                    '<div class="file-info">' +
-                    '<div class="file-name">' + esc(uploaded.filename || uploaded.name) + '</div>' +
-                    '<div class="file-size">' + esc(uploaded.size || '') + '</div>' +
+                    '<div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">' +
+                    '<div class="w-8 h-8 rounded bg-blue-50 flex items-center justify-center shrink-0">' + icon('file-text', 16, 'text-blue-500') + '</div>' +
+                    '<div class="flex-1 min-w-0">' +
+                    '<div class="text-sm font-medium text-slate-900 truncate">' + esc(uploaded.filename || uploaded.name) + '</div>' +
+                    '<div class="text-xs text-slate-400">' + esc(uploaded.size || '') + '</div>' +
                     '</div>' +
-                    '<span class="badge badge-green">\u2713 Uploaded</span>' +
+                    '<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700">' + icon('check', 12, 'inline') + ' Uploaded</span>' +
                     '</div>' +
                     (uploaded.ai_analysis ? renderAIAnalysis(uploaded.ai_analysis) : '') :
-                    '<div class="upload-zone" id="upload-zone-' + key + '" ' +
+                    '<div class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-500 hover:bg-brand-50/30 transition-colors cursor-pointer" id="upload-zone-' + key + '" ' +
                     'onclick="triggerUpload(\'' + key + '\')" ' +
-                    'ondragover="event.preventDefault();this.classList.add(\'dragover\');" ' +
-                    'ondragleave="this.classList.remove(\'dragover\');" ' +
-                    'ondrop="event.preventDefault();this.classList.remove(\'dragover\');handleDrop(event,\'' + key + '\');">' +
-                    '<div class="upload-icon">\uD83D\uDCCE</div>' +
-                    '<div class="upload-text">Drag & drop your file here or <strong>click to browse</strong></div>' +
-                    '<div style="font-size:12px;color:#94a3b8;margin-top:4px;">PDF, DOC, DOCX, XLS, XLSX (Max 10MB)</div>' +
+                    'ondragover="event.preventDefault();this.classList.add(\'border-brand-500\',\'bg-brand-50/30\');" ' +
+                    'ondragleave="this.classList.remove(\'border-brand-500\',\'bg-brand-50/30\');" ' +
+                    'ondrop="event.preventDefault();this.classList.remove(\'border-brand-500\',\'bg-brand-50/30\');handleDrop(event,\'' + key + '\');">' +
+                    '<div class="mb-2">' + icon('upload-cloud', 32, 'text-slate-400 mx-auto') + '</div>' +
+                    '<div class="text-sm text-slate-600">Drag & drop your file here or <strong class="text-brand-600">click to browse</strong></div>' +
+                    '<div class="text-xs text-slate-400 mt-1">PDF, DOC, DOCX, XLS, XLSX (Max 10MB)</div>' +
                     '</div>' +
-                    '<input type="file" id="file-input-' + key + '" style="display:none;" ' +
+                    '<input type="file" id="file-input-' + key + '" class="hidden" ' +
                     'accept=".pdf,.doc,.docx,.xls,.xlsx" onchange="handleFileSelect(event,\'' + key + '\')">'
                 ) +
-                '</div></div>';
+                '</div>';
         }).join('');
 }
 
@@ -2443,20 +2546,22 @@ function renderAIAnalysis(analysis) {
     if (!analysis) return '';
     var score = analysis.score || analysis.quality_score || 0;
     var cls = score >= 70 ? 'pass' : score >= 40 ? 'warning' : 'fail';
+    var bgCls = cls === 'pass' ? 'bg-emerald-50 border-emerald-200' : cls === 'warning' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200';
+    var scoreBadgeCls = cls === 'pass' ? 'bg-emerald-100 text-emerald-700' : cls === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700';
 
     // Per-requirement scores if available
     var reqScoresHTML = '';
     if (analysis.requirement_scores && analysis.requirement_scores.length > 0) {
-        reqScoresHTML = '<div style="margin-top:10px;border-top:1px solid rgba(0,0,0,0.1);padding-top:10px;">' +
-            '<strong style="font-size:13px;">Donor Requirement Compliance:</strong>' +
+        reqScoresHTML = '<div class="mt-3 border-t border-black/10 pt-3">' +
+            '<strong class="text-sm">Donor Requirement Compliance:</strong>' +
             analysis.requirement_scores.map(function(rs) {
                 var rScore = rs.score || 0;
-                var rCls = rScore >= 70 ? '#2d8f6f' : rScore >= 40 ? '#f59e0b' : '#ef4444';
-                var icon = rs.addressed ? '\u2705' : '\u274C';
-                return '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;padding:6px 8px;background:rgba(0,0,0,0.03);border-radius:6px;">' +
-                    '<span>' + icon + '</span>' +
-                    '<div style="flex:1;font-size:13px;">' + esc(rs.requirement || 'Requirement') + '</div>' +
-                    '<div style="min-width:48px;text-align:center;font-weight:600;color:' + rCls + ';font-size:13px;">' + rScore + '%</div>' +
+                var rCls = rScore >= 70 ? 'text-emerald-600' : rScore >= 40 ? 'text-amber-500' : 'text-rose-500';
+                var rIcon = rs.addressed ? icon('check-circle', 14, 'text-emerald-500') : icon('x-circle', 14, 'text-rose-500');
+                return '<div class="flex items-center gap-2 my-1.5 px-2 py-1.5 bg-black/[0.03] rounded-md">' +
+                    '<span>' + rIcon + '</span>' +
+                    '<div class="flex-1 text-sm">' + esc(rs.requirement || 'Requirement') + '</div>' +
+                    '<div class="min-w-[48px] text-center font-semibold ' + rCls + ' text-sm">' + rScore + '%</div>' +
                     '</div>';
             }).join('') +
             '</div>';
@@ -2465,37 +2570,37 @@ function renderAIAnalysis(analysis) {
     var findingsHTML = '';
     if (analysis.findings) {
         if (Array.isArray(analysis.findings)) {
-            findingsHTML = '<div style="margin-top:4px;"><strong>Findings:</strong>' +
-                analysis.findings.map(function(f) { return '<div style="font-size:13px;color:#475569;margin:2px 0;">\u2022 ' + esc(f) + '</div>'; }).join('') + '</div>';
+            findingsHTML = '<div class="mt-1"><strong class="text-sm">Findings:</strong>' +
+                analysis.findings.map(function(f) { return '<div class="text-sm text-slate-600 my-0.5">' + icon('chevron-right', 12, 'inline text-slate-400') + ' ' + esc(f) + '</div>'; }).join('') + '</div>';
         } else {
-            findingsHTML = '<div style="margin-top:4px;"><strong>Findings:</strong> ' + esc(analysis.findings) + '</div>';
+            findingsHTML = '<div class="mt-1"><strong class="text-sm">Findings:</strong> ' + esc(analysis.findings) + '</div>';
         }
     }
 
     var recsHTML = '';
     if (analysis.recommendations) {
         if (Array.isArray(analysis.recommendations)) {
-            recsHTML = '<div style="margin-top:4px;"><strong>Recommendations:</strong>' +
-                analysis.recommendations.map(function(r) { return '<div style="font-size:13px;color:#475569;margin:2px 0;">\u2022 ' + esc(r) + '</div>'; }).join('') + '</div>';
+            recsHTML = '<div class="mt-1"><strong class="text-sm">Recommendations:</strong>' +
+                analysis.recommendations.map(function(r) { return '<div class="text-sm text-slate-600 my-0.5">' + icon('chevron-right', 12, 'inline text-slate-400') + ' ' + esc(r) + '</div>'; }).join('') + '</div>';
         } else {
-            recsHTML = '<div style="margin-top:4px;"><strong>Recommendations:</strong> ' + esc(analysis.recommendations) + '</div>';
+            recsHTML = '<div class="mt-1"><strong class="text-sm">Recommendations:</strong> ' + esc(analysis.recommendations) + '</div>';
         }
     }
 
     var aiSource = analysis.source || 'ai';
     var transparencyBadge = aiSource === 'claude'
-        ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#7c3aed;background:#f5f3ff;padding:2px 8px;border-radius:10px;margin-left:8px;">\uD83E\uDD16 Claude AI</span>'
-        : '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#0369a1;background:#f0f9ff;padding:2px 8px;border-radius:10px;margin-left:8px;">\u2699\uFE0F Rule-based</span>';
+        ? '<span class="inline-flex items-center gap-1 text-[11px] text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full ml-2">' + icon('bot', 12) + ' Claude AI</span>'
+        : '<span class="inline-flex items-center gap-1 text-[11px] text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full ml-2">' + icon('settings', 12) + ' Rule-based</span>';
 
-    return '<div class="analysis-result ' + cls + '" style="margin-top:12px;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
-        '<div><strong>\u2728 AI Document Analysis</strong>' + transparencyBadge + '</div>' +
-        '<span class="badge badge-' + (cls === 'pass' ? 'green' : cls === 'warning' ? 'amber' : 'red') + '">' +
+    return '<div class="mt-3 p-4 rounded-lg border text-sm ' + bgCls + '">' +
+        '<div class="flex justify-between items-center mb-2">' +
+        '<div class="flex items-center"><strong class="flex items-center gap-1">' + icon('sparkles', 14, 'text-blue-500') + ' AI Document Analysis</strong>' + transparencyBadge + '</div>' +
+        '<span class="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full ' + scoreBadgeCls + '">' +
         'Score: ' + score + '%</span>' +
         '</div>' +
-        (analysis.summary ? '<div style="margin-top:4px;font-size:13px;color:#334155;">' + esc(analysis.summary) + '</div>' : '') +
+        (analysis.summary ? '<div class="mt-1 text-sm text-slate-700">' + esc(analysis.summary) + '</div>' : '') +
         findingsHTML + recsHTML + reqScoresHTML +
-        '<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.06);font-size:11px;color:#94a3b8;font-style:italic;">AI-generated analysis \u2014 verify important details against original documents.</div>' +
+        '<div class="mt-2 pt-2 border-t border-black/[0.06] text-[11px] text-slate-400 italic">AI-generated analysis \u2014 verify important details against original documents.</div>' +
         '</div>';
 }
 
@@ -2588,8 +2693,8 @@ async function uploadFile(file, key) {
                     '<div style="font-size:20px;margin-bottom:4px;">\u274C</div>' +
                     '<div style="font-size:14px;font-weight:600;color:#991b1b;">' + (T('upload.failed') || 'Upload failed') + '</div>' +
                     '<div style="font-size:12px;color:#b91c1c;margin-top:4px;">' + esc(errMsg) + '</div>' +
-                    '<button class="btn btn-sm" style="margin-top:8px;background:#fee2e2;border:1px solid #ef4444;color:#991b1b;" ' +
-                    'onclick="triggerUpload(\'' + key + '\')">\uD83D\uDD04 ' + (T('common.click_to_retry') || 'Retry upload') + '</button></div>';
+                    '<button class="mt-2 px-3 py-1.5 bg-rose-50 border border-rose-300 text-rose-700 text-xs font-medium rounded-lg hover:bg-rose-100 transition-colors" ' +
+                    'onclick="triggerUpload(\'' + key + '\')">' + icon('refresh-cw', 12, 'inline') + ' ' + (T('common.click_to_retry') || 'Retry upload') + '</button></div>';
             }
         }
     } catch (uploadErr) {
@@ -2615,49 +2720,49 @@ function renderApplyReview(g) {
     // Use shared validation function (Issue #7a fix)
     var missingItems = getApplyMissingItems(g);
 
-    return '<div class="card" style="margin-bottom:16px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('apply.review_submit') + '</h3>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-4">' +
+        '<h3 class="text-base font-semibold text-slate-900 mb-4">' + T('apply.review_submit') + '</h3>' +
 
-        (missingItems.length ? '<div style="background:#fef3c7;padding:16px;border-radius:8px;margin-bottom:16px;border-left:4px solid #f59e0b;">' +
-            '<strong style="color:#92400e;">\u26A0\uFE0F Missing Items (' + missingItems.length + ')</strong>' +
-            '<ul style="margin-top:8px;list-style:disc;padding-left:20px;">' +
-            missingItems.map(function(m) { return '<li style="color:#92400e;font-size:13px;">' + esc(m) + '</li>'; }).join('') +
-            '</ul></div>' : '<div style="background:#dcfce7;padding:16px;border-radius:8px;margin-bottom:16px;border-left:4px solid #10b981;">' +
-            '<strong style="color:#166534;">\u2705 All requirements met! Your application is ready to submit.</strong></div>') +
+        (missingItems.length ? '<div class="bg-amber-50 p-4 rounded-lg mb-4 border-l-4 border-amber-400">' +
+            '<strong class="text-amber-800 flex items-center gap-1.5">' + icon('alert-triangle', 16, 'text-amber-500') + ' Missing Items (' + missingItems.length + ')</strong>' +
+            '<ul class="mt-2 list-disc pl-5">' +
+            missingItems.map(function(m) { return '<li class="text-amber-800 text-sm">' + esc(m) + '</li>'; }).join('') +
+            '</ul></div>' : '<div class="bg-emerald-50 p-4 rounded-lg mb-4 border-l-4 border-emerald-400">' +
+            '<strong class="text-emerald-800 flex items-center gap-1.5">' + icon('check-circle', 16, 'text-emerald-500') + ' All requirements met! Your application is ready to submit.</strong></div>') +
 
         // Eligibility Summary
-        '<h4 style="font-weight:600;margin:16px 0 8px;">' + T('application.eligibility_responses') + '</h4>' +
+        '<h4 class="font-semibold text-slate-900 mt-4 mb-2">' + T('application.eligibility_responses') + '</h4>' +
         eligReqs.map(function(r, i) {
             var checked = S.applyEligibility['elig_' + i];
-            return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;">' +
-                (checked ? '\u2705' : '\u274C') +
-                '<span>' + esc(r.category || r.name || 'Requirement ' + (i + 1)) + '</span></div>';
+            return '<div class="flex items-center gap-2 py-1.5 text-sm">' +
+                (checked ? icon('check-circle', 16, 'text-emerald-500') : icon('x-circle', 16, 'text-rose-500')) +
+                '<span class="text-slate-700">' + esc(r.category || r.name || 'Requirement ' + (i + 1)) + '</span></div>';
         }).join('') +
 
         // Criteria Responses Summary
-        '<h4 style="font-weight:600;margin:16px 0 8px;">' + T('application.proposal_responses') + '</h4>' +
+        '<h4 class="font-semibold text-slate-900 mt-4 mb-2">' + T('application.proposal_responses') + '</h4>' +
         criteria.map(function(c, i) {
             var text = S.applyResponses['criterion_' + i] || '';
             var wc = wordCount(text);
-            return '<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;">' +
-                '<div style="font-weight:500;font-size:14px;">' + esc(c.label || c.name) + '</div>' +
-                '<div style="font-size:12px;color:#64748b;">' + wc + ' words</div>' +
+            return '<div class="py-2 border-b border-slate-100">' +
+                '<div class="font-medium text-sm text-slate-900">' + esc(c.label || c.name) + '</div>' +
+                '<div class="text-xs text-slate-500">' + wc + ' words</div>' +
                 '</div>';
         }).join('') +
 
         // Documents Summary
-        '<h4 style="font-weight:600;margin:16px 0 8px;">' + T('application.uploaded_documents') + '</h4>' +
+        '<h4 class="font-semibold text-slate-900 mt-4 mb-2">' + T('application.uploaded_documents') + '</h4>' +
         docs.map(function(d, i) {
             var key = d.type || ('doc_' + i);
             var uploaded = S.uploadedDocs[key];
-            return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;">' +
-                (uploaded ? '\u2705' : '\u274C') +
-                '<span>' + esc(d.name || d.type) + '</span>' +
-                (uploaded ? ' <span style="color:#94a3b8;">(' + esc(uploaded.filename || uploaded.name) + ')</span>' : '') +
+            return '<div class="flex items-center gap-2 py-1.5 text-sm">' +
+                (uploaded ? icon('check-circle', 16, 'text-emerald-500') : icon('x-circle', 16, 'text-rose-500')) +
+                '<span class="text-slate-700">' + esc(d.name || d.type) + '</span>' +
+                (uploaded ? ' <span class="text-slate-400">(' + esc(uploaded.filename || uploaded.name) + ')</span>' : '') +
                 '</div>';
         }).join('') +
 
-        '</div></div>';
+        '</div>';
 }
 
 /**
@@ -2845,9 +2950,7 @@ function highlightMissingCriteria(grant, missingLabels) {
 
 function renderMyApplications() {
     loadApplications();
-    return '<div class="page-header">' +
-        '<h1>\uD83D\uDCCB ' + T('application.my_applications') + '</h1>' +
-        '</div>' +
+    return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('clipboard-list', 24, 'text-brand-600') + ' ' + T('application.my_applications') + '</h1></div>' +
         '<div id="my-applications-list">' + renderLoadingTable() + '</div>';
 }
 
@@ -2896,41 +2999,37 @@ function renderApplicationDetail() {
 
     var backPage = role === 'ngo' ? 'applications' : (role === 'donor' ? 'rankings' : 'assignments');
 
-    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'' + backPage + '\')" style="margin-bottom:16px;">\u2190 ' + T('common.back') + '</button>' +
+    return '<button class="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 mb-4 transition-colors" onclick="nav(\'' + backPage + '\')">' + icon('arrow-left', 16) + ' ' + T('common.back') + '</button>' +
 
-        '<div class="card" style="margin-bottom:24px;">' +
-        '<div class="card-body">' +
-        '<div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:16px;">' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-6">' +
+        '<div class="flex justify-between items-start flex-wrap gap-4">' +
         '<div>' +
-        '<h1 style="font-size:22px;font-weight:700;">' + esc(a.grant_title || a.grant_name || 'Application') + '</h1>' +
-        '<p style="color:#64748b;margin-top:4px;">' + esc(a.org_name || a.applicant_name || '') + '</p>' +
+        '<h1 class="text-xl font-bold text-slate-900">' + esc(a.grant_title || a.grant_name || 'Application') + '</h1>' +
+        '<p class="text-slate-500 mt-1 text-sm">' + esc(a.org_name || a.applicant_name || '') + '</p>' +
         '</div>' +
-        '<div style="display:flex;align-items:center;gap:16px;">' +
+        '<div class="flex items-center gap-4">' +
         statusBadge(a.status) +
         '</div>' +
         '</div>' +
-        '<div style="display:flex;gap:24px;margin-top:16px;">' +
-        '<div style="text-align:center;">' +
+        '<div class="flex gap-6 mt-4">' +
+        '<div class="text-center">' +
         scoreRingHTML(a.ai_score || 0, 64, 'AI') +
         '</div>' +
-        '<div style="text-align:center;">' +
+        '<div class="text-center">' +
         scoreRingHTML(a.human_score || 0, 64, 'Human') +
         '</div>' +
-        '<div style="text-align:center;">' +
+        '<div class="text-center">' +
         scoreRingHTML(a.final_score || 0, 64, 'Final') +
-        '</div>' +
         '</div>' +
         '</div>' +
         '</div>' +
 
         // Tabs
-        '<div style="display:flex;gap:4px;margin-bottom:24px;border-bottom:2px solid #e2e8f0;">' +
+        '<div class="flex gap-1 mb-6 border-b-2 border-slate-200">' +
         tabs.map(function(t) {
             var active = tab === t.key;
-            return '<button class="btn btn-sm" style="border:none;border-bottom:2px solid ' +
-                (active ? '#2d8f6f' : 'transparent') + ';border-radius:0;color:' +
-                (active ? '#2d8f6f' : '#64748b') + ';font-weight:' +
-                (active ? '600' : '400') + ';padding:8px 16px;margin-bottom:-2px;" ' +
+            return '<button class="px-4 py-2 text-sm border-b-2 -mb-[2px] transition-colors ' +
+                (active ? 'border-brand-600 text-brand-600 font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700') + '" ' +
                 'onclick="S.appDetailTab=\'' + t.key + '\';render();">' + esc(t.label) + '</button>';
         }).join('') +
         '</div>' +
@@ -2938,85 +3037,85 @@ function renderApplicationDetail() {
         tabContent +
 
         (role === 'donor' || role === 'reviewer' ?
-            '<div style="margin-top:24px;">' +
-            '<button class="btn btn-primary" onclick="nav(\'scoreapp\',{selectedApplication:' +
-            'S.selectedApplication})">' + T('review.submit_review') + '</button></div>' : '');
+            '<div class="mt-6">' +
+            '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="nav(\'scoreapp\',{selectedApplication:' +
+            'S.selectedApplication})">' + icon('send', 16) + ' ' + T('review.submit_review') + '</button></div>' : '');
 }
 
 function renderAppResponses(a) {
     var responses = a.responses || {};
     var keys = Object.keys(responses);
-    if (!keys.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No responses submitted.</p></div></div>';
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('application.application_responses') + '</h3>' +
+    if (!keys.length) return '<div class="bg-white rounded-xl border border-slate-200/60 p-5"><p class="text-sm text-slate-400">No responses submitted.</p></div>';
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-4">' + T('application.application_responses') + '</h3>' +
         keys.map(function(k) {
             var label = k.replace(/_/g, ' ').replace(/criterion /i, 'Criterion ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
-            return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f1f5f9;">' +
-                '<h4 style="font-weight:600;font-size:14px;margin-bottom:4px;">' + esc(label) + '</h4>' +
-                '<p style="color:#475569;font-size:14px;white-space:pre-wrap;">' + esc(responses[k]) + '</p>' +
+            return '<div class="mb-4 pb-4 border-b border-slate-100">' +
+                '<h4 class="font-semibold text-sm text-slate-900 mb-1">' + esc(label) + '</h4>' +
+                '<p class="text-sm text-slate-600 whitespace-pre-wrap">' + esc(responses[k]) + '</p>' +
                 '</div>';
         }).join('') +
-        '</div></div>';
+        '</div>';
 }
 
 function renderAppDocuments(a) {
     var docs = a.documents || [];
-    if (!docs.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No documents uploaded.</p></div></div>';
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('application.uploaded_documents') + '</h3>' +
+    if (!docs.length) return '<div class="bg-white rounded-xl border border-slate-200/60 p-5"><p class="text-sm text-slate-400">No documents uploaded.</p></div>';
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-4">' + T('application.uploaded_documents') + '</h3>' +
         docs.map(function(d) {
-            return '<div class="upload-file-item" style="margin-bottom:8px;">' +
-                '<span class="file-icon">\uD83D\uDCC4</span>' +
-                '<div class="file-info">' +
-                '<div class="file-name">' + esc(d.filename || d.name || 'Document') + '</div>' +
-                '<div class="file-size">' + esc(d.type || '') + '</div>' +
+            return '<div class="flex items-center gap-3 mb-2 p-2 rounded-lg hover:bg-slate-50 transition-colors">' +
+                '<span class="text-slate-400">' + icon('file-text', 18) + '</span>' +
+                '<div class="flex-1 min-w-0">' +
+                '<div class="text-sm font-medium text-slate-900 truncate">' + esc(d.filename || d.name || 'Document') + '</div>' +
+                '<div class="text-xs text-slate-400">' + esc(d.type || '') + '</div>' +
                 '</div>' +
-                (d.ai_analysis ? '<span class="badge badge-' + (d.ai_analysis.score >= 70 ? 'green' : 'amber') + '">' +
-                    'AI: ' + d.ai_analysis.score + '%</span>' : '') +
+                (d.ai_analysis ? statusBadge('AI: ' + d.ai_analysis.score + '%', d.ai_analysis.score >= 70 ? 'green' : 'amber') : '') +
                 '</div>' +
                 (d.ai_analysis ? renderAIAnalysis(d.ai_analysis) : '');
         }).join('') +
-        '</div></div>';
+        '</div>';
 }
 
 function renderAppScores(a) {
     var scores = a.scores || a.criteria_scores || {};
     var keys = Object.keys(scores);
-    if (!keys.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No scores available yet.</p></div></div>';
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('application.scoring_breakdown') + '</h3>' +
+    if (!keys.length) return '<div class="bg-white rounded-xl border border-slate-200/60 p-5"><p class="text-sm text-slate-400">No scores available yet.</p></div>';
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-4">' + T('application.scoring_breakdown') + '</h3>' +
         keys.map(function(k) {
             var s = scores[k];
             var val = typeof s === 'object' ? (s.score || 0) : s;
-            return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #f1f5f9;">' +
-                '<div style="flex:1;font-weight:500;">' + esc(k.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); })) + '</div>' +
-                '<div style="width:200px;">' +
-                '<div class="progress"><div class="progress-bar ' + scoreColor(val) + '" style="width:' + val + '%"></div></div>' +
+            var barColor = val >= 70 ? 'bg-emerald-500' : val >= 50 ? 'bg-amber-500' : 'bg-rose-500';
+            return '<div class="flex items-center gap-3 py-2 border-b border-slate-100">' +
+                '<div class="flex-1 font-medium text-sm text-slate-700">' + esc(k.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); })) + '</div>' +
+                '<div class="w-48">' +
+                '<div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full rounded-full ' + barColor + '" style="width:' + val + '%"></div></div>' +
                 '</div>' +
-                '<span style="font-weight:600;width:40px;text-align:right;">' + val + '%</span>' +
+                '<span class="font-semibold text-sm text-slate-900 w-10 text-right">' + val + '%</span>' +
                 '</div>';
         }).join('') +
-        '</div></div>';
+        '</div>';
 }
 
 function renderAppReviews(a) {
     var reviews = a.reviews || [];
-    if (!reviews.length) return '<div class="card"><div class="card-body"><p style="color:#94a3b8;">No reviews completed yet.</p></div></div>';
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('application.reviews') + '</h3>' +
+    if (!reviews.length) return '<div class="bg-white rounded-xl border border-slate-200/60 p-5"><p class="text-sm text-slate-400">No reviews completed yet.</p></div>';
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-4">' + T('application.reviews') + '</h3>' +
         reviews.map(function(r) {
-            return '<div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:12px;">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+            return '<div class="p-4 border border-slate-200 rounded-lg mb-3">' +
+                '<div class="flex justify-between items-center">' +
                 '<div>' +
-                '<div style="font-weight:600;">' + esc(r.reviewer_name || 'Reviewer') + '</div>' +
-                '<div style="font-size:12px;color:#94a3b8;">' + formatDate(r.completed_at || r.created_at) + '</div>' +
+                '<div class="font-semibold text-sm text-slate-900">' + esc(r.reviewer_name || 'Reviewer') + '</div>' +
+                '<div class="text-xs text-slate-400">' + formatDate(r.completed_at || r.created_at) + '</div>' +
                 '</div>' +
-                '<div style="font-size:24px;font-weight:700;color:#2d8f6f;">' + (r.score || 0) + '%</div>' +
+                '<div class="text-2xl font-bold text-brand-600">' + (r.score || 0) + '%</div>' +
                 '</div>' +
-                (r.comments ? '<p style="margin-top:8px;color:#475569;font-size:13px;">' + esc(r.comments) + '</p>' : '') +
+                (r.comments ? '<p class="mt-2 text-slate-600 text-sm">' + esc(r.comments) + '</p>' : '') +
                 '</div>';
         }).join('') +
-        '</div></div>';
+        '</div>';
 }
 
 // =============================================================================
@@ -3049,32 +3148,33 @@ function renderCreateGrant() {
     // Persisted-state indicator
     var draftIndicator = '';
     if (S.createData._draftSaving) {
-        draftIndicator = '<span data-draft-state="saving" style="font-size:12px;color:#6366f1;margin-left:12px;"><span class="spinner" style="width:12px;height:12px;border:2px solid #e0e7ff;border-top-color:#6366f1;border-radius:50%;animation:spin 0.6s linear infinite;display:inline-block;vertical-align:middle;margin-right:4px;"></span>Saving\u2026</span>';
+        draftIndicator = '<span data-draft-state="saving" class="text-xs text-indigo-500 ml-3"><span class="w-3 h-3 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin inline-block align-middle mr-1"></span>Saving\u2026</span>';
     } else if (S.createData._lastSavedAt) {
-        draftIndicator = '<span data-draft-state="saved" data-draft-save-success="' + (S.createData._draftSaveSuccess ? 'true' : 'false') + '" data-saved-time="' + (S.createData._lastSavedIso || '') + '" style="font-size:12px;color:#15803d;margin-left:12px;">\u2705 Saved at ' + esc(S.createData._lastSavedAt) + '</span>';
+        draftIndicator = '<span data-draft-state="saved" data-draft-save-success="' + (S.createData._draftSaveSuccess ? 'true' : 'false') + '" data-saved-time="' + (S.createData._lastSavedIso || '') + '" class="text-xs text-emerald-700 ml-3">' + icon('check-circle', 12, 'inline text-emerald-500') + ' Saved at ' + esc(S.createData._lastSavedAt) + '</span>';
     } else if (S.createData.id) {
-        draftIndicator = '<span data-draft-state="persisted" style="font-size:12px;color:#64748b;margin-left:12px;">\uD83D\uDCBE Draft (ID: ' + S.createData.id + ')</span>';
+        draftIndicator = '<span data-draft-state="persisted" class="text-xs text-slate-500 ml-3">' + icon('hard-drive', 12, 'inline text-slate-400') + ' Draft (ID: ' + S.createData.id + ')</span>';
     }
 
-    return '<div class="page-header"><h1>' + (S.createData.id ? '\u270F\uFE0F ' + T('common.edit') : '\u2795 ' + T('grant.create.title')) + draftIndicator + '</h1></div>' +
+    return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + (S.createData.id ? icon('pencil', 24) + ' ' + T('common.edit') : icon('plus-circle', 24) + ' ' + T('grant.create.title')) + draftIndicator + '</h1></div>' +
 
         renderWizardSteps(steps, Math.min(step, 5)) +
 
-        '<div class="wizard-content">' + stepContent + '</div>' +
+        '<div class="mb-6">' + stepContent + '</div>' +
 
-        '<div class="wizard-actions">' +
-        (S._extractingReqs ? '<div data-upload-active="true" style="color:#6366f1;font-size:13px;font-weight:500;">' +
+        '<div class="flex items-center justify-between pt-4 border-t border-slate-200/60">' +
+        (S._extractingReqs ? '<div data-upload-active="true" class="text-sm text-indigo-500 font-medium flex items-center gap-2">' +
+            '<span class="w-3.5 h-3.5 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin inline-block"></span>' +
             (S._uploadPhase === 'saving_draft' ? T('grant.create.saving_draft') || 'Saving draft…' :
              S._uploadPhase === 'uploading' ? T('grant.create.uploading_doc') || 'Uploading…' :
              T('grant.create.ai_analyzing') || 'AI analyzing document…') + ' ' + T('common.please_wait') + '</div>' :
-        (step > 1 ? '<button class="btn btn-secondary" onclick="S.createStep--;render();">\u2190 ' + T('common.previous') + '</button>' : '<div></div>')) +
-        '<div style="display:flex;gap:8px;">' +
+        (step > 1 ? '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="S.createStep--;render();">' + icon('arrow-left', 16) + ' ' + T('common.previous') + '</button>' : '<div></div>')) +
+        '<div class="flex items-center gap-2">' +
         (S._extractingReqs ? '' :
         (step === 6 ?
-            '<button class="btn btn-secondary" onclick="saveGrantDraft()">' + T('grant.create.save_draft') + '</button>' +
-            '<button class="btn btn-primary btn-lg" onclick="publishGrant()">\uD83D\uDE80 ' + T('grant.create.publish') + '</button>' :
-            '<button class="btn btn-outline" style="font-size:13px;" onclick="saveGrantDraft()">' + T('grant.create.save_draft') + '</button>' +
-            '<button class="btn btn-primary" onclick="' + (step === 5 ? 'S.createStep=6;render();' : 'S.createStep++;render();') + '">' + T('common.next') + ' \u2192</button>')) +
+            '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="saveGrantDraft()">' + icon('save', 16) + ' ' + T('grant.create.save_draft') + '</button>' +
+            '<button class="px-5 py-2.5 bg-brand-600 text-white text-sm font-semibold rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2 shadow-sm" onclick="publishGrant()">' + icon('rocket', 16) + ' ' + T('grant.create.publish') + '</button>' :
+            '<button class="px-3 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="saveGrantDraft()">' + icon('save', 16) + ' ' + T('grant.create.save_draft') + '</button>' +
+            '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="' + (step === 5 ? 'S.createStep=6;render();' : 'S.createStep++;render();') + '">' + T('common.next') + ' ' + icon('arrow-right', 16) + '</button>')) +
         '</div>' +
         '</div>';
 }
@@ -3085,55 +3185,55 @@ function renderCreateBasicInfo() {
     var countries = ['Somalia', 'Kenya', 'Ethiopia', 'Uganda', 'South Sudan', 'Global'];
     var currencies = ['USD', 'EUR', 'GBP', 'KES', 'CHF'];
 
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('grant.create.step1') + '</h3>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.grant_title') + ' <span class="required">*</span></label>' +
-        '<input type="text" class="form-control" placeholder="' + T('grant.create.grant_title_placeholder') + '" ' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="text-base font-semibold text-slate-900 mb-4">' + T('grant.create.step1') + '</h3>' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.grant_title') + ' <span class="text-rose-500">*</span></label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" placeholder="' + T('grant.create.grant_title_placeholder') + '" ' +
         'value="' + esc(d.title) + '" oninput="S.createData.title=this.value;">' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.description') + ' <span class="required">*</span></label>' +
-        '<textarea class="form-control" rows="5" placeholder="' + T('grant.create.description_placeholder') + '" ' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.description') + ' <span class="text-rose-500">*</span></label>' +
+        '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="5" placeholder="' + T('grant.create.description_placeholder') + '" ' +
         'oninput="S.createData.description=this.value;">' + esc(d.description) + '</textarea>' +
         '</div>' +
-        '<div class="form-row">' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.total_funding') + ' <span class="required">*</span></label>' +
-        '<input type="number" class="form-control" placeholder="500000" ' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">' +
+        '<div>' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.total_funding') + ' <span class="text-rose-500">*</span></label>' +
+        '<input type="number" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" placeholder="500000" ' +
         'value="' + esc(d.total_funding) + '" oninput="S.createData.total_funding=this.value;">' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.currency') + '</label>' +
-        '<select class="form-control" onchange="S.createData.currency=this.value;">' +
+        '<div>' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.currency') + '</label>' +
+        '<select class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" onchange="S.createData.currency=this.value;">' +
         currencies.map(function(c) { return '<option value="' + c + '"' + (d.currency === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
         '</select>' +
         '</div>' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.deadline') + ' <span class="required">*</span></label>' +
-        '<input type="date" class="form-control" min="' + todayStr() + '" ' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.deadline') + ' <span class="text-rose-500">*</span></label>' +
+        '<input type="date" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" min="' + todayStr() + '" ' +
         'value="' + esc(d.deadline) + '" oninput="S.createData.deadline=this.value;">' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.sectors') + '</label>' +
-        '<div style="display:flex;flex-wrap:wrap;gap:8px;">' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.sectors') + '</label>' +
+        '<div class="flex flex-wrap gap-2">' +
         sectors.map(function(s) {
             var active = d.sectors.indexOf(s) >= 0;
-            return '<button class="btn btn-sm ' + (active ? 'btn-primary' : 'btn-secondary') + '" ' +
+            return '<button class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5 ' + (active ? 'bg-brand-600 text-white hover:bg-brand-700' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50') + '" ' +
                 'onclick="toggleCreateTag(\'sectors\',\'' + s + '\')">' + sectorIcon(s) + ' ' + s + '</button>';
         }).join('') +
         '</div></div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.countries') + '</label>' +
-        '<div style="display:flex;flex-wrap:wrap;gap:8px;">' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.countries') + '</label>' +
+        '<div class="flex flex-wrap gap-2">' +
         countries.map(function(c) {
             var active = d.countries.indexOf(c) >= 0;
-            return '<button class="btn btn-sm ' + (active ? 'btn-primary' : 'btn-secondary') + '" ' +
-                'onclick="toggleCreateTag(\'countries\',\'' + c + '\')">\uD83C\uDF10 ' + c + '</button>';
+            return '<button class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5 ' + (active ? 'bg-brand-600 text-white hover:bg-brand-700' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50') + '" ' +
+                'onclick="toggleCreateTag(\'countries\',\'' + c + '\')">' + icon('globe', 14) + ' ' + c + '</button>';
         }).join('') +
         '</div></div>' +
-        '</div></div>';
+        '</div>';
 }
 
 function toggleCreateTag(field, value) {
@@ -3145,70 +3245,71 @@ function toggleCreateTag(field, value) {
 }
 
 function renderCreateEligibility() {
+    var catIcons = { geographic: 'globe', org_type: 'building-2', experience: 'calendar', budget: 'banknote', sector: 'target', registration: 'scroll-text' };
     var categories = [
-        { key: 'geographic', label: 'Geographic Location', icon: '\uD83C\uDF10', desc: 'Require applicants to operate in specific regions' },
-        { key: 'org_type', label: 'Organization Type', icon: '\uD83C\uDFE2', desc: 'Specify required organization types (NGO, CBO, etc.)' },
-        { key: 'experience', label: 'Years of Experience', icon: '\uD83D\uDCC5', desc: 'Minimum years of operational experience' },
-        { key: 'budget', label: 'Budget Range', icon: '\uD83D\uDCB5', desc: 'Annual budget requirements' },
-        { key: 'sector', label: 'Sector Focus', icon: '\uD83C\uDFAF', desc: 'Required sector expertise' },
-        { key: 'registration', label: 'Legal Registration', icon: '\uD83D\uDCDC', desc: 'Registration and legal status requirements' }
+        { key: 'geographic', label: 'Geographic Location', desc: 'Require applicants to operate in specific regions' },
+        { key: 'org_type', label: 'Organization Type', desc: 'Specify required organization types (NGO, CBO, etc.)' },
+        { key: 'experience', label: 'Years of Experience', desc: 'Minimum years of operational experience' },
+        { key: 'budget', label: 'Budget Range', desc: 'Annual budget requirements' },
+        { key: 'sector', label: 'Sector Focus', desc: 'Required sector expertise' },
+        { key: 'registration', label: 'Legal Registration', desc: 'Registration and legal status requirements' }
     ];
 
     var currentElig = S.createData.eligibility || [];
 
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('grant.detail.eligibility') + '</h3>' +
-        '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Define who can apply for this grant.</p>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="text-base font-semibold text-slate-900 mb-1">' + T('grant.detail.eligibility') + '</h3>' +
+        '<p class="text-sm text-slate-500 mb-4">Define who can apply for this grant.</p>' +
 
         categories.map(function(cat) {
             var existing = currentElig.find(function(e) { return e.category === cat.key; });
             var enabled = !!existing;
-            return '<div class="eligibility-section">' +
-                '<div class="eligibility-section-header" onclick="toggleEligibility(\'' + cat.key + '\')">' +
-                '<div style="display:flex;align-items:center;gap:12px;">' +
-                '<span style="font-size:20px;">' + cat.icon + '</span>' +
-                '<div><h4>' + esc(cat.label) + '</h4>' +
-                '<p style="font-size:12px;color:#94a3b8;font-weight:400;">' + esc(cat.desc) + '</p></div>' +
+            return '<div class="border border-slate-200 rounded-lg mb-3 overflow-hidden">' +
+                '<div class="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors" onclick="toggleEligibility(\'' + cat.key + '\')">' +
+                '<div class="flex items-center gap-3">' +
+                '<div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center">' + icon(catIcons[cat.key] || 'circle', 18, 'text-slate-500') + '</div>' +
+                '<div><h4 class="text-sm font-semibold text-slate-900">' + esc(cat.label) + '</h4>' +
+                '<p class="text-xs text-slate-400 font-normal">' + esc(cat.desc) + '</p></div>' +
                 '</div>' +
                 '<div class="toggle-switch">' +
                 '<input type="checkbox" ' + (enabled ? 'checked' : '') + '>' +
                 '<span class="slider"></span>' +
                 '</div>' +
                 '</div>' +
-                (enabled ? '<div class="eligibility-section-body">' +
-                    '<div class="form-group">' +
-                    '<label class="form-label">Details / Parameters</label>' +
-                    '<input type="text" class="form-control" placeholder="Specify requirements..." ' +
+                (enabled ? '<div class="px-4 pb-4 pt-0 border-t border-slate-100">' +
+                    '<div class="mb-3 mt-3">' +
+                    '<label class="block text-xs font-medium text-slate-600 mb-1">Details / Parameters</label>' +
+                    '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" placeholder="Specify requirements..." ' +
                     'value="' + esc(existing.description || '') + '" ' +
                     'oninput="updateEligibility(\'' + cat.key + '\',\'description\',this.value);">' +
                     '</div>' +
-                    '<div class="form-row">' +
-                    '<div class="form-group">' +
-                    '<label class="form-label">Weight</label>' +
+                    '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
+                    '<div>' +
+                    '<label class="block text-xs font-medium text-slate-600 mb-1">Weight</label>' +
                     '<input type="range" min="0" max="100" value="' + (existing.weight || 50) + '" ' +
-                    'style="width:100%;" ' +
+                    'class="w-full" ' +
                     'oninput="updateEligibility(\'' + cat.key + '\',\'weight\',this.value);this.nextElementSibling.textContent=this.value+\'%\';">' +
-                    '<span style="font-size:12px;color:#64748b;">' + (existing.weight || 50) + '%</span>' +
+                    '<span class="text-xs text-slate-500">' + (existing.weight || 50) + '%</span>' +
                     '</div>' +
-                    '<div class="form-group">' +
-                    '<label class="form-label">Required</label>' +
-                    '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:8px;">' +
-                    '<input type="checkbox" ' + (existing.required ? 'checked' : '') + ' ' +
+                    '<div>' +
+                    '<label class="block text-xs font-medium text-slate-600 mb-1">Required</label>' +
+                    '<label class="flex items-center gap-2 cursor-pointer mt-2">' +
+                    '<input type="checkbox" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500/20" ' + (existing.required ? 'checked' : '') + ' ' +
                     'onchange="updateEligibility(\'' + cat.key + '\',\'required\',this.checked);">' +
-                    '<span style="font-size:13px;">' + T('grant.create.must_meet_requirement') + '</span></label>' +
+                    '<span class="text-sm text-slate-700">' + T('grant.create.must_meet_requirement') + '</span></label>' +
                     '</div></div>' +
                     '</div>' : '') +
                 '</div>';
         }).join('') +
 
-        '<button class="btn btn-secondary btn-sm" style="margin-top:12px;" ' +
-        'onclick="addCustomEligibility()">\u2795 ' + T('grant.create.add_eligibility') + '</button>' +
+        '<button class="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5 mt-3" ' +
+        'onclick="addCustomEligibility()">' + icon('plus', 14) + ' ' + T('grant.create.add_eligibility') + '</button>' +
 
-        '<div style="background:#eff6ff;padding:12px;border-radius:6px;margin-top:16px;font-size:13px;border-left:3px solid #3b82f6;">' +
-        '\uD83D\uDCA1 <strong>AI Tip:</strong> Consider including geographic requirements to target specific communities, ' +
+        '<div class="bg-blue-50 p-3 rounded-lg mt-4 text-sm border-l-[3px] border-blue-500">' +
+        icon('lightbulb', 14, 'text-blue-600 inline') + ' <strong class="text-blue-800">AI Tip:</strong> Consider including geographic requirements to target specific communities, ' +
         'and experience requirements to ensure grantees have the capacity to deliver results.</div>' +
 
-        '</div></div>';
+        '</div>';
 }
 
 function toggleEligibility(key) {
@@ -3243,66 +3344,66 @@ function renderCreateCriteria() {
     var criteria = S.createData.criteria || [];
     var totalWeight = criteria.reduce(function(sum, c) { return sum + (Number(c.weight) || 0); }, 0);
 
-    return '<div class="card"><div class="card-body">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<div class="flex justify-between items-center mb-4">' +
         '<div>' +
-        '<h3 style="font-weight:600;">' + T('grant.detail.evaluation_criteria') + '</h3>' +
-        '<p style="font-size:13px;color:#64748b;">Define how applications will be evaluated.</p>' +
+        '<h3 class="text-base font-semibold text-slate-900">' + T('grant.detail.evaluation_criteria') + '</h3>' +
+        '<p class="text-sm text-slate-500">Define how applications will be evaluated.</p>' +
         '</div>' +
-        '<div style="text-align:right;">' +
-        '<div style="font-size:24px;font-weight:700;color:' + (totalWeight === 100 ? '#10b981' : '#ef4444') + ';">' + totalWeight + '%</div>' +
-        '<div style="font-size:12px;color:#64748b;">Total Weight' + (totalWeight !== 100 ? ' (must = 100%)' : ' \u2713') + '</div>' +
+        '<div class="text-right">' +
+        '<div class="text-2xl font-bold ' + (totalWeight === 100 ? 'text-emerald-500' : 'text-rose-500') + '">' + totalWeight + '%</div>' +
+        '<div class="text-xs text-slate-500">Total Weight' + (totalWeight !== 100 ? ' (must = 100%)' : ' ' + icon('check', 12, 'inline text-emerald-500')) + '</div>' +
         '</div>' +
         '</div>' +
 
         criteria.map(function(c, i) {
-            return '<div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:12px;position:relative;">' +
-                '<button style="position:absolute;top:8px;right:8px;background:none;border:none;color:#ef4444;cursor:pointer;font-size:18px;" ' +
-                'onclick="S.createData.criteria.splice(' + i + ',1);render();">\u00D7</button>' +
-                '<div class="form-row">' +
-                '<div class="form-group">' +
-                '<label class="form-label">Label <span class="required">*</span></label>' +
-                '<input type="text" class="form-control" value="' + esc(c.label || '') + '" placeholder="e.g., Technical Approach" ' +
+            return '<div class="p-4 border border-slate-200 rounded-lg mb-3 relative">' +
+                '<button class="absolute top-2 right-2 text-rose-400 hover:text-rose-600 transition-colors" ' +
+                'onclick="S.createData.criteria.splice(' + i + ',1);render();">' + icon('x', 18) + '</button>' +
+                '<div class="grid grid-cols-1 sm:grid-cols-[1fr_100px] gap-4 mb-3">' +
+                '<div>' +
+                '<label class="block text-xs font-medium text-slate-600 mb-1">Label <span class="text-rose-500">*</span></label>' +
+                '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + esc(c.label || '') + '" placeholder="e.g., Technical Approach" ' +
                 'oninput="S.createData.criteria[' + i + '].label=this.value;">' +
                 '</div>' +
-                '<div class="form-group" style="max-width:100px;">' +
-                '<label class="form-label">Weight %</label>' +
-                '<input type="number" class="form-control" value="' + (c.weight || '') + '" min="0" max="100" ' +
+                '<div>' +
+                '<label class="block text-xs font-medium text-slate-600 mb-1">Weight %</label>' +
+                '<input type="number" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + (c.weight || '') + '" min="0" max="100" ' +
                 'oninput="S.createData.criteria[' + i + '].weight=Number(this.value);">' +
                 '</div>' +
                 '</div>' +
-                '<div class="form-group">' +
-                '<label class="form-label">Description</label>' +
-                '<textarea class="form-control" rows="2" placeholder="What should applicants address?" ' +
+                '<div class="mb-3">' +
+                '<label class="block text-xs font-medium text-slate-600 mb-1">Description</label>' +
+                '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="2" placeholder="What should applicants address?" ' +
                 'oninput="S.createData.criteria[' + i + '].description=this.value;">' + esc(c.description || '') + '</textarea>' +
                 '</div>' +
-                '<div class="form-group">' +
-                '<label class="form-label">' + T('grant.create.instructions_for_applicants') + '</label>' +
-                '<textarea class="form-control" rows="2" placeholder="Guidance for writing a strong response..." ' +
+                '<div class="mb-3">' +
+                '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.instructions_for_applicants') + '</label>' +
+                '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="2" placeholder="Guidance for writing a strong response..." ' +
                 'oninput="S.createData.criteria[' + i + '].instructions=this.value;">' + esc(c.instructions || '') + '</textarea>' +
                 '</div>' +
-                '<div class="form-row">' +
-                '<div class="form-group">' +
-                '<label class="form-label">' + T('grant.create.example_response') + '</label>' +
-                '<textarea class="form-control" rows="2" placeholder="Provide a sample response..." ' +
+                '<div class="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-4">' +
+                '<div>' +
+                '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.example_response') + '</label>' +
+                '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="2" placeholder="Provide a sample response..." ' +
                 'oninput="S.createData.criteria[' + i + '].example=this.value;">' + esc(c.example || '') + '</textarea>' +
                 '</div>' +
-                '<div class="form-group" style="max-width:120px;">' +
-                '<label class="form-label">' + T('grant.create.max_words') + '</label>' +
-                '<input type="number" class="form-control" value="' + (c.max_words || 500) + '" min="50" ' +
+                '<div>' +
+                '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.max_words') + '</label>' +
+                '<input type="number" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + (c.max_words || 500) + '" min="50" ' +
                 'oninput="S.createData.criteria[' + i + '].max_words=Number(this.value);">' +
                 '</div>' +
                 '</div>' +
                 '</div>';
         }).join('') +
 
-        '<div style="display:flex;gap:8px;margin-top:12px;">' +
-        '<button class="btn btn-secondary" onclick="addCriterion()">\u2795 ' + T('grant.create.add_criterion') + '</button>' +
-        '<button class="btn btn-sm" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;" ' +
-        'onclick="suggestCriteria()">\u2728 AI Suggest Criteria</button>' +
+        '<div class="flex gap-2 mt-3">' +
+        '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="addCriterion()">' + icon('plus', 16) + ' ' + T('grant.create.add_criterion') + '</button>' +
+        '<button class="px-3 py-1.5 bg-blue-50 text-blue-600 text-xs font-medium rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors inline-flex items-center gap-1" ' +
+        'onclick="suggestCriteria()">' + icon('sparkles', 14) + ' AI Suggest Criteria</button>' +
         '</div>' +
 
-        '</div></div>';
+        '</div>';
 }
 
 function addCriterion() {
@@ -3329,69 +3430,70 @@ async function suggestCriteria() {
 }
 
 function renderCreateDocRequirements() {
+    var docIconMap = { financial_report: 'bar-chart-3', registration: 'scroll-text', audit: 'search', psea: 'shield', project_report: 'file-text', budget: 'banknote', cv: 'user', strategic_plan: 'clipboard-list' };
     var docTypes = [
-        { key: 'financial_report', label: 'Financial Report', icon: '\uD83D\uDCCA', desc: 'Annual financial statements' },
-        { key: 'registration', label: 'Registration Certificate', icon: '\uD83D\uDCDC', desc: 'Legal registration documents' },
-        { key: 'audit', label: 'Audit Report', icon: '\uD83D\uDD0D', desc: 'External audit report' },
-        { key: 'psea', label: 'PSEA Policy', icon: '\uD83D\uDEE1\uFE0F', desc: 'Protection policy document' },
-        { key: 'project_report', label: 'Project Report', icon: '\uD83D\uDCC4', desc: 'Previous project reports' },
-        { key: 'budget', label: 'Budget Detail', icon: '\uD83D\uDCB5', desc: 'Detailed project budget' },
-        { key: 'cv', label: 'Staff CVs', icon: '\uD83D\uDC64', desc: 'Key staff qualifications' },
-        { key: 'strategic_plan', label: 'Strategic Plan', icon: '\uD83D\uDCCB', desc: 'Organization strategic plan' }
+        { key: 'financial_report', label: 'Financial Report', desc: 'Annual financial statements' },
+        { key: 'registration', label: 'Registration Certificate', desc: 'Legal registration documents' },
+        { key: 'audit', label: 'Audit Report', desc: 'External audit report' },
+        { key: 'psea', label: 'PSEA Policy', desc: 'Protection policy document' },
+        { key: 'project_report', label: 'Project Report', desc: 'Previous project reports' },
+        { key: 'budget', label: 'Budget Detail', desc: 'Detailed project budget' },
+        { key: 'cv', label: 'Staff CVs', desc: 'Key staff qualifications' },
+        { key: 'strategic_plan', label: 'Strategic Plan', desc: 'Organization strategic plan' }
     ];
 
     var currentDocs = S.createData.doc_requirements || [];
 
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('grant.detail.doc_requirements') + '</h3>' +
-        '<p style="font-size:13px;color:#64748b;margin-bottom:16px;">Select which documents applicants must submit.</p>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="text-base font-semibold text-slate-900 mb-1">' + T('grant.detail.doc_requirements') + '</h3>' +
+        '<p class="text-sm text-slate-500 mb-4">Select which documents applicants must submit.</p>' +
 
         docTypes.map(function(dt) {
             var existing = currentDocs.find(function(d) { return d.type === dt.key; });
             var enabled = !!existing;
-            return '<div class="eligibility-section">' +
-                '<div class="eligibility-section-header" onclick="toggleDocRequirement(\'' + dt.key + '\',\'' + esc(dt.label) + '\')">' +
-                '<div style="display:flex;align-items:center;gap:12px;">' +
-                '<span style="font-size:20px;">' + dt.icon + '</span>' +
-                '<div><h4>' + esc(dt.label) + '</h4>' +
-                '<p style="font-size:12px;color:#94a3b8;font-weight:400;">' + esc(dt.desc) + '</p></div>' +
+            return '<div class="border border-slate-200 rounded-lg mb-3 overflow-hidden">' +
+                '<div class="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors" onclick="toggleDocRequirement(\'' + dt.key + '\',\'' + esc(dt.label) + '\')">' +
+                '<div class="flex items-center gap-3">' +
+                '<div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center">' + icon(docIconMap[dt.key] || 'file-text', 18, 'text-slate-500') + '</div>' +
+                '<div><h4 class="text-sm font-semibold text-slate-900">' + esc(dt.label) + '</h4>' +
+                '<p class="text-xs text-slate-400 font-normal">' + esc(dt.desc) + '</p></div>' +
                 '</div>' +
                 '<div class="toggle-switch">' +
                 '<input type="checkbox" ' + (enabled ? 'checked' : '') + '>' +
                 '<span class="slider"></span>' +
                 '</div>' +
                 '</div>' +
-                (enabled ? '<div class="eligibility-section-body">' +
-                    '<div class="form-group">' +
-                    '<label class="form-label">' + T('grant.create.specific_requirements') + '</label>' +
-                    '<input type="text" class="form-control" placeholder="Any specific requirements for this document..." ' +
+                (enabled ? '<div class="px-4 pb-4 pt-0 border-t border-slate-100">' +
+                    '<div class="mb-3 mt-3">' +
+                    '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.specific_requirements') + '</label>' +
+                    '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" placeholder="Any specific requirements for this document..." ' +
                     'value="' + esc(existing.requirements || existing.description || '') + '" ' +
                     'oninput="updateDocReq(\'' + dt.key + '\',\'requirements\',this.value);">' +
                     '</div>' +
-                    '<div class="form-row">' +
-                    '<div class="form-group">' +
-                    '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">' +
-                    '<input type="checkbox" ' + (existing.required !== false ? 'checked' : '') + ' ' +
+                    '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
+                    '<div>' +
+                    '<label class="flex items-center gap-2 cursor-pointer">' +
+                    '<input type="checkbox" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500/20" ' + (existing.required !== false ? 'checked' : '') + ' ' +
                     'onchange="updateDocReq(\'' + dt.key + '\',\'required\',this.checked);">' +
-                    '<span style="font-size:13px;">' + T('grant.create.required_document') + '</span></label>' +
+                    '<span class="text-sm text-slate-700">' + T('grant.create.required_document') + '</span></label>' +
                     '</div>' +
-                    '<div class="form-group">' +
-                    '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">' +
-                    '<input type="checkbox" ' + (existing.ai_review ? 'checked' : '') + ' ' +
+                    '<div>' +
+                    '<label class="flex items-center gap-2 cursor-pointer">' +
+                    '<input type="checkbox" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500/20" ' + (existing.ai_review ? 'checked' : '') + ' ' +
                     'onchange="updateDocReq(\'' + dt.key + '\',\'ai_review\',this.checked);">' +
-                    '<span style="font-size:13px;">\u2728 AI Document Review</span></label>' +
+                    '<span class="text-sm text-slate-700">' + icon('sparkles', 12, 'inline text-blue-500') + ' AI Document Review</span></label>' +
                     '</div></div>' +
-                    (existing.ai_review ? '<div class="form-group" style="margin-top:8px;">' +
-                    '<label class="form-label">\u2728 AI Evaluation Criteria</label>' +
-                    '<textarea class="form-control" rows="2" placeholder="What should AI look for? e.g., Must include 3 years audited financials, budget variance under 10%..." ' +
+                    (existing.ai_review ? '<div class="mt-2">' +
+                    '<label class="block text-xs font-medium text-slate-600 mb-1">' + icon('sparkles', 12, 'inline text-blue-500') + ' AI Evaluation Criteria</label>' +
+                    '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="2" placeholder="What should AI look for? e.g., Must include 3 years audited financials, budget variance under 10%..." ' +
                     'oninput="updateDocReq(\'' + dt.key + '\',\'ai_criteria\',this.value);">' + esc(existing.ai_criteria || '') + '</textarea>' +
-                    '<p style="font-size:11px;color:#94a3b8;margin-top:4px;">AI will evaluate uploaded documents against these specific criteria.</p>' +
+                    '<p class="text-[11px] text-slate-400 mt-1">AI will evaluate uploaded documents against these specific criteria.</p>' +
                     '</div>' : '') +
                     '</div>' : '') +
                 '</div>';
         }).join('') +
 
-        '</div></div>';
+        '</div>';
 }
 
 function toggleDocRequirement(key, label) {
@@ -3424,91 +3526,91 @@ function renderCreateReporting() {
     var reqsHTML = '';
     if (d.reporting_requirements && d.reporting_requirements.length > 0) {
         reqsHTML = d.reporting_requirements.map(function(req, i) {
-            return '<div class="card" style="margin-bottom:12px;border-left:4px solid #2d8f6f;">' +
-                '<div class="card-body" style="padding:12px 16px;">' +
-                '<div style="display:flex;justify-content:space-between;align-items:start;">' +
+            return '<div class="bg-white rounded-lg border border-slate-200 border-l-4 border-l-brand-500 mb-3">' +
+                '<div class="px-4 py-3">' +
+                '<div class="flex justify-between items-start">' +
                 '<div>' +
-                '<strong>' + esc(req.title || req.type) + '</strong>' +
-                '<span class="badge badge-green" style="margin-left:8px;font-size:11px;">' + esc(req.type) + '</span>' +
-                '<span class="badge badge-outline" style="margin-left:4px;font-size:11px;">' + esc(req.frequency || d.reporting_frequency) + '</span>' +
+                '<strong class="text-sm text-slate-900">' + esc(req.title || req.type) + '</strong>' +
+                '<span class="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full bg-emerald-50 text-emerald-700 ml-2">' + esc(req.type) + '</span>' +
+                '<span class="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full bg-slate-100 text-slate-600 ml-1">' + esc(req.frequency || d.reporting_frequency) + '</span>' +
                 '</div>' +
-                '<button class="btn btn-sm" style="color:#ef4444;padding:2px 8px;" onclick="removeReportingReq(' + i + ')">x</button>' +
+                '<button class="text-rose-400 hover:text-rose-600 transition-colors px-2 py-0.5" onclick="removeReportingReq(' + i + ')">' + icon('x', 14) + '</button>' +
                 '</div>' +
-                '<p style="font-size:13px;color:#64748b;margin-top:4px;">' + esc(req.description || '') + '</p>' +
-                (req.due_days_after_period ? '<p style="font-size:12px;color:#94a3b8;margin-top:4px;">' + T('grant.create.due_days', {days: req.due_days_after_period}) + '</p>' : '') +
+                '<p class="text-sm text-slate-500 mt-1">' + esc(req.description || '') + '</p>' +
+                (req.due_days_after_period ? '<p class="text-xs text-slate-400 mt-1">' + T('grant.create.due_days', {days: req.due_days_after_period}) + '</p>' : '') +
                 '</div></div>';
         }).join('');
     } else {
-        reqsHTML = '<p style="color:#94a3b8;padding:16px;text-align:center;">' + T('grant.create.no_reqs_yet') + '</p>';
+        reqsHTML = '<p class="text-slate-400 py-4 text-center text-sm">' + T('grant.create.no_reqs_yet') + '</p>';
     }
 
     var templateHTML = '';
     var tmpl = d.report_template;
     if (tmpl && tmpl.template_sections && tmpl.template_sections.length > 0) {
-        templateHTML = '<div style="margin-top:16px;">' +
-            '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">' + T('grant.create.report_template_sections') + '</h4>' +
+        templateHTML = '<div class="mt-4">' +
+            '<h4 class="text-sm font-semibold text-slate-900 mb-2">' + T('grant.create.report_template_sections') + '</h4>' +
             tmpl.template_sections.map(function(s, i) {
-                return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;">' +
-                    '<span style="color:#2d8f6f;font-weight:600;">' + (i+1) + '.</span>' +
-                    '<span style="font-weight:500;">' + esc(s.title) + '</span>' +
-                    (s.required ? '<span class="badge badge-red" style="font-size:10px;">Required</span>' : '<span class="badge badge-outline" style="font-size:10px;">Optional</span>') +
+                return '<div class="flex items-center gap-2 py-1.5 border-b border-slate-100">' +
+                    '<span class="text-brand-600 font-semibold text-sm">' + (i+1) + '.</span>' +
+                    '<span class="font-medium text-sm text-slate-900">' + esc(s.title) + '</span>' +
+                    (s.required ? '<span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-rose-50 text-rose-700">Required</span>' : '<span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-slate-100 text-slate-600">Optional</span>') +
                     '</div>';
             }).join('') +
             '</div>';
     }
 
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('grant.create.reporting_requirements') + '</h3>' +
-        '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">' + T('grant.create.reporting_requirements_desc') + '</p>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="text-base font-semibold text-slate-900 mb-1">' + T('grant.create.reporting_requirements') + '</h3>' +
+        '<p class="text-sm text-slate-500 mb-4">' + T('grant.create.reporting_requirements_desc') + '</p>' +
 
         // Upload grant document
-        '<div style="background:#f0fdf4;border:2px dashed #86efac;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;">' +
-        '<p style="font-weight:600;margin-bottom:8px;">' + (d.grant_document ? '\u2705 ' + T('grant.create.grant_doc_uploaded') : '\uD83D\uDCC4 ' + T('grant.create.upload_grant_doc')) + '</p>' +
-        (d.grant_document && d._docOriginalName ? '<p style="font-size:12px;color:#2d8f6f;margin-bottom:4px;"><strong>' + esc(d._docOriginalName) + '</strong>' +
+        '<div class="bg-emerald-50/50 border-2 border-dashed border-emerald-300 rounded-xl p-5 text-center mb-5">' +
+        '<p class="font-semibold text-slate-900 mb-2">' + (d.grant_document ? icon('check-circle', 16, 'inline text-emerald-500') + ' ' + T('grant.create.grant_doc_uploaded') : icon('file-text', 16, 'inline text-slate-400') + ' ' + T('grant.create.upload_grant_doc')) + '</p>' +
+        (d.grant_document && d._docOriginalName ? '<p class="text-xs text-emerald-700 mb-1"><strong>' + esc(d._docOriginalName) + '</strong>' +
             (d._docUploadTime ? ' — ' + T('grant.create.uploaded_at') + ' ' + esc(d._docUploadTime) : '') + '</p>' : '') +
-        (d._extractionStatus === 'success' ? '<div id="extraction-result" data-extraction-status="success" data-extraction-count="' + (d._extractedCount || 0) + '" data-extraction-time="' + (d._extractionTimestamp || '') + '" style="background:#dcfce7;color:#166534;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #22c55e;box-shadow:0 2px 8px rgba(34,197,94,0.15);">' +
-            '<div style="font-size:16px;margin-bottom:4px;">\u2705 ' + T('grant.create.ai_extraction_complete') + '</div>' +
+        (d._extractionStatus === 'success' ? '<div id="extraction-result" data-extraction-status="success" data-extraction-count="' + (d._extractedCount || 0) + '" data-extraction-time="' + (d._extractionTimestamp || '') + '" class="bg-emerald-100 text-emerald-800 p-4 rounded-lg text-sm font-medium mb-3 border-2 border-emerald-400 shadow-sm">' +
+            '<div class="text-base mb-1">' + icon('check-circle', 16, 'inline text-emerald-500') + ' ' + T('grant.create.ai_extraction_complete') + '</div>' +
             '<div>' + T('grant.create.extracted_count') + ' <strong>' + (d._extractedCount || 0) + '</strong> ' + T('grant.create.reporting_requirements').toLowerCase() +
             (d.report_template && d.report_template.template_sections ? ', <strong>' + d.report_template.template_sections.length + '</strong> ' + T('grant.create.template_sections') : '') +
             (d.report_template && d.report_template.indicators ? ', <strong>' + d.report_template.indicators.length + '</strong> ' + T('grant.create.indicators') : '') +
             '</div>' +
-            (d._docUploadTime ? '<div style="font-size:12px;color:#15803d;font-weight:400;margin-top:4px;">' + T('grant.create.processed_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
+            (d._docUploadTime ? '<div class="text-xs text-emerald-600 font-normal mt-1">' + T('grant.create.processed_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
             '</div>' :
-         d._extractionStatus === 'empty' ? '<div id="extraction-result" data-extraction-status="empty" data-extraction-time="' + (d._extractionTimestamp || '') + '" style="background:#fef9c3;color:#854d0e;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #f59e0b;box-shadow:0 2px 8px rgba(245,158,11,0.12);">' +
-            '<div style="font-size:16px;margin-bottom:4px;">\u26A0\uFE0F ' + T('grant.create.no_reqs_found') + '</div>' +
+         d._extractionStatus === 'empty' ? '<div id="extraction-result" data-extraction-status="empty" data-extraction-time="' + (d._extractionTimestamp || '') + '" class="bg-amber-50 text-amber-800 p-4 rounded-lg text-sm font-medium mb-3 border-2 border-amber-400 shadow-sm">' +
+            '<div class="text-base mb-1">' + icon('alert-triangle', 16, 'inline text-amber-500') + ' ' + T('grant.create.no_reqs_found') + '</div>' +
             '<div>' + T('grant.create.no_reqs_found_desc') + '</div>' +
-            (d._docUploadTime ? '<div style="font-size:12px;font-weight:400;margin-top:4px;">' + T('grant.create.attempted_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
-            '<button class="btn btn-sm" style="margin-top:8px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 ' + T('grant.create.retry_file') + '</button>' +
+            (d._docUploadTime ? '<div class="text-xs font-normal mt-1">' + T('grant.create.attempted_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
+            '<button class="px-3 py-1.5 mt-2 bg-amber-100 border border-amber-400 text-amber-800 text-xs font-medium rounded-lg hover:bg-amber-200 transition-colors inline-flex items-center gap-1" onclick="document.getElementById(\'grant-doc-upload\').click();">' + icon('refresh-cw', 12) + ' ' + T('grant.create.retry_file') + '</button>' +
             '</div>' :
-         d._extractionStatus === 'failed' ? '<div id="extraction-result" data-extraction-status="failed" data-extraction-time="' + (d._extractionTimestamp || '') + '" style="background:#fee2e2;color:#991b1b;padding:16px 20px;border-radius:10px;font-size:14px;font-weight:500;margin-bottom:12px;border:2px solid #ef4444;box-shadow:0 2px 8px rgba(239,68,68,0.12);">' +
-            '<div style="font-size:16px;margin-bottom:4px;">\u274C ' + T('grant.create.extraction_failed') + '</div>' +
+         d._extractionStatus === 'failed' ? '<div id="extraction-result" data-extraction-status="failed" data-extraction-time="' + (d._extractionTimestamp || '') + '" class="bg-rose-50 text-rose-800 p-4 rounded-lg text-sm font-medium mb-3 border-2 border-rose-400 shadow-sm">' +
+            '<div class="text-base mb-1">' + icon('x-circle', 16, 'inline text-rose-500') + ' ' + T('grant.create.extraction_failed') + '</div>' +
             '<div>' + T('grant.create.extraction_failed_desc') + '</div>' +
-            (d._docUploadTime ? '<div style="font-size:12px;font-weight:400;margin-top:4px;">' + T('grant.create.failed_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
-            '<button class="btn btn-sm" style="margin-top:8px;background:#fee2e2;border:1px solid #ef4444;color:#991b1b;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 ' + T('grant.create.retry_upload') + '</button>' +
+            (d._docUploadTime ? '<div class="text-xs font-normal mt-1">' + T('grant.create.failed_at') + ' ' + esc(d._docUploadTime) + '</div>' : '') +
+            '<button class="px-3 py-1.5 mt-2 bg-rose-100 border border-rose-400 text-rose-800 text-xs font-medium rounded-lg hover:bg-rose-200 transition-colors inline-flex items-center gap-1" onclick="document.getElementById(\'grant-doc-upload\').click();">' + icon('refresh-cw', 12) + ' ' + T('grant.create.retry_upload') + '</button>' +
             '</div>' : '') +
-        (d._extractionStatus ? '' : '<p style="font-size:13px;color:#64748b;margin-bottom:12px;">' + T('grant.create.upload_doc_desc') + '</p>') +
-        '<input type="file" id="grant-doc-upload" style="display:none;" accept=".pdf,.doc,.docx,.txt" onchange="uploadGrantDoc()">' +
-        (!d._extractionStatus ? '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\'grant-doc-upload\').click();">' +
+        (d._extractionStatus ? '' : '<p class="text-sm text-slate-500 mb-3">' + T('grant.create.upload_doc_desc') + '</p>') +
+        '<input type="file" id="grant-doc-upload" class="hidden" accept=".pdf,.doc,.docx,.txt" onchange="uploadGrantDoc()">' +
+        (!d._extractionStatus ? '<button class="px-4 py-2 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-1.5" onclick="document.getElementById(\'grant-doc-upload\').click();">' + icon('upload', 14) + ' ' +
             (d.grant_document ? T('grant.create.replace_document') : T('grant.create.choose_file')) + '</button>' : '') +
-        (d._extractionStatus === 'success' ? '<button class="btn btn-sm" style="margin-top:8px;background:#f0fdf4;border:1px solid #86efac;color:#166534;" onclick="document.getElementById(\'grant-doc-upload\').click();">\uD83D\uDD04 ' + T('grant.create.upload_different_doc') + '</button>' : '') +
-        (S._extractingReqs ? '<div id="extraction-result" class="ai-analyzing" data-upload-phase="' + (S._uploadPhase || 'processing') + '" style="margin-top:16px;padding:16px;background:#eff6ff;border-radius:10px;border:2px solid #93c5fd;text-align:center;">' +
-            '<div class="dot-pulse" style="margin-bottom:8px;"><span></span><span></span><span></span></div>' +
-            '<div style="font-size:14px;font-weight:600;color:#1e40af;">' +
+        (d._extractionStatus === 'success' ? '<button class="px-3 py-1.5 mt-2 bg-emerald-50 border border-emerald-300 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-100 transition-colors inline-flex items-center gap-1" onclick="document.getElementById(\'grant-doc-upload\').click();">' + icon('refresh-cw', 12) + ' ' + T('grant.create.upload_different_doc') + '</button>' : '') +
+        (S._extractingReqs ? '<div id="extraction-result" class="ai-analyzing" data-upload-phase="' + (S._uploadPhase || 'processing') + '" class="mt-4 p-4 bg-blue-50 rounded-lg border-2 border-blue-300 text-center">' +
+            '<div class="dot-pulse mb-2"><span></span><span></span><span></span></div>' +
+            '<div class="text-sm font-semibold text-blue-800">' +
             (S._uploadPhase === 'saving_draft' ? (T('grant.create.saving_draft') || 'Saving draft…') :
              S._uploadPhase === 'uploading' ? (T('grant.create.uploading_doc') || 'Uploading document…') :
              T('grant.create.ai_analyzing')) + '</div>' +
-            '<div style="font-size:12px;color:#3b82f6;margin-top:4px;">' +
+            '<div class="text-xs text-blue-500 mt-1">' +
             (S._uploadPhase === 'saving_draft' ? (T('grant.create.saving_draft_wait') || 'Please wait while we save your grant…') :
              S._uploadPhase === 'uploading' ? (T('grant.create.uploading_wait') || 'Transferring file to server…') :
              T('grant.create.ai_analyzing_wait')) + '</div>' +
-            (S.createData._docOriginalName ? '<div style="font-size:11px;color:#64748b;margin-top:6px;">📄 ' + esc(S.createData._docOriginalName) + '</div>' : '') +
+            (S.createData._docOriginalName ? '<div class="text-[11px] text-slate-500 mt-1.5">' + icon('file-text', 12, 'inline text-slate-400') + ' ' + esc(S.createData._docOriginalName) + '</div>' : '') +
             '</div>' : '') +
         '</div>' +
 
         // Reporting frequency
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.default_reporting_freq') + '</label>' +
-        '<select class="form-control" onchange="S.createData.reporting_frequency=this.value;">' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.default_reporting_freq') + '</label>' +
+        '<select class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" onchange="S.createData.reporting_frequency=this.value;">' +
         frequencies.map(function(f) {
             return '<option value="' + f.value + '"' + (d.reporting_frequency === f.value ? ' selected' : '') + '>' + f.label + '</option>';
         }).join('') +
@@ -3516,49 +3618,49 @@ function renderCreateReporting() {
         '</div>' +
 
         // Current requirements list
-        '<div style="margin-top:16px;">' +
-        '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">' + T('grant.create.required_reports') + '</h4>' +
+        '<div class="mt-4">' +
+        '<h4 class="text-sm font-semibold text-slate-900 mb-2">' + T('grant.create.required_reports') + '</h4>' +
         reqsHTML +
         '</div>' +
 
         // Add requirement manually
-        '<div style="margin-top:16px;padding:16px;background:#f8fafc;border-radius:8px;">' +
-        '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">' + T('grant.create.add_req_manually') + '</h4>' +
-        '<div class="form-row">' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('report.type') + '</label>' +
-        '<select class="form-control" id="new-req-type">' +
+        '<div class="mt-4 p-4 bg-slate-50 rounded-lg">' +
+        '<h4 class="text-sm font-semibold text-slate-900 mb-2">' + T('grant.create.add_req_manually') + '</h4>' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">' +
+        '<div>' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('report.type') + '</label>' +
+        '<select class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" id="new-req-type">' +
         reportTypes.map(function(t) { return '<option value="' + t + '">' + t.charAt(0).toUpperCase() + t.slice(1) + '</option>'; }).join('') +
         '</select>' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.title_label') + '</label>' +
-        '<input type="text" class="form-control" id="new-req-title" placeholder="e.g., Quarterly Financial Report">' +
+        '<div>' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.title_label') + '</label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" id="new-req-title" placeholder="e.g., Quarterly Financial Report">' +
         '</div>' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.description_label') + '</label>' +
-        '<textarea class="form-control" rows="2" id="new-req-desc" placeholder="Describe what should be included in this report..."></textarea>' +
+        '<div class="mb-3">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.description_label') + '</label>' +
+        '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="2" id="new-req-desc" placeholder="Describe what should be included in this report..."></textarea>' +
         '</div>' +
-        '<div class="form-row">' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.frequency_label') + '</label>' +
-        '<select class="form-control" id="new-req-freq">' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">' +
+        '<div>' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.frequency_label') + '</label>' +
+        '<select class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" id="new-req-freq">' +
         frequencies.map(function(f) { return '<option value="' + f.value + '">' + f.label + '</option>'; }).join('') +
         '</select>' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.days_due_after_period') + '</label>' +
-        '<input type="number" class="form-control" id="new-req-days" value="30" min="1" max="180">' +
+        '<div>' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.days_due_after_period') + '</label>' +
+        '<input type="number" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" id="new-req-days" value="30" min="1" max="180">' +
         '</div>' +
         '</div>' +
-        '<button class="btn btn-secondary btn-sm" onclick="addReportingReq()">' + T('grant.create.add_requirement') + '</button>' +
+        '<button class="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5" onclick="addReportingReq()">' + icon('plus', 14) + ' ' + T('grant.create.add_requirement') + '</button>' +
         '</div>' +
 
         // Template preview
         templateHTML +
 
-        '</div></div>';
+        '</div>';
 }
 
 function addReportingReq() {
@@ -3775,47 +3877,47 @@ function renderCreateReview() {
     var d = S.createData;
     var totalWeight = (d.criteria || []).reduce(function(sum, c) { return sum + (Number(c.weight) || 0); }, 0);
 
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('grant.create.review_publish') + '</h3>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="text-base font-semibold text-slate-900 mb-4">' + T('grant.create.review_publish') + '</h3>' +
 
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-6">' +
         '<div>' +
-        '<h4 style="font-weight:600;margin-bottom:8px;">' + T('grant.create.basic_information') + '</h4>' +
-        '<div style="font-size:14px;">' +
-        '<p><strong>' + T('grant.create.review_title') + '</strong> ' + esc(d.title || 'Not set') + '</p>' +
-        '<p><strong>' + T('grant.create.review_funding') + '</strong> ' + formatCurrency(d.total_funding, d.currency) + '</p>' +
-        '<p><strong>' + T('grant.create.review_deadline') + '</strong> ' + formatDate(d.deadline) + '</p>' +
-        '<p><strong>' + T('grant.create.review_sectors') + '</strong> ' + esc((d.sectors || []).join(', ') || 'None') + '</p>' +
-        '<p><strong>' + T('grant.create.review_countries') + '</strong> ' + esc((d.countries || []).join(', ') || 'None') + '</p>' +
+        '<h4 class="font-semibold text-slate-900 mb-2">' + T('grant.create.basic_information') + '</h4>' +
+        '<div class="text-sm space-y-1">' +
+        '<p><strong class="text-slate-600">' + T('grant.create.review_title') + '</strong> ' + esc(d.title || 'Not set') + '</p>' +
+        '<p><strong class="text-slate-600">' + T('grant.create.review_funding') + '</strong> ' + formatCurrency(d.total_funding, d.currency) + '</p>' +
+        '<p><strong class="text-slate-600">' + T('grant.create.review_deadline') + '</strong> ' + formatDate(d.deadline) + '</p>' +
+        '<p><strong class="text-slate-600">' + T('grant.create.review_sectors') + '</strong> ' + esc((d.sectors || []).join(', ') || 'None') + '</p>' +
+        '<p><strong class="text-slate-600">' + T('grant.create.review_countries') + '</strong> ' + esc((d.countries || []).join(', ') || 'None') + '</p>' +
         '</div>' +
         '</div>' +
         '<div>' +
-        '<h4 style="font-weight:600;margin-bottom:8px;">' + T('grant.create.configuration') + '</h4>' +
-        '<div style="font-size:14px;">' +
-        '<p><strong>' + T('grant.create.review_eligibility') + '</strong> ' + (d.eligibility || []).length + '</p>' +
-        '<p><strong>' + T('grant.create.review_criteria') + '</strong> ' + (d.criteria || []).length +
-        ' (' + T('grant.create.review_total_weight') + ' ' + totalWeight + '%' + (totalWeight === 100 ? ' \u2713' : ' \u26A0\uFE0F') + ')</p>' +
-        '<p><strong>' + T('grant.create.review_doc_reqs') + '</strong> ' + (d.doc_requirements || []).length + '</p>' +
-        '<p><strong>' + T('grant.create.review_reporting_reqs') + '</strong> ' + (d.reporting_requirements || []).length + '</p>' +
-        '<p><strong>' + T('grant.create.review_reporting_freq') + '</strong> ' + esc(d.reporting_frequency || 'quarterly') + '</p>' +
+        '<h4 class="font-semibold text-slate-900 mb-2">' + T('grant.create.configuration') + '</h4>' +
+        '<div class="text-sm space-y-1">' +
+        '<p><strong class="text-slate-600">' + T('grant.create.review_eligibility') + '</strong> ' + (d.eligibility || []).length + '</p>' +
+        '<p><strong class="text-slate-600">' + T('grant.create.review_criteria') + '</strong> ' + (d.criteria || []).length +
+        ' (' + T('grant.create.review_total_weight') + ' ' + totalWeight + '%' + (totalWeight === 100 ? ' ' + icon('check', 12, 'inline text-emerald-500') : ' ' + icon('alert-triangle', 12, 'inline text-amber-500')) + ')</p>' +
+        '<p><strong class="text-slate-600">' + T('grant.create.review_doc_reqs') + '</strong> ' + (d.doc_requirements || []).length + '</p>' +
+        '<p><strong class="text-slate-600">' + T('grant.create.review_reporting_reqs') + '</strong> ' + (d.reporting_requirements || []).length + '</p>' +
+        '<p><strong class="text-slate-600">' + T('grant.create.review_reporting_freq') + '</strong> ' + esc(d.reporting_frequency || 'quarterly') + '</p>' +
         '</div>' +
         '</div>' +
         '</div>' +
 
         ((!d.title || !d.total_funding || !d.deadline) ?
-            '<div style="background:#fef3c7;padding:12px;border-radius:6px;margin-top:16px;border-left:3px solid #f59e0b;">' +
-            '<strong style="color:#92400e;">\u26A0\uFE0F ' + T('grant.create.fill_required_warning') + '</strong>' +
-            (!d.title ? '<br>- ' + T('grant.create.grant_title') : '') +
-            (!d.total_funding ? '<br>- ' + T('grant.create.total_funding') : '') +
-            (!d.deadline ? '<br>- ' + T('grant.create.deadline') : '') +
+            '<div class="bg-amber-50 p-3 rounded-lg mt-4 border-l-[3px] border-amber-400">' +
+            '<strong class="text-amber-800 flex items-center gap-1">' + icon('alert-triangle', 14, 'text-amber-500') + ' ' + T('grant.create.fill_required_warning') + '</strong>' +
+            (!d.title ? '<br><span class="text-amber-700 text-sm">- ' + T('grant.create.grant_title') + '</span>' : '') +
+            (!d.total_funding ? '<br><span class="text-amber-700 text-sm">- ' + T('grant.create.total_funding') + '</span>' : '') +
+            (!d.deadline ? '<br><span class="text-amber-700 text-sm">- ' + T('grant.create.deadline') + '</span>' : '') +
             '</div>' : '') +
 
         (totalWeight !== 100 && (d.criteria || []).length > 0 ?
-            '<div style="background:#fef3c7;padding:12px;border-radius:6px;margin-top:12px;border-left:3px solid #f59e0b;">' +
-            '<strong style="color:#92400e;">\u26A0\uFE0F ' + T('grant.create.criteria_weight_warning', {weight: totalWeight}) + '</strong>' +
+            '<div class="bg-amber-50 p-3 rounded-lg mt-3 border-l-[3px] border-amber-400">' +
+            '<strong class="text-amber-800 flex items-center gap-1">' + icon('alert-triangle', 14, 'text-amber-500') + ' ' + T('grant.create.criteria_weight_warning', {weight: totalWeight}) + '</strong>' +
             '</div>' : '') +
 
-        '</div></div>';
+        '</div>';
 }
 
 async function saveGrantDraft() {
@@ -3920,15 +4022,13 @@ function renderApplicantRankings() {
         return '<option value="' + g.id + '"' + (S._rankingsGrantId == g.id ? ' selected' : '') + '>' + esc(g.title) + '</option>';
     }).join('');
 
-    return '<div class="page-header">' +
-        '<h1>\u2B50 ' + T('dashboard.action.review_apps') + '</h1>' +
-        '</div>' +
+    return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('star', 24, 'text-amber-500') + ' ' + T('dashboard.action.review_apps') + '</h1></div>' +
 
-        '<div class="card" style="margin-bottom:24px;">' +
-        '<div class="card-body" style="display:flex;gap:16px;align-items:end;">' +
-        '<div class="form-group" style="margin:0;flex:1;">' +
-        '<label class="form-label">' + T('ranking.select_grant') + '</label>' +
-        '<select class="form-control" onchange="loadRankingsByGrant(this.value);">' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-6">' +
+        '<div class="flex gap-4 items-end">' +
+        '<div class="flex-1">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('ranking.select_grant') + '</label>' +
+        '<select class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" onchange="loadRankingsByGrant(this.value);">' +
         '<option value="">-- Select a Grant --</option>' +
         grantOptions +
         '</select>' +
@@ -3939,33 +4039,34 @@ function renderApplicantRankings() {
         '<div id="rankings-table">' +
         (S._rankingsApps && S._rankingsApps.length ?
             renderRankingsTable(S._rankingsApps) :
-            '<div class="card"><div class="card-body" style="text-align:center;padding:48px;color:#94a3b8;">' +
-            '<p style="font-size:40px;margin-bottom:12px;">\uD83D\uDCCB</p>' +
-            '<p>Select a grant to view applications.</p></div></div>') +
+            '<div class="bg-white rounded-xl border border-slate-200/60 p-12 text-center">' +
+            '<div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">' + icon('clipboard-list', 22, 'text-slate-400') + '</div>' +
+            '<p class="text-sm text-slate-400">Select a grant to view applications.</p></div>') +
         '</div>';
 }
 
 function renderRankingsTable(apps) {
-    if (!apps.length) return '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">No applications for this grant.</div></div>';
+    if (!apps.length) return '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center"><p class="text-sm text-slate-400">No applications for this grant.</p></div>';
 
     var sorted = apps.slice().sort(function(a, b) { return (b.final_score || b.ai_score || 0) - (a.final_score || a.ai_score || 0); });
 
-    return '<div class="table-wrapper"><table class="table table-hover">' +
-        '<thead><tr><th>#</th><th>' + T('verification.organization') + '</th><th>' + T('verification.country') + '</th><th>' + T('dashboard.stat.capacity_score') + '</th><th>' + T('ranking.ai_score') + '</th><th>' + T('ranking.human_score') + '</th><th>' + T('ranking.final_score') + '</th><th>' + T('application.tab.status') + '</th><th></th></tr></thead>' +
-        '<tbody>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden overflow-x-auto"><table class="w-full">' +
+        '<thead><tr class="bg-slate-50 border-b border-slate-200"><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">#</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('verification.organization') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('verification.country') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('dashboard.stat.capacity_score') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('ranking.ai_score') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('ranking.human_score') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('ranking.final_score') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.tab.status') + '</th><th class="px-4 py-3"></th></tr></thead>' +
+        '<tbody class="divide-y divide-slate-100">' +
         sorted.map(function(a, i) {
-            return '<tr style="cursor:pointer;" onclick="viewApplication(' + a.id + ')">' +
-                '<td style="font-weight:600;">' + (i + 1) + '</td>' +
-                '<td style="font-weight:500;">' + esc(a.org_name || a.applicant_name || '') + '</td>' +
-                '<td>' + esc(a.country || '') + '</td>' +
-                '<td>' + (a.capacity_score != null ? a.capacity_score + '%' : '-') + '</td>' +
-                '<td style="font-weight:600;color:' + (a.ai_score >= 70 ? '#10b981' : '#f59e0b') + ';">' + (a.ai_score != null ? a.ai_score + '%' : '-') + '</td>' +
-                '<td>' + (a.human_score != null ? a.human_score + '%' : '-') + '</td>' +
-                '<td style="font-weight:700;">' + (a.final_score != null ? a.final_score + '%' : '-') + '</td>' +
-                '<td>' + statusBadge(a.status) + '</td>' +
-                '<td style="white-space:nowrap;">' +
-                '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();nav(\'scoreapp\',{selectedApplication:null});viewAndScore(' + a.id + ');">Score</button> ' +
-                (a.status !== 'awarded' ? '<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();awardGrant(' + a.id + ');">\uD83C\uDFC6 Award</button>' : '') +
+            var aiScoreColor = a.ai_score >= 70 ? 'text-emerald-600' : 'text-amber-500';
+            return '<tr class="hover:bg-slate-50/80 transition-colors cursor-pointer" onclick="viewApplication(' + a.id + ')">' +
+                '<td class="px-4 py-3.5 text-sm font-semibold text-slate-900">' + (i + 1) + '</td>' +
+                '<td class="px-4 py-3.5 text-sm font-medium text-slate-900">' + esc(a.org_name || a.applicant_name || '') + '</td>' +
+                '<td class="px-4 py-3.5 text-sm text-slate-600">' + esc(a.country || '') + '</td>' +
+                '<td class="px-4 py-3.5 text-sm text-slate-600">' + (a.capacity_score != null ? a.capacity_score + '%' : '<span class="text-slate-300">-</span>') + '</td>' +
+                '<td class="px-4 py-3.5 text-sm font-semibold ' + aiScoreColor + '">' + (a.ai_score != null ? a.ai_score + '%' : '<span class="text-slate-300">-</span>') + '</td>' +
+                '<td class="px-4 py-3.5 text-sm text-slate-600">' + (a.human_score != null ? a.human_score + '%' : '<span class="text-slate-300">-</span>') + '</td>' +
+                '<td class="px-4 py-3.5 text-sm font-bold text-slate-900">' + (a.final_score != null ? a.final_score + '%' : '<span class="text-slate-300">-</span>') + '</td>' +
+                '<td class="px-4 py-3.5">' + statusBadge(a.status) + '</td>' +
+                '<td class="px-4 py-3.5 whitespace-nowrap">' +
+                '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-1" onclick="event.stopPropagation();nav(\'scoreapp\',{selectedApplication:null});viewAndScore(' + a.id + ');">' + icon('pencil', 14) + ' Score</button> ' +
+                (a.status !== 'awarded' ? '<button class="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1 ml-1" onclick="event.stopPropagation();awardGrant(' + a.id + ');">' + icon('trophy', 14, 'text-amber-500') + ' Award</button>' : '') +
                 '</td></tr>';
         }).join('') +
         '</tbody></table></div>';
@@ -4014,7 +4115,7 @@ async function awardGrant(appId) {
 
 function renderScoreApp() {
     var a = S.selectedApplication;
-    if (!a) return '<div class="page-header"><h1>' + T('review.submit_review') + '</h1><p>' + T('common.loading') + '</p></div>';
+    if (!a) return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900">' + T('review.submit_review') + '</h1><p class="text-sm text-slate-500">' + T('common.loading') + '</p></div>';
 
     var responses = a.responses || {};
     var criteria = a.grant_criteria || a.criteria || [];
@@ -4041,15 +4142,15 @@ function renderScoreApp() {
     var role = (S.user.role || '').toLowerCase();
     var backPage = role === 'reviewer' ? 'assignments' : 'rankings';
 
-    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'' + backPage + '\')" style="margin-bottom:16px;">\u2190 ' + T('common.back') + '</button>' +
+    return '<button class="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 mb-4 transition-colors" onclick="nav(\'' + backPage + '\')">' + icon('arrow-left', 16) + ' ' + T('common.back') + '</button>' +
 
-        '<div class="card" style="margin-bottom:24px;">' +
-        '<div class="card-body" style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-6">' +
+        '<div class="flex justify-between items-center">' +
         '<div>' +
-        '<h1 style="font-size:20px;font-weight:700;">' + esc(a.grant_title || a.grant_name || 'Application') + '</h1>' +
-        '<p style="color:#64748b;">' + esc(a.org_name || a.applicant_name || '') + '</p>' +
+        '<h1 class="text-xl font-bold text-slate-900">' + esc(a.grant_title || a.grant_name || 'Application') + '</h1>' +
+        '<p class="text-sm text-slate-500">' + esc(a.org_name || a.applicant_name || '') + '</p>' +
         '</div>' +
-        '<div style="text-align:center;">' +
+        '<div class="text-center">' +
         scoreRingHTML(weightedScore, 80, 'Score') +
         '</div>' +
         '</div></div>' +
@@ -4061,55 +4162,54 @@ function renderScoreApp() {
             var currentScore = S.scoreData[key] || '';
             var currentComment = S.scoreComments[key] || '';
 
-            return '<div class="card" style="margin-bottom:16px;">' +
-                '<div class="card-body">' +
-                '<div style="display:flex;gap:24px;flex-wrap:wrap;">' +
+            return '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-4">' +
+                '<div class="flex gap-6 flex-wrap">' +
                 // Left: Response
-                '<div style="flex:1;min-width:300px;">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
-                '<h3 style="font-weight:600;">' + esc(c.label || c.name || 'Criterion') + '</h3>' +
-                '<span class="badge badge-blue">' + T('grant.create.weight') + ': ' + (c.weight || 0) + '%</span>' +
+                '<div class="flex-1 min-w-[300px]">' +
+                '<div class="flex justify-between items-center mb-2">' +
+                '<h3 class="font-semibold text-slate-900">' + esc(c.label || c.name || 'Criterion') + '</h3>' +
+                statusBadge(T('grant.create.weight') + ': ' + (c.weight || 0) + '%', 'blue') +
                 '</div>' +
-                '<div style="background:#f8fafc;padding:12px;border-radius:6px;font-size:14px;color:#475569;max-height:300px;overflow-y:auto;white-space:pre-wrap;">' +
+                '<div class="bg-slate-50 p-3 rounded-lg text-sm text-slate-600 max-h-72 overflow-y-auto whitespace-pre-wrap">' +
                 esc(responseText || 'No response provided.') +
                 '</div>' +
                 '</div>' +
                 // Right: Scoring
-                '<div style="width:280px;flex-shrink:0;">' +
-                '<div class="form-group">' +
-                '<label class="form-label">Score (0-100)</label>' +
-                '<input type="number" class="form-control" min="0" max="100" ' +
+                '<div class="w-72 flex-shrink-0">' +
+                '<div class="mb-4">' +
+                '<label class="block text-xs font-medium text-slate-600 mb-1">Score (0-100)</label>' +
+                '<input type="number" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" min="0" max="100" ' +
                 'value="' + esc(currentScore) + '" ' +
                 'oninput="S.scoreData[\'' + key + '\']=Number(this.value);">' +
                 '<input type="range" min="0" max="100" value="' + (currentScore || 0) + '" ' +
-                'style="width:100%;margin-top:8px;" ' +
+                'class="w-full mt-2 accent-brand-600" ' +
                 'oninput="S.scoreData[\'' + key + '\']=Number(this.value);this.previousElementSibling.previousElementSibling.value=this.value;">' +
                 '</div>' +
-                '<div class="form-group">' +
-                '<label class="form-label">Comment</label>' +
-                '<textarea class="form-control" rows="3" placeholder="Feedback..." ' +
+                '<div class="mb-4">' +
+                '<label class="block text-xs font-medium text-slate-600 mb-1">Comment</label>' +
+                '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="3" placeholder="Feedback..." ' +
                 'oninput="S.scoreComments[\'' + key + '\']=this.value;">' + esc(currentComment) + '</textarea>' +
                 '</div>' +
                 '</div>' +
                 '</div>' +
-                '</div></div>';
+                '</div>';
         }).join('') +
 
         // Document Scores
-        (a.documents && a.documents.length ? '<div class="card" style="margin-bottom:16px;"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">' + T('application.document_analysis') + '</h3>' +
+        (a.documents && a.documents.length ? '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-4">' +
+            '<h3 class="font-semibold text-slate-900 mb-3">' + T('application.document_analysis') + '</h3>' +
             a.documents.map(function(d) {
-                return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #f1f5f9;">' +
-                    '<span>\uD83D\uDCC4</span>' +
-                    '<span style="flex:1;font-weight:500;">' + esc(d.name || d.filename || d.type) + '</span>' +
-                    (d.ai_analysis ? '<span class="badge badge-' + (d.ai_analysis.score >= 70 ? 'green' : 'amber') + '">AI: ' + d.ai_analysis.score + '%</span>' : '') +
+                return '<div class="flex items-center gap-3 py-2 border-b border-slate-100">' +
+                    '<span class="text-slate-400">' + icon('file-text', 16) + '</span>' +
+                    '<span class="flex-1 font-medium text-sm text-slate-700">' + esc(d.name || d.filename || d.type) + '</span>' +
+                    (d.ai_analysis ? statusBadge('AI: ' + d.ai_analysis.score + '%', d.ai_analysis.score >= 70 ? 'green' : 'amber') : '') +
                     '</div>';
             }).join('') +
-            '</div></div>' : '') +
+            '</div>' : '') +
 
-        '<div style="display:flex;gap:12px;margin-top:24px;">' +
-        '<button class="btn btn-primary btn-lg" onclick="submitScores()">' + T('review.submit_review') + '</button>' +
-        '<button class="btn btn-secondary" onclick="aiScoreApplication();">\u2728 AI Auto-Score</button>' +
+        '<div class="flex gap-3 mt-6">' +
+        '<button class="px-4 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="submitScores()">' + icon('send', 16) + ' ' + T('review.submit_review') + '</button>' +
+        '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="aiScoreApplication();">' + icon('sparkles', 16, 'text-amber-500') + ' AI Auto-Score</button>' +
         '</div>';
 }
 
@@ -4167,42 +4267,41 @@ function renderAssessmentHub() {
     var cap = capacityLabel(score);
     var categories = stats.category_scores || {};
 
-    return '<div class="page-header">' +
-        '<h1>\uD83D\uDCDD ' + T('assessment.title') + '</h1>' +
-        '</div>' +
+    return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('clipboard-check', 24, 'text-brand-600') + ' ' + T('assessment.title') + '</h1></div>' +
 
-        '<div class="card" style="margin-bottom:24px;">' +
-        '<div class="card-body" style="display:flex;align-items:center;gap:32px;flex-wrap:wrap;">' +
-        '<div style="text-align:center;">' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-6">' +
+        '<div class="flex items-center gap-8 flex-wrap">' +
+        '<div class="text-center">' +
         scoreRingHTML(score, 120, '%') +
         '</div>' +
-        '<div style="flex:1;">' +
-        '<h2 style="font-size:22px;font-weight:700;">' + T('dashboard.stat.capacity_score') + '</h2>' +
-        '<p style="margin-top:4px;font-size:16px;">Level: <span class="badge badge-' + cap.color + '" style="font-size:14px;">' + esc(cap.label) + '</span></p>' +
-        '<div style="margin-top:16px;">' +
+        '<div class="flex-1">' +
+        '<h2 class="text-xl font-bold text-slate-900">' + T('dashboard.stat.capacity_score') + '</h2>' +
+        '<p class="mt-1 text-base">Level: ' + statusBadge(cap.label, cap.color) + '</p>' +
+        '<div class="mt-4">' +
         Object.keys(categories).map(function(k) {
             var val = categories[k] || 0;
-            return '<div style="margin-bottom:8px;">' +
-                '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">' +
-                '<span>' + esc(k.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); })) + '</span>' +
-                '<span style="font-weight:600;">' + val + '%</span></div>' +
-                '<div class="progress"><div class="progress-bar ' + scoreColor(val) + '" style="width:' + val + '%"></div></div>' +
+            var barColor = val >= 70 ? 'bg-emerald-500' : val >= 50 ? 'bg-amber-500' : 'bg-rose-500';
+            return '<div class="mb-2">' +
+                '<div class="flex justify-between text-sm mb-1">' +
+                '<span class="text-slate-600">' + esc(k.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); })) + '</span>' +
+                '<span class="font-semibold text-slate-900">' + val + '%</span></div>' +
+                '<div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full rounded-full ' + barColor + '" style="width:' + val + '%"></div></div>' +
                 '</div>';
         }).join('') +
         '</div>' +
         '</div>' +
         '</div></div>' +
 
-        '<div style="margin-bottom:24px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">' + T('assessment.previous_assessments') + '</h2>' +
+        '<div class="mb-6">' +
+        '<h2 class="text-lg font-semibold text-slate-900 mb-4">' + T('assessment.previous_assessments') + '</h2>' +
         '<div id="assessment-history">' + renderLoadingTable() + '</div>' +
         '</div>' +
 
         // Framework selection cards
-        '<div style="margin-top:24px;">' +
-        '<h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">' + T('assessment.start_new') + '</h2>' +
-        '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Choose an assessment framework that best fits your needs and donor requirements.</p>' +
-        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">' +
+        '<div class="mt-6">' +
+        '<h2 class="text-lg font-semibold text-slate-900 mb-4">' + T('assessment.start_new') + '</h2>' +
+        '<p class="text-slate-500 text-sm mb-4">Choose an assessment framework that best fits your needs and donor requirements.</p>' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">' +
 
         renderFrameworkCard('kuja', T('assessment.framework.kuja'), T('assessment.framework.kuja_desc'), '26 items', '30-45 min') +
         renderFrameworkCard('step', T('assessment.framework.step'), T('assessment.framework.step_desc'), '26 items', '45-60 min') +
@@ -4211,27 +4310,26 @@ function renderAssessmentHub() {
         renderFrameworkCard('nupas', T('assessment.framework.nupas'), T('assessment.framework.nupas_desc'), '27 items', '60-90 min') +
 
         '</div>' +
-        '<button class="btn btn-primary btn-lg" style="margin-top:16px;" onclick="startAssessment()">' +
-        (score > 0 ? '\uD83D\uDD04 ' + T('assessment.start_new') : '\uD83D\uDCDD ' + T('assessment.start_new')) +
+        '<button class="mt-4 px-4 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="startAssessment()">' +
+        icon(score > 0 ? 'refresh-cw' : 'clipboard-check', 16) + ' ' + T('assessment.start_new') +
         '</button>' +
         '</div>';
 }
 
 function renderFrameworkCard(id, name, desc, items, time) {
     var selected = S.selectedFramework === id;
-    return '<div class="card" style="cursor:pointer;border:2px solid ' + (selected ? '#2d8f6f' : '#e2e8f0') + ';transition:all 0.2s;" ' +
+    return '<div class="bg-white rounded-xl p-4 cursor-pointer border-2 transition-all duration-200 hover:shadow-md ' + (selected ? 'border-brand-600' : 'border-slate-200') + '" ' +
         'onclick="S.selectedFramework=\'' + id + '\';render();">' +
-        '<div class="card-body" style="padding:16px;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-        '<h4 style="font-size:15px;font-weight:600;">' + esc(name) + '</h4>' +
-        (selected ? '<span class="badge badge-green">Selected</span>' : '') +
+        '<div class="flex justify-between items-center">' +
+        '<h4 class="text-sm font-semibold text-slate-900">' + esc(name) + '</h4>' +
+        (selected ? statusBadge('Selected', 'green') : '') +
         '</div>' +
-        '<p style="font-size:13px;color:#64748b;margin-top:4px;">' + esc(desc) + '</p>' +
-        '<div style="display:flex;gap:12px;margin-top:8px;">' +
-        '<span style="font-size:12px;color:#94a3b8;">\uD83D\uDCCB ' + items + '</span>' +
-        '<span style="font-size:12px;color:#94a3b8;">\u23F1 ' + time + '</span>' +
+        '<p class="text-sm text-slate-500 mt-1">' + esc(desc) + '</p>' +
+        '<div class="flex gap-3 mt-2">' +
+        '<span class="text-xs text-slate-400 inline-flex items-center gap-1">' + icon('clipboard-list', 12) + ' ' + items + '</span>' +
+        '<span class="text-xs text-slate-400 inline-flex items-center gap-1">' + icon('clock', 12) + ' ' + time + '</span>' +
         '</div>' +
-        '</div></div>';
+        '</div>';
 }
 
 async function loadAssessments() {
@@ -4239,10 +4337,10 @@ async function loadAssessments() {
     var timeout = setTimeout(function() {
         var el = document.getElementById('assessment-history');
         if (el && el.innerHTML.indexOf('spinner') > -1) {
-            el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-                '<p>\u26A0\uFE0F ' + (T('common.load_timeout') || 'Loading timed out. Please try again.') + '</p>' +
-                '<button class="btn btn-secondary btn-sm" style="margin-top:8px;" onclick="loadAssessments()">\uD83D\uDD04 Retry</button>' +
-                '</div></div>';
+            el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center text-slate-400">' +
+                '<p>' + icon('alert-triangle', 20, 'text-amber-400 inline') + ' ' + (T('common.load_timeout') || 'Loading timed out. Please try again.') + '</p>' +
+                '<button class="mt-2 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1" onclick="loadAssessments()">' + icon('refresh-cw', 14) + ' Retry</button>' +
+                '</div>';
         }
     }, 15000);
 
@@ -4254,27 +4352,27 @@ async function loadAssessments() {
     if (res && res.assessments) {
         S.assessments = res.assessments;
         if (S.assessments.length) {
-            el.innerHTML = '<div class="table-wrapper"><table class="table">' +
-                '<thead><tr><th>' + T('common.date') + '</th><th>' + T('assessment.framework_label') + '</th><th>' + T('assessment.score') + '</th><th>' + T('assessment.level') + '</th><th>' + T('application.tab.status') + '</th></tr></thead><tbody>' +
+            el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden overflow-x-auto"><table class="w-full">' +
+                '<thead><tr class="bg-slate-50 border-b border-slate-200"><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('common.date') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('assessment.framework_label') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('assessment.score') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('assessment.level') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.tab.status') + '</th></tr></thead><tbody class="divide-y divide-slate-100">' +
                 S.assessments.map(function(a) {
                     var sc = a.overall_score || a.score || 0;
                     var c = capacityLabel(sc);
-                    return '<tr><td>' + formatDate(a.created_at || a.date) + '</td>' +
-                        '<td>' + esc((a.framework || 'kuja').toUpperCase()) + '</td>' +
-                        '<td style="font-weight:600;">' + sc + '%</td>' +
-                        '<td><span class="badge badge-' + c.color + '">' + esc(c.label) + '</span></td>' +
-                        '<td>' + statusBadge(a.status || 'completed') + '</td></tr>';
+                    return '<tr class="hover:bg-slate-50/80 transition-colors"><td class="px-4 py-3.5 text-sm text-slate-600">' + formatDate(a.created_at || a.date) + '</td>' +
+                        '<td class="px-4 py-3.5 text-sm text-slate-600">' + esc((a.framework || 'kuja').toUpperCase()) + '</td>' +
+                        '<td class="px-4 py-3.5 text-sm font-semibold text-slate-900">' + sc + '%</td>' +
+                        '<td class="px-4 py-3.5">' + statusBadge(c.label, c.color) + '</td>' +
+                        '<td class="px-4 py-3.5">' + statusBadge(a.status || 'completed') + '</td></tr>';
                 }).join('') +
                 '</tbody></table></div>';
         } else {
-            el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-                '<p>' + T('assessment.no_assessments') + '</p></div></div>';
+            el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center text-slate-400">' +
+                '<p class="text-sm">' + T('assessment.no_assessments') + '</p></div>';
         }
     } else {
-        el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-            '<p>\u26A0\uFE0F ' + (T('common.load_error') || 'Failed to load assessments.') + '</p>' +
-            '<button class="btn btn-secondary btn-sm" style="margin-top:8px;" onclick="loadAssessments()">\uD83D\uDD04 Retry</button>' +
-            '</div></div>';
+        el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center text-slate-400">' +
+            '<p>' + icon('alert-triangle', 20, 'text-amber-400 inline') + ' ' + (T('common.load_error') || 'Failed to load assessments.') + '</p>' +
+            '<button class="mt-2 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1" onclick="loadAssessments()">' + icon('refresh-cw', 14) + ' Retry</button>' +
+            '</div>';
     }
 }
 
@@ -4299,121 +4397,121 @@ function renderAssessmentWizard() {
         case 4: stepContent = renderAssessResults(); break;
     }
 
-    return '<div class="page-header"><h1>\uD83D\uDCDD ' + T('assessment.title') + '</h1></div>' +
+    return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('clipboard-check', 24, 'text-brand-600') + ' ' + T('assessment.title') + '</h1></div>' +
         renderWizardSteps(steps, step) +
         '<div class="wizard-content">' + stepContent + '</div>' +
         '<div class="wizard-actions">' +
-        (step > 1 && step < 4 ? '<button class="btn btn-secondary" onclick="S.assessStep--;render();window.scrollTo(0,0);">\u2190 ' + T('common.previous') + '</button>' : '<div></div>') +
-        (step < 3 ? '<button class="btn btn-primary" onclick="S.assessStep++;render();window.scrollTo(0,0);">' + T('common.next') + ' \u2192</button>' :
-            step === 3 ? '<button class="btn btn-primary btn-lg" onclick="submitAssessment()">' + T('assessment.complete') + '</button>' :
-                '<button class="btn btn-primary" onclick="nav(\'assessment\')">' + T('common.back') + '</button>') +
+        (step > 1 && step < 4 ? '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="S.assessStep--;render();window.scrollTo(0,0);">' + icon('arrow-left', 16) + ' ' + T('common.previous') + '</button>' : '<div></div>') +
+        (step < 3 ? '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="S.assessStep++;render();window.scrollTo(0,0);">' + T('common.next') + ' ' + icon('arrow-right', 16) + '</button>' :
+            step === 3 ? '<button class="px-4 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="submitAssessment()">' + icon('check-circle', 16) + ' ' + T('assessment.complete') + '</button>' :
+                '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="nav(\'assessment\')">' + icon('arrow-left', 16) + ' ' + T('common.back') + '</button>') +
         '</div>';
 }
 
 function renderAssessProfile() {
     var p = S.assessOrgProfile;
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('assessment.step1') + '</h3>' +
-        '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Review and confirm your organization details.</p>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('org.name') + '</label>' +
-        '<input type="text" class="form-control" value="' + esc(p.name || S.user.org_name || '') + '" ' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-1">' + T('assessment.step1') + '</h3>' +
+        '<p class="text-slate-500 text-sm mb-4">Review and confirm your organization details.</p>' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('org.name') + '</label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + esc(p.name || S.user.org_name || '') + '" ' +
         'oninput="S.assessOrgProfile.name=this.value;">' +
         '</div>' +
-        '<div class="form-row">' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('org.country') + '</label>' +
-        '<input type="text" class="form-control" value="' + esc(p.country || '') + '" ' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('org.country') + '</label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + esc(p.country || '') + '" ' +
         'oninput="S.assessOrgProfile.country=this.value;">' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('org.year_established') + '</label>' +
-        '<input type="number" class="form-control" value="' + esc(p.year_established || '') + '" ' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('org.year_established') + '</label>' +
+        '<input type="number" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + esc(p.year_established || '') + '" ' +
         'oninput="S.assessOrgProfile.year_established=this.value;">' +
         '</div>' +
         '</div>' +
-        '<div class="form-row">' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('org.annual_budget') + '</label>' +
-        '<input type="text" class="form-control" value="' + esc(p.annual_budget || '') + '" placeholder="e.g., $500,000" ' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('org.annual_budget') + '</label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + esc(p.annual_budget || '') + '" placeholder="e.g., $500,000" ' +
         'oninput="S.assessOrgProfile.annual_budget=this.value;">' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('assessment.number_of_staff') + '</label>' +
-        '<input type="number" class="form-control" value="' + esc(p.staff_count || '') + '" ' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('assessment.number_of_staff') + '</label>' +
+        '<input type="number" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + esc(p.staff_count || '') + '" ' +
         'oninput="S.assessOrgProfile.staff_count=this.value;">' +
         '</div>' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('assessment.mission_statement') + '</label>' +
-        '<textarea class="form-control" rows="3" ' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('assessment.mission_statement') + '</label>' +
+        '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="3" ' +
         'oninput="S.assessOrgProfile.mission=this.value;">' + esc(p.mission || '') + '</textarea>' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('assessment.key_sectors') + '</label>' +
-        '<input type="text" class="form-control" value="' + esc(p.sectors || '') + '" placeholder="Health, Education, etc." ' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('assessment.key_sectors') + '</label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + esc(p.sectors || '') + '" placeholder="Health, Education, etc." ' +
         'oninput="S.assessOrgProfile.sectors=this.value;">' +
         '</div>' +
-        '</div></div>';
+        '</div>';
 }
 
 function renderAssessChecklist() {
     var framework = S.selectedFramework || 'kuja';
     var categories = FRAMEWORK_CHECKLISTS[framework] || FRAMEWORK_CHECKLISTS['kuja'];
 
-    var html = '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('assessment.step2') + '</h3>' +
-        '<p style="color:#64748b;font-size:13px;margin-bottom:4px;">Framework: <strong>' + esc(framework.toUpperCase().replace(/_/g, ' ')) + '</strong></p>' +
-        '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Check each item that your organization has in place.</p>';
+    var html = '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-1">' + T('assessment.step2') + '</h3>' +
+        '<p class="text-slate-500 text-sm mb-1">Framework: <strong class="text-slate-900">' + esc(framework.toUpperCase().replace(/_/g, ' ')) + '</strong></p>' +
+        '<p class="text-slate-500 text-sm mb-4">Check each item that your organization has in place.</p>';
 
     Object.keys(categories).forEach(function(catName) {
         var items = categories[catName];
-        html += '<div style="margin-bottom:20px;">' +
-            '<h4 style="font-size:15px;font-weight:600;color:#334155;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #e2e8f0;">' + esc(catName) + '</h4>';
+        html += '<div class="mb-5">' +
+            '<h4 class="text-sm font-semibold text-slate-700 mb-2 pb-1 border-b border-slate-200">' + esc(catName) + '</h4>';
 
         items.forEach(function(item) {
             var checked = S.assessChecklist[item.key] ? ' checked' : '';
-            html += '<label style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;border-bottom:1px solid #f8fafc;">' +
-                '<input type="checkbox"' + checked + ' onchange="S.assessChecklist[\'' + item.key + '\']=this.checked;" style="width:18px;height:18px;accent-color:#2d8f6f;">' +
-                '<span style="font-size:14px;">' + esc(item.label) + '</span>' +
+            html += '<label class="flex items-center gap-3 py-2 cursor-pointer border-b border-slate-50 hover:bg-slate-50/50 rounded transition-colors">' +
+                '<input type="checkbox"' + checked + ' onchange="S.assessChecklist[\'' + item.key + '\']=this.checked;" class="w-4.5 h-4.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500/20">' +
+                '<span class="text-sm text-slate-700">' + esc(item.label) + '</span>' +
                 '</label>';
         });
 
         html += '</div>';
     });
 
-    html += '</div></div>';
+    html += '</div>';
     return html;
 }
 
 function renderAssessDocUpload() {
     var docTypes = [
-        { key: 'registration', label: 'Registration Certificate', icon: '\uD83D\uDCDC' },
-        { key: 'financial', label: 'Financial Statements', icon: '\uD83D\uDCCA' },
-        { key: 'audit', label: 'Audit Report', icon: '\uD83D\uDD0D' },
-        { key: 'psea', label: 'PSEA Policy', icon: '\uD83D\uDEE1\uFE0F' },
-        { key: 'strategic', label: 'Strategic Plan', icon: '\uD83D\uDCCB' }
+        { key: 'registration', label: 'Registration Certificate', iconName: 'scroll' },
+        { key: 'financial', label: 'Financial Statements', iconName: 'bar-chart-3' },
+        { key: 'audit', label: 'Audit Report', iconName: 'search' },
+        { key: 'psea', label: 'PSEA Policy', iconName: 'shield' },
+        { key: 'strategic', label: 'Strategic Plan', iconName: 'clipboard-list' }
     ];
 
-    return '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:4px;">' + T('assessment.step3') + '</h3>' +
-        '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Upload documents to support your assessment.</p>' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-1">' + T('assessment.step3') + '</h3>' +
+        '<p class="text-slate-500 text-sm mb-4">Upload documents to support your assessment.</p>' +
 
         docTypes.map(function(dt) {
             var uploaded = S.assessDocuments[dt.key];
-            return '<div style="margin-bottom:16px;">' +
-                '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">' +
-                '<span style="font-size:20px;">' + dt.icon + '</span>' +
-                '<strong>' + esc(dt.label) + '</strong>' +
-                (uploaded ? '<span class="badge badge-green">\u2713 Uploaded</span>' : '') +
+            return '<div class="mb-4">' +
+                '<div class="flex items-center gap-3 mb-2">' +
+                '<span class="text-slate-500">' + icon(dt.iconName, 20) + '</span>' +
+                '<strong class="text-sm text-slate-900">' + esc(dt.label) + '</strong>' +
+                (uploaded ? statusBadge('Uploaded', 'green') : '') +
                 '</div>' +
                 (uploaded ?
-                    '<div class="upload-file-item">' +
-                    '<span class="file-icon">\uD83D\uDCC4</span>' +
-                    '<div class="file-info"><div class="file-name">' + esc(uploaded.name) + '</div></div>' +
+                    '<div class="flex items-center gap-3 p-2 rounded-lg bg-slate-50">' +
+                    '<span class="text-slate-400">' + icon('file-text', 16) + '</span>' +
+                    '<div class="flex-1 min-w-0"><div class="text-sm font-medium text-slate-700 truncate">' + esc(uploaded.name) + '</div></div>' +
                     '</div>' :
-                    '<div class="upload-zone" style="padding:20px;" onclick="triggerAssessUpload(\'' + dt.key + '\')">' +
-                    '<div class="upload-text"><strong>' + T('common.click_to_upload') + '</strong> ' + esc(dt.label) + '</div>' +
+                    '<div class="border-2 border-dashed border-slate-200 rounded-lg p-5 text-center cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-colors" onclick="triggerAssessUpload(\'' + dt.key + '\')">' +
+                    '<div class="text-sm text-slate-500"><strong class="text-brand-600">' + T('common.click_to_upload') + '</strong> ' + esc(dt.label) + '</div>' +
                     '</div>' +
                     '<input type="file" id="assess-file-' + dt.key + '" style="display:none;" ' +
                     'accept=".pdf,.doc,.docx" onchange="handleAssessUpload(event,\'' + dt.key + '\')">'
@@ -4421,7 +4519,7 @@ function renderAssessDocUpload() {
                 '</div>';
         }).join('') +
 
-        '</div></div>';
+        '</div>';
 }
 
 function triggerAssessUpload(key) {
@@ -4485,39 +4583,39 @@ function renderAssessResults() {
     var gaps = r.gaps || [];
     var recs = r.recommendations || [];
 
-    return '<div class="card" style="margin-bottom:24px;">' +
-        '<div class="card-body" style="text-align:center;padding:32px;">' +
-        '<div style="margin-bottom:16px;">' +
+    return '<div class="bg-white rounded-xl border border-slate-200/60 p-8 mb-6 text-center">' +
+        '<div class="mb-4">' +
         scoreRingHTML(score, 120, '%') +
         '</div>' +
-        '<h2 style="font-size:24px;font-weight:700;margin-bottom:4px;">' + T('assessment.completed_success') + '</h2>' +
-        '<p style="font-size:16px;margin-bottom:12px;">Capacity Level: <span class="badge badge-' + cap.color + '" style="font-size:14px;">' + esc(cap.label) + '</span></p>' +
-        '</div></div>' +
+        '<h2 class="text-2xl font-bold text-slate-900 mb-1">' + T('assessment.completed_success') + '</h2>' +
+        '<p class="text-base mb-3">Capacity Level: ' + statusBadge(cap.label, cap.color) + '</p>' +
+        '</div>' +
 
-        (Object.keys(categories).length ? '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:16px;">' + T('assessment.category_scores') + '</h3>' +
+        (Object.keys(categories).length ? '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-6">' +
+            '<h3 class="font-semibold text-slate-900 mb-4">' + T('assessment.category_scores') + '</h3>' +
             Object.keys(categories).map(function(k) {
                 var val = categories[k] || 0;
-                return '<div style="margin-bottom:12px;">' +
-                    '<div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;">' +
-                    '<span>' + esc(k.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); })) + '</span>' +
-                    '<span style="font-weight:600;">' + val + '%</span></div>' +
-                    '<div class="progress" style="height:10px;"><div class="progress-bar ' + scoreColor(val) + '" style="width:' + val + '%"></div></div>' +
+                var barColor = val >= 70 ? 'bg-emerald-500' : val >= 50 ? 'bg-amber-500' : 'bg-rose-500';
+                return '<div class="mb-3">' +
+                    '<div class="flex justify-between text-sm mb-1">' +
+                    '<span class="text-slate-600">' + esc(k.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); })) + '</span>' +
+                    '<span class="font-semibold text-slate-900">' + val + '%</span></div>' +
+                    '<div class="h-2.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full rounded-full ' + barColor + '" style="width:' + val + '%"></div></div>' +
                     '</div>';
             }).join('') +
-            '</div></div>' : '') +
+            '</div>' : '') +
 
-        (gaps.length ? '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">\u26A0\uFE0F ' + T('assessment.gaps_identified') + '</h3>' +
-            '<ul style="list-style:disc;padding-left:20px;">' +
-            gaps.map(function(g) { return '<li style="margin-bottom:4px;color:#475569;">' + esc(g) + '</li>'; }).join('') +
-            '</ul></div></div>' : '') +
+        (gaps.length ? '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-6">' +
+            '<h3 class="font-semibold text-slate-900 mb-3 flex items-center gap-2">' + icon('alert-triangle', 18, 'text-amber-500') + ' ' + T('assessment.gaps_identified') + '</h3>' +
+            '<ul class="list-disc pl-5 space-y-1">' +
+            gaps.map(function(g) { return '<li class="text-sm text-slate-600">' + esc(g) + '</li>'; }).join('') +
+            '</ul></div>' : '') +
 
-        (recs.length ? '<div class="card"><div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">\uD83D\uDCA1 Recommendations</h3>' +
-            '<ul style="list-style:disc;padding-left:20px;">' +
-            recs.map(function(r) { return '<li style="margin-bottom:4px;color:#475569;">' + esc(r) + '</li>'; }).join('') +
-            '</ul></div></div>' : '');
+        (recs.length ? '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+            '<h3 class="font-semibold text-slate-900 mb-3 flex items-center gap-2">' + icon('lightbulb', 18, 'text-amber-500') + ' Recommendations</h3>' +
+            '<ul class="list-disc pl-5 space-y-1">' +
+            recs.map(function(r) { return '<li class="text-sm text-slate-600">' + esc(r) + '</li>'; }).join('') +
+            '</ul></div>' : '');
 }
 
 // =============================================================================
@@ -4528,74 +4626,72 @@ function renderOrgProfile() {
     loadOrgProfile();
     var org = S.selectedOrg || {};
 
-    return '<div class="page-header">' +
-        '<h1>\uD83D\uDC64 ' + T('org.title') + '</h1>' +
-        '</div>' +
+    return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('user', 24, 'text-brand-600') + ' ' + T('org.title') + '</h1></div>' +
 
         '<div id="org-profile-content">' +
-        '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('org.details') + '</h3>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('org.name') + '</label>' +
-        '<input type="text" class="form-control" value="' + esc(org.name || S.user.org_name || '') + '" ' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-6">' +
+        '<h3 class="font-semibold text-slate-900 mb-4">' + T('org.details') + '</h3>' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('org.name') + '</label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + esc(org.name || S.user.org_name || '') + '" ' +
         'oninput="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.name=this.value;">' +
         '</div>' +
-        '<div class="form-row">' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('org.country') + '</label>' +
-        '<input type="text" class="form-control" value="' + esc(org.country || '') + '" ' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('org.country') + '</label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + esc(org.country || '') + '" ' +
         'oninput="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.country=this.value;">' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('org.year_established') + '</label>' +
-        '<input type="number" class="form-control" value="' + esc(org.year_established || '') + '" ' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('org.year_established') + '</label>' +
+        '<input type="number" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + esc(org.year_established || '') + '" ' +
         'oninput="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.year_established=this.value;">' +
         '</div></div>' +
-        '<div class="form-row">' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('org.type') + '</label>' +
-        '<select class="form-control" onchange="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.type=this.value;">' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('org.type') + '</label>' +
+        '<select class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" onchange="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.type=this.value;">' +
         '<option value="">Select type...</option>' +
         ['NGO', 'CBO', 'INGO', 'Government', 'UN Agency', 'Other'].map(function(t) {
             return '<option value="' + t + '"' + (org.type === t ? ' selected' : '') + '>' + t + '</option>';
         }).join('') +
         '</select>' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('org.annual_budget') + '</label>' +
-        '<input type="text" class="form-control" value="' + esc(org.annual_budget || '') + '" placeholder="e.g., $500,000" ' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('org.annual_budget') + '</label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + esc(org.annual_budget || '') + '" placeholder="e.g., $500,000" ' +
         'oninput="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.annual_budget=this.value;">' +
         '</div></div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('org.description') + '</label>' +
-        '<textarea class="form-control" rows="4" ' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('org.description') + '</label>' +
+        '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="4" ' +
         'oninput="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.description=this.value;">' + esc(org.description || '') + '</textarea>' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('grant.create.sectors') + '</label>' +
-        '<input type="text" class="form-control" value="' + esc((org.sectors || []).join(', ')) + '" placeholder="Health, Education, etc." ' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('grant.create.sectors') + '</label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" value="' + esc((org.sectors || []).join(', ')) + '" placeholder="Health, Education, etc." ' +
         'oninput="if(!S.selectedOrg)S.selectedOrg={};S.selectedOrg.sectors_text=this.value;">' +
         '</div>' +
-        '<button class="btn btn-primary" onclick="saveOrgProfile()">' + T('org.save_profile') + '</button>' +
-        '</div></div>' +
+        '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="saveOrgProfile()">' + icon('save', 16) + ' ' + T('org.save_profile') + '</button>' +
+        '</div>' +
 
         // Registration Verification Status
-        '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">\u2705 ' + T('verification.title') + '</h3>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-6">' +
+        '<h3 class="font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('check-circle', 18, 'text-emerald-500') + ' ' + T('verification.title') + '</h3>' +
         '<div id="org-verification-status">' + renderLoadingTable() + '</div>' +
-        '</div></div>' +
+        '</div>' +
 
         // Compliance
-        '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">\uD83D\uDEE1\uFE0F ' + T('compliance.title') + '</h3>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-6">' +
+        '<h3 class="font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('shield', 18, 'text-brand-600') + ' ' + T('compliance.title') + '</h3>' +
         '<div id="org-compliance">' + renderLoadingTable() + '</div>' +
-        '</div></div>' +
+        '</div>' +
 
         // Assessment History
-        '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">\uD83D\uDCDD ' + T('assessment.previous_assessments') + '</h3>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('clipboard-check', 18, 'text-brand-600') + ' ' + T('assessment.previous_assessments') + '</h3>' +
         '<div id="org-assessments">' + renderLoadingTable() + '</div>' +
-        '</div></div>' +
+        '</div>' +
         '</div>';
 }
 
@@ -4614,16 +4710,16 @@ async function loadOrgProfile() {
         if (el) {
             el.innerHTML = cRes.checks.length ?
                 cRes.checks.map(function(c) {
-                    return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #f1f5f9;">' +
-                        '<span style="font-size:18px;">' + (c.passed ? '\u2705' : '\u274C') + '</span>' +
-                        '<div style="flex:1;">' +
-                        '<div style="font-weight:500;">' + esc(c.name || c.check) + '</div>' +
-                        '<div style="font-size:12px;color:#94a3b8;">' + esc(c.description || '') + '</div>' +
+                    return '<div class="flex items-center gap-3 py-2 border-b border-slate-100">' +
+                        '<span class="text-lg">' + (c.passed ? icon('check-circle', 18, 'text-emerald-500') : icon('x-circle', 18, 'text-rose-500')) + '</span>' +
+                        '<div class="flex-1">' +
+                        '<div class="text-sm font-medium text-slate-700">' + esc(c.name || c.check) + '</div>' +
+                        '<div class="text-xs text-slate-400">' + esc(c.description || '') + '</div>' +
                         '</div>' +
                         statusBadge(c.status || (c.passed ? 'passed' : 'failed')) +
                         '</div>';
                 }).join('') :
-                '<p style="color:#94a3b8;">No compliance checks available.</p>';
+                '<p class="text-sm text-slate-400">No compliance checks available.</p>';
         }
     }
 }
@@ -4639,16 +4735,14 @@ async function saveOrgProfile() {
 
 function renderMyDocuments() {
     loadMyDocuments();
-    return '<div class="page-header">' +
-        '<h1>\uD83D\uDCC4 ' + T('document.title') + '</h1>' +
-        '</div>' +
+    return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('file-text', 24, 'text-brand-600') + ' ' + T('document.title') + '</h1></div>' +
 
-        '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('document.upload') + '</h3>' +
-        '<div class="form-row" style="margin-bottom:12px;">' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('document.type') + '</label>' +
-        '<select class="form-control" id="doc-upload-type">' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-6">' +
+        '<h3 class="font-semibold text-slate-900 mb-4">' + T('document.upload') + '</h3>' +
+        '<div class="mb-3">' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('document.type') + '</label>' +
+        '<select class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" id="doc-upload-type">' +
         '<option value="financial_report">' + T('document.type.financial_report') + '</option>' +
         '<option value="registration">' + T('document.type.registration_certificate') + '</option>' +
         '<option value="audit">' + T('document.type.audit_report') + '</option>' +
@@ -4661,13 +4755,13 @@ function renderMyDocuments() {
         '</select>' +
         '</div>' +
         '</div>' +
-        '<div class="upload-zone" onclick="document.getElementById(\'doc-general-upload\').click();">' +
-        '<div class="upload-icon">\uD83D\uDCCE</div>' +
-        '<div class="upload-text">Drag & drop or <strong>click to browse</strong></div>' +
-        '<div style="font-size:12px;color:#94a3b8;margin-top:4px;">PDF, DOC, DOCX, XLS, XLSX (Max 10MB)</div>' +
+        '<div class="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-colors" onclick="document.getElementById(\'doc-general-upload\').click();">' +
+        '<div class="text-slate-400 mb-2">' + icon('paperclip', 24, 'mx-auto') + '</div>' +
+        '<div class="text-sm text-slate-500">Drag & drop or <strong class="text-brand-600">click to browse</strong></div>' +
+        '<div class="text-xs text-slate-400 mt-1">PDF, DOC, DOCX, XLS, XLSX (Max 10MB)</div>' +
         '</div>' +
         '<input type="file" id="doc-general-upload" style="display:none;" accept=".pdf,.doc,.docx,.xls,.xlsx" onchange="uploadGeneralDoc(event)">' +
-        '</div></div>' +
+        '</div>' +
 
         '<div id="my-docs-list">' + renderLoadingTable() + '</div>';
 }
@@ -4692,21 +4786,23 @@ async function loadMyDocuments() {
     if (!el) return;
     if (res && res.documents && res.documents.length) {
         var rows = res.documents.map(function(d) {
-            var scoreHTML = d.score ? '<span style="color:' + (d.score >= 70 ? '#16a34a' : d.score >= 50 ? '#d97706' : '#dc2626') + ';font-weight:600;">' + d.score + '%</span>' : '-';
-            return '<tr>' +
-                '<td style="font-weight:500;">' + esc(d.original_filename) + '</td>' +
-                '<td><span class="badge">' + esc(d.doc_type || 'other') + '</span></td>' +
-                '<td>' + (d.file_size ? Math.round(d.file_size / 1024) + ' KB' : '-') + '</td>' +
-                '<td>' + scoreHTML + '</td>' +
-                '<td>' + formatDate(d.uploaded_at) + '</td>' +
+            var scoreColor = d.score >= 70 ? 'text-emerald-600' : d.score >= 50 ? 'text-amber-500' : 'text-rose-500';
+            var scoreHTML = d.score ? '<span class="font-semibold ' + scoreColor + '">' + d.score + '%</span>' : '<span class="text-slate-300">-</span>';
+            return '<tr class="hover:bg-slate-50/80 transition-colors">' +
+                '<td class="px-4 py-3.5 text-sm font-medium text-slate-900">' + esc(d.original_filename) + '</td>' +
+                '<td class="px-4 py-3.5">' + statusBadge(d.doc_type || 'other') + '</td>' +
+                '<td class="px-4 py-3.5 text-sm text-slate-600">' + (d.file_size ? Math.round(d.file_size / 1024) + ' KB' : '-') + '</td>' +
+                '<td class="px-4 py-3.5 text-sm">' + scoreHTML + '</td>' +
+                '<td class="px-4 py-3.5 text-xs text-slate-500">' + formatDate(d.uploaded_at) + '</td>' +
                 '</tr>';
         }).join('');
-        el.innerHTML = '<div class="table-wrapper"><table class="table">' +
-            '<thead><tr><th>' + T('document.filename') + '</th><th>' + T('document.type') + '</th><th>' + T('document.size') + '</th><th>' + T('document.ai_score') + '</th><th>' + T('document.uploaded_at') + '</th></tr></thead>' +
-            '<tbody>' + rows + '</tbody></table></div>';
+        el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden overflow-x-auto"><table class="w-full">' +
+            '<thead><tr class="bg-slate-50 border-b border-slate-200"><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('document.filename') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('document.type') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('document.size') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('document.ai_score') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('document.uploaded_at') + '</th></tr></thead>' +
+            '<tbody class="divide-y divide-slate-100">' + rows + '</tbody></table></div>';
     } else {
-        el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-            '<p>\uD83D\uDCC4 Documents you upload will appear here and can be reused across applications.</p></div></div>';
+        el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center">' +
+            '<div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">' + icon('file-text', 22, 'text-slate-400') + '</div>' +
+            '<p class="text-sm text-slate-400">Documents you upload will appear here and can be reused across applications.</p></div>';
     }
 }
 
@@ -4716,9 +4812,7 @@ async function loadMyDocuments() {
 
 function renderCompliance() {
     loadComplianceData();
-    return '<div class="page-header">' +
-        '<h1>\uD83D\uDEE1\uFE0F ' + T('compliance.title') + '</h1>' +
-        '</div>' +
+    return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('shield', 24, 'text-brand-600') + ' ' + T('compliance.title') + '</h1></div>' +
         '<div id="compliance-content">' + renderLoadingTable() + '</div>';
 }
 
@@ -4728,8 +4822,8 @@ async function loadComplianceData() {
     var el = document.getElementById('compliance-content');
     if (!el) return;
     if (res && res.checks && res.checks.length) {
-        el.innerHTML = '<div class="table-wrapper"><table class="table">' +
-            '<thead><tr><th>' + T('compliance.check_type') + '</th><th>' + T('grant.create.description') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('common.last_updated') + '</th></tr></thead><tbody>' +
+        el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden overflow-x-auto"><table class="w-full">' +
+            '<thead><tr class="bg-slate-50 border-b border-slate-200"><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('compliance.check_type') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('grant.create.description') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.tab.status') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('common.last_updated') + '</th></tr></thead><tbody class="divide-y divide-slate-100">' +
             res.checks.map(function(c) {
                 // Issue #10: Human-readable compliance check labels
                 var checkLabel = c.name || c.check || '';
@@ -4744,15 +4838,16 @@ async function loadComplianceData() {
                     'opensanctions': 'OpenSanctions Database'
                 };
                 var displayLabel = readableLabels[checkLabel.toLowerCase()] || T('compliance.check_type.' + checkLabel.toLowerCase()) || checkLabel;
-                return '<tr><td style="font-weight:500;">' + esc(displayLabel) + '</td>' +
-                    '<td style="color:#64748b;">' + esc(c.description || '') + '</td>' +
-                    '<td>' + (c.passed ? '<span class="badge badge-green">\u2705 Passed</span>' : '<span class="badge badge-red">\u274C Failed</span>') + '</td>' +
-                    '<td>' + formatDate(c.updated_at || c.date) + '</td></tr>';
+                return '<tr class="hover:bg-slate-50/80 transition-colors"><td class="px-4 py-3.5 text-sm font-medium text-slate-900">' + esc(displayLabel) + '</td>' +
+                    '<td class="px-4 py-3.5 text-sm text-slate-500">' + esc(c.description || '') + '</td>' +
+                    '<td class="px-4 py-3.5">' + (c.passed ? statusBadge('Passed', 'green') : statusBadge('Failed', 'red')) + '</td>' +
+                    '<td class="px-4 py-3.5 text-xs text-slate-500">' + formatDate(c.updated_at || c.date) + '</td></tr>';
             }).join('') +
             '</tbody></table></div>';
     } else {
-        el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:48px;color:#94a3b8;">' +
-            '<p>No compliance data available.</p></div></div>';
+        el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 p-12 text-center">' +
+            '<div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">' + icon('shield', 22, 'text-slate-400') + '</div>' +
+            '<p class="text-sm text-slate-400">No compliance data available.</p></div>';
     }
 }
 
@@ -4761,19 +4856,15 @@ async function loadComplianceData() {
 // =============================================================================
 
 function renderOrgSearch() {
-    return '<div class="page-header">' +
-        '<h1>\uD83D\uDD0D ' + T('org.search_title') + '</h1>' +
-        '</div>' +
-        '<div class="card" style="margin-bottom:24px;"><div class="card-body">' +
-        '<div class="form-group" style="margin:0;">' +
-        '<input type="text" class="form-control" placeholder="' + T('org.search_placeholder') + '" ' +
+    return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('search', 24, 'text-brand-600') + ' ' + T('org.search_title') + '</h1></div>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mb-6">' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" placeholder="' + T('org.search_placeholder') + '" ' +
         'id="org-search-input" oninput="searchOrgs(this.value);">' +
         '</div>' +
-        '</div></div>' +
         '<div id="org-search-results">' +
-        '<div class="card"><div class="card-body" style="text-align:center;padding:48px;color:#94a3b8;">' +
-        '<p style="font-size:40px;margin-bottom:12px;">\uD83D\uDD0D</p>' +
-        '<p>Enter a search term to find organizations.</p></div></div>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-12 text-center">' +
+        '<div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">' + icon('search', 22, 'text-slate-400') + '</div>' +
+        '<p class="text-sm text-slate-400">Enter a search term to find organizations.</p></div>' +
         '</div>';
 }
 
@@ -4794,18 +4885,18 @@ function searchOrgs(q) {
                     }
                 });
                 var orgList = Object.values(orgs);
-                el.innerHTML = '<div class="content-grid">' +
+                el.innerHTML = '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">' +
                     orgList.map(function(o) {
-                        return '<div class="card"><div class="card-body">' +
-                            '<h3 style="font-weight:600;">' + esc(o.name) + '</h3>' +
-                            '<p style="color:#64748b;margin-top:4px;">\uD83C\uDF10 ' + esc(o.country || 'Unknown') + '</p>' +
-                            (o.capacity != null ? '<p style="margin-top:8px;">Capacity: <span class="badge badge-' + scoreColor(o.capacity) + '">' + o.capacity + '%</span></p>' : '') +
-                            '</div></div>';
+                        return '<div class="bg-white rounded-xl border border-slate-200/60 p-5 hover:shadow-md transition-all duration-200">' +
+                            '<h3 class="font-semibold text-slate-900">' + esc(o.name) + '</h3>' +
+                            '<p class="text-sm text-slate-500 mt-1 flex items-center gap-1">' + icon('globe', 14) + ' ' + esc(o.country || 'Unknown') + '</p>' +
+                            (o.capacity != null ? '<p class="mt-2 text-sm">Capacity: ' + statusBadge(o.capacity + '%', scoreColor(o.capacity)) + '</p>' : '') +
+                            '</div>';
                     }).join('') +
                     '</div>';
             } else {
-                el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-                    '<p>No organizations found matching "' + esc(q) + '".</p></div></div>';
+                el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center">' +
+                    '<p class="text-sm text-slate-400">No organizations found matching "' + esc(q) + '".</p></div>';
             }
         }
     }, 400);
@@ -4817,9 +4908,7 @@ function searchOrgs(q) {
 
 function renderAssignments() {
     loadReviewerAssignments();
-    return '<div class="page-header">' +
-        '<h1>\uD83D\uDCCB ' + T('review.assignments') + '</h1>' +
-        '</div>' +
+    return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('clipboard-list', 24, 'text-brand-600') + ' ' + T('review.assignments') + '</h1></div>' +
         '<div id="assignments-list">' + renderLoadingTable() + '</div>';
 }
 
@@ -4835,9 +4924,7 @@ async function loadReviewerAssignments() {
 
 function renderCompletedReviews() {
     loadCompletedReviews();
-    return '<div class="page-header">' +
-        '<h1>\u2705 ' + T('review.completed') + '</h1>' +
-        '</div>' +
+    return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('check-circle', 24, 'text-emerald-500') + ' ' + T('review.completed') + '</h1></div>' +
         '<div id="completed-reviews-list">' + renderLoadingTable() + '</div>';
 }
 
@@ -4848,18 +4935,18 @@ async function loadCompletedReviews() {
         var el = document.getElementById('completed-reviews-list');
         if (el) {
             if (completed.length) {
-                el.innerHTML = '<div class="table-wrapper"><table class="table">' +
-                    '<thead><tr><th>Application</th><th>Grant</th><th>Score</th><th>Completed</th></tr></thead><tbody>' +
+                el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 overflow-hidden overflow-x-auto"><table class="w-full">' +
+                    '<thead><tr class="bg-slate-50 border-b border-slate-200"><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Application</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Grant</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Score</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Completed</th></tr></thead><tbody class="divide-y divide-slate-100">' +
                     completed.map(function(r) {
-                        return '<tr><td style="font-weight:500;">' + esc(r.org_name || r.application_name || '') + '</td>' +
-                            '<td>' + esc(r.grant_title || '') + '</td>' +
-                            '<td style="font-weight:600;">' + (r.score || 0) + '%</td>' +
-                            '<td>' + formatDate(r.completed_at) + '</td></tr>';
+                        return '<tr class="hover:bg-slate-50/80 transition-colors"><td class="px-4 py-3.5 text-sm font-medium text-slate-900">' + esc(r.org_name || r.application_name || '') + '</td>' +
+                            '<td class="px-4 py-3.5 text-sm text-slate-600">' + esc(r.grant_title || '') + '</td>' +
+                            '<td class="px-4 py-3.5 text-sm font-semibold text-slate-900">' + (r.score || 0) + '%</td>' +
+                            '<td class="px-4 py-3.5 text-xs text-slate-500">' + formatDate(r.completed_at) + '</td></tr>';
                     }).join('') +
                     '</tbody></table></div>';
             } else {
-                el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;">' +
-                    '<p>No completed reviews yet.</p></div></div>';
+                el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center">' +
+                    '<p class="text-sm text-slate-400">No completed reviews yet.</p></div>';
             }
         }
     }
@@ -4901,18 +4988,16 @@ function renderReportsPage() {
     var role = (S.user.role || '').toLowerCase();
     var isNGO = role === 'ngo';
 
-    return '<div class="page-header">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-        '<div>' +
-        '<h1>\uD83D\uDCC8 ' + T('report.title') + '</h1>' +
-        '</div>' +
-        (isNGO ? '<button class="btn btn-primary" onclick="startNewReport()">+ ' + T('report.submit_new') + '</button>' : '') +
+    return '<div class="mb-8 animate-fade-in">' +
+        '<div class="flex justify-between items-center">' +
+        '<h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('bar-chart-3', 24, 'text-brand-600') + ' ' + T('report.title') + '</h1>' +
+        (isNGO ? '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="startNewReport()">' + icon('plus', 16) + ' ' + T('report.submit_new') + '</button>' : '') +
         '</div></div>' +
 
         // Upcoming/Expected reports section
-        '<div id="reports-upcoming" style="margin-bottom:24px;"></div>' +
+        '<div id="reports-upcoming" class="mb-6"></div>' +
 
-        '<h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">' + T(isNGO ? 'report.submitted_reports' : 'report.all_reports') + '</h3>' +
+        '<h3 class="text-base font-semibold text-slate-900 mb-3">' + T(isNGO ? 'report.submitted_reports' : 'report.all_reports') + '</h3>' +
         '<div id="reports-list">' + renderLoadingCards(3) + '</div>';
 }
 
@@ -4928,37 +5013,37 @@ async function loadReportsUpcoming() {
     var isNGO = (S.user.role || '').toLowerCase() === 'ngo';
     var overdueCount = res.overdue_count || 0;
 
-    el.innerHTML = '<div class="card" style="border-left:4px solid ' + (overdueCount > 0 ? '#ef4444' : '#f59e0b') + ';">' +
-        '<div class="card-body">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
-        '<h3 style="font-weight:600;">' + (isNGO ? '\uD83D\uDCC5 Upcoming Deadlines' : '\uD83D\uDCC5 Expected Reports') + '</h3>' +
-        (overdueCount > 0 ? '<span class="badge badge-red">' + overdueCount + ' ' + T('report.overdue').toLowerCase() + '</span>' : '<span class="badge badge-green">' + T('report.all_on_track') + '</span>') +
+    el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 border-l-4 ' + (overdueCount > 0 ? 'border-l-rose-500' : 'border-l-amber-500') + '">' +
+        '<div class="p-5">' +
+        '<div class="flex justify-between items-center mb-3">' +
+        '<h3 class="font-semibold text-slate-900 flex items-center gap-2">' + icon('calendar', 18, overdueCount > 0 ? 'text-rose-500' : 'text-amber-500') + ' ' + (isNGO ? 'Upcoming Deadlines' : 'Expected Reports') + '</h3>' +
+        (overdueCount > 0 ? statusBadge(overdueCount + ' ' + T('report.overdue').toLowerCase(), 'red') : statusBadge(T('report.all_on_track'), 'green')) +
         '</div>' +
-        '<div class="table-wrapper"><table class="table table-hover"><thead><tr>' +
-        '<th>Report</th><th>' + (isNGO ? 'Grant' : 'NGO') + '</th><th>Due</th><th>Status</th><th>Action</th>' +
-        '</tr></thead><tbody>' +
+        '<div class="overflow-x-auto"><table class="w-full"><thead><tr class="bg-slate-50 border-b border-slate-200">' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Report</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + (isNGO ? 'Grant' : 'NGO') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Due</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Action</th>' +
+        '</tr></thead><tbody class="divide-y divide-slate-100">' +
         reports.map(function(r) {
             var isOverdue = r.is_overdue;
             var daysText = isOverdue ? Math.abs(r.days_until_due) + 'd overdue' : r.days_until_due + 'd left';
-            var badgeCls = isOverdue ? 'badge-red' : r.days_until_due <= 7 ? 'badge-amber' : 'badge-outline';
-            var statusBadge = r.status === 'not_started' || r.status === 'not_submitted' ? '<span class="badge badge-outline">' + T('common.not_started') + '</span>' :
-                '<span class="badge badge-' + (r.status === 'draft' ? 'outline' : r.status === 'submitted' ? 'blue' : 'amber') + '">' + esc(r.status).replace(/_/g, ' ') + '</span>';
+            var badgeColor = isOverdue ? 'red' : r.days_until_due <= 7 ? 'amber' : 'outline';
+            var sBadge = r.status === 'not_started' || r.status === 'not_submitted' ? statusBadge(T('common.not_started')) :
+                statusBadge(esc(r.status).replace(/_/g, ' '), r.status === 'draft' ? 'outline' : r.status === 'submitted' ? 'blue' : 'amber');
             var actionBtn = '';
             if (isNGO) {
                 actionBtn = r.draft_report_id ?
-                    '<button class="btn btn-primary btn-sm" onclick="editReport(' + r.draft_report_id + ')">Continue</button>' :
-                    '<button class="btn btn-primary btn-sm" onclick="startReportForGrant(' + r.grant_id + ',\'' + esc(r.report_type) + '\',\'' + esc(r.reporting_period) + '\')">Start</button>';
+                    '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="editReport(' + r.draft_report_id + ')">Continue</button>' :
+                    '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="startReportForGrant(' + r.grant_id + ',\'' + esc(r.report_type) + '\',\'' + esc(r.reporting_period) + '\')">Start</button>';
             } else {
                 actionBtn = r.report_id ?
-                    '<button class="btn btn-primary btn-sm" onclick="reviewReport(' + r.report_id + ')">Review</button>' :
-                    '<span style="color:#94a3b8;font-size:12px;">Awaiting</span>';
+                    '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="reviewReport(' + r.report_id + ')">Review</button>' :
+                    '<span class="text-xs text-slate-400">Awaiting</span>';
             }
-            return '<tr' + (isOverdue ? ' style="background:#fef2f2;"' : '') + '>' +
-                '<td><strong>' + esc(r.requirement_title || r.report_type) + '</strong><br><span style="font-size:12px;color:#94a3b8;">' + esc(r.reporting_period) + '</span></td>' +
-                '<td>' + esc(isNGO ? (r.grant_title || '') : (r.ngo_org_name || '')) + '</td>' +
-                '<td><span class="badge ' + badgeCls + '">' + daysText + '</span></td>' +
-                '<td>' + statusBadge + '</td>' +
-                '<td>' + actionBtn + '</td></tr>';
+            return '<tr class="' + (isOverdue ? 'bg-rose-50/50' : 'hover:bg-slate-50/80') + ' transition-colors">' +
+                '<td class="px-4 py-3.5"><strong class="text-sm text-slate-900">' + esc(r.requirement_title || r.report_type) + '</strong><br><span class="text-xs text-slate-400">' + esc(r.reporting_period) + '</span></td>' +
+                '<td class="px-4 py-3.5 text-sm text-slate-600">' + esc(isNGO ? (r.grant_title || '') : (r.ngo_org_name || '')) + '</td>' +
+                '<td class="px-4 py-3.5">' + statusBadge(daysText, badgeColor) + '</td>' +
+                '<td class="px-4 py-3.5">' + sBadge + '</td>' +
+                '<td class="px-4 py-3.5">' + actionBtn + '</td></tr>';
         }).join('') +
         '</tbody></table></div>' +
         '</div></div>';
@@ -4966,8 +5051,8 @@ async function loadReportsUpcoming() {
 
 function renderReportsList(reports) {
     if (!reports || !reports.length) {
-        return '<div class="card" style="padding:32px;text-align:center;">' +
-            '<p style="color:#94a3b8;font-size:16px;">' + T('report.no_reports') + '</p>' +
+        return '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center">' +
+            '<p class="text-sm text-slate-400">' + T('report.no_reports') + '</p>' +
             '</div>';
     }
 
@@ -4999,11 +5084,11 @@ function renderReportsList(reports) {
     return grantOrder.map(function(grantTitle) {
         var grantReports = grouped[grantTitle];
         var overdueCount = grantReports.filter(function(r) { return r.status === 'revision_requested'; }).length;
-        return '<div class="card" style="margin-bottom:16px;">' +
-            '<div class="card-body" style="padding-bottom:0;">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
-            '<h4 style="font-weight:600;">\uD83D\uDCBC ' + esc(grantTitle) + '</h4>' +
-            '<span class="badge badge-outline">' + grantReports.length + ' ' + T('report.title').toLowerCase() + '</span>' +
+        return '<div class="bg-white rounded-xl border border-slate-200/60 mb-4">' +
+            '<div class="p-5 pb-0">' +
+            '<div class="flex justify-between items-center mb-3">' +
+            '<h4 class="font-semibold text-slate-900 flex items-center gap-2">' + icon('briefcase', 16, 'text-slate-500') + ' ' + esc(grantTitle) + '</h4>' +
+            statusBadge(grantReports.length + ' ' + T('report.title').toLowerCase()) +
             '</div>' +
             renderReportsTableFlat(grantReports, statusColors, isNGO, isDonor) +
             '</div></div>';
@@ -5011,29 +5096,29 @@ function renderReportsList(reports) {
 }
 
 function renderReportsTableFlat(reports, statusColors, isNGO, isDonor) {
-    return '<div class="table-wrapper"><table class="table table-hover"><thead><tr>' +
-        '<th>' + T('report.title') + '</th>' +
-        (isDonor ? '<th>NGO</th>' : '') +
-        '<th>' + T('report.type') + '</th><th>' + T('report.period') + '</th><th>' + T('application.tab.status') + '</th><th>' + T('common.actions') + '</th>' +
-        '</tr></thead><tbody>' +
+    return '<div class="overflow-x-auto"><table class="w-full"><thead><tr class="bg-slate-50 border-b border-slate-200">' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('report.title') + '</th>' +
+        (isDonor ? '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">NGO</th>' : '') +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('report.type') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('report.period') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.tab.status') + '</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('common.actions') + '</th>' +
+        '</tr></thead><tbody class="divide-y divide-slate-100">' +
         reports.map(function(r) {
-            var badge = statusColors[r.status] || 'badge-outline';
+            var badgeColor = {draft:'outline',submitted:'blue',under_review:'amber',accepted:'green',revision_requested:'red'}[r.status] || 'outline';
             var actionBtn = '';
             if (isNGO && (r.status === 'draft' || r.status === 'revision_requested')) {
-                actionBtn = '<button class="btn btn-primary btn-sm" onclick="editReport(' + r.id + ')">' + T('common.edit') + '</button>';
+                actionBtn = '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="editReport(' + r.id + ')">' + T('common.edit') + '</button>';
             } else if (!isNGO && r.status === 'submitted') {
-                actionBtn = '<button class="btn btn-primary btn-sm" onclick="reviewReport(' + r.id + ')">Review</button>';
+                actionBtn = '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="reviewReport(' + r.id + ')">Review</button>';
             } else {
-                actionBtn = '<button class="btn btn-secondary btn-sm" onclick="viewReport(' + r.id + ')">' + T('common.view') + '</button>';
+                actionBtn = '<button class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors" onclick="viewReport(' + r.id + ')">' + T('common.view') + '</button>';
             }
 
-            return '<tr>' +
-                '<td><strong>' + esc(r.title || 'Report #' + r.id) + '</strong></td>' +
-                (isDonor ? '<td>' + esc(r.ngo_org_name || r.org_name || '') + '</td>' : '') +
-                '<td><span class="badge badge-outline">' + esc(r.report_type || '') + '</span></td>' +
-                '<td>' + esc(r.reporting_period || '-') + '</td>' +
-                '<td><span class="badge ' + badge + '">' + esc(r.status || 'draft').replace(/_/g, ' ') + '</span></td>' +
-                '<td>' + actionBtn + '</td></tr>';
+            return '<tr class="hover:bg-slate-50/80 transition-colors">' +
+                '<td class="px-4 py-3.5 text-sm font-medium text-slate-900">' + esc(r.title || 'Report #' + r.id) + '</td>' +
+                (isDonor ? '<td class="px-4 py-3.5 text-sm text-slate-600">' + esc(r.ngo_org_name || r.org_name || '') + '</td>' : '') +
+                '<td class="px-4 py-3.5">' + statusBadge(r.report_type || '') + '</td>' +
+                '<td class="px-4 py-3.5 text-sm text-slate-600">' + esc(r.reporting_period || '-') + '</td>' +
+                '<td class="px-4 py-3.5">' + statusBadge(esc(r.status || 'draft').replace(/_/g, ' '), badgeColor) + '</td>' +
+                '<td class="px-4 py-3.5">' + actionBtn + '</td></tr>';
         }).join('') +
         '</tbody></table></div>';
 }
@@ -5136,12 +5221,12 @@ function renderSubmitReport() {
     if (sections.length > 0) {
         contentFields = sections.map(function(s, i) {
             var val = (r.content && r.content[s.title]) || '';
-            return '<div class="form-group">' +
-                '<label class="form-label">' + esc(s.title) +
-                (s.required ? ' <span class="required">*</span>' : ' <span style="color:#94a3b8;">(Optional)</span>') +
+            return '<div class="mb-4">' +
+                '<label class="block text-xs font-medium text-slate-600 mb-1">' + esc(s.title) +
+                (s.required ? ' <span class="text-rose-500">*</span>' : ' <span class="text-slate-400">(Optional)</span>') +
                 '</label>' +
-                '<p style="font-size:12px;color:#94a3b8;margin-bottom:4px;">' + esc(s.description || '') + '</p>' +
-                '<textarea class="form-control" rows="4" placeholder="Enter details..." ' +
+                '<p class="text-xs text-slate-400 mb-1">' + esc(s.description || '') + '</p>' +
+                '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="4" placeholder="Enter details..." ' +
                 'oninput="if(!S.newReport.content)S.newReport.content={};S.newReport.content[\'' + esc(s.title).replace(/'/g, "\\'") + '\']=this.value;">' + esc(val) + '</textarea>' +
                 '</div>';
         }).join('');
@@ -5150,9 +5235,9 @@ function renderSubmitReport() {
         var defaultSections = ['Executive Summary', 'Activities and Outputs', 'Progress Against Indicators', 'Financial Summary', 'Challenges and Mitigation', 'Next Steps'];
         contentFields = defaultSections.map(function(s) {
             var val = (r.content && r.content[s]) || '';
-            return '<div class="form-group">' +
-                '<label class="form-label">' + esc(s) + ' <span class="required">*</span></label>' +
-                '<textarea class="form-control" rows="4" placeholder="Enter details for ' + esc(s) + '..." ' +
+            return '<div class="mb-4">' +
+                '<label class="block text-xs font-medium text-slate-600 mb-1">' + esc(s) + ' <span class="text-rose-500">*</span></label>' +
+                '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="4" placeholder="Enter details for ' + esc(s) + '..." ' +
                 'oninput="if(!S.newReport.content)S.newReport.content={};S.newReport.content[\'' + s.replace(/'/g, "\\'") + '\']=this.value;">' + esc(val) + '</textarea>' +
                 '</div>';
         }).join('');
@@ -5161,11 +5246,11 @@ function renderSubmitReport() {
     // Reporting requirements info
     var reqsInfo = '';
     if (reqs.length > 0) {
-        reqsInfo = '<div class="card" style="margin-bottom:20px;border-left:4px solid #f59e0b;">' +
-            '<div class="card-body" style="padding:12px 16px;">' +
-            '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">\u26A0\uFE0F Reporting Requirements</h4>' +
+        reqsInfo = '<div class="bg-white rounded-xl border border-slate-200/60 border-l-4 border-l-amber-500 mb-5">' +
+            '<div class="p-4">' +
+            '<h4 class="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">' + icon('alert-triangle', 16, 'text-amber-500') + ' Reporting Requirements</h4>' +
             reqs.map(function(req) {
-                return '<p style="font-size:13px;margin-bottom:4px;"><strong>' + esc(req.title || req.type) + ':</strong> ' + esc(req.description || '') + '</p>';
+                return '<p class="text-sm text-slate-600 mb-1"><strong class="text-slate-700">' + esc(req.title || req.type) + ':</strong> ' + esc(req.description || '') + '</p>';
             }).join('') +
             '</div></div>';
     }
@@ -5173,54 +5258,54 @@ function renderSubmitReport() {
     // Grant selector for new reports (when user has multiple awarded grants)
     var grantSelector = '';
     if (!r.id && S.reportGrants && S.reportGrants.length > 1) {
-        grantSelector = '<div class="card" style="margin-bottom:16px;"><div class="card-body" style="padding:12px 16px;">' +
-            '<label class="form-label" style="font-weight:600;">' + T('report.select_grant_to_report') + '</label>' +
-            '<select class="form-control" onchange="changeReportGrant(this.value);">' +
+        grantSelector = '<div class="bg-white rounded-xl border border-slate-200/60 p-4 mb-4">' +
+            '<label class="block text-xs font-semibold text-slate-700 mb-1">' + T('report.select_grant_to_report') + '</label>' +
+            '<select class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" onchange="changeReportGrant(this.value);">' +
             S.reportGrants.map(function(a) {
                 return '<option value="' + a.grant_id + ':' + a.id + '"' + (r.grant_id == a.grant_id ? ' selected' : '') + '>' +
                     esc(a.grant_title) + '</option>';
             }).join('') +
-            '</select></div></div>';
+            '</select></div>';
     } else if (S.currentReport && S.currentReport.grant_title) {
-        grantSelector = '<div style="margin-bottom:12px;color:#64748b;font-size:13px;">Reporting on: <strong>' + esc(S.currentReport.grant_title) + '</strong></div>';
+        grantSelector = '<div class="mb-3 text-sm text-slate-500">Reporting on: <strong class="text-slate-700">' + esc(S.currentReport.grant_title) + '</strong></div>';
     }
 
-    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'reports\')" style="margin-bottom:16px;">\u2190 ' + T('common.back') + '</button>' +
-        '<div class="page-header"><h1>' + (r.id ? '\u270F\uFE0F ' + T('common.edit') : '\uD83D\uDCDD ' + T('report.submit_new')) + '</h1></div>' +
+    return '<button class="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 mb-4 transition-colors" onclick="nav(\'reports\')">' + icon('arrow-left', 16) + ' ' + T('common.back') + '</button>' +
+        '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon(r.id ? 'edit' : 'file-plus', 24, 'text-brand-600') + ' ' + (r.id ? T('common.edit') : T('report.submit_new')) + '</h1></div>' +
 
         grantSelector +
         reqsInfo +
 
-        '<div class="card"><div class="card-body">' +
-        '<div class="form-row">' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('report.type') + '</label>' +
-        '<select class="form-control" onchange="S.newReport.report_type=this.value;">' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('report.type') + '</label>' +
+        '<select class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" onchange="S.newReport.report_type=this.value;">' +
         reportTypes.map(function(t) { return '<option value="' + t + '"' + (r.report_type === t ? ' selected' : '') + '>' + t.charAt(0).toUpperCase() + t.slice(1) + '</option>'; }).join('') +
         '</select>' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('report.reporting_period') + '</label>' +
-        '<input type="text" class="form-control" placeholder="e.g., Q1 2026, Jan-Mar 2026" ' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('report.reporting_period') + '</label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" placeholder="e.g., Q1 2026, Jan-Mar 2026" ' +
         'value="' + esc(r.reporting_period) + '" oninput="S.newReport.reporting_period=this.value;">' +
         '</div>' +
         '</div>' +
-        '<div class="form-group">' +
-        '<label class="form-label">' + T('report.report_title') + '</label>' +
-        '<input type="text" class="form-control" placeholder="e.g., Q1 2026 Progress Report" ' +
+        '<div class="mb-4">' +
+        '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('report.report_title') + '</label>' +
+        '<input type="text" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" placeholder="e.g., Q1 2026 Progress Report" ' +
         'value="' + esc(r.title) + '" oninput="S.newReport.title=this.value;">' +
         '</div>' +
-        '</div></div>' +
+        '</div>' +
 
-        '<div class="card" style="margin-top:16px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('report.content') + '</h3>' +
-        '<p style="color:#64748b;font-size:13px;margin-bottom:16px;">Complete each section below. The AI will help format and validate your report.</p>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mt-4">' +
+        '<h3 class="font-semibold text-slate-900 mb-4">' + T('report.content') + '</h3>' +
+        '<p class="text-sm text-slate-500 mb-4">Complete each section below. The AI will help format and validate your report.</p>' +
         contentFields +
-        '</div></div>' +
+        '</div>' +
 
-        '<div style="display:flex;gap:12px;margin-top:20px;">' +
-        '<button class="btn btn-secondary" onclick="saveReportDraft()">' + T('grant.create.save_draft') + '</button>' +
-        '<button class="btn btn-primary btn-lg" onclick="submitReport()">\uD83D\uDE80 ' + T('report.submit') + '</button>' +
+        '<div class="flex gap-3 mt-5">' +
+        '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="saveReportDraft()">' + icon('save', 16) + ' ' + T('grant.create.save_draft') + '</button>' +
+        '<button class="px-4 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="submitReport()">' + icon('rocket', 16) + ' ' + T('report.submit') + '</button>' +
         '</div>';
 }
 
@@ -5341,11 +5426,11 @@ function renderReviewReport() {
     // Content sections
     var content = r.content || {};
     var contentHTML = Object.keys(content).map(function(key) {
-        return '<div style="margin-bottom:16px;">' +
-            '<h4 style="font-size:14px;font-weight:600;color:#334155;">' + esc(key) + '</h4>' +
-            '<p style="font-size:14px;color:#475569;white-space:pre-wrap;">' + esc(content[key] || 'Not provided') + '</p>' +
+        return '<div class="mb-4">' +
+            '<h4 class="text-sm font-semibold text-slate-700">' + esc(key) + '</h4>' +
+            '<p class="text-sm text-slate-600 whitespace-pre-wrap">' + esc(content[key] || 'Not provided') + '</p>' +
             '</div>';
-    }).join('') || '<p style="color:#94a3b8;">No content provided.</p>';
+    }).join('') || '<p class="text-sm text-slate-400">No content provided.</p>';
 
     // AI analysis
     var aiHTML = '';
@@ -5354,21 +5439,22 @@ function renderReviewReport() {
         // Per-requirement compliance section
         var reqScoresHTML = '';
         if (ai.requirement_scores && ai.requirement_scores.length > 0) {
-            reqScoresHTML = '<div style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px;">' +
-                '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">' + T('application.donor_req_compliance') + '</h4>' +
+            reqScoresHTML = '<div class="mt-4 border-t border-slate-200 pt-3">' +
+                '<h4 class="text-sm font-semibold text-slate-900 mb-2">' + T('application.donor_req_compliance') + '</h4>' +
                 ai.requirement_scores.map(function(rs) {
                     var rScore = rs.score || 0;
-                    var barColor = rScore >= 70 ? '#2d8f6f' : rScore >= 40 ? '#f59e0b' : '#ef4444';
-                    var icon = rs.addressed ? '\u2705' : '\u274C';
-                    return '<div style="margin-bottom:10px;padding:8px 12px;background:#f8fafc;border-radius:8px;">' +
-                        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
-                        '<span style="font-size:13px;font-weight:500;">' + icon + ' ' + esc(rs.requirement || 'Requirement') + '</span>' +
-                        '<span style="font-weight:600;color:' + barColor + ';">' + rScore + '%</span>' +
+                    var barColor = rScore >= 70 ? 'bg-brand-600' : rScore >= 40 ? 'bg-amber-500' : 'bg-rose-500';
+                    var scoreTextColor = rScore >= 70 ? 'text-brand-600' : rScore >= 40 ? 'text-amber-500' : 'text-rose-500';
+                    var reqIcon = rs.addressed ? icon('check-circle', 14, 'text-emerald-500') : icon('x-circle', 14, 'text-rose-500');
+                    return '<div class="mb-2.5 p-2 bg-slate-50 rounded-lg">' +
+                        '<div class="flex justify-between items-center mb-1">' +
+                        '<span class="text-sm font-medium text-slate-700 flex items-center gap-1">' + reqIcon + ' ' + esc(rs.requirement || 'Requirement') + '</span>' +
+                        '<span class="font-semibold text-sm ' + scoreTextColor + '">' + rScore + '%</span>' +
                         '</div>' +
-                        '<div style="height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden;">' +
-                        '<div style="height:100%;width:' + rScore + '%;background:' + barColor + ';border-radius:2px;"></div>' +
+                        '<div class="h-1 bg-slate-200 rounded-full overflow-hidden">' +
+                        '<div class="h-full rounded-full ' + barColor + '" style="width:' + rScore + '%"></div>' +
                         '</div>' +
-                        (rs.feedback ? '<p style="font-size:12px;color:#64748b;margin-top:4px;">' + esc(rs.feedback) + '</p>' : '') +
+                        (rs.feedback ? '<p class="text-xs text-slate-500 mt-1">' + esc(rs.feedback) + '</p>' : '') +
                         '</div>';
                 }).join('') +
                 '</div>';
@@ -5377,25 +5463,25 @@ function renderReviewReport() {
         // Risk flags
         var riskHTML = '';
         if (ai.risk_flags && ai.risk_flags.length > 0) {
-            riskHTML = '<div style="margin-top:12px;padding:10px 12px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;">' +
-                '<strong style="font-size:13px;color:#dc2626;">\u26A0\uFE0F Risk Flags:</strong>' +
-                ai.risk_flags.map(function(rf) { return '<p style="font-size:13px;color:#dc2626;margin:2px 0;">\u2022 ' + esc(rf) + '</p>'; }).join('') +
+            riskHTML = '<div class="mt-3 p-3 bg-rose-50 rounded-lg border border-rose-200">' +
+                '<strong class="text-sm text-rose-600 flex items-center gap-1">' + icon('alert-triangle', 14) + ' Risk Flags:</strong>' +
+                ai.risk_flags.map(function(rf) { return '<p class="text-sm text-rose-600 my-0.5">&bull; ' + esc(rf) + '</p>'; }).join('') +
                 '</div>';
         }
 
-        aiHTML = '<div class="card" style="margin-top:16px;border-left:4px solid #2d8f6f;">' +
-            '<div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">\u2728 ' + T('report.ai_analysis') + '</h3>' +
-            '<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">' +
-            '<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:#2d8f6f;">' + (ai.score || 0) + '</div><div style="font-size:12px;color:#94a3b8;">Overall</div></div>' +
-            '<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:#3b82f6;">' + (ai.completeness_score || 0) + '</div><div style="font-size:12px;color:#94a3b8;">Completeness</div></div>' +
-            '<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:#f59e0b;">' + (ai.quality_score || 0) + '</div><div style="font-size:12px;color:#94a3b8;">Quality</div></div>' +
-            (ai.compliance_score != null ? '<div style="text-align:center;"><div style="font-size:24px;font-weight:700;color:#8b5cf6;">' + (ai.compliance_score || 0) + '</div><div style="font-size:12px;color:#94a3b8;">Compliance</div></div>' : '') +
+        aiHTML = '<div class="bg-white rounded-xl border border-slate-200/60 border-l-4 border-l-brand-600 mt-4">' +
+            '<div class="p-5">' +
+            '<h3 class="font-semibold text-slate-900 mb-3 flex items-center gap-2">' + icon('sparkles', 18, 'text-amber-500') + ' ' + T('report.ai_analysis') + '</h3>' +
+            '<div class="flex gap-4 mb-3 flex-wrap">' +
+            '<div class="text-center"><div class="text-2xl font-bold text-brand-600">' + (ai.score || 0) + '</div><div class="text-xs text-slate-400">Overall</div></div>' +
+            '<div class="text-center"><div class="text-2xl font-bold text-blue-600">' + (ai.completeness_score || 0) + '</div><div class="text-xs text-slate-400">Completeness</div></div>' +
+            '<div class="text-center"><div class="text-2xl font-bold text-amber-500">' + (ai.quality_score || 0) + '</div><div class="text-xs text-slate-400">Quality</div></div>' +
+            (ai.compliance_score != null ? '<div class="text-center"><div class="text-2xl font-bold text-violet-600">' + (ai.compliance_score || 0) + '</div><div class="text-xs text-slate-400">Compliance</div></div>' : '') +
             '</div>' +
-            (ai.summary ? '<p style="font-size:14px;color:#334155;margin-bottom:12px;"><strong>Summary:</strong> ' + esc(ai.summary) + '</p>' : '') +
-            (ai.findings && ai.findings.length ? '<div style="margin-bottom:8px;"><strong style="font-size:13px;">Findings:</strong>' + ai.findings.map(function(f) { return '<p style="font-size:13px;color:#475569;margin:2px 0;">\u2022 ' + esc(f) + '</p>'; }).join('') + '</div>' : '') +
-            (ai.missing_items && ai.missing_items.length ? '<div style="margin-bottom:8px;"><strong style="font-size:13px;color:#ef4444;">Missing:</strong>' + ai.missing_items.map(function(m) { return '<p style="font-size:13px;color:#ef4444;margin:2px 0;">\u2022 ' + esc(m) + '</p>'; }).join('') + '</div>' : '') +
-            (ai.recommendations && ai.recommendations.length ? '<div><strong style="font-size:13px;">Recommendations:</strong>' + ai.recommendations.map(function(rec) { return '<p style="font-size:13px;color:#475569;margin:2px 0;">\u2022 ' + esc(rec) + '</p>'; }).join('') + '</div>' : '') +
+            (ai.summary ? '<p class="text-sm text-slate-700 mb-3"><strong>Summary:</strong> ' + esc(ai.summary) + '</p>' : '') +
+            (ai.findings && ai.findings.length ? '<div class="mb-2"><strong class="text-sm text-slate-700">Findings:</strong>' + ai.findings.map(function(f) { return '<p class="text-sm text-slate-600 my-0.5">&bull; ' + esc(f) + '</p>'; }).join('') + '</div>' : '') +
+            (ai.missing_items && ai.missing_items.length ? '<div class="mb-2"><strong class="text-sm text-rose-600">Missing:</strong>' + ai.missing_items.map(function(m) { return '<p class="text-sm text-rose-600 my-0.5">&bull; ' + esc(m) + '</p>'; }).join('') + '</div>' : '') +
+            (ai.recommendations && ai.recommendations.length ? '<div><strong class="text-sm text-slate-700">Recommendations:</strong>' + ai.recommendations.map(function(rec) { return '<p class="text-sm text-slate-600 my-0.5">&bull; ' + esc(rec) + '</p>'; }).join('') + '</div>' : '') +
             reqScoresHTML + riskHTML +
             '</div></div>';
     }
@@ -5403,16 +5489,16 @@ function renderReviewReport() {
     // Donor review actions
     var reviewActions = '';
     if (canReview) {
-        reviewActions = '<div class="card" style="margin-top:16px;border-left:4px solid #f59e0b;">' +
-            '<div class="card-body">' +
-            '<h3 style="font-weight:600;margin-bottom:12px;">\uD83D\uDD0D Review Actions</h3>' +
-            '<div class="form-group">' +
-            '<label class="form-label">' + T('report.review_notes') + '</label>' +
-            '<textarea class="form-control" rows="3" id="review-notes" placeholder="Add feedback or notes for the grantee..."></textarea>' +
+        reviewActions = '<div class="bg-white rounded-xl border border-slate-200/60 border-l-4 border-l-amber-500 mt-4">' +
+            '<div class="p-5">' +
+            '<h3 class="font-semibold text-slate-900 mb-3 flex items-center gap-2">' + icon('search', 18, 'text-amber-500') + ' Review Actions</h3>' +
+            '<div class="mb-4">' +
+            '<label class="block text-xs font-medium text-slate-600 mb-1">' + T('report.review_notes') + '</label>' +
+            '<textarea class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" rows="3" id="review-notes" placeholder="Add feedback or notes for the grantee..."></textarea>' +
             '</div>' +
-            '<div style="display:flex;gap:12px;">' +
-            '<button class="btn btn-primary btn-lg" onclick="acceptReport(' + r.id + ')">\u2705 ' + T('report.accept') + '</button>' +
-            '<button class="btn btn-secondary" onclick="requestRevision(' + r.id + ')">\u21A9\uFE0F ' + T('report.request_revision') + '</button>' +
+            '<div class="flex gap-3">' +
+            '<button class="px-4 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="acceptReport(' + r.id + ')">' + icon('check-circle', 16) + ' ' + T('report.accept') + '</button>' +
+            '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="requestRevision(' + r.id + ')">' + icon('corner-down-left', 16) + ' ' + T('report.request_revision') + '</button>' +
             '</div>' +
             '</div></div>';
     }
@@ -5420,11 +5506,11 @@ function renderReviewReport() {
     // Reviewer notes (if any)
     var notesHTML = '';
     if (r.reviewer_notes) {
-        notesHTML = '<div class="card" style="margin-top:16px;border-left:4px solid #3b82f6;">' +
-            '<div class="card-body">' +
-            '<h4 style="font-weight:600;margin-bottom:8px;">' + T('report.reviewer_notes') + '</h4>' +
-            '<p style="color:#475569;">' + esc(r.reviewer_notes) + '</p>' +
-            '<p style="font-size:12px;color:#94a3b8;margin-top:4px;">Reviewed: ' + (r.reviewed_at ? new Date(r.reviewed_at).toLocaleDateString() : 'N/A') + '</p>' +
+        notesHTML = '<div class="bg-white rounded-xl border border-slate-200/60 border-l-4 border-l-blue-500 mt-4">' +
+            '<div class="p-5">' +
+            '<h4 class="font-semibold text-slate-900 mb-2">' + T('report.reviewer_notes') + '</h4>' +
+            '<p class="text-sm text-slate-600">' + esc(r.reviewer_notes) + '</p>' +
+            '<p class="text-xs text-slate-400 mt-1">Reviewed: ' + (r.reviewed_at ? new Date(r.reviewed_at).toLocaleDateString() : 'N/A') + '</p>' +
             '</div></div>';
     }
 
@@ -5432,41 +5518,41 @@ function renderReviewReport() {
     var donorReqsHTML = '';
     var donorReqs = r.grant_reporting_requirements || [];
     if (donorReqs.length > 0) {
-        donorReqsHTML = '<div class="card" style="margin-top:16px;border-left:4px solid #8b5cf6;">' +
-            '<div class="card-body" style="padding:12px 16px;">' +
-            '<h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">\uD83D\uDCCB Donor Reporting Requirements</h4>' +
+        donorReqsHTML = '<div class="bg-white rounded-xl border border-slate-200/60 border-l-4 border-l-violet-500 mt-4">' +
+            '<div class="p-4">' +
+            '<h4 class="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">' + icon('clipboard-list', 16, 'text-violet-500') + ' Donor Reporting Requirements</h4>' +
             donorReqs.map(function(req) {
                 var isMatch = req.type && r.report_type && req.type.toLowerCase() === r.report_type.toLowerCase();
-                return '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px;">' +
-                    (isMatch ? '<span style="color:#2d8f6f;">\u2705</span>' : '<span style="color:#94a3b8;">\u25CB</span>') +
-                    '<div><strong style="font-size:13px;">' + esc(req.title || req.type) + '</strong>' +
-                    (req.frequency ? ' <span style="color:#94a3b8;font-size:12px;">(' + esc(req.frequency) + ')</span>' : '') +
-                    '<br><span style="font-size:12px;color:#64748b;">' + esc(req.description || '') + '</span></div></div>';
+                return '<div class="flex items-baseline gap-2 mb-1">' +
+                    (isMatch ? '<span class="text-brand-600">' + icon('check-circle', 14) + '</span>' : '<span class="text-slate-300">' + icon('circle', 14) + '</span>') +
+                    '<div><strong class="text-sm text-slate-700">' + esc(req.title || req.type) + '</strong>' +
+                    (req.frequency ? ' <span class="text-xs text-slate-400">(' + esc(req.frequency) + ')</span>' : '') +
+                    '<br><span class="text-xs text-slate-500">' + esc(req.description || '') + '</span></div></div>';
             }).join('') +
             '</div></div>';
     }
 
-    return '<button class="btn btn-secondary btn-sm" onclick="nav(\'reports\')" style="margin-bottom:16px;">\u2190 ' + T('common.back') + '</button>' +
-        '<div class="card"><div class="card-body">' +
-        '<div style="display:flex;justify-content:space-between;align-items:start;">' +
+    return '<button class="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 mb-4 transition-colors" onclick="nav(\'reports\')">' + icon('arrow-left', 16) + ' ' + T('common.back') + '</button>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<div class="flex justify-between items-start">' +
         '<div>' +
-        '<h2 style="font-weight:600;">' + esc(r.title || 'Report #' + r.id) + '</h2>' +
-        '<p style="color:#64748b;">' + esc(r.grant_title || '') + '</p>' +
+        '<h2 class="text-lg font-semibold text-slate-900">' + esc(r.title || 'Report #' + r.id) + '</h2>' +
+        '<p class="text-sm text-slate-500">' + esc(r.grant_title || '') + '</p>' +
         '</div>' +
-        '<div style="text-align:right;">' +
-        '<span class="badge ' + (statusColors[r.status] || 'badge-outline') + '">' + esc(r.status || 'draft').replace(/_/g, ' ') + '</span>' +
-        '<p style="font-size:12px;color:#94a3b8;margin-top:4px;">' + esc(r.report_type || '') + ' | ' + esc(r.reporting_period || '') + '</p>' +
-        (r.org_name ? '<p style="font-size:12px;color:#94a3b8;">By: ' + esc(r.org_name) + '</p>' : '') +
+        '<div class="text-right">' +
+        statusBadge(esc(r.status || 'draft').replace(/_/g, ' '), {draft:'outline',submitted:'blue',under_review:'amber',accepted:'green',revision_requested:'red'}[r.status] || 'outline') +
+        '<p class="text-xs text-slate-400 mt-1">' + esc(r.report_type || '') + ' | ' + esc(r.reporting_period || '') + '</p>' +
+        (r.org_name ? '<p class="text-xs text-slate-400">By: ' + esc(r.org_name) + '</p>' : '') +
         '</div>' +
         '</div>' +
-        '</div></div>' +
+        '</div>' +
 
         donorReqsHTML +
 
-        '<div class="card" style="margin-top:16px;"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">' + T('report.content') + '</h3>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5 mt-4">' +
+        '<h3 class="font-semibold text-slate-900 mb-4">' + T('report.content') + '</h3>' +
         contentHTML +
-        '</div></div>' +
+        '</div>' +
 
         aiHTML +
         notesHTML +
@@ -5511,47 +5597,45 @@ async function requestRevision(id) {
 
 function verificationStatusBadge(status) {
     var map = {
-        'verified': { color: 'green', icon: '\u2705', label: T('status.verified') },
-        'ai_reviewed': { color: 'blue', icon: '\uD83E\uDD16', label: T('status.ai_reviewed') },
-        'pending': { color: 'amber', icon: '\u23F3', label: T('status.pending') },
-        'flagged': { color: 'red', icon: '\u26A0\uFE0F', label: T('status.flagged') },
-        'expired': { color: 'red', icon: '\u274C', label: T('status.expired') },
-        'unverified': { color: 'outline', icon: '\u2753', label: T('status.unverified') },
+        'verified': { color: 'green', iconName: 'check-circle', label: T('status.verified') },
+        'ai_reviewed': { color: 'blue', iconName: 'bot', label: T('status.ai_reviewed') },
+        'pending': { color: 'amber', iconName: 'clock', label: T('status.pending') },
+        'flagged': { color: 'red', iconName: 'alert-triangle', label: T('status.flagged') },
+        'expired': { color: 'red', iconName: 'x-circle', label: T('status.expired') },
+        'unverified': { color: 'outline', iconName: 'help-circle', label: T('status.unverified') },
     };
     var s = map[status] || map['unverified'];
-    return '<span class="badge badge-' + s.color + '" role="status">' + s.icon + ' ' + s.label + '</span>';
+    return statusBadge(icon(s.iconName, 12) + ' ' + s.label, s.color);
 }
 
 function renderVerificationDashboard() {
     loadVerificationData();
-    return '<div class="page-header">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-        '<div>' +
-        '<h1>\u2705 ' + T('verification.title') + '</h1>' +
-        '</div>' +
-        '<button class="btn btn-secondary" onclick="loadRegistryDirectory()">\uD83C\uDF10 Government Registries</button>' +
+    return '<div class="mb-8 animate-fade-in">' +
+        '<div class="flex justify-between items-center">' +
+        '<h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + icon('check-circle', 24, 'text-emerald-500') + ' ' + T('verification.title') + '</h1>' +
+        '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="loadRegistryDirectory()">' + icon('globe', 16) + ' Government Registries</button>' +
         '</div></div>' +
 
         // Summary stat cards
-        '<div id="verification-stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:24px;">' +
-        renderStatCard('\u2705', T('status.verified'), '-', 'green') +
-        renderStatCard('\uD83E\uDD16', T('status.ai_reviewed'), '-', 'blue') +
-        renderStatCard('\u23F3', T('status.pending'), '-', 'amber') +
-        renderStatCard('\u26A0\uFE0F', T('status.flagged'), '-', 'red') +
-        renderStatCard('\u2753', T('status.unverified'), '-', 'outline') +
+        '<div id="verification-stats" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">' +
+        renderStatCard('check-circle', T('status.verified'), '-', 'green') +
+        renderStatCard('bot', T('status.ai_reviewed'), '-', 'blue') +
+        renderStatCard('clock', T('status.pending'), '-', 'amber') +
+        renderStatCard('alert-triangle', T('status.flagged'), '-', 'red') +
+        renderStatCard('help-circle', T('status.unverified'), '-', 'outline') +
         '</div>' +
 
         // Registry directory (hidden by default)
-        '<div id="registry-directory" style="display:none;margin-bottom:24px;"></div>' +
+        '<div id="registry-directory" style="display:none;" class="mb-6"></div>' +
 
         // Main table
-        '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">\uD83C\uDFE2 NGO Registration Status</h3>' +
+        '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('building-2', 18, 'text-slate-500') + ' NGO Registration Status</h3>' +
         '<div id="verification-table">' + renderLoadingTable() + '</div>' +
-        '</div></div>' +
+        '</div>' +
 
         // Detail panel (hidden by default)
-        '<div id="verification-detail" style="display:none;margin-top:24px;"></div>';
+        '<div id="verification-detail" style="display:none;" class="mt-6"></div>';
 }
 
 async function loadVerificationData() {
@@ -5570,11 +5654,11 @@ async function loadVerificationData() {
     var statsEl = document.getElementById('verification-stats');
     if (statsEl) {
         statsEl.innerHTML =
-            renderStatCard('\u2705', T('status.verified'), counts.verified, 'green') +
-            renderStatCard('\uD83E\uDD16', T('status.ai_reviewed'), counts.ai_reviewed, 'blue') +
-            renderStatCard('\u23F3', T('status.pending'), counts.pending + counts.expired, 'amber') +
-            renderStatCard('\u26A0\uFE0F', T('status.flagged'), counts.flagged, 'red') +
-            renderStatCard('\u2753', T('status.unverified'), counts.unverified, 'outline');
+            renderStatCard('check-circle', T('status.verified'), counts.verified, 'green') +
+            renderStatCard('bot', T('status.ai_reviewed'), counts.ai_reviewed, 'blue') +
+            renderStatCard('clock', T('status.pending'), counts.pending + counts.expired, 'amber') +
+            renderStatCard('alert-triangle', T('status.flagged'), counts.flagged, 'red') +
+            renderStatCard('help-circle', T('status.unverified'), counts.unverified, 'outline');
     }
 
     // Render table
@@ -5582,47 +5666,48 @@ async function loadVerificationData() {
     if (!el) return;
 
     var rows = orgs.map(function(o) {
-        var regNum = o.registration_number ? esc(o.registration_number) : '<span style="color:#dc2626;">' + T('common.not_provided') + '</span>';
+        var regNum = o.registration_number ? esc(o.registration_number) : '<span class="text-rose-600">' + T('common.not_provided') + '</span>';
         var registryLink = o.registry_search_url ?
-            '<a href="' + esc(o.registry_search_url) + '" target="_blank" style="color:#2563eb;text-decoration:underline;font-size:12px;">Check Registry \u2197</a>' :
-            (o.registry_url ? '<a href="' + esc(o.registry_url) + '" target="_blank" style="color:#2563eb;text-decoration:underline;font-size:12px;">Registry \u2197</a>' : '');
+            '<a href="' + esc(o.registry_search_url) + '" target="_blank" class="text-blue-600 hover:underline text-xs">Check Registry ' + icon('external-link', 12, 'inline') + '</a>' :
+            (o.registry_url ? '<a href="' + esc(o.registry_url) + '" target="_blank" class="text-blue-600 hover:underline text-xs">Registry ' + icon('external-link', 12, 'inline') + '</a>' : '');
+        var confColor = o.ai_confidence >= 80 ? 'text-emerald-600' : o.ai_confidence >= 50 ? 'text-amber-500' : 'text-rose-500';
         var confidence = o.ai_confidence != null ?
-            '<span style="color:' + (o.ai_confidence >= 80 ? '#16a34a' : o.ai_confidence >= 50 ? '#d97706' : '#dc2626') + ';font-weight:600;">' + Math.round(o.ai_confidence) + '%</span>' : '-';
-        var actions = '<div style="display:flex;gap:6px;">';
+            '<span class="font-semibold ' + confColor + '">' + Math.round(o.ai_confidence) + '%</span>' : '<span class="text-slate-300">-</span>';
+        var actions = '<div class="flex gap-1.5 flex-wrap">';
         if (o.verification_status === 'unverified' || o.verification_status === 'pending') {
-            actions += '<button class="btn btn-primary btn-sm" onclick="runVerification(' + o.org_id + ')">\uD83D\uDD0D Verify</button>';
+            actions += '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-1" onclick="runVerification(' + o.org_id + ')">' + icon('search', 12) + ' Verify</button>';
         }
         if (o.verification_status === 'ai_reviewed') {
-            actions += '<button class="btn btn-primary btn-sm" onclick="confirmVerification(' + o.org_id + ')">\u2705 Confirm</button>';
-            actions += '<button class="btn btn-secondary btn-sm" onclick="flagVerification(' + o.org_id + ')">\u26A0\uFE0F Flag</button>';
+            actions += '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-1" onclick="confirmVerification(' + o.org_id + ')">' + icon('check', 12) + ' Confirm</button>';
+            actions += '<button class="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1" onclick="flagVerification(' + o.org_id + ')">' + icon('alert-triangle', 12) + ' Flag</button>';
         }
         if (o.verification_status === 'verified') {
-            actions += '<span style="color:#16a34a;font-size:12px;">Verified' + (o.verified_by ? ' by ' + esc(o.verified_by) : '') + '</span>';
+            actions += '<span class="text-emerald-600 text-xs">Verified' + (o.verified_by ? ' by ' + esc(o.verified_by) : '') + '</span>';
         }
         if (o.verification_status === 'flagged' || o.verification_status === 'expired') {
-            actions += '<button class="btn btn-secondary btn-sm" onclick="runVerification(' + o.org_id + ')">\uD83D\uDD04 Re-verify</button>';
+            actions += '<button class="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1" onclick="runVerification(' + o.org_id + ')">' + icon('refresh-cw', 12) + ' Re-verify</button>';
         }
-        actions += '<button class="btn btn-secondary btn-sm" onclick="viewVerificationDetail(' + o.org_id + ')">\uD83D\uDC41\uFE0F</button>';
+        actions += '<button class="px-2 py-1.5 bg-white border border-slate-200 text-slate-500 text-xs rounded-lg hover:bg-slate-50 transition-colors" onclick="viewVerificationDetail(' + o.org_id + ')">' + icon('eye', 14) + '</button>';
         actions += '</div>';
 
-        return '<tr>' +
-            '<td><strong>' + esc(o.org_name) + '</strong><br><span style="font-size:12px;color:#64748b;">' + esc(o.country || '') + '</span></td>' +
-            '<td style="font-family:monospace;font-size:13px;">' + regNum + '</td>' +
-            '<td>' + (o.registry_authority ? '<span style="font-size:12px;">' + esc(o.registry_authority) + '</span><br>' : '') + registryLink + '</td>' +
-            '<td>' + verificationStatusBadge(o.verification_status) + '</td>' +
-            '<td style="text-align:center;">' + confidence + '</td>' +
-            '<td>' + actions + '</td></tr>';
+        return '<tr class="hover:bg-slate-50/80 transition-colors">' +
+            '<td class="px-4 py-3.5"><strong class="text-sm text-slate-900">' + esc(o.org_name) + '</strong><br><span class="text-xs text-slate-500">' + esc(o.country || '') + '</span></td>' +
+            '<td class="px-4 py-3.5 font-mono text-sm">' + regNum + '</td>' +
+            '<td class="px-4 py-3.5">' + (o.registry_authority ? '<span class="text-xs text-slate-600">' + esc(o.registry_authority) + '</span><br>' : '') + registryLink + '</td>' +
+            '<td class="px-4 py-3.5">' + verificationStatusBadge(o.verification_status) + '</td>' +
+            '<td class="px-4 py-3.5 text-center">' + confidence + '</td>' +
+            '<td class="px-4 py-3.5">' + actions + '</td></tr>';
     }).join('');
 
-    el.innerHTML = '<div class="table-wrapper"><table class="table">' +
-        '<thead><tr>' +
-        '<th>' + T('verification.organization') + '</th>' +
-        '<th>' + T('verification.reg_number') + '</th>' +
-        '<th>' + T('verification.authority') + '</th>' +
-        '<th>' + T('application.tab.status') + '</th>' +
-        '<th>' + T('verification.ai_confidence') + '</th>' +
-        '<th>' + T('common.actions') + '</th>' +
-        '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    el.innerHTML = '<div class="overflow-x-auto"><table class="w-full">' +
+        '<thead><tr class="bg-slate-50 border-b border-slate-200">' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('verification.organization') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('verification.reg_number') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('verification.authority') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('application.tab.status') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('verification.ai_confidence') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('common.actions') + '</th>' +
+        '</tr></thead><tbody class="divide-y divide-slate-100">' + rows + '</tbody></table></div>';
 }
 
 async function runVerification(orgId) {
@@ -5651,54 +5736,55 @@ async function viewVerificationDetail(orgId) {
     var reg = res.registry_info;
     var analysis = v ? v.ai_analysis : null;
 
-    var html = '<div class="card"><div class="card-body">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
-        '<h3 style="font-weight:600;">\uD83D\uDCC4 ' + T('verification.detail_title') + ' ' + esc(res.org_name) + '</h3>' +
-        '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'verification-detail\').style.display=\'none\';">\u2715 ' + T('common.close') + '</button>' +
+    var html = '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<div class="flex justify-between items-center mb-4">' +
+        '<h3 class="font-semibold text-slate-900 flex items-center gap-2">' + icon('file-text', 18, 'text-brand-600') + ' ' + T('verification.detail_title') + ' ' + esc(res.org_name) + '</h3>' +
+        '<button class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1" onclick="document.getElementById(\'verification-detail\').style.display=\'none\';">' + icon('x', 14) + ' ' + T('common.close') + '</button>' +
         '</div>';
 
     // Registration info
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">';
+    html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">';
 
     // Left: Org Registration Details
     html += '<div>' +
-        '<h4 style="font-weight:600;margin-bottom:12px;font-size:14px;color:#475569;">' + T('verification.registration_info') + '</h4>' +
-        '<table style="width:100%;font-size:14px;border-collapse:collapse;">' +
-        '<tr><td style="padding:6px 12px 6px 0;color:#64748b;width:40%;">' + T('verification.country') + '</td><td style="padding:6px 0;font-weight:500;">' + esc(res.org_country || '-') + '</td></tr>' +
-        '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('verification.reg_number') + '</td><td style="padding:6px 0;font-family:monospace;font-weight:500;">' + esc(res.registration_number || 'Not provided') + '</td></tr>' +
-        '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('application.tab.status') + '</td><td style="padding:6px 0;">' + verificationStatusBadge(res.overall_status) + '</td></tr>';
+        '<h4 class="font-semibold text-sm text-slate-600 mb-3">' + T('verification.registration_info') + '</h4>' +
+        '<table class="w-full text-sm">' +
+        '<tr><td class="py-1.5 pr-3 text-slate-500 w-2/5">' + T('verification.country') + '</td><td class="py-1.5 font-medium text-slate-900">' + esc(res.org_country || '-') + '</td></tr>' +
+        '<tr><td class="py-1.5 pr-3 text-slate-500">' + T('verification.reg_number') + '</td><td class="py-1.5 font-mono font-medium text-slate-900">' + esc(res.registration_number || 'Not provided') + '</td></tr>' +
+        '<tr><td class="py-1.5 pr-3 text-slate-500">' + T('application.tab.status') + '</td><td class="py-1.5">' + verificationStatusBadge(res.overall_status) + '</td></tr>';
 
     if (v) {
-        html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('verification.authority') + '</td><td style="padding:6px 0;">' + esc(v.registration_authority || '-') + '</td></tr>';
-        if (v.registration_date) html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('verification.registered') + '</td><td style="padding:6px 0;">' + formatDate(v.registration_date) + '</td></tr>';
-        if (v.expiry_date) html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('verification.expires') + '</td><td style="padding:6px 0;' + (new Date(v.expiry_date) < new Date() ? 'color:#dc2626;font-weight:600;' : '') + '">' + formatDate(v.expiry_date) + (new Date(v.expiry_date) < new Date() ? ' (' + T('verification.expired_label') + ')' : '') + '</td></tr>';
-        html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('verification.ai_confidence') + '</td><td style="padding:6px 0;">' +
-            '<span style="color:' + (v.ai_confidence >= 80 ? '#16a34a' : v.ai_confidence >= 50 ? '#d97706' : '#dc2626') + ';font-weight:600;">' + Math.round(v.ai_confidence || 0) + '%</span></td></tr>';
+        html += '<tr><td class="py-1.5 pr-3 text-slate-500">' + T('verification.authority') + '</td><td class="py-1.5 text-slate-900">' + esc(v.registration_authority || '-') + '</td></tr>';
+        if (v.registration_date) html += '<tr><td class="py-1.5 pr-3 text-slate-500">' + T('verification.registered') + '</td><td class="py-1.5 text-slate-900">' + formatDate(v.registration_date) + '</td></tr>';
+        if (v.expiry_date) html += '<tr><td class="py-1.5 pr-3 text-slate-500">' + T('verification.expires') + '</td><td class="py-1.5 ' + (new Date(v.expiry_date) < new Date() ? 'text-rose-600 font-semibold' : 'text-slate-900') + '">' + formatDate(v.expiry_date) + (new Date(v.expiry_date) < new Date() ? ' (' + T('verification.expired_label') + ')' : '') + '</td></tr>';
+        var confColor2 = v.ai_confidence >= 80 ? 'text-emerald-600' : v.ai_confidence >= 50 ? 'text-amber-500' : 'text-rose-500';
+        html += '<tr><td class="py-1.5 pr-3 text-slate-500">' + T('verification.ai_confidence') + '</td><td class="py-1.5">' +
+            '<span class="font-semibold ' + confColor2 + '">' + Math.round(v.ai_confidence || 0) + '%</span></td></tr>';
         if (v.verified_by_name) {
-            html += '<tr><td style="padding:6px 12px 6px 0;color:#64748b;">' + T('verification.verified_by') + '</td><td style="padding:6px 0;">' + esc(v.verified_by_name) + ' on ' + formatDate(v.verified_at) + '</td></tr>';
+            html += '<tr><td class="py-1.5 pr-3 text-slate-500">' + T('verification.verified_by') + '</td><td class="py-1.5 text-slate-900">' + esc(v.verified_by_name) + ' on ' + formatDate(v.verified_at) + '</td></tr>';
         }
     }
     html += '</table></div>';
 
     // Right: Government Registry Info
     html += '<div>' +
-        '<h4 style="font-weight:600;margin-bottom:12px;font-size:14px;color:#475569;">' + T('verification.government_registry') + '</h4>';
+        '<h4 class="font-semibold text-sm text-slate-600 mb-3">' + T('verification.government_registry') + '</h4>';
     if (reg) {
-        html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;font-size:14px;">' +
-            '<div style="font-weight:600;margin-bottom:8px;">\uD83C\uDFDB\uFE0F ' + esc(reg.authority) + '</div>' +
-            '<div style="color:#64748b;margin-bottom:4px;">Expected format: <code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:12px;">' + esc(reg.expected_format || 'N/A') + '</code></div>' +
-            '<div style="color:#64748b;font-size:13px;margin-bottom:12px;">' + esc(reg.notes || '') + '</div>';
+        html += '<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm">' +
+            '<div class="font-semibold text-slate-900 mb-2 flex items-center gap-2">' + icon('landmark', 16, 'text-emerald-600') + ' ' + esc(reg.authority) + '</div>' +
+            '<div class="text-slate-500 mb-1">Expected format: <code class="bg-slate-200 px-1.5 py-0.5 rounded text-xs">' + esc(reg.expected_format || 'N/A') + '</code></div>' +
+            '<div class="text-sm text-slate-500 mb-3">' + esc(reg.notes || '') + '</div>';
         if (reg.search_url) {
-            html += '<a href="' + esc(reg.search_url) + '" target="_blank" class="btn btn-primary btn-sm" style="margin-right:8px;">\uD83D\uDD0D Search Registry Online</a>';
+            html += '<a href="' + esc(reg.search_url) + '" target="_blank" class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-1 mr-2">' + icon('search', 12) + ' Search Registry Online</a>';
         }
         if (reg.url) {
-            html += '<a href="' + esc(reg.url) + '" target="_blank" class="btn btn-secondary btn-sm">\uD83C\uDF10 Registry Website</a>';
+            html += '<a href="' + esc(reg.url) + '" target="_blank" class="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1">' + icon('globe', 12) + ' Registry Website</a>';
         }
         html += '</div>';
     } else {
-        html += '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:16px;font-size:14px;">' +
-            '<div style="font-weight:600;margin-bottom:4px;">\u26A0\uFE0F No Registry Data Available</div>' +
-            '<div style="color:#64748b;">Government registry information not available for this country. Manual verification required.</div>' +
+        html += '<div class="bg-amber-50 border border-amber-300 rounded-lg p-4 text-sm">' +
+            '<div class="font-semibold text-slate-900 mb-1 flex items-center gap-2">' + icon('alert-triangle', 16, 'text-amber-500') + ' No Registry Data Available</div>' +
+            '<div class="text-slate-500">Government registry information not available for this country. Manual verification required.</div>' +
             '</div>';
     }
     html += '</div></div>';
@@ -5707,13 +5793,14 @@ async function viewVerificationDetail(orgId) {
     if (analysis) {
         // Findings
         if (analysis.findings && analysis.findings.length) {
-            html += '<div style="margin-bottom:16px;">' +
-                '<h4 style="font-weight:600;margin-bottom:8px;font-size:14px;color:#475569;">\uD83E\uDD16 AI Findings</h4>' +
-                '<div style="background:#f8fafc;border-radius:8px;padding:16px;">' +
+            html += '<div class="mb-4">' +
+                '<h4 class="font-semibold text-sm text-slate-600 mb-2 flex items-center gap-2">' + icon('bot', 16, 'text-blue-500') + ' AI Findings</h4>' +
+                '<div class="bg-slate-50 rounded-lg p-4">' +
                 analysis.findings.map(function(f) {
-                    var icon = f.toLowerCase().includes('warning') || f.toLowerCase().includes('expired') || f.toLowerCase().includes('not match') ? '\u26A0\uFE0F' : '\u2139\uFE0F';
-                    return '<div style="display:flex;gap:8px;align-items:start;margin-bottom:8px;font-size:14px;">' +
-                        '<span>' + icon + '</span><span>' + esc(f) + '</span></div>';
+                    var findIcon = f.toLowerCase().includes('warning') || f.toLowerCase().includes('expired') || f.toLowerCase().includes('not match') ? 'alert-triangle' : 'info';
+                    var findIconColor = findIcon === 'alert-triangle' ? 'text-amber-500' : 'text-blue-500';
+                    return '<div class="flex gap-2 items-start mb-2 text-sm">' +
+                        '<span class="mt-0.5">' + icon(findIcon, 14, findIconColor) + '</span><span class="text-slate-700">' + esc(f) + '</span></div>';
                 }).join('') +
                 '</div></div>';
         }
@@ -5721,9 +5808,9 @@ async function viewVerificationDetail(orgId) {
         // Validation checks
         if (analysis.validation) {
             var checks = analysis.validation;
-            html += '<div style="margin-bottom:16px;">' +
-                '<h4 style="font-weight:600;margin-bottom:8px;font-size:14px;color:#475569;">\u2705 Validation Checks</h4>' +
-                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+            html += '<div class="mb-4">' +
+                '<h4 class="font-semibold text-sm text-slate-600 mb-2 flex items-center gap-2">' + icon('check-circle', 16, 'text-emerald-500') + ' Validation Checks</h4>' +
+                '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">';
             var checkItems = [
                 { key: 'name_matches', label: 'Name matches certificate' },
                 { key: 'number_format_valid', label: 'Registration number format valid' },
@@ -5733,12 +5820,12 @@ async function viewVerificationDetail(orgId) {
             checkItems.forEach(function(ci) {
                 var val = checks[ci.key];
                 if (val === null || val === undefined) {
-                    html += '<div style="display:flex;gap:8px;align-items:center;padding:8px;background:#f8fafc;border-radius:6px;font-size:13px;">' +
-                        '<span>\u2753</span><span style="color:#64748b;">' + esc(ci.label) + ' - Unknown</span></div>';
+                    html += '<div class="flex gap-2 items-center p-2 bg-slate-50 rounded-md text-sm">' +
+                        '<span>' + icon('help-circle', 14, 'text-slate-400') + '</span><span class="text-slate-500">' + esc(ci.label) + ' - Unknown</span></div>';
                 } else {
                     var pass = ci.invert ? !val : val;
-                    html += '<div style="display:flex;gap:8px;align-items:center;padding:8px;background:' + (pass ? '#f0fdf4' : '#fef2f2') + ';border-radius:6px;font-size:13px;">' +
-                        '<span>' + (pass ? '\u2705' : '\u274C') + '</span><span>' + esc(ci.label) + '</span></div>';
+                    html += '<div class="flex gap-2 items-center p-2 rounded-md text-sm ' + (pass ? 'bg-emerald-50' : 'bg-rose-50') + '">' +
+                        '<span>' + icon(pass ? 'check-circle' : 'x-circle', 14, pass ? 'text-emerald-500' : 'text-rose-500') + '</span><span class="text-slate-700">' + esc(ci.label) + '</span></div>';
                 }
             });
             html += '</div></div>';
@@ -5746,12 +5833,12 @@ async function viewVerificationDetail(orgId) {
 
         // Recommendations
         if (analysis.recommendations && analysis.recommendations.length) {
-            html += '<div style="margin-bottom:16px;">' +
-                '<h4 style="font-weight:600;margin-bottom:8px;font-size:14px;color:#475569;">\uD83D\uDCA1 Recommendations</h4>' +
-                '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;">' +
+            html += '<div class="mb-4">' +
+                '<h4 class="font-semibold text-sm text-slate-600 mb-2 flex items-center gap-2">' + icon('lightbulb', 16, 'text-amber-500') + ' Recommendations</h4>' +
+                '<div class="bg-blue-50 border border-blue-200 rounded-lg p-4">' +
                 analysis.recommendations.map(function(r) {
-                    return '<div style="display:flex;gap:8px;align-items:start;margin-bottom:6px;font-size:14px;">' +
-                        '<span>\u27A1\uFE0F</span><span>' + esc(r) + '</span></div>';
+                    return '<div class="flex gap-2 items-start mb-1.5 text-sm">' +
+                        '<span class="mt-0.5">' + icon('arrow-right', 14, 'text-blue-500') + '</span><span class="text-slate-700">' + esc(r) + '</span></div>';
                 }).join('') +
                 '</div></div>';
         }
@@ -5759,14 +5846,14 @@ async function viewVerificationDetail(orgId) {
 
     // Action buttons
     if (v && v.status !== 'verified') {
-        html += '<div style="display:flex;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;">' +
-            '<button class="btn btn-primary" onclick="confirmVerificationById(' + v.id + ', ' + orgId + ')">\u2705 Mark as Verified</button>' +
-            '<button class="btn btn-secondary" style="background:#fef2f2;color:#dc2626;border-color:#fca5a5;" onclick="flagVerificationById(' + v.id + ', ' + orgId + ')">\u26A0\uFE0F Flag Issue</button>' +
-            '<button class="btn btn-secondary" onclick="runVerification(' + orgId + ')">\uD83D\uDD04 Re-run AI Check</button>' +
+        html += '<div class="flex gap-3 mt-4 pt-4 border-t border-slate-200">' +
+            '<button class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-2" onclick="confirmVerificationById(' + v.id + ', ' + orgId + ')">' + icon('check-circle', 16) + ' Mark as Verified</button>' +
+            '<button class="px-4 py-2 bg-rose-50 border border-rose-300 text-rose-600 text-sm font-medium rounded-lg hover:bg-rose-100 transition-colors inline-flex items-center gap-2" onclick="flagVerificationById(' + v.id + ', ' + orgId + ')">' + icon('alert-triangle', 16) + ' Flag Issue</button>' +
+            '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="runVerification(' + orgId + ')">' + icon('refresh-cw', 16) + ' Re-run AI Check</button>' +
             '</div>';
     }
 
-    html += '</div></div>';
+    html += '</div>';
     el.innerHTML = html;
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -5831,25 +5918,28 @@ async function loadRegistryDirectory() {
     if (!res || !res.registries) return;
 
     var countries = Object.keys(res.registries).sort();
-    var html = '<div class="card"><div class="card-body">' +
-        '<h3 style="font-weight:600;margin-bottom:16px;">\uD83C\uDF10 Government NGO Registries Directory</h3>' +
-        '<p style="color:#64748b;margin-bottom:16px;">Direct links to government registries where you can manually verify NGO registrations. Use these for cross-referencing AI verification results.</p>' +
-        '<div class="table-wrapper"><table class="table"><thead><tr>' +
-        '<th>' + T('verification.country') + '</th><th>' + T('verification.registration_authority') + '</th><th>' + T('verification.expected_format') + '</th><th>' + T('common.actions') + '</th>' +
-        '</tr></thead><tbody>' +
+    var html = '<div class="bg-white rounded-xl border border-slate-200/60 p-5">' +
+        '<h3 class="font-semibold text-slate-900 mb-4 flex items-center gap-2">' + icon('globe', 18, 'text-brand-500') + ' Government NGO Registries Directory</h3>' +
+        '<p class="text-sm text-slate-500 mb-4">Direct links to government registries where you can manually verify NGO registrations.</p>' +
+        '<div class="overflow-x-auto"><table class="w-full"><thead><tr class="bg-slate-50 border-b border-slate-200">' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('verification.country') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('verification.registration_authority') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('verification.expected_format') + '</th>' +
+        '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">' + T('common.actions') + '</th>' +
+        '</tr></thead><tbody class="divide-y divide-slate-100">' +
         countries.map(function(c) {
             var r = res.registries[c];
             var links = '';
-            if (r.search_url) links += '<a href="' + esc(r.search_url) + '" target="_blank" class="btn btn-primary btn-sm" style="margin-right:4px;">\uD83D\uDD0D Search</a>';
-            if (r.url) links += '<a href="' + esc(r.url) + '" target="_blank" class="btn btn-secondary btn-sm">\uD83C\uDF10 Website</a>';
-            if (!r.search_url && !r.url) links = '<span style="color:#94a3b8;font-size:12px;">' + T('verification.no_online_portal') + '</span>';
-            return '<tr>' +
-                '<td style="font-weight:600;">\uD83C\uDFF3\uFE0F ' + esc(c) + '</td>' +
-                '<td style="font-size:13px;">' + esc(r.authority) + '<br><span style="font-size:11px;color:#94a3b8;">' + esc(r.notes || '') + '</span></td>' +
-                '<td><code style="background:#f1f5f9;padding:2px 8px;border-radius:4px;font-size:12px;">' + esc(r.expected_format || 'N/A') + '</code></td>' +
-                '<td>' + links + '</td></tr>';
+            if (r.search_url) links += '<a href="' + esc(r.search_url) + '" target="_blank" class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors inline-flex items-center gap-1 mr-1">' + icon('search', 12) + ' Search</a>';
+            if (r.url) links += '<a href="' + esc(r.url) + '" target="_blank" class="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1">' + icon('globe', 12) + ' Website</a>';
+            if (!r.search_url && !r.url) links = '<span class="text-slate-400 text-xs">' + T('verification.no_online_portal') + '</span>';
+            return '<tr class="hover:bg-slate-50/80 transition-colors">' +
+                '<td class="px-4 py-3.5 font-semibold text-sm text-slate-900 flex items-center gap-1">' + icon('flag', 14) + ' ' + esc(c) + '</td>' +
+                '<td class="px-4 py-3.5 text-xs text-slate-600">' + esc(r.authority) + '<br><span class="text-slate-400">' + esc(r.notes || '') + '</span></td>' +
+                '<td class="px-4 py-3.5"><code class="bg-slate-100 px-2 py-0.5 rounded text-xs">' + esc(r.expected_format || 'N/A') + '</code></td>' +
+                '<td class="px-4 py-3.5">' + links + '</td></tr>';
         }).join('') +
-        '</tbody></table></div></div></div>';
+        '</tbody></table></div></div>';
 
     el.innerHTML = html;
     el.style.display = 'block';
@@ -5915,36 +6005,39 @@ async function loadOrgVerificationStatus() {
 function renderAIPanel() {
     var messagesHTML = S.aiMessages.map(function(m) {
         var sourceTag = (m.role === 'assistant' && m.source) ?
-            '<div style="font-size:10px;color:#94a3b8;margin-top:4px;">' + esc(m.source) + '</div>' : '';
+            '<div class="text-[10px] text-slate-400 mt-1">' + esc(m.source) + '</div>' : '';
         var content = m.role === 'assistant' ? renderMarkdown(m.content) : esc(m.content);
-        return '<div class="ai-bubble ' + (m.role === 'user' ? 'user' : 'assistant') + '">' +
+        var bubbleCls = m.role === 'user'
+            ? 'ml-auto max-w-[85%] bg-brand-600 text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm'
+            : 'mr-auto max-w-[85%] bg-slate-100 text-slate-800 rounded-2xl rounded-bl-md px-4 py-2.5 text-sm';
+        return '<div class="' + bubbleCls + '">' +
             content + sourceTag + '</div>';
     }).join('');
 
     if (S.aiLoading) {
-        messagesHTML += '<div class="ai-analyzing">' +
+        messagesHTML += '<div class="mr-auto flex items-center gap-2 px-4 py-2.5 text-sm text-slate-500">' +
             '<div class="dot-pulse"><span></span><span></span><span></span></div>' +
             '<span>' + T('ai.thinking') + '</span></div>';
     }
 
     if (!S.aiMessages.length) {
-        messagesHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">' +
-            '<p style="font-size:32px;margin-bottom:8px;">\u2728</p>' +
+        messagesHTML = '<div class="text-center py-8 text-slate-400 text-sm">' +
+            '<div class="mb-2">' + icon('sparkles', 32, 'text-brand-300 mx-auto') + '</div>' +
             '<p>' + T('ai.welcome') + '</p>' +
             '</div>';
     }
 
     return '<div class="ai-panel' + (S.aiPanelOpen ? '' : ' collapsed') + '" id="ai-panel" role="complementary" aria-label="' + T('ai.panel_title') + '">' +
-        '<div class="ai-panel-header">' +
-        '<h3>\u2728 ' + T('ai.panel_title') + '</h3>' +
-        '<button class="ai-panel-close" onclick="toggleAI()" aria-label="Close AI panel">\u00D7</button>' +
+        '<div class="bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-3 flex items-center justify-between">' +
+        '<h3 class="text-white font-semibold text-sm flex items-center gap-2">' + icon('sparkles', 16, 'text-brand-200') + ' ' + T('ai.panel_title') + '</h3>' +
+        '<button class="text-white/70 hover:text-white transition-colors" onclick="toggleAI()" aria-label="Close AI panel">' + icon('x', 18) + '</button>' +
         '</div>' +
-        '<div class="ai-messages" id="ai-messages">' + messagesHTML + '</div>' +
-        '<div class="ai-input">' +
-        '<input type="text" id="ai-input-field" placeholder="' + T('ai.placeholder') + '" ' +
+        '<div class="ai-messages flex flex-col gap-3 p-4 overflow-y-auto" id="ai-messages">' + messagesHTML + '</div>' +
+        '<div class="border-t border-slate-200 p-3 flex items-center gap-2">' +
+        '<input type="text" id="ai-input-field" class="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors" placeholder="' + T('ai.placeholder') + '" ' +
         'aria-label="' + T('ai.placeholder') + '" ' +
         'onkeydown="if(event.key===\'Enter\')sendAIMessage();">' +
-        '<button onclick="sendAIMessage()">' + T('ai.send') + '</button>' +
+        '<button class="px-3 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors shrink-0" onclick="sendAIMessage()">' + icon('send', 16) + '</button>' +
         '</div>' +
         '</div>';
 }
@@ -5971,7 +6064,7 @@ async function sendAIMessage() {
     S.aiLoading = false;
     if (res) {
         var source = res.source || 'unknown';
-        var sourceLabel = source === 'claude' ? '\uD83E\uDD16 Claude AI' : '\u2699\uFE0F Rule-based';
+        var sourceLabel = source === 'claude' ? 'Claude AI' : 'Rule-based';
         S.aiMessages.push({ role: 'assistant', content: res.response || res.message || 'I\'m here to help!', source: sourceLabel });
     } else {
         S.aiMessages.push({ role: 'assistant', content: 'Sorry, I encountered an issue. Please try again.' });
@@ -5985,12 +6078,17 @@ function refreshAIPanel() {
 
     var messagesHTML = S.aiMessages.map(function(m) {
         var content = m.role === 'assistant' ? renderMarkdown(m.content) : esc(m.content);
-        return '<div class="ai-bubble ' + (m.role === 'user' ? 'user' : 'assistant') + '">' +
-            content + '</div>';
+        var sourceTag = (m.role === 'assistant' && m.source) ?
+            '<div class="text-[10px] text-slate-400 mt-1">' + esc(m.source) + '</div>' : '';
+        var bubbleCls = m.role === 'user'
+            ? 'ml-auto max-w-[85%] bg-brand-600 text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm'
+            : 'mr-auto max-w-[85%] bg-slate-100 text-slate-800 rounded-2xl rounded-bl-md px-4 py-2.5 text-sm';
+        return '<div class="' + bubbleCls + '">' +
+            content + sourceTag + '</div>';
     }).join('');
 
     if (S.aiLoading) {
-        messagesHTML += '<div class="ai-analyzing">' +
+        messagesHTML += '<div class="mr-auto flex items-center gap-2 px-4 py-2.5 text-sm text-slate-500">' +
             '<div class="dot-pulse"><span></span><span></span><span></span></div>' +
             '<span>Thinking...</span></div>';
     }
@@ -6021,10 +6119,6 @@ function refreshAIPanel() {
         '  .sidebar { transform: translateX(-100%); }' +
         '  .sidebar.mobile-open { transform: translateX(0); }' +
         '  .main-content { margin-left: 0 !important; }' +
-        '  .form-row { flex-direction: column; }' +
-        '  .wizard-steps { flex-wrap: wrap; }' +
-        '  .wizard-step .step-label { display: none; }' +
-        '  .wizard-connector { width: 24px; }' +
         '  .header-user span:not(.badge) { display: none; }' +
         '}' +
         '@media (max-width: 1024px) {' +
