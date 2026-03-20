@@ -7,36 +7,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-    tailwind.config = {
-        darkMode: 'class',
-        theme: {
-            extend: {
-                colors: {
-                    brand: {
-                        50: '#EEF2FF',
-                        100: '#E0E7FF',
-                        200: '#C7D2FE',
-                        300: '#A5B4FC',
-                        400: '#818CF8',
-                        500: '#6366F1',
-                        600: '#4F46E5',
-                        700: '#4338CA',
-                        800: '#3730A3',
-                        900: '#312E81'
-                    }
-                },
-                fontFamily: {
-                    sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif']
-                }
-            }
-        }
-    }
-    </script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/static/css/style.css?v=4.1.0">
+    <link rel="stylesheet" href="/static/css/tailwind.min.css?v=4.2.0">
+    <link rel="stylesheet" href="/static/css/style.css?v=4.2.0">
+    <script src="/static/js/vendor/lucide.min.js"></script>
+    <script src="/static/js/vendor/chart.min.js"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%234F46E5'/><stop offset='100%' stop-color='%236366F1'/></linearGradient></defs><rect rx='8' width='32' height='32' fill='url(%23g)'/><text x='16' y='22' text-anchor='middle' fill='white' font-size='18' font-family='Inter,Arial' font-weight='bold'>K</text></svg>">
 </head>
 <body class="bg-slate-50 font-sans text-slate-900 antialiased">
@@ -46,6 +20,6 @@
     <div id="modal-overlay" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[200] hidden flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" onclick="closeModal(event)">
         <div id="modal-content" class="w-full max-w-xl" onclick="event.stopPropagation()"></div>
     </div>
-    <script src="/static/js/app.js?v=4.1.0"></script>
+    <script src="/static/js/app.js?v=4.2.0"></script>
 </body>
 </html>

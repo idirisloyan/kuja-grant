@@ -24,3 +24,7 @@ dist/
 build/
 venv/
 .venv/
+
+# Node (Tailwind CSS build tooling - dev only)
+node_modules/
+package-lock.json
