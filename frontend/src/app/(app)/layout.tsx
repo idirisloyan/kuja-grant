@@ -28,8 +28,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-brand-600 to-brand-700 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/25">
-            <span className="text-white text-xl font-bold">K</span>
+          <div className="w-10 h-10 bg-brand-600 rounded-lg flex items-center justify-center">
+            <span className="text-white text-lg font-bold">K</span>
           </div>
           <div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
         </div>
@@ -45,7 +45,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div
         className={cn(
           'transition-all duration-300',
-          sidebarCollapsed ? 'ml-16' : 'ml-60'
+          sidebarCollapsed ? 'ml-16' : 'ml-56'
         )}
       >
         <Header />
