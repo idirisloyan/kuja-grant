@@ -4,11 +4,25 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Mail, Lock, Building2, Wallet, Star, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import Avatar from '@mui/material/Avatar';
+import InputAdornment from '@mui/material/InputAdornment';
+import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
+import Stack from '@mui/material/Stack';
+
+import EmailOutlined from '@mui/icons-material/EmailOutlined';
+import LockOutlined from '@mui/icons-material/LockOutlined';
+import Business from '@mui/icons-material/Business';
+import AccountBalanceWallet from '@mui/icons-material/AccountBalanceWallet';
+import StarOutline from '@mui/icons-material/StarOutline';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,22 +38,22 @@ const demoAccounts = [
   {
     label: 'NGO',
     email: 'fatima@amani.org',
-    icon: Building2,
-    color: 'bg-emerald-500',
+    icon: <Business />,
+    color: '#10B981',
     description: 'Amani Foundation',
   },
   {
     label: 'Donor',
     email: 'sarah@globalhealth.org',
-    icon: Wallet,
-    color: 'bg-blue-500',
+    icon: <AccountBalanceWallet />,
+    color: '#3B82F6',
     description: 'Global Health Fund',
   },
   {
     label: 'Reviewer',
     email: 'james@reviewer.org',
-    icon: Star,
-    color: 'bg-amber-500',
+    icon: <StarOutline />,
+    color: '#F59E0B',
     description: 'Independent Reviewer',
   },
 ] as const;
@@ -86,41 +100,132 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
+    <Box
+      sx={{
+        position: 'relative',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+      }}
+    >
       {/* Gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-brand-700 via-brand-600 to-indigo-500" />
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(135deg, #4338CA 0%, #4F46E5 35%, #6366F1 70%, #818CF8 100%)',
+        }}
+      />
 
       {/* Decorative blurred orbs */}
-      <div className="absolute top-[-120px] left-[-60px] w-96 h-96 rounded-full bg-brand-400/30 blur-3xl" />
-      <div className="absolute bottom-[-100px] right-[-80px] w-[500px] h-[500px] rounded-full bg-purple-400/20 blur-3xl" />
-      <div className="absolute top-1/2 left-1/3 w-72 h-72 rounded-full bg-indigo-300/20 blur-2xl" />
+      <Box
+        sx={{
+          position: 'absolute',
+          top: -120,
+          left: -60,
+          width: 384,
+          height: 384,
+          borderRadius: '50%',
+          background: 'rgba(129,140,248,0.3)',
+          filter: 'blur(80px)',
+        }}
+      />
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: -100,
+          right: -80,
+          width: 500,
+          height: 500,
+          borderRadius: '50%',
+          background: 'rgba(168,85,247,0.2)',
+          filter: 'blur(80px)',
+        }}
+      />
+      <Box
+        sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '33%',
+          width: 288,
+          height: 288,
+          borderRadius: '50%',
+          background: 'rgba(165,180,252,0.2)',
+          filter: 'blur(60px)',
+        }}
+      />
 
       {/* Login card */}
-      <div className="relative z-10 w-full max-w-md mx-4">
+      <Box sx={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 440, mx: 2 }}>
         {/* Logo & title */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 mb-4">
-            <span className="text-3xl font-bold text-white">K</span>
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Kuja Grant Management</h1>
-          <p className="text-indigo-100/80 text-sm">AI-Powered Grant Management for Impact</p>
-        </div>
+        <Stack alignItems="center" spacing={1} sx={{ mb: 4 }}>
+          <Box
+            sx={{
+              width: 64,
+              height: 64,
+              borderRadius: 3,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(255,255,255,0.1)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255,255,255,0.2)',
+            }}
+          >
+            <Typography variant="h4" sx={{ color: '#fff', fontWeight: 700 }}>
+              K
+            </Typography>
+          </Box>
+          <Typography variant="h4" sx={{ color: '#fff', fontWeight: 700 }}>
+            Kuja Grant Management
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'rgba(224,231,255,0.8)' }}>
+            AI-Powered Grant Management for Impact
+          </Typography>
+        </Stack>
 
         {/* Frosted glass card */}
-        <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 shadow-2xl">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            {/* Email */}
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium text-white/90">
-                Email
-              </Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
-                <Input
-                  id="email"
+        <Card
+          sx={{
+            background: 'rgba(255,255,255,0.1)',
+            backdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 3,
+            boxShadow: '0 24px 48px -12px rgba(0,0,0,0.25)',
+          }}
+        >
+          <CardContent sx={{ p: 4 }}>
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <Stack spacing={2.5}>
+                {/* Email */}
+                <TextField
+                  fullWidth
+                  label="Email"
                   type="email"
                   placeholder="you@organization.org"
-                  className="h-11 pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:border-white/50 focus-visible:ring-white/20"
+                  error={!!errors.email}
+                  helperText={errors.email?.message}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <EmailOutlined sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 20 }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      color: '#fff',
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.4)' },
+                      '&.Mui-focused fieldset': { borderColor: 'rgba(255,255,255,0.6)' },
+                    },
+                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
+                    '& .MuiInputLabel-root.Mui-focused': { color: 'rgba(255,255,255,0.9)' },
+                    '& .MuiFormHelperText-root': { color: '#FCA5A5' },
+                    '& input::placeholder': { color: 'rgba(255,255,255,0.4)' },
+                  }}
                   {...register('email', {
                     required: 'Email is required',
                     pattern: {
@@ -129,95 +234,142 @@ export default function LoginPage() {
                     },
                   })}
                 />
-              </div>
-              {errors.email && (
-                <p className="text-xs text-red-300">{errors.email.message}</p>
-              )}
-            </div>
 
-            {/* Password */}
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium text-white/90">
-                Password
-              </Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
-                <Input
-                  id="password"
+                {/* Password */}
+                <TextField
+                  fullWidth
+                  label="Password"
                   type="password"
                   placeholder="Enter your password"
-                  className="h-11 pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:border-white/50 focus-visible:ring-white/20"
+                  error={!!errors.password}
+                  helperText={errors.password?.message}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LockOutlined sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 20 }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      color: '#fff',
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.4)' },
+                      '&.Mui-focused fieldset': { borderColor: 'rgba(255,255,255,0.6)' },
+                    },
+                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
+                    '& .MuiInputLabel-root.Mui-focused': { color: 'rgba(255,255,255,0.9)' },
+                    '& .MuiFormHelperText-root': { color: '#FCA5A5' },
+                    '& input::placeholder': { color: 'rgba(255,255,255,0.4)' },
+                  }}
                   {...register('password', {
                     required: 'Password is required',
                   })}
                 />
-              </div>
-              {errors.password && (
-                <p className="text-xs text-red-300">{errors.password.message}</p>
-              )}
-            </div>
 
-            {/* Submit */}
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full h-11 bg-white text-brand-700 font-semibold hover:bg-white/90 transition-colors"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Signing in...
-                </>
-              ) : (
-                'Sign In'
-              )}
-            </Button>
-          </form>
-
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/20" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-3 text-white/60 bg-transparent backdrop-blur-sm">
-                Quick Demo Access
-              </span>
-            </div>
-          </div>
-
-          {/* Demo account cards */}
-          <div className="grid grid-cols-3 gap-3">
-            {demoAccounts.map((account) => {
-              const Icon = account.icon;
-              return (
-                <button
-                  key={account.email}
-                  type="button"
-                  onClick={() => handleDemoLogin(account.email)}
+                {/* Submit */}
+                <Button
+                  type="submit"
+                  variant="contained"
+                  fullWidth
                   disabled={isLoading}
-                  className="group flex flex-col items-center gap-2 p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/15 hover:border-white/30 transition-all duration-200 disabled:opacity-50"
+                  size="large"
+                  sx={{
+                    height: 48,
+                    bgcolor: '#fff',
+                    color: '#4F46E5',
+                    fontWeight: 600,
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' },
+                    '&.Mui-disabled': {
+                      bgcolor: 'rgba(255,255,255,0.6)',
+                      color: '#4F46E5',
+                    },
+                  }}
                 >
-                  <div className={`w-10 h-10 rounded-lg ${account.color} flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform`}>
-                    <Icon className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs font-semibold text-white">{account.label}</div>
-                    <div className="text-[10px] text-white/50 leading-tight mt-0.5">
-                      {account.description}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+                  {isLoading ? (
+                    <CircularProgress size={22} sx={{ color: '#4F46E5' }} />
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
+              </Stack>
+            </form>
+
+            {/* Divider */}
+            <Divider
+              sx={{
+                my: 3,
+                '&::before, &::after': { borderColor: 'rgba(255,255,255,0.2)' },
+              }}
+            >
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', px: 1 }}>
+                Quick Demo Access
+              </Typography>
+            </Divider>
+
+            {/* Demo account cards */}
+            <Stack direction="row" spacing={1.5}>
+              {demoAccounts.map((account) => (
+                <Card
+                  key={account.email}
+                  onClick={() => !isLoading && handleDemoLogin(account.email)}
+                  sx={{
+                    flex: 1,
+                    cursor: isLoading ? 'default' : 'pointer',
+                    opacity: isLoading ? 0.5 : 1,
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 2,
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      background: isLoading ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.15)',
+                      borderColor: 'rgba(255,255,255,0.3)',
+                      transform: isLoading ? 'none' : 'translateY(-1px)',
+                    },
+                  }}
+                >
+                  <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                    <Stack alignItems="center" spacing={1}>
+                      <Avatar
+                        sx={{
+                          bgcolor: account.color,
+                          width: 40,
+                          height: 40,
+                          boxShadow: `0 4px 12px ${account.color}40`,
+                        }}
+                      >
+                        {account.icon}
+                      </Avatar>
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: '#fff', fontWeight: 600, display: 'block' }}
+                        >
+                          {account.label}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.625rem', lineHeight: 1.3 }}
+                        >
+                          {account.description}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ))}
+            </Stack>
+          </CardContent>
+        </Card>
 
         {/* Footer */}
-        <p className="text-center text-xs text-indigo-200/50 mt-6">
+        <Typography
+          variant="caption"
+          sx={{ display: 'block', textAlign: 'center', mt: 3, color: 'rgba(199,210,254,0.5)' }}
+        >
           Kuja Link &middot; Empowering grants through AI
-        </p>
-      </div>
-    </div>
+        </Typography>
+      </Box>
+    </Box>
   );
 }

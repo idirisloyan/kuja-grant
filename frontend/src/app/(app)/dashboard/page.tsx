@@ -4,16 +4,21 @@ import { useMemo } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useDashboardStats } from '@/lib/hooks/use-api';
 import { StatusBadge } from '@/components/shared/status-badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
+import Skeleton from '@mui/material/Skeleton';
+import Chip from '@mui/material/Chip';
+
+import { BarChart } from '@mui/x-charts/BarChart';
+
 import {
-  AreaChart, Area, ResponsiveContainer, XAxis, Tooltip,
-} from 'recharts';
-import {
-  FileText, Search, ClipboardCheck, Briefcase,
-  ArrowRight, Calendar, Clock, ChevronRight,
+  Search, ClipboardCheck, ChevronRight,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -30,12 +35,12 @@ export default function DashboardPage() {
   if (!user) return null;
 
   return (
-    <div className="space-y-8 pb-8 max-w-5xl">
+    <Stack spacing={4} sx={{ pb: 4, maxWidth: 960 }}>
       {user.role === 'ngo' && <NGODashboard stats={stats} userName={user.name} />}
       {user.role === 'donor' && <DonorDashboard stats={stats} userName={user.name} />}
       {user.role === 'reviewer' && <ReviewerDashboard stats={stats} userName={user.name} />}
       {user.role === 'admin' && <AdminDashboard stats={stats} userName={user.name} />}
-    </div>
+    </Stack>
   );
 }
 
@@ -45,16 +50,18 @@ export default function DashboardPage() {
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-8 max-w-5xl">
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-4 w-48" />
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-        {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
-      </div>
-      <Skeleton className="h-64 rounded-lg" />
-    </div>
+    <Stack spacing={4} sx={{ maxWidth: 960 }}>
+      <Box>
+        <Skeleton variant="text" width={260} height={36} />
+        <Skeleton variant="text" width={200} height={20} />
+      </Box>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 3 }}>
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} variant="rounded" height={96} sx={{ borderRadius: 2 }} />
+        ))}
+      </Box>
+      <Skeleton variant="rounded" height={260} sx={{ borderRadius: 2 }} />
+    </Stack>
   );
 }
 
@@ -62,12 +69,21 @@ function DashboardSkeleton() {
 // Shared: Simple stat card
 // ---------------------------------------------------------------------------
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function DashStatCard({ label, value, color }: { label: string; value: string | number; color?: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5">
-      <p className="text-2xl font-semibold text-slate-900">{value}</p>
-      <p className="text-sm text-slate-500 mt-1">{label}</p>
-    </div>
+    <Card>
+      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+        <Typography
+          variant="h4"
+          sx={{ fontWeight: 700, color: color || 'text.primary', mb: 0.5 }}
+        >
+          {value}
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          {label}
+        </Typography>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -81,10 +97,10 @@ function DeadlineItem({ title, subtitle, daysLeft }: {
   daysLeft: number;
 }) {
   const color =
-    daysLeft < 0 ? 'text-red-600' :
-    daysLeft < 7 ? 'text-red-600' :
-    daysLeft < 30 ? 'text-amber-600' :
-    'text-slate-500';
+    daysLeft < 0 ? 'error.main' :
+    daysLeft < 7 ? 'error.main' :
+    daysLeft < 30 ? 'warning.main' :
+    'text.secondary';
 
   const label =
     daysLeft < 0 ? `${Math.abs(daysLeft)}d overdue` :
@@ -92,62 +108,67 @@ function DeadlineItem({ title, subtitle, daysLeft }: {
     `${daysLeft}d left`;
 
   return (
-    <div className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm text-slate-900 truncate">{title}</p>
-        <p className="text-xs text-slate-400 mt-0.5 truncate">{subtitle}</p>
-      </div>
-      <span className={`text-xs font-medium shrink-0 ml-4 ${color}`}>
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        py: 1.5,
+        borderBottom: '1px solid',
+        borderColor: 'divider',
+        '&:last-child': { borderBottom: 'none' },
+      }}
+    >
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>
+          {title}
+        </Typography>
+        <Typography variant="caption" noWrap sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}>
+          {subtitle}
+        </Typography>
+      </Box>
+      <Typography
+        variant="caption"
+        sx={{ fontWeight: 600, color, flexShrink: 0, ml: 2 }}
+      >
         {label}
-      </span>
-    </div>
+      </Typography>
+    </Box>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Shared: Simple chart
+// Shared: Trend Bar Chart using @mui/x-charts
 // ---------------------------------------------------------------------------
 
-function TrendChart({ data }: { data: Array<{ month: string; value: number }> }) {
+function TrendBarChart({ data }: { data: Array<{ month: string; value: number }> }) {
   return (
-    <Card className="border border-slate-200">
-      <CardContent className="p-5">
-        <p className="text-sm font-medium text-slate-700 mb-4">Activity trend</p>
-        <div className="h-36">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data}>
-              <defs>
-                <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#4F46E5" stopOpacity={0.12} />
-                  <stop offset="100%" stopColor="#4F46E5" stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <XAxis
-                dataKey="month"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: '#1e293b',
-                  border: 'none',
-                  borderRadius: '6px',
-                  color: '#fff',
-                  fontSize: '12px',
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="#4F46E5"
-                strokeWidth={2}
-                fill="url(#trendFill)"
-                dot={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+    <Card>
+      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 2 }}>
+          Activity Trend
+        </Typography>
+        <Box sx={{ height: 200, width: '100%' }}>
+          <BarChart
+            xAxis={[{
+              data: data.map((d) => d.month),
+              scaleType: 'band',
+            }]}
+            series={[{
+              data: data.map((d) => d.value),
+              color: '#4F46E5',
+            }]}
+            height={200}
+            margin={{ top: 10, right: 10, bottom: 24, left: 30 }}
+            borderRadius={6}
+            slotProps={{
+              bar: {
+                rx: 4,
+                ry: 4,
+              },
+            }}
+          />
+        </Box>
       </CardContent>
     </Card>
   );
@@ -184,75 +205,92 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
   return (
     <>
       {/* Greeting */}
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">
+      <Box>
+        <Typography variant="h2" sx={{ color: 'text.primary' }}>
           Welcome back, {userName.split(' ')[0]}
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
           Here is what is happening with your grants and applications.
-        </p>
-      </div>
+        </Typography>
+      </Box>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-        <StatCard label="Applications" value={totalApps} />
-        <StatCard label="Open Grants" value={openGrants} />
-        <StatCard label="Pending Reports" value={pendingReports} />
-        <StatCard label="Assessments" value={assessmentCount} />
-      </div>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 3 }}>
+        <DashStatCard label="Applications" value={totalApps} />
+        <DashStatCard label="Open Grants" value={openGrants} />
+        <DashStatCard label="Pending Reports" value={pendingReports} />
+        <DashStatCard label="Assessments" value={assessmentCount} />
+      </Box>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3 }}>
         {/* Recent Applications */}
-        <Card className="border border-slate-200">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-slate-700">Recent Applications</p>
-              <button
+        <Card>
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                Recent Applications
+              </Typography>
+              <Button
+                size="small"
                 onClick={() => router.push('/applications')}
-                className="text-xs text-brand-600 hover:text-brand-700"
+                sx={{ fontSize: '0.75rem', fontWeight: 500 }}
               >
                 View all
-              </button>
-            </div>
+              </Button>
+            </Box>
             {recentApps.length > 0 ? (
-              <div>
+              <Stack spacing={0}>
                 {recentApps.map((app, i) => (
-                  <div
+                  <Box
                     key={i}
-                    className="flex items-center gap-3 py-2.5 border-b border-slate-100 last:border-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded"
                     onClick={() => router.push('/applications')}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      py: 1.25,
+                      px: 1,
+                      borderBottom: '1px solid',
+                      borderColor: 'divider',
+                      '&:last-child': { borderBottom: 'none' },
+                      cursor: 'pointer',
+                      borderRadius: 1,
+                      '&:hover': { bgcolor: 'action.hover' },
+                    }}
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-slate-900 truncate">
-                        {String(app.grant_title || 'Untitled Grant')}
-                      </p>
-                    </div>
+                    <Typography variant="body2" noWrap sx={{ flex: 1, color: 'text.primary' }}>
+                      {String(app.grant_title || 'Untitled Grant')}
+                    </Typography>
                     <StatusBadge status={String(app.status || 'draft')} />
-                  </div>
+                  </Box>
                 ))}
-              </div>
+              </Stack>
             ) : (
-              <div className="py-8 text-center">
-                <p className="text-sm text-slate-400">No applications yet</p>
+              <Box sx={{ py: 6, textAlign: 'center' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  No applications yet
+                </Typography>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 text-brand-600"
+                  variant="outlined"
+                  size="small"
                   onClick={() => router.push('/grants')}
+                  sx={{ mt: 2 }}
                 >
                   Browse Grants
                 </Button>
-              </div>
+              </Box>
             )}
           </CardContent>
         </Card>
 
         {/* Upcoming Deadlines */}
-        <Card className="border border-slate-200">
-          <CardContent className="p-5">
-            <p className="text-sm font-medium text-slate-700 mb-4">Upcoming Deadlines</p>
+        <Card>
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 2 }}>
+              Upcoming Deadlines
+            </Typography>
             {upcomingDeadlines.length > 0 ? (
-              <div>
+              <Box>
                 {upcomingDeadlines.map((dl, i) => (
                   <DeadlineItem
                     key={i}
@@ -261,39 +299,41 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
                     daysLeft={Number(dl.days_left) || 0}
                   />
                 ))}
-              </div>
+              </Box>
             ) : (
-              <div className="py-8 text-center">
-                <p className="text-sm text-slate-400">No upcoming deadlines</p>
-              </div>
+              <Box sx={{ py: 6, textAlign: 'center' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  No upcoming deadlines
+                </Typography>
+              </Box>
             )}
           </CardContent>
         </Card>
-      </div>
+      </Box>
 
       {/* Trend Chart */}
-      <TrendChart data={trendData} />
+      <TrendBarChart data={trendData} />
 
       {/* Quick Actions */}
-      <div className="flex gap-3">
+      <Stack direction="row" spacing={1.5}>
         <Button
-          variant="outline"
-          size="sm"
-          className="text-slate-600"
+          variant="outlined"
+          size="small"
+          startIcon={<ClipboardCheck size={16} />}
           onClick={() => router.push('/assessments')}
+          sx={{ color: 'text.secondary', borderColor: 'divider' }}
         >
-          <ClipboardCheck className="w-4 h-4 mr-1.5 text-slate-400" />
           Start Assessment
         </Button>
         <Button
-          size="sm"
-          className="bg-brand-600 hover:bg-brand-700 text-white"
+          variant="contained"
+          size="small"
+          startIcon={<Search size={16} />}
           onClick={() => router.push('/grants')}
         >
-          <Search className="w-4 h-4 mr-1.5" />
           Browse Grants
         </Button>
-      </div>
+      </Stack>
     </>
   );
 }
@@ -324,75 +364,86 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box>
+          <Typography variant="h2" sx={{ color: 'text.primary' }}>
             Welcome back, {userName.split(' ')[0]}
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
             Your funding portfolio at a glance.
-          </p>
-        </div>
+          </Typography>
+        </Box>
         <Button
-          size="sm"
-          className="bg-brand-600 hover:bg-brand-700 text-white"
+          variant="contained"
+          size="small"
           onClick={() => router.push('/grants/new')}
         >
           Create Grant
         </Button>
-      </div>
+      </Box>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-        <StatCard label="Active Grants" value={totalGrants} />
-        <StatCard label="Applications" value={totalApps} />
-        <StatCard label="Pending Reviews" value={pendingReviews} />
-        <StatCard label="Reports Due" value={reportsToReview} />
-      </div>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 3 }}>
+        <DashStatCard label="Active Grants" value={totalGrants} />
+        <DashStatCard label="Applications" value={totalApps} />
+        <DashStatCard label="Pending Reviews" value={pendingReviews} />
+        <DashStatCard label="Reports Due" value={reportsToReview} />
+      </Box>
 
-      {/* Recent Activity */}
-      <Card className="border border-slate-200">
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-slate-700">Grant Performance</p>
-            <button
+      {/* Grant Performance */}
+      <Card>
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+              Grant Performance
+            </Typography>
+            <Button
+              size="small"
               onClick={() => router.push('/grants')}
-              className="text-xs text-brand-600 hover:text-brand-700"
+              sx={{ fontSize: '0.75rem' }}
             >
               View all
-            </button>
-          </div>
+            </Button>
+          </Box>
           {grantPerformance.length > 0 ? (
-            <div>
+            <Stack spacing={0}>
               {grantPerformance.map((grant, i) => (
-                <div
+                <Box
                   key={i}
-                  className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0"
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    py: 1.5,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    '&:last-child': { borderBottom: 'none' },
+                  }}
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-slate-900 truncate">
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>
                       {String(grant.title || 'Grant')}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                       {String(grant.applicant_count || 0)} applicants
-                    </p>
-                  </div>
-                  <span className="text-sm font-medium text-slate-600 ml-4">
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', ml: 2 }}>
                     {Number(grant.progress) || 0}%
-                  </span>
-                </div>
+                  </Typography>
+                </Box>
               ))}
-            </div>
+            </Stack>
           ) : (
-            <div className="py-8 text-center">
-              <p className="text-sm text-slate-400">
+            <Box sx={{ py: 6, textAlign: 'center' }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                 Create your first grant to see performance data.
-              </p>
-            </div>
+              </Typography>
+            </Box>
           )}
         </CardContent>
       </Card>
 
-      <TrendChart data={trendData} />
+      <TrendBarChart data={trendData} />
     </>
   );
 }
@@ -414,57 +465,74 @@ function ReviewerDashboard({ stats, userName }: { stats?: Record<string, unknown
 
   return (
     <>
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">
+      <Box>
+        <Typography variant="h2" sx={{ color: 'text.primary' }}>
           Welcome back, {userName.split(' ')[0]}
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
           You have {pendingReviews} application{pendingReviews !== 1 ? 's' : ''} waiting for review.
-        </p>
-      </div>
+        </Typography>
+      </Box>
 
-      <div className="grid grid-cols-3 gap-6">
-        <StatCard label="Pending" value={pendingReviews} />
-        <StatCard label="In Progress" value={inProgress} />
-        <StatCard label="Completed" value={completedReviews} />
-      </div>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
+        <DashStatCard label="Pending" value={pendingReviews} />
+        <DashStatCard label="In Progress" value={inProgress} />
+        <DashStatCard label="Completed" value={completedReviews} />
+      </Box>
 
       {/* Assignments */}
-      <Card className="border border-slate-200">
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-slate-700">Your Assignments</p>
-            <button
+      <Card>
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+              Your Assignments
+            </Typography>
+            <Button
+              size="small"
               onClick={() => router.push('/reviews')}
-              className="text-xs text-brand-600 hover:text-brand-700"
+              sx={{ fontSize: '0.75rem' }}
             >
               View all
-            </button>
-          </div>
+            </Button>
+          </Box>
           {pendingQueue.length > 0 ? (
-            <div>
+            <Stack spacing={0}>
               {pendingQueue.map((item, i) => (
-                <div
+                <Box
                   key={i}
-                  className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded"
                   onClick={() => router.push('/reviews')}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    py: 1.5,
+                    px: 1,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    '&:last-child': { borderBottom: 'none' },
+                    cursor: 'pointer',
+                    borderRadius: 1,
+                    '&:hover': { bgcolor: 'action.hover' },
+                  }}
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-slate-900 truncate">
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>
                       {String(item.grant_title || item.title || 'Application')}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-0.5 truncate">
+                    </Typography>
+                    <Typography variant="caption" noWrap sx={{ color: 'text.secondary' }}>
                       {String(item.ngo_org_name || item.org_name || '')}
-                    </p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
-                </div>
+                    </Typography>
+                  </Box>
+                  <ChevronRight size={16} color="#94A3B8" />
+                </Box>
               ))}
-            </div>
+            </Stack>
           ) : (
-            <div className="py-8 text-center">
-              <p className="text-sm text-slate-400">No pending assignments</p>
-            </div>
+            <Box sx={{ py: 6, textAlign: 'center' }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                No pending assignments
+              </Typography>
+            </Box>
           )}
         </CardContent>
       </Card>
@@ -493,21 +561,23 @@ function AdminDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
 
   return (
     <>
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">
+      <Box>
+        <Typography variant="h2" sx={{ color: 'text.primary' }}>
           Welcome back, {userName.split(' ')[0]}
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">System overview</p>
-      </div>
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+          System overview
+        </Typography>
+      </Box>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-        <StatCard label="Users" value={totalUsers} />
-        <StatCard label="Organizations" value={totalOrgs} />
-        <StatCard label="Grants" value={totalGrants} />
-        <StatCard label="Applications" value={totalApps} />
-      </div>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 3 }}>
+        <DashStatCard label="Users" value={totalUsers} />
+        <DashStatCard label="Organizations" value={totalOrgs} />
+        <DashStatCard label="Grants" value={totalGrants} />
+        <DashStatCard label="Applications" value={totalApps} />
+      </Box>
 
-      <TrendChart data={trendData} />
+      <TrendBarChart data={trendData} />
     </>
   );
 }

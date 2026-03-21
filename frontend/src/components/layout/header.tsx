@@ -2,18 +2,28 @@
 
 import { useAuthStore } from '@/stores/auth-store';
 import { useUIStore } from '@/stores/ui-store';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import { Menu, LogOut, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import Avatar from '@mui/material/Avatar';
+import Button from '@mui/material/Button';
+import Box from '@mui/material/Box';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import Tooltip from '@mui/material/Tooltip';
+
+import MenuIcon from '@mui/icons-material/Menu';
+import LogoutOutlined from '@mui/icons-material/LogoutOutlined';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
 
 export function Header() {
   const router = useRouter();
   const { user, logout, setLanguage } = useAuthStore();
-  const { toggleSidebar, toggleAIPanel } = useUIStore();
+  const { toggleAIPanel, setMobileSidebarOpen } = useUIStore();
 
   const handleLogout = async () => {
     await logout();
@@ -23,68 +33,112 @@ export function Header() {
   if (!user) return null;
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between h-14 px-4 sm:px-6 bg-white border-b border-slate-200">
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="lg:hidden h-8 w-8"
-          onClick={toggleSidebar}
+    <AppBar
+      position="sticky"
+      color="inherit"
+      elevation={0}
+      sx={{
+        bgcolor: 'background.paper',
+        borderBottom: '1px solid',
+        borderColor: 'divider',
+        zIndex: (theme) => theme.zIndex.appBar,
+      }}
+    >
+      <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, px: { xs: 1.5, sm: 3 } }}>
+        {/* Mobile menu button */}
+        <IconButton
+          onClick={() => setMobileSidebarOpen(true)}
+          sx={{ display: { sm: 'none' }, mr: 1 }}
+          size="small"
         >
-          <Menu className="w-4 h-4" />
-        </Button>
-      </div>
+          <MenuIcon fontSize="small" />
+        </IconButton>
 
-      <div className="flex items-center gap-3">
-        {/* AI Assistant */}
-        <button
-          onClick={toggleAIPanel}
-          className="text-sm text-slate-500 hover:text-brand-600 transition-colors"
-        >
-          <span className="flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4" />
-            <span className="hidden sm:inline">AI Assistant</span>
-          </span>
-        </button>
+        {/* Spacer */}
+        <Box sx={{ flexGrow: 1 }} />
 
-        {/* Language */}
-        <Select
-          value={user.language || 'en'}
-          onValueChange={(val) => { if (val) setLanguage(val); }}
-        >
-          <SelectTrigger className="w-[60px] h-8 text-xs border-slate-200">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="en">EN</SelectItem>
-            <SelectItem value="ar">AR</SelectItem>
-            <SelectItem value="fr">FR</SelectItem>
-            <SelectItem value="es">ES</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* Right side actions */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1.5 } }}>
+          {/* AI Assistant button */}
+          <Button
+            onClick={toggleAIPanel}
+            startIcon={<AutoAwesome sx={{ fontSize: '18px !important' }} />}
+            size="small"
+            sx={{
+              color: 'text.secondary',
+              fontWeight: 500,
+              fontSize: '0.8125rem',
+              '&:hover': { color: 'primary.main', bgcolor: 'primary.main', backgroundColor: 'rgba(79,70,229,0.08)' },
+            }}
+          >
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+              AI Assistant
+            </Box>
+          </Button>
 
-        {/* User */}
-        <div className="flex items-center gap-2">
-          <Avatar className="w-7 h-7">
-            <AvatarFallback className="bg-brand-600 text-white text-xs font-medium">
+          {/* Language selector */}
+          <FormControl size="small" sx={{ minWidth: 60 }}>
+            <Select
+              value={user.language || 'en'}
+              onChange={(e) => setLanguage(e.target.value)}
+              variant="outlined"
+              sx={{
+                height: 32,
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'divider',
+                },
+                '& .MuiSelect-select': {
+                  py: 0.5,
+                  px: 1,
+                },
+              }}
+            >
+              <MenuItem value="en" sx={{ fontSize: '0.75rem' }}>EN</MenuItem>
+              <MenuItem value="ar" sx={{ fontSize: '0.75rem' }}>AR</MenuItem>
+              <MenuItem value="fr" sx={{ fontSize: '0.75rem' }}>FR</MenuItem>
+              <MenuItem value="es" sx={{ fontSize: '0.75rem' }}>ES</MenuItem>
+            </Select>
+          </FormControl>
+
+          {/* User info */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Avatar
+              sx={{
+                width: 32,
+                height: 32,
+                bgcolor: 'primary.main',
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+              }}
+            >
               {user.name?.charAt(0)?.toUpperCase() || 'U'}
-            </AvatarFallback>
-          </Avatar>
-          <span className="hidden md:inline text-sm text-slate-700">
-            {user.name}
-          </span>
-        </div>
+            </Avatar>
+            <Typography
+              variant="body2"
+              sx={{
+                display: { xs: 'none', md: 'block' },
+                color: 'text.primary',
+                fontWeight: 500,
+              }}
+            >
+              {user.name}
+            </Typography>
+          </Box>
 
-        {/* Logout */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleLogout}
-          className="h-8 w-8 text-slate-400 hover:text-slate-600"
-        >
-          <LogOut className="w-4 h-4" />
-        </Button>
-      </div>
-    </header>
+          {/* Logout */}
+          <Tooltip title="Sign out">
+            <IconButton
+              onClick={handleLogout}
+              size="small"
+              sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}
+            >
+              <LogoutOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </Toolbar>
+    </AppBar>
   );
 }

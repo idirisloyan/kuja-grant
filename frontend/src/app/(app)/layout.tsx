@@ -7,7 +7,22 @@ import { useUIStore } from '@/stores/ui-store';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { AIPanel } from '@/components/layout/ai-panel';
-import { cn } from '@/lib/utils';
+
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Typography from '@mui/material/Typography';
+import Stack from '@mui/material/Stack';
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const SIDEBAR_WIDTH = 260;
+const SIDEBAR_COLLAPSED_WIDTH = 72;
+
+// ---------------------------------------------------------------------------
+// App Layout
+// ---------------------------------------------------------------------------
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -26,34 +41,64 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 bg-brand-600 rounded-lg flex items-center justify-center">
-            <span className="text-white text-lg font-bold">K</span>
-          </div>
-          <div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
-        </div>
-      </div>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'background.default',
+        }}
+      >
+        <Stack alignItems="center" spacing={2}>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              bgcolor: 'primary.main',
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '1.25rem' }}>K</Typography>
+          </Box>
+          <CircularProgress size={28} sx={{ color: 'primary.main' }} />
+        </Stack>
+      </Box>
     );
   }
 
   if (!user) return null;
 
+  const drawerWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Sidebar />
-      <div
-        className={cn(
-          'transition-all duration-300',
-          sidebarCollapsed ? 'ml-16' : 'ml-56'
-        )}
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+      <Sidebar width={SIDEBAR_WIDTH} collapsedWidth={SIDEBAR_COLLAPSED_WIDTH} />
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          ml: { sm: `${drawerWidth}px` },
+          transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
       >
         <Header />
-        <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto animate-fade-in">
+        <Box
+          sx={{
+            px: { xs: 2, sm: 3, lg: 4 },
+            py: { xs: 2, sm: 3 },
+            maxWidth: 1200,
+            mx: 'auto',
+          }}
+        >
           {children}
-        </main>
-      </div>
+        </Box>
+      </Box>
       <AIPanel />
-    </div>
+    </Box>
   );
 }

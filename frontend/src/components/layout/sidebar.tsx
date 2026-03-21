@@ -2,9 +2,23 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui-store';
 import { useAuthStore } from '@/stores/auth-store';
+
+import Box from '@mui/material/Box';
+import Drawer from '@mui/material/Drawer';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
+import Divider from '@mui/material/Divider';
+import Tooltip from '@mui/material/Tooltip';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
+
 import {
   LayoutDashboard, ClipboardCheck, Search, FileText, BarChart3, Building2,
   PlusCircle, Briefcase, Star, Shield, CheckCircle2, ClipboardList,
@@ -65,83 +79,174 @@ const navItems: Record<UserRole, NavItem[]> = {
 // Sidebar Component
 // ---------------------------------------------------------------------------
 
-export function Sidebar() {
+interface SidebarProps {
+  width: number;
+  collapsedWidth: number;
+}
+
+export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   const pathname = usePathname();
-  const { sidebarCollapsed, toggleSidebar } = useUIStore();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, setMobileSidebarOpen } = useUIStore();
   const user = useAuthStore((s) => s.user);
   const role = user?.role || 'ngo';
   const items = navItems[role] || navItems.ngo;
 
-  return (
-    <aside
-      className={cn(
-        'fixed left-0 top-0 bottom-0 z-40 flex flex-col bg-white border-r border-slate-200 transition-all duration-300',
-        sidebarCollapsed ? 'w-16' : 'w-56'
-      )}
+  const currentWidth = sidebarCollapsed ? collapsedWidth : width;
+
+  const drawerContent = (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+      }}
     >
       {/* Logo */}
-      <div
-        className={cn(
-          'flex items-center h-14 px-4 border-b border-slate-100',
-          sidebarCollapsed ? 'justify-center' : 'gap-3'
-        )}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          height: 64,
+          px: sidebarCollapsed ? 0 : 2.5,
+          justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+          gap: 1.5,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+        }}
       >
-        <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center shrink-0">
-          <span className="text-white font-bold text-sm">K</span>
-        </div>
+        <Box
+          sx={{
+            width: 36,
+            height: 36,
+            bgcolor: 'primary.main',
+            borderRadius: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '0.9rem' }}>K</Typography>
+        </Box>
         {!sidebarCollapsed && (
-          <span className="font-semibold text-sm text-slate-900">Kuja</span>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '1rem' }}>
+            Kuja
+          </Typography>
         )}
-      </div>
+      </Box>
 
       {/* Navigation */}
-      <nav className="flex-1 px-2 py-4 overflow-y-auto">
-        <ul className="space-y-0.5">
+      <Box sx={{ flex: 1, overflow: 'auto', px: 1.5, py: 2 }}>
+        <List disablePadding>
           {items.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              pathname?.startsWith(item.href + '/');
+            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+            const Icon = item.icon;
 
-            return (
-              <li key={item.href}>
-                <Link
+            const button = (
+              <ListItem key={item.href} disablePadding sx={{ mb: 0.25 }}>
+                <ListItemButton
+                  component={Link}
                   href={item.href}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-                    isActive
-                      ? 'bg-brand-50 text-brand-600 font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
-                    sidebarCollapsed && 'justify-center px-2'
-                  )}
-                  title={sidebarCollapsed ? item.label : undefined}
+                  selected={isActive}
+                  onClick={() => isMobile && setMobileSidebarOpen(false)}
+                  sx={{
+                    minHeight: 42,
+                    px: sidebarCollapsed ? 0 : 2,
+                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                    borderRadius: 1.5,
+                  }}
                 >
-                  <item.icon
-                    className={cn(
-                      'w-4 h-4 shrink-0',
-                      isActive ? 'text-brand-600' : 'text-slate-400'
-                    )}
-                  />
+                  <ListItemIcon
+                    sx={{
+                      minWidth: sidebarCollapsed ? 0 : 36,
+                      justifyContent: 'center',
+                      color: isActive ? 'primary.main' : 'text.secondary',
+                    }}
+                  >
+                    <Icon size={18} />
+                  </ListItemIcon>
                   {!sidebarCollapsed && (
-                    <span className="truncate">{item.label}</span>
+                    <ListItemText
+                      primary={item.label}
+                      primaryTypographyProps={{
+                        fontSize: '0.8125rem',
+                        fontWeight: isActive ? 600 : 400,
+                      }}
+                    />
                   )}
-                </Link>
-              </li>
+                </ListItemButton>
+              </ListItem>
             );
+
+            if (sidebarCollapsed) {
+              return (
+                <Tooltip key={item.href} title={item.label} placement="right" arrow>
+                  {button}
+                </Tooltip>
+              );
+            }
+            return button;
           })}
-        </ul>
-      </nav>
+        </List>
+      </Box>
 
       {/* Collapse Toggle */}
-      <button
-        onClick={toggleSidebar}
-        className="flex items-center justify-center h-10 border-t border-slate-100 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+      <Divider />
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
+        <IconButton
+          onClick={toggleSidebar}
+          size="small"
+          sx={{
+            color: 'text.secondary',
+            '&:hover': { bgcolor: 'action.hover' },
+          }}
+        >
+          {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </IconButton>
+      </Box>
+    </Box>
+  );
+
+  // Mobile: temporary drawer
+  if (isMobile) {
+    return (
+      <Drawer
+        variant="temporary"
+        open={sidebarMobileOpen}
+        onClose={() => setMobileSidebarOpen(false)}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          '& .MuiDrawer-paper': {
+            width: width,
+            boxSizing: 'border-box',
+          },
+        }}
       >
-        {sidebarCollapsed ? (
-          <ChevronRight className="w-4 h-4" />
-        ) : (
-          <ChevronLeft className="w-4 h-4" />
-        )}
-      </button>
-    </aside>
+        {drawerContent}
+      </Drawer>
+    );
+  }
+
+  // Desktop: permanent drawer
+  return (
+    <Drawer
+      variant="permanent"
+      sx={{
+        width: currentWidth,
+        flexShrink: 0,
+        '& .MuiDrawer-paper': {
+          width: currentWidth,
+          boxSizing: 'border-box',
+          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          overflowX: 'hidden',
+        },
+      }}
+    >
+      {drawerContent}
+    </Drawer>
   );
 }

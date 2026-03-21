@@ -4,13 +4,32 @@ import { useState, useMemo, useRef } from 'react';
 import { useReports, useUpcomingReports } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
 import { ScoreRing } from '@/components/shared/score-ring';
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import {
-  ChevronDown, Upload, Loader2,
-} from 'lucide-react';
 import type { Report } from '@/lib/types';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Chip from '@mui/material/Chip';
+import LinearProgress from '@mui/material/LinearProgress';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
+
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -30,26 +49,26 @@ function getDaysUntil(dateStr: string | null): number {
 }
 
 function getDeadlineText(dateStr: string | null): { label: string; color: string } {
-  if (!dateStr) return { label: '', color: 'text-slate-400' };
+  if (!dateStr) return { label: '', color: 'text.secondary' };
   const days = getDaysUntil(dateStr);
-  if (days < 0) return { label: `${Math.abs(days)}d overdue`, color: 'text-red-600' };
-  if (days === 0) return { label: 'Due today', color: 'text-red-600' };
-  if (days <= 7) return { label: `${days}d left`, color: 'text-red-600' };
-  if (days <= 30) return { label: `${days}d left`, color: 'text-amber-600' };
-  return { label: `${days}d left`, color: 'text-slate-500' };
+  if (days < 0) return { label: `${Math.abs(days)}d overdue`, color: 'error.main' };
+  if (days === 0) return { label: 'Due today', color: 'error.main' };
+  if (days <= 7) return { label: `${days}d left`, color: 'error.main' };
+  if (days <= 30) return { label: `${days}d left`, color: 'warning.main' };
+  return { label: `${days}d left`, color: 'text.secondary' };
 }
 
 // ---------------------------------------------------------------------------
-// Status helpers
+// Report Status Chip
 // ---------------------------------------------------------------------------
 
-function StatusDot({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    accepted: 'bg-emerald-500',
-    submitted: 'bg-blue-500',
-    under_review: 'bg-amber-500',
-    revision_requested: 'bg-amber-500',
-    draft: 'bg-slate-300',
+function ReportStatusChip({ status }: { status: string }) {
+  const colorMap: Record<string, 'success' | 'info' | 'warning' | 'default'> = {
+    accepted: 'success',
+    submitted: 'info',
+    under_review: 'warning',
+    revision_requested: 'warning',
+    draft: 'default',
   };
 
   const labels: Record<string, string> = {
@@ -61,10 +80,12 @@ function StatusDot({ status }: { status: string }) {
   };
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
-      <span className={`w-1.5 h-1.5 rounded-full ${colors[status] ?? 'bg-slate-300'}`} />
-      {labels[status] ?? status}
-    </span>
+    <Chip
+      label={labels[status] ?? status}
+      color={colorMap[status] ?? 'default'}
+      size="small"
+      variant="outlined"
+    />
   );
 }
 
@@ -75,6 +96,7 @@ function StatusDot({ status }: { status: string }) {
 export default function ReportsPage() {
   const { data: reportData, isLoading: reportsLoading, mutate: mutateReports } = useReports();
   const { data: upcomingData, isLoading: upcomingLoading } = useUpcomingReports();
+  const [tabValue, setTabValue] = useState(0);
 
   const reports = useMemo(() => reportData?.reports ?? [], [reportData]);
   const overdueCount = upcomingData?.overdue_count ?? 0;
@@ -112,7 +134,6 @@ export default function ReportsPage() {
 
   // Timeline items (next 90 days)
   const timelineItems = useMemo(() => {
-    const today = new Date();
     const items: Array<{
       report: Report;
       grantTitle: string;
@@ -135,13 +156,15 @@ export default function ReportsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 max-w-5xl">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
-        </div>
-        <Skeleton className="h-64 rounded-lg" />
-      </div>
+      <Stack spacing={3} sx={{ maxWidth: 960 }}>
+        <Skeleton variant="text" width={260} height={36} />
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 3 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} variant="rounded" height={80} sx={{ borderRadius: 2 }} />
+          ))}
+        </Box>
+        <Skeleton variant="rounded" height={260} sx={{ borderRadius: 2 }} />
+      </Stack>
     );
   }
 
@@ -149,112 +172,178 @@ export default function ReportsPage() {
   const pendingCount = reports.filter((r) => r.status === 'draft').length;
 
   return (
-    <div className="space-y-8 max-w-5xl">
+    <Stack spacing={4} sx={{ maxWidth: 960 }}>
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Reports & Compliance</h1>
-        <div className="flex items-center gap-3 mt-1">
-          <p className="text-sm text-slate-500">
+      <Box>
+        <Typography variant="h2" sx={{ color: 'text.primary' }}>
+          Reports & Compliance
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 0.5 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             {overallCompliance > 0
               ? `${overallCompliance}% compliant`
               : `${reports.length} reports total`}
-          </p>
+          </Typography>
           {overdueCount > 0 && (
-            <span className="text-sm text-red-600">
-              {overdueCount} overdue report{overdueCount !== 1 ? 's' : ''}
-            </span>
+            <Chip
+              label={`${overdueCount} overdue`}
+              color="error"
+              size="small"
+              variant="outlined"
+            />
           )}
-        </div>
-      </div>
+        </Box>
+      </Box>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <p className="text-2xl font-semibold text-slate-900">{reports.length}</p>
-          <p className="text-sm text-slate-500 mt-1">Total Reports</p>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <p className="text-2xl font-semibold text-slate-900">{submittedCount}</p>
-          <p className="text-sm text-slate-500 mt-1">Submitted</p>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <p className="text-2xl font-semibold text-slate-900">{pendingCount}</p>
-          <p className="text-sm text-slate-500 mt-1">Pending</p>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <p className={`text-2xl font-semibold ${overdueCount > 0 ? 'text-red-600' : 'text-slate-900'}`}>
-            {overdueCount}
-          </p>
-          <p className="text-sm text-slate-500 mt-1">Overdue</p>
-        </div>
-      </div>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 3 }}>
+        <Card>
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Typography variant="h4" sx={{ fontWeight: 700 }}>{reports.length}</Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>Total Reports</Typography>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Typography variant="h4" sx={{ fontWeight: 700 }}>{submittedCount}</Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>Submitted</Typography>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Typography variant="h4" sx={{ fontWeight: 700 }}>{pendingCount}</Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>Pending</Typography>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: overdueCount > 0 ? 'error.main' : 'text.primary' }}>
+              {overdueCount}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>Overdue</Typography>
+          </CardContent>
+        </Card>
+      </Box>
+
+      {/* Overall Compliance Progress */}
+      {overallCompliance > 0 && (
+        <Card>
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                Overall Compliance
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                {overallCompliance}%
+              </Typography>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={overallCompliance}
+              color={overallCompliance >= 80 ? 'success' : overallCompliance >= 60 ? 'warning' : 'error'}
+              sx={{ height: 8, borderRadius: 1 }}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs */}
-      <Tabs defaultValue="by-grant">
-        <TabsList className="bg-slate-100 h-9">
-          <TabsTrigger value="by-grant" className="text-xs">By Grant</TabsTrigger>
-          <TabsTrigger value="timeline" className="text-xs">Timeline</TabsTrigger>
-        </TabsList>
+      <Box>
+        <Tabs
+          value={tabValue}
+          onChange={(_, v) => setTabValue(v)}
+          sx={{
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Tab label="By Grant" />
+          <Tab label="Timeline" />
+        </Tabs>
 
         {/* By Grant Tab */}
-        <TabsContent value="by-grant" className="mt-6">
-          {reportsByGrant.length === 0 ? (
-            <div className="py-16 text-center">
-              <p className="text-sm text-slate-500">No reports yet</p>
-              <p className="text-xs text-slate-400 mt-1">
-                Reports will appear once you have awarded grants with reporting requirements.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {reportsByGrant.map((group) => (
+        {tabValue === 0 && (
+          <Stack spacing={2} sx={{ mt: 3 }}>
+            {reportsByGrant.length === 0 ? (
+              <Box sx={{ py: 10, textAlign: 'center' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  No reports yet
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>
+                  Reports will appear once you have awarded grants with reporting requirements.
+                </Typography>
+              </Box>
+            ) : (
+              reportsByGrant.map((group) => (
                 <GrantReportGroup
                   key={group.grantId}
                   group={group}
                   mutateReports={mutateReports}
                 />
-              ))}
-            </div>
-          )}
-        </TabsContent>
+              ))
+            )}
+          </Stack>
+        )}
 
         {/* Timeline Tab */}
-        <TabsContent value="timeline" className="mt-6">
-          {timelineItems.length === 0 ? (
-            <div className="py-16 text-center">
-              <p className="text-sm text-slate-500">No upcoming deadlines</p>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {timelineItems.map((item) => {
-                const dl = getDeadlineText(item.report.due_date);
-                return (
-                  <div
-                    key={item.report.id}
-                    className="flex items-center gap-4 py-3 border-b border-slate-100 last:border-0"
-                  >
-                    <span className="text-xs text-slate-400 w-20 shrink-0">
-                      {formatDate(item.report.due_date)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-slate-900 truncate">{item.report.title}</p>
-                      <p className="text-xs text-slate-400 truncate">{item.grantTitle}</p>
-                    </div>
-                    <span className="text-xs text-slate-400 shrink-0">
-                      {item.report.report_type}
-                    </span>
-                    <StatusDot status={item.report.status} />
-                    <span className={`text-xs font-medium shrink-0 ${dl.color}`}>
-                      {dl.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
+        {tabValue === 1 && (
+          <Box sx={{ mt: 3 }}>
+            {timelineItems.length === 0 ? (
+              <Box sx={{ py: 10, textAlign: 'center' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  No upcoming deadlines
+                </Typography>
+              </Box>
+            ) : (
+              <Stack spacing={0}>
+                {timelineItems.map((item) => {
+                  const dl = getDeadlineText(item.report.due_date);
+                  return (
+                    <Box
+                      key={item.report.id}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                        py: 1.5,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                        '&:last-child': { borderBottom: 'none' },
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: 'text.secondary', width: 80, flexShrink: 0 }}>
+                        {formatDate(item.report.due_date)}
+                      </Typography>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>
+                          {item.report.title}
+                        </Typography>
+                        <Typography variant="caption" noWrap sx={{ color: 'text.secondary' }}>
+                          {item.grantTitle}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={item.report.report_type}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: '0.6875rem', borderColor: 'divider' }}
+                      />
+                      <ReportStatusChip status={item.report.status} />
+                      <Typography
+                        variant="caption"
+                        sx={{ fontWeight: 600, color: dl.color, flexShrink: 0 }}
+                      >
+                        {dl.label}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            )}
+          </Box>
+        )}
+      </Box>
+    </Stack>
   );
 }
 
@@ -269,8 +358,6 @@ function GrantReportGroup({
   group: { grantId: number; grantTitle: string; reports: Report[] };
   mutateReports: () => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
-
   const scored = group.reports.filter(
     (r) => r.ai_analysis && (r.ai_analysis as Record<string, unknown>).score !== undefined,
   );
@@ -288,54 +375,52 @@ function GrantReportGroup({
   ).length;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-      {/* Header */}
-      <button
-        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors text-left"
-        onClick={() => setExpanded(!expanded)}
+    <Accordion defaultExpanded>
+      <AccordionSummary
+        expandIcon={<ExpandMoreIcon />}
+        sx={{ px: 2.5 }}
       >
-        <ChevronDown
-          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${
-            expanded ? '' : '-rotate-90'
-          }`}
-        />
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-slate-900 truncate">
-            {group.grantTitle}
-          </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {group.reports.length} deliverable{group.reports.length !== 1 ? 's' : ''}
-            {' / '}
-            {completedCount} completed
-          </p>
-        </div>
-
-        {grantCompliance > 0 && (
-          <span className="text-xs text-slate-500 shrink-0">
-            {grantCompliance}%
-          </span>
-        )}
-      </button>
-
-      {/* Table */}
-      {expanded && (
-        <div className="border-t border-slate-100">
-          {/* Header row */}
-          <div className="grid grid-cols-12 gap-2 px-5 py-2 text-[11px] font-medium text-slate-400 uppercase tracking-wider bg-slate-50">
-            <div className="col-span-4">Report</div>
-            <div className="col-span-2">Type</div>
-            <div className="col-span-2">Due Date</div>
-            <div className="col-span-1 text-center">Status</div>
-            <div className="col-span-1 text-center">Score</div>
-            <div className="col-span-2 text-right">Action</div>
-          </div>
-
-          {group.reports.map((report) => (
-            <ReportRow key={report.id} report={report} mutateReports={mutateReports} />
-          ))}
-        </div>
-      )}
-    </div>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, mr: 2 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }} noWrap>
+              {group.grantTitle}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              {group.reports.length} deliverable{group.reports.length !== 1 ? 's' : ''} / {completedCount} completed
+            </Typography>
+          </Box>
+          {grantCompliance > 0 && (
+            <Chip
+              label={`${grantCompliance}%`}
+              size="small"
+              color={grantCompliance >= 80 ? 'success' : grantCompliance >= 60 ? 'warning' : 'error'}
+              variant="outlined"
+            />
+          )}
+        </Box>
+      </AccordionSummary>
+      <AccordionDetails sx={{ p: 0 }}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Report</TableCell>
+                <TableCell>Type</TableCell>
+                <TableCell>Due Date</TableCell>
+                <TableCell align="center">Status</TableCell>
+                <TableCell align="center">Score</TableCell>
+                <TableCell align="right">Action</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {group.reports.map((report) => (
+                <ReportRow key={report.id} report={report} mutateReports={mutateReports} />
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </AccordionDetails>
+    </Accordion>
   );
 }
 
@@ -373,60 +458,70 @@ function ReportRow({
   };
 
   return (
-    <div className="grid grid-cols-12 gap-2 px-5 py-3 items-center border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+    <TableRow sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
       {/* Title */}
-      <div className="col-span-4 min-w-0">
-        <p className="text-sm text-slate-900 truncate">{report.title}</p>
+      <TableCell>
+        <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+          {report.title}
+        </Typography>
         {report.reporting_period && (
-          <p className="text-[11px] text-slate-400 truncate">{report.reporting_period}</p>
+          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }} noWrap>
+            {report.reporting_period}
+          </Typography>
         )}
-      </div>
+      </TableCell>
 
       {/* Type */}
-      <div className="col-span-2">
-        <span className="text-xs text-slate-500">{report.report_type}</span>
-      </div>
+      <TableCell>
+        <Chip
+          label={report.report_type}
+          size="small"
+          variant="outlined"
+          sx={{ fontSize: '0.6875rem', borderColor: 'divider' }}
+        />
+      </TableCell>
 
       {/* Due Date */}
-      <div className="col-span-2">
-        <p className="text-xs text-slate-600">{formatDate(report.due_date)}</p>
-        <span className={`text-[11px] ${dl.color}`}>{dl.label}</span>
-      </div>
+      <TableCell>
+        <Typography variant="body2" sx={{ color: 'text.primary' }}>
+          {formatDate(report.due_date)}
+        </Typography>
+        <Typography variant="caption" sx={{ color: dl.color, fontWeight: 500 }}>
+          {dl.label}
+        </Typography>
+      </TableCell>
 
       {/* Status */}
-      <div className="col-span-1 flex justify-center">
-        <StatusDot status={report.status} />
-      </div>
+      <TableCell align="center">
+        <ReportStatusChip status={report.status} />
+      </TableCell>
 
       {/* Score */}
-      <div className="col-span-1 flex justify-center">
+      <TableCell align="center">
         {aiScore !== null ? (
           <ScoreRing score={Math.round(aiScore)} size={28} strokeWidth={2.5} />
         ) : (
-          <span className="text-xs text-slate-300">--</span>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>--</Typography>
         )}
-      </div>
+      </TableCell>
 
       {/* Upload */}
-      <div className="col-span-2 flex justify-end">
+      <TableCell align="right">
         {report.status === 'draft' ? (
           <>
-            <button
+            <Button
+              size="small"
+              startIcon={uploading ? <CircularProgress size={14} /> : <UploadFileOutlined sx={{ fontSize: 16 }} />}
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="text-xs text-brand-600 hover:text-brand-700 disabled:opacity-50 flex items-center gap-1"
+              sx={{ fontSize: '0.75rem' }}
             >
-              {uploading ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <Upload className="w-3 h-3" />
-              )}
               Upload
-            </button>
+            </Button>
             <input
               ref={fileRef}
               type="file"
-              className="hidden"
+              style={{ display: 'none' }}
               accept=".pdf,.doc,.docx,.xls,.xlsx"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -435,11 +530,11 @@ function ReportRow({
             />
           </>
         ) : (
-          <span className="text-xs text-slate-400">
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             {report.status === 'accepted' ? 'Accepted' : 'Submitted'}
-          </span>
+          </Typography>
         )}
-      </div>
-    </div>
+      </TableCell>
+    </TableRow>
   );
 }

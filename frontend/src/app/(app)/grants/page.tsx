@@ -5,11 +5,24 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useGrants } from '@/lib/hooks/use-api';
 import { StatusBadge } from '@/components/shared/status-badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Search } from 'lucide-react';
 import type { Grant } from '@/lib/types';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import CardActions from '@mui/material/CardActions';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import Chip from '@mui/material/Chip';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import InputAdornment from '@mui/material/InputAdornment';
+import Divider from '@mui/material/Divider';
+
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
+import AddIcon from '@mui/icons-material/Add';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -24,16 +37,16 @@ function formatFunding(amount: number | null, currency: string): string {
 }
 
 function getDaysLeft(dateStr: string | null): { label: string; color: string } {
-  if (!dateStr) return { label: 'No deadline', color: 'text-slate-400' };
+  if (!dateStr) return { label: 'No deadline', color: 'text.secondary' };
   const d = new Date(dateStr);
   const now = new Date();
   const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 0) return { label: 'Expired', color: 'text-red-600' };
-  if (diffDays === 0) return { label: 'Due today', color: 'text-red-600' };
-  if (diffDays <= 7) return { label: `${diffDays}d left`, color: 'text-red-600' };
-  if (diffDays <= 30) return { label: `${diffDays}d left`, color: 'text-amber-600' };
-  return { label: `${diffDays}d left`, color: 'text-slate-500' };
+  if (diffDays < 0) return { label: 'Expired', color: 'error.main' };
+  if (diffDays === 0) return { label: 'Due today', color: 'error.main' };
+  if (diffDays <= 7) return { label: `${diffDays}d left`, color: 'error.main' };
+  if (diffDays <= 30) return { label: `${diffDays}d left`, color: 'warning.main' };
+  return { label: `${diffDays}d left`, color: 'text.secondary' };
 }
 
 // ---------------------------------------------------------------------------
@@ -48,16 +61,16 @@ const SECTOR_OPTIONS = [
 type SortOption = 'deadline' | 'funding' | 'recent';
 
 // ---------------------------------------------------------------------------
-// Status dot
+// Status chip for grant cards
 // ---------------------------------------------------------------------------
 
-function StatusDot({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    open: 'bg-emerald-500',
-    draft: 'bg-slate-300',
-    review: 'bg-amber-400',
-    closed: 'bg-slate-400',
-    awarded: 'bg-brand-500',
+function GrantStatusChip({ status }: { status: string }) {
+  const colorMap: Record<string, 'success' | 'default' | 'warning' | 'info' | 'primary'> = {
+    open: 'success',
+    draft: 'default',
+    review: 'warning',
+    closed: 'default',
+    awarded: 'primary',
   };
 
   const labels: Record<string, string> = {
@@ -69,10 +82,12 @@ function StatusDot({ status }: { status: string }) {
   };
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
-      <span className={`w-1.5 h-1.5 rounded-full ${colors[status] ?? 'bg-slate-300'}`} />
-      {labels[status] ?? status}
-    </span>
+    <Chip
+      label={labels[status] ?? status}
+      color={colorMap[status] ?? 'default'}
+      size="small"
+      variant="outlined"
+    />
   );
 }
 
@@ -137,15 +152,15 @@ export default function GrantsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 max-w-5xl">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-10 w-full max-w-lg" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Stack spacing={3} sx={{ maxWidth: 960 }}>
+        <Skeleton variant="text" width={200} height={36} />
+        <Skeleton variant="rounded" width={400} height={44} sx={{ borderRadius: 2 }} />
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-48 rounded-lg" />
+            <Skeleton key={i} variant="rounded" height={200} sx={{ borderRadius: 2 }} />
           ))}
-        </div>
-      </div>
+        </Box>
+      </Stack>
     );
   }
 
@@ -156,101 +171,119 @@ export default function GrantsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <Stack spacing={3} sx={{ maxWidth: 960 }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box>
+          <Typography variant="h2" sx={{ color: 'text.primary' }}>
             {isNgo ? 'Browse Grants' : 'My Grants'}
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
             {filteredGrants.length} grant{filteredGrants.length !== 1 ? 's' : ''} found
-          </p>
-        </div>
+          </Typography>
+        </Box>
         {!isNgo && (
           <Button
+            variant="contained"
+            size="small"
+            startIcon={<AddIcon />}
             onClick={() => router.push('/grants/new')}
-            className="bg-brand-600 hover:bg-brand-700 text-white"
-            size="sm"
           >
             Create Grant
           </Button>
         )}
-      </div>
+      </Box>
 
       {/* Search */}
-      <div className="relative max-w-lg">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input
-          placeholder="Search by title, donor, or keyword..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 h-10 border-slate-200 bg-white"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
-          >
-            Clear
-          </button>
-        )}
-      </div>
+      <TextField
+        placeholder="Search by title, donor, or keyword..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        size="small"
+        sx={{ maxWidth: 480 }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+            </InputAdornment>
+          ),
+          endAdornment: searchQuery ? (
+            <InputAdornment position="end">
+              <Button
+                size="small"
+                onClick={() => setSearchQuery('')}
+                sx={{ minWidth: 'auto', p: 0.5, fontSize: '0.75rem', color: 'text.secondary' }}
+              >
+                <ClearIcon sx={{ fontSize: 16 }} />
+              </Button>
+            </InputAdornment>
+          ) : null,
+        }}
+      />
 
       {/* Filters + Sort */}
-      <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75 }}>
         {SECTOR_OPTIONS.map((sector) => {
           const isActive = activeSectors.has(sector);
           return (
-            <button
+            <Chip
               key={sector}
+              label={sector}
               onClick={() => toggleSector(sector)}
-              className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                isActive
-                  ? 'text-brand-600 font-semibold bg-brand-50'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              {sector}
-            </button>
+              variant={isActive ? 'filled' : 'outlined'}
+              color={isActive ? 'primary' : 'default'}
+              size="small"
+              sx={{
+                fontWeight: isActive ? 600 : 400,
+                borderColor: isActive ? 'primary.main' : 'divider',
+              }}
+            />
           );
         })}
         {activeSectors.size > 0 && (
-          <button
+          <Chip
+            label="Clear filters"
             onClick={() => setActiveSectors(new Set())}
-            className="px-2.5 py-1 text-xs text-red-500 hover:text-red-600"
-          >
-            Clear filters
-          </button>
+            size="small"
+            color="error"
+            variant="outlined"
+            sx={{ fontWeight: 500 }}
+          />
         )}
-        <span className="mx-2 text-slate-200">|</span>
+
+        <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+
         {(['deadline', 'funding', 'recent'] as SortOption[]).map((opt) => (
-          <button
+          <Chip
             key={opt}
+            label={sortLabels[opt]}
             onClick={() => setSortBy(opt)}
-            className={`px-2.5 py-1 text-xs rounded transition-colors ${
-              sortBy === opt
-                ? 'text-slate-900 font-semibold'
-                : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            {sortLabels[opt]}
-          </button>
+            size="small"
+            variant={sortBy === opt ? 'filled' : 'outlined'}
+            color={sortBy === opt ? 'default' : 'default'}
+            sx={{
+              fontWeight: sortBy === opt ? 600 : 400,
+              bgcolor: sortBy === opt ? 'action.selected' : 'transparent',
+              borderColor: 'divider',
+            }}
+          />
         ))}
-      </div>
+      </Box>
 
       {/* Grant Cards */}
       {filteredGrants.length === 0 ? (
-        <div className="py-16 text-center">
-          <p className="text-sm text-slate-500">No grants found</p>
+        <Box sx={{ py: 10, textAlign: 'center' }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            No grants found
+          </Typography>
           {(searchQuery || activeSectors.size > 0) && (
-            <p className="text-xs text-slate-400 mt-1">
+            <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
               Try adjusting your search or clearing filters.
-            </p>
+            </Typography>
           )}
-        </div>
+        </Box>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
           {filteredGrants.map((grant) => (
             <GrantCard
               key={grant.id}
@@ -260,9 +293,9 @@ export default function GrantsPage() {
               onApply={() => router.push(`/apply/${grant.id}`)}
             />
           ))}
-        </div>
+        </Box>
       )}
-    </div>
+    </Stack>
   );
 }
 
@@ -284,57 +317,109 @@ function GrantCard({
   const deadline = getDaysLeft(grant.deadline);
 
   return (
-    <div
-      className="bg-white rounded-lg border border-slate-200 p-5 hover:border-slate-300 transition-colors cursor-pointer"
+    <Card
       onClick={onView}
+      sx={{
+        cursor: 'pointer',
+        '&:hover': {
+          borderColor: '#CBD5E1',
+          boxShadow: '0 4px 12px -2px rgba(0,0,0,0.08)',
+        },
+        transition: 'all 0.2s',
+      }}
     >
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <StatusDot status={grant.status} />
-        <span className={`text-xs ${deadline.color}`}>{deadline.label}</span>
-      </div>
+      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 0 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5, mb: 1.5 }}>
+          <GrantStatusChip status={grant.status} />
+          <Typography variant="caption" sx={{ color: deadline.color, fontWeight: 500 }}>
+            {deadline.label}
+          </Typography>
+        </Box>
 
-      <h3 className="text-sm font-semibold text-slate-900 leading-snug line-clamp-2 mb-1">
-        {grant.title}
-      </h3>
+        <Typography
+          variant="body1"
+          sx={{
+            fontWeight: 600,
+            color: 'text.primary',
+            lineHeight: 1.4,
+            mb: 0.5,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {grant.title}
+        </Typography>
 
-      {grant.donor_org_name && (
-        <p className="text-sm text-slate-500 mb-3">{grant.donor_org_name}</p>
-      )}
+        {grant.donor_org_name && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5 }}>
+            {grant.donor_org_name}
+          </Typography>
+        )}
 
-      <p className="text-lg font-semibold text-slate-900 mb-3">
-        {formatFunding(grant.total_funding, grant.currency)}
-      </p>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mb: 1.5 }}>
+          {formatFunding(grant.total_funding, grant.currency)}
+        </Typography>
 
-      {/* Sectors as plain text */}
-      {grant.sectors && grant.sectors.length > 0 && (
-        <p className="text-xs text-slate-400 mb-3">
-          {grant.sectors.join(', ')}
-        </p>
-      )}
+        {/* Sectors */}
+        {grant.sectors && grant.sectors.length > 0 && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
+            {grant.sectors.slice(0, 3).map((sector) => (
+              <Chip
+                key={sector}
+                label={sector}
+                size="small"
+                variant="outlined"
+                sx={{
+                  height: 22,
+                  fontSize: '0.6875rem',
+                  borderColor: 'divider',
+                  color: 'text.secondary',
+                }}
+              />
+            ))}
+            {grant.sectors.length > 3 && (
+              <Chip
+                label={`+${grant.sectors.length - 3}`}
+                size="small"
+                sx={{
+                  height: 22,
+                  fontSize: '0.6875rem',
+                  bgcolor: 'action.hover',
+                  color: 'text.secondary',
+                }}
+              />
+            )}
+          </Box>
+        )}
+      </CardContent>
 
       {/* Actions */}
-      <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
-        <button
+      <CardActions sx={{ px: 2.5, py: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+        <Button
+          size="small"
           onClick={(e) => { e.stopPropagation(); onView(); }}
-          className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+          sx={{ fontSize: '0.75rem' }}
         >
           View details
-        </button>
+        </Button>
         {isNgo && grant.status === 'open' && !grant.user_application_status && (
           <Button
-            size="sm"
-            className="ml-auto bg-brand-600 hover:bg-brand-700 text-white text-xs h-8"
+            size="small"
+            variant="contained"
             onClick={(e) => { e.stopPropagation(); onApply(); }}
+            sx={{ ml: 'auto', fontSize: '0.75rem' }}
           >
             Apply
           </Button>
         )}
         {isNgo && grant.user_application_status && (
-          <div className="ml-auto" onClick={(e) => e.stopPropagation()}>
+          <Box sx={{ ml: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <StatusBadge status={grant.user_application_status} />
-          </div>
+          </Box>
         )}
-      </div>
-    </div>
+      </CardActions>
+    </Card>
   );
 }
