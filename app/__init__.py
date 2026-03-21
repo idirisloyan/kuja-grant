@@ -58,7 +58,7 @@ def create_app(config_name=None):
     # -----------------------------------------------------------------
     # Production: only the Railway domain. Development: add localhost for convenience.
     _prod_origins = 'https://web-production-6f8a.up.railway.app'
-    _dev_origins = 'https://web-production-6f8a.up.railway.app,http://localhost:5000,http://127.0.0.1:5000'
+    _dev_origins = 'https://web-production-6f8a.up.railway.app,http://localhost:5000,http://127.0.0.1:5000,http://localhost:3000'
     _default_origins = _prod_origins if config_name == 'production' else _dev_origins
     _allowed_origins = [o.strip() for o in os.getenv('CORS_ORIGINS', _default_origins).split(',') if o.strip()]
     CORS(app, supports_credentials=True,
@@ -186,11 +186,38 @@ def _setup_logging(app, config_name):
 
 
 def _register_spa_routes(app):
-    """Register SPA catch-all and static file routes."""
+    """Register SPA catch-all and static file routes.
+
+    Serves the Next.js static export from static/nextjs/ if available,
+    otherwise falls back to the legacy vanilla JS SPA in templates/.
+    """
+    nextjs_dir = os.path.join(app.static_folder, 'nextjs')
+
+    def _serve_nextjs(path=''):
+        """Try to serve a Next.js static export file."""
+        if not os.path.isdir(nextjs_dir):
+            return None
+
+        # Try exact file first (JS, CSS, images, etc.)
+        file_path = os.path.join(nextjs_dir, path)
+        if os.path.isfile(file_path):
+            return send_from_directory(nextjs_dir, path)
+
+        # Try path/index.html (Next.js trailingSlash output)
+        for candidate in [f'{path}/index.html', f'{path}.html', 'index.html']:
+            cand_path = os.path.join(nextjs_dir, candidate)
+            if os.path.isfile(cand_path):
+                return send_from_directory(nextjs_dir, candidate)
+        return None
 
     @app.route('/')
     def index():
         """Serve the SPA index page."""
+        # Try Next.js first
+        resp = _serve_nextjs('')
+        if resp:
+            return resp
+        # Legacy SPA fallback
         index_path = os.path.join(app.static_folder, 'index.html')
         if os.path.exists(index_path):
             return send_from_directory(app.static_folder, 'index.html')
@@ -205,6 +232,25 @@ def _register_spa_routes(app):
             'version': APP_VERSION,
             'status': 'running',
         })
+
+    @app.route('/<path:path>')
+    def catch_all(path):
+        """Catch-all route for Next.js client-side routing."""
+        # Skip API routes and uploads
+        if path.startswith('api') or path.startswith('uploads') or path.startswith('static'):
+            from flask import abort
+            abort(404)
+        # Serve Next.js
+        resp = _serve_nextjs(path)
+        if resp:
+            return resp
+        # Fallback to legacy SPA index
+        templates_index = os.path.join(app.template_folder, 'index.html')
+        if os.path.exists(templates_index):
+            from flask import render_template
+            return render_template('index.html')
+        from flask import abort
+        abort(404)
 
     @app.route('/api')
     def api_info():

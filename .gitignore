@@ -25,6 +25,14 @@ build/
 venv/
 .venv/
 
-# Node (Tailwind CSS build tooling - dev only)
+# Node
 node_modules/
 package-lock.json
+
+# Next.js frontend build artifacts
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+
+# Next.js static output served by Flask
+static/nextjs/
