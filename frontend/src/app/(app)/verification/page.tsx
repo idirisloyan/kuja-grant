@@ -264,7 +264,21 @@ export default function VerificationPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [runningId, setRunningId] = useState<number | null>(null);
 
-  const verifications = data?.verifications ?? [];
+  // Map API response fields to what the page expects
+  // API returns: verification_status, org_id; Page expects: status, id
+  const verifications = useMemo(() => {
+    const orgs = (data?.organizations ?? []) as unknown as Array<Record<string, unknown>>;
+    return orgs.map((o) => ({
+      ...o,
+      id: (o.org_id ?? o.id) as number,
+      status: ((o.verification_status ?? o.status) || 'unverified') as string,
+      ai_confidence: (o.ai_confidence ?? null) as number | null,
+      org_name: (o.org_name ?? '') as string,
+      country: (o.country ?? '') as string,
+      registration_number: (o.registration_number ?? '') as string,
+      registration_authority: (o.registration_authority ?? o.registry_authority ?? '') as string,
+    })) as unknown as RegistrationVerification[];
+  }, [data]);
 
   // Summary stats
   const statCounts = useMemo(() => {
@@ -294,14 +308,18 @@ export default function VerificationPage() {
   const runVerification = useCallback(async (orgId: number) => {
     setRunningId(orgId);
     try {
-      await api.post(`/verification/${orgId}/check`);
+      const org = verifications.find(v => (v as unknown as Record<string, unknown>).org_id === orgId || v.id === orgId);
+      await api.post('/verification/verify', {
+        org_id: orgId,
+        country: org?.country || '',
+      });
       await mutate();
     } catch {
       // Errors are handled by the API layer
     } finally {
       setRunningId(null);
     }
-  }, [mutate]);
+  }, [mutate, verifications]);
 
   if (isLoading) {
     return (

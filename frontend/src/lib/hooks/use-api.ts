@@ -162,7 +162,7 @@ export function useComplianceChecks(orgId: number | null) {
 // ---------------------------------------------------------------------------
 
 export function useVerifications() {
-  return useSWR<{ verifications: RegistrationVerification[] }>(
+  return useSWR<{ organizations: RegistrationVerification[]; success: boolean }>(
     '/verification/all',
     fetcher,
   );
