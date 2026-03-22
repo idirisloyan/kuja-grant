@@ -106,7 +106,7 @@ function ClickableStatCard({ icon: Icon, label, value, color, bgColor, href }: S
           <ChevronRight size={16} color="#94a3b8" />
         )}
       </Box>
-      <Typography variant="h4" sx={{ fontWeight: 700, mt: 2, color: 'text.primary' }}>
+      <Typography variant="h4" sx={{ fontWeight: 700, mt: 1.5, color: 'text.primary' }}>
         {value}
       </Typography>
       <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25 }}>
@@ -117,7 +117,7 @@ function ClickableStatCard({ icon: Icon, label, value, color, bgColor, href }: S
 
   if (href) {
     return (
-      <Card sx={{ '&:hover': { boxShadow: 4 }, transition: 'box-shadow 0.2s' }}>
+      <Card sx={{ borderLeft: `4px solid ${color}`, '&:hover': { boxShadow: 4 }, transition: 'box-shadow 0.2s' }}>
         <CardActionArea onClick={() => router.push(href)}>
           {content}
         </CardActionArea>
@@ -125,7 +125,7 @@ function ClickableStatCard({ icon: Icon, label, value, color, bgColor, href }: S
     );
   }
 
-  return <Card>{content}</Card>;
+  return <Card sx={{ borderLeft: `4px solid ${color}` }}>{content}</Card>;
 }
 
 // ---------------------------------------------------------------------------
@@ -210,25 +210,39 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
 
   return (
     <>
-      {/* Greeting + Actions */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-            Welcome back, {userName.split(' ')[0]}
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-            Here is what is happening with your grants and applications.
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" size="small" startIcon={<ClipboardCheck size={16} />} onClick={() => router.push('/assessments')}>
-            Start Assessment
-          </Button>
-          <Button variant="contained" size="small" startIcon={<Search size={16} />} onClick={() => router.push('/grants')}>
-            Browse Grants
-          </Button>
-        </Box>
-      </Box>
+      {/* Welcome Banner */}
+      <Card sx={{
+        background: 'linear-gradient(135deg, #4F46E5 0%, #6366F1 50%, #818CF8 100%)',
+        color: '#fff',
+        overflow: 'hidden',
+        position: 'relative',
+      }}>
+        <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, position: 'relative', zIndex: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: '#fff' }}>
+                Welcome back, {userName.split(' ')[0]} 👋
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)', mt: 0.5 }}>
+                Here is what is happening with your grants and applications.
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button variant="outlined" size="small" startIcon={<ClipboardCheck size={16} />} onClick={() => router.push('/assessments')}
+                sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)', '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                Start Assessment
+              </Button>
+              <Button variant="contained" size="small" startIcon={<Search size={16} />} onClick={() => router.push('/grants')}
+                sx={{ bgcolor: '#fff', color: '#4F46E5', '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' } }}>
+                Browse Grants
+              </Button>
+            </Box>
+          </Box>
+        </CardContent>
+        {/* Decorative circles */}
+        <Box sx={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.1)' }} />
+        <Box sx={{ position: 'absolute', bottom: -20, right: 60, width: 80, height: 80, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.08)' }} />
+      </Card>
 
       {/* Stat cards */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
@@ -326,17 +340,31 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
 
   return (
     <>
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Welcome back, {userName.split(' ')[0]}</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Manage your grants, review applications, and track compliance.
-          </Typography>
-        </Box>
-        <Button variant="contained" size="small" startIcon={<PlusCircle size={16} />} onClick={() => router.push('/grants/new')}>
-          Create Grant
-        </Button>
-      </Box>
+      {/* Welcome Banner */}
+      <Card sx={{
+        background: 'linear-gradient(135deg, #059669 0%, #10B981 50%, #34D399 100%)',
+        color: '#fff',
+        overflow: 'hidden',
+        position: 'relative',
+      }}>
+        <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, position: 'relative', zIndex: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: '#fff' }}>
+                Welcome back, {userName.split(' ')[0]} 👋
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)', mt: 0.5 }}>
+                Manage your grants, review applications, and track compliance.
+              </Typography>
+            </Box>
+            <Button variant="contained" size="small" startIcon={<PlusCircle size={16} />} onClick={() => router.push('/grants/new')}
+              sx={{ bgcolor: '#fff', color: '#059669', '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' } }}>
+              Create Grant
+            </Button>
+          </Box>
+        </CardContent>
+        <Box sx={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.1)' }} />
+      </Card>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
         <ClickableStatCard icon={Briefcase} label="Total Grants" value={totalGrants} color="#4F46E5" bgColor="#EEF2FF" href="/grants" />
