@@ -12,13 +12,15 @@ import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
+import Container from '@mui/material/Container';
+import GlobalStyles from '@mui/material/GlobalStyles';
 
 // ---------------------------------------------------------------------------
-// Constants
+// Constants — matching Devias Kit / Materio pattern
 // ---------------------------------------------------------------------------
 
-const SIDEBAR_WIDTH = 240;
-const SIDEBAR_COLLAPSED_WIDTH = 64;
+const SIDEBAR_WIDTH = 280;
+const NAV_HEIGHT = 64;
 
 // ---------------------------------------------------------------------------
 // App Layout
@@ -47,7 +49,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          bgcolor: 'background.default',
+          bgcolor: '#F8FAFC',
         }}
       >
         <Stack alignItems="center" spacing={2}>
@@ -72,33 +74,56 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (!user) return null;
 
-  const drawerWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
+  const currentWidth = sidebarCollapsed ? 72 : SIDEBAR_WIDTH;
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Sidebar width={SIDEBAR_WIDTH} collapsedWidth={SIDEBAR_COLLAPSED_WIDTH} />
+    <>
+      <GlobalStyles
+        styles={{
+          ':root': {
+            '--SideNav-width': `${SIDEBAR_WIDTH}px`,
+            '--SideNav-collapsed': '72px',
+            '--MainNav-height': `${NAV_HEIGHT}px`,
+          },
+        }}
+      />
       <Box
-        component="main"
         sx={{
-          flexGrow: 1,
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
-          transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          bgcolor: '#F8FAFC',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          minHeight: '100vh',
         }}
       >
-        <Header />
+        <Sidebar width={SIDEBAR_WIDTH} collapsedWidth={72} />
         <Box
           sx={{
-            px: { xs: 2, sm: 3, lg: 4 },
-            py: { xs: 2, sm: 3 },
-            maxWidth: 1400,
-            mx: 'auto',
+            display: 'flex',
+            flex: '1 1 auto',
+            flexDirection: 'column',
+            pl: { lg: `${currentWidth}px` },
+            transition: 'padding-left 0.25s ease',
           }}
         >
-          {children}
+          <Header />
+          <Box
+            component="main"
+            sx={{
+              display: 'flex',
+              flex: '1 1 auto',
+              flexDirection: 'column',
+              py: 3,
+              px: { xs: 2, sm: 3, md: 4 },
+            }}
+          >
+            <Container maxWidth="xl" disableGutters>
+              {children}
+            </Container>
+          </Box>
         </Box>
+        <AIPanel />
       </Box>
-      <AIPanel />
-    </Box>
+    </>
   );
 }
