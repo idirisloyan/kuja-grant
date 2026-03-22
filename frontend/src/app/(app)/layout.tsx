@@ -17,8 +17,8 @@ import Stack from '@mui/material/Stack';
 // Constants
 // ---------------------------------------------------------------------------
 
-const SIDEBAR_WIDTH = 260;
-const SIDEBAR_COLLAPSED_WIDTH = 72;
+const SIDEBAR_WIDTH = 240;
+const SIDEBAR_COLLAPSED_WIDTH = 64;
 
 // ---------------------------------------------------------------------------
 // App Layout
@@ -91,7 +91,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           sx={{
             px: { xs: 2, sm: 3, lg: 4 },
             py: { xs: 2, sm: 3 },
-            maxWidth: 1200,
+            maxWidth: 1400,
             mx: 'auto',
           }}
         >
