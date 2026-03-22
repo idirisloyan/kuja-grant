@@ -4,10 +4,18 @@ import { useParams, useRouter } from 'next/navigation';
 import { useApplication } from '@/lib/hooks/use-api';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { ScoreRing } from '@/components/shared/score-ring';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+
 import {
   ArrowLeft, FileText, Upload, BarChart3, MessageSquare,
   AlertCircle, CheckCircle,
@@ -22,11 +30,11 @@ function formatDate(dateStr: string | null): string {
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews';
 
-const TAB_ITEMS: { id: TabId; label: string; icon: React.ElementType }[] = [
-  { id: 'responses', label: 'Responses', icon: FileText },
-  { id: 'documents', label: 'Documents', icon: Upload },
-  { id: 'scores', label: 'Scores', icon: BarChart3 },
-  { id: 'reviews', label: 'Reviews', icon: MessageSquare },
+const TAB_ITEMS: { id: TabId; label: string }[] = [
+  { id: 'responses', label: 'Responses' },
+  { id: 'documents', label: 'Documents' },
+  { id: 'scores', label: 'Scores' },
+  { id: 'reviews', label: 'Reviews' },
 ];
 
 export default function ApplicationDetailClient() {
@@ -40,92 +48,95 @@ export default function ApplicationDetailClient() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-6 w-96" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
+      <Stack spacing={3}>
+        <Skeleton variant="text" width={200} height={32} />
+        <Skeleton variant="text" width={400} height={24} />
+        <Skeleton variant="rounded" height={48} sx={{ borderRadius: 2 }} />
+        <Skeleton variant="rounded" height={260} sx={{ borderRadius: 2 }} />
+      </Stack>
     );
   }
 
   if (!application) {
     return (
-      <div className="text-center py-12">
-        <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-        <p className="text-slate-500 font-medium">Application not found</p>
-        <Button variant="outline" className="mt-4 gap-2" onClick={() => router.push('/applications')}>
-          <ArrowLeft className="w-4 h-4" /> Back to Applications
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <AlertCircle size={48} color="#CBD5E1" style={{ margin: '0 auto 12px' }} />
+        <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>Application not found</Typography>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<ArrowLeft size={16} />}
+          onClick={() => router.push('/applications')}
+          sx={{ mt: 2 }}
+        >
+          Back to Applications
         </Button>
-      </div>
+      </Box>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <Stack spacing={3}>
       {/* Back button */}
-      <Button variant="ghost" size="sm" className="gap-1 -ml-2 text-slate-500" onClick={() => router.push('/applications')}>
-        <ArrowLeft className="w-4 h-4" /> Back to Applications
+      <Button
+        size="small"
+        startIcon={<ArrowLeft size={16} />}
+        onClick={() => router.push('/applications')}
+        sx={{ alignSelf: 'flex-start', color: 'text.secondary' }}
+      >
+        Back to Applications
       </Button>
 
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-bold text-slate-900">
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: { lg: 'flex-start' }, justifyContent: 'space-between', gap: 2 }}>
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+            <Typography variant="h2" sx={{ color: 'text.primary' }}>
               {application.grant_title || `Application #${application.id}`}
-            </h1>
+            </Typography>
             <StatusBadge status={application.status} />
-          </div>
+          </Box>
           {application.ngo_org_name && (
-            <p className="text-sm text-slate-500">{application.ngo_org_name}</p>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>{application.ngo_org_name}</Typography>
           )}
-          <div className="flex flex-wrap gap-4 mt-2 text-sm text-slate-500">
-            <span>Submitted: {formatDate(application.submitted_at)}</span>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 1 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Submitted: {formatDate(application.submitted_at)}
+            </Typography>
             {application.final_score !== null && application.final_score !== undefined && (
-              <span>Final Score: {application.final_score}%</span>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Final Score: {application.final_score}%
+              </Typography>
             )}
-          </div>
-        </div>
+          </Box>
+        </Box>
         {application.ai_score !== null && application.ai_score !== undefined && (
-          <div className="flex items-center gap-3">
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <ScoreRing score={Math.round(application.ai_score)} size={64} label="AI" />
             {application.human_score !== null && application.human_score !== undefined && (
               <ScoreRing score={Math.round(application.human_score)} size={64} label="Human" />
             )}
-          </div>
+          </Box>
         )}
-      </div>
+      </Box>
 
       {/* Tabs */}
-      <div className="border-b border-slate-200">
-        <nav className="flex gap-1 -mb-px">
-          {TAB_ITEMS.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-brand-600 text-brand-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+      <Tabs
+        value={activeTab}
+        onChange={(_, newVal) => setActiveTab(newVal as TabId)}
+        sx={{ borderBottom: 1, borderColor: 'divider' }}
+      >
+        {TAB_ITEMS.map((tab) => (
+          <Tab key={tab.id} value={tab.id} label={tab.label} sx={{ textTransform: 'none', fontWeight: 500 }} />
+        ))}
+      </Tabs>
 
       {/* Tab Content */}
       {activeTab === 'responses' && <ResponsesTab application={application} />}
       {activeTab === 'documents' && <DocumentsTab applicationId={application.id} />}
       {activeTab === 'scores' && <ScoresTab application={application} />}
       {activeTab === 'reviews' && <ReviewsTab applicationId={application.id} />}
-    </div>
+    </Stack>
   );
 }
 
@@ -140,32 +151,35 @@ function ResponsesTab({ application }: { application: Application }) {
   if (entries.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8 text-center">
-          <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">No responses submitted</p>
+        <CardContent sx={{ py: 6, textAlign: 'center' }}>
+          <FileText size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>No responses submitted</Typography>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <Stack spacing={2}>
       {entries.map(([key, value]) => {
         const wordCount = value.trim() ? value.trim().split(/\s+/).length : 0;
         return (
           <Card key={key}>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base capitalize">
+            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', textTransform: 'capitalize' }}>
                   {key.replace(/_/g, ' ')}
-                </CardTitle>
-                <Badge variant="outline" className="text-xs bg-slate-50 text-slate-500 border-slate-200">
-                  {wordCount} words
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{value}</p>
+                </Typography>
+                <Chip
+                  label={`${wordCount} words`}
+                  size="small"
+                  variant="outlined"
+                  sx={{ fontSize: '0.6875rem', borderColor: 'divider' }}
+                />
+              </Box>
+              <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                {value}
+              </Typography>
             </CardContent>
           </Card>
         );
@@ -174,30 +188,36 @@ function ResponsesTab({ application }: { application: Application }) {
       {/* Eligibility Responses */}
       {application.eligibility_responses && Object.keys(application.eligibility_responses).length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Eligibility Responses</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {Object.entries(application.eligibility_responses).map(([key, val]) => {
-              const item = val as Record<string, unknown>;
-              return (
-                <div key={key} className="flex items-center gap-2 text-sm">
-                  {item.met ? (
-                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-slate-300 shrink-0" />
-                  )}
-                  <span className="text-slate-700 capitalize">{key.replace(/_/g, ' ')}</span>
-                  {item.evidence ? (
-                    <span className="text-xs text-slate-400 ml-auto truncate max-w-xs">{String(item.evidence)}</span>
-                  ) : null}
-                </div>
-              );
-            })}
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 2 }}>
+              Eligibility Responses
+            </Typography>
+            <Stack spacing={1}>
+              {Object.entries(application.eligibility_responses).map(([key, val]) => {
+                const item = val as Record<string, unknown>;
+                return (
+                  <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {item.met ? (
+                      <CheckCircle size={16} color="#059669" />
+                    ) : (
+                      <AlertCircle size={16} color="#CBD5E1" />
+                    )}
+                    <Typography variant="body2" sx={{ color: 'text.secondary', textTransform: 'capitalize', flex: 1 }}>
+                      {key.replace(/_/g, ' ')}
+                    </Typography>
+                    {item.evidence ? (
+                      <Typography variant="caption" noWrap sx={{ color: 'text.disabled', maxWidth: 200, ml: 'auto' }}>
+                        {String(item.evidence)}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                );
+              })}
+            </Stack>
           </CardContent>
         </Card>
       )}
-    </div>
+    </Stack>
   );
 }
 
@@ -206,16 +226,16 @@ function ResponsesTab({ application }: { application: Application }) {
 // ---------------------------------------------------------------------------
 
 function DocumentsTab({ applicationId }: { applicationId: number }) {
-  // Documents would be fetched with a dedicated hook in a full implementation
-  // For now, show a placeholder
   return (
     <Card>
-      <CardContent className="py-8 text-center">
-        <Upload className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-        <p className="text-sm text-slate-500">
+      <CardContent sx={{ py: 6, textAlign: 'center' }}>
+        <Upload size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           Documents uploaded with this application will appear here
-        </p>
-        <p className="text-xs text-slate-400 mt-1">Application ID: {applicationId}</p>
+        </Typography>
+        <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5, display: 'block' }}>
+          Application ID: {applicationId}
+        </Typography>
       </CardContent>
     </Card>
   );
@@ -231,43 +251,44 @@ function ScoresTab({ application }: { application: Application }) {
   if (!hasScores) {
     return (
       <Card>
-        <CardContent className="py-8 text-center">
-          <BarChart3 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">No scores available yet</p>
-          <p className="text-xs text-slate-400 mt-1">Scores will appear after AI and reviewer evaluation</p>
+        <CardContent sx={{ py: 6, textAlign: 'center' }}>
+          <BarChart3 size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>No scores available yet</Typography>
+          <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5, display: 'block' }}>
+            Scores will appear after AI and reviewer evaluation
+          </Typography>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Score Overview */}
+    <Stack spacing={2}>
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Score Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center gap-8">
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 2 }}>
+            Score Overview
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             {application.ai_score !== null && application.ai_score !== undefined && (
-              <div className="text-center">
+              <Box sx={{ textAlign: 'center' }}>
                 <ScoreRing score={Math.round(application.ai_score)} size={100} label="AI Score" />
-              </div>
+              </Box>
             )}
             {application.human_score !== null && application.human_score !== undefined && (
-              <div className="text-center">
+              <Box sx={{ textAlign: 'center' }}>
                 <ScoreRing score={Math.round(application.human_score)} size={100} label="Human" />
-              </div>
+              </Box>
             )}
             {application.final_score !== null && application.final_score !== undefined && (
-              <div className="text-center">
+              <Box sx={{ textAlign: 'center' }}>
                 <ScoreRing score={Math.round(application.final_score)} size={100} label="Final" />
-              </div>
+              </Box>
             )}
-          </div>
+          </Box>
         </CardContent>
       </Card>
-    </div>
+    </Stack>
   );
 }
 
@@ -276,15 +297,16 @@ function ScoresTab({ application }: { application: Application }) {
 // ---------------------------------------------------------------------------
 
 function ReviewsTab({ applicationId }: { applicationId: number }) {
-  // Reviews would be fetched with a dedicated hook
   return (
     <Card>
-      <CardContent className="py-8 text-center">
-        <MessageSquare className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-        <p className="text-sm text-slate-500">
+      <CardContent sx={{ py: 6, textAlign: 'center' }}>
+        <MessageSquare size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           Reviewer scores and comments will appear here
-        </p>
-        <p className="text-xs text-slate-400 mt-1">Application ID: {applicationId}</p>
+        </Typography>
+        <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5, display: 'block' }}>
+          Application ID: {applicationId}
+        </Typography>
       </CardContent>
     </Card>
   );

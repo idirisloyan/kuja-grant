@@ -5,14 +5,25 @@ import { useVerifications, useRegistries } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
 import { StatCard } from '@/components/shared/stat-card';
 import { StatusBadge } from '@/components/shared/status-badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
+import Skeleton from '@mui/material/Skeleton';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import InputAdornment from '@mui/material/InputAdornment';
+import Collapse from '@mui/material/Collapse';
+import IconButton from '@mui/material/IconButton';
+
 import {
   ShieldCheck, AlertTriangle, Clock, Eye, Search, RefreshCw,
   ChevronDown, ChevronRight, Loader2, CheckCircle, XCircle, Cpu,
@@ -29,10 +40,10 @@ function formatDate(dateStr: string | null): string {
 }
 
 function confidenceColor(confidence: number | null | undefined): string {
-  if (confidence == null) return 'text-slate-400';
-  if (confidence >= 80) return 'text-emerald-600';
-  if (confidence >= 60) return 'text-amber-600';
-  return 'text-rose-600';
+  if (confidence == null) return 'text.disabled';
+  if (confidence >= 80) return 'success.main';
+  if (confidence >= 60) return 'warning.main';
+  return 'error.main';
 }
 
 // ---------------------------------------------------------------------------
@@ -46,73 +57,199 @@ function VerificationDetail({ verification }: { verification: RegistrationVerifi
   const registryResult = verification.registry_check_result as Record<string, unknown> | null;
 
   return (
-    <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <Box sx={{ px: 3, py: 2.5, bgcolor: 'action.hover', borderTop: '1px solid', borderColor: 'divider' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
         {/* AI Analysis */}
-        <div>
-          <h4 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5 mb-2">
-            <Cpu className="w-3.5 h-3.5 text-brand-500" /> AI Analysis
-          </h4>
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+            <Cpu size={14} style={{ color: '#4F46E5' }} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+              AI Analysis
+            </Typography>
+          </Box>
           {findings && findings.length > 0 ? (
-            <ul className="space-y-1">
+            <Stack spacing={0.5}>
               {findings.map((f, i) => (
-                <li key={i} className="text-sm text-slate-600 flex items-start gap-2">
-                  <span className="text-slate-400 mt-0.5">-</span>
+                <Typography key={i} variant="body2" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                  <Box component="span" sx={{ color: 'text.disabled', mt: 0.25 }}>-</Box>
                   {f}
-                </li>
+                </Typography>
               ))}
-            </ul>
+            </Stack>
           ) : (
-            <p className="text-sm text-slate-400">No AI findings available.</p>
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>No AI findings available.</Typography>
           )}
-        </div>
+        </Box>
 
         {/* Recommendations */}
-        <div>
-          <h4 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5 mb-2">
-            <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> Recommendations
-          </h4>
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+            <CheckCircle size={14} style={{ color: '#059669' }} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+              Recommendations
+            </Typography>
+          </Box>
           {recommendations && recommendations.length > 0 ? (
-            <ul className="space-y-1">
+            <Stack spacing={0.5}>
               {recommendations.map((r, i) => (
-                <li key={i} className="text-sm text-slate-600 flex items-start gap-2">
-                  <span className="text-slate-400 mt-0.5">-</span>
+                <Typography key={i} variant="body2" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                  <Box component="span" sx={{ color: 'text.disabled', mt: 0.25 }}>-</Box>
                   {r}
-                </li>
+                </Typography>
               ))}
-            </ul>
+            </Stack>
           ) : (
-            <p className="text-sm text-slate-400">No recommendations available.</p>
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>No recommendations available.</Typography>
           )}
-        </div>
-      </div>
+        </Box>
+      </Box>
 
       {/* Registry Check */}
       {registryResult && (
-        <div>
-          <h4 className="text-sm font-semibold text-slate-900 mb-2">Registry Check Result</h4>
-          <div className="text-xs text-slate-600 bg-white p-3 rounded-md border border-slate-200 font-mono overflow-x-auto">
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1 }}>
+            Registry Check Result
+          </Typography>
+          <Box
+            sx={{
+              fontSize: '0.75rem',
+              color: 'text.secondary',
+              bgcolor: 'background.paper',
+              p: 1.5,
+              borderRadius: 1,
+              border: '1px solid',
+              borderColor: 'divider',
+              fontFamily: 'monospace',
+              overflow: 'auto',
+            }}
+          >
             {JSON.stringify(registryResult, null, 2)}
-          </div>
-        </div>
+          </Box>
+        </Box>
       )}
 
       {/* Metadata */}
-      <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
         {verification.registry_url && (
-          <span>Registry: <a href={verification.registry_url} target="_blank" rel="noreferrer" className="text-brand-600 underline">{verification.registry_url}</a></span>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            Registry:{' '}
+            <Box
+              component="a"
+              href={verification.registry_url}
+              target="_blank"
+              rel="noreferrer"
+              sx={{ color: 'primary.main', textDecoration: 'underline' }}
+            >
+              {verification.registry_url}
+            </Box>
+          </Typography>
         )}
         {verification.verified_by_name && (
-          <span>Verified by: {verification.verified_by_name}</span>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            Verified by: {verification.verified_by_name}
+          </Typography>
         )}
         {verification.verified_at && (
-          <span>Verified: {formatDate(verification.verified_at)}</span>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            Verified: {formatDate(verification.verified_at)}
+          </Typography>
         )}
         {verification.notes && (
-          <span>Notes: {verification.notes}</span>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            Notes: {verification.notes}
+          </Typography>
         )}
-      </div>
-    </div>
+      </Box>
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Table Row
+// ---------------------------------------------------------------------------
+
+function VerificationRow({
+  verification,
+  isExpanded,
+  isRunning,
+  onToggle,
+  onRun,
+}: {
+  verification: RegistrationVerification;
+  isExpanded: boolean;
+  isRunning: boolean;
+  onToggle: () => void;
+  onRun: () => void;
+}) {
+  return (
+    <>
+      <TableRow
+        hover
+        onClick={onToggle}
+        sx={{ cursor: 'pointer' }}
+      >
+        <TableCell sx={{ width: 40 }}>
+          {isExpanded ? (
+            <ChevronDown size={16} style={{ color: '#94A3B8' }} />
+          ) : (
+            <ChevronRight size={16} style={{ color: '#94A3B8' }} />
+          )}
+        </TableCell>
+        <TableCell>
+          <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+            {verification.org_name || `Org #${verification.org_id}`}
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <Chip label={verification.country} size="small" variant="outlined" sx={{ fontSize: '0.6875rem' }} />
+        </TableCell>
+        <TableCell>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
+            {verification.registration_number || '--'}
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            {verification.registration_authority || '--'}
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <StatusBadge status={verification.status} />
+        </TableCell>
+        <TableCell align="right">
+          <Typography variant="body2" sx={{ fontWeight: 500, color: confidenceColor(verification.ai_confidence) }}>
+            {verification.ai_confidence != null ? `${verification.ai_confidence}%` : '--'}
+          </Typography>
+        </TableCell>
+        <TableCell align="right">
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={isRunning}
+            startIcon={
+              isRunning
+                ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                : <RefreshCw size={14} />
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              onRun();
+            }}
+            sx={{ fontSize: '0.75rem', height: 28 }}
+          >
+            {isRunning ? 'Running...' : 'Verify'}
+          </Button>
+        </TableCell>
+      </TableRow>
+
+      {isExpanded && (
+        <TableRow>
+          <TableCell colSpan={8} sx={{ p: 0 }}>
+            <VerificationDetail verification={verification} />
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   );
 }
 
@@ -168,72 +305,83 @@ export default function VerificationPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-28" />)}
-        </div>
-        <Skeleton className="h-96" />
-      </div>
+      <Stack spacing={3}>
+        <Skeleton variant="text" width={260} height={36} />
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(5, 1fr)' }, gap: 2 }}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} variant="rounded" height={112} sx={{ borderRadius: 2 }} />
+          ))}
+        </Box>
+        <Skeleton variant="rounded" height={384} sx={{ borderRadius: 2 }} />
+      </Stack>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <Stack spacing={3}>
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Registration Verification</h1>
-        <p className="text-sm text-slate-500 mt-1">
+      <Box>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
+          Registration Verification
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
           Verify organization registrations across {Object.keys(registriesData?.registries ?? {}).length} supported countries
-        </p>
-      </div>
+        </Typography>
+      </Box>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(3, 1fr)', lg: 'repeat(5, 1fr)' }, gap: 2 }}>
         <StatCard icon={ShieldCheck} label="Verified" value={statCounts.verified} color="emerald" />
         <StatCard icon={Cpu} label="AI Reviewed" value={statCounts.ai_reviewed} color="violet" />
         <StatCard icon={Clock} label="Pending" value={statCounts.pending} color="amber" />
         <StatCard icon={AlertTriangle} label="Flagged" value={statCounts.flagged} color="rose" />
         <StatCard icon={XCircle} label="Unverified" value={statCounts.unverified} color="blue" />
-      </div>
+      </Box>
 
       {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input
-          placeholder="Search by org, country, reg number..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
-      </div>
+      <TextField
+        placeholder="Search by org, country, reg number..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        size="small"
+        sx={{ maxWidth: 400 }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Search size={16} style={{ color: '#94A3B8' }} />
+            </InputAdornment>
+          ),
+        }}
+      />
 
       {/* Table */}
       {filtered.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center">
-            <Eye className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-medium">No verifications found</p>
-            <p className="text-sm text-slate-400 mt-1">
+          <CardContent sx={{ py: 8, textAlign: 'center' }}>
+            <Eye size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
+            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+              No verifications found
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
               {searchQuery ? 'Try a different search term.' : 'No organization verifications available.'}
-            </p>
+            </Typography>
           </CardContent>
         </Card>
       ) : (
         <Card>
           <Table>
-            <TableHeader>
+            <TableHead>
               <TableRow>
-                <TableHead className="w-8" />
-                <TableHead>Organization</TableHead>
-                <TableHead>Country</TableHead>
-                <TableHead>Reg Number</TableHead>
-                <TableHead>Authority</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">AI Confidence</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableCell sx={{ width: 40 }} />
+                <TableCell>Organization</TableCell>
+                <TableCell>Country</TableCell>
+                <TableCell>Reg Number</TableCell>
+                <TableCell>Authority</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell align="right">AI Confidence</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
-            </TableHeader>
+            </TableHead>
             <TableBody>
               {filtered.map((v) => (
                 <VerificationRow
@@ -249,85 +397,6 @@ export default function VerificationPage() {
           </Table>
         </Card>
       )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Table Row
-// ---------------------------------------------------------------------------
-
-function VerificationRow({
-  verification,
-  isExpanded,
-  isRunning,
-  onToggle,
-  onRun,
-}: {
-  verification: RegistrationVerification;
-  isExpanded: boolean;
-  isRunning: boolean;
-  onToggle: () => void;
-  onRun: () => void;
-}) {
-  return (
-    <>
-      <TableRow className="cursor-pointer" onClick={onToggle}>
-        <TableCell>
-          {isExpanded ? (
-            <ChevronDown className="w-4 h-4 text-slate-400" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-slate-400" />
-          )}
-        </TableCell>
-        <TableCell className="font-medium text-slate-900">
-          {verification.org_name || `Org #${verification.org_id}`}
-        </TableCell>
-        <TableCell>
-          <Badge variant="outline" className="text-xs">{verification.country}</Badge>
-        </TableCell>
-        <TableCell className="text-slate-600 font-mono text-xs">
-          {verification.registration_number || '--'}
-        </TableCell>
-        <TableCell className="text-slate-600 text-xs">
-          {verification.registration_authority || '--'}
-        </TableCell>
-        <TableCell>
-          <StatusBadge status={verification.status} />
-        </TableCell>
-        <TableCell className="text-right">
-          <span className={`text-sm font-medium ${confidenceColor(verification.ai_confidence)}`}>
-            {verification.ai_confidence != null ? `${verification.ai_confidence}%` : '--'}
-          </span>
-        </TableCell>
-        <TableCell className="text-right">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1 h-7 text-xs"
-            disabled={isRunning}
-            onClick={(e) => {
-              e.stopPropagation();
-              onRun();
-            }}
-          >
-            {isRunning ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <RefreshCw className="w-3 h-3" />
-            )}
-            {isRunning ? 'Running...' : 'Verify'}
-          </Button>
-        </TableCell>
-      </TableRow>
-
-      {isExpanded && (
-        <TableRow>
-          <TableCell colSpan={8} className="p-0">
-            <VerificationDetail verification={verification} />
-          </TableCell>
-        </TableRow>
-      )}
-    </>
+    </Stack>
   );
 }

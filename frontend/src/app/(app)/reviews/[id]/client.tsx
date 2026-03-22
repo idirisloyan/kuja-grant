@@ -1,18 +1,26 @@
 'use client';
+
 import { useState, useCallback, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApplication, useGrant } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { ScoreRing } from '@/components/shared/score-ring';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
+import Skeleton from '@mui/material/Skeleton';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import Slider from '@mui/material/Slider';
+import Alert from '@mui/material/Alert';
+
 import {
   ArrowLeft, Send, Cpu, Loader2, FileText, Star, MessageSquare,
   CheckCircle,
@@ -66,6 +74,9 @@ export default function ReviewDetailClient() {
   // Documents state
   const [documents, setDocuments] = useState<DocType[]>([]);
   const [docsLoading, setDocsLoading] = useState(false);
+
+  // Tab state
+  const [tab, setTab] = useState(2); // default to "Scores" tab (index 2)
 
   // Initialize scores from criteria
   useEffect(() => {
@@ -161,45 +172,59 @@ export default function ReviewDetailClient() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 max-w-4xl mx-auto">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-32" />
-        <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-96" />
-      </div>
+      <Stack spacing={3} sx={{ maxWidth: 960, mx: 'auto' }}>
+        <Skeleton variant="text" width={260} height={36} />
+        <Skeleton variant="rounded" height={128} sx={{ borderRadius: 2 }} />
+        <Skeleton variant="rounded" height={40} width={200} />
+        <Skeleton variant="rounded" height={384} sx={{ borderRadius: 2 }} />
+      </Stack>
     );
   }
 
   if (!application) {
     return (
-      <div className="max-w-4xl mx-auto space-y-4">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/reviews')} className="gap-1">
-          <ArrowLeft className="w-4 h-4" /> Back
+      <Stack spacing={2} sx={{ maxWidth: 960, mx: 'auto' }}>
+        <Button
+          size="small"
+          startIcon={<ArrowLeft size={16} />}
+          onClick={() => router.push('/reviews')}
+          sx={{ color: 'text.secondary', alignSelf: 'flex-start' }}
+        >
+          Back
         </Button>
         <Card>
-          <CardContent className="py-12 text-center">
-            <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-medium">Application not found</p>
+          <CardContent sx={{ py: 8, textAlign: 'center' }}>
+            <FileText size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
+            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+              Application not found
+            </Typography>
           </CardContent>
         </Card>
-      </div>
+      </Stack>
     );
   }
 
   if (success) {
     return (
-      <div className="max-w-4xl mx-auto space-y-4">
+      <Stack spacing={2} sx={{ maxWidth: 960, mx: 'auto' }}>
         <Card>
-          <CardContent className="py-12 text-center">
-            <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Scores Submitted</h2>
-            <p className="text-sm text-slate-500 mb-6">Your review has been recorded successfully.</p>
-            <Button onClick={() => router.push('/reviews')} className="bg-brand-600 hover:bg-brand-700">
+          <CardContent sx={{ py: 8, textAlign: 'center' }}>
+            <CheckCircle size={64} style={{ color: '#10B981', margin: '0 auto 16px' }} />
+            <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', mb: 1 }}>
+              Scores Submitted
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
+              Your review has been recorded successfully.
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => router.push('/reviews')}
+            >
               Back to Reviews
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </Stack>
     );
   }
 
@@ -214,183 +239,259 @@ export default function ReviewDetailClient() {
     : 0;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+    <Stack spacing={3} sx={{ maxWidth: 960, mx: 'auto' }}>
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/reviews')} className="gap-1">
-          <ArrowLeft className="w-4 h-4" /> Back
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Button
+          size="small"
+          startIcon={<ArrowLeft size={16} />}
+          onClick={() => router.push('/reviews')}
+          sx={{ color: 'text.secondary' }}
+        >
+          Back
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Score Application</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Application #{id}</p>
-        </div>
-      </div>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
+            Score Application
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25 }}>
+            Application #{id}
+          </Typography>
+        </Box>
+      </Box>
 
       {/* Application Summary */}
       <Card>
-        <CardContent className="py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
+        <CardContent sx={{ py: 2.5, '&:last-child': { pb: 2.5 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box>
+              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>
                 {application.ngo_org_name || application.org_name || `Org #${application.ngo_org_id}`}
-              </h2>
-              <p className="text-sm text-slate-500 mt-0.5">
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25 }}>
                 {grant?.title || `Grant #${application.grant_id}`}
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <StatusBadge status={application.status} />
               <ScoreRing score={overallScore} size={64} strokeWidth={5} label="Total" />
-            </div>
-          </div>
+            </Box>
+          </Box>
           {application.ai_score != null && (
-            <div className="mt-2 flex items-center gap-2">
-              <Cpu className="w-3.5 h-3.5 text-violet-500" />
-              <span className="text-xs text-slate-500">AI Pre-Score: {application.ai_score}%</span>
-            </div>
+            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Cpu size={14} style={{ color: '#7C3AED' }} />
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                AI Pre-Score: {application.ai_score}%
+              </Typography>
+            </Box>
           )}
         </CardContent>
       </Card>
 
       {/* Tabs */}
-      <Tabs defaultValue="scores">
-        <TabsList>
-          <TabsTrigger value="responses">
-            <MessageSquare className="w-3.5 h-3.5 mr-1" /> Responses
-          </TabsTrigger>
-          <TabsTrigger value="documents">
-            <FileText className="w-3.5 h-3.5 mr-1" /> Documents
-          </TabsTrigger>
-          <TabsTrigger value="scores">
-            <Star className="w-3.5 h-3.5 mr-1" /> Scores
-          </TabsTrigger>
-        </TabsList>
+      <Box>
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          sx={{ borderBottom: '1px solid', borderColor: 'divider', mb: 2 }}
+        >
+          <Tab
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <MessageSquare size={14} /> Responses
+              </Box>
+            }
+          />
+          <Tab
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <FileText size={14} /> Documents
+              </Box>
+            }
+          />
+          <Tab
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Star size={14} /> Scores
+              </Box>
+            }
+          />
+        </Tabs>
 
         {/* Responses Tab */}
-        <TabsContent value="responses">
-          {criteria.length === 0 && Object.keys(responses).length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-sm text-slate-400">
-                No responses available for this application.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {criteria.map((c) => (
-                <Card key={c.key}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      {c.label}
-                      <Badge variant="outline" className="text-xs font-normal">
-                        {c.weight}%
-                      </Badge>
-                    </CardTitle>
-                    {c.description && (
-                      <p className="text-xs text-slate-500">{c.description}</p>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="bg-slate-50 rounded-md p-3 text-sm text-slate-700 whitespace-pre-wrap">
-                      {responses[c.key] || <span className="text-slate-400 italic">No response provided</span>}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-
-              {/* Additional responses not mapped to criteria */}
-              {Object.entries(responses)
-                .filter(([key]) => !criteria.some((c) => c.key === key))
-                .map(([key, value]) => (
-                  <Card key={key}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-semibold">{key}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="bg-slate-50 rounded-md p-3 text-sm text-slate-700 whitespace-pre-wrap">
-                        {value || <span className="text-slate-400 italic">No response</span>}
-                      </div>
+        {tab === 0 && (
+          <>
+            {criteria.length === 0 && Object.keys(responses).length === 0 ? (
+              <Card>
+                <CardContent sx={{ py: 6, textAlign: 'center' }}>
+                  <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                    No responses available for this application.
+                  </Typography>
+                </CardContent>
+              </Card>
+            ) : (
+              <Stack spacing={2}>
+                {criteria.map((c) => (
+                  <Card key={c.key}>
+                    <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                          {c.label}
+                        </Typography>
+                        <Chip
+                          label={`${c.weight}%`}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontSize: '0.6875rem' }}
+                        />
+                      </Box>
+                      {c.description && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
+                          {c.description}
+                        </Typography>
+                      )}
+                      <Box
+                        sx={{
+                          bgcolor: 'action.hover',
+                          borderRadius: 1,
+                          p: 1.5,
+                          whiteSpace: 'pre-wrap',
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                          {responses[c.key] || (
+                            <Box component="span" sx={{ color: 'text.disabled', fontStyle: 'italic' }}>
+                              No response provided
+                            </Box>
+                          )}
+                        </Typography>
+                      </Box>
                     </CardContent>
                   </Card>
                 ))}
-            </div>
-          )}
-        </TabsContent>
+
+                {/* Additional responses not mapped to criteria */}
+                {Object.entries(responses)
+                  .filter(([key]) => !criteria.some((c) => c.key === key))
+                  .map(([key, value]) => (
+                    <Card key={key}>
+                      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1 }}>
+                          {key}
+                        </Typography>
+                        <Box
+                          sx={{
+                            bgcolor: 'action.hover',
+                            borderRadius: 1,
+                            p: 1.5,
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                            {value || (
+                              <Box component="span" sx={{ color: 'text.disabled', fontStyle: 'italic' }}>
+                                No response
+                              </Box>
+                            )}
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </Stack>
+            )}
+          </>
+        )}
 
         {/* Documents Tab */}
-        <TabsContent value="documents">
-          {docsLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16" />)}
-            </div>
-          ) : documents.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-sm text-slate-400">
-                No documents uploaded for this application.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {documents.map((doc) => (
-                <Card key={doc.id}>
-                  <CardContent className="py-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <FileText className="w-5 h-5 text-slate-400" />
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">{doc.original_filename}</p>
-                          <p className="text-xs text-slate-500">
-                            {doc.doc_type} | {(doc.file_size / 1024).toFixed(1)} KB
-                          </p>
-                        </div>
-                      </div>
-                      {doc.score != null && (
-                        <div className="flex items-center gap-2">
-                          <Cpu className="w-3.5 h-3.5 text-violet-500" />
-                          <span className={`text-sm font-semibold ${
-                            doc.score >= 80 ? 'text-emerald-600' :
-                            doc.score >= 60 ? 'text-amber-600' : 'text-rose-600'
-                          }`}>
-                            {doc.score}%
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
+        {tab === 1 && (
+          <>
+            {docsLoading ? (
+              <Stack spacing={1.5}>
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} variant="rounded" height={64} sx={{ borderRadius: 2 }} />
+                ))}
+              </Stack>
+            ) : documents.length === 0 ? (
+              <Card>
+                <CardContent sx={{ py: 6, textAlign: 'center' }}>
+                  <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                    No documents uploaded for this application.
+                  </Typography>
+                </CardContent>
+              </Card>
+            ) : (
+              <Stack spacing={1.5}>
+                {documents.map((doc) => (
+                  <Card key={doc.id}>
+                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <FileText size={20} style={{ color: '#94A3B8' }} />
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                              {doc.original_filename}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                              {doc.doc_type} | {(doc.file_size / 1024).toFixed(1)} KB
+                            </Typography>
+                          </Box>
+                        </Box>
+                        {doc.score != null && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Cpu size={14} style={{ color: '#7C3AED' }} />
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 600,
+                                color:
+                                  doc.score >= 80 ? 'success.main' :
+                                  doc.score >= 60 ? 'warning.main' : 'error.main',
+                              }}
+                            >
+                              {doc.score}%
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Stack>
+            )}
+          </>
+        )}
 
         {/* Scores Tab */}
-        <TabsContent value="scores">
-          <div className="space-y-4">
+        {tab === 2 && (
+          <Stack spacing={2}>
             {/* AI Auto-Score Button */}
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                 Score each criterion below (0-100). The weighted total updates automatically.
-              </p>
+              </Typography>
               <Button
-                variant="outline"
-                size="sm"
-                className="gap-1"
+                variant="outlined"
+                size="small"
                 disabled={aiScoring}
+                startIcon={
+                  aiScoring
+                    ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                    : <Cpu size={14} />
+                }
                 onClick={handleAiScore}
               >
-                {aiScoring ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Cpu className="w-3.5 h-3.5" />
-                )}
                 {aiScoring ? 'Scoring...' : 'AI Auto-Score'}
               </Button>
-            </div>
+            </Box>
 
             {/* Criterion Scoring Cards */}
             {criteria.length === 0 ? (
               <Card>
-                <CardContent className="py-8 text-center text-sm text-slate-400">
-                  No evaluation criteria defined for this grant.
+                <CardContent sx={{ py: 6, textAlign: 'center' }}>
+                  <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                    No evaluation criteria defined for this grant.
+                  </Typography>
                 </CardContent>
               </Card>
             ) : (
@@ -398,61 +499,89 @@ export default function ReviewDetailClient() {
                 const entry = scores[c.key] ?? { score: 0, comment: '' };
                 return (
                   <Card key={c.key}>
-                    <CardContent className="py-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="text-sm font-semibold text-slate-900">{c.label}</h4>
-                          {c.description && (
-                            <p className="text-xs text-slate-500 mt-0.5">{c.description}</p>
-                          )}
-                        </div>
-                        <Badge variant="outline" className="text-xs">Weight: {c.weight}%</Badge>
-                      </div>
+                    <CardContent sx={{ py: 2.5, '&:last-child': { pb: 2.5 } }}>
+                      <Stack spacing={2}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                              {c.label}
+                            </Typography>
+                            {c.description && (
+                              <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}>
+                                {c.description}
+                              </Typography>
+                            )}
+                          </Box>
+                          <Chip
+                            label={`Weight: ${c.weight}%`}
+                            size="small"
+                            variant="outlined"
+                            sx={{ fontSize: '0.6875rem' }}
+                          />
+                        </Box>
 
-                      {/* Reference: AI score if available */}
-                      {application.ai_score != null && (
-                        <div className="flex items-center gap-2 text-xs text-violet-600 bg-violet-50 px-2 py-1 rounded">
-                          <Cpu className="w-3 h-3" />
-                          AI reference available
-                        </div>
-                      )}
+                        {/* Reference: AI score if available */}
+                        {application.ai_score != null && (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1,
+                              bgcolor: '#F5F3FF',
+                              color: '#7C3AED',
+                              px: 1.5,
+                              py: 0.5,
+                              borderRadius: 1,
+                            }}
+                          >
+                            <Cpu size={12} />
+                            <Typography variant="caption">AI reference available</Typography>
+                          </Box>
+                        )}
 
-                      {/* Score Input */}
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1">
-                          <Label className="text-xs text-slate-500">Score (0-100)</Label>
-                          <div className="flex items-center gap-3 mt-1">
-                            <input
-                              type="range"
-                              min={0}
-                              max={100}
-                              value={entry.score}
-                              onChange={(e) => updateScore(c.key, 'score', Number(e.target.value))}
-                              className="flex-1 h-2 accent-brand-600"
-                            />
-                            <Input
-                              type="number"
-                              min={0}
-                              max={100}
-                              value={entry.score}
-                              onChange={(e) => updateScore(c.key, 'score', Math.min(100, Math.max(0, Number(e.target.value))))}
-                              className="w-20 text-center"
-                            />
-                          </div>
-                        </div>
-                        <ScoreRing score={entry.score} size={56} strokeWidth={4} />
-                      </div>
+                        {/* Score Input */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', mb: 0.5, display: 'block' }}>
+                              Score (0-100)
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <Slider
+                                value={entry.score}
+                                onChange={(_, val) => updateScore(c.key, 'score', val as number)}
+                                min={0}
+                                max={100}
+                                sx={{ flex: 1 }}
+                              />
+                              <TextField
+                                type="number"
+                                inputProps={{ min: 0, max: 100 }}
+                                value={entry.score}
+                                onChange={(e) => updateScore(c.key, 'score', Math.min(100, Math.max(0, Number(e.target.value))))}
+                                size="small"
+                                sx={{ width: 80 }}
+                              />
+                            </Box>
+                          </Box>
+                          <ScoreRing score={entry.score} size={56} strokeWidth={4} />
+                        </Box>
 
-                      {/* Comment */}
-                      <div>
-                        <Label className="text-xs text-slate-500">Comment</Label>
-                        <Textarea
-                          placeholder="Provide feedback on this criterion..."
-                          value={entry.comment}
-                          onChange={(e) => updateScore(c.key, 'comment', e.target.value)}
-                          className="mt-1 min-h-[60px]"
-                        />
-                      </div>
+                        {/* Comment */}
+                        <Box>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', mb: 0.5, display: 'block' }}>
+                            Comment
+                          </Typography>
+                          <TextField
+                            placeholder="Provide feedback on this criterion..."
+                            value={entry.comment}
+                            onChange={(e) => updateScore(c.key, 'comment', e.target.value)}
+                            fullWidth
+                            multiline
+                            minRows={2}
+                            size="small"
+                          />
+                        </Box>
+                      </Stack>
                     </CardContent>
                   </Card>
                 );
@@ -461,36 +590,38 @@ export default function ReviewDetailClient() {
 
             {/* Error */}
             {error && (
-              <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-sm text-rose-700">
-                {error}
-              </div>
+              <Alert severity="error">{error}</Alert>
             )}
 
             {/* Submit */}
-            <div className="flex items-center justify-between pt-2">
-              <div className="flex items-center gap-4">
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <ScoreRing score={overallScore} size={64} strokeWidth={5} label="Total" />
-                <div className="text-sm">
-                  <p className="font-semibold text-slate-900">Weighted Total: {overallScore}%</p>
-                  <p className="text-slate-500 text-xs">Based on {criteria.length} criteria</p>
-                </div>
-              </div>
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    Weighted Total: {overallScore}%
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Based on {criteria.length} criteria
+                  </Typography>
+                </Box>
+              </Box>
               <Button
-                onClick={handleSubmit}
+                variant="contained"
                 disabled={submitting || criteria.length === 0}
-                className="gap-1 bg-brand-600 hover:bg-brand-700"
+                startIcon={
+                  submitting
+                    ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    : <Send size={16} />
+                }
+                onClick={handleSubmit}
               >
-                {submitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
                 {submitting ? 'Submitting...' : 'Submit Scores'}
               </Button>
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
+            </Box>
+          </Stack>
+        )}
+      </Box>
+    </Stack>
   );
 }

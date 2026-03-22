@@ -5,11 +5,22 @@ import { useGrants, useReports } from '@/lib/hooks/use-api';
 import { StatCard } from '@/components/shared/stat-card';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { StatusBadge } from '@/components/shared/status-badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
+import Skeleton from '@mui/material/Skeleton';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import LinearProgress from '@mui/material/LinearProgress';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+
 import {
-  ShieldCheck, AlertTriangle, Clock, BarChart3, ChevronDown, ChevronRight,
+  ShieldCheck, AlertTriangle, Clock, BarChart3,
   FileText, TrendingUp,
 } from 'lucide-react';
 import type { Grant, Report } from '@/lib/types';
@@ -28,12 +39,22 @@ function getRiskLevel(score: number | null, status: string, dueDate: string | nu
 }
 
 function RiskDot({ level }: { level: 'green' | 'amber' | 'red' }) {
-  const colors = {
-    green: 'bg-emerald-500',
-    amber: 'bg-amber-500',
-    red: 'bg-rose-500',
+  const colorMap = {
+    green: 'success.main',
+    amber: 'warning.main',
+    red: 'error.main',
   };
-  return <span className={`inline-block w-2.5 h-2.5 rounded-full ${colors[level]}`} />;
+  return (
+    <Box
+      sx={{
+        width: 10,
+        height: 10,
+        borderRadius: '50%',
+        bgcolor: colorMap[level],
+        flexShrink: 0,
+      }}
+    />
+  );
 }
 
 function formatDate(dateStr: string | null): string {
@@ -45,9 +66,7 @@ function formatDate(dateStr: string | null): string {
 // Grant Accordion Component
 // ---------------------------------------------------------------------------
 
-function GrantAccordion({ grant, reports }: { grant: Grant; reports: Report[] }) {
-  const [expanded, setExpanded] = useState(false);
-
+function GrantAccordionItem({ grant, reports }: { grant: Grant; reports: Report[] }) {
   // Group reports by org
   const orgMap = useMemo(() => {
     const map = new Map<string, Report[]>();
@@ -73,83 +92,111 @@ function GrantAccordion({ grant, reports }: { grant: Grant; reports: Report[] })
   const overdueCount = reports.filter((r) => r.due_date && new Date(r.due_date) < new Date() && r.status !== 'accepted').length;
 
   return (
-    <Card>
-      <div
-        className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors rounded-lg"
-        onClick={() => setExpanded(!expanded)}
+    <Accordion
+      disableGutters
+      sx={{
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 2,
+        '&:before': { display: 'none' },
+        boxShadow: 'none',
+        '&:not(:last-child)': { mb: 0 },
+      }}
+    >
+      <AccordionSummary
+        expandIcon={<ExpandMoreIcon />}
+        sx={{
+          px: 2.5,
+          '&:hover': { bgcolor: 'action.hover' },
+        }}
       >
-        <div className="flex items-center gap-4">
-          {expanded ? (
-            <ChevronDown className="w-5 h-5 text-slate-400" />
-          ) : (
-            <ChevronRight className="w-5 h-5 text-slate-400" />
-          )}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900">{grant.title}</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mr: 2 }}>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+              {grant.title}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}>
               {orgMap.size} grantee{orgMap.size !== 1 ? 's' : ''} | {reports.length} deliverable{reports.length !== 1 ? 's' : ''}
               {overdueCount > 0 && (
-                <span className="text-rose-600 ml-2">| {overdueCount} overdue</span>
+                <Box component="span" sx={{ color: 'error.main', ml: 1 }}>| {overdueCount} overdue</Box>
               )}
-            </p>
-          </div>
-        </div>
+            </Typography>
+          </Box>
 
-        <div className="flex items-center gap-4">
-          <ScoreRing score={avgCompliance} size={48} strokeWidth={4} label="Compl." />
-          <StatusBadge status={grant.status} />
-        </div>
-      </div>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <ScoreRing score={avgCompliance} size={48} strokeWidth={4} label="Compl." />
+            <StatusBadge status={grant.status} />
+          </Box>
+        </Box>
+      </AccordionSummary>
 
-      {expanded && (
-        <CardContent className="pt-0 pb-4">
-          {Array.from(orgMap.entries()).map(([orgName, orgReports]) => (
-            <div key={orgName} className="mb-4 last:mb-0">
-              <h4 className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                <FileText className="w-3.5 h-3.5 text-brand-500" />
+      <AccordionDetails sx={{ px: 2.5, pb: 2.5 }}>
+        {Array.from(orgMap.entries()).map(([orgName, orgReports]) => (
+          <Box key={orgName} sx={{ mb: 2, '&:last-child': { mb: 0 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <FileText size={14} style={{ color: '#4F46E5' }} />
+              <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
                 {orgName}
-              </h4>
-              <div className="ml-5 space-y-1.5">
-                {orgReports.map((report) => {
-                  const analysis = report.ai_analysis as Record<string, unknown> | null;
-                  const score = analysis && typeof analysis === 'object' && 'compliance_score' in analysis
-                    ? Number(analysis.compliance_score)
-                    : null;
-                  const risk = getRiskLevel(score, report.status, report.due_date);
-                  return (
-                    <div
-                      key={report.id}
-                      className="flex items-center justify-between py-2 px-3 rounded-md bg-slate-50 text-sm"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <RiskDot level={risk} />
-                        <span className="text-slate-900 truncate">{report.title}</span>
-                        <Badge variant="outline" className="text-xs shrink-0">{report.report_type}</Badge>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        {score !== null && (
-                          <span className={`text-xs font-medium ${score >= 80 ? 'text-emerald-600' : score >= 60 ? 'text-amber-600' : 'text-rose-600'}`}>
-                            {score}%
-                          </span>
-                        )}
-                        <span className="text-xs text-slate-400">
-                          Due: {formatDate(report.due_date)}
-                        </span>
-                        <StatusBadge status={report.status} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+              </Typography>
+            </Box>
+            <Stack spacing={0.75} sx={{ ml: 3 }}>
+              {orgReports.map((report) => {
+                const analysis = report.ai_analysis as Record<string, unknown> | null;
+                const score = analysis && typeof analysis === 'object' && 'compliance_score' in analysis
+                  ? Number(analysis.compliance_score)
+                  : null;
+                const risk = getRiskLevel(score, report.status, report.due_date);
+                return (
+                  <Box
+                    key={report.id}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      py: 1,
+                      px: 1.5,
+                      borderRadius: 1,
+                      bgcolor: 'action.hover',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                      <RiskDot level={risk} />
+                      <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>
+                        {report.title}
+                      </Typography>
+                      <Chip label={report.report_type} size="small" variant="outlined" sx={{ fontSize: '0.6875rem', flexShrink: 0 }} />
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
+                      {score !== null && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 500,
+                            color: score >= 80 ? 'success.main' : score >= 60 ? 'warning.main' : 'error.main',
+                          }}
+                        >
+                          {score}%
+                        </Typography>
+                      )}
+                      <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                        Due: {formatDate(report.due_date)}
+                      </Typography>
+                      <StatusBadge status={report.status} />
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Stack>
+          </Box>
+        ))}
 
-          {orgMap.size === 0 && (
-            <p className="text-sm text-slate-400 text-center py-4">No reports submitted for this grant yet.</p>
-          )}
-        </CardContent>
-      )}
-    </Card>
+        {orgMap.size === 0 && (
+          <Typography variant="body2" sx={{ color: 'text.disabled', textAlign: 'center', py: 3 }}>
+            No reports submitted for this grant yet.
+          </Typography>
+        )}
+      </AccordionDetails>
+    </Accordion>
   );
 }
 
@@ -212,30 +259,36 @@ export default function CompliancePage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-28" />)}
-        </div>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20" />)}
-        </div>
-      </div>
+      <Stack spacing={3}>
+        <Skeleton variant="text" width={260} height={36} />
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 2 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} variant="rounded" height={112} sx={{ borderRadius: 2 }} />
+          ))}
+        </Box>
+        <Stack spacing={2}>
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} variant="rounded" height={80} sx={{ borderRadius: 2 }} />
+          ))}
+        </Stack>
+      </Stack>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <Stack spacing={3}>
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Compliance Dashboard</h1>
-        <p className="text-sm text-slate-500 mt-1">
+      <Box>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
+          Compliance Dashboard
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
           Track grantee compliance across all your grants
-        </p>
-      </div>
+        </Typography>
+      </Box>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 2 }}>
         <StatCard
           icon={ShieldCheck}
           label="Total Grants"
@@ -260,28 +313,32 @@ export default function CompliancePage() {
           value={summaryStats.atRiskCount}
           color="rose"
         />
-      </div>
+      </Box>
 
       {/* Grant Accordions */}
-      <div className="space-y-3">
+      <Stack spacing={1.5}>
         {grants.length === 0 ? (
           <Card>
-            <CardContent className="py-12 text-center">
-              <BarChart3 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 font-medium">No grants found</p>
-              <p className="text-sm text-slate-400 mt-1">Create a grant to start tracking compliance.</p>
+            <CardContent sx={{ py: 8, textAlign: 'center' }}>
+              <BarChart3 size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
+              <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+                No grants found
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
+                Create a grant to start tracking compliance.
+              </Typography>
             </CardContent>
           </Card>
         ) : (
           grants.map((grant) => (
-            <GrantAccordion
+            <GrantAccordionItem
               key={grant.id}
               grant={grant}
               reports={reportsByGrant.get(grant.id) ?? []}
             />
           ))
         )}
-      </div>
-    </div>
+      </Stack>
+    </Stack>
   );
 }

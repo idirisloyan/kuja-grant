@@ -2,12 +2,20 @@
 
 import { useRouter } from 'next/navigation';
 import { useReviews } from '@/lib/hooks/use-api';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
+import Skeleton from '@mui/material/Skeleton';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+
 import { FileText, Eye, CheckCircle } from 'lucide-react';
 import type { Review } from '@/lib/types';
 
@@ -32,36 +40,40 @@ export default function CompletedReviewsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-96" />
-      </div>
+      <Stack spacing={3}>
+        <Skeleton variant="text" width={260} height={36} />
+        <Skeleton variant="rounded" height={384} sx={{ borderRadius: 2 }} />
+      </Stack>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <Stack spacing={3}>
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Completed Reviews</h1>
-        <p className="text-sm text-slate-500 mt-1">
+      <Box>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
+          Completed Reviews
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
           {completed.length} review{completed.length !== 1 ? 's' : ''} completed
-        </p>
-      </div>
+        </Typography>
+      </Box>
 
       {/* Table */}
       {completed.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center">
-            <CheckCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-medium">No completed reviews yet</p>
-            <p className="text-sm text-slate-400 mt-1">
+          <CardContent sx={{ py: 8, textAlign: 'center' }}>
+            <CheckCircle size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
+            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+              No completed reviews yet
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
               Reviews you complete will be listed here for reference.
-            </p>
+            </Typography>
             <Button
-              variant="outline"
-              className="mt-4"
+              variant="outlined"
               onClick={() => router.push('/reviews')}
+              sx={{ mt: 2 }}
             >
               View Pending Assignments
             </Button>
@@ -70,48 +82,54 @@ export default function CompletedReviewsPage() {
       ) : (
         <Card>
           <Table>
-            <TableHeader>
+            <TableHead>
               <TableRow>
-                <TableHead>Application</TableHead>
-                <TableHead>Grant</TableHead>
-                <TableHead className="text-right">Score</TableHead>
-                <TableHead>Completed</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableCell>Application</TableCell>
+                <TableCell>Grant</TableCell>
+                <TableCell align="right">Score</TableCell>
+                <TableCell>Completed</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
-            </TableHeader>
+            </TableHead>
             <TableBody>
               {completed.map((review) => (
-                <TableRow key={review.id}>
-                  <TableCell className="font-medium text-slate-900">
-                    {review.ngo_org_name || `Application #${review.application_id}`}
+                <TableRow key={review.id} hover>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                      {review.ngo_org_name || `Application #${review.application_id}`}
+                    </Typography>
                   </TableCell>
-                  <TableCell className="text-slate-600">
-                    {review.grant_title || '--'}
+                  <TableCell>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      {review.grant_title || '--'}
+                    </Typography>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <span
-                      className={`text-sm font-semibold ${
-                        (review.overall_score ?? 0) >= 80
-                          ? 'text-emerald-600'
-                          : (review.overall_score ?? 0) >= 60
-                            ? 'text-amber-600'
-                            : 'text-rose-600'
-                      }`}
+                  <TableCell align="right">
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: 600,
+                        color:
+                          (review.overall_score ?? 0) >= 80 ? 'success.main' :
+                          (review.overall_score ?? 0) >= 60 ? 'warning.main' : 'error.main',
+                      }}
                     >
                       {review.overall_score != null ? `${review.overall_score}%` : '--'}
-                    </span>
+                    </Typography>
                   </TableCell>
-                  <TableCell className="text-slate-500 text-sm">
-                    {formatDate(review.completed_at)}
+                  <TableCell>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      {formatDate(review.completed_at)}
+                    </Typography>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell align="right">
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1 h-7 text-xs"
+                      size="small"
+                      startIcon={<Eye size={14} />}
                       onClick={() => router.push(`/reviews/${review.application_id}`)}
+                      sx={{ fontSize: '0.75rem', height: 28, color: 'text.secondary' }}
                     >
-                      <Eye className="w-3 h-3" /> View
+                      View
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -120,6 +138,6 @@ export default function CompletedReviewsPage() {
           </Table>
         </Card>
       )}
-    </div>
+    </Stack>
   );
 }

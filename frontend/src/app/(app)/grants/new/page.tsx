@@ -3,13 +3,31 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
+import Stepper from '@mui/material/Stepper';
+import Step from '@mui/material/Step';
+import StepLabel from '@mui/material/StepLabel';
+import Switch from '@mui/material/Switch';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import InputLabel from '@mui/material/InputLabel';
+import FormControl from '@mui/material/FormControl';
+import IconButton from '@mui/material/IconButton';
+import Slider from '@mui/material/Slider';
+import InputAdornment from '@mui/material/InputAdornment';
+import Alert from '@mui/material/Alert';
+import Divider from '@mui/material/Divider';
+
 import {
   ArrowLeft, ArrowRight, Check, Plus, Trash2, Info,
   FileText, DollarSign, ClipboardList, Upload, BarChart3, Send,
@@ -110,54 +128,7 @@ interface ReportReqItem {
 }
 
 // ---------------------------------------------------------------------------
-// Step Progress Component
-// ---------------------------------------------------------------------------
-
-function StepIndicator({ currentStep }: { currentStep: number }) {
-  return (
-    <div className="flex items-center justify-center gap-0 mb-8">
-      {STEPS.map((step, i) => {
-        const StepIcon = step.icon;
-        const isActive = i === currentStep;
-        const isComplete = i < currentStep;
-        return (
-          <div key={step.label} className="flex items-center">
-            <div className="flex flex-col items-center">
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                  isComplete
-                    ? 'bg-emerald-500 text-white'
-                    : isActive
-                      ? 'bg-brand-600 text-white'
-                      : 'bg-slate-100 text-slate-400'
-                }`}
-              >
-                {isComplete ? <Check className="w-5 h-5" /> : <StepIcon className="w-4 h-4" />}
-              </div>
-              <span
-                className={`text-xs mt-1.5 font-medium whitespace-nowrap ${
-                  isActive ? 'text-brand-600' : isComplete ? 'text-emerald-600' : 'text-slate-400'
-                }`}
-              >
-                {step.label}
-              </span>
-            </div>
-            {i < STEPS.length - 1 && (
-              <div
-                className={`w-12 h-0.5 mx-1 mt-[-18px] ${
-                  i < currentStep ? 'bg-emerald-400' : 'bg-slate-200'
-                }`}
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Multi-Select Toggle Component
+// Multi-Select Toggle Component (MUI Chips)
 // ---------------------------------------------------------------------------
 
 function MultiSelectToggle({
@@ -176,22 +147,26 @@ function MultiSelectToggle({
   };
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((opt) => (
-        <Badge
-          key={opt}
-          variant="outline"
-          className={`cursor-pointer px-3 py-1.5 text-sm transition-colors ${
-            selected.includes(opt)
-              ? 'bg-brand-50 text-brand-700 border-brand-300'
-              : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-          }`}
-          onClick={() => toggle(opt)}
-        >
-          {opt}
-        </Badge>
-      ))}
-    </div>
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+      {options.map((opt) => {
+        const isActive = selected.includes(opt);
+        return (
+          <Chip
+            key={opt}
+            label={opt}
+            onClick={() => toggle(opt)}
+            variant={isActive ? 'filled' : 'outlined'}
+            color={isActive ? 'primary' : 'default'}
+            size="small"
+            sx={{
+              fontWeight: isActive ? 600 : 400,
+              borderColor: isActive ? 'primary.main' : 'divider',
+              cursor: 'pointer',
+            }}
+          />
+        );
+      })}
+    </Box>
   );
 }
 
@@ -373,474 +348,530 @@ export default function CreateGrantPage() {
     switch (step) {
       case 0:
         return (
-          <div className="space-y-5">
-            <div>
-              <Label htmlFor="title">Grant Title *</Label>
-              <Input
-                id="title"
-                placeholder="e.g., Community Health Resilience Program 2026"
-                value={basic.title}
-                onChange={(e) => updateBasic('title', e.target.value)}
-                className="mt-1.5"
-              />
-            </div>
+          <Stack spacing={3}>
+            <TextField
+              label="Grant Title *"
+              placeholder="e.g., Community Health Resilience Program 2026"
+              value={basic.title}
+              onChange={(e) => updateBasic('title', e.target.value)}
+              fullWidth
+              size="small"
+            />
 
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="Describe the grant purpose, objectives, and target outcomes..."
-                value={basic.description}
-                onChange={(e) => updateBasic('description', e.target.value)}
-                className="mt-1.5 min-h-[100px]"
-              />
-            </div>
+            <TextField
+              label="Description"
+              placeholder="Describe the grant purpose, objectives, and target outcomes..."
+              value={basic.description}
+              onChange={(e) => updateBasic('description', e.target.value)}
+              fullWidth
+              multiline
+              minRows={3}
+              size="small"
+            />
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="funding">Funding Amount</Label>
-                <div className="relative mt-1.5">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input
-                    id="funding"
-                    type="number"
-                    placeholder="500000"
-                    value={basic.total_funding}
-                    onChange={(e) => updateBasic('total_funding', e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="currency">Currency</Label>
-                <select
-                  id="currency"
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2 }}>
+              <TextField
+                label="Funding Amount"
+                type="number"
+                placeholder="500000"
+                value={basic.total_funding}
+                onChange={(e) => updateBasic('total_funding', e.target.value)}
+                size="small"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <DollarSign size={16} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <FormControl size="small">
+                <InputLabel>Currency</InputLabel>
+                <Select
+                  label="Currency"
                   value={basic.currency}
                   onChange={(e) => updateBasic('currency', e.target.value)}
-                  className="mt-1.5 w-full h-9 px-3 rounded-lg border border-input bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   {CURRENCY_OPTIONS.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <MenuItem key={c} value={c}>{c}</MenuItem>
                   ))}
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="deadline">Application Deadline</Label>
-                <Input
-                  id="deadline"
-                  type="date"
-                  value={basic.deadline}
-                  onChange={(e) => updateBasic('deadline', e.target.value)}
-                  className="mt-1.5"
-                />
-              </div>
-            </div>
+                </Select>
+              </FormControl>
+              <TextField
+                label="Application Deadline"
+                type="date"
+                value={basic.deadline}
+                onChange={(e) => updateBasic('deadline', e.target.value)}
+                size="small"
+                InputLabelProps={{ shrink: true }}
+              />
+            </Box>
 
-            <div>
-              <Label>Sectors</Label>
-              <div className="mt-1.5">
-                <MultiSelectToggle
-                  options={SECTOR_OPTIONS}
-                  selected={basic.sectors}
-                  onChange={(val) => updateBasic('sectors', val)}
-                />
-              </div>
-            </div>
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mb: 1 }}>
+                Sectors
+              </Typography>
+              <MultiSelectToggle
+                options={SECTOR_OPTIONS}
+                selected={basic.sectors}
+                onChange={(val) => updateBasic('sectors', val)}
+              />
+            </Box>
 
-            <div>
-              <Label>Target Countries</Label>
-              <div className="mt-1.5">
-                <MultiSelectToggle
-                  options={COUNTRY_OPTIONS}
-                  selected={basic.countries}
-                  onChange={(val) => updateBasic('countries', val)}
-                />
-              </div>
-            </div>
-          </div>
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mb: 1 }}>
+                Target Countries
+              </Typography>
+              <MultiSelectToggle
+                options={COUNTRY_OPTIONS}
+                selected={basic.countries}
+                onChange={(val) => updateBasic('countries', val)}
+              />
+            </Box>
+          </Stack>
         );
 
       case 1:
         return (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500">
+          <Stack spacing={2}>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               Toggle the eligibility categories you want applicants to meet. Add details and set relative weights.
-            </p>
+            </Typography>
             {eligibility.map((item, i) => (
-              <Card key={item.key} className={item.enabled ? 'border-brand-200 bg-brand-50/30' : ''}>
-                <CardContent className="py-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <Switch
-                        checked={item.enabled}
-                        onCheckedChange={() => toggleEligibility(i)}
-                      />
-                      <span className={`text-sm font-medium ${item.enabled ? 'text-slate-900' : 'text-slate-400'}`}>
-                        {item.label}
-                      </span>
-                    </div>
+              <Card
+                key={item.key}
+                sx={{
+                  borderColor: item.enabled ? 'primary.light' : 'divider',
+                  bgcolor: item.enabled ? 'primary.50' : 'background.paper',
+                }}
+              >
+                <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: item.enabled ? 1.5 : 0 }}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={item.enabled}
+                          onChange={() => toggleEligibility(i)}
+                          size="small"
+                        />
+                      }
+                      label={
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 500,
+                            color: item.enabled ? 'text.primary' : 'text.disabled',
+                          }}
+                        >
+                          {item.label}
+                        </Typography>
+                      }
+                    />
                     {item.enabled && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-500">Weight:</span>
-                        <input
-                          type="range"
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          Weight:
+                        </Typography>
+                        <Slider
+                          value={item.weight}
+                          onChange={(_, val) => updateEligibility(i, 'weight', val as number)}
                           min={0}
                           max={100}
-                          value={item.weight}
-                          onChange={(e) => updateEligibility(i, 'weight', Number(e.target.value))}
-                          className="w-24 h-2 accent-brand-600"
+                          size="small"
+                          sx={{ width: 100 }}
                         />
-                        <span className="text-sm font-medium text-brand-600 w-10 text-right">
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', minWidth: 40, textAlign: 'right' }}>
                           {item.weight}%
-                        </span>
-                      </div>
+                        </Typography>
+                      </Box>
                     )}
-                  </div>
+                  </Box>
                   {item.enabled && (
-                    <div className="ml-12">
-                      <Input
+                    <Box sx={{ ml: 6 }}>
+                      <TextField
                         placeholder="Describe specific requirements..."
                         value={item.details}
                         onChange={(e) => updateEligibility(i, 'details', e.target.value)}
+                        fullWidth
+                        size="small"
                       />
-                    </div>
+                    </Box>
                   )}
                 </CardContent>
               </Card>
             ))}
-          </div>
+          </Stack>
         );
 
       case 2:
         return (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">
+          <Stack spacing={2}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                 Define the criteria reviewers will use to evaluate applications.
-              </p>
-              <div className="flex items-center gap-3">
-                <span
-                  className={`text-sm font-medium ${
-                    criteriaWeightTotal === 100
-                      ? 'text-emerald-600'
-                      : 'text-rose-600'
-                  }`}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 500,
+                    color: criteriaWeightTotal === 100 ? 'success.main' : 'error.main',
+                  }}
                 >
                   Total Weight: {criteriaWeightTotal}%
                   {criteriaWeightTotal !== 100 && ' (must equal 100%)'}
-                </span>
-                <Button variant="outline" size="sm" className="gap-1" onClick={addCriterion}>
-                  <Plus className="w-3 h-3" /> Add
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<Plus size={14} />}
+                  onClick={addCriterion}
+                >
+                  Add
                 </Button>
-              </div>
-            </div>
+              </Box>
+            </Box>
 
             {criteria.map((criterion, i) => (
               <Card key={i}>
-                <CardContent className="py-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-500">Criterion {i + 1}</span>
-                    {criteria.length > 1 && (
-                      <Button variant="ghost" size="sm" className="text-rose-500 h-7" onClick={() => removeCriterion(i)}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    )}
-                  </div>
+                <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+                  <Stack spacing={2}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+                        Criterion {i + 1}
+                      </Typography>
+                      {criteria.length > 1 && (
+                        <IconButton
+                          size="small"
+                          onClick={() => removeCriterion(i)}
+                          sx={{ color: 'error.main' }}
+                        >
+                          <Trash2 size={14} />
+                        </IconButton>
+                      )}
+                    </Box>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div className="sm:col-span-3">
-                      <Label>Label *</Label>
-                      <Input
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '3fr 1fr' }, gap: 2 }}>
+                      <TextField
+                        label="Label *"
                         placeholder="e.g., Technical Approach"
                         value={criterion.label}
                         onChange={(e) => updateCriterion(i, 'label', e.target.value)}
-                        className="mt-1"
+                        size="small"
+                        fullWidth
                       />
-                    </div>
-                    <div>
-                      <Label>Weight %</Label>
-                      <Input
+                      <TextField
+                        label="Weight %"
                         type="number"
-                        min={0}
-                        max={100}
+                        inputProps={{ min: 0, max: 100 }}
                         value={criterion.weight}
                         onChange={(e) => updateCriterion(i, 'weight', Number(e.target.value))}
-                        className="mt-1"
+                        size="small"
                       />
-                    </div>
-                  </div>
+                    </Box>
 
-                  <div>
-                    <Label>Description</Label>
-                    <Textarea
+                    <TextField
+                      label="Description"
                       placeholder="What should applicants address..."
                       value={criterion.description}
                       onChange={(e) => updateCriterion(i, 'description', e.target.value)}
-                      className="mt-1 min-h-[60px]"
+                      fullWidth
+                      multiline
+                      minRows={2}
+                      size="small"
                     />
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <Label>Instructions for Applicants</Label>
-                      <Textarea
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                      <TextField
+                        label="Instructions for Applicants"
                         placeholder="Guidance on how to respond..."
                         value={criterion.instructions}
                         onChange={(e) => updateCriterion(i, 'instructions', e.target.value)}
-                        className="mt-1 min-h-[60px]"
+                        fullWidth
+                        multiline
+                        minRows={2}
+                        size="small"
                       />
-                    </div>
-                    <div>
-                      <Label>Example Response</Label>
-                      <Textarea
+                      <TextField
+                        label="Example Response"
                         placeholder="An example of a strong response..."
                         value={criterion.example}
                         onChange={(e) => updateCriterion(i, 'example', e.target.value)}
-                        className="mt-1 min-h-[60px]"
+                        fullWidth
+                        multiline
+                        minRows={2}
+                        size="small"
                       />
-                    </div>
-                  </div>
+                    </Box>
 
-                  <div className="w-32">
-                    <Label>Max Words</Label>
-                    <Input
+                    <TextField
+                      label="Max Words"
                       type="number"
-                      min={50}
-                      max={5000}
+                      inputProps={{ min: 50, max: 5000 }}
                       value={criterion.max_words}
                       onChange={(e) => updateCriterion(i, 'max_words', Number(e.target.value))}
-                      className="mt-1"
+                      size="small"
+                      sx={{ maxWidth: 140 }}
                     />
-                  </div>
+                  </Stack>
                 </CardContent>
               </Card>
             ))}
-          </div>
+          </Stack>
         );
 
       case 3:
         return (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500">
+          <Stack spacing={2}>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               Select which documents applicants must upload with their application.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
               {docReqs.map((doc, i) => (
                 <Card
                   key={doc.key}
-                  className={`cursor-pointer transition-colors ${
-                    doc.required
-                      ? 'border-brand-200 bg-brand-50/30'
-                      : 'hover:border-slate-300'
-                  }`}
                   onClick={() => toggleDocReq(i)}
+                  sx={{
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    borderColor: doc.required ? 'primary.light' : 'divider',
+                    bgcolor: doc.required ? 'primary.50' : 'background.paper',
+                    '&:hover': {
+                      borderColor: doc.required ? 'primary.main' : 'action.hover',
+                    },
+                  }}
                 >
-                  <CardContent className="py-4">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                          doc.required
-                            ? 'bg-brand-600 border-brand-600'
-                            : 'border-slate-300'
-                        }`}
-                      >
-                        {doc.required && <Check className="w-3 h-3 text-white" />}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">{doc.label}</p>
-                        <p className="text-xs text-slate-500">{doc.key}</p>
-                      </div>
-                    </div>
+                  <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Checkbox
+                        checked={doc.required}
+                        size="small"
+                        sx={{ p: 0 }}
+                        tabIndex={-1}
+                      />
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                          {doc.label}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          {doc.key}
+                        </Typography>
+                      </Box>
+                    </Box>
                   </CardContent>
                 </Card>
               ))}
-            </div>
-          </div>
+            </Box>
+          </Stack>
         );
 
       case 4:
         return (
-          <div className="space-y-5">
-            <div>
-              <Label htmlFor="freq">Reporting Frequency</Label>
-              <select
-                id="freq"
+          <Stack spacing={3}>
+            <FormControl size="small" sx={{ maxWidth: 280 }}>
+              <InputLabel>Reporting Frequency</InputLabel>
+              <Select
+                label="Reporting Frequency"
                 value={reportingFrequency}
                 onChange={(e) => setReportingFrequency(e.target.value)}
-                className="mt-1.5 w-full max-w-xs h-9 px-3 rounded-lg border border-input bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 {FREQUENCY_OPTIONS.map((f) => (
-                  <option key={f} value={f}>
+                  <MenuItem key={f} value={f}>
                     {f.charAt(0).toUpperCase() + f.slice(1)}
-                  </option>
+                  </MenuItem>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </FormControl>
 
-            <div className="flex items-center justify-between">
-              <Label>Reporting Requirements</Label>
-              <Button variant="outline" size="sm" className="gap-1" onClick={addReportReq}>
-                <Plus className="w-3 h-3" /> Add Requirement
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                Reporting Requirements
+              </Typography>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<Plus size={14} />}
+                onClick={addReportReq}
+              >
+                Add Requirement
               </Button>
-            </div>
+            </Box>
 
             {reportReqs.length === 0 && (
               <Card>
-                <CardContent className="py-8 text-center">
-                  <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500">No reporting requirements added yet.</p>
-                  <p className="text-xs text-slate-400 mt-1">Click &quot;Add Requirement&quot; to define what grantees must report.</p>
+                <CardContent sx={{ py: 6, textAlign: 'center' }}>
+                  <FileText size={40} style={{ color: '#CBD5E1', margin: '0 auto 8px' }} />
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    No reporting requirements added yet.
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5, display: 'block' }}>
+                    Click &quot;Add Requirement&quot; to define what grantees must report.
+                  </Typography>
                 </CardContent>
               </Card>
             )}
 
             {reportReqs.map((req, i) => (
               <Card key={i}>
-                <CardContent className="py-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-500">Requirement {i + 1}</span>
-                    <Button variant="ghost" size="sm" className="text-rose-500 h-7" onClick={() => removeReportReq(i)}>
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
+                <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+                  <Stack spacing={2}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+                        Requirement {i + 1}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => removeReportReq(i)}
+                        sx={{ color: 'error.main' }}
+                      >
+                        <Trash2 size={14} />
+                      </IconButton>
+                    </Box>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <Label>Title *</Label>
-                      <Input
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                      <TextField
+                        label="Title *"
                         placeholder="e.g., Quarterly Narrative Report"
                         value={req.title}
                         onChange={(e) => updateReportReq(i, 'title', e.target.value)}
-                        className="mt-1"
+                        size="small"
+                        fullWidth
                       />
-                    </div>
-                    <div>
-                      <Label>Type</Label>
-                      <select
-                        value={req.type}
-                        onChange={(e) => updateReportReq(i, 'type', e.target.value)}
-                        className="mt-1 w-full h-9 px-3 rounded-lg border border-input bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      >
-                        {REPORT_TYPE_OPTIONS.map((t) => (
-                          <option key={t} value={t}>
-                            {t.charAt(0).toUpperCase() + t.slice(1)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                      <FormControl size="small" fullWidth>
+                        <InputLabel>Type</InputLabel>
+                        <Select
+                          label="Type"
+                          value={req.type}
+                          onChange={(e) => updateReportReq(i, 'type', e.target.value)}
+                        >
+                          {REPORT_TYPE_OPTIONS.map((t) => (
+                            <MenuItem key={t} value={t}>
+                              {t.charAt(0).toUpperCase() + t.slice(1)}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Box>
 
-                  <div>
-                    <Label>Description</Label>
-                    <Textarea
+                    <TextField
+                      label="Description"
                       placeholder="Describe what the report should include..."
                       value={req.description}
                       onChange={(e) => updateReportReq(i, 'description', e.target.value)}
-                      className="mt-1 min-h-[60px]"
+                      fullWidth
+                      multiline
+                      minRows={2}
+                      size="small"
                     />
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <Label>Frequency</Label>
-                      <select
-                        value={req.frequency}
-                        onChange={(e) => updateReportReq(i, 'frequency', e.target.value)}
-                        className="mt-1 w-full h-9 px-3 rounded-lg border border-input bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      >
-                        {FREQUENCY_OPTIONS.map((f) => (
-                          <option key={f} value={f}>
-                            {f.charAt(0).toUpperCase() + f.slice(1)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <Label>Due Days After Period End</Label>
-                      <Input
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                      <FormControl size="small" fullWidth>
+                        <InputLabel>Frequency</InputLabel>
+                        <Select
+                          label="Frequency"
+                          value={req.frequency}
+                          onChange={(e) => updateReportReq(i, 'frequency', e.target.value)}
+                        >
+                          {FREQUENCY_OPTIONS.map((f) => (
+                            <MenuItem key={f} value={f}>
+                              {f.charAt(0).toUpperCase() + f.slice(1)}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <TextField
+                        label="Due Days After Period End"
                         type="number"
-                        min={1}
-                        max={180}
+                        inputProps={{ min: 1, max: 180 }}
                         value={req.due_days}
                         onChange={(e) => updateReportReq(i, 'due_days', Number(e.target.value))}
-                        className="mt-1"
+                        size="small"
+                        fullWidth
                       />
-                    </div>
-                  </div>
+                    </Box>
+                  </Stack>
                 </CardContent>
               </Card>
             ))}
-          </div>
+          </Stack>
         );
 
       case 5:
         return (
-          <div className="space-y-6">
-            <div className="flex items-center gap-2 text-brand-600 mb-2">
-              <Info className="w-4 h-4" />
-              <span className="text-sm font-medium">Review your grant before publishing</span>
-            </div>
+          <Stack spacing={3}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main', mb: 1 }}>
+              <Info size={16} />
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                Review your grant before publishing
+              </Typography>
+            </Box>
 
             {/* Basic Info Summary */}
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Basic Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Title</span>
-                  <span className="font-medium text-slate-900">{basic.title || '(not set)'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Funding</span>
-                  <span className="font-medium text-slate-900">
-                    {basic.total_funding ? `${basic.currency} ${Number(basic.total_funding).toLocaleString()}` : '(not set)'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Deadline</span>
-                  <span className="font-medium text-slate-900">{basic.deadline || '(not set)'}</span>
-                </div>
-                {basic.sectors.length > 0 && (
-                  <div className="flex justify-between items-start">
-                    <span className="text-slate-500">Sectors</span>
-                    <div className="flex flex-wrap gap-1 justify-end max-w-[60%]">
-                      {basic.sectors.map((s) => (
-                        <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {basic.countries.length > 0 && (
-                  <div className="flex justify-between items-start">
-                    <span className="text-slate-500">Countries</span>
-                    <div className="flex flex-wrap gap-1 justify-end max-w-[60%]">
-                      {basic.countries.map((c) => (
-                        <Badge key={c} variant="outline" className="text-xs">{c}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
+                  Basic Information
+                </Typography>
+                <Stack spacing={1}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Title</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                      {basic.title || '(not set)'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Funding</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                      {basic.total_funding ? `${basic.currency} ${Number(basic.total_funding).toLocaleString()}` : '(not set)'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Deadline</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                      {basic.deadline || '(not set)'}
+                    </Typography>
+                  </Box>
+                  {basic.sectors.length > 0 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Sectors</Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end', maxWidth: '60%' }}>
+                        {basic.sectors.map((s) => (
+                          <Chip key={s} label={s} size="small" variant="outlined" sx={{ fontSize: '0.6875rem' }} />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+                  {basic.countries.length > 0 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Countries</Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end', maxWidth: '60%' }}>
+                        {basic.countries.map((c) => (
+                          <Chip key={c} label={c} size="small" variant="outlined" sx={{ fontSize: '0.6875rem' }} />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+                </Stack>
               </CardContent>
             </Card>
 
             {/* Eligibility Summary */}
             {eligibility.some((e) => e.enabled) && (
               <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Eligibility Requirements</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
+                <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
+                    Eligibility Requirements
+                  </Typography>
+                  <Stack spacing={1}>
                     {eligibility
                       .filter((e) => e.enabled)
                       .map((e) => (
-                        <div key={e.key} className="flex justify-between text-sm">
-                          <span className="text-slate-700">{e.label}</span>
-                          <span className="text-slate-500">Weight: {e.weight}%</span>
-                        </div>
+                        <Box key={e.key} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" sx={{ color: 'text.primary' }}>{e.label}</Typography>
+                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>Weight: {e.weight}%</Typography>
+                        </Box>
                       ))}
-                  </div>
+                  </Stack>
                 </CardContent>
               </Card>
             )}
@@ -848,25 +879,31 @@ export default function CreateGrantPage() {
             {/* Criteria Summary */}
             {criteria.some((c) => c.label.trim()) && (
               <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">
-                    Evaluation Criteria
-                    <span className={`ml-2 text-sm font-normal ${criteriaWeightTotal === 100 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                      Evaluation Criteria
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: 400,
+                        color: criteriaWeightTotal === 100 ? 'success.main' : 'error.main',
+                      }}
+                    >
                       ({criteriaWeightTotal}%)
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
+                    </Typography>
+                  </Box>
+                  <Stack spacing={1}>
                     {criteria
                       .filter((c) => c.label.trim())
                       .map((c, i) => (
-                        <div key={i} className="flex justify-between text-sm">
-                          <span className="text-slate-700">{c.label}</span>
-                          <span className="text-slate-500">{c.weight}%</span>
-                        </div>
+                        <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" sx={{ color: 'text.primary' }}>{c.label}</Typography>
+                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>{c.weight}%</Typography>
+                        </Box>
                       ))}
-                  </div>
+                  </Stack>
                 </CardContent>
               </Card>
             )}
@@ -874,41 +911,39 @@ export default function CreateGrantPage() {
             {/* Documents Summary */}
             {docReqs.some((d) => d.required) && (
               <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Required Documents</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
+                <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
+                    Required Documents
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                     {docReqs
                       .filter((d) => d.required)
                       .map((d) => (
-                        <Badge key={d.key} variant="outline" className="text-xs">{d.label}</Badge>
+                        <Chip key={d.key} label={d.label} size="small" variant="outlined" sx={{ fontSize: '0.6875rem' }} />
                       ))}
-                  </div>
+                  </Box>
                 </CardContent>
               </Card>
             )}
 
             {/* Reporting Summary */}
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Reporting</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm">
-                <p className="text-slate-600">
-                  Frequency: <span className="font-medium">{reportingFrequency}</span>
+              <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1 }}>
+                  Reporting
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  Frequency: <Box component="span" sx={{ fontWeight: 500 }}>{reportingFrequency}</Box>
                   {' | '}
-                  Requirements: <span className="font-medium">{reportReqs.length}</span>
-                </p>
+                  Requirements: <Box component="span" sx={{ fontWeight: 500 }}>{reportReqs.length}</Box>
+                </Typography>
               </CardContent>
             </Card>
 
             {error && (
-              <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-sm text-rose-700">
-                {error}
-              </div>
+              <Alert severity="error">{error}</Alert>
             )}
-          </div>
+          </Stack>
         );
 
       default:
@@ -917,55 +952,74 @@ export default function CreateGrantPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+    <Stack spacing={3} sx={{ maxWidth: 960, mx: 'auto' }}>
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/grants')} className="gap-1">
-          <ArrowLeft className="w-4 h-4" /> Back
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Button
+          size="small"
+          startIcon={<ArrowLeft size={16} />}
+          onClick={() => router.push('/grants')}
+          sx={{ color: 'text.secondary' }}
+        >
+          Back
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Create New Grant</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Step {step + 1} of {STEPS.length}: {STEPS[step].label}</p>
-        </div>
-      </div>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
+            Create New Grant
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25 }}>
+            Step {step + 1} of {STEPS.length}: {STEPS[step].label}
+          </Typography>
+        </Box>
+      </Box>
 
-      {/* Step Indicator */}
-      <StepIndicator currentStep={step} />
+      {/* MUI Stepper */}
+      <Stepper activeStep={step} alternativeLabel>
+        {STEPS.map((s) => (
+          <Step key={s.label}>
+            <StepLabel>{s.label}</StepLabel>
+          </Step>
+        ))}
+      </Stepper>
 
       {/* Step Content */}
       <Card>
-        <CardContent className="py-6">{renderStep()}</CardContent>
+        <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+          {renderStep()}
+        </CardContent>
       </Card>
 
       {/* Navigation */}
-      <div className="flex items-center justify-between">
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Button
-          variant="outline"
+          variant="outlined"
+          startIcon={<ArrowLeft size={16} />}
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0}
-          className="gap-1"
         >
-          <ArrowLeft className="w-4 h-4" /> Previous
+          Previous
         </Button>
 
         {step < STEPS.length - 1 ? (
           <Button
+            variant="contained"
+            endIcon={<ArrowRight size={16} />}
             onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
-            className="gap-1 bg-brand-600 hover:bg-brand-700"
           >
-            Next <ArrowRight className="w-4 h-4" />
+            Next
           </Button>
         ) : (
           <Button
+            variant="contained"
+            color="success"
+            endIcon={<Send size={16} />}
             onClick={handlePublish}
             disabled={submitting || !basic.title.trim()}
-            className="gap-1 bg-emerald-600 hover:bg-emerald-700"
           >
             {submitting ? 'Publishing...' : 'Publish Grant'}
-            <Send className="w-4 h-4" />
           </Button>
         )}
-      </div>
-    </div>
+      </Box>
+    </Stack>
   );
 }

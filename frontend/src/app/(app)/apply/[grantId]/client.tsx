@@ -4,17 +4,26 @@ import { useParams, useRouter } from 'next/navigation';
 import { useGrant } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
 import { ScoreRing } from '@/components/shared/score-ring';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import Chip from '@mui/material/Chip';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import Stepper from '@mui/material/Stepper';
+import Step from '@mui/material/Step';
+import StepLabel from '@mui/material/StepLabel';
+import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import CircularProgress from '@mui/material/CircularProgress';
+
 import {
-  ArrowLeft, ArrowRight, Check, ClipboardList, FileText,
-  Upload, Send, Sparkles, Loader2, AlertCircle, CheckCircle,
+  ArrowLeft, ArrowRight, ClipboardList, FileText,
+  Upload, Send, Sparkles, AlertCircle, CheckCircle,
 } from 'lucide-react';
 import type { EligibilityRequirement, Criterion, DocRequirement } from '@/lib/types';
 
@@ -39,12 +48,7 @@ interface DocUpload {
   fileName: string;
 }
 
-const STEPS = [
-  { num: 1, label: 'Eligibility', icon: ClipboardList },
-  { num: 2, label: 'Proposal', icon: FileText },
-  { num: 3, label: 'Documents', icon: Upload },
-  { num: 4, label: 'Review & Submit', icon: Send },
-];
+const STEPS = ['Eligibility', 'Proposal', 'Documents', 'Review & Submit'];
 
 // ---------------------------------------------------------------------------
 // Main Component
@@ -178,47 +182,67 @@ export default function ApplyWizardClient() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-96" />
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
+      <Stack spacing={3}>
+        <Skeleton variant="text" width={200} height={32} />
+        <Skeleton variant="text" width={400} height={20} />
+        <Skeleton variant="rounded" height={64} sx={{ borderRadius: 2 }} />
+        <Skeleton variant="rounded" height={260} sx={{ borderRadius: 2 }} />
+      </Stack>
     );
   }
 
   if (!grant) {
     return (
-      <div className="text-center py-12">
-        <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-        <p className="text-slate-500 font-medium">Grant not found</p>
-        <Button variant="outline" className="mt-4 gap-2" onClick={() => router.push('/grants')}>
-          <ArrowLeft className="w-4 h-4" /> Back to Grants
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <AlertCircle size={48} color="#CBD5E1" style={{ margin: '0 auto 12px' }} />
+        <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>Grant not found</Typography>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<ArrowLeft size={16} />}
+          onClick={() => router.push('/grants')}
+          sx={{ mt: 2 }}
+        >
+          Back to Grants
         </Button>
-      </div>
+      </Box>
     );
   }
 
   if (submitted) {
     return (
-      <div className="text-center py-16 animate-fade-in">
-        <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
-          <CheckCircle className="w-8 h-8 text-emerald-600" />
-        </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">Application Submitted!</h2>
-        <p className="text-sm text-slate-500 max-w-md mx-auto mb-6">
+      <Box sx={{ textAlign: 'center', py: 10 }}>
+        <Box
+          sx={{
+            width: 64,
+            height: 64,
+            borderRadius: '50%',
+            bgcolor: '#ECFDF5',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            mx: 'auto',
+            mb: 2.5,
+          }}
+        >
+          <CheckCircle size={32} color="#059669" />
+        </Box>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mb: 1 }}>
+          Application Submitted!
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary', maxWidth: 400, mx: 'auto', mb: 4 }}>
           Your application for &quot;{grant.title}&quot; has been submitted successfully.
           You will be notified when reviews are complete.
-        </p>
-        <div className="flex justify-center gap-3">
-          <Button variant="outline" onClick={() => router.push('/applications')}>
+        </Typography>
+        <Stack direction="row" spacing={1.5} justifyContent="center">
+          <Button variant="outlined" onClick={() => router.push('/applications')}>
             View My Applications
           </Button>
-          <Button className="bg-brand-600 hover:bg-brand-700" onClick={() => router.push('/grants')}>
+          <Button variant="contained" onClick={() => router.push('/grants')}>
             Browse More Grants
           </Button>
-        </div>
-      </div>
+        </Stack>
+      </Box>
     );
   }
 
@@ -227,56 +251,32 @@ export default function ApplyWizardClient() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <Stack spacing={3}>
       {/* Back & Title */}
-      <Button variant="ghost" size="sm" className="gap-1 -ml-2 text-slate-500" onClick={() => router.push(`/grants/${grantId}`)}>
-        <ArrowLeft className="w-4 h-4" /> Back to Grant
+      <Button
+        size="small"
+        startIcon={<ArrowLeft size={16} />}
+        onClick={() => router.push(`/grants/${grantId}`)}
+        sx={{ alignSelf: 'flex-start', color: 'text.secondary' }}
+      >
+        Back to Grant
       </Button>
 
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Apply: {grant.title}</h1>
-        <p className="text-sm text-slate-500 mt-1">{grant.donor_org_name}</p>
-      </div>
+      <Box>
+        <Typography variant="h2" sx={{ color: 'text.primary' }}>
+          Apply: {grant.title}
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{grant.donor_org_name}</Typography>
+      </Box>
 
-      {/* Step Progress */}
-      <div className="flex items-center justify-center gap-0">
-        {STEPS.map((step, i) => {
-          const Icon = step.icon;
-          const isActive = currentStep === step.num;
-          const isCompleted = currentStep > step.num;
-          return (
-            <div key={step.num} className="flex items-center">
-              <div className="flex flex-col items-center">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                    isCompleted
-                      ? 'bg-emerald-100 text-emerald-600'
-                      : isActive
-                      ? 'bg-brand-600 text-white'
-                      : 'bg-slate-100 text-slate-400'
-                  }`}
-                >
-                  {isCompleted ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
-                </div>
-                <span
-                  className={`text-xs mt-1.5 font-medium ${
-                    isActive ? 'text-brand-600' : isCompleted ? 'text-emerald-600' : 'text-slate-400'
-                  }`}
-                >
-                  {step.label}
-                </span>
-              </div>
-              {i < STEPS.length - 1 && (
-                <div
-                  className={`w-16 sm:w-24 h-0.5 mx-2 mt-[-20px] ${
-                    currentStep > step.num ? 'bg-emerald-300' : 'bg-slate-200'
-                  }`}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {/* MUI Stepper */}
+      <Stepper activeStep={currentStep - 1} alternativeLabel>
+        {STEPS.map((label) => (
+          <Step key={label}>
+            <StepLabel>{label}</StepLabel>
+          </Step>
+        ))}
+      </Stepper>
 
       {/* Step Content */}
       {currentStep === 1 && (
@@ -312,41 +312,35 @@ export default function ApplyWizardClient() {
       )}
 
       {/* Navigation */}
-      <div className="flex justify-between pt-4 border-t border-slate-200">
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
         <Button
-          variant="outline"
+          variant="outlined"
           disabled={currentStep === 1}
+          startIcon={<ArrowLeft size={16} />}
           onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
-          className="gap-1"
         >
-          <ArrowLeft className="w-4 h-4" /> Previous
+          Previous
         </Button>
         {currentStep < 4 ? (
           <Button
-            className="gap-1 bg-brand-600 hover:bg-brand-700"
+            variant="contained"
+            endIcon={<ArrowRight size={16} />}
             onClick={() => setCurrentStep((s) => Math.min(4, s + 1))}
           >
-            Next <ArrowRight className="w-4 h-4" />
+            Next
           </Button>
         ) : (
           <Button
-            className="gap-1 bg-brand-600 hover:bg-brand-700"
+            variant="contained"
             disabled={submitting}
+            startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />}
             onClick={handleSubmit}
           >
-            {submitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Submitting...
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" /> Submit Application
-              </>
-            )}
+            {submitting ? 'Submitting...' : 'Submit Application'}
           </Button>
         )}
-      </div>
-    </div>
+      </Box>
+    </Stack>
   );
 }
 
@@ -366,62 +360,73 @@ function EligibilityStep({
   if (requirements.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8 text-center">
-          <CheckCircle className="w-10 h-10 text-emerald-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">No specific eligibility requirements. Proceed to the next step.</p>
+        <CardContent sx={{ py: 6, textAlign: 'center' }}>
+          <CheckCircle size={40} color="#A7F3D0" style={{ margin: '0 auto 8px' }} />
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>No specific eligibility requirements. Proceed to the next step.</Typography>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <Stack spacing={2}>
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <ClipboardList className="w-4 h-4 text-brand-600" />
-            Eligibility Requirements
-          </CardTitle>
-          <p className="text-sm text-slate-500">Confirm that your organization meets each requirement</p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {requirements.map((req) => {
-            const resp = responses[req.key] || { checked: false, evidence: '' };
-            return (
-              <div key={req.key} className="space-y-2 pb-4 border-b border-slate-100 last:border-0 last:pb-0">
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    checked={resp.checked}
-                    onCheckedChange={(val: boolean) => onChange(req.key, 'checked', val)}
-                    className="mt-0.5"
-                  />
-                  <div className="flex-1">
-                    <Label className="text-sm font-medium text-slate-900 cursor-pointer">
-                      {req.label}
-                      {req.required && <span className="text-rose-500 ml-1">*</span>}
-                    </Label>
-                    {req.details && (
-                      <p className="text-xs text-slate-500 mt-0.5">{req.details}</p>
-                    )}
-                  </div>
-                </div>
-                {resp.checked && (
-                  <div className="ml-7">
-                    <Textarea
-                      placeholder="Provide evidence or explanation..."
-                      value={resp.evidence}
-                      onChange={(e) => onChange(req.key, 'evidence', e.target.value)}
-                      className="text-sm"
-                      rows={2}
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <ClipboardList size={16} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+              Eligibility Requirements
+            </Typography>
+          </Box>
+          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2.5 }}>
+            Confirm that your organization meets each requirement
+          </Typography>
+          <Stack spacing={2.5} divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'divider' }} />}>
+            {requirements.map((req) => {
+              const resp = responses[req.key] || { checked: false, evidence: '' };
+              return (
+                <Box key={req.key}>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <Checkbox
+                      checked={resp.checked}
+                      onChange={(e) => onChange(req.key, 'checked', e.target.checked)}
+                      size="small"
+                      sx={{ mt: -0.5 }}
                     />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                        {req.label}
+                        {req.required && (
+                          <Box component="span" sx={{ color: 'error.main', ml: 0.5 }}>*</Box>
+                        )}
+                      </Typography>
+                      {req.details && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}>
+                          {req.details}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                  {resp.checked && (
+                    <Box sx={{ ml: 5, mt: 1 }}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        multiline
+                        rows={2}
+                        placeholder="Provide evidence or explanation..."
+                        value={resp.evidence}
+                        onChange={(e) => onChange(req.key, 'evidence', e.target.value)}
+                      />
+                    </Box>
+                  )}
+                </Box>
+              );
+            })}
+          </Stack>
         </CardContent>
       </Card>
-    </div>
+    </Stack>
   );
 }
 
@@ -445,82 +450,93 @@ function ProposalStep({
   if (criteria.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8 text-center">
-          <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">No proposal criteria defined. Proceed to the next step.</p>
+        <CardContent sx={{ py: 6, textAlign: 'center' }}>
+          <FileText size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>No proposal criteria defined. Proceed to the next step.</Typography>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <Stack spacing={2}>
       {criteria.map((c) => {
         const resp = responses[c.key] || { text: '', wordCount: 0 };
         const isLoading = guidanceLoading[c.key] || false;
         return (
           <Card key={c.key}>
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <CardTitle className="text-base">{c.label}</CardTitle>
+            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, mb: 2 }}>
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    {c.label}
+                  </Typography>
                   {c.description && (
-                    <p className="text-sm text-slate-500 mt-1">{c.description}</p>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{c.description}</Typography>
                   )}
                   {c.instructions && (
-                    <p className="text-xs text-slate-400 mt-1 italic">{c.instructions}</p>
+                    <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5, display: 'block', fontStyle: 'italic' }}>
+                      {c.instructions}
+                    </Typography>
                   )}
-                </div>
-                <Badge variant="outline" className="shrink-0 bg-brand-50 text-brand-700 border-brand-200">
-                  Weight: {c.weight}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea
+                </Box>
+                <Chip
+                  label={`Weight: ${c.weight}`}
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  sx={{ flexShrink: 0, fontWeight: 500, fontSize: '0.6875rem' }}
+                />
+              </Box>
+              <TextField
+                size="small"
+                fullWidth
+                multiline
+                rows={5}
                 placeholder={c.example || `Write your response for "${c.label}"...`}
                 value={resp.text}
                 onChange={(e) => onChange(c.key, e.target.value)}
-                rows={5}
               />
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className={`text-xs ${c.max_words && resp.wordCount > c.max_words ? 'text-rose-500 font-medium' : 'text-slate-400'}`}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: c.max_words && resp.wordCount > c.max_words ? 'error.main' : 'text.disabled',
+                      fontWeight: c.max_words && resp.wordCount > c.max_words ? 500 : 400,
+                    }}
+                  >
                     {resp.wordCount} words{c.max_words ? ` / ${c.max_words} max` : ''}
-                  </span>
+                  </Typography>
                   {resp.qualityScore !== undefined && (
                     <ScoreRing score={resp.qualityScore} size={36} strokeWidth={3} />
                   )}
-                </div>
+                </Box>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-violet-600 border-violet-200 hover:bg-violet-50"
+                  variant="outlined"
+                  size="small"
                   disabled={!resp.text.trim() || isLoading}
+                  startIcon={isLoading ? <CircularProgress size={12} /> : <Sparkles size={12} />}
                   onClick={() => onGetGuidance(c.key, resp.text)}
+                  sx={{ color: '#7C3AED', borderColor: '#DDD6FE', '&:hover': { bgcolor: '#F5F3FF', borderColor: '#C4B5FD' } }}
                 >
-                  {isLoading ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-3 h-3" />
-                  )}
                   AI Guidance
                 </Button>
-              </div>
+              </Box>
               {resp.guidance && (
-                <div className="p-3 bg-violet-50 rounded-lg border border-violet-100">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Sparkles className="w-3 h-3 text-violet-600" />
-                    <span className="text-xs font-medium text-violet-700">AI Guidance</span>
-                  </div>
-                  <p className="text-sm text-violet-800">{resp.guidance}</p>
-                </div>
+                <Box sx={{ mt: 1.5, p: 2, bgcolor: '#F5F3FF', borderRadius: 2, border: '1px solid #EDE9FE' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
+                    <Sparkles size={12} color="#7C3AED" />
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: '#7C3AED' }}>AI Guidance</Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ color: '#6D28D9' }}>{resp.guidance}</Typography>
+                </Box>
               )}
             </CardContent>
           </Card>
         );
       })}
-    </div>
+    </Stack>
   );
 }
 
@@ -540,82 +556,101 @@ function DocumentsStep({
   if (requirements.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8 text-center">
-          <Upload className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">No documents required. Proceed to review.</p>
+        <CardContent sx={{ py: 6, textAlign: 'center' }}>
+          <Upload size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>No documents required. Proceed to review.</Typography>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <Stack spacing={2}>
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Upload className="w-4 h-4 text-brand-600" />
-            Required Documents
-          </CardTitle>
-          <p className="text-sm text-slate-500">Upload the requested documents for your application</p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {requirements.map((doc) => {
-            const upload = uploads[doc.key];
-            return (
-              <div key={doc.key} className="p-4 border border-slate-200 rounded-lg">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">
-                      {doc.label}
-                      {doc.required && <span className="text-rose-500 ml-1">*</span>}
-                    </p>
-                    {doc.specific_requirements && (
-                      <p className="text-xs text-slate-500 mt-0.5">{doc.specific_requirements}</p>
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Upload size={16} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+              Required Documents
+            </Typography>
+          </Box>
+          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2.5 }}>
+            Upload the requested documents for your application
+          </Typography>
+          <Stack spacing={2}>
+            {requirements.map((doc) => {
+              const upload = uploads[doc.key];
+              return (
+                <Box key={doc.key} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5, mb: 1.5 }}>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                        {doc.label}
+                        {doc.required && (
+                          <Box component="span" sx={{ color: 'error.main', ml: 0.5 }}>*</Box>
+                        )}
+                      </Typography>
+                      {doc.specific_requirements && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}>
+                          {doc.specific_requirements}
+                        </Typography>
+                      )}
+                    </Box>
+                    {doc.ai_review && (
+                      <Chip
+                        label="AI Review"
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: '0.625rem', height: 22, color: '#7C3AED', borderColor: '#DDD6FE', bgcolor: '#F5F3FF' }}
+                      />
                     )}
-                  </div>
-                  {doc.ai_review && (
-                    <Badge variant="outline" className="text-[10px] bg-violet-50 text-violet-600 border-violet-200 shrink-0">
-                      AI Review
-                    </Badge>
-                  )}
-                </div>
-                <div className="relative">
+                  </Box>
                   {upload?.file ? (
-                    <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                      <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-                      <span className="text-sm text-emerald-700 truncate flex-1">{upload.fileName}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-slate-400 hover:text-slate-600 shrink-0"
-                        onClick={() => onChange(doc.key, null)}
-                      >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, bgcolor: '#ECFDF5', borderRadius: 2, border: '1px solid #A7F3D0' }}>
+                      <CheckCircle size={20} color="#059669" />
+                      <Typography variant="body2" noWrap sx={{ flex: 1, color: '#059669' }}>{upload.fileName}</Typography>
+                      <Button size="small" onClick={() => onChange(doc.key, null)} sx={{ color: 'text.secondary' }}>
                         Remove
                       </Button>
-                    </div>
+                    </Box>
                   ) : (
-                    <label className="flex flex-col items-center gap-2 p-6 border-2 border-dashed border-slate-200 rounded-lg cursor-pointer hover:border-brand-300 hover:bg-brand-50/30 transition-colors">
-                      <Upload className="w-6 h-6 text-slate-400" />
-                      <span className="text-sm text-slate-500">Click to upload</span>
-                      <span className="text-xs text-slate-400">PDF, DOC, DOCX, XLS, XLSX up to 10MB</span>
-                      <Input
+                    <Box
+                      component="label"
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 1,
+                        p: 4,
+                        border: '2px dashed',
+                        borderColor: 'divider',
+                        borderRadius: 2,
+                        cursor: 'pointer',
+                        '&:hover': { borderColor: 'primary.light', bgcolor: 'action.hover' },
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <Upload size={24} color="#94A3B8" />
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Click to upload</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.disabled' }}>PDF, DOC, DOCX, XLS, XLSX up to 10MB</Typography>
+                      <input
                         type="file"
-                        className="hidden"
+                        hidden
                         accept=".pdf,.doc,.docx,.xls,.xlsx"
                         onChange={(e) => {
                           const file = e.target.files?.[0] ?? null;
                           onChange(doc.key, file);
                         }}
                       />
-                    </label>
+                    </Box>
                   )}
-                </div>
-              </div>
-            );
-          })}
+                </Box>
+              );
+            })}
+          </Stack>
         </CardContent>
       </Card>
-    </div>
+    </Stack>
   );
 }
 
@@ -645,104 +680,129 @@ function ReviewStep({
   const requiredUploaded = requiredDocs.filter((d) => docUploads[d.key]?.file).length;
 
   return (
-    <div className="space-y-4">
+    <Stack spacing={2}>
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Send className="w-4 h-4 text-brand-600" />
-            Review Your Application
-          </CardTitle>
-          <p className="text-sm text-slate-500">Please review before submitting</p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Eligibility Summary */}
-          <div className="p-4 bg-slate-50 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-slate-900">Eligibility</p>
-              <Badge variant="outline" className={metCount === eligibility.length && eligibility.length > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}>
-                {metCount} / {eligibility.length} met
-              </Badge>
-            </div>
-            <div className="space-y-1.5">
-              {eligibility.map((req) => {
-                const resp = eligibilityResponses[req.key];
-                return (
-                  <div key={req.key} className="flex items-center gap-2 text-sm">
-                    {resp?.checked ? (
-                      <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 text-slate-300 shrink-0" />
-                    )}
-                    <span className={resp?.checked ? 'text-slate-700' : 'text-slate-400'}>{req.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Proposal Summary */}
-          <div className="p-4 bg-slate-50 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-slate-900">Proposal Responses</p>
-              <Badge variant="outline" className={answeredCount === criteria.length && criteria.length > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}>
-                {answeredCount} / {criteria.length} answered
-              </Badge>
-            </div>
-            <div className="space-y-1.5">
-              {criteria.map((c) => {
-                const resp = proposalResponses[c.key];
-                const hasText = resp?.text?.trim();
-                return (
-                  <div key={c.key} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      {hasText ? (
-                        <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Send size={16} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+              Review Your Application
+            </Typography>
+          </Box>
+          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2.5 }}>
+            Please review before submitting
+          </Typography>
+          <Stack spacing={3}>
+            {/* Eligibility Summary */}
+            <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>Eligibility</Typography>
+                <Chip
+                  label={`${metCount} / ${eligibility.length} met`}
+                  size="small"
+                  variant="outlined"
+                  color={metCount === eligibility.length && eligibility.length > 0 ? 'success' : 'warning'}
+                  sx={{ fontWeight: 500, fontSize: '0.6875rem' }}
+                />
+              </Box>
+              <Stack spacing={0.75}>
+                {eligibility.map((req) => {
+                  const resp = eligibilityResponses[req.key];
+                  return (
+                    <Box key={req.key} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {resp?.checked ? (
+                        <CheckCircle size={16} color="#059669" />
                       ) : (
-                        <AlertCircle className="w-4 h-4 text-slate-300 shrink-0" />
+                        <AlertCircle size={16} color="#CBD5E1" />
                       )}
-                      <span className={hasText ? 'text-slate-700' : 'text-slate-400'}>{c.label}</span>
-                    </div>
-                    {hasText && (
-                      <span className="text-xs text-slate-400">{resp.wordCount} words</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+                      <Typography variant="body2" sx={{ color: resp?.checked ? 'text.secondary' : 'text.disabled' }}>
+                        {req.label}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
 
-          {/* Documents Summary */}
-          <div className="p-4 bg-slate-50 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-slate-900">Documents</p>
-              <Badge variant="outline" className={requiredUploaded === requiredDocs.length && requiredDocs.length > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}>
-                {uploadedCount} / {docs.length} uploaded
-              </Badge>
-            </div>
-            <div className="space-y-1.5">
-              {docs.map((d) => {
-                const uploaded = docUploads[d.key]?.file;
-                return (
-                  <div key={d.key} className="flex items-center gap-2 text-sm">
-                    {uploaded ? (
-                      <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                    ) : (
-                      <AlertCircle className={`w-4 h-4 shrink-0 ${d.required ? 'text-rose-400' : 'text-slate-300'}`} />
-                    )}
-                    <span className={uploaded ? 'text-slate-700' : d.required ? 'text-rose-500' : 'text-slate-400'}>
-                      {d.label}
-                      {d.required && !uploaded && ' (required)'}
-                    </span>
-                    {uploaded && (
-                      <span className="text-xs text-slate-400 truncate ml-auto">{docUploads[d.key].fileName}</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+            {/* Proposal Summary */}
+            <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>Proposal Responses</Typography>
+                <Chip
+                  label={`${answeredCount} / ${criteria.length} answered`}
+                  size="small"
+                  variant="outlined"
+                  color={answeredCount === criteria.length && criteria.length > 0 ? 'success' : 'warning'}
+                  sx={{ fontWeight: 500, fontSize: '0.6875rem' }}
+                />
+              </Box>
+              <Stack spacing={0.75}>
+                {criteria.map((c) => {
+                  const resp = proposalResponses[c.key];
+                  const hasText = resp?.text?.trim();
+                  return (
+                    <Box key={c.key} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {hasText ? (
+                          <CheckCircle size={16} color="#059669" />
+                        ) : (
+                          <AlertCircle size={16} color="#CBD5E1" />
+                        )}
+                        <Typography variant="body2" sx={{ color: hasText ? 'text.secondary' : 'text.disabled' }}>
+                          {c.label}
+                        </Typography>
+                      </Box>
+                      {hasText && (
+                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>{resp.wordCount} words</Typography>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
+
+            {/* Documents Summary */}
+            <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>Documents</Typography>
+                <Chip
+                  label={`${uploadedCount} / ${docs.length} uploaded`}
+                  size="small"
+                  variant="outlined"
+                  color={requiredUploaded === requiredDocs.length && requiredDocs.length > 0 ? 'success' : 'warning'}
+                  sx={{ fontWeight: 500, fontSize: '0.6875rem' }}
+                />
+              </Box>
+              <Stack spacing={0.75}>
+                {docs.map((d) => {
+                  const uploaded = docUploads[d.key]?.file;
+                  return (
+                    <Box key={d.key} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {uploaded ? (
+                        <CheckCircle size={16} color="#059669" />
+                      ) : (
+                        <AlertCircle size={16} color={d.required ? '#F87171' : '#CBD5E1'} />
+                      )}
+                      <Typography
+                        variant="body2"
+                        sx={{ color: uploaded ? 'text.secondary' : d.required ? 'error.main' : 'text.disabled', flex: 1 }}
+                      >
+                        {d.label}
+                        {d.required && !uploaded && ' (required)'}
+                      </Typography>
+                      {uploaded && (
+                        <Typography variant="caption" noWrap sx={{ color: 'text.disabled', ml: 'auto' }}>
+                          {docUploads[d.key].fileName}
+                        </Typography>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
+          </Stack>
         </CardContent>
       </Card>
-    </div>
+    </Stack>
   );
 }

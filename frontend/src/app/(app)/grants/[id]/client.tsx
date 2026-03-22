@@ -4,10 +4,19 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useGrant } from '@/lib/hooks/use-api';
 import { StatusBadge } from '@/components/shared/status-badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import Avatar from '@mui/material/Avatar';
+
 import {
   DollarSign, Calendar, MapPin, FileText, Target, ClipboardList,
   Upload, Users, ArrowLeft, CheckCircle, AlertCircle,
@@ -27,12 +36,12 @@ function formatDate(dateStr: string | null): string {
 
 type TabId = 'overview' | 'eligibility' | 'criteria' | 'documents' | 'applications';
 
-const TAB_ITEMS: { id: TabId; label: string; icon: React.ElementType }[] = [
-  { id: 'overview', label: 'Overview', icon: FileText },
-  { id: 'eligibility', label: 'Eligibility', icon: ClipboardList },
-  { id: 'criteria', label: 'Criteria', icon: Target },
-  { id: 'documents', label: 'Documents', icon: Upload },
-  { id: 'applications', label: 'Applications', icon: Users },
+const TAB_ITEMS: { id: TabId; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'eligibility', label: 'Eligibility' },
+  { id: 'criteria', label: 'Criteria' },
+  { id: 'documents', label: 'Documents' },
+  { id: 'applications', label: 'Applications' },
 ];
 
 export default function GrantDetailClient() {
@@ -49,24 +58,30 @@ export default function GrantDetailClient() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-6 w-96" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
+      <Stack spacing={3}>
+        <Skeleton variant="text" width={200} height={32} />
+        <Skeleton variant="text" width={400} height={24} />
+        <Skeleton variant="rounded" height={48} sx={{ borderRadius: 2 }} />
+        <Skeleton variant="rounded" height={260} sx={{ borderRadius: 2 }} />
+      </Stack>
     );
   }
 
   if (!grant) {
     return (
-      <div className="text-center py-12">
-        <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-        <p className="text-slate-500 font-medium">Grant not found</p>
-        <Button variant="outline" className="mt-4 gap-2" onClick={() => router.push('/grants')}>
-          <ArrowLeft className="w-4 h-4" /> Back to Grants
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <AlertCircle size={48} color="#CBD5E1" style={{ margin: '0 auto 12px' }} />
+        <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>Grant not found</Typography>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<ArrowLeft size={16} />}
+          onClick={() => router.push('/grants')}
+          sx={{ mt: 2 }}
+        >
+          Back to Grants
         </Button>
-      </div>
+      </Box>
     );
   }
 
@@ -77,77 +92,75 @@ export default function GrantDetailClient() {
   });
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <Stack spacing={3}>
       {/* Back button */}
-      <Button variant="ghost" size="sm" className="gap-1 -ml-2 text-slate-500" onClick={() => router.push('/grants')}>
-        <ArrowLeft className="w-4 h-4" /> Back to Grants
+      <Button
+        size="small"
+        startIcon={<ArrowLeft size={16} />}
+        onClick={() => router.push('/grants')}
+        sx={{ alignSelf: 'flex-start', color: 'text.secondary' }}
+      >
+        Back to Grants
       </Button>
 
       {/* Grant Header */}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-bold text-slate-900">{grant.title}</h1>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: { lg: 'flex-start' }, justifyContent: 'space-between', gap: 2 }}>
+        <Box sx={{ flex: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+            <Typography variant="h2" sx={{ color: 'text.primary' }}>
+              {grant.title}
+            </Typography>
             <StatusBadge status={grant.status} />
-          </div>
+          </Box>
           {grant.donor_org_name && (
-            <p className="text-sm text-slate-500">{grant.donor_org_name}</p>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>{grant.donor_org_name}</Typography>
           )}
-          <div className="flex flex-wrap gap-4 mt-3 text-sm text-slate-600">
-            <div className="flex items-center gap-1.5">
-              <DollarSign className="w-4 h-4 text-emerald-500" />
-              <span className="font-semibold">{formatFunding(grant.total_funding, grant.currency)}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <span>{formatDate(grant.deadline)}</span>
-            </div>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2.5, mt: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <DollarSign size={16} color="#059669" />
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                {formatFunding(grant.total_funding, grant.currency)}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Calendar size={16} color="#94A3B8" />
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>{formatDate(grant.deadline)}</Typography>
+            </Box>
             {grant.countries && grant.countries.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-slate-400" />
-                <span>{grant.countries.join(', ')}</span>
-              </div>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <MapPin size={16} color="#94A3B8" />
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>{grant.countries.join(', ')}</Typography>
+              </Box>
             )}
-          </div>
-        </div>
+          </Box>
+        </Box>
         {isNgo && grant.status === 'open' && !grant.user_application_status && (
           <Button
-            className="bg-brand-600 hover:bg-brand-700 gap-2"
+            variant="contained"
+            startIcon={<FileText size={16} />}
             onClick={() => router.push(`/apply/${grant.id}`)}
           >
-            <FileText className="w-4 h-4" /> Apply Now
+            Apply Now
           </Button>
         )}
         {isNgo && grant.user_application_status && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-500">Your application:</span>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>Your application:</Typography>
             <StatusBadge status={grant.user_application_status} />
-          </div>
+          </Box>
         )}
-      </div>
+      </Box>
 
       {/* Tabs */}
-      <div className="border-b border-slate-200">
-        <nav className="flex gap-1 -mb-px">
-          {visibleTabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-brand-600 text-brand-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+      <Tabs
+        value={activeTab}
+        onChange={(_, newVal) => setActiveTab(newVal as TabId)}
+        sx={{ borderBottom: 1, borderColor: 'divider' }}
+      >
+        {visibleTabs.map((tab) => (
+          <Tab key={tab.id} value={tab.id} label={tab.label} sx={{ textTransform: 'none', fontWeight: 500 }} />
+        ))}
+      </Tabs>
 
       {/* Tab Content */}
       {activeTab === 'overview' && <OverviewTab grant={grant} />}
@@ -155,118 +168,143 @@ export default function GrantDetailClient() {
       {activeTab === 'criteria' && <CriteriaTab criteria={grant.criteria ?? []} />}
       {activeTab === 'documents' && <DocumentsTab requirements={grant.doc_requirements ?? []} />}
       {activeTab === 'applications' && <ApplicationsTab grantId={grant.id} />}
-    </div>
+    </Stack>
   );
 }
 
 function OverviewTab({ grant }: { grant: NonNullable<ReturnType<typeof useGrant>['data']>['grant'] }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 space-y-6">
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' }, gap: 3 }}>
+      <Stack spacing={3}>
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Description</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
+              Description
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
               {grant.description || 'No description provided.'}
-            </p>
+            </Typography>
           </CardContent>
         </Card>
 
         {grant.reporting_requirements && grant.reporting_requirements.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Reporting Requirements</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
+                Reporting Requirements
+              </Typography>
+              <Stack spacing={1.5}>
                 {grant.reporting_requirements.map((r, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                    <FileText className="w-4 h-4 text-brand-600 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{r.title}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                  <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, p: 1.5, bgcolor: 'action.hover', borderRadius: 2 }}>
+                    <FileText size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>{r.title}</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}>
                         {r.type} &middot; {r.frequency} &middot; Due {r.due_days_after_period} days after period
-                      </p>
+                      </Typography>
                       {r.description && (
-                        <p className="text-xs text-slate-600 mt-1">{r.description}</p>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>
+                          {r.description}
+                        </Typography>
                       )}
-                    </div>
-                  </div>
+                    </Box>
+                  </Box>
                 ))}
-              </div>
+              </Stack>
             </CardContent>
           </Card>
         )}
-      </div>
+      </Stack>
 
-      <div className="space-y-4">
+      <Stack spacing={2}>
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Quick Facts</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Funding</p>
-              <p className="text-sm font-semibold text-slate-900 mt-0.5">
-                {formatFunding(grant.total_funding, grant.currency)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Deadline</p>
-              <p className="text-sm font-medium text-slate-900 mt-0.5">{formatDate(grant.deadline)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Status</p>
-              <div className="mt-1">
-                <StatusBadge status={grant.status} />
-              </div>
-            </div>
-            {grant.application_count !== undefined && (
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Applications</p>
-                <p className="text-sm font-medium text-slate-900 mt-0.5">{grant.application_count}</p>
-              </div>
-            )}
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
+              Quick Facts
+            </Typography>
+            <Stack spacing={1.5}>
+              <Box>
+                <Typography variant="caption" sx={{ color: 'text.disabled', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Funding
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mt: 0.25 }}>
+                  {formatFunding(grant.total_funding, grant.currency)}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ color: 'text.disabled', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Deadline
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mt: 0.25 }}>
+                  {formatDate(grant.deadline)}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ color: 'text.disabled', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Status
+                </Typography>
+                <Box sx={{ mt: 0.5 }}>
+                  <StatusBadge status={grant.status} />
+                </Box>
+              </Box>
+              {grant.application_count !== undefined && (
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.disabled', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Applications
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mt: 0.25 }}>
+                    {grant.application_count}
+                  </Typography>
+                </Box>
+              )}
+            </Stack>
           </CardContent>
         </Card>
 
         {grant.sectors && grant.sectors.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Sectors</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-1.5">
+            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
+                Sectors
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
                 {grant.sectors.map((s) => (
-                  <Badge key={s} variant="outline" className="bg-brand-50 text-brand-700 border-brand-200">
-                    {s}
-                  </Badge>
+                  <Chip
+                    key={s}
+                    label={s}
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    sx={{ fontSize: '0.6875rem' }}
+                  />
                 ))}
-              </div>
+              </Box>
             </CardContent>
           </Card>
         )}
 
         {grant.countries && grant.countries.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Countries</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-1.5">
+            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
+                Countries
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
                 {grant.countries.map((c) => (
-                  <Badge key={c} variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
-                    {c}
-                  </Badge>
+                  <Chip
+                    key={c}
+                    label={c}
+                    size="small"
+                    variant="outlined"
+                    sx={{ fontSize: '0.6875rem', borderColor: 'divider' }}
+                  />
                 ))}
-              </div>
+              </Box>
             </CardContent>
           </Card>
         )}
-      </div>
-    </div>
+      </Stack>
+    </Box>
   );
 }
 
@@ -274,46 +312,61 @@ function EligibilityTab({ requirements }: { requirements: EligibilityRequirement
   if (requirements.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8 text-center">
-          <ClipboardList className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">No eligibility requirements specified</p>
+        <CardContent sx={{ py: 6, textAlign: 'center' }}>
+          <ClipboardList size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>No eligibility requirements specified</Typography>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <Stack spacing={1.5}>
       {requirements.map((req, i) => (
         <Card key={req.key || i}>
-          <CardContent className="py-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center shrink-0 mt-0.5">
-                <CheckCircle className="w-4 h-4 text-brand-600" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-slate-900">{req.label}</p>
+          <CardContent sx={{ py: 2, px: 2.5, '&:last-child': { pb: 2 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+              <Avatar
+                sx={{
+                  width: 32,
+                  height: 32,
+                  bgcolor: '#EEF2FF',
+                  flexShrink: 0,
+                  mt: 0.25,
+                }}
+              >
+                <CheckCircle size={16} color="#4F46E5" />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>{req.label}</Typography>
                   {req.required && (
-                    <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-600 border-rose-200">
-                      Required
-                    </Badge>
+                    <Chip
+                      label="Required"
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      sx={{ height: 20, fontSize: '0.625rem' }}
+                    />
                   )}
                   {req.weight && (
-                    <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-500 border-slate-200">
-                      Weight: {req.weight}
-                    </Badge>
+                    <Chip
+                      label={`Weight: ${req.weight}`}
+                      size="small"
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: '0.625rem', borderColor: 'divider' }}
+                    />
                   )}
-                </div>
+                </Box>
                 {req.details && (
-                  <p className="text-sm text-slate-600 mt-1">{req.details}</p>
+                  <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{req.details}</Typography>
                 )}
-              </div>
-            </div>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
       ))}
-    </div>
+    </Stack>
   );
 }
 
@@ -321,9 +374,9 @@ function CriteriaTab({ criteria }: { criteria: Criterion[] }) {
   if (criteria.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8 text-center">
-          <Target className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">No scoring criteria specified</p>
+        <CardContent sx={{ py: 6, textAlign: 'center' }}>
+          <Target size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>No scoring criteria specified</Typography>
         </CardContent>
       </Card>
     );
@@ -332,36 +385,42 @@ function CriteriaTab({ criteria }: { criteria: Criterion[] }) {
   const totalWeight = criteria.reduce((sum, c) => sum + c.weight, 0);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
-        <Target className="w-4 h-4" />
-        <span>Total weight: {totalWeight}</span>
-      </div>
+    <Stack spacing={1.5}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+        <Target size={16} color="#94A3B8" />
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>Total weight: {totalWeight}</Typography>
+      </Box>
       {criteria.map((c, i) => (
         <Card key={c.key || i}>
-          <CardContent className="py-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-slate-900">{c.label}</p>
+          <CardContent sx={{ py: 2, px: 2.5, '&:last-child': { pb: 2 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>{c.label}</Typography>
                 {c.description && (
-                  <p className="text-sm text-slate-600 mt-1">{c.description}</p>
+                  <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{c.description}</Typography>
                 )}
                 {c.instructions && (
-                  <p className="text-xs text-slate-500 mt-2 italic">{c.instructions}</p>
+                  <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1, display: 'block', fontStyle: 'italic' }}>
+                    {c.instructions}
+                  </Typography>
                 )}
                 {c.max_words && (
-                  <p className="text-xs text-slate-400 mt-1">Max words: {c.max_words}</p>
+                  <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5, display: 'block' }}>
+                    Max words: {c.max_words}
+                  </Typography>
                 )}
-              </div>
-              <div className="text-right shrink-0">
-                <div className="text-lg font-bold text-brand-600">{c.weight}</div>
-                <p className="text-[10px] text-slate-400 uppercase">weight</p>
-              </div>
-            </div>
+              </Box>
+              <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>{c.weight}</Typography>
+                <Typography variant="caption" sx={{ color: 'text.disabled', textTransform: 'uppercase', fontSize: '0.625rem' }}>
+                  weight
+                </Typography>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
       ))}
-    </div>
+    </Stack>
   );
 }
 
@@ -369,71 +428,85 @@ function DocumentsTab({ requirements }: { requirements: DocRequirement[] }) {
   if (requirements.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8 text-center">
-          <Upload className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">No document requirements specified</p>
+        <CardContent sx={{ py: 6, textAlign: 'center' }}>
+          <Upload size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>No document requirements specified</Typography>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <Stack spacing={1.5}>
       {requirements.map((doc, i) => (
         <Card key={doc.key || i}>
-          <CardContent className="py-4">
-            <div className="flex items-start gap-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                doc.required ? 'bg-rose-50' : 'bg-slate-50'
-              }`}>
-                <Upload className={`w-4 h-4 ${doc.required ? 'text-rose-500' : 'text-slate-400'}`} />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-slate-900">{doc.label}</p>
+          <CardContent sx={{ py: 2, px: 2.5, '&:last-child': { pb: 2 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+              <Avatar
+                variant="rounded"
+                sx={{
+                  width: 32,
+                  height: 32,
+                  bgcolor: doc.required ? '#FFF1F2' : 'action.hover',
+                  borderRadius: 2,
+                  flexShrink: 0,
+                }}
+              >
+                <Upload size={16} color={doc.required ? '#E11D48' : '#94A3B8'} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>{doc.label}</Typography>
                   {doc.required && (
-                    <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-600 border-rose-200">
-                      Required
-                    </Badge>
+                    <Chip
+                      label="Required"
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      sx={{ height: 20, fontSize: '0.625rem' }}
+                    />
                   )}
                   {doc.ai_review && (
-                    <Badge variant="outline" className="text-[10px] bg-violet-50 text-violet-600 border-violet-200">
-                      AI Reviewed
-                    </Badge>
+                    <Chip
+                      label="AI Reviewed"
+                      size="small"
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: '0.625rem', color: '#7C3AED', borderColor: '#DDD6FE', bgcolor: '#F5F3FF' }}
+                    />
                   )}
-                </div>
+                </Box>
                 {doc.specific_requirements && (
-                  <p className="text-sm text-slate-600 mt-1">{doc.specific_requirements}</p>
+                  <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{doc.specific_requirements}</Typography>
                 )}
                 {doc.ai_criteria && (
-                  <p className="text-xs text-slate-500 mt-1">AI criteria: {doc.ai_criteria}</p>
+                  <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5, display: 'block' }}>
+                    AI criteria: {doc.ai_criteria}
+                  </Typography>
                 )}
-              </div>
-            </div>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
       ))}
-    </div>
+    </Stack>
   );
 }
 
 function ApplicationsTab({ grantId }: { grantId: number }) {
   const router = useRouter();
-  // For donors/admins: we could fetch applications for this grant
-  // For now, show a message directing to the applications list
   return (
     <Card>
-      <CardContent className="py-8 text-center">
-        <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-        <p className="text-sm text-slate-500 mb-3">
+      <CardContent sx={{ py: 6, textAlign: 'center' }}>
+        <Users size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
+        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
           View and manage applications for this grant
-        </p>
+        </Typography>
         <Button
-          variant="outline"
-          className="gap-2"
+          variant="outlined"
+          startIcon={<Users size={16} />}
           onClick={() => router.push(`/applications?grant_id=${grantId}`)}
         >
-          <Users className="w-4 h-4" /> View Applications
+          View Applications
         </Button>
       </CardContent>
     </Card>

@@ -3,13 +3,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import Chip from '@mui/material/Chip';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+
 import {
   Building2, Save, Loader2, CheckCircle, MapPin, Calendar,
   DollarSign, Users, Target, Globe,
@@ -109,228 +113,241 @@ export default function OrgProfilePage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-96 w-full" />
-      </div>
+      <Stack spacing={3}>
+        <Skeleton variant="text" width={260} height={40} />
+        <Skeleton variant="rounded" height={400} sx={{ borderRadius: 2 }} />
+      </Stack>
     );
   }
 
   if (!user?.org_id) {
     return (
-      <div className="text-center py-12">
-        <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-        <p className="text-slate-500 font-medium">No organization linked</p>
-        <p className="text-sm text-slate-400 mt-1">Contact an administrator to link your account to an organization</p>
-      </div>
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <Building2 size={48} color="#CBD5E1" style={{ margin: '0 auto 12px' }} />
+        <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>No organization linked</Typography>
+        <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
+          Contact an administrator to link your account to an organization
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <Stack spacing={3}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Organization Profile</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage your organization&apos;s information</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { sm: 'center' }, justifyContent: 'space-between', gap: 2 }}>
+        <Box>
+          <Typography variant="h2" sx={{ color: 'text.primary' }}>
+            Organization Profile
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+            Manage your organization&apos;s information
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           {saved && (
-            <span className="flex items-center gap-1 text-sm text-emerald-600">
-              <CheckCircle className="w-4 h-4" /> Saved
-            </span>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <CheckCircle size={16} color="#059669" />
+              <Typography variant="body2" sx={{ color: '#059669' }}>Saved</Typography>
+            </Box>
           )}
           <Button
-            className="gap-2 bg-brand-600 hover:bg-brand-700"
+            variant="contained"
             disabled={saving}
+            startIcon={saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             onClick={handleSave}
           >
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" /> Save Changes
-              </>
-            )}
+            {saving ? 'Saving...' : 'Save Changes'}
           </Button>
-        </div>
-      </div>
+        </Box>
+      </Box>
 
       {/* Org Status */}
       {org && (
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="outline" className={org.verified ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}>
-            {org.verified ? 'Verified' : 'Unverified'}
-          </Badge>
-          <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200">
-            {org.org_type?.toUpperCase() || 'NGO'}
-          </Badge>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          <Chip
+            label={org.verified ? 'Verified' : 'Unverified'}
+            variant="outlined"
+            size="small"
+            color={org.verified ? 'success' : 'warning'}
+            sx={{ fontWeight: 500, fontSize: '0.6875rem' }}
+          />
+          <Chip
+            label={org.org_type?.toUpperCase() || 'NGO'}
+            variant="outlined"
+            size="small"
+            sx={{ fontWeight: 500, fontSize: '0.6875rem', borderColor: 'divider' }}
+          />
           {org.registration_number && (
-            <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200">
-              Reg: {org.registration_number}
-            </Badge>
+            <Chip
+              label={`Reg: ${org.registration_number}`}
+              variant="outlined"
+              size="small"
+              sx={{ fontWeight: 500, fontSize: '0.6875rem', borderColor: 'divider' }}
+            />
           )}
           {org.assess_score !== null && org.assess_score !== undefined && (
-            <Badge variant="outline" className="bg-brand-50 text-brand-700 border-brand-200">
-              Capacity Score: {org.assess_score}%
-            </Badge>
+            <Chip
+              label={`Capacity Score: ${org.assess_score}%`}
+              variant="outlined"
+              size="small"
+              color="primary"
+              sx={{ fontWeight: 500, fontSize: '0.6875rem' }}
+            />
           )}
-        </div>
+        </Box>
       )}
 
       {/* Profile Form */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-brand-600" />
-            Basic Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="org-name" className="flex items-center gap-1">
-                <Building2 className="w-3 h-3 text-slate-400" /> Organization Name
-              </Label>
-              <Input
-                id="org-name"
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
+            <Building2 size={16} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+              Basic Information
+            </Typography>
+          </Box>
+          <Stack spacing={2.5}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
+              <TextField
+                label="Organization Name"
+                size="small"
+                fullWidth
                 value={name}
                 onChange={(e) => { setName(e.target.value); setSaved(false); }}
                 placeholder="Enter organization name"
+                InputProps={{
+                  startAdornment: <Building2 size={14} color="#94A3B8" style={{ marginRight: 8 }} />,
+                }}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="org-country" className="flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-slate-400" /> Country
-              </Label>
-              <Input
-                id="org-country"
+              <TextField
+                label="Country"
+                size="small"
+                fullWidth
                 value={country}
                 onChange={(e) => { setCountry(e.target.value); setSaved(false); }}
                 placeholder="e.g., Kenya"
+                InputProps={{
+                  startAdornment: <MapPin size={14} color="#94A3B8" style={{ marginRight: 8 }} />,
+                }}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="org-year" className="flex items-center gap-1">
-                <Calendar className="w-3 h-3 text-slate-400" /> Year Established
-              </Label>
-              <Input
-                id="org-year"
+              <TextField
+                label="Year Established"
+                size="small"
+                fullWidth
                 type="number"
                 value={yearEstablished}
                 onChange={(e) => { setYearEstablished(e.target.value); setSaved(false); }}
                 placeholder="e.g., 2010"
+                InputProps={{
+                  startAdornment: <Calendar size={14} color="#94A3B8" style={{ marginRight: 8 }} />,
+                }}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="org-budget" className="flex items-center gap-1">
-                <DollarSign className="w-3 h-3 text-slate-400" /> Annual Budget
-              </Label>
-              <Input
-                id="org-budget"
+              <TextField
+                label="Annual Budget"
+                size="small"
+                fullWidth
                 value={annualBudget}
                 onChange={(e) => { setAnnualBudget(e.target.value); setSaved(false); }}
                 placeholder="e.g., $500,000"
+                InputProps={{
+                  startAdornment: <DollarSign size={14} color="#94A3B8" style={{ marginRight: 8 }} />,
+                }}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="org-staff" className="flex items-center gap-1">
-                <Users className="w-3 h-3 text-slate-400" /> Staff Count
-              </Label>
-              <Input
-                id="org-staff"
+              <TextField
+                label="Staff Count"
+                size="small"
+                fullWidth
                 value={staffCount}
                 onChange={(e) => { setStaffCount(e.target.value); setSaved(false); }}
                 placeholder="e.g., 50"
+                InputProps={{
+                  startAdornment: <Users size={14} color="#94A3B8" style={{ marginRight: 8 }} />,
+                }}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="org-website" className="flex items-center gap-1">
-                <Globe className="w-3 h-3 text-slate-400" /> Website
-              </Label>
-              <Input
-                id="org-website"
+              <TextField
+                label="Website"
+                size="small"
+                fullWidth
                 value={website}
                 onChange={(e) => { setWebsite(e.target.value); setSaved(false); }}
                 placeholder="https://example.org"
+                InputProps={{
+                  startAdornment: <Globe size={14} color="#94A3B8" style={{ marginRight: 8 }} />,
+                }}
               />
-            </div>
-          </div>
+            </Box>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="org-mission">Mission Statement</Label>
-            <Textarea
-              id="org-mission"
+            <TextField
+              label="Mission Statement"
+              size="small"
+              fullWidth
+              multiline
+              rows={4}
               value={mission}
               onChange={(e) => { setMission(e.target.value); setSaved(false); }}
               placeholder="Describe your organization's mission..."
-              rows={4}
             />
-          </div>
+          </Stack>
         </CardContent>
       </Card>
 
       {/* Sectors */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Target className="w-4 h-4 text-brand-600" />
-            Sectors
-          </CardTitle>
-          <p className="text-sm text-slate-500">Select the sectors your organization works in</p>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Target size={16} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+              Sectors
+            </Typography>
+          </Box>
+          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
+            Select the sectors your organization works in
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {SECTOR_OPTIONS.map((sector) => {
               const isSelected = selectedSectors.includes(sector);
               return (
-                <button
+                <Chip
                   key={sector}
+                  label={sector}
                   onClick={() => toggleSector(sector)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                    isSelected
-                      ? 'bg-brand-600 text-white border-brand-600'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-brand-300 hover:text-brand-600'
-                  }`}
-                >
-                  {sector}
-                </button>
+                  variant={isSelected ? 'filled' : 'outlined'}
+                  color={isSelected ? 'primary' : 'default'}
+                  size="small"
+                  sx={{
+                    fontWeight: isSelected ? 600 : 400,
+                    borderColor: isSelected ? 'primary.main' : 'divider',
+                  }}
+                />
               );
             })}
-          </div>
+          </Box>
           {selectedSectors.length > 0 && (
-            <p className="text-xs text-slate-400 mt-3">
+            <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1.5, display: 'block' }}>
               {selectedSectors.length} sector{selectedSectors.length !== 1 ? 's' : ''} selected
-            </p>
+            </Typography>
           )}
         </CardContent>
       </Card>
 
       {/* Bottom Save */}
-      <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
         {saved && (
-          <span className="flex items-center gap-1 text-sm text-emerald-600 self-center">
-            <CheckCircle className="w-4 h-4" /> Changes saved
-          </span>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <CheckCircle size={16} color="#059669" />
+            <Typography variant="body2" sx={{ color: '#059669' }}>Changes saved</Typography>
+          </Box>
         )}
         <Button
-          className="gap-2 bg-brand-600 hover:bg-brand-700"
+          variant="contained"
           disabled={saving}
+          startIcon={saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
           onClick={handleSave}
         >
-          {saving ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" /> Saving...
-            </>
-          ) : (
-            <>
-              <Save className="w-4 h-4" /> Save Changes
-            </>
-          )}
+          {saving ? 'Saving...' : 'Save Changes'}
         </Button>
-      </div>
-    </div>
+      </Box>
+    </Stack>
   );
 }

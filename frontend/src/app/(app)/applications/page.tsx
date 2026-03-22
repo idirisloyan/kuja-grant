@@ -4,12 +4,20 @@ import { useRouter } from 'next/navigation';
 import { useApplications } from '@/lib/hooks/use-api';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { ScoreRing } from '@/components/shared/score-ring';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+
 import { FileText, Eye, ArrowRight, Inbox } from 'lucide-react';
 
 function formatDate(dateStr: string | null): string {
@@ -25,102 +33,116 @@ export default function ApplicationsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-8 w-full" />
+      <Stack spacing={3}>
+        <Skeleton variant="text" width={260} height={40} />
+        <Skeleton variant="rounded" height={36} sx={{ borderRadius: 2 }} />
         {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-14 w-full" />
+          <Skeleton key={i} variant="rounded" height={56} sx={{ borderRadius: 2 }} />
         ))}
-      </div>
+      </Stack>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <Stack spacing={3}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">My Applications</h1>
-          <p className="text-sm text-slate-500 mt-1">
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { sm: 'center' }, justifyContent: 'space-between', gap: 2 }}>
+        <Box>
+          <Typography variant="h2" sx={{ color: 'text.primary' }}>
+            My Applications
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
             {applications.length} application{applications.length !== 1 ? 's' : ''}
-          </p>
-        </div>
+          </Typography>
+        </Box>
         <Button
-          className="gap-2 bg-brand-600 hover:bg-brand-700"
+          variant="contained"
+          startIcon={<FileText size={16} />}
           onClick={() => router.push('/grants')}
         >
-          <FileText className="w-4 h-4" /> Browse Grants
+          Browse Grants
         </Button>
-      </div>
+      </Box>
 
       {/* Applications Table */}
       {applications.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center">
-            <Inbox className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-medium">No applications yet</p>
-            <p className="text-sm text-slate-400 mt-1">Browse available grants to get started</p>
+          <CardContent sx={{ py: 8, textAlign: 'center' }}>
+            <Inbox size={48} color="#CBD5E1" style={{ margin: '0 auto 12px' }} />
+            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>No applications yet</Typography>
+            <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>Browse available grants to get started</Typography>
             <Button
-              variant="outline"
-              className="mt-4 gap-2"
+              variant="outlined"
+              size="small"
+              endIcon={<ArrowRight size={16} />}
               onClick={() => router.push('/grants')}
+              sx={{ mt: 2 }}
             >
-              Browse Grants <ArrowRight className="w-4 h-4" />
+              Browse Grants
             </Button>
           </CardContent>
         </Card>
       ) : (
         <Card>
-          <CardContent className="p-0">
+          <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
             <Table>
-              <TableHeader>
+              <TableHead>
                 <TableRow>
-                  <TableHead>Grant</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-center">AI Score</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableCell>Grant</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell align="center">AI Score</TableCell>
+                  <TableCell>Submitted</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
-              </TableHeader>
+              </TableHead>
               <TableBody>
                 {applications.map((app) => (
-                  <TableRow key={app.id} className="cursor-pointer" onClick={() => router.push(`/applications/${app.id}`)}>
+                  <TableRow
+                    key={app.id}
+                    hover
+                    sx={{ cursor: 'pointer' }}
+                    onClick={() => router.push(`/applications/${app.id}`)}
+                  >
                     <TableCell>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
                           {app.grant_title || `Grant #${app.grant_id}`}
-                        </p>
+                        </Typography>
                         {app.org_name && (
-                          <p className="text-xs text-slate-500 mt-0.5">{app.org_name}</p>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}>
+                            {app.org_name}
+                          </Typography>
                         )}
-                      </div>
+                      </Box>
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={app.status} />
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell align="center">
                       {app.ai_score !== null && app.ai_score !== undefined ? (
-                        <div className="flex justify-center">
+                        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                           <ScoreRing score={Math.round(app.ai_score)} size={40} strokeWidth={3} />
-                        </div>
+                        </Box>
                       ) : (
-                        <span className="text-xs text-slate-400">-</span>
+                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>-</Typography>
                       )}
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm text-slate-600">{formatDate(app.submitted_at)}</span>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        {formatDate(app.submitted_at)}
+                      </Typography>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell align="right">
                       <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1 text-brand-600"
+                        size="small"
+                        startIcon={<Eye size={16} />}
                         onClick={(e) => {
                           e.stopPropagation();
                           router.push(`/applications/${app.id}`);
                         }}
+                        sx={{ color: 'primary.main' }}
                       >
-                        <Eye className="w-4 h-4" /> View
+                        View
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -130,6 +152,6 @@ export default function ApplicationsPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+    </Stack>
   );
 }
