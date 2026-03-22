@@ -278,13 +278,6 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
   const pendingReviews = Number(s.pending_reviews) || 0;
   const totalAwarded = Number(s.total_awarded) || 0;
 
-  const chartData = useMemo(() => {
-    return ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'].map((m) => ({
-      month: m,
-      value: Math.max(1, totalApps + Math.floor(Math.random() * 5) - 2),
-    }));
-  }, [totalApps]);
-
   return (
     <Grid container spacing={3}>
       <Grid size={12}>
@@ -322,48 +315,101 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
         <MetricCard icon={TrendingUp} label="Total Awarded" value={`$${(totalAwarded / 1000).toFixed(0)}K`} color="#10B981" bgColor="#ECFDF5" />
       </Grid>
 
+      {/* My Grants List */}
       <Grid size={{ xs: 12, lg: 8 }}>
         <Card sx={{ height: '100%' }}>
-          <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Applications Received</Typography>
-            <Box sx={{ height: 280 }}>
-              <BarChart
-                xAxis={[{ data: chartData.map(d => d.month), scaleType: 'band' }]}
-                series={[{ data: chartData.map(d => d.value), color: '#10B981', label: 'Applications' }]}
-                height={280}
-                margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
-                borderRadius={6}
-              />
+          <CardContent sx={{ p: 0 }}>
+            <Box sx={{ p: 3, pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>My Grants</Typography>
+              <Button size="small" onClick={() => router.push('/grants')} endIcon={<ChevronRight size={14} />}>
+                View all
+              </Button>
             </Box>
+            {Array.isArray(s.recent_grants) && (s.recent_grants as Array<Record<string, unknown>>).length > 0 ? (
+              <List disablePadding>
+                {(s.recent_grants as Array<Record<string, unknown>>).slice(0, 5).map((g, i) => (
+                  <ListItem key={i} disablePadding divider={i < Math.min((s.recent_grants as Array<unknown>).length, 5) - 1}>
+                    <ListItemButton onClick={() => router.push(`/grants/${g.id}`)} sx={{ py: 1.5, px: 3 }}>
+                      <ListItemText
+                        primary={String(g.title || 'Untitled Grant')}
+                        primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
+                        secondary={`$${((Number(g.total_funding) || 0) / 1000).toFixed(0)}K \u00B7 ${Number(g.application_count) || 0} applications`}
+                        secondaryTypographyProps={{ variant: 'caption' }}
+                      />
+                      <StatusBadge status={String(g.status || 'draft')} />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Box sx={{ py: 4, textAlign: 'center', px: 3 }}>
+                <Typography variant="body2" color="text.secondary">No grants yet</Typography>
+                <Button size="small" variant="outlined" onClick={() => router.push('/grants/new')} sx={{ mt: 1 }}>
+                  Create Your First Grant
+                </Button>
+              </Box>
+            )}
           </CardContent>
         </Card>
       </Grid>
 
+      {/* Risk & Quick Actions */}
       <Grid size={{ xs: 12, lg: 4 }}>
-        <Card sx={{ height: '100%' }}>
-          <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Quick Actions</Typography>
-            <Stack spacing={1.5}>
-              {[
-                { icon: PlusCircle, label: 'Create New Grant', href: '/grants/new', color: '#4F46E5' },
-                { icon: Star, label: 'Review Applications', href: '/reviews', color: '#F59E0B' },
-                { icon: BarChart3, label: 'Grant Reports', href: '/reports', color: '#3B82F6' },
-                { icon: Shield, label: 'Compliance Dashboard', href: '/compliance', color: '#10B981' },
-              ].map(({ icon: I, label, href, color }) => (
-                <Button
-                  key={label}
-                  fullWidth
-                  variant="outlined"
-                  startIcon={<I size={18} color={color} />}
-                  onClick={() => router.push(href)}
-                  sx={{ justifyContent: 'flex-start', py: 1.5, borderColor: 'divider', color: 'text.primary', '&:hover': { borderColor: color, bgcolor: `${color}08` } }}
-                >
-                  {label}
-                </Button>
-              ))}
-            </Stack>
-          </CardContent>
-        </Card>
+        <Stack spacing={2} sx={{ height: '100%' }}>
+          {/* Risk Items */}
+          <Card sx={{ borderLeft: '4px solid #EF4444' }}>
+            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>Attention Required</Typography>
+              <Stack spacing={1}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">Overdue reports</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: Number(s.overdue_reports) ? 'error.main' : 'text.secondary' }}>
+                    {Number(s.overdue_reports) || 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">Reports due this month</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'warning.main' }}>
+                    {Number(s.reports_due_soon) || 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">Flagged compliance</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: Number(s.flagged_compliance) ? 'error.main' : 'text.secondary' }}>
+                    {Number(s.flagged_compliance) || 0}
+                  </Typography>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card sx={{ flex: 1 }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>Quick Actions</Typography>
+              <Stack spacing={1}>
+                {[
+                  { icon: PlusCircle, label: 'Create New Grant', href: '/grants/new', color: '#4F46E5' },
+                  { icon: Star, label: 'Review Applications', href: '/reviews', color: '#F59E0B' },
+                  { icon: BarChart3, label: 'Grant Reports', href: '/reports', color: '#3B82F6' },
+                  { icon: Shield, label: 'Compliance', href: '/compliance', color: '#10B981' },
+                ].map(({ icon: I, label, href, color }) => (
+                  <Button
+                    key={label}
+                    fullWidth
+                    variant="outlined"
+                    size="small"
+                    startIcon={<I size={16} color={color} />}
+                    onClick={() => router.push(href)}
+                    sx={{ justifyContent: 'flex-start', py: 1, borderColor: 'divider', color: 'text.primary', fontSize: '0.8125rem', '&:hover': { borderColor: color, bgcolor: `${color}08` } }}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </Stack>
+            </CardContent>
+          </Card>
+        </Stack>
       </Grid>
     </Grid>
   );

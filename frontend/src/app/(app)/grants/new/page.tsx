@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { toast } from 'sonner';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -26,11 +27,13 @@ import IconButton from '@mui/material/IconButton';
 import Slider from '@mui/material/Slider';
 import InputAdornment from '@mui/material/InputAdornment';
 import Alert from '@mui/material/Alert';
-import Divider from '@mui/material/Divider';
+import CircularProgress from '@mui/material/CircularProgress';
+import LinearProgress from '@mui/material/LinearProgress';
 
 import {
   ArrowLeft, ArrowRight, Check, Plus, Trash2, Info,
   FileText, DollarSign, ClipboardList, Upload, BarChart3, Send,
+  Sparkles, CheckCircle2, CloudUpload, X,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -38,25 +41,25 @@ import {
 // ---------------------------------------------------------------------------
 
 const STEPS = [
+  { label: 'Upload Document', icon: CloudUpload },
   { label: 'Basic Info', icon: FileText },
   { label: 'Eligibility', icon: ClipboardList },
   { label: 'Evaluation', icon: BarChart3 },
   { label: 'Documents', icon: Upload },
-  { label: 'Reporting', icon: FileText },
-  { label: 'Review', icon: Send },
+  { label: 'Review & Publish', icon: Send },
 ];
 
 const SECTOR_OPTIONS = [
-  'Health', 'Education', 'WASH', 'Food Security', 'Livelihoods',
-  'Protection', 'Shelter', 'Gender Equality', 'Climate', 'Governance',
+  'Health', 'Education', 'WASH', 'Climate', 'Protection',
+  'Nutrition', 'Livelihoods', 'Governance', 'Agriculture', 'Gender Equality',
 ];
 
 const COUNTRY_OPTIONS = [
-  'Kenya', 'Nigeria', 'South Africa', 'Uganda', 'Tanzania',
-  'Somalia', 'Ethiopia', 'Sudan', 'Mozambique', 'DRC',
+  'Kenya', 'Somalia', 'Ethiopia', 'Uganda', 'Tanzania',
+  'South Sudan', 'Nigeria', 'South Africa',
 ];
 
-const CURRENCY_OPTIONS = ['USD', 'EUR', 'GBP', 'KES', 'NGN', 'ZAR'];
+const CURRENCY_OPTIONS = ['USD', 'EUR', 'GBP', 'KES', 'CHF'];
 
 const ELIGIBILITY_CATEGORIES = [
   { key: 'geographic', label: 'Geographic Requirements' },
@@ -68,21 +71,20 @@ const ELIGIBILITY_CATEGORIES = [
 ];
 
 const DOC_TYPES = [
-  { key: 'financial_report', label: 'Financial Report' },
-  { key: 'registration', label: 'Registration Certificate' },
-  { key: 'audit', label: 'Audit Report' },
-  { key: 'PSEA', label: 'PSEA Policy' },
-  { key: 'project_report', label: 'Project Report' },
-  { key: 'budget', label: 'Budget Template' },
-  { key: 'CV', label: 'Key Personnel CVs' },
-  { key: 'strategic_plan', label: 'Strategic Plan' },
+  { key: 'financial_report', label: 'Financial Report', icon: '📊' },
+  { key: 'registration', label: 'Registration Certificate', icon: '📋' },
+  { key: 'audit', label: 'Audit Report', icon: '🔍' },
+  { key: 'PSEA', label: 'PSEA Policy', icon: '🛡' },
+  { key: 'project_report', label: 'Project Reports', icon: '📄' },
+  { key: 'budget', label: 'Detailed Budget', icon: '💰' },
+  { key: 'CV', label: 'Staff CVs', icon: '👤' },
+  { key: 'strategic_plan', label: 'Strategic Plan', icon: '🗺' },
 ];
 
-const FREQUENCY_OPTIONS = ['monthly', 'quarterly', 'semi-annual', 'annual'];
-const REPORT_TYPE_OPTIONS = ['narrative', 'financial', 'monitoring', 'audit', 'compliance'];
+const ACCEPTED_FILE_TYPES = '.pdf,.doc,.docx,.txt';
 
 // ---------------------------------------------------------------------------
-// Form State Types
+// Types
 // ---------------------------------------------------------------------------
 
 interface BasicInfo {
@@ -109,26 +111,41 @@ interface CriterionItem {
   weight: number;
   description: string;
   instructions: string;
-  example: string;
   max_words: number;
 }
 
 interface DocReqItem {
   key: string;
   label: string;
+  icon: string;
+  enabled: boolean;
+  specific_requirements: string;
   required: boolean;
 }
 
-interface ReportReqItem {
-  title: string;
-  type: string;
-  description: string;
-  frequency: string;
-  due_days: number;
+interface ExtractedData {
+  requirements?: Array<{ title?: string; type?: string; description?: string; frequency?: string }>;
+  template_sections?: Array<{ name?: string; description?: string }>;
+  indicators?: Array<{ name?: string; description?: string; target?: string }>;
+}
+
+interface GrantCreateResponse {
+  success: boolean;
+  grant: { id: number; title?: string; description?: string };
+}
+
+interface UploadResponse {
+  success: boolean;
+  grant: Record<string, unknown>;
+  extracted?: ExtractedData;
+}
+
+interface AIChatResponse {
+  response: string;
 }
 
 // ---------------------------------------------------------------------------
-// Multi-Select Toggle Component (MUI Chips)
+// Multi-Select Toggle Component
 // ---------------------------------------------------------------------------
 
 function MultiSelectToggle({
@@ -176,11 +193,26 @@ function MultiSelectToggle({
 
 export default function CreateGrantPage() {
   const router = useRouter();
-  const [step, setStep] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Step 1: Basic Info
+  // Wizard state
+  const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
+  // Grant ID (created on first upload or manual draft creation)
+  const [grantId, setGrantId] = useState<number | null>(null);
+
+  // Upload state
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [extracted, setExtracted] = useState<ExtractedData | null>(null);
+  const [uploadError, setUploadError] = useState('');
+
+  // AI suggestion state
+  const [suggestingCriteria, setSuggestingCriteria] = useState(false);
+
+  // Step 2: Basic Info
   const [basic, setBasic] = useState<BasicInfo>({
     title: '',
     description: '',
@@ -191,7 +223,7 @@ export default function CreateGrantPage() {
     countries: [],
   });
 
-  // Step 2: Eligibility
+  // Step 3: Eligibility
   const [eligibility, setEligibility] = useState<EligibilityItem[]>(
     ELIGIBILITY_CATEGORIES.map((c) => ({
       key: c.key,
@@ -202,22 +234,188 @@ export default function CreateGrantPage() {
     })),
   );
 
-  // Step 3: Criteria
+  // Step 4: Criteria
   const [criteria, setCriteria] = useState<CriterionItem[]>([
-    { key: 'criterion_1', label: '', weight: 100, description: '', instructions: '', example: '', max_words: 500 },
+    { key: 'criterion_1', label: '', weight: 100, description: '', instructions: '', max_words: 500 },
   ]);
 
-  // Step 4: Document Requirements
+  // Step 5: Document Requirements
   const [docReqs, setDocReqs] = useState<DocReqItem[]>(
-    DOC_TYPES.map((d) => ({ key: d.key, label: d.label, required: false })),
+    DOC_TYPES.map((d) => ({
+      key: d.key,
+      label: d.label,
+      icon: d.icon,
+      enabled: false,
+      specific_requirements: '',
+      required: true,
+    })),
   );
 
-  // Step 5: Reporting
-  const [reportingFrequency, setReportingFrequency] = useState('quarterly');
-  const [reportReqs, setReportReqs] = useState<ReportReqItem[]>([]);
+  // ---------------------------------------------------------------------------
+  // File Upload Handler (AI-First)
+  // ---------------------------------------------------------------------------
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
+    setUploadError('');
+    setUploadedFileName(file.name);
+
+    try {
+      // Step 1: Create a draft grant if we don't have one yet
+      let id = grantId;
+      if (!id) {
+        const grantTitle = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+        const res = await api.post<GrantCreateResponse>('/grants/', { title: grantTitle });
+        if (res.success) {
+          id = res.grant.id;
+          setGrantId(id);
+        } else {
+          throw new Error('Failed to create draft grant');
+        }
+      }
+
+      // Step 2: Upload the grant document for AI extraction
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes = await fetch(`/api/grants/${id}/upload-grant-doc`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => ({ error: 'Upload failed' }));
+        throw new Error((errData as { error?: string }).error || `HTTP ${uploadRes.status}`);
+      }
+
+      const data = (await uploadRes.json()) as UploadResponse;
+
+      if (data.success) {
+        const extractedData = data.extracted || null;
+        setExtracted(extractedData);
+
+        // Pre-fill basic info from extracted data if the grant response has useful fields
+        const grantData = data.grant as Record<string, unknown>;
+        if (grantData) {
+          setBasic((prev) => ({
+            ...prev,
+            title: (grantData.title as string) || prev.title || file.name.replace(/\.[^.]+$/, ''),
+            description: (grantData.description as string) || prev.description,
+          }));
+        }
+
+        // Pre-fill eligibility from extracted requirements
+        if (extractedData?.requirements && extractedData.requirements.length > 0) {
+          setEligibility((prev) =>
+            prev.map((e) => {
+              const match = extractedData.requirements?.find(
+                (r) => r.type?.toLowerCase().includes(e.key) || r.title?.toLowerCase().includes(e.key),
+              );
+              if (match) {
+                return { ...e, enabled: true, details: match.description || match.title || '' };
+              }
+              return e;
+            }),
+          );
+        }
+
+        const reqCount = extractedData?.requirements?.length || 0;
+        const indCount = extractedData?.indicators?.length || 0;
+        toast.success(
+          `AI extracted ${reqCount} reporting requirement${reqCount !== 1 ? 's' : ''} and ${indCount} indicator${indCount !== 1 ? 's' : ''}`,
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upload failed';
+      setUploadError(msg);
+      toast.error(msg);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileUpload(file);
+  }, [grantId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileUpload(file);
+  }, [grantId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
-  // Handlers
+  // Auto-Save on Step Change
+  // ---------------------------------------------------------------------------
+
+  const autoSave = async () => {
+    if (!grantId) return;
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        title: basic.title,
+        description: basic.description,
+        total_funding: basic.total_funding ? Number(basic.total_funding) : null,
+        currency: basic.currency,
+        deadline: basic.deadline || null,
+        sectors: basic.sectors,
+        countries: basic.countries,
+        eligibility: eligibility
+          .filter((e) => e.enabled)
+          .map((e) => ({ key: e.key, label: e.label, details: e.details, weight: e.weight, required: true })),
+        criteria: criteria
+          .filter((c) => c.label.trim())
+          .map((c, i) => ({
+            key: `criterion_${i + 1}`,
+            label: c.label,
+            weight: c.weight,
+            description: c.description,
+            instructions: c.instructions,
+            max_words: c.max_words,
+          })),
+        doc_requirements: docReqs
+          .filter((d) => d.enabled)
+          .map((d) => ({
+            key: d.key,
+            label: d.label,
+            required: d.required,
+            specific_requirements: d.specific_requirements,
+          })),
+      };
+      await api.put(`/grants/${grantId}`, payload);
+    } catch {
+      // Silent fail for auto-save; user can still proceed
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const goNext = async () => {
+    // Ensure a draft exists before leaving step 0
+    if (step === 0 && !grantId) {
+      try {
+        const res = await api.post<GrantCreateResponse>('/grants/', { title: 'Draft Grant' });
+        if (res.success) setGrantId(res.grant.id);
+      } catch {
+        toast.error('Failed to create draft grant');
+        return;
+      }
+    }
+
+    // Auto-save current step data
+    if (grantId && step > 0) {
+      await autoSave();
+    }
+
+    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  };
+
+  const goBack = () => setStep((s) => Math.max(0, s - 1));
+
+  // ---------------------------------------------------------------------------
+  // Form Handlers
   // ---------------------------------------------------------------------------
 
   const updateBasic = useCallback((field: keyof BasicInfo, value: string | string[]) => {
@@ -245,7 +443,6 @@ export default function CreateGrantPage() {
         weight: 0,
         description: '',
         instructions: '',
-        example: '',
         max_words: 500,
       },
     ]);
@@ -264,692 +461,919 @@ export default function CreateGrantPage() {
 
   const toggleDocReq = (index: number) => {
     setDocReqs((prev) =>
-      prev.map((d, i) => (i === index ? { ...d, required: !d.required } : d)),
+      prev.map((d, i) => (i === index ? { ...d, enabled: !d.enabled } : d)),
     );
   };
 
-  const addReportReq = () => {
-    setReportReqs((prev) => [
-      ...prev,
-      { title: '', type: 'narrative', description: '', frequency: 'quarterly', due_days: 30 },
-    ]);
-  };
-
-  const removeReportReq = (index: number) => {
-    setReportReqs((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const updateReportReq = (index: number, field: keyof ReportReqItem, value: string | number) => {
-    setReportReqs((prev) =>
-      prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)),
+  const updateDocReq = (index: number, field: 'specific_requirements' | 'required', value: string | boolean) => {
+    setDocReqs((prev) =>
+      prev.map((d, i) => (i === index ? { ...d, [field]: value } : d)),
     );
   };
 
   const criteriaWeightTotal = criteria.reduce((sum, c) => sum + c.weight, 0);
 
   // ---------------------------------------------------------------------------
-  // Publish
+  // AI Suggest Criteria
   // ---------------------------------------------------------------------------
+
+  const handleSuggestCriteria = async () => {
+    setSuggestingCriteria(true);
+    try {
+      const sectorsText = basic.sectors.length > 0 ? basic.sectors.join(', ') : 'humanitarian';
+      const titleText = basic.title || 'a humanitarian grant';
+      const message = `Suggest 5 evaluation criteria for a grant titled "${titleText}" in the sectors: ${sectorsText}. For each criterion, provide: label, weight (percentages totaling 100), description, instructions for applicants, and recommended max words. Format as JSON array with keys: label, weight, description, instructions, max_words.`;
+
+      const res = await api.post<AIChatResponse>('/ai/chat', {
+        message,
+        context: { page: 'grant_wizard' },
+      });
+
+      if (res.response) {
+        // Try to parse JSON from the AI response
+        const jsonMatch = res.response.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          try {
+            const parsed = JSON.parse(jsonMatch[0]) as Array<{
+              label?: string;
+              weight?: number;
+              description?: string;
+              instructions?: string;
+              max_words?: number;
+            }>;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setCriteria(
+                parsed.map((item, i) => ({
+                  key: `criterion_${i + 1}`,
+                  label: item.label || '',
+                  weight: item.weight || 20,
+                  description: item.description || '',
+                  instructions: item.instructions || '',
+                  max_words: item.max_words || 500,
+                })),
+              );
+              toast.success(`AI suggested ${parsed.length} evaluation criteria`);
+            }
+          } catch {
+            toast.error('Could not parse AI suggestions. Please add criteria manually.');
+          }
+        } else {
+          toast.error('AI response did not contain structured criteria. Please add criteria manually.');
+        }
+      }
+    } catch {
+      toast.error('AI suggestion failed. Please add criteria manually.');
+    } finally {
+      setSuggestingCriteria(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Publish / Save Draft
+  // ---------------------------------------------------------------------------
+
+  const handleSaveDraft = async () => {
+    setSaving(true);
+    try {
+      if (!grantId) {
+        const res = await api.post<GrantCreateResponse>('/grants/', {
+          title: basic.title || 'Draft Grant',
+        });
+        if (res.success) setGrantId(res.grant.id);
+      }
+      await autoSave();
+      toast.success('Grant saved as draft');
+    } catch {
+      toast.error('Failed to save draft');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handlePublish = async () => {
-    setSubmitting(true);
-    setError('');
-    try {
-      const payload = {
-        title: basic.title,
-        description: basic.description,
-        total_funding: basic.total_funding ? Number(basic.total_funding) : null,
-        currency: basic.currency,
-        deadline: basic.deadline || null,
-        sectors: basic.sectors,
-        countries: basic.countries,
-        eligibility: eligibility
-          .filter((e) => e.enabled)
-          .map((e) => ({ key: e.key, label: e.label, details: e.details, weight: e.weight, required: true })),
-        criteria: criteria
-          .filter((c) => c.label.trim())
-          .map((c, i) => ({
-            key: `criterion_${i + 1}`,
-            label: c.label,
-            weight: c.weight,
-            description: c.description,
-            instructions: c.instructions,
-            example: c.example,
-            max_words: c.max_words,
-          })),
-        doc_requirements: docReqs
-          .filter((d) => d.required)
-          .map((d) => ({ key: d.key, label: d.label, required: true })),
-        reporting_frequency: reportingFrequency,
-        reporting_requirements: reportReqs.map((r) => ({
-          title: r.title,
-          type: r.type,
-          description: r.description,
-          frequency: r.frequency,
-          due_days_after_period: r.due_days,
-        })),
-        status: 'open',
-      };
+    if (!grantId) {
+      toast.error('No grant to publish. Please complete the wizard first.');
+      return;
+    }
 
-      await api.post('/grants/', payload);
+    setPublishing(true);
+    try {
+      // Save all data first
+      await autoSave();
+
+      // Then publish
+      await api.post(`/grants/${grantId}/publish`);
+      toast.success('Grant published successfully!');
       router.push('/grants');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create grant');
+      const msg = err instanceof Error ? err.message : 'Failed to publish grant';
+      toast.error(msg);
     } finally {
-      setSubmitting(false);
+      setPublishing(false);
     }
   };
 
   // ---------------------------------------------------------------------------
-  // Render Steps
+  // Step Renderers
   // ---------------------------------------------------------------------------
 
-  const renderStep = () => {
-    switch (step) {
-      case 0:
-        return (
-          <Stack spacing={3}>
-            <TextField
-              label="Grant Title *"
-              placeholder="e.g., Community Health Resilience Program 2026"
-              value={basic.title}
-              onChange={(e) => updateBasic('title', e.target.value)}
-              fullWidth
-              size="small"
-            />
+  const renderStep0Upload = () => (
+    <Stack spacing={3} sx={{ alignItems: 'center', py: 2 }}>
+      {/* Hero section */}
+      <Box sx={{ textAlign: 'center', maxWidth: 560 }}>
+        <Box
+          sx={{
+            width: 64,
+            height: 64,
+            borderRadius: '50%',
+            bgcolor: 'primary.50',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            mx: 'auto',
+            mb: 2,
+          }}
+        >
+          <Sparkles size={32} style={{ color: 'var(--mui-palette-primary-main, #1976d2)' }} />
+        </Box>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mb: 1 }}>
+          Upload Your Grant Agreement
+        </Typography>
+        <Typography variant="body1" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
+          Our AI will extract eligibility requirements, reporting schedules, and KPIs automatically
+          — saving you hours of manual data entry.
+        </Typography>
+      </Box>
 
-            <TextField
-              label="Description"
-              placeholder="Describe the grant purpose, objectives, and target outcomes..."
-              value={basic.description}
-              onChange={(e) => updateBasic('description', e.target.value)}
-              fullWidth
-              multiline
-              minRows={3}
-              size="small"
-            />
+      {/* Upload area */}
+      {!uploadedFileName || uploadError ? (
+        <Box
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onDrop={handleFileDrop}
+          onClick={() => fileInputRef.current?.click()}
+          sx={{
+            width: '100%',
+            maxWidth: 560,
+            border: '2px dashed',
+            borderColor: uploading ? 'primary.main' : 'divider',
+            borderRadius: 3,
+            py: 6,
+            px: 4,
+            textAlign: 'center',
+            cursor: uploading ? 'default' : 'pointer',
+            transition: 'all 0.2s ease',
+            bgcolor: uploading ? 'primary.50' : 'background.default',
+            '&:hover': uploading
+              ? {}
+              : {
+                  borderColor: 'primary.light',
+                  bgcolor: 'action.hover',
+                },
+          }}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_FILE_TYPES}
+            onChange={handleFileSelect}
+            style={{ display: 'none' }}
+          />
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2 }}>
-              <TextField
-                label="Funding Amount"
-                type="number"
-                placeholder="500000"
-                value={basic.total_funding}
-                onChange={(e) => updateBasic('total_funding', e.target.value)}
-                size="small"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <DollarSign size={16} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              <FormControl size="small">
-                <InputLabel>Currency</InputLabel>
-                <Select
-                  label="Currency"
-                  value={basic.currency}
-                  onChange={(e) => updateBasic('currency', e.target.value)}
-                >
-                  {CURRENCY_OPTIONS.map((c) => (
-                    <MenuItem key={c} value={c}>{c}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                label="Application Deadline"
-                type="date"
-                value={basic.deadline}
-                onChange={(e) => updateBasic('deadline', e.target.value)}
-                size="small"
-                InputLabelProps={{ shrink: true }}
-              />
-            </Box>
-
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mb: 1 }}>
-                Sectors
+          {uploading ? (
+            <Stack spacing={2} sx={{ alignItems: 'center' }}>
+              <CircularProgress size={48} />
+              <Typography variant="body1" sx={{ fontWeight: 500, color: 'primary.main' }}>
+                AI is analyzing your document...
               </Typography>
-              <MultiSelectToggle
-                options={SECTOR_OPTIONS}
-                selected={basic.sectors}
-                onChange={(val) => updateBasic('sectors', val)}
-              />
-            </Box>
-
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mb: 1 }}>
-                Target Countries
-              </Typography>
-              <MultiSelectToggle
-                options={COUNTRY_OPTIONS}
-                selected={basic.countries}
-                onChange={(val) => updateBasic('countries', val)}
-              />
-            </Box>
-          </Stack>
-        );
-
-      case 1:
-        return (
-          <Stack spacing={2}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Toggle the eligibility categories you want applicants to meet. Add details and set relative weights.
-            </Typography>
-            {eligibility.map((item, i) => (
-              <Card
-                key={item.key}
-                sx={{
-                  borderColor: item.enabled ? 'primary.light' : 'divider',
-                  bgcolor: item.enabled ? 'primary.50' : 'background.paper',
-                }}
-              >
-                <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: item.enabled ? 1.5 : 0 }}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={item.enabled}
-                          onChange={() => toggleEligibility(i)}
-                          size="small"
-                        />
-                      }
-                      label={
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontWeight: 500,
-                            color: item.enabled ? 'text.primary' : 'text.disabled',
-                          }}
-                        >
-                          {item.label}
-                        </Typography>
-                      }
-                    />
-                    {item.enabled && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                          Weight:
-                        </Typography>
-                        <Slider
-                          value={item.weight}
-                          onChange={(_, val) => updateEligibility(i, 'weight', val as number)}
-                          min={0}
-                          max={100}
-                          size="small"
-                          sx={{ width: 100 }}
-                        />
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', minWidth: 40, textAlign: 'right' }}>
-                          {item.weight}%
-                        </Typography>
-                      </Box>
-                    )}
-                  </Box>
-                  {item.enabled && (
-                    <Box sx={{ ml: 6 }}>
-                      <TextField
-                        placeholder="Describe specific requirements..."
-                        value={item.details}
-                        onChange={(e) => updateEligibility(i, 'details', e.target.value)}
-                        fullWidth
-                        size="small"
-                      />
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </Stack>
-        );
-
-      case 2:
-        return (
-          <Stack spacing={2}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Define the criteria reviewers will use to evaluate applications.
+                Extracting requirements, KPIs, and reporting schedules
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontWeight: 500,
-                    color: criteriaWeightTotal === 100 ? 'success.main' : 'error.main',
-                  }}
-                >
-                  Total Weight: {criteriaWeightTotal}%
-                  {criteriaWeightTotal !== 100 && ' (must equal 100%)'}
-                </Typography>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<Plus size={14} />}
-                  onClick={addCriterion}
-                >
-                  Add
-                </Button>
+              <LinearProgress sx={{ width: '80%', mt: 1, borderRadius: 1 }} />
+            </Stack>
+          ) : (
+            <Stack spacing={1.5} sx={{ alignItems: 'center' }}>
+              <CloudUpload size={48} style={{ color: '#94a3b8' }} />
+              <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                Drag & drop your grant document here
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                or click to browse
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                {['PDF', 'DOC', 'DOCX', 'TXT'].map((fmt) => (
+                  <Chip
+                    key={fmt}
+                    label={fmt}
+                    size="small"
+                    variant="outlined"
+                    sx={{ fontSize: '0.75rem', color: 'text.secondary' }}
+                  />
+                ))}
               </Box>
-            </Box>
+            </Stack>
+          )}
+        </Box>
+      ) : null}
 
-            {criteria.map((criterion, i) => (
-              <Card key={i}>
-                <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
-                  <Stack spacing={2}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-                        Criterion {i + 1}
-                      </Typography>
-                      {criteria.length > 1 && (
-                        <IconButton
-                          size="small"
-                          onClick={() => removeCriterion(i)}
-                          sx={{ color: 'error.main' }}
-                        >
-                          <Trash2 size={14} />
-                        </IconButton>
-                      )}
-                    </Box>
+      {/* Upload error */}
+      {uploadError && (
+        <Alert severity="error" sx={{ width: '100%', maxWidth: 560 }}>
+          {uploadError}
+        </Alert>
+      )}
 
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '3fr 1fr' }, gap: 2 }}>
-                      <TextField
-                        label="Label *"
-                        placeholder="e.g., Technical Approach"
-                        value={criterion.label}
-                        onChange={(e) => updateCriterion(i, 'label', e.target.value)}
-                        size="small"
-                        fullWidth
-                      />
-                      <TextField
-                        label="Weight %"
-                        type="number"
-                        inputProps={{ min: 0, max: 100 }}
-                        value={criterion.weight}
-                        onChange={(e) => updateCriterion(i, 'weight', Number(e.target.value))}
-                        size="small"
-                      />
-                    </Box>
+      {/* Upload success */}
+      {uploadedFileName && !uploadError && !uploading && (
+        <Card
+          sx={{
+            width: '100%',
+            maxWidth: 560,
+            border: '1px solid',
+            borderColor: 'success.light',
+            bgcolor: 'success.50',
+          }}
+        >
+          <CardContent sx={{ py: 3, '&:last-child': { pb: 3 } }}>
+            <Stack spacing={2}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <CheckCircle2 size={24} style={{ color: '#16a34a' }} />
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.dark' }}>
+                    Document analyzed successfully
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    {uploadedFileName}
+                  </Typography>
+                </Box>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setUploadedFileName(null);
+                    setExtracted(null);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  <X size={16} />
+                </IconButton>
+              </Box>
 
-                    <TextField
-                      label="Description"
-                      placeholder="What should applicants address..."
-                      value={criterion.description}
-                      onChange={(e) => updateCriterion(i, 'description', e.target.value)}
-                      fullWidth
-                      multiline
-                      minRows={2}
-                      size="small"
-                    />
-
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-                      <TextField
-                        label="Instructions for Applicants"
-                        placeholder="Guidance on how to respond..."
-                        value={criterion.instructions}
-                        onChange={(e) => updateCriterion(i, 'instructions', e.target.value)}
-                        fullWidth
-                        multiline
-                        minRows={2}
-                        size="small"
-                      />
-                      <TextField
-                        label="Example Response"
-                        placeholder="An example of a strong response..."
-                        value={criterion.example}
-                        onChange={(e) => updateCriterion(i, 'example', e.target.value)}
-                        fullWidth
-                        multiline
-                        minRows={2}
-                        size="small"
-                      />
-                    </Box>
-
-                    <TextField
-                      label="Max Words"
-                      type="number"
-                      inputProps={{ min: 50, max: 5000 }}
-                      value={criterion.max_words}
-                      onChange={(e) => updateCriterion(i, 'max_words', Number(e.target.value))}
-                      size="small"
-                      sx={{ maxWidth: 140 }}
-                    />
-                  </Stack>
-                </CardContent>
-              </Card>
-            ))}
-          </Stack>
-        );
-
-      case 3:
-        return (
-          <Stack spacing={2}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Select which documents applicants must upload with their application.
-            </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-              {docReqs.map((doc, i) => (
-                <Card
-                  key={doc.key}
-                  onClick={() => toggleDocReq(i)}
+              {extracted && (
+                <Box
                   sx={{
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    borderColor: doc.required ? 'primary.light' : 'divider',
-                    bgcolor: doc.required ? 'primary.50' : 'background.paper',
-                    '&:hover': {
-                      borderColor: doc.required ? 'primary.main' : 'action.hover',
-                    },
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 2,
+                    pt: 1,
                   }}
                 >
-                  <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                      {extracted.requirements?.length || 0}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Requirements
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                      {extracted.template_sections?.length || 0}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Sections
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                      {extracted.indicators?.length || 0}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Indicators
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Skip link */}
+      <Button
+        variant="text"
+        size="small"
+        onClick={goNext}
+        sx={{ color: 'text.secondary', textTransform: 'none', mt: 1 }}
+      >
+        Skip — I&apos;ll enter details manually
+      </Button>
+    </Stack>
+  );
+
+  const renderStep1BasicInfo = () => (
+    <Stack spacing={3}>
+      {extracted && (
+        <Alert severity="info" icon={<Sparkles size={18} />} sx={{ mb: 1 }}>
+          Fields below have been pre-filled from your uploaded document. Review and adjust as needed.
+        </Alert>
+      )}
+
+      <TextField
+        label="Grant Title *"
+        placeholder="e.g., Community Health Resilience Program 2026"
+        value={basic.title}
+        onChange={(e) => updateBasic('title', e.target.value)}
+        fullWidth
+        size="small"
+      />
+
+      <TextField
+        label="Description"
+        placeholder="Describe the grant purpose, objectives, and target outcomes..."
+        value={basic.description}
+        onChange={(e) => updateBasic('description', e.target.value)}
+        fullWidth
+        multiline
+        minRows={4}
+        size="small"
+      />
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2 }}>
+        <TextField
+          label="Total Funding Amount"
+          type="number"
+          placeholder="500000"
+          value={basic.total_funding}
+          onChange={(e) => updateBasic('total_funding', e.target.value)}
+          size="small"
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <DollarSign size={16} />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <FormControl size="small">
+          <InputLabel>Currency</InputLabel>
+          <Select
+            label="Currency"
+            value={basic.currency}
+            onChange={(e) => updateBasic('currency', e.target.value)}
+          >
+            {CURRENCY_OPTIONS.map((c) => (
+              <MenuItem key={c} value={c}>{c}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <TextField
+          label="Application Deadline"
+          type="date"
+          value={basic.deadline}
+          onChange={(e) => updateBasic('deadline', e.target.value)}
+          size="small"
+          InputLabelProps={{ shrink: true }}
+        />
+      </Box>
+
+      <Box>
+        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mb: 1 }}>
+          Sectors
+        </Typography>
+        <MultiSelectToggle
+          options={SECTOR_OPTIONS}
+          selected={basic.sectors}
+          onChange={(val) => updateBasic('sectors', val)}
+        />
+      </Box>
+
+      <Box>
+        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mb: 1 }}>
+          Target Countries
+        </Typography>
+        <MultiSelectToggle
+          options={COUNTRY_OPTIONS}
+          selected={basic.countries}
+          onChange={(val) => updateBasic('countries', val)}
+        />
+      </Box>
+    </Stack>
+  );
+
+  const renderStep2Eligibility = () => (
+    <Stack spacing={2}>
+      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+        Toggle the eligibility categories you want applicants to meet. Add details and set relative weights.
+      </Typography>
+
+      {extracted && eligibility.some((e) => e.enabled) && (
+        <Alert severity="info" icon={<Sparkles size={18} />} sx={{ mb: 1 }}>
+          Some requirements have been pre-filled from your uploaded document.
+        </Alert>
+      )}
+
+      {eligibility.map((item, i) => (
+        <Card
+          key={item.key}
+          sx={{
+            border: '1px solid',
+            borderColor: item.enabled ? 'primary.light' : 'divider',
+            bgcolor: item.enabled ? 'primary.50' : 'background.paper',
+          }}
+        >
+          <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                mb: item.enabled ? 1.5 : 0,
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={item.enabled}
+                    onChange={() => toggleEligibility(i)}
+                    size="small"
+                  />
+                }
+                label={
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 500,
+                      color: item.enabled ? 'text.primary' : 'text.disabled',
+                    }}
+                  >
+                    {item.label}
+                  </Typography>
+                }
+              />
+              {item.enabled && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Weight:
+                  </Typography>
+                  <Slider
+                    value={item.weight}
+                    onChange={(_, val) => updateEligibility(i, 'weight', val as number)}
+                    min={0}
+                    max={100}
+                    size="small"
+                    sx={{ width: 100 }}
+                  />
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 600, color: 'primary.main', minWidth: 40, textAlign: 'right' }}
+                  >
+                    {item.weight}%
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+            {item.enabled && (
+              <Box sx={{ ml: 6 }}>
+                <TextField
+                  placeholder="Describe specific requirements..."
+                  value={item.details}
+                  onChange={(e) => updateEligibility(i, 'details', e.target.value)}
+                  fullWidth
+                  size="small"
+                />
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+
+      <Button
+        variant="outlined"
+        size="small"
+        startIcon={<Plus size={14} />}
+        sx={{ alignSelf: 'flex-start' }}
+        onClick={() => {
+          const newKey = `custom_${Date.now()}`;
+          setEligibility((prev) => [
+            ...prev,
+            { key: newKey, label: 'Custom Requirement', enabled: true, details: '', weight: 10 },
+          ]);
+        }}
+      >
+        Add Custom Requirement
+      </Button>
+    </Stack>
+  );
+
+  const renderStep3Evaluation = () => (
+    <Stack spacing={2}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          Define the criteria reviewers will use to evaluate applications.
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: 500,
+              color: criteriaWeightTotal === 100 ? 'success.main' : 'error.main',
+            }}
+          >
+            Total: {criteriaWeightTotal}%
+            {criteriaWeightTotal !== 100 && ' (must = 100%)'}
+          </Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={suggestingCriteria ? <CircularProgress size={14} /> : <Sparkles size={14} />}
+            onClick={handleSuggestCriteria}
+            disabled={suggestingCriteria}
+          >
+            {suggestingCriteria ? 'Suggesting...' : 'AI Suggest Criteria'}
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<Plus size={14} />}
+            onClick={addCriterion}
+          >
+            Add
+          </Button>
+        </Box>
+      </Box>
+
+      {criteria.map((criterion, i) => (
+        <Card key={i} sx={{ border: '1px solid', borderColor: 'divider' }}>
+          <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+            <Stack spacing={2}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+                  Criterion {i + 1}
+                </Typography>
+                {criteria.length > 1 && (
+                  <IconButton size="small" onClick={() => removeCriterion(i)} sx={{ color: 'error.main' }}>
+                    <Trash2 size={14} />
+                  </IconButton>
+                )}
+              </Box>
+
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '3fr 1fr' }, gap: 2 }}>
+                <TextField
+                  label="Label *"
+                  placeholder="e.g., Technical Approach"
+                  value={criterion.label}
+                  onChange={(e) => updateCriterion(i, 'label', e.target.value)}
+                  size="small"
+                  fullWidth
+                />
+                <TextField
+                  label="Weight %"
+                  type="number"
+                  inputProps={{ min: 0, max: 100 }}
+                  value={criterion.weight}
+                  onChange={(e) => updateCriterion(i, 'weight', Number(e.target.value))}
+                  size="small"
+                />
+              </Box>
+
+              <TextField
+                label="Description"
+                placeholder="What should applicants address..."
+                value={criterion.description}
+                onChange={(e) => updateCriterion(i, 'description', e.target.value)}
+                fullWidth
+                multiline
+                minRows={2}
+                size="small"
+              />
+
+              <TextField
+                label="Instructions for Applicants"
+                placeholder="Guidance on how to respond..."
+                value={criterion.instructions}
+                onChange={(e) => updateCriterion(i, 'instructions', e.target.value)}
+                fullWidth
+                multiline
+                minRows={2}
+                size="small"
+              />
+
+              <TextField
+                label="Max Words"
+                type="number"
+                inputProps={{ min: 50, max: 5000 }}
+                value={criterion.max_words}
+                onChange={(e) => updateCriterion(i, 'max_words', Number(e.target.value))}
+                size="small"
+                sx={{ maxWidth: 140 }}
+              />
+            </Stack>
+          </CardContent>
+        </Card>
+      ))}
+    </Stack>
+  );
+
+  const renderStep4Documents = () => (
+    <Stack spacing={2}>
+      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+        Select which documents applicants must upload. Click a card to toggle it on, then add specific requirements.
+      </Typography>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+        {docReqs.map((doc, i) => (
+          <Card
+            key={doc.key}
+            onClick={() => toggleDocReq(i)}
+            sx={{
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              border: '1px solid',
+              borderColor: doc.enabled ? 'primary.light' : 'divider',
+              bgcolor: doc.enabled ? 'primary.50' : 'background.paper',
+              '&:hover': {
+                borderColor: doc.enabled ? 'primary.main' : 'action.hover',
+                boxShadow: 1,
+              },
+            }}
+          >
+            <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Checkbox
+                  checked={doc.enabled}
+                  size="small"
+                  sx={{ p: 0 }}
+                  tabIndex={-1}
+                />
+                <Typography sx={{ fontSize: '1.25rem', lineHeight: 1 }}>{doc.icon}</Typography>
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                    {doc.label}
+                  </Typography>
+                </Box>
+              </Box>
+
+              {doc.enabled && (
+                <Box
+                  sx={{ mt: 1.5, ml: 4.5 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <TextField
+                    placeholder="Specific requirements for this document..."
+                    value={doc.specific_requirements}
+                    onChange={(e) => updateDocReq(i, 'specific_requirements', e.target.value)}
+                    fullWidth
+                    size="small"
+                    sx={{ mb: 1 }}
+                  />
+                  <FormControlLabel
+                    control={
                       <Checkbox
                         checked={doc.required}
+                        onChange={(e) => updateDocReq(i, 'required', e.target.checked)}
                         size="small"
-                        sx={{ p: 0 }}
-                        tabIndex={-1}
                       />
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                          {doc.label}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                          {doc.key}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
-              ))}
-            </Box>
-          </Stack>
-        );
-
-      case 4:
-        return (
-          <Stack spacing={3}>
-            <FormControl size="small" sx={{ maxWidth: 280 }}>
-              <InputLabel>Reporting Frequency</InputLabel>
-              <Select
-                label="Reporting Frequency"
-                value={reportingFrequency}
-                onChange={(e) => setReportingFrequency(e.target.value)}
-              >
-                {FREQUENCY_OPTIONS.map((f) => (
-                  <MenuItem key={f} value={f}>
-                    {f.charAt(0).toUpperCase() + f.slice(1)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                Reporting Requirements
-              </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<Plus size={14} />}
-                onClick={addReportReq}
-              >
-                Add Requirement
-              </Button>
-            </Box>
-
-            {reportReqs.length === 0 && (
-              <Card>
-                <CardContent sx={{ py: 6, textAlign: 'center' }}>
-                  <FileText size={40} style={{ color: '#CBD5E1', margin: '0 auto 8px' }} />
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    No reporting requirements added yet.
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5, display: 'block' }}>
-                    Click &quot;Add Requirement&quot; to define what grantees must report.
-                  </Typography>
-                </CardContent>
-              </Card>
-            )}
-
-            {reportReqs.map((req, i) => (
-              <Card key={i}>
-                <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
-                  <Stack spacing={2}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-                        Requirement {i + 1}
+                    }
+                    label={
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        Required (applicants must upload)
                       </Typography>
-                      <IconButton
-                        size="small"
-                        onClick={() => removeReportReq(i)}
-                        sx={{ color: 'error.main' }}
-                      >
-                        <Trash2 size={14} />
-                      </IconButton>
-                    </Box>
+                    }
+                  />
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </Box>
+    </Stack>
+  );
 
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-                      <TextField
-                        label="Title *"
-                        placeholder="e.g., Quarterly Narrative Report"
-                        value={req.title}
-                        onChange={(e) => updateReportReq(i, 'title', e.target.value)}
-                        size="small"
-                        fullWidth
-                      />
-                      <FormControl size="small" fullWidth>
-                        <InputLabel>Type</InputLabel>
-                        <Select
-                          label="Type"
-                          value={req.type}
-                          onChange={(e) => updateReportReq(i, 'type', e.target.value)}
-                        >
-                          {REPORT_TYPE_OPTIONS.map((t) => (
-                            <MenuItem key={t} value={t}>
-                              {t.charAt(0).toUpperCase() + t.slice(1)}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Box>
+  const renderStep5Review = () => (
+    <Stack spacing={3}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main', mb: 1 }}>
+        <Info size={16} />
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+          Review your grant before publishing
+        </Typography>
+      </Box>
 
-                    <TextField
-                      label="Description"
-                      placeholder="Describe what the report should include..."
-                      value={req.description}
-                      onChange={(e) => updateReportReq(i, 'description', e.target.value)}
-                      fullWidth
-                      multiline
-                      minRows={2}
-                      size="small"
-                    />
-
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-                      <FormControl size="small" fullWidth>
-                        <InputLabel>Frequency</InputLabel>
-                        <Select
-                          label="Frequency"
-                          value={req.frequency}
-                          onChange={(e) => updateReportReq(i, 'frequency', e.target.value)}
-                        >
-                          {FREQUENCY_OPTIONS.map((f) => (
-                            <MenuItem key={f} value={f}>
-                              {f.charAt(0).toUpperCase() + f.slice(1)}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      <TextField
-                        label="Due Days After Period End"
-                        type="number"
-                        inputProps={{ min: 1, max: 180 }}
-                        value={req.due_days}
-                        onChange={(e) => updateReportReq(i, 'due_days', Number(e.target.value))}
-                        size="small"
-                        fullWidth
-                      />
-                    </Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-            ))}
+      {/* Basic Info Summary */}
+      <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+          <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
+            Basic Information
+          </Typography>
+          <Stack spacing={1}>
+            <SummaryRow label="Title" value={basic.title || '(not set)'} />
+            <SummaryRow
+              label="Funding"
+              value={
+                basic.total_funding
+                  ? `${basic.currency} ${Number(basic.total_funding).toLocaleString()}`
+                  : '(not set)'
+              }
+            />
+            <SummaryRow label="Deadline" value={basic.deadline || '(not set)'} />
+            {basic.sectors.length > 0 && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>Sectors</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end', maxWidth: '60%' }}>
+                  {basic.sectors.map((s) => (
+                    <Chip key={s} label={s} size="small" variant="outlined" sx={{ fontSize: '0.6875rem' }} />
+                  ))}
+                </Box>
+              </Box>
+            )}
+            {basic.countries.length > 0 && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>Countries</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end', maxWidth: '60%' }}>
+                  {basic.countries.map((c) => (
+                    <Chip key={c} label={c} size="small" variant="outlined" sx={{ fontSize: '0.6875rem' }} />
+                  ))}
+                </Box>
+              </Box>
+            )}
           </Stack>
-        );
+        </CardContent>
+      </Card>
 
-      case 5:
-        return (
-          <Stack spacing={3}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main', mb: 1 }}>
-              <Info size={16} />
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                Review your grant before publishing
+      {/* Eligibility Summary */}
+      {eligibility.some((e) => e.enabled) && (
+        <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
+              Eligibility Requirements
+            </Typography>
+            <Stack spacing={1}>
+              {eligibility
+                .filter((e) => e.enabled)
+                .map((e) => (
+                  <Box key={e.key} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography variant="body2" sx={{ color: 'text.primary' }}>{e.label}</Typography>
+                      {e.details && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          {e.details}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', whiteSpace: 'nowrap', ml: 2 }}>
+                      {e.weight}%
+                    </Typography>
+                  </Box>
+                ))}
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Criteria Summary */}
+      {criteria.some((c) => c.label.trim()) && (
+        <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                Evaluation Criteria
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 400,
+                  color: criteriaWeightTotal === 100 ? 'success.main' : 'error.main',
+                }}
+              >
+                ({criteriaWeightTotal}%)
+              </Typography>
+            </Box>
+            <Stack spacing={1}>
+              {criteria
+                .filter((c) => c.label.trim())
+                .map((c, i) => (
+                  <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ color: 'text.primary' }}>{c.label}</Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>{c.weight}%</Typography>
+                  </Box>
+                ))}
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Document Requirements Summary */}
+      {docReqs.some((d) => d.enabled) && (
+        <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
+              Required Documents
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {docReqs
+                .filter((d) => d.enabled)
+                .map((d) => (
+                  <Chip
+                    key={d.key}
+                    label={d.label}
+                    size="small"
+                    variant="outlined"
+                    color={d.required ? 'primary' : 'default'}
+                    sx={{ fontSize: '0.6875rem' }}
+                  />
+                ))}
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* AI Extracted Data Summary */}
+      {extracted && (
+        <Card sx={{ border: '1px solid', borderColor: 'info.light', bgcolor: 'info.50' }}>
+          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <Sparkles size={16} style={{ color: 'var(--mui-palette-info-main, #0288d1)' }} />
+              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                AI Extracted Data
               </Typography>
             </Box>
 
-            {/* Basic Info Summary */}
-            <Card>
-              <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-                <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
-                  Basic Information
+            {extracted.requirements && extracted.requirements.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mb: 0.5 }}>
+                  Reporting Requirements ({extracted.requirements.length})
                 </Typography>
-                <Stack spacing={1}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Title</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                      {basic.title || '(not set)'}
+                <Stack spacing={0.5}>
+                  {extracted.requirements.map((req, i) => (
+                    <Typography key={i} variant="caption" sx={{ color: 'text.secondary' }}>
+                      {i + 1}. {req.title || req.description || 'Requirement'}
+                      {req.frequency ? ` (${req.frequency})` : ''}
                     </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Funding</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                      {basic.total_funding ? `${basic.currency} ${Number(basic.total_funding).toLocaleString()}` : '(not set)'}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Deadline</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                      {basic.deadline || '(not set)'}
-                    </Typography>
-                  </Box>
-                  {basic.sectors.length > 0 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Sectors</Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end', maxWidth: '60%' }}>
-                        {basic.sectors.map((s) => (
-                          <Chip key={s} label={s} size="small" variant="outlined" sx={{ fontSize: '0.6875rem' }} />
-                        ))}
-                      </Box>
-                    </Box>
-                  )}
-                  {basic.countries.length > 0 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Countries</Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end', maxWidth: '60%' }}>
-                        {basic.countries.map((c) => (
-                          <Chip key={c} label={c} size="small" variant="outlined" sx={{ fontSize: '0.6875rem' }} />
-                        ))}
-                      </Box>
-                    </Box>
-                  )}
+                  ))}
                 </Stack>
-              </CardContent>
-            </Card>
-
-            {/* Eligibility Summary */}
-            {eligibility.some((e) => e.enabled) && (
-              <Card>
-                <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-                  <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
-                    Eligibility Requirements
-                  </Typography>
-                  <Stack spacing={1}>
-                    {eligibility
-                      .filter((e) => e.enabled)
-                      .map((e) => (
-                        <Box key={e.key} sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <Typography variant="body2" sx={{ color: 'text.primary' }}>{e.label}</Typography>
-                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>Weight: {e.weight}%</Typography>
-                        </Box>
-                      ))}
-                  </Stack>
-                </CardContent>
-              </Card>
+              </Box>
             )}
 
-            {/* Criteria Summary */}
-            {criteria.some((c) => c.label.trim()) && (
-              <Card>
-                <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                    <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                      Evaluation Criteria
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: 400,
-                        color: criteriaWeightTotal === 100 ? 'success.main' : 'error.main',
-                      }}
-                    >
-                      ({criteriaWeightTotal}%)
-                    </Typography>
-                  </Box>
-                  <Stack spacing={1}>
-                    {criteria
-                      .filter((c) => c.label.trim())
-                      .map((c, i) => (
-                        <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <Typography variant="body2" sx={{ color: 'text.primary' }}>{c.label}</Typography>
-                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>{c.weight}%</Typography>
-                        </Box>
-                      ))}
-                  </Stack>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Documents Summary */}
-            {docReqs.some((d) => d.required) && (
-              <Card>
-                <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-                  <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
-                    Required Documents
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {docReqs
-                      .filter((d) => d.required)
-                      .map((d) => (
-                        <Chip key={d.key} label={d.label} size="small" variant="outlined" sx={{ fontSize: '0.6875rem' }} />
-                      ))}
-                  </Box>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Reporting Summary */}
-            <Card>
-              <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-                <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1 }}>
-                  Reporting
+            {extracted.indicators && extracted.indicators.length > 0 && (
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mb: 0.5 }}>
+                  KPIs / Indicators ({extracted.indicators.length})
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  Frequency: <Box component="span" sx={{ fontWeight: 500 }}>{reportingFrequency}</Box>
-                  {' | '}
-                  Requirements: <Box component="span" sx={{ fontWeight: 500 }}>{reportReqs.length}</Box>
-                </Typography>
-              </CardContent>
-            </Card>
-
-            {error && (
-              <Alert severity="error">{error}</Alert>
+                <Stack spacing={0.5}>
+                  {extracted.indicators.map((ind, i) => (
+                    <Typography key={i} variant="caption" sx={{ color: 'text.secondary' }}>
+                      {i + 1}. {ind.name || ind.description || 'Indicator'}
+                      {ind.target ? ` — Target: ${ind.target}` : ''}
+                    </Typography>
+                  ))}
+                </Stack>
+              </Box>
             )}
-          </Stack>
-        );
+          </CardContent>
+        </Card>
+      )}
 
-      default:
-        return null;
+      {/* Action Buttons */}
+      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', pt: 1 }}>
+        <Button
+          variant="outlined"
+          onClick={handleSaveDraft}
+          disabled={saving || publishing}
+          startIcon={saving ? <CircularProgress size={16} /> : <FileText size={16} />}
+        >
+          {saving ? 'Saving...' : 'Save as Draft'}
+        </Button>
+        <Button
+          variant="contained"
+          color="success"
+          onClick={handlePublish}
+          disabled={publishing || saving || !basic.title.trim()}
+          startIcon={publishing ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />}
+        >
+          {publishing ? 'Publishing...' : 'Publish Grant'}
+        </Button>
+      </Box>
+    </Stack>
+  );
+
+  // ---------------------------------------------------------------------------
+  // Step Router
+  // ---------------------------------------------------------------------------
+
+  const renderCurrentStep = () => {
+    switch (step) {
+      case 0: return renderStep0Upload();
+      case 1: return renderStep1BasicInfo();
+      case 2: return renderStep2Eligibility();
+      case 3: return renderStep3Evaluation();
+      case 4: return renderStep4Documents();
+      case 5: return renderStep5Review();
+      default: return null;
     }
   };
+
+  // ---------------------------------------------------------------------------
+  // Main Render
+  // ---------------------------------------------------------------------------
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 960, mx: 'auto' }}>
@@ -963,14 +1387,28 @@ export default function CreateGrantPage() {
         >
           Back
         </Button>
-        <Box>
+        <Box sx={{ flex: 1 }}>
           <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
             Create New Grant
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25 }}>
             Step {step + 1} of {STEPS.length}: {STEPS[step].label}
+            {saving && (
+              <Box component="span" sx={{ ml: 1, color: 'info.main' }}>
+                (Saving...)
+              </Box>
+            )}
           </Typography>
         </Box>
+        {grantId && (
+          <Chip
+            label={`Draft #${grantId}`}
+            size="small"
+            variant="outlined"
+            color="info"
+            sx={{ fontSize: '0.75rem' }}
+          />
+        )}
       </Box>
 
       {/* MUI Stepper */}
@@ -985,41 +1423,57 @@ export default function CreateGrantPage() {
       {/* Step Content */}
       <Card>
         <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
-          {renderStep()}
+          {renderCurrentStep()}
         </CardContent>
       </Card>
 
-      {/* Navigation */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Button
-          variant="outlined"
-          startIcon={<ArrowLeft size={16} />}
-          onClick={() => setStep((s) => Math.max(0, s - 1))}
-          disabled={step === 0}
-        >
-          Previous
-        </Button>
+      {/* Navigation (hidden on review step which has its own buttons) */}
+      {step < STEPS.length - 1 && (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Button
+            variant="outlined"
+            startIcon={<ArrowLeft size={16} />}
+            onClick={goBack}
+            disabled={step === 0}
+          >
+            Previous
+          </Button>
 
-        {step < STEPS.length - 1 ? (
           <Button
             variant="contained"
             endIcon={<ArrowRight size={16} />}
-            onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
+            onClick={goNext}
           >
             Next
           </Button>
-        ) : (
+        </Box>
+      )}
+
+      {/* Back button on the review step */}
+      {step === STEPS.length - 1 && (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Button
-            variant="contained"
-            color="success"
-            endIcon={<Send size={16} />}
-            onClick={handlePublish}
-            disabled={submitting || !basic.title.trim()}
+            variant="outlined"
+            startIcon={<ArrowLeft size={16} />}
+            onClick={goBack}
           >
-            {submitting ? 'Publishing...' : 'Publish Grant'}
+            Previous
           </Button>
-        )}
-      </Box>
+        </Box>
+      )}
     </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helper: Summary Row
+// ---------------------------------------------------------------------------
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+      <Typography variant="body2" sx={{ color: 'text.secondary' }}>{label}</Typography>
+      <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>{value}</Typography>
+    </Box>
   );
 }
