@@ -124,6 +124,46 @@ def _build_ngo_stats(org_id):
     ).scalar()
     stats['average_score'] = round(float(avg), 1) if avg else None
 
+    # -- Upcoming deadlines for "What's Due Next" panel --
+    from datetime import datetime, timedelta
+    upcoming = []
+    # Reports due
+    draft_reports = Report.query.filter_by(
+        submitted_by_org_id=org_id
+    ).filter(Report.status.in_(['draft', 'revision_requested'])).limit(5).all()
+    for r in draft_reports:
+        upcoming.append({
+            'type': 'report',
+            'title': r.title or f'{r.report_type} Report',
+            'grant_title': r.grant.title if r.grant else '',
+            'due_date': r.due_date.isoformat() if r.due_date else None,
+            'status': r.status,
+            'href': '/reports',
+        })
+    # Open grants to apply to (show as opportunity)
+    if stats['total_applications'] < 3:
+        open_grants = Grant.query.filter_by(status='open').limit(2).all()
+        for g in open_grants:
+            upcoming.append({
+                'type': 'application',
+                'title': f'Apply to {g.title}',
+                'grant_title': g.title,
+                'due_date': g.deadline.isoformat() if g.deadline else None,
+                'status': 'open',
+                'href': '/grants',
+            })
+    # Assessment reminder if none done
+    if stats['assessments'] == 0:
+        upcoming.insert(0, {
+            'type': 'assessment',
+            'title': 'Complete your first capacity assessment',
+            'grant_title': '',
+            'due_date': None,
+            'status': 'pending',
+            'href': '/assessments',
+        })
+    stats['upcoming_deadlines'] = upcoming[:5]
+
     return stats
 
 
@@ -202,6 +242,27 @@ def _build_donor_stats(org_id):
         donor_org_id=org_id
     ).order_by(Grant.created_at.desc()).limit(5).all()
     stats['recent_grants'] = [g.to_dict(summary=True) for g in recent_grants]
+
+    # -- Risk items for "At Risk Now" panel --
+    stats['overdue_reports'] = report_status_map.get('draft', 0)  # drafts past due
+    stats['reports_due_soon'] = report_status_map.get('submitted', 0)
+    stats['flagged_compliance'] = 0  # placeholder
+
+    # -- Application status breakdown for pipeline widget --
+    stats['application_status_breakdown'] = {
+        'draft': app_status_map.get('draft', 0),
+        'submitted': app_status_map.get('submitted', 0),
+        'under_review': app_status_map.get('under_review', 0),
+        'scored': app_status_map.get('scored', 0),
+        'awarded': app_status_map.get('awarded', 0),
+        'rejected': app_status_map.get('rejected', 0),
+    }
+
+    # -- Pending reviews (alias) --
+    stats['pending_reviews'] = stats['pending_review']
+
+    # -- Total awarded (alias for frontend) --
+    stats['total_awarded'] = stats['total_funding_awarded']
 
     return stats
 

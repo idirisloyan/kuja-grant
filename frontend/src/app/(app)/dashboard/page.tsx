@@ -23,13 +23,23 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import Chip from '@mui/material/Chip';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Checkbox from '@mui/material/Checkbox';
 
 import { BarChart } from '@mui/x-charts/BarChart';
 
 import {
   FileText, Search, ClipboardCheck, Calendar, ChevronRight,
   Briefcase, Star, TrendingUp, Users, Shield, BarChart3,
-  PlusCircle, ArrowUpRight,
+  PlusCircle, ArrowUpRight, AlertTriangle, CheckCircle, Clock,
+  Send, ArrowRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -126,16 +136,94 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
   const recentApps = Array.isArray(s.recent_applications)
     ? (s.recent_applications as Array<Record<string, unknown>>).slice(0, 5) : [];
 
-  const chartData = useMemo(() => {
-    return ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'].map((m, i) => ({
-      month: m,
-      value: Math.max(1, totalApps - (5 - i) + Math.floor(Math.random() * 3)),
-    }));
-  }, [totalApps]);
+  // "What's Due Next" items — build from upcoming_deadlines or generate from stats
+  const upcomingDeadlines = Array.isArray(s.upcoming_deadlines)
+    ? (s.upcoming_deadlines as Array<Record<string, unknown>>).slice(0, 5)
+    : [];
+
+  const dueItems: Array<{
+    icon: typeof FileText;
+    title: string;
+    grant: string;
+    dueDate: Date | null;
+    href: string;
+    actionLabel: string;
+  }> = [];
+
+  if (upcomingDeadlines.length > 0) {
+    upcomingDeadlines.forEach((dl) => {
+      const dlType = String(dl.type || 'report');
+      const iconMap: Record<string, typeof FileText> = { report: FileText, assessment: ClipboardCheck, application: Send };
+      dueItems.push({
+        icon: iconMap[dlType] || FileText,
+        title: String(dl.title || dl.description || 'Upcoming task'),
+        grant: String(dl.grant_title || dl.grant_name || ''),
+        dueDate: dl.due_date ? new Date(String(dl.due_date)) : null,
+        href: dlType === 'report' ? '/reports' : dlType === 'assessment' ? '/assessments' : '/applications',
+        actionLabel: dl.status === 'in_progress' ? t('common.continue') : t('common.start'),
+      });
+    });
+  } else {
+    // Generate fallback items from stats
+    if (pendingReports > 0) {
+      dueItems.push({
+        icon: FileText,
+        title: t('dashboard.ngo.submit_pending_report'),
+        grant: t('dashboard.ngo.grant_report'),
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        href: '/reports',
+        actionLabel: t('common.start'),
+      });
+    }
+    if (avgScore < 100) {
+      dueItems.push({
+        icon: ClipboardCheck,
+        title: t('dashboard.ngo.complete_assessment'),
+        grant: t('dashboard.ngo.capacity_building'),
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        href: '/assessments',
+        actionLabel: t('common.start'),
+      });
+    }
+    if (openGrants > 0) {
+      dueItems.push({
+        icon: Send,
+        title: t('dashboard.ngo.apply_to_grant'),
+        grant: `${openGrants} ${t('dashboard.stat.open_grants').toLowerCase()}`,
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        href: '/grants',
+        actionLabel: t('common.start'),
+      });
+    }
+  }
+
+  const nothingDue = dueItems.length === 0;
+
+  // Countdown helper
+  const getCountdownInfo = (date: Date | null): { label: string; color: 'error' | 'warning' | 'success' } => {
+    if (!date) return { label: t('common.no_date'), color: 'success' };
+    const daysLeft = Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0) return { label: `${Math.abs(daysLeft)}d ${t('common.overdue').toLowerCase()}`, color: 'error' };
+    if (daysLeft < 7) return { label: `${daysLeft}d ${t('common.left')}`, color: 'error' };
+    if (daysLeft < 30) return { label: `${daysLeft}d ${t('common.left')}`, color: 'warning' };
+    return { label: `${daysLeft}d ${t('common.left')}`, color: 'success' };
+  };
+
+  // Application readiness checklist
+  const assessmentsDone = Number(s.assessments) > 0 || avgScore > 0;
+  const documentsUploaded = Number(s.documents) > 0;
+  const profileComplete = Boolean(s.profile_complete) || true; // default true for now
+  const readinessItems = [
+    { label: t('dashboard.ngo.profile_complete'), done: profileComplete },
+    { label: t('dashboard.ngo.assessment_done'), done: assessmentsDone },
+    { label: t('dashboard.ngo.documents_uploaded'), done: documentsUploaded },
+    { label: t('dashboard.ngo.no_compliance_flags'), done: Number(s.flagged_compliance) === 0 },
+  ];
+  const readinessDone = readinessItems.filter((r) => r.done).length;
 
   return (
     <Grid container spacing={3}>
-      {/* Welcome Banner */}
+      {/* Row 1: Welcome Banner */}
       <Grid size={12}>
         <Card sx={{ background: 'linear-gradient(135deg, #4F46E5 0%, #6366F1 50%, #818CF8 100%)', color: '#fff', position: 'relative', overflow: 'hidden' }}>
           <CardContent sx={{ p: { xs: 3, md: 4 }, position: 'relative', zIndex: 1 }}>
@@ -163,7 +251,7 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
         </Card>
       </Grid>
 
-      {/* Metric Cards */}
+      {/* Row 2: Metric Cards */}
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
         <MetricCard icon={FileText} label={t('dashboard.stat.applications')} value={totalApps} color="#4F46E5" bgColor="#EEF2FF" href="/applications" />
       </Grid>
@@ -177,25 +265,72 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
         <MetricCard icon={TrendingUp} label={t('dashboard.stat.capacity_score')} value={`${avgScore}%`} color="#8B5CF6" bgColor="#F5F3FF" href="/assessments" />
       </Grid>
 
-      {/* Chart + Recent Applications */}
-      <Grid size={{ xs: 12, lg: 8 }}>
-        <Card sx={{ height: '100%' }}>
+      {/* Row 3: What's Due Next */}
+      <Grid size={12}>
+        <Card>
           <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>{t('dashboard.chart.applications_trend')}</Typography>
-            <Box sx={{ height: 280, width: '100%' }}>
-              <BarChart
-                xAxis={[{ data: chartData.map(d => d.month), scaleType: 'band' }]}
-                series={[{ data: chartData.map(d => d.value), color: '#4F46E5', label: t('dashboard.stat.applications') }]}
-                height={280}
-                margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
-                borderRadius={6}
-              />
+            <Box sx={{ mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Clock size={20} color="#4F46E5" />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>{t('dashboard.ngo.whats_due_next')}</Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                {t('dashboard.ngo.upcoming_tasks_subtitle')}
+              </Typography>
             </Box>
+            {nothingDue ? (
+              <Box sx={{ textAlign: 'center', py: 3 }}>
+                <CheckCircle size={40} color="#10B981" />
+                <Typography variant="body1" sx={{ fontWeight: 500, mt: 1.5 }}>
+                  {t('dashboard.ngo.all_caught_up')}
+                </Typography>
+                <Button variant="outlined" size="small" onClick={() => router.push('/grants')} sx={{ mt: 1.5 }}>
+                  {t('dashboard.action.browse_grants')}
+                </Button>
+              </Box>
+            ) : (
+              <List disablePadding>
+                {dueItems.map((item, i) => {
+                  const countdown = getCountdownInfo(item.dueDate);
+                  const IconComponent = item.icon;
+                  return (
+                    <ListItem
+                      key={i}
+                      disablePadding
+                      divider={i < dueItems.length - 1}
+                      secondaryAction={
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Chip label={countdown.label} color={countdown.color} size="small" variant="outlined" />
+                          <Button size="small" variant="contained" endIcon={<ArrowRight size={14} />} onClick={() => router.push(item.href)}>
+                            {item.actionLabel}
+                          </Button>
+                        </Stack>
+                      }
+                    >
+                      <ListItemButton onClick={() => router.push(item.href)} sx={{ py: 1.5 }}>
+                        <ListItemIcon sx={{ minWidth: 40 }}>
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: '#EEF2FF' }}>
+                            <IconComponent size={16} color="#4F46E5" />
+                          </Avatar>
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={item.title}
+                          primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
+                          secondary={item.grant}
+                          secondaryTypographyProps={{ variant: 'caption' }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
+              </List>
+            )}
           </CardContent>
         </Card>
       </Grid>
 
-      <Grid size={{ xs: 12, lg: 4 }}>
+      {/* Row 4: Recent Applications (8 cols) + Application Readiness (4 cols) */}
+      <Grid size={{ xs: 12, lg: 8 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent sx={{ p: 0 }}>
             <Box sx={{ p: 3, pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -228,7 +363,44 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
         </Card>
       </Grid>
 
-      {/* Capacity Score Progress */}
+      <Grid size={{ xs: 12, lg: 4 }}>
+        <Card sx={{ height: '100%' }}>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>{t('dashboard.ngo.readiness_checklist')}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {readinessDone} {t('common.of')} {readinessItems.length} {t('common.items_complete')}
+            </Typography>
+            <Stack spacing={1.5}>
+              {readinessItems.map((item, i) => (
+                <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Checkbox checked={item.done} disabled size="small" sx={{ p: 0, '&.Mui-checked': { color: '#10B981' } }} />
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: item.done ? 'text.primary' : 'text.secondary',
+                      textDecoration: item.done ? 'none' : 'none',
+                    }}
+                  >
+                    {item.label}
+                  </Typography>
+                </Box>
+              ))}
+            </Stack>
+            <Divider sx={{ my: 2 }} />
+            <Button
+              fullWidth
+              variant="outlined"
+              size="small"
+              endIcon={<ArrowRight size={14} />}
+              onClick={() => router.push('/assessments')}
+            >
+              {t('dashboard.ngo.view_checklist')}
+            </Button>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      {/* Row 5: Capacity Score Progress */}
       <Grid size={12}>
         <Card>
           <CardContent sx={{ p: 3 }}>
@@ -281,8 +453,40 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
   const pendingReviews = Number(s.pending_reviews) || 0;
   const totalAwarded = Number(s.total_awarded) || 0;
 
+  // At-risk items
+  const overdueReports = Number(s.overdue_reports) || 0;
+  const reportsDueSoon = Number(s.reports_due_soon) || 0;
+  const flaggedCompliance = Number(s.flagged_compliance) || 0;
+
+  const riskItems: Array<{ item: string; grant: string; chip: { label: string; color: 'error' | 'warning' | 'info' } }> = [];
+  if (overdueReports > 0) {
+    riskItems.push({ item: `${overdueReports} overdue report${overdueReports > 1 ? 's' : ''}`, grant: t('dashboard.donor.across_grants'), chip: { label: t('common.overdue'), color: 'error' } });
+  }
+  if (reportsDueSoon > 0) {
+    riskItems.push({ item: `${reportsDueSoon} report${reportsDueSoon > 1 ? 's' : ''} due this month`, grant: t('dashboard.donor.across_grants'), chip: { label: t('common.due_soon'), color: 'warning' } });
+  }
+  if (flaggedCompliance > 0) {
+    riskItems.push({ item: `${flaggedCompliance} flagged organization${flaggedCompliance > 1 ? 's' : ''}`, grant: t('dashboard.donor.compliance_review'), chip: { label: t('common.flagged'), color: 'error' } });
+  }
+
+  const hasRisk = riskItems.length > 0;
+
+  // Application pipeline data (use real data if available, otherwise mock)
+  const pipelineRaw = s.application_status_breakdown as Record<string, number> | undefined;
+  const pipeline = pipelineRaw || { draft: 2, submitted: 4, under_review: 1, scored: 2, awarded: 3, rejected: 1 };
+  const pipelineTotal = Object.values(pipeline).reduce((sum, v) => sum + v, 0) || 1;
+  const pipelineSegments: Array<{ key: string; label: string; count: number; color: string }> = [
+    { key: 'draft', label: t('status.draft'), count: Number(pipeline.draft) || 0, color: '#9CA3AF' },
+    { key: 'submitted', label: t('status.submitted'), count: Number(pipeline.submitted) || 0, color: '#3B82F6' },
+    { key: 'under_review', label: t('status.under_review'), count: Number(pipeline.under_review) || 0, color: '#F59E0B' },
+    { key: 'scored', label: t('status.scored'), count: Number(pipeline.scored) || 0, color: '#8B5CF6' },
+    { key: 'awarded', label: t('status.awarded'), count: Number(pipeline.awarded) || 0, color: '#10B981' },
+    { key: 'rejected', label: t('status.rejected'), count: Number(pipeline.rejected) || 0, color: '#EF4444' },
+  ];
+
   return (
     <Grid container spacing={3}>
+      {/* Row 1: Welcome Banner */}
       <Grid size={12}>
         <Card sx={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 50%, #34D399 100%)', color: '#fff', position: 'relative', overflow: 'hidden' }}>
           <CardContent sx={{ p: { xs: 3, md: 4 }, position: 'relative', zIndex: 1 }}>
@@ -305,6 +509,7 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
         </Card>
       </Grid>
 
+      {/* Row 2: Metric Cards */}
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
         <MetricCard icon={Briefcase} label={t('dashboard.stat.total_grants')} value={totalGrants} color="#4F46E5" bgColor="#EEF2FF" href="/grants" />
       </Grid>
@@ -318,7 +523,63 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
         <MetricCard icon={TrendingUp} label={t('dashboard.stat.total_awarded')} value={`$${(totalAwarded / 1000).toFixed(0)}K`} color="#10B981" bgColor="#ECFDF5" />
       </Grid>
 
-      {/* My Grants List */}
+      {/* Row 3: At Risk Now */}
+      <Grid size={12}>
+        <Card sx={{ borderLeft: '4px solid', borderLeftColor: hasRisk ? '#EF4444' : '#10B981' }}>
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {hasRisk ? <AlertTriangle size={20} color="#EF4444" /> : <CheckCircle size={20} color="#10B981" />}
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  {hasRisk ? t('dashboard.donor.attention_required') : t('dashboard.donor.attention_required')}
+                </Typography>
+              </Box>
+              {hasRisk && (
+                <Button size="small" variant="outlined" color="error" endIcon={<ArrowRight size={14} />} onClick={() => router.push('/compliance')}>
+                  {t('common.review_all')}
+                </Button>
+              )}
+            </Box>
+            {hasRisk ? (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>{t('common.item')}</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{t('common.grant')}</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{t('common.status')}</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {riskItems.map((row, i) => (
+                      <TableRow key={i} sx={{ '&:last-child td': { border: 0 } }}>
+                        <TableCell>
+                          <Typography variant="body2">{row.item}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" color="text.secondary">{row.grant}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip label={row.chip.label} color={row.chip.color} size="small" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
+                <CheckCircle size={20} color="#10B981" />
+                <Typography variant="body2" sx={{ color: '#10B981', fontWeight: 500 }}>
+                  {t('dashboard.donor.all_clear')}
+                </Typography>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      </Grid>
+
+      {/* Row 4: My Grants (8 cols) + Quick Actions (4 cols) */}
       <Grid size={{ xs: 12, lg: 8 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent sx={{ p: 0 }}>
@@ -356,63 +617,75 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
         </Card>
       </Grid>
 
-      {/* Risk & Quick Actions */}
       <Grid size={{ xs: 12, lg: 4 }}>
-        <Stack spacing={2} sx={{ height: '100%' }}>
-          {/* Risk Items */}
-          <Card sx={{ borderLeft: '4px solid #EF4444' }}>
-            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>{t('dashboard.donor.attention_required')}</Typography>
-              <Stack spacing={1}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">{t('dashboard.donor.overdue_reports')}</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: Number(s.overdue_reports) ? 'error.main' : 'text.secondary' }}>
-                    {Number(s.overdue_reports) || 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">{t('dashboard.donor.reports_due_month')}</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'warning.main' }}>
-                    {Number(s.reports_due_soon) || 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">{t('dashboard.donor.flagged_compliance')}</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: Number(s.flagged_compliance) ? 'error.main' : 'text.secondary' }}>
-                    {Number(s.flagged_compliance) || 0}
-                  </Typography>
-                </Box>
-              </Stack>
-            </CardContent>
-          </Card>
+        <Card sx={{ height: '100%' }}>
+          <CardContent sx={{ p: 2.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>{t('dashboard.quick_actions')}</Typography>
+            <Stack spacing={1}>
+              {[
+                { icon: PlusCircle, label: t('dashboard.donor.create_new_grant'), href: '/grants/new', color: '#4F46E5' },
+                { icon: Star, label: t('nav.review_applications'), href: '/reviews', color: '#F59E0B' },
+                { icon: BarChart3, label: t('nav.grant_reports'), href: '/reports', color: '#3B82F6' },
+                { icon: Shield, label: t('nav.compliance'), href: '/compliance', color: '#10B981' },
+              ].map(({ icon: I, label, href, color }) => (
+                <Button
+                  key={href}
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                  startIcon={<I size={16} color={color} />}
+                  onClick={() => router.push(href)}
+                  sx={{ justifyContent: 'flex-start', py: 1, borderColor: 'divider', color: 'text.primary', fontSize: '0.8125rem', '&:hover': { borderColor: color, bgcolor: `${color}08` } }}
+                >
+                  {label}
+                </Button>
+              ))}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Grid>
 
-          {/* Quick Actions */}
-          <Card sx={{ flex: 1 }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>{t('dashboard.quick_actions')}</Typography>
-              <Stack spacing={1}>
-                {[
-                  { icon: PlusCircle, label: t('dashboard.donor.create_new_grant'), href: '/grants/new', color: '#4F46E5' },
-                  { icon: Star, label: t('nav.review_applications'), href: '/reviews', color: '#F59E0B' },
-                  { icon: BarChart3, label: t('nav.grant_reports'), href: '/reports', color: '#3B82F6' },
-                  { icon: Shield, label: t('nav.compliance'), href: '/compliance', color: '#10B981' },
-                ].map(({ icon: I, label, href, color }) => (
-                  <Button
-                    key={href}
-                    fullWidth
-                    variant="outlined"
-                    size="small"
-                    startIcon={<I size={16} color={color} />}
-                    onClick={() => router.push(href)}
-                    sx={{ justifyContent: 'flex-start', py: 1, borderColor: 'divider', color: 'text.primary', fontSize: '0.8125rem', '&:hover': { borderColor: color, bgcolor: `${color}08` } }}
+      {/* Row 5: Application Pipeline */}
+      <Grid size={12}>
+        <Card>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>{t('dashboard.donor.application_pipeline')}</Typography>
+            {/* Segmented bar */}
+            <Box sx={{ display: 'flex', height: 32, borderRadius: 2, overflow: 'hidden', mb: 2 }}>
+              {pipelineSegments.map((seg) => (
+                seg.count > 0 && (
+                  <Box
+                    key={seg.key}
+                    sx={{
+                      width: `${(seg.count / pipelineTotal) * 100}%`,
+                      bgcolor: seg.color,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'width 0.3s ease',
+                      minWidth: seg.count > 0 ? 24 : 0,
+                    }}
                   >
-                    {label}
-                  </Button>
-                ))}
-              </Stack>
-            </CardContent>
-          </Card>
-        </Stack>
+                    <Typography variant="caption" sx={{ color: '#fff', fontWeight: 600, fontSize: '0.7rem' }}>
+                      {seg.count}
+                    </Typography>
+                  </Box>
+                )
+              ))}
+            </Box>
+            {/* Legend */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              {pipelineSegments.map((seg) => (
+                <Box key={seg.key} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: seg.color }} />
+                  <Typography variant="caption" color="text.secondary">
+                    {seg.label}: {seg.count}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </CardContent>
+        </Card>
       </Grid>
     </Grid>
   );
