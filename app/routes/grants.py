@@ -16,9 +16,35 @@ if HAS_PYPDF2:
 if HAS_PYTHON_DOCX:
     import docx as python_docx
 
+from app.services.audit import log_action
+
 logger = logging.getLogger('kuja')
 
 grants_bp = Blueprint('grants', __name__, url_prefix='/api/grants')
+
+
+def _validate_grant_arrays(data):
+    """Validate and normalize grant configuration arrays."""
+    errors = []
+
+    if 'criteria' in data:
+        criteria = data['criteria']
+        if not isinstance(criteria, list):
+            errors.append('criteria must be a list')
+        else:
+            total_weight = sum(c.get('weight', 0) for c in criteria if isinstance(c, dict))
+            if criteria and abs(total_weight - 100) > 1:
+                errors.append(f'criteria weights sum to {total_weight}, expected 100')
+
+    if 'eligibility' in data:
+        if not isinstance(data['eligibility'], list):
+            errors.append('eligibility must be a list')
+
+    if 'doc_requirements' in data:
+        if not isinstance(data['doc_requirements'], list):
+            errors.append('doc_requirements must be a list')
+
+    return errors
 
 
 @grants_bp.route('/', methods=['GET'])
@@ -144,6 +170,11 @@ def api_create_grant():
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid deadline format. Use YYYY-MM-DD.', 'success': False}), 400
 
+    # Validate array fields (log warnings but don't reject to preserve compatibility)
+    validation_errors = _validate_grant_arrays(data)
+    if validation_errors:
+        logger.warning(f"Grant create validation warnings: {validation_errors}")
+
     if data.get('sectors'):
         grant.set_sectors(data['sectors'])
     if data.get('countries'):
@@ -181,6 +212,11 @@ def api_update_grant(grant_id):
         return jsonify({'error': 'You can only edit your own grants', 'success': False}), 403
 
     data = get_request_json()
+
+    # Validate array fields (log warnings but don't reject to preserve compatibility)
+    validation_errors = _validate_grant_arrays(data)
+    if validation_errors:
+        logger.warning(f"Grant update validation warnings for grant {grant_id}: {validation_errors}")
 
     if 'title' in data:
         grant.title = data['title']
@@ -230,6 +266,11 @@ def api_publish_grant(grant_id):
     if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
         return jsonify({'error': 'You can only publish your own grants', 'success': False}), 403
 
+    # Idempotent: if already open, return success without error
+    if grant.status == 'open':
+        logger.info(f"Grant already published (idempotent): {grant.title} (id={grant.id}) by user {current_user.email}")
+        return jsonify({'success': True, 'message': 'Grant is already published', 'grant': grant.to_dict()})
+
     if grant.status != 'draft':
         return jsonify({'error': f'Cannot publish a grant with status "{grant.status}"', 'success': False}), 400
 
@@ -237,7 +278,10 @@ def api_publish_grant(grant_id):
     grant.published_at = datetime.now(timezone.utc)
     db.session.commit()
 
-    logger.info(f"Grant published: {grant.title} (id={grant.id})")
+    log_action('grant.published', current_user.email, 'grant', grant.id,
+               {'title': grant.title, 'donor_org_id': grant.donor_org_id})
+
+    logger.info(f"Grant published: {grant.title} (id={grant.id}) by user {current_user.email}")
     return jsonify({'success': True, 'grant': grant.to_dict()})
 
 

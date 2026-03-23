@@ -9,9 +9,13 @@ Extracted from the monolithic server.py during modularisation.
 import json
 import os
 import logging
+import re
 import time
 import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
+from threading import Lock
+from time import time as _time
 
 from flask import request, jsonify, send_from_directory
 from flask_login import current_user
@@ -21,6 +25,47 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from app.extensions import db
 
 logger = logging.getLogger('kuja')
+
+
+# ---------------------------------------------------------------------------
+# In-memory per-IP rate limiter for sensitive endpoints (defense-in-depth).
+# For enterprise scale (multi-instance), swap for a Redis-backed limiter.
+# ---------------------------------------------------------------------------
+
+class EndpointRateLimiter:
+    """Simple in-memory per-IP rate limiter.
+    Tracks request timestamps per (IP, endpoint_group) pair and rejects
+    requests that exceed the configured threshold within the sliding window.
+    Thread-safe via a Lock for Gunicorn thread workers.
+    """
+
+    def __init__(self):
+        self._hits = defaultdict(list)  # key: (ip, endpoint_group) -> [timestamps]
+        self._lock = Lock()
+
+    def is_limited(self, ip: str, endpoint: str, max_requests: int, window_seconds: int) -> bool:
+        key = (ip, endpoint)
+        now = _time()
+        with self._lock:
+            # Prune old entries
+            self._hits[key] = [t for t in self._hits[key] if now - t < window_seconds]
+            if len(self._hits[key]) >= max_requests:
+                return True
+            self._hits[key].append(now)
+            return False
+
+
+_endpoint_rate_limiter = EndpointRateLimiter()
+
+# Rate limit rules: (endpoint pattern, max_requests, window_seconds)
+# Patterns are matched against request.path using re.match.
+_RATE_LIMIT_RULES = [
+    (r'^/api/auth/login$', 10, 60),
+    (r'^/api/ai/', 20, 60),
+    (r'^/api/documents/upload$', 10, 60),
+    (r'^/api/grants/\d+/upload-grant-doc$', 10, 60),
+    (r'^/api/compliance/screen$', 5, 60),
+]
 
 APP_VERSION = '3.3.4'
 APP_START_TIME = datetime.now(timezone.utc)
@@ -185,6 +230,32 @@ def register_middleware(app):
         if is_production or request.is_secure:
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         return response
+
+    # ------------------------------------------------------------------
+    # Per-endpoint rate limiting (defense-in-depth, in-memory per-IP)
+    # ------------------------------------------------------------------
+    @app.before_request
+    def endpoint_rate_limit():
+        """Throttle sensitive endpoints per client IP.
+        This is a lightweight in-memory limiter that adds defense-in-depth
+        on top of the existing per-user and DB-backed limiters."""
+        path = request.path
+        for pattern, max_req, window in _RATE_LIMIT_RULES:
+            if re.match(pattern, path):
+                # Extract real client IP (Railway proxy sets X-Forwarded-For)
+                xff = request.headers.get('X-Forwarded-For', '')
+                client_ip = xff.split(',')[0].strip() if xff else (request.remote_addr or '0.0.0.0')
+                if _endpoint_rate_limiter.is_limited(client_ip, pattern, max_req, window):
+                    logger.warning(
+                        f"RATE_LIMIT: {client_ip} exceeded {max_req}/{window}s on {path}"
+                    )
+                    response = jsonify({
+                        'error': 'Rate limit exceeded. Please wait before retrying.',
+                        'retry_after': window,
+                    })
+                    response.headers['Retry-After'] = str(window)
+                    return response, 429
+                break  # Only match the first applicable rule
 
     @app.before_request
     def check_content_length():

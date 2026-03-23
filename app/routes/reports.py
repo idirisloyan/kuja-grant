@@ -26,6 +26,8 @@ from app.models import Application, Grant, Report
 from app.services.ai_service import AIService
 from app.utils.helpers import get_request_json, paginate_query
 
+from app.services.audit import log_action
+
 logger = logging.getLogger('kuja')
 
 reports_bp = Blueprint('reports', __name__, url_prefix='/api/reports')
@@ -256,6 +258,15 @@ def api_review_report(report_id):
     report.reviewed_at = datetime.now(timezone.utc)
 
     db.session.commit()
+
+    # Audit trail for report review actions
+    if action == 'accept':
+        log_action('report.accepted', current_user.email, 'report', report.id,
+                   {'grant_id': report.grant_id})
+    elif action == 'request_revision':
+        log_action('report.revision_requested', current_user.email, 'report', report.id,
+                   {'grant_id': report.grant_id})
+
     return jsonify({'success': True, 'report': report.to_dict()})
 
 

@@ -8,6 +8,8 @@ from app.utils.decorators import role_required
 from app.services.scoring_engine import ScoringEngine
 import logging
 
+from app.services.audit import log_action
+
 logger = logging.getLogger('kuja')
 
 applications_bp = Blueprint('applications', __name__, url_prefix='/api/applications')
@@ -170,8 +172,10 @@ def api_update_application(app_id):
     elig_data = data.get('eligibility_responses') or data.get('eligibility')
     if elig_data:
         application.set_eligibility_responses(elig_data)
+    new_status = None
     if 'status' in data and current_user.role in ('donor', 'admin'):
-        application.status = data['status']
+        new_status = data['status']
+        application.status = new_status
     if 'ai_score' in data:
         application.ai_score = data['ai_score']
     if 'human_score' in data:
@@ -180,6 +184,12 @@ def api_update_application(app_id):
         application.final_score = data['final_score']
 
     db.session.commit()
+
+    # Audit trail for critical state transition: awarded
+    if new_status == 'awarded':
+        log_action('application.awarded', current_user.email, 'application', application.id,
+                   {'grant_id': application.grant_id})
+
     return jsonify({'success': True, 'application': application.to_dict()})
 
 
@@ -193,6 +203,11 @@ def api_submit_application(app_id):
 
     if application.ngo_org_id != current_user.org_id:
         return jsonify({'error': 'Access denied'}), 403
+
+    # Idempotent: if already submitted (or further along), return success
+    if application.status in ('submitted', 'under_review', 'scored', 'awarded'):
+        logger.info(f"Application already submitted (idempotent): id={app_id} status={application.status} by org {current_user.org_id}")
+        return jsonify({'success': True, 'message': 'Application already submitted', 'application': application.to_dict()})
 
     if application.status != 'draft':
         return jsonify({'error': 'Only draft applications can be submitted', 'success': False}), 400
@@ -236,5 +251,8 @@ def api_submit_application(app_id):
 
     db.session.commit()
 
-    logger.info(f"Application submitted: {app_id} (score: {application.ai_score})")
+    log_action('application.submitted', current_user.email, 'application', application.id,
+               {'grant_id': application.grant_id, 'ai_score': application.ai_score})
+
+    logger.info(f"Application submitted: id={app_id} by org {current_user.org_id} (score: {application.ai_score})")
     return jsonify({'success': True, 'application': application.to_dict()})

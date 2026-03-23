@@ -97,12 +97,32 @@ class ScoringEngine:
             'document_average': round(doc_avg, 2),
             'eligibility_score': round(eligibility_score, 2),
             'overall_score': overall,
+            'quality_tier': ScoringEngine._classify_quality_tier(overall),
             'breakdown': {
                 'criteria_weight': 0.60,
                 'documents_weight': 0.20,
                 'eligibility_weight': 0.20,
             },
+            'scoring_metadata': {
+                'engine_version': '2.0',
+                'scoring_model': 'rule_based_v2',
+                'weights': {'criteria': 0.60, 'documents': 0.20, 'eligibility': 0.20},
+                'sub_weights': {'completeness': 0.25, 'relevance': 0.35, 'depth': 0.40},
+            },
         }
+
+    @staticmethod
+    def _classify_quality_tier(score):
+        """Classify a numeric score into a quality tier label."""
+        if score >= 85:
+            return 'excellent'
+        if score >= 70:
+            return 'good'
+        if score >= 55:
+            return 'adequate'
+        if score >= 40:
+            return 'needs_improvement'
+        return 'poor'
 
     @staticmethod
     def _score_criterion_response(text, label, desc, weight, max_words):
@@ -131,44 +151,85 @@ class ScoringEngine:
             completeness = min(word_count / 3, 100)  # ~300 words for 100
         completeness = min(completeness, 100)
 
-        # Sub-score: Relevance (keyword matching)
+        # Sub-score: Relevance (keyword + bigram matching, v2)
         combined = (label + ' ' + desc).lower()
-        keywords = set(re.findall(r'\b[a-z]{4,}\b', combined))
+        # Extract single keywords (4+ chars) from both label and description
+        unigrams = set(re.findall(r'\b[a-z]{4,}\b', combined))
         # Remove very common words
         stopwords = {'this', 'that', 'with', 'from', 'your', 'have', 'will', 'been',
                       'what', 'when', 'where', 'which', 'their', 'there', 'these',
                       'those', 'about', 'would', 'could', 'should', 'does', 'into',
-                      'than', 'then', 'them', 'some', 'more', 'also', 'each', 'such'}
-        keywords -= stopwords
+                      'than', 'then', 'them', 'some', 'more', 'also', 'each', 'such',
+                      'must', 'only', 'very', 'most', 'just', 'like', 'over', 'many'}
+        unigrams -= stopwords
+        # Extract bigrams (2-word phrases) from combined label+desc
+        combined_words = re.findall(r'\b[a-z]{3,}\b', combined)
+        bigrams = set()
+        for i in range(len(combined_words) - 1):
+            if combined_words[i] not in stopwords and combined_words[i + 1] not in stopwords:
+                bigrams.add(combined_words[i] + ' ' + combined_words[i + 1])
+        keywords = unigrams | bigrams
         text_lower = text.lower()
         if keywords:
             matches = sum(1 for kw in keywords if kw in text_lower)
-            relevance = min((matches / len(keywords)) * 120, 100)
+            # Require at minimum 3 keyword matches for score > 50
+            if matches < 3:
+                relevance = min((matches / 3) * 50, 50)
+            else:
+                relevance = min((matches / len(keywords)) * 120, 100)
         else:
             relevance = 50  # neutral
 
-        # Sub-score: Depth (structure, evidence, analysis)
-        depth = 30  # base
-        # Structural indicators
+        # Sub-score: Depth (structure, evidence, analysis) -- v2 recalibrated
+        depth = 20  # base (lowered from 30 so poor responses score lower)
+
+        # Structural indicators -- paragraph counting
+        paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+        paragraph_count = len(paragraphs)
+        if paragraph_count >= 3:
+            depth += 10
+        elif paragraph_count >= 2:
+            depth += 5
+
+        # Lists / numbering
         if re.search(r'(\d+\.|\-\s|\*\s|•)', text):
-            depth += 10  # uses lists/numbering
-        if len(text.split('\n')) > 2:
-            depth += 5   # multiple paragraphs
-        # Evidence indicators
+            depth += 8  # uses lists/numbering
+        if len(text.split('\n')) > 4:
+            depth += 4   # multiple line breaks indicate structure
+
+        # Specific examples: numbers, dates, percentages
+        specific_examples = len(re.findall(r'\b\d{1,3}(?:,\d{3})*(?:\.\d+)?%?\b', text))
+        specific_examples += len(re.findall(r'\b(?:20\d{2}|19\d{2})\b', text))  # years
+        depth += min(specific_examples * 3, 15)
+
+        # Evidence indicators (expanded list, more aggressive scoring)
         evidence_words = ['data', 'evidence', 'study', 'survey', 'report', 'percent',
                           'increase', 'decrease', 'result', 'outcome', 'impact', 'baseline',
-                          'target', 'indicator', 'beneficiar', 'household', 'community']
+                          'target', 'indicator', 'beneficiar', 'household', 'community',
+                          'assessment', 'monitoring', 'evaluation', 'measured', 'achieved',
+                          'milestone', 'benchmark', 'statistic', 'findings', 'research']
         evidence_count = sum(1 for w in evidence_words if w in text_lower)
-        depth += min(evidence_count * 5, 30)
+        depth += min(evidence_count * 4, 25)
+
         # Analytical words
         analysis_words = ['because', 'therefore', 'however', 'furthermore', 'consequently',
-                          'specifically', 'strategy', 'approach', 'framework', 'methodology']
+                          'specifically', 'strategy', 'approach', 'framework', 'methodology',
+                          'analysis', 'recommend', 'address', 'mitigat', 'sustainab',
+                          'scalab', 'leverage', 'priorit', 'systematic', 'comprehensive']
         analysis_count = sum(1 for w in analysis_words if w in text_lower)
-        depth += min(analysis_count * 5, 20)
+        depth += min(analysis_count * 4, 18)
+
         depth = min(depth, 100)
 
-        # Composite score
-        score = (completeness * 0.35) + (relevance * 0.35) + (depth * 0.30)
+        # Cap depth for very short responses
+        if word_count < 100:
+            depth = min(depth, 40)
+        # Bonus for well-structured long responses
+        if word_count > 300 and paragraph_count >= 3 and evidence_count >= 2:
+            depth = min(depth + 10, 100)
+
+        # Composite score (v2: weight depth and relevance higher than raw word count)
+        score = (completeness * 0.25) + (relevance * 0.35) + (depth * 0.40)
         score = round(min(score, 100), 1)
 
         # Feedback generation
@@ -186,6 +247,7 @@ class ScoringEngine:
 
         return {
             'score': score,
+            'quality_tier': ScoringEngine._classify_quality_tier(score),
             'word_count': word_count,
             'max_words': max_words,
             'feedback': ' '.join(feedback_parts) if feedback_parts else 'Response meets basic requirements.',
