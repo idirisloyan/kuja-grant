@@ -1,0 +1,3 @@
+This is a plain text file disguised as a PDF.
+It does not contain valid PDF content.
+The system should detect this via magic byte validation.

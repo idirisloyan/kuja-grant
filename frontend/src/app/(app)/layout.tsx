@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUIStore } from '@/stores/ui-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { AIPanel } from '@/components/layout/ai-panel';
@@ -30,6 +31,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, loading, checkSession } = useAuthStore();
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
+
+  // Initialize i18n at the app shell level — sets dir="rtl" on <html> for Arabic
+  useTranslation();
 
   useEffect(() => {
     checkSession();

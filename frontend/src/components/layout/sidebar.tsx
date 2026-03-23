@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useUIStore } from '@/stores/ui-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
@@ -38,44 +39,6 @@ interface NavItem {
 }
 
 // ---------------------------------------------------------------------------
-// Nav config per role
-// ---------------------------------------------------------------------------
-
-const navItems: Record<UserRole, NavItem[]> = {
-  ngo: [
-    { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-    { icon: ClipboardCheck, label: 'Assessment Hub', href: '/assessments' },
-    { icon: Search, label: 'Browse Grants', href: '/grants' },
-    { icon: FileText, label: 'My Applications', href: '/applications' },
-    { icon: BarChart3, label: 'Reports', href: '/reports' },
-    { icon: Building2, label: 'Org Profile', href: '/organizations/profile' },
-  ],
-  donor: [
-    { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-    { icon: PlusCircle, label: 'Create Grant', href: '/grants/new' },
-    { icon: Briefcase, label: 'My Grants', href: '/grants' },
-    { icon: Star, label: 'Review Applications', href: '/reviews' },
-    { icon: BarChart3, label: 'Grant Reports', href: '/reports' },
-    { icon: Shield, label: 'Compliance', href: '/compliance' },
-    { icon: Search, label: 'Org Search', href: '/organizations/search' },
-    { icon: CheckCircle2, label: 'Registration', href: '/verification' },
-  ],
-  reviewer: [
-    { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-    { icon: ClipboardList, label: 'My Assignments', href: '/reviews' },
-    { icon: CheckCircle2, label: 'Completed', href: '/reviews/completed' },
-  ],
-  admin: [
-    { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-    { icon: Briefcase, label: 'All Grants', href: '/grants' },
-    { icon: FileText, label: 'All Applications', href: '/applications' },
-    { icon: Search, label: 'Org Search', href: '/organizations/search' },
-    { icon: CheckCircle2, label: 'Registration', href: '/verification' },
-    { icon: Shield, label: 'Compliance', href: '/compliance' },
-  ],
-};
-
-// ---------------------------------------------------------------------------
 // Sidebar Component
 // ---------------------------------------------------------------------------
 
@@ -88,10 +51,50 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   const pathname = usePathname();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { t } = useTranslation();
 
   const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, setMobileSidebarOpen } = useUIStore();
   const user = useAuthStore((s) => s.user);
   const role = user?.role || 'ngo';
+
+  // ---------------------------------------------------------------------------
+  // Nav config per role — built inside the component to use t()
+  // ---------------------------------------------------------------------------
+
+  const navItems: Record<UserRole, NavItem[]> = {
+    ngo: [
+      { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
+      { icon: ClipboardCheck, label: t('nav.assessment_hub'), href: '/assessments' },
+      { icon: Search, label: t('nav.browse_grants'), href: '/grants' },
+      { icon: FileText, label: t('nav.my_applications'), href: '/applications' },
+      { icon: BarChart3, label: t('nav.reports'), href: '/reports' },
+      { icon: Building2, label: t('nav.org_profile'), href: '/organizations/profile' },
+    ],
+    donor: [
+      { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
+      { icon: PlusCircle, label: t('nav.create_grant'), href: '/grants/new' },
+      { icon: Briefcase, label: t('nav.my_grants'), href: '/grants' },
+      { icon: Star, label: t('nav.review_applications'), href: '/reviews' },
+      { icon: BarChart3, label: t('nav.grant_reports'), href: '/reports' },
+      { icon: Shield, label: t('nav.compliance'), href: '/compliance' },
+      { icon: Search, label: t('nav.org_search'), href: '/organizations/search' },
+      { icon: CheckCircle2, label: t('nav.registration_checks'), href: '/verification' },
+    ],
+    reviewer: [
+      { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
+      { icon: ClipboardList, label: t('nav.my_assignments'), href: '/reviews' },
+      { icon: CheckCircle2, label: t('nav.completed_reviews'), href: '/reviews/completed' },
+    ],
+    admin: [
+      { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
+      { icon: Briefcase, label: t('nav.all_grants'), href: '/grants' },
+      { icon: FileText, label: t('nav.all_applications'), href: '/applications' },
+      { icon: Search, label: t('nav.org_search'), href: '/organizations/search' },
+      { icon: CheckCircle2, label: t('nav.registration_checks'), href: '/verification' },
+      { icon: Shield, label: t('nav.compliance'), href: '/compliance' },
+    ],
+  };
+
   const items = navItems[role] || navItems.ngo;
 
   const currentWidth = sidebarCollapsed ? collapsedWidth : width;
@@ -134,7 +137,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
         </Box>
         {!sidebarCollapsed && (
           <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '1rem' }}>
-            Kuja
+            {t('header.kuja_grant')}
           </Typography>
         )}
       </Box>

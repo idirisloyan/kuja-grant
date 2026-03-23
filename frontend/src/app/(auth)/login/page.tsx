@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -31,34 +32,6 @@ import StarOutline from '@mui/icons-material/StarOutline';
 type LoginFormValues = { email: string; password: string };
 
 // ---------------------------------------------------------------------------
-// Demo accounts
-// ---------------------------------------------------------------------------
-
-const demoAccounts = [
-  {
-    label: 'NGO',
-    email: 'fatima@amani.org',
-    icon: <Business />,
-    color: '#10B981',
-    description: 'Amani Foundation',
-  },
-  {
-    label: 'Donor',
-    email: 'sarah@globalhealth.org',
-    icon: <AccountBalanceWallet />,
-    color: '#3B82F6',
-    description: 'Global Health Fund',
-  },
-  {
-    label: 'Reviewer',
-    email: 'james@reviewer.org',
-    icon: <StarOutline />,
-    color: '#F59E0B',
-    description: 'Independent Reviewer',
-  },
-] as const;
-
-// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -66,6 +39,32 @@ export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((s) => s.login);
   const [isLoading, setIsLoading] = useState(false);
+  const { t } = useTranslation();
+
+  // Demo accounts — built inside component to use t()
+  const demoAccounts = [
+    {
+      label: t('auth.role_ngo'),
+      email: 'fatima@amani.org',
+      icon: <Business />,
+      color: '#10B981',
+      description: 'Amani Foundation',
+    },
+    {
+      label: t('auth.role_donor'),
+      email: 'sarah@globalhealth.org',
+      icon: <AccountBalanceWallet />,
+      color: '#3B82F6',
+      description: 'Global Health Fund',
+    },
+    {
+      label: t('auth.role_reviewer'),
+      email: 'james@reviewer.org',
+      icon: <StarOutline />,
+      color: '#F59E0B',
+      description: 'Independent Reviewer',
+    },
+  ];
 
   const {
     register,
@@ -179,10 +178,10 @@ export default function LoginPage() {
             </Typography>
           </Box>
           <Typography variant="h4" sx={{ color: '#fff', fontWeight: 700 }}>
-            Kuja Grant Management
+            {t('auth.login_title')}
           </Typography>
           <Typography variant="body2" sx={{ color: 'rgba(224,231,255,0.8)' }}>
-            AI-Powered Grant Management for Impact
+            {t('auth.subtitle')}
           </Typography>
         </Stack>
 
@@ -202,9 +201,9 @@ export default function LoginPage() {
                 {/* Email */}
                 <TextField
                   fullWidth
-                  label="Email"
+                  label={t('auth.email_label')}
                   type="email"
-                  placeholder="you@organization.org"
+                  placeholder={t('auth.email_placeholder')}
                   error={!!errors.email}
                   helperText={errors.email?.message}
                   InputProps={{
@@ -238,9 +237,9 @@ export default function LoginPage() {
                 {/* Password */}
                 <TextField
                   fullWidth
-                  label="Password"
+                  label={t('auth.password_label')}
                   type="password"
-                  placeholder="Enter your password"
+                  placeholder={t('auth.password_placeholder')}
                   error={!!errors.password}
                   helperText={errors.password?.message}
                   InputProps={{
@@ -289,7 +288,7 @@ export default function LoginPage() {
                   {isLoading ? (
                     <CircularProgress size={22} sx={{ color: '#4F46E5' }} />
                   ) : (
-                    'Sign In'
+                    t('auth.sign_in')
                   )}
                 </Button>
               </Stack>
@@ -303,7 +302,7 @@ export default function LoginPage() {
               }}
             >
               <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', px: 1 }}>
-                Quick Demo Access
+                {t('auth.demo_accounts')}
               </Typography>
             </Divider>
 

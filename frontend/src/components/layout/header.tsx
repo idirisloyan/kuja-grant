@@ -2,6 +2,7 @@
 
 import { useAuthStore } from '@/stores/auth-store';
 import { useUIStore } from '@/stores/ui-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { useRouter } from 'next/navigation';
 
 import AppBar from '@mui/material/AppBar';
@@ -24,6 +25,7 @@ export function Header() {
   const router = useRouter();
   const { user, logout, setLanguage } = useAuthStore();
   const { toggleAIPanel, setMobileSidebarOpen } = useUIStore();
+  const { t } = useTranslation();
 
   const handleLogout = async () => {
     await logout();
@@ -72,7 +74,7 @@ export function Header() {
             }}
           >
             <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-              AI Assistant
+              {t('header.ai_assistant')}
             </Box>
           </Button>
 
@@ -128,7 +130,7 @@ export function Header() {
           </Box>
 
           {/* Logout */}
-          <Tooltip title="Sign out">
+          <Tooltip title={t('auth.logout')}>
             <IconButton
               onClick={handleLogout}
               size="small"

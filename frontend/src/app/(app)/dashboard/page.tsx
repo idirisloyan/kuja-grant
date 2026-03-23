@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useDashboardStats } from '@/lib/hooks/use-api';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { useRouter } from 'next/navigation';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -115,6 +116,7 @@ function MetricCard({ icon: Icon, label, value, color, bgColor, href, trend }: {
 
 function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; userName: string }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const s = stats || {};
   const totalApps = Number(s.total_applications) || 0;
   const openGrants = Number(s.open_grants) || 0;
@@ -139,19 +141,19 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
           <CardContent sx={{ p: { xs: 3, md: 4 }, position: 'relative', zIndex: 1 }}>
             <Grid container alignItems="center" justifyContent="space-between" spacing={2}>
               <Grid size={{ xs: 12, sm: 7 }}>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>Welcome back, {userName.split(' ')[0]} 👋</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700 }}>{t('auth.welcome_back', { name: userName.split(' ')[0] })}</Typography>
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', mt: 0.5 }}>
-                  Track your grants, assessments, and compliance status all in one place.
+                  {t('dashboard.ngo.subtitle')}
                 </Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 5 }} sx={{ textAlign: { sm: 'right' } }}>
                 <Button variant="outlined" size="small" startIcon={<ClipboardCheck size={16} />} onClick={() => router.push('/assessments')}
                   sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)', mr: 1, '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                  Start Assessment
+                  {t('dashboard.action.start_assessment')}
                 </Button>
                 <Button variant="contained" size="small" startIcon={<Search size={16} />} onClick={() => router.push('/grants')}
                   sx={{ bgcolor: '#fff', color: '#4F46E5', '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' } }}>
-                  Browse Grants
+                  {t('dashboard.action.browse_grants')}
                 </Button>
               </Grid>
             </Grid>
@@ -163,27 +165,27 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
 
       {/* Metric Cards */}
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={FileText} label="Total Applications" value={totalApps} color="#4F46E5" bgColor="#EEF2FF" href="/applications" />
+        <MetricCard icon={FileText} label={t('dashboard.stat.applications')} value={totalApps} color="#4F46E5" bgColor="#EEF2FF" href="/applications" />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={Search} label="Open Grants" value={openGrants} color="#10B981" bgColor="#ECFDF5" href="/grants" />
+        <MetricCard icon={Search} label={t('dashboard.stat.open_grants')} value={openGrants} color="#10B981" bgColor="#ECFDF5" href="/grants" />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={Calendar} label="Pending Reports" value={pendingReports} color="#F59E0B" bgColor="#FFFBEB" href="/reports" />
+        <MetricCard icon={Calendar} label={t('dashboard.stat.pending_reports')} value={pendingReports} color="#F59E0B" bgColor="#FFFBEB" href="/reports" />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={TrendingUp} label="Capacity Score" value={`${avgScore}%`} color="#8B5CF6" bgColor="#F5F3FF" href="/assessments" />
+        <MetricCard icon={TrendingUp} label={t('dashboard.stat.capacity_score')} value={`${avgScore}%`} color="#8B5CF6" bgColor="#F5F3FF" href="/assessments" />
       </Grid>
 
       {/* Chart + Recent Applications */}
       <Grid size={{ xs: 12, lg: 8 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Applications Over Time</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>{t('dashboard.chart.applications_trend')}</Typography>
             <Box sx={{ height: 280, width: '100%' }}>
               <BarChart
                 xAxis={[{ data: chartData.map(d => d.month), scaleType: 'band' }]}
-                series={[{ data: chartData.map(d => d.value), color: '#4F46E5', label: 'Applications' }]}
+                series={[{ data: chartData.map(d => d.value), color: '#4F46E5', label: t('dashboard.stat.applications') }]}
                 height={280}
                 margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
                 borderRadius={6}
@@ -197,9 +199,9 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
         <Card sx={{ height: '100%' }}>
           <CardContent sx={{ p: 0 }}>
             <Box sx={{ p: 3, pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>Recent Applications</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>{t('dashboard.recent_applications')}</Typography>
               <Button size="small" onClick={() => router.push('/applications')} endIcon={<ChevronRight size={14} />}>
-                View all
+                {t('common.view_all')}
               </Button>
             </Box>
             <List disablePadding>
@@ -217,8 +219,8 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
                 </ListItem>
               )) : (
                 <Box sx={{ py: 6, textAlign: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">No applications yet</Typography>
-                  <Button size="small" onClick={() => router.push('/grants')} sx={{ mt: 1 }}>Browse Grants</Button>
+                  <Typography variant="body2" color="text.secondary">{t('dashboard.no_applications_yet')}</Typography>
+                  <Button size="small" onClick={() => router.push('/grants')} sx={{ mt: 1 }}>{t('dashboard.action.browse_grants')}</Button>
                 </Box>
               )}
             </List>
@@ -232,11 +234,11 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
           <CardContent sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>Organization Readiness</Typography>
-                <Typography variant="body2" color="text.secondary">Your capacity assessment score</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>{t('dashboard.org_readiness')}</Typography>
+                <Typography variant="body2" color="text.secondary">{t('dashboard.org_readiness_subtitle')}</Typography>
               </Box>
               <Button variant="outlined" size="small" onClick={() => router.push('/assessments')}>
-                View Details
+                {t('common.view_details')}
               </Button>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -272,6 +274,7 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
 
 function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; userName: string }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const s = stats || {};
   const totalGrants = Number(s.total_grants) || 0;
   const totalApps = Number(s.total_applications) || 0;
@@ -285,15 +288,15 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
           <CardContent sx={{ p: { xs: 3, md: 4 }, position: 'relative', zIndex: 1 }}>
             <Grid container alignItems="center" justifyContent="space-between" spacing={2}>
               <Grid size={{ xs: 12, sm: 8 }}>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>Welcome back, {userName.split(' ')[0]} 👋</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700 }}>{t('auth.welcome_back', { name: userName.split(' ')[0] })}</Typography>
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', mt: 0.5 }}>
-                  Create grants, review applications, and track grantee compliance.
+                  {t('dashboard.donor.subtitle')}
                 </Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 4 }} sx={{ textAlign: { sm: 'right' } }}>
                 <Button variant="contained" size="small" startIcon={<PlusCircle size={16} />} onClick={() => router.push('/grants/new')}
                   sx={{ bgcolor: '#fff', color: '#059669', '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' } }}>
-                  Create Grant
+                  {t('nav.create_grant')}
                 </Button>
               </Grid>
             </Grid>
@@ -303,16 +306,16 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
       </Grid>
 
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={Briefcase} label="Total Grants" value={totalGrants} color="#4F46E5" bgColor="#EEF2FF" href="/grants" />
+        <MetricCard icon={Briefcase} label={t('dashboard.stat.total_grants')} value={totalGrants} color="#4F46E5" bgColor="#EEF2FF" href="/grants" />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={FileText} label="Applications" value={totalApps} color="#3B82F6" bgColor="#EFF6FF" href="/reviews" />
+        <MetricCard icon={FileText} label={t('dashboard.stat.total_applications')} value={totalApps} color="#3B82F6" bgColor="#EFF6FF" href="/reviews" />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={Star} label="Pending Review" value={pendingReviews} color="#F59E0B" bgColor="#FFFBEB" href="/reviews" />
+        <MetricCard icon={Star} label={t('dashboard.stat.pending_reviews')} value={pendingReviews} color="#F59E0B" bgColor="#FFFBEB" href="/reviews" />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={TrendingUp} label="Total Awarded" value={`$${(totalAwarded / 1000).toFixed(0)}K`} color="#10B981" bgColor="#ECFDF5" />
+        <MetricCard icon={TrendingUp} label={t('dashboard.stat.total_awarded')} value={`$${(totalAwarded / 1000).toFixed(0)}K`} color="#10B981" bgColor="#ECFDF5" />
       </Grid>
 
       {/* My Grants List */}
@@ -320,9 +323,9 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
         <Card sx={{ height: '100%' }}>
           <CardContent sx={{ p: 0 }}>
             <Box sx={{ p: 3, pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>My Grants</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>{t('dashboard.donor.my_grants')}</Typography>
               <Button size="small" onClick={() => router.push('/grants')} endIcon={<ChevronRight size={14} />}>
-                View all
+                {t('common.view_all')}
               </Button>
             </Box>
             {Array.isArray(s.recent_grants) && (s.recent_grants as Array<Record<string, unknown>>).length > 0 ? (
@@ -333,7 +336,7 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
                       <ListItemText
                         primary={String(g.title || 'Untitled Grant')}
                         primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
-                        secondary={`$${((Number(g.total_funding) || 0) / 1000).toFixed(0)}K \u00B7 ${Number(g.application_count) || 0} applications`}
+                        secondary={`$${((Number(g.total_funding) || 0) / 1000).toFixed(0)}K \u00B7 ${Number(g.application_count) || 0} ${t('grant.applications').toLowerCase()}`}
                         secondaryTypographyProps={{ variant: 'caption' }}
                       />
                       <StatusBadge status={String(g.status || 'draft')} />
@@ -343,9 +346,9 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
               </List>
             ) : (
               <Box sx={{ py: 4, textAlign: 'center', px: 3 }}>
-                <Typography variant="body2" color="text.secondary">No grants yet</Typography>
+                <Typography variant="body2" color="text.secondary">{t('dashboard.donor.no_grants_yet')}</Typography>
                 <Button size="small" variant="outlined" onClick={() => router.push('/grants/new')} sx={{ mt: 1 }}>
-                  Create Your First Grant
+                  {t('grant.create_first')}
                 </Button>
               </Box>
             )}
@@ -359,22 +362,22 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
           {/* Risk Items */}
           <Card sx={{ borderLeft: '4px solid #EF4444' }}>
             <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>Attention Required</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>{t('dashboard.donor.attention_required')}</Typography>
               <Stack spacing={1}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">Overdue reports</Typography>
+                  <Typography variant="body2" color="text.secondary">{t('dashboard.donor.overdue_reports')}</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 600, color: Number(s.overdue_reports) ? 'error.main' : 'text.secondary' }}>
                     {Number(s.overdue_reports) || 0}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">Reports due this month</Typography>
+                  <Typography variant="body2" color="text.secondary">{t('dashboard.donor.reports_due_month')}</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 600, color: 'warning.main' }}>
                     {Number(s.reports_due_soon) || 0}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">Flagged compliance</Typography>
+                  <Typography variant="body2" color="text.secondary">{t('dashboard.donor.flagged_compliance')}</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 600, color: Number(s.flagged_compliance) ? 'error.main' : 'text.secondary' }}>
                     {Number(s.flagged_compliance) || 0}
                   </Typography>
@@ -386,16 +389,16 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
           {/* Quick Actions */}
           <Card sx={{ flex: 1 }}>
             <CardContent sx={{ p: 2.5 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>Quick Actions</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>{t('dashboard.quick_actions')}</Typography>
               <Stack spacing={1}>
                 {[
-                  { icon: PlusCircle, label: 'Create New Grant', href: '/grants/new', color: '#4F46E5' },
-                  { icon: Star, label: 'Review Applications', href: '/reviews', color: '#F59E0B' },
-                  { icon: BarChart3, label: 'Grant Reports', href: '/reports', color: '#3B82F6' },
-                  { icon: Shield, label: 'Compliance', href: '/compliance', color: '#10B981' },
+                  { icon: PlusCircle, label: t('dashboard.donor.create_new_grant'), href: '/grants/new', color: '#4F46E5' },
+                  { icon: Star, label: t('nav.review_applications'), href: '/reviews', color: '#F59E0B' },
+                  { icon: BarChart3, label: t('nav.grant_reports'), href: '/reports', color: '#3B82F6' },
+                  { icon: Shield, label: t('nav.compliance'), href: '/compliance', color: '#10B981' },
                 ].map(({ icon: I, label, href, color }) => (
                   <Button
-                    key={label}
+                    key={href}
                     fullWidth
                     variant="outlined"
                     size="small"
@@ -421,15 +424,16 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
 
 function ReviewerDashboard({ stats, userName }: { stats?: Record<string, unknown>; userName: string }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const s = stats || {};
   return (
     <Grid container spacing={3}>
       <Grid size={12}>
         <Card sx={{ background: 'linear-gradient(135deg, #7C3AED 0%, #8B5CF6 50%, #A78BFA 100%)', color: '#fff', position: 'relative', overflow: 'hidden' }}>
           <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>Welcome back, {userName.split(' ')[0]} 👋</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>{t('auth.welcome_back', { name: userName.split(' ')[0] })}</Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', mt: 0.5 }}>
-              Review and score assigned applications.
+              {t('dashboard.reviewer.subtitle')}
             </Typography>
           </CardContent>
           <Box sx={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.08)' }} />
@@ -437,13 +441,13 @@ function ReviewerDashboard({ stats, userName }: { stats?: Record<string, unknown
       </Grid>
 
       <Grid size={{ xs: 12, sm: 4 }}>
-        <MetricCard icon={FileText} label="Pending Assignments" value={Number(s.pending_reviews) || 0} color="#F59E0B" bgColor="#FFFBEB" href="/reviews" />
+        <MetricCard icon={FileText} label={t('dashboard.stat.pending_assignments')} value={Number(s.pending_reviews) || 0} color="#F59E0B" bgColor="#FFFBEB" href="/reviews" />
       </Grid>
       <Grid size={{ xs: 12, sm: 4 }}>
-        <MetricCard icon={Star} label="Completed Reviews" value={Number(s.completed_reviews) || 0} color="#10B981" bgColor="#ECFDF5" href="/reviews/completed" />
+        <MetricCard icon={Star} label={t('dashboard.stat.completed_reviews')} value={Number(s.completed_reviews) || 0} color="#10B981" bgColor="#ECFDF5" href="/reviews/completed" />
       </Grid>
       <Grid size={{ xs: 12, sm: 4 }}>
-        <MetricCard icon={TrendingUp} label="Average Score" value={`${Number(s.average_score) || 0}%`} color="#4F46E5" bgColor="#EEF2FF" />
+        <MetricCard icon={TrendingUp} label={t('dashboard.stat.average_score')} value={`${Number(s.average_score) || 0}%`} color="#4F46E5" bgColor="#EEF2FF" />
       </Grid>
 
       <Grid size={12}>
@@ -452,12 +456,12 @@ function ReviewerDashboard({ stats, userName }: { stats?: Record<string, unknown
             <Avatar sx={{ width: 64, height: 64, bgcolor: '#EEF2FF', mx: 'auto', mb: 2 }}>
               <Star size={28} color="#4F46E5" />
             </Avatar>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Ready to review?</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>{t('dashboard.reviewer.ready_to_review')}</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Start scoring your assigned applications to help match NGOs with the right grants.
+              {t('dashboard.reviewer.ready_subtitle')}
             </Typography>
             <Button variant="contained" size="large" startIcon={<Star size={18} />} onClick={() => router.push('/reviews')}>
-              Go to Assignments
+              {t('dashboard.reviewer.go_to_assignments')}
             </Button>
           </CardContent>
         </Card>
@@ -472,6 +476,7 @@ function ReviewerDashboard({ stats, userName }: { stats?: Record<string, unknown
 
 function AdminDashboard({ stats, userName }: { stats?: Record<string, unknown>; userName: string }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const s = stats || {};
 
   const chartData = useMemo(() => {
@@ -486,9 +491,9 @@ function AdminDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
       <Grid size={12}>
         <Card sx={{ background: 'linear-gradient(135deg, #1E293B 0%, #334155 50%, #475569 100%)', color: '#fff', position: 'relative', overflow: 'hidden' }}>
           <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>Admin Dashboard</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>{t('dashboard.admin.title')}</Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mt: 0.5 }}>
-              System overview and administration.
+              {t('dashboard.admin.subtitle')}
             </Typography>
           </CardContent>
           <Box sx={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)' }} />
@@ -496,26 +501,26 @@ function AdminDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
       </Grid>
 
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={Users} label="Total Users" value={Number(s.total_users) || 0} color="#4F46E5" bgColor="#EEF2FF" />
+        <MetricCard icon={Users} label={t('dashboard.stat.total_users')} value={Number(s.total_users) || 0} color="#4F46E5" bgColor="#EEF2FF" />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={Briefcase} label="Grants" value={Number(s.total_grants) || 0} color="#3B82F6" bgColor="#EFF6FF" href="/grants" />
+        <MetricCard icon={Briefcase} label={t('dashboard.stat.grants')} value={Number(s.total_grants) || 0} color="#3B82F6" bgColor="#EFF6FF" href="/grants" />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={FileText} label="Applications" value={Number(s.total_applications) || 0} color="#10B981" bgColor="#ECFDF5" href="/applications" />
+        <MetricCard icon={FileText} label={t('dashboard.stat.total_applications')} value={Number(s.total_applications) || 0} color="#10B981" bgColor="#ECFDF5" href="/applications" />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={Shield} label="Compliance Checks" value={Number(s.total_checks) || 0} color="#F59E0B" bgColor="#FFFBEB" href="/compliance" />
+        <MetricCard icon={Shield} label={t('dashboard.stat.compliance_checks')} value={Number(s.total_checks) || 0} color="#F59E0B" bgColor="#FFFBEB" href="/compliance" />
       </Grid>
 
       <Grid size={12}>
         <Card>
           <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Platform Activity</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>{t('dashboard.admin.platform_activity')}</Typography>
             <Box sx={{ height: 300 }}>
               <BarChart
                 xAxis={[{ data: chartData.map(d => d.month), scaleType: 'band' }]}
-                series={[{ data: chartData.map(d => d.value), color: '#4F46E5', label: 'Activity' }]}
+                series={[{ data: chartData.map(d => d.value), color: '#4F46E5', label: t('dashboard.recent_activity') }]}
                 height={300}
                 margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
                 borderRadius={6}

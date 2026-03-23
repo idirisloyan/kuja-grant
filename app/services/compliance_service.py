@@ -33,7 +33,7 @@ class ComplianceService:
     """
 
     FLAGGED_KEYWORDS = ['shadow', 'phantom', 'ghost', 'blacklisted']
-    FUZZY_THRESHOLD = 0.75  # SequenceMatcher ratio threshold
+    FUZZY_THRESHOLD = 0.82  # SequenceMatcher ratio threshold (raised from 0.75 to reduce false positives)
 
     # --- Main entry point ---
 
@@ -316,16 +316,32 @@ class ComplianceService:
 
     @classmethod
     def _fuzzy_match(cls, name, entity_name, threshold=None):
-        """Fuzzy name matching using SequenceMatcher."""
+        """Fuzzy name matching using SequenceMatcher with reduced false positives.
+
+        Guards against substring-collision false positives (e.g. "OMM" inside
+        "Community") by requiring the shorter string to be at least 4 chars
+        and at least 40% of the longer string's length before counting a
+        substring match.
+        """
         threshold = threshold or cls.FUZZY_THRESHOLD
         name_lower = name.lower().strip()
         entity_lower = entity_name.lower().strip()
+
+        # Skip very short entity names (< 4 chars) — too prone to false positives
+        if len(entity_lower) < 4 or len(name_lower) < 4:
+            return 0.0
+
         # Exact match
         if name_lower == entity_lower:
             return 1.0
-        # Substring containment
-        if name_lower in entity_lower or entity_lower in name_lower:
-            return 0.9
+
+        # Substring containment — only if the substring is ≥40% of the longer string
+        shorter = min(len(name_lower), len(entity_lower))
+        longer = max(len(name_lower), len(entity_lower))
+        if shorter / longer >= 0.4:
+            if name_lower in entity_lower or entity_lower in name_lower:
+                return 0.9
+
         # Fuzzy ratio
         return SequenceMatcher(None, name_lower, entity_lower).ratio()
 
