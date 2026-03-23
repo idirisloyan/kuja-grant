@@ -518,6 +518,32 @@ def api_admin_security_events():
     return jsonify({'success': True, 'security': events, 'window_hours': hours})
 
 
+@admin_bp.route('/tasks/<task_id>', methods=['GET'])
+@login_required
+def get_task_status(task_id):
+    """Check the status of a background task (async AI/compliance operations).
+    Returns task status, result on completion, or error on failure."""
+    from app.services.task_runner import get_task
+    task = get_task(task_id)
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+    return jsonify(task)
+
+
+@admin_bp.route('/tasks', methods=['GET'])
+@login_required
+def list_tasks():
+    """List all background tasks. Admin-only for full list, others see own tasks."""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+    from app.services.task_runner import list_tasks as _list_tasks, cleanup_old_tasks
+    # Auto-cleanup old tasks on each listing
+    cleanup_old_tasks(max_age_hours=24)
+    status_filter = request.args.get('status')
+    tasks = _list_tasks(status=status_filter)
+    return jsonify({'tasks': tasks, 'count': len(tasks)})
+
+
 @admin_bp.route('/admin/reseed', methods=['POST'])
 @login_required
 def api_admin_reseed():

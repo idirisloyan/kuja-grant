@@ -9,6 +9,8 @@ Extracted from the monolithic server.py during modularisation.
 import json
 import os
 import logging
+import time
+import uuid
 from datetime import datetime, timezone
 
 from flask import request, jsonify, send_from_directory
@@ -111,6 +113,48 @@ def register_middleware(app):
 
     is_production = os.getenv('DATABASE_URL') is not None
 
+    # ------------------------------------------------------------------
+    # Request ID: unique identifier for tracing requests across logs
+    # ------------------------------------------------------------------
+    @app.before_request
+    def add_request_id():
+        """Assign a unique request ID for tracing. Honors upstream X-Request-ID if present."""
+        request_id = request.headers.get('X-Request-ID', str(uuid.uuid4())[:8])
+        request.request_id = request_id
+
+    @app.after_request
+    def add_request_id_header(response):
+        """Include request ID in response for client-side correlation."""
+        if hasattr(request, 'request_id'):
+            response.headers['X-Request-ID'] = request.request_id
+        return response
+
+    # ------------------------------------------------------------------
+    # Latency tracking: measure and log request duration for all API calls
+    # ------------------------------------------------------------------
+    @app.before_request
+    def start_timer():
+        """Record request start time for latency measurement."""
+        request._start_time = time.monotonic()
+
+    @app.after_request
+    def log_request_metrics(response):
+        """Log structured request metrics for observability."""
+        if hasattr(request, '_start_time') and request.path.startswith('/api/'):
+            duration_ms = (time.monotonic() - request._start_time) * 1000
+            req_id = getattr(request, 'request_id', '-')
+            user_email = current_user.email if current_user.is_authenticated else 'anonymous'
+            logger.info(
+                f"REQUEST {request.method} {request.path} "
+                f"status={response.status_code} "
+                f"duration={duration_ms:.1f}ms "
+                f"user={user_email} "
+                f"request_id={req_id}"
+            )
+            # Add Server-Timing header for browser DevTools
+            response.headers['Server-Timing'] = f'total;dur={duration_ms:.1f}'
+        return response
+
     @app.after_request
     def add_security_headers(response):
         """Add enterprise security headers to every response."""
@@ -119,12 +163,17 @@ def register_middleware(app):
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+        # CSP: 'unsafe-inline' required for script-src and style-src because
+        # the Vanilla JS SPA uses inline event handlers and dynamic styles.
+        # Once migrated to a framework with nonce support, replace with nonce-based CSP.
+        # blob: in img-src covers chart libraries that render to blob URLs.
+        # data: in font-src covers libraries that inline small icon fonts.
         response.headers['Content-Security-Policy'] = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "img-src 'self' data:; "
-            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: blob:; "
+            "font-src 'self' https://fonts.gstatic.com data:; "
             "connect-src 'self' https://api.anthropic.com; "
             "frame-ancestors 'none'; "
             "base-uri 'self'; "
