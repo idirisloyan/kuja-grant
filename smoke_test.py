@@ -49,11 +49,13 @@ def run(name, fn):
         results.append(("PASS", name, ""))
         print(f"  [PASS] {name}")
     except AssertionError as e:
-        results.append(("FAIL", name, str(e)))
-        print(f"  [FAIL] {name} -- {e}")
+        msg = str(e).encode('ascii', 'replace').decode()
+        results.append(("FAIL", name, msg))
+        print(f"  [FAIL] {name} -- {msg}")
     except Exception as e:
-        results.append(("ERROR", name, f"{type(e).__name__}: {e}"))
-        print(f"  [ERR]  {name} -- {type(e).__name__}: {e}")
+        msg = f"{type(e).__name__}: {e}".encode('ascii', 'replace').decode()
+        results.append(("ERROR", name, msg))
+        print(f"  [ERR]  {name} -- {msg}")
 
 def _retry_session():
     s = requests.Session()
@@ -203,6 +205,58 @@ def make_tests(base):
             s.delete(f"{base}/api/grants/{gid}",
                      headers={"X-Requested-With": "XMLHttpRequest"}, timeout=5)
     tests.append(("DEF-UX-001: Grant publish sets status to open", test_grant_publish))
+
+    # --- Wizard full flow: create empty draft → PUT title → upload → publish ---
+    def test_wizard_full_flow():
+        """Simulate the exact Next.js wizard flow that was failing."""
+        s = login_ok(base, USERS["donor"])
+        # Step 0: Create empty draft (like Skip path or upload path)
+        gr = s.post(f"{base}/api/grants/",
+                    json={"title": "Draft Grant"},
+                    headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert gr.status_code in (200, 201), f"Draft create: {gr.status_code}"
+        gid = gr.json()["grant"]["id"]
+        try:
+            # Step 1: Upload doc for AI extraction
+            content = (
+                "Grant Agreement - Reporting Requirements\n"
+                "1. Quarterly Financial Report due 30 days.\n"
+                "2. Annual Impact Assessment.\n"
+                "KPIs: Beneficiaries (5000), Budget utilization (90%)\n"
+            )
+            up = s.post(f"{base}/api/grants/{gid}/upload-grant-doc",
+                        files={"file": ("agreement.txt", io.BytesIO(content.encode()), "text/plain")},
+                        headers={"X-Requested-With": "XMLHttpRequest"}, timeout=90)
+            assert up.status_code == 200, f"Upload: {up.status_code}"
+            ext = up.json().get("extracted_requirements", {})
+            assert len(ext.get("requirements", [])) > 0, "Extraction returned 0 reqs"
+
+            # Step 2-4: autoSave with title + required fields (simulates wizard PUT)
+            put = s.put(f"{base}/api/grants/{gid}",
+                        json={"title": "Wizard Flow Test Grant",
+                              "total_funding": 50000, "currency": "USD",
+                              "deadline": "2026-12-31"},
+                        headers={"Content-Type": "application/json",
+                                 "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+            assert put.status_code == 200, f"PUT: {put.status_code}"
+
+            # Verify title persisted (not overwritten by empty autoSave)
+            get = s.get(f"{base}/api/grants/{gid}",
+                        headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+            assert get.status_code == 200
+            assert get.json()["grant"]["title"] == "Wizard Flow Test Grant", \
+                f"Title was overwritten: {get.json()['grant']['title']}"
+
+            # Step 5: Publish
+            pub = s.post(f"{base}/api/grants/{gid}/publish",
+                         headers={"Content-Type": "application/json",
+                                  "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+            assert pub.status_code == 200, f"Publish: {pub.status_code}"
+            assert pub.json().get("grant", {}).get("status") == "open"
+        finally:
+            s.delete(f"{base}/api/grants/{gid}",
+                     headers={"X-Requested-With": "XMLHttpRequest"}, timeout=5)
+    tests.append(("DEF-UX-001: Full wizard flow (draft>upload>put>publish)", test_wizard_full_flow))
 
     # --- i18n: key count parity (DEF-I18N-001) ---
     def test_i18n_key_counts():

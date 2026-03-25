@@ -355,36 +355,37 @@ export default function CreateGrantPage() {
     if (!grantId) return;
     setSaving(true);
     try {
-      const payload: Record<string, unknown> = {
-        title: basic.title,
-        description: basic.description,
-        total_funding: basic.total_funding ? Number(basic.total_funding) : null,
-        currency: basic.currency,
-        deadline: basic.deadline || null,
-        sectors: basic.sectors,
-        countries: basic.countries,
-        eligibility: eligibility
-          .filter((e) => e.enabled)
-          .map((e) => ({ key: e.key, label: e.label, details: e.details, weight: e.weight, required: true })),
-        criteria: criteria
-          .filter((c) => c.label.trim())
-          .map((c, i) => ({
-            key: `criterion_${i + 1}`,
-            label: c.label,
-            weight: c.weight,
-            description: c.description,
-            instructions: c.instructions,
-            max_words: c.max_words,
-          })),
-        doc_requirements: docReqs
-          .filter((d) => d.enabled)
-          .map((d) => ({
-            key: d.key,
-            label: d.label,
-            required: d.required,
-            specific_requirements: d.specific_requirements,
-          })),
-      };
+      // Only include fields that the user has actually filled in,
+      // so we never overwrite server data with empty strings
+      const payload: Record<string, unknown> = {};
+      if (basic.title) payload.title = basic.title;
+      if (basic.description) payload.description = basic.description;
+      if (basic.total_funding) payload.total_funding = Number(basic.total_funding);
+      if (basic.currency) payload.currency = basic.currency;
+      if (basic.deadline) payload.deadline = basic.deadline;
+      if (basic.sectors.length > 0) payload.sectors = basic.sectors;
+      if (basic.countries.length > 0) payload.countries = basic.countries;
+      payload.eligibility = eligibility
+        .filter((e) => e.enabled)
+        .map((e) => ({ key: e.key, label: e.label, details: e.details, weight: e.weight, required: true }));
+      payload.criteria = criteria
+        .filter((c) => c.label.trim())
+        .map((c, i) => ({
+          key: `criterion_${i + 1}`,
+          label: c.label,
+          weight: c.weight,
+          description: c.description,
+          instructions: c.instructions,
+          max_words: c.max_words,
+        }));
+      payload.doc_requirements = docReqs
+        .filter((d) => d.enabled)
+        .map((d) => ({
+          key: d.key,
+          label: d.label,
+          required: d.required,
+          specific_requirements: d.specific_requirements,
+        }));
       await api.put(`/grants/${grantId}`, payload);
     } catch {
       // Silent fail for auto-save; user can still proceed
@@ -397,8 +398,15 @@ export default function CreateGrantPage() {
     // Ensure a draft exists before leaving step 0
     if (step === 0 && !grantId) {
       try {
-        const res = await api.post<GrantCreateResponse>('/grants/', { title: 'Draft Grant' });
-        if (res.success) setGrantId(res.grant.id);
+        const draftTitle = basic.title || 'Draft Grant';
+        const res = await api.post<GrantCreateResponse>('/grants/', { title: draftTitle });
+        if (res.success) {
+          setGrantId(res.grant.id);
+          // Sync basic state so title is never empty after draft creation
+          if (!basic.title) {
+            setBasic((prev) => ({ ...prev, title: draftTitle }));
+          }
+        }
       } catch {
         toast.error('Failed to create draft grant');
         return;
@@ -554,6 +562,19 @@ export default function CreateGrantPage() {
   const handlePublish = async () => {
     if (!grantId) {
       toast.error('No grant to publish. Please complete the wizard first.');
+      return;
+    }
+
+    // Validate required fields with user feedback
+    const missing: string[] = [];
+    if (!basic.title.trim()) missing.push('Title');
+    if (!basic.total_funding) missing.push('Funding Amount');
+    if (!basic.deadline) missing.push('Deadline');
+    if (missing.length > 0) {
+      toast.error(`Please fill in required fields: ${missing.join(', ')}`, {
+        description: 'Go back to Basic Info (Step 2) to complete these fields.',
+        duration: 5000,
+      });
       return;
     }
 
@@ -1159,6 +1180,19 @@ export default function CreateGrantPage() {
         </Typography>
       </Box>
 
+      {/* Validation warning if required fields are missing */}
+      {(!basic.title.trim() || !basic.total_funding || !basic.deadline) && (
+        <Alert severity="warning" sx={{ mb: 0 }}>
+          <strong>Required fields missing:</strong>{' '}
+          {[
+            !basic.title.trim() && 'Title',
+            !basic.total_funding && 'Funding Amount',
+            !basic.deadline && 'Deadline',
+          ].filter(Boolean).join(', ')}
+          . Go back to <strong>Basic Info</strong> (Step 2) to complete them before publishing.
+        </Alert>
+      )}
+
       {/* Basic Info Summary */}
       <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
         <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
@@ -1347,7 +1381,7 @@ export default function CreateGrantPage() {
           variant="contained"
           color="success"
           onClick={handlePublish}
-          disabled={publishing || saving || !basic.title.trim()}
+          disabled={publishing || saving}
           startIcon={publishing ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />}
         >
           {publishing ? 'Publishing...' : 'Publish Grant'}
