@@ -966,6 +966,11 @@ Return ONLY valid JSON, no other text."""
                 logger.error(f"AI requirement extraction failed: {e}")
 
         # Fallback simulated extraction
+        return AIService._fallback_reporting_requirements()
+
+    @staticmethod
+    def _fallback_reporting_requirements():
+        """Default reporting requirements used when AI extraction yields no results."""
         return {
             'reporting_frequency': 'quarterly',
             'requirements': [

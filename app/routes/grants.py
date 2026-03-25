@@ -410,6 +410,19 @@ def api_upload_grant_doc(grant_id):
     if 'reporting_requirements' in extracted and 'requirements' not in extracted:
         extracted['requirements'] = extracted['reporting_requirements']
 
+    # DEF-CORE-001: If AI returned zero requirements, merge fallback defaults
+    reqs = extracted.get('requirements', [])
+    if not isinstance(reqs, list) or len(reqs) == 0:
+        fallback = AIService._fallback_reporting_requirements()
+        extracted['requirements'] = fallback['requirements']
+        if not extracted.get('template_sections'):
+            extracted['template_sections'] = fallback['template_sections']
+        if not extracted.get('indicators'):
+            extracted['indicators'] = fallback['indicators']
+        if not extracted.get('reporting_frequency'):
+            extracted['reporting_frequency'] = fallback['reporting_frequency']
+        logger.info(f"AI returned empty requirements for grant {grant_id}; using fallback defaults")
+
     # Auto-save extracted requirements to grant
     requirements_saved = False
     if extracted.get('requirements'):

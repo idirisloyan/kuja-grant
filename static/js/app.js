@@ -1041,7 +1041,7 @@ function renderNGODashboard() {
         '<div class="shrink-0">' + scoreRingHTML(score, 80, '%') + '</div>' +
         '<div class="flex-1 text-center sm:text-left">' +
         '<h3 class="text-lg font-semibold text-slate-900">' + T('dashboard.stat.capacity_score') + '</h3>' +
-        '<p class="text-sm text-slate-500 mt-1">Your current capacity level: ' + statusBadge(cap.label, cap.color) + '</p>' +
+        '<p class="text-sm text-slate-500 mt-1">' + T('dashboard.capacity_level') + ' ' + statusBadge(cap.label, cap.color) + '</p>' +
         '</div>' +
         '<div class="shrink-0">' +
         '<button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-2" onclick="nav(\'assessment\')">' + icon('arrow-right', 16) + ' ' + T('dashboard.action.start_assessment') + '</button>' +
@@ -1083,7 +1083,7 @@ async function loadUpcomingReports() {
     var el = document.getElementById('upcoming-reports');
     if (!el) return;
     if (!res || !res.upcoming_reports || res.upcoming_reports.length === 0) {
-        el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center"><p class="text-slate-400 text-sm">No upcoming reports due. Reports will appear here when you have awarded grants.</p></div>';
+        el.innerHTML = '<div class="bg-white rounded-xl border border-slate-200/60 p-8 text-center"><p class="text-slate-400 text-sm">' + T('dashboard.no_upcoming_reports') + '</p></div>';
         return;
     }
     var reports = res.upcoming_reports;
@@ -1097,14 +1097,14 @@ async function loadUpcomingReports() {
         '</tr></thead><tbody class="divide-y divide-slate-100">' +
         reports.slice(0, 8).map(function(r) {
             var isOverdue = r.is_overdue;
-            var daysText = isOverdue ? Math.abs(r.days_until_due) + ' days overdue' : r.days_until_due + ' days left';
+            var daysText = isOverdue ? T('dashboard.days_overdue', {days: Math.abs(r.days_until_due)}) : T('dashboard.days_left', {days: r.days_until_due});
             var urgBadge = isOverdue ? statusBadge(daysText, 'red') : r.days_until_due <= 7 ? statusBadge(daysText, 'amber') : statusBadge(daysText, 'blue');
             var sBadge = r.status === 'not_started' ? statusBadge(T('common.not_started'), 'gray') :
-                r.status === 'draft' ? statusBadge('Draft', 'gray') :
+                r.status === 'draft' ? statusBadge(T('common.draft'), 'gray') :
                 statusBadge(esc(r.status).replace(/_/g, ' '), 'amber');
             var actionBtn = r.draft_report_id ?
-                '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="editReport(' + r.draft_report_id + ')">Continue</button>' :
-                '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="startReportForGrant(' + r.grant_id + ',\'' + esc(r.report_type) + '\',\'' + esc(r.reporting_period) + '\')">Start</button>';
+                '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="editReport(' + r.draft_report_id + ')">' + T('dashboard.btn_continue') + '</button>' :
+                '<button class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors" onclick="startReportForGrant(' + r.grant_id + ',\'' + esc(r.report_type) + '\',\'' + esc(r.reporting_period) + '\')">' + T('dashboard.btn_start') + '</button>';
             return '<tr class="hover:bg-slate-50/80 transition-colors' + (isOverdue ? ' bg-rose-50/50' : '') + '">' +
                 '<td class="px-4 py-3.5"><div class="font-medium text-slate-900 text-sm">' + esc(r.requirement_title || r.report_type) + '</div><div class="text-xs text-slate-400 mt-0.5">' + esc(r.reporting_period) + '</div></td>' +
                 '<td class="px-4 py-3.5 text-sm text-slate-600">' + esc(r.grant_title || '') + '</td>' +
@@ -3132,7 +3132,8 @@ function renderCreateGrant() {
         { num: 2, label: T('grant.create.step2') },
         { num: 3, label: T('grant.create.step3') },
         { num: 4, label: T('grant.create.step4') },
-        { num: 5, label: T('grant.create.step5') }
+        { num: 5, label: T('grant.create.step5') },
+        { num: 6, label: T('grant.create.step6') }
     ];
 
     var stepContent = '';
@@ -3157,7 +3158,7 @@ function renderCreateGrant() {
 
     return '<div class="mb-8 animate-fade-in"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">' + (S.createData.id ? icon('pencil', 24) + ' ' + T('common.edit') : icon('plus-circle', 24) + ' ' + T('grant.create.title')) + draftIndicator + '</h1></div>' +
 
-        renderWizardSteps(steps, Math.min(step, 5)) +
+        renderWizardSteps(steps, step) +
 
         '<div class="mb-6">' + stepContent + '</div>' +
 
@@ -3965,8 +3966,14 @@ async function saveGrantDraft() {
 
 async function publishGrant() {
     var d = S.createData;
-    if (!d.title || !d.total_funding || !d.deadline) {
-        showToast(T('common.required_field'), 'warning');
+    var missing = [];
+    if (!d.title) missing.push(T('grant.create.grant_title'));
+    if (!d.total_funding) missing.push(T('grant.create.total_funding'));
+    if (!d.deadline) missing.push(T('grant.create.deadline'));
+    if (missing.length) {
+        showToast((T('grant.create.fill_required_warning') || 'Please fill in required fields') + ': ' + missing.join(', '), 'warning');
+        S.createStep = 1;
+        render();
         return;
     }
     var method = d.id ? 'PUT' : 'POST';
