@@ -565,25 +565,12 @@ export default function CreateGrantPage() {
       return;
     }
 
-    // Validate required fields with user feedback
-    const missing: string[] = [];
-    if (!basic.title.trim()) missing.push('Title');
-    if (!basic.total_funding) missing.push('Funding Amount');
-    if (!basic.deadline) missing.push('Deadline');
-    if (missing.length > 0) {
-      toast.error(`Please fill in required fields: ${missing.join(', ')}`, {
-        description: 'Go back to Basic Info (Step 2) to complete these fields.',
-        duration: 5000,
-      });
-      return;
-    }
-
     setPublishing(true);
     try {
       // Save all data first
       await autoSave();
 
-      // Then publish
+      // Then publish — the server controls what's required
       await api.post(`/grants/${grantId}/publish`);
       toast.success('Grant published successfully!');
       router.push('/grants');

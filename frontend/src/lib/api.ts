@@ -27,7 +27,10 @@ async function apiFetch<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    // Required by Flask CSRF middleware for all mutating API requests
+    'X-Requested-With': 'XMLHttpRequest',
+  };
 
   const opts: RequestInit = {
     method,
@@ -37,6 +40,8 @@ async function apiFetch<T>(
 
   if (body instanceof FormData) {
     // Let the browser set the multipart boundary automatically
+    // Remove X-Requested-With for multipart (Flask skips CSRF check for uploads)
+    delete headers['X-Requested-With'];
     opts.body = body;
   } else if (body !== undefined && body !== null) {
     headers['Content-Type'] = 'application/json';
