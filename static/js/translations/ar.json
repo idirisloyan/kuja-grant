@@ -681,5 +681,16 @@
   "report.review_notes": "ملاحظات المراجعة",
   "verification.registration_authority": "جهة التسجيل",
   "verification.expected_format": "الصيغة المتوقعة",
-  "verification.no_online_portal": "لا تتوفر بوابة إلكترونية"
+  "verification.no_online_portal": "لا تتوفر بوابة إلكترونية",
+  "apply.continue_draft": "متابعة المسودة",
+  "apply.draft_loaded": "تم تحميل المسودة الحالية. يمكنك المتابعة من حيث توقفت.",
+  "common.unsaved_warning": "لديك تغييرات غير محفوظة. هل أنت متأكد من رغبتك في المغادرة؟",
+  "common.load_timeout": "انتهت مهلة التحميل. يرجى المحاولة مرة أخرى.",
+  "common.load_error": "فشل تحميل البيانات. يرجى المحاولة مرة أخرى.",
+  "common.date": "التاريخ",
+  "assessment.framework_label": "إطار العمل",
+  "assessment.score": "الدرجة",
+  "assessment.level": "المستوى",
+  "report.submitted_reports": "التقارير المقدمة",
+  "report.all_reports": "جميع التقارير"
 }

@@ -681,5 +681,16 @@
   "report.review_notes": "Notes de révision",
   "verification.registration_authority": "Autorité d'enregistrement",
   "verification.expected_format": "Format attendu",
-  "verification.no_online_portal": "Aucun portail en ligne disponible"
+  "verification.no_online_portal": "Aucun portail en ligne disponible",
+  "apply.continue_draft": "Continuer le brouillon",
+  "apply.draft_loaded": "Brouillon existant chargé. Vous pouvez continuer là où vous vous êtes arrêté.",
+  "common.unsaved_warning": "Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir quitter ?",
+  "common.load_timeout": "Le chargement a expiré. Veuillez réessayer.",
+  "common.load_error": "Échec du chargement des données. Veuillez réessayer.",
+  "common.date": "Date",
+  "assessment.framework_label": "Cadre de référence",
+  "assessment.score": "Score",
+  "assessment.level": "Niveau",
+  "report.submitted_reports": "Rapports soumis",
+  "report.all_reports": "Tous les rapports"
 }
