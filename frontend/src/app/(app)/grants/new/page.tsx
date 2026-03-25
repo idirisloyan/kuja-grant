@@ -136,8 +136,12 @@ interface GrantCreateResponse {
 
 interface UploadResponse {
   success: boolean;
-  grant: Record<string, unknown>;
-  extracted?: ExtractedData;
+  grant_document?: string;
+  original_filename?: string;
+  extracted_requirements?: ExtractedData;
+  requirements_saved?: boolean;
+  content_extracted?: boolean;
+  auto_saved?: boolean;
 }
 
 interface AIChatResponse {
@@ -291,18 +295,15 @@ export default function CreateGrantPage() {
       const data = (await uploadRes.json()) as UploadResponse;
 
       if (data.success) {
-        const extractedData = data.extracted || null;
+        const extractedData = data.extracted_requirements || null;
         setExtracted(extractedData);
 
-        // Pre-fill basic info from extracted data if the grant response has useful fields
-        const grantData = data.grant as Record<string, unknown>;
-        if (grantData) {
-          setBasic((prev) => ({
-            ...prev,
-            title: (grantData.title as string) || prev.title || file.name.replace(/\.[^.]+$/, ''),
-            description: (grantData.description as string) || prev.description,
-          }));
-        }
+        // Pre-fill basic info: use the filename-derived title we created the draft with
+        const draftTitle = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+        setBasic((prev) => ({
+          ...prev,
+          title: prev.title || draftTitle,
+        }));
 
         // Pre-fill eligibility from extracted requirements
         if (extractedData?.requirements && extractedData.requirements.length > 0) {
