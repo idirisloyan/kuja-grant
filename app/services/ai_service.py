@@ -628,7 +628,25 @@ Return ONLY valid JSON."""
                 if ext in ('txt', 'csv'):
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                         file_content = f.read()[:8000]
-                elif ext in ('pdf', 'doc', 'docx'):
+                elif ext == 'pdf' and HAS_PYPDF2:
+                    try:
+                        reader = PdfReader(file_path)
+                        pages_text = []
+                        for page in reader.pages[:10]:
+                            text = page.extract_text()
+                            if text:
+                                pages_text.append(text)
+                        file_content = '\n'.join(pages_text)[:8000]
+                    except Exception:
+                        file_content = f"[PDF document: {filename}, size: {file_size} bytes]"
+                elif ext in ('docx', 'doc') and HAS_PYTHON_DOCX:
+                    try:
+                        doc_obj = python_docx.Document(file_path)
+                        paragraphs = [p.text for p in doc_obj.paragraphs if p.text.strip()]
+                        file_content = '\n'.join(paragraphs)[:8000]
+                    except Exception:
+                        file_content = f"[DOCX document: {filename}, size: {file_size} bytes]"
+                else:
                     file_content = f"[Binary document: {filename}, size: {file_size} bytes]"
 
                 country_context = ''

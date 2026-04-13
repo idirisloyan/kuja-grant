@@ -198,3 +198,41 @@ def api_get_assessment_frameworks():
             }
 
     return jsonify({'frameworks': frameworks})
+
+
+@assessments_bp.route('/<int:assess_id>/documents', methods=['POST'])
+@login_required
+def api_upload_assessment_document(assess_id):
+    """Upload a document for a specific assessment.
+    Accepts multipart/form-data with 'file' and optional 'doc_type'.
+    Delegates to the main document upload handler."""
+    assessment = db.session.get(Assessment, assess_id)
+    if not assessment:
+        return jsonify({'error': 'Assessment not found', 'success': False}), 404
+
+    if current_user.role not in ('admin',) and assessment.org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied', 'success': False}), 403
+
+    # Inject assessment_id into form data and forward to the document upload handler
+    # We use a test client internal redirect to avoid duplicating upload logic
+    from app.routes.documents import api_upload_document
+    # Monkey-patch the form to include assessment_id
+    from werkzeug.datastructures import ImmutableMultiDict
+    original_form = request.form
+    patched = dict(original_form)
+    patched['assessment_id'] = str(assess_id)
+    # Map frontend doc types to backend doc types
+    doc_type = patched.get('doc_type', 'general')
+    doc_type_map = {
+        'registration': 'registration_certificate',
+        'financial': 'financial_report',
+        'audit': 'audit_report',
+        'psea': 'policy_document',
+        'strategic_plan': 'policy_document',
+    }
+    patched['doc_type'] = doc_type_map.get(doc_type, doc_type)
+    request.form = ImmutableMultiDict(patched)
+    try:
+        return api_upload_document()
+    finally:
+        request.form = original_form
