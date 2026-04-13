@@ -16,8 +16,8 @@ logger = logging.getLogger('kuja')
 
 _backend_translations = {}
 
-SUPPORTED_LANGUAGES = ('en', 'ar', 'fr', 'es')
-LANG_NAMES = {'en': 'English', 'ar': 'Arabic', 'fr': 'French', 'es': 'Spanish'}
+SUPPORTED_LANGUAGES = ('en', 'ar', 'fr', 'es', 'sw', 'so')
+LANG_NAMES = {'en': 'English', 'ar': 'Arabic', 'fr': 'French', 'es': 'Spanish', 'sw': 'Kiswahili', 'so': 'Soomaali'}
 
 
 def _load_translations():

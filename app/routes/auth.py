@@ -361,7 +361,8 @@ def api_set_language():
     """Update the current user's preferred language."""
     data = get_request_json()
     lang = data.get('language', 'en')
-    if lang not in ('en', 'ar', 'fr', 'es'):
+    from app.utils.i18n import SUPPORTED_LANGUAGES
+    if lang not in SUPPORTED_LANGUAGES:
         return jsonify({'success': False, 'error': 'Unsupported language'}), 400
     current_user.language = lang
     db.session.commit()

@@ -118,9 +118,23 @@ export default function AssessmentWizardPage() {
     return frameworks[selectedFramework] as FrameworkInfo;
   }, [selectedFramework, frameworks]);
 
-  // Generate checklist items from framework categories
+  // Generate checklist items from real backend framework keys
   const checklistCategories = useMemo(() => {
     if (!frameworkInfo) return [];
+    // Use real item keys from category_items (populated by scoring engine)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const catItems = (frameworkInfo as any).category_items as
+      Record<string, { weight: number; label: string; items: { key: string; label: string }[] }> | undefined;
+    if (catItems) {
+      return Object.entries(catItems).map(([, catData]) => ({
+        category: catData.label,
+        items: catData.items.map((item) => ({
+          key: item.key,
+          label: item.label.replace(/ Hact| Nupas| Chs| Psea/gi, (m) => m.toUpperCase()),
+        })),
+      }));
+    }
+    // Fallback to generic items if category_items not available
     return frameworkInfo.categories.map((cat) => ({
       category: cat,
       items: [
@@ -155,34 +169,55 @@ export default function AssessmentWizardPage() {
     if (!selectedFramework) return;
     setSubmitting(true);
     try {
+      // Backend returns {success, assessment: {...}} — assessment has scores inside
       const res = await api.post<{
-        assessment_id: number;
-        overall_score: number;
-        category_scores: Record<string, number>;
-        gaps: string[];
         success: boolean;
+        assessment: {
+          id: number;
+          overall_score: number;
+          category_scores: Record<string, { score: number; met: number; total: number; weight: number }>;
+          gaps: Array<{ category: string; item: string; label: string; priority: string }>;
+        };
       }>('/assessments/', {
         framework: selectedFramework,
         org_profile: orgProfile,
         checklist_responses: checklistResponses,
       });
 
-      // Upload documents if any
-      if (res.assessment_id) {
+      const assessmentId = res.assessment?.id;
+
+      // Upload documents using the correct endpoint + doc type mapping
+      const docTypeMap: Record<string, string> = {
+        registration: 'registration_certificate',
+        financial: 'financial_report',
+        audit: 'audit_report',
+        psea: 'policy_document',
+        strategic_plan: 'policy_document',
+      };
+      if (assessmentId) {
         for (const [docType, upload] of Object.entries(docUploads)) {
           if (upload.file) {
             const formData = new FormData();
             formData.append('file', upload.file);
-            formData.append('doc_type', docType);
-            await api.upload(`/assessments/${res.assessment_id}/documents`, formData);
+            formData.append('doc_type', docTypeMap[docType] || 'general');
+            formData.append('assessment_id', String(assessmentId));
+            await api.upload('/documents/upload', formData);
           }
         }
       }
 
+      // Map category_scores from {score,met,total,weight} objects to flat numbers
+      const catScores: Record<string, number> = {};
+      for (const [k, v] of Object.entries(res.assessment?.category_scores ?? {})) {
+        catScores[k] = typeof v === 'number' ? v : v.score;
+      }
+
       setResults({
-        overall_score: res.overall_score ?? 0,
-        category_scores: res.category_scores ?? {},
-        gaps: res.gaps ?? [],
+        overall_score: res.assessment?.overall_score ?? 0,
+        category_scores: catScores,
+        gaps: (res.assessment?.gaps ?? []).map((g) =>
+          typeof g === 'string' ? g : g.label,
+        ),
       });
       setCurrentStep(4);
     } catch {

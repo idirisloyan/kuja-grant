@@ -172,16 +172,16 @@ class ScoringEngine:
         text_lower = text.lower()
         if keywords:
             matches = sum(1 for kw in keywords if kw in text_lower)
-            # Require at minimum 3 keyword matches for score > 50
-            if matches < 3:
-                relevance = min((matches / 3) * 50, 50)
+            # Require at minimum 2 keyword matches for score > 50
+            if matches < 2:
+                relevance = min((matches / 2) * 50, 50)
             else:
                 relevance = min((matches / len(keywords)) * 120, 100)
         else:
             relevance = 50  # neutral
 
         # Sub-score: Depth (structure, evidence, analysis) -- v2 recalibrated
-        depth = 20  # base (lowered from 30 so poor responses score lower)
+        depth = 35  # base (raised from 20 for better calibration of good applications)
 
         # Structural indicators -- paragraph counting
         paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
@@ -223,7 +223,10 @@ class ScoringEngine:
 
         # Cap depth for very short responses
         if word_count < 100:
-            depth = min(depth, 40)
+            depth = min(depth, 55)
+        # Quality floor: well-structured responses with evidence should score decently
+        if word_count >= 150 and evidence_count >= 1 and paragraph_count >= 2:
+            depth = max(depth, 50)
         # Bonus for well-structured long responses
         if word_count > 300 and paragraph_count >= 3 and evidence_count >= 2:
             depth = min(depth + 10, 100)
@@ -297,15 +300,10 @@ class ScoringEngine:
 
 
 # ---------------------------------------------------------------------------
-# Standalone helper used by the assessments route
+# Assessment framework definitions — used by scoring + frameworks API
 # ---------------------------------------------------------------------------
 
-def _calculate_assessment_scores(checklist, framework='kuja'):
-    """
-    Calculate assessment category scores, overall score, and identify gaps.
-    Supports multiple assessment frameworks.
-    """
-    FRAMEWORK_CATEGORIES = {
+FRAMEWORK_CATEGORIES = {
         'kuja': {
             'governance': { 'weight': 0.20, 'items': ['board_exists', 'board_meets_regularly', 'strategic_plan', 'policies_documented', 'conflict_of_interest_policy'] },
             'financial_management': { 'weight': 0.25, 'items': ['financial_policies', 'annual_audit', 'budget_process', 'internal_controls', 'financial_reporting', 'procurement_policy'] },
@@ -345,6 +343,12 @@ def _calculate_assessment_scores(checklist, framework='kuja'):
         },
     }
 
+
+def _calculate_assessment_scores(checklist, framework='kuja'):
+    """
+    Calculate assessment category scores, overall score, and identify gaps.
+    Supports multiple assessment frameworks.
+    """
     categories = FRAMEWORK_CATEGORIES.get(framework, FRAMEWORK_CATEGORIES['kuja'])
 
     category_scores = {}

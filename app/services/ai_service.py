@@ -32,6 +32,12 @@ try:
 except ImportError:
     HAS_PYTHON_DOCX = False
 
+try:
+    import openpyxl
+    HAS_OPENPYXL = True
+except ImportError:
+    HAS_OPENPYXL = False
+
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
 
 
@@ -389,6 +395,21 @@ class AIService:
                         file_content = '\n'.join(paragraphs)[:8000]
                     except Exception:
                         file_content = f"[DOCX document: {filename}, type: {doc_type}, size: {file_size} bytes]"
+                elif ext in ('xlsx', 'xls') and HAS_OPENPYXL:
+                    try:
+                        wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+                        parts = []
+                        for sheet_name in wb.sheetnames[:5]:
+                            ws = wb[sheet_name]
+                            parts.append(f"=== Sheet: {sheet_name} ===")
+                            for row in ws.iter_rows(max_row=50, values_only=True):
+                                cells = [str(c) if c is not None else '' for c in row]
+                                if any(cells):
+                                    parts.append(' | '.join(cells))
+                        wb.close()
+                        file_content = '\n'.join(parts)[:8000]
+                    except Exception:
+                        file_content = f"[XLSX document: {filename}, type: {doc_type}, size: {file_size} bytes]"
                 else:
                     file_content = f"[File: {filename}, type: {doc_type}, size: {file_size} bytes]"
 
@@ -681,6 +702,11 @@ Analyze this registration document and extract the following information. Return
                     result['findings'] = ai_result.get('findings', [])
                     result['recommendations'] = ai_result.get('recommendations', [])
 
+                    # Confidence floor: if AI returned any extracted fields, minimum 30
+                    ed = result['extracted_data']
+                    if ed.get('registration_number') or ed.get('organization_name'):
+                        result['confidence'] = max(result['confidence'], 30)
+
                     # Determine status based on validation
                     v = result['validation']
                     if v.get('is_expired') is True:
@@ -696,6 +722,58 @@ Analyze this registration document and extract the following information. Return
 
             except Exception as e:
                 logger.error(f"AI registration verification failed: {e}")
+
+        # Intermediate fallback: try regex extraction from file content
+        if file_path:
+            file_ext = (filename or '').rsplit('.', 1)[-1].lower() if filename and '.' in filename else ''
+            raw_text = ''
+            try:
+                if file_ext == 'pdf' and HAS_PYPDF2:
+                    reader = PdfReader(file_path)
+                    for page in reader.pages[:5]:
+                        raw_text += (page.extract_text() or '')
+                elif file_ext in ('docx',) and HAS_PYTHON_DOCX:
+                    doc_obj = python_docx.Document(file_path)
+                    raw_text = '\n'.join(p.text for p in doc_obj.paragraphs if p.text.strip())
+                elif file_ext in ('txt', 'csv'):
+                    with open(file_path, 'r', errors='ignore') as f:
+                        raw_text = f.read()[:5000]
+            except Exception:
+                pass
+
+            if raw_text:
+                # Try to extract registration number via regex
+                reg_patterns = [
+                    r'(?:Reg(?:istration)?\.?\s*(?:No|Number|#)?\.?\s*[:.]?\s*)([A-Z0-9/-]{4,20})',
+                    r'(?:Certificate\s*(?:No|Number)\.?\s*[:.]?\s*)([A-Z0-9/-]{4,20})',
+                    r'(?:NGO/\d{4}/\d+)',
+                ]
+                for pattern in reg_patterns:
+                    m = re.search(pattern, raw_text, re.IGNORECASE)
+                    if m:
+                        extracted_reg = m.group(1) if m.lastindex else m.group(0)
+                        result['extracted_data']['registration_number'] = extracted_reg
+                        result['confidence'] = max(result.get('confidence', 0), 40)
+                        if not reg_number:
+                            reg_number = extracted_reg
+                        break
+
+                # Try to extract org name
+                name_patterns = [
+                    r'(?:This is to certify that\s+)([A-Z][A-Za-z\s&-]{5,60})',
+                    r'(?:Name of Organization\s*[:.]?\s*)([A-Z][A-Za-z\s&-]{5,60})',
+                    r'(?:Organisation\s*[:.]?\s*)([A-Z][A-Za-z\s&-]{5,60})',
+                ]
+                for pattern in name_patterns:
+                    m = re.search(pattern, raw_text)
+                    if m:
+                        result['extracted_data']['organization_name'] = m.group(1).strip()
+                        result['confidence'] = max(result.get('confidence', 0), 35)
+                        break
+
+                if result['confidence'] >= 35:
+                    result['status'] = 'pending'
+                    result['findings'].append('Registration fields extracted via text analysis')
 
         # Fallback: Simulate verification based on available data
         if reg_number and org_country and registry:

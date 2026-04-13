@@ -78,10 +78,27 @@ def api_create_assessment():
     if data.get('checklist_responses'):
         assessment.set_checklist_responses(data['checklist_responses'])
 
+        # Auto-calculate scores when checklist is provided at creation time
+        checklist = data['checklist_responses']
+        category_scores, overall, gaps = _calculate_assessment_scores(
+            checklist, assessment.framework or 'kuja'
+        )
+        assessment.set_category_scores(category_scores)
+        assessment.overall_score = overall
+        assessment.set_gaps(gaps)
+        assessment.status = 'completed'
+        assessment.completed_at = datetime.now(timezone.utc)
+
+        # Update org assess score
+        org = db.session.get(Organization, org_id)
+        if org:
+            org.assess_score = overall
+            org.assess_date = datetime.now(timezone.utc)
+
     db.session.add(assessment)
     db.session.commit()
 
-    logger.info(f"Assessment created: org={org_id}, id={assessment.id}")
+    logger.info(f"Assessment created: org={org_id}, id={assessment.id}, score={assessment.overall_score}")
     return jsonify({'success': True, 'assessment': assessment.to_dict()}), 201
 
 
@@ -167,4 +184,17 @@ def api_get_assessment_frameworks():
             'estimated_time': '60-90 minutes',
         },
     }
+    # Attach real checklist item keys from the scoring engine so frontends
+    # generate the exact keys the backend expects for scoring.
+    from app.services.scoring_engine import FRAMEWORK_CATEGORIES
+    for fw_key, fw_info in frameworks.items():
+        cats = FRAMEWORK_CATEGORIES.get(fw_key, {})
+        fw_info['category_items'] = {}
+        for cat_key, cat_data in cats.items():
+            fw_info['category_items'][cat_key] = {
+                'weight': cat_data['weight'],
+                'label': cat_key.replace('_', ' ').title(),
+                'items': [{'key': k, 'label': k.replace('_', ' ').title()} for k in cat_data['items']],
+            }
+
     return jsonify({'frameworks': frameworks})

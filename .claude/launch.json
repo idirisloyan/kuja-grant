@@ -5,7 +5,8 @@
       "name": "kuja-dev",
       "runtimeExecutable": "python",
       "runtimeArgs": ["run.py"],
-      "port": 5000
+      "port": 5000,
+      "cwd": "C:\\Users\\IdirisLoyan\\kuja-grant"
     }
   ]
 }

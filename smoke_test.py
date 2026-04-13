@@ -286,6 +286,76 @@ def make_tests(base):
                 assert key in trans, f"{lang}.json missing {key}"
     tests.append(("DEF-UX-001: Wizard step1-6 keys in all languages", test_wizard_step6))
 
+    # --- Assessment frameworks endpoint returns category_items ---
+    def test_assessment_frameworks():
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/assessments/frameworks",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"Frameworks: {r.status_code}"
+        fw = r.json().get("frameworks", {})
+        assert "kuja" in fw, "Missing kuja framework"
+        kuja = fw["kuja"]
+        assert "category_items" in kuja, "Missing category_items in kuja framework"
+        cat_items = kuja["category_items"]
+        assert "governance" in cat_items, "Missing governance in category_items"
+        items = cat_items["governance"]["items"]
+        assert len(items) >= 3, f"Governance has only {len(items)} items"
+        keys = [i["key"] for i in items]
+        assert "board_exists" in keys, f"Missing board_exists key, got: {keys}"
+    tests.append(("P0-1: Assessment frameworks return real item keys", test_assessment_frameworks))
+
+    # --- Assessment create with real keys scores > 0 ---
+    def test_assessment_scoring():
+        s = login_ok(base, USERS["ngo"])
+        # Use real Kuja framework keys with positive responses
+        checklist = {
+            "board_exists": True, "board_meets_regularly": True, "strategic_plan": True,
+            "policies_documented": True, "conflict_of_interest_policy": False,
+            "financial_policies": True, "annual_audit": True, "budget_process": True,
+            "internal_controls": True, "financial_reporting": True, "procurement_policy": False,
+            "needs_assessment": True, "project_planning": True, "beneficiary_feedback": True,
+            "partnership_agreements": False, "reporting_systems": True,
+            "hr_policies": True, "staff_contracts": True, "safeguarding_policy": True,
+            "training_plan": False, "code_of_conduct": True,
+            "me_framework": True, "data_collection": True, "indicator_tracking": True,
+            "evaluation_reports": False, "learning_integration": True,
+        }
+        r = s.post(f"{base}/api/assessments/",
+                   json={"framework": "kuja", "checklist_responses": checklist},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 201, f"Assessment create: {r.status_code}"
+        data = r.json()
+        assess = data.get("assessment", {})
+        assert assess.get("overall_score", 0) > 0, f"Score is {assess.get('overall_score')} (expected > 0)"
+        assert assess.get("status") == "completed", f"Status: {assess.get('status')}"
+        gaps = assess.get("gaps", [])
+        # We set 5 items to False, so should have exactly 5 gaps
+        assert len(gaps) == 5, f"Expected 5 gaps, got {len(gaps)}"
+    tests.append(("P0-1: Assessment with real keys scores > 0", test_assessment_scoring))
+
+    # --- Swahili and Somali language switch ---
+    def test_language_sw_so():
+        for lang in ("sw", "so"):
+            # Check translation file exists
+            lang_file = os.path.join(TRANSLATION_DIR, f"{lang}.json")
+            assert os.path.exists(lang_file), f"Missing {lang}.json translation file"
+            trans = json.load(open(lang_file, encoding="utf-8"))
+            assert len(trans) > 100, f"{lang}.json has only {len(trans)} keys (expected 600+)"
+            # Test API accepts the language
+            s = login_ok(base, USERS["ngo"])
+            r = s.put(f"{base}/api/auth/language",
+                      json={"language": lang},
+                      headers={"Content-Type": "application/json",
+                               "X-Requested-With": "XMLHttpRequest"}, timeout=10)
+            assert r.status_code == 200, f"Language {lang}: {r.status_code} {r.text[:100]}"
+        # Reset to English
+        s.put(f"{base}/api/auth/language",
+              json={"language": "en"},
+              headers={"Content-Type": "application/json",
+                       "X-Requested-With": "XMLHttpRequest"}, timeout=10)
+    tests.append(("P0-3: Swahili and Somali language support", test_language_sw_so))
+
     return tests
 
 
