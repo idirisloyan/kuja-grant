@@ -217,9 +217,24 @@ function VerificationRow({
           <StatusBadge status={verification.status} />
         </TableCell>
         <TableCell align="right">
-          <Typography variant="body2" sx={{ fontWeight: 500, color: confidenceColor(verification.ai_confidence) }}>
-            {verification.ai_confidence != null ? `${verification.ai_confidence}%` : '--'}
-          </Typography>
+          {verification.ai_confidence != null ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'flex-end' }}>
+              <Box sx={{ width: 48, height: 6, borderRadius: 3, bgcolor: 'action.hover', overflow: 'hidden' }}>
+                <Box sx={{
+                  width: `${Math.min(verification.ai_confidence, 100)}%`,
+                  height: '100%',
+                  borderRadius: 3,
+                  bgcolor: confidenceColor(verification.ai_confidence),
+                  transition: 'width 0.3s ease',
+                }} />
+              </Box>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: confidenceColor(verification.ai_confidence), minWidth: 32, textAlign: 'right' }}>
+                {verification.ai_confidence}%
+              </Typography>
+            </Box>
+          ) : (
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>--</Typography>
+          )}
         </TableCell>
         <TableCell align="right">
           <Button

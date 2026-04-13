@@ -277,7 +277,7 @@ export default function CompliancePage() {
 
   return (
     <Stack spacing={3}>
-      {/* Header */}
+      {/* Header with risk summary */}
       <Box>
         <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
           Compliance Dashboard
@@ -286,6 +286,45 @@ export default function CompliancePage() {
           Track grantee compliance across all your grants
         </Typography>
       </Box>
+
+      {/* Risk Summary Banner */}
+      {(summaryStats.overdueItems > 0 || summaryStats.atRiskCount > 0) && (
+        <Card sx={{ borderLeft: '4px solid', borderLeftColor: 'error.main', bgcolor: 'error.50' }}>
+          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <AlertTriangle size={20} style={{ color: '#DC2626' }} />
+            <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+              {summaryStats.overdueItems > 0 && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'error.dark' }}>
+                    {summaryStats.overdueItems}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'error.dark' }}>
+                    overdue
+                  </Typography>
+                </Box>
+              )}
+              {summaryStats.atRiskCount > 0 && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'warning.dark' }}>
+                    {summaryStats.atRiskCount}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'warning.dark' }}>
+                    at risk
+                  </Typography>
+                </Box>
+              )}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                  {reports.filter((r) => r.status === 'accepted').length}
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  on track
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary Stats */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 2 }}>

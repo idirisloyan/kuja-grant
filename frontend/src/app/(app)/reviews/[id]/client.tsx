@@ -278,10 +278,25 @@ export default function ReviewDetailClient() {
             </Box>
           </Box>
           {application.ai_score != null && (
-            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Cpu size={14} style={{ color: '#7C3AED' }} />
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                AI Pre-Score: {application.ai_score}%
+            <Box sx={{
+              mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: '#F5F3FF', border: '1px solid #E9E5FF',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1,
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Cpu size={14} style={{ color: '#fff' }} />
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#7C3AED', display: 'block', letterSpacing: '0.04em' }}>
+                    AI PRE-SCORE
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
+                    Completeness (25%) + Relevance (35%) + Depth (40%)
+                  </Typography>
+                </Box>
+              </Box>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: application.ai_score >= 70 ? 'success.main' : application.ai_score >= 50 ? 'warning.dark' : 'error.main' }}>
+                {application.ai_score}%
               </Typography>
             </Box>
           )}

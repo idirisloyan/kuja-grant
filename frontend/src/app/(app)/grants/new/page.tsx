@@ -728,39 +728,81 @@ export default function CreateGrantPage() {
               </Box>
 
               {extracted && (
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    gap: 2,
-                    pt: 1,
-                  }}
-                >
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                      {extracted.requirements?.length || 0}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      Requirements
-                    </Typography>
+                <Stack spacing={2} sx={{ pt: 1 }}>
+                  {/* Summary stats */}
+                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2 }}>
+                    <Box sx={{ textAlign: 'center', p: 1.5, borderRadius: 2, bgcolor: 'primary.50' }}>
+                      <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                        {extracted.requirements?.length || 0}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                        Requirements
+                      </Typography>
+                    </Box>
+                    <Box sx={{ textAlign: 'center', p: 1.5, borderRadius: 2, bgcolor: 'info.50' }}>
+                      <Typography variant="h4" sx={{ fontWeight: 700, color: 'info.main' }}>
+                        {extracted.template_sections?.length || 0}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                        Sections
+                      </Typography>
+                    </Box>
+                    <Box sx={{ textAlign: 'center', p: 1.5, borderRadius: 2, bgcolor: 'warning.50' }}>
+                      <Typography variant="h4" sx={{ fontWeight: 700, color: 'warning.dark' }}>
+                        {extracted.indicators?.length || 0}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                        Indicators
+                      </Typography>
+                    </Box>
                   </Box>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                      {extracted.template_sections?.length || 0}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      Sections
-                    </Typography>
-                  </Box>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                      {extracted.indicators?.length || 0}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      Indicators
-                    </Typography>
-                  </Box>
-                </Box>
+
+                  {/* Extracted requirements detail */}
+                  {extracted.requirements && extracted.requirements.length > 0 && (
+                    <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 1.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'text.secondary', mb: 1, display: 'block' }}>
+                        Reporting Requirements
+                      </Typography>
+                      {extracted.requirements.slice(0, 4).map((req, i) => (
+                        <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
+                          <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0 }} />
+                          <Typography variant="body2" sx={{ color: 'text.primary', fontSize: '0.8rem' }}>
+                            {(req as Record<string, string>).title || (req as Record<string, string>).type || 'Requirement'}
+                          </Typography>
+                          {(req as Record<string, string>).frequency && (
+                            <Chip label={(req as Record<string, string>).frequency} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                          )}
+                        </Box>
+                      ))}
+                      {extracted.requirements.length > 4 && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>
+                          +{extracted.requirements.length - 4} more
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+
+                  {/* KPI indicators */}
+                  {extracted.indicators && extracted.indicators.length > 0 && (
+                    <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 1.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'text.secondary', mb: 1, display: 'block' }}>
+                        Key Performance Indicators
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                        {extracted.indicators.slice(0, 6).map((ind, i) => (
+                          <Chip
+                            key={i}
+                            label={`${(ind as Record<string, string>).name || 'KPI'}${(ind as Record<string, string>).target ? ` — ${(ind as Record<string, string>).target}` : ''}`}
+                            size="small"
+                            variant="outlined"
+                            color="warning"
+                            sx={{ fontSize: '0.7rem', height: 24 }}
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+                </Stack>
               )}
             </Stack>
           </CardContent>
@@ -1354,26 +1396,41 @@ export default function CreateGrantPage() {
         </Card>
       )}
 
-      {/* Action Buttons */}
-      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', pt: 1 }}>
-        <Button
-          variant="outlined"
-          onClick={handleSaveDraft}
-          disabled={saving || publishing}
-          startIcon={saving ? <CircularProgress size={16} /> : <FileText size={16} />}
-        >
-          {saving ? 'Saving...' : 'Save as Draft'}
-        </Button>
-        <Button
-          variant="contained"
-          color="success"
-          onClick={handlePublish}
-          disabled={publishing || saving}
-          startIcon={publishing ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />}
-        >
-          {publishing ? 'Publishing...' : 'Publish Grant'}
-        </Button>
-      </Box>
+      {/* Action Buttons — prominent publish */}
+      <Card sx={{ border: '2px solid', borderColor: 'success.light', bgcolor: 'success.50', p: 0 }}>
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 }, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          <Box>
+            <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.dark' }}>
+              Ready to publish?
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              Your grant will be visible to matched NGOs immediately
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Button
+              variant="outlined"
+              onClick={handleSaveDraft}
+              disabled={saving || publishing}
+              startIcon={saving ? <CircularProgress size={16} /> : <FileText size={16} />}
+              sx={{ borderColor: 'divider' }}
+            >
+              {saving ? 'Saving...' : 'Save Draft'}
+            </Button>
+            <Button
+              variant="contained"
+              color="success"
+              size="large"
+              onClick={handlePublish}
+              disabled={publishing || saving}
+              startIcon={publishing ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />}
+              sx={{ fontWeight: 700, px: 4 }}
+            >
+              {publishing ? 'Publishing...' : 'Publish Grant'}
+            </Button>
+          </Box>
+        </CardContent>
+      </Card>
     </Stack>
   );
 
