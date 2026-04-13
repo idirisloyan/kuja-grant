@@ -205,15 +205,16 @@ def _setup_logging(app, config_name):
 
 
 def _register_spa_routes(app):
-    """Register SPA catch-all and static file routes.
+    """Register routes for the Next.js static export frontend.
 
-    Serves the Next.js static export from static/nextjs/ if available,
-    otherwise falls back to the legacy vanilla JS SPA in templates/.
+    Serves pre-built pages from static/nextjs/ (produced by `npm run build`
+    in the frontend/ directory). No legacy SPA fallback — the vanilla JS
+    SPA in templates/ is retained for reference only and is not served.
     """
     nextjs_dir = os.path.join(app.static_folder, 'nextjs')
 
     def _serve_nextjs(path=''):
-        """Try to serve a Next.js static export file."""
+        """Serve a Next.js static export file."""
         if not os.path.isdir(nextjs_dir):
             return None
 
@@ -231,43 +232,28 @@ def _register_spa_routes(app):
 
     @app.route('/')
     def index():
-        """Serve the SPA index page."""
-        # Try Next.js first
+        """Serve the Next.js index page."""
         resp = _serve_nextjs('')
         if resp:
             return resp
-        # Legacy SPA fallback
-        index_path = os.path.join(app.static_folder, 'index.html')
-        if os.path.exists(index_path):
-            return send_from_directory(app.static_folder, 'index.html')
-        templates_index = os.path.join(app.template_folder, 'index.html')
-        if os.path.exists(templates_index):
-            from flask import render_template
-            return render_template('index.html')
         from app.middleware import APP_VERSION
         from flask import jsonify
         return jsonify({
             'name': 'Kuja Grant Management System',
             'version': APP_VERSION,
             'status': 'running',
+            'message': 'Frontend not built. Run: cd frontend && npm run build',
         })
 
     @app.route('/<path:path>')
     def catch_all(path):
         """Catch-all route for Next.js client-side routing."""
-        # Skip API routes and uploads
         if path.startswith('api') or path.startswith('uploads') or path.startswith('static'):
             from flask import abort
             abort(404)
-        # Serve Next.js
         resp = _serve_nextjs(path)
         if resp:
             return resp
-        # Fallback to legacy SPA index
-        templates_index = os.path.join(app.template_folder, 'index.html')
-        if os.path.exists(templates_index):
-            from flask import render_template
-            return render_template('index.html')
         from flask import abort
         abort(404)
 

@@ -208,18 +208,17 @@ def register_middleware(app):
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
-        # CSP: 'unsafe-inline' required for script-src and style-src because
-        # the Vanilla JS SPA uses inline event handlers and dynamic styles.
-        # Once migrated to a framework with nonce support, replace with nonce-based CSP.
+        # CSP: Next.js frontend uses bundled JS/CSS (no inline scripts).
+        # 'unsafe-inline' only on style-src for MUI runtime style injection.
         # blob: in img-src covers chart libraries that render to blob URLs.
         # data: in font-src covers libraries that inline small icon fonts.
         response.headers['Content-Security-Policy'] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "img-src 'self' data: blob:; "
             "font-src 'self' https://fonts.gstatic.com data:; "
-            "connect-src 'self' https://api.anthropic.com; "
+            "connect-src 'self'; "
             "frame-ancestors 'none'; "
             "base-uri 'self'; "
             "form-action 'self'; "

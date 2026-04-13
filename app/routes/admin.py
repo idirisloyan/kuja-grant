@@ -139,6 +139,7 @@ def api_admin_canary():
         checks['opensanctions'] = {'status': 'down', 'error': str(e)[:100]}
 
     # Government registries (quick connectivity test)
+    # Note: 403/redirect is normal for some portals — only 5xx or timeout = degraded
     registry_urls = {
         'kenya_brs': 'https://brs.go.ke/',
         'nigeria_cac': 'https://search.cac.gov.ng/',
@@ -151,39 +152,62 @@ def api_admin_canary():
         try:
             r = ext_requests.head(url, timeout=8, allow_redirects=True,
                                   headers={'User-Agent': 'Kuja-Grant-Canary/1.0'})
+            # Registries often return 403/301 — that means the server is UP.
+            # Only 5xx or connection failure means degraded.
+            if r.status_code >= 500:
+                reg_status = 'degraded'
+            elif r.status_code == 200:
+                reg_status = 'ok'
+            else:
+                reg_status = 'reachable'  # 301/302/403/404 = server alive
             checks['registries'][name] = {
-                'status': 'ok' if r.status_code < 500 else 'degraded',
+                'status': reg_status,
                 'http_code': r.status_code,
                 'latency_ms': int(r.elapsed.total_seconds() * 1000),
             }
         except Exception as e:
             checks['registries'][name] = {'status': 'down', 'error': str(e)[:80]}
 
-    # Anthropic AI API
+    # Anthropic AI API (connectivity check only — never send API key in health probes)
     try:
         if ANTHROPIC_API_KEY:
-            r = ext_requests.get('https://api.anthropic.com/', timeout=8,
-                                 headers={'x-api-key': ANTHROPIC_API_KEY[:10] + '...'})
+            # Use the messages endpoint with no auth to confirm API is reachable.
+            # Expect 401 (auth required) = API is up and responding.
+            r = ext_requests.get('https://api.anthropic.com/v1/messages', timeout=8,
+                                 headers={'anthropic-version': '2023-06-01'})
+            if r.status_code in (401, 403):
+                ai_status = 'ok'  # API reachable, auth required = healthy
+            elif r.status_code < 500:
+                ai_status = 'ok'
+            else:
+                ai_status = 'degraded'
             checks['anthropic'] = {
-                'status': 'ok' if r.status_code < 500 else 'degraded',
+                'status': ai_status,
                 'http_code': r.status_code,
                 'latency_ms': int(r.elapsed.total_seconds() * 1000),
+                'key_configured': True,
             }
         else:
-            checks['anthropic'] = {'status': 'not_configured'}
+            checks['anthropic'] = {'status': 'not_configured', 'key_configured': False}
     except Exception as e:
         checks['anthropic'] = {'status': 'down', 'error': str(e)[:80]}
 
-    # Overall status
-    all_ok = all(
-        c.get('status') == 'ok'
-        for c in checks.values()
-        if isinstance(c, dict) and 'status' in c
-    )
+    # Overall status — check core services (opensanctions, anthropic, db)
+    # Registries are advisory only (many return 403 normally)
+    core_checks = [checks.get('opensanctions', {}), checks.get('anthropic', {})]
+    core_ok = all(c.get('status') in ('ok', 'reachable') for c in core_checks if c.get('status'))
+    any_down = any(c.get('status') == 'down' for c in core_checks)
+
+    if any_down:
+        overall = 'degraded'
+    elif core_ok:
+        overall = 'healthy'
+    else:
+        overall = 'degraded'
 
     return jsonify({
         'success': True,
-        'overall': 'healthy' if all_ok else 'degraded',
+        'overall': overall,
         'checks': checks,
         'timestamp': datetime.now(timezone.utc).isoformat() + 'Z',
     })

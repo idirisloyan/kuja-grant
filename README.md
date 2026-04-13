@@ -1,187 +1,150 @@
 # Kuja Grant Management System
 
-AI-powered grant management platform for NGOs and Donors in the humanitarian sector. Part of the Kuja Link ecosystem.
+AI-powered grant management platform for the humanitarian sector. Built by [Adeso — African Development Solutions](https://adesoafrica.org). Part of the Kuja Link ecosystem.
 
-## Features
+## Overview
 
-- **NGO Portal**: Capacity assessments, grant discovery, AI-guided applications, document upload with AI analysis
-- **Donor Portal**: Grant creation wizard, eligibility & criteria setup, applicant ranking, dual scoring (AI + human)
-- **Reviewer Portal**: Assignment management, structured scoring rubrics
-- **AI Integration**: Claude-powered document analysis, application guidance, automated scoring
-- **Compliance**: Sanctions screening (UN, OFAC, EU, World Bank), registration verification
+Kuja streamlines the complete grant lifecycle — from donor grant creation through NGO applications, capacity assessment, compliance verification, and ongoing reporting. The platform uses Anthropic Claude AI for document extraction, application scoring, and real-time guidance.
 
-## Quick Start (Local - No Docker)
+### Core Capabilities
 
-### Prerequisites
-- Python 3.9+
-- pip
+| Module | Description |
+|--------|-------------|
+| **Grant Wizard** | AI-first 6-step grant creation. Upload agreements → AI extracts requirements, KPIs, reporting schedules |
+| **NGO Marketplace** | Searchable directory of pre-vetted NGOs with capacity scores and compliance status |
+| **Capacity Assessment** | 5-framework assessment (Kuja, STEP, UN-HACT, CHS, NUPAS) with standardized scoring |
+| **Application & Scoring** | Dual scoring engine (AI + human) with per-criterion evaluation and applicant ranking |
+| **Compliance** | Live sanctions screening (UN, OFAC, EU, World Bank) and government registry verification (7 countries) |
+| **Reporting** | AI-evaluated grantee reports scored per donor requirement with risk flags |
+| **Internationalization** | Full platform in 6 languages: English, French, Arabic, Spanish, Swahili, Somali |
 
-### Setup
-
-```bash
-# 1. Navigate to the project
-cd kuja-grant
-
-# 2. Create virtual environment (recommended)
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Configure environment
-copy .env.example .env
-# Edit .env with your settings (optional - works with defaults)
-
-# 5. Seed the database
-python seed.py
-
-# 6. Run the application
-python run.py
-```
-
-The app will be available at **http://localhost:5000**
-
-### Demo Login Accounts
-
-| Role | Email | Password |
-|------|-------|----------|
-| NGO (Amani) | fatima@amani.org | pass123 |
-| NGO (Ubuntu) | thandi@ubuntu.org | pass123 |
-| Donor (Global Health) | sarah@globalhealth.org | pass123 |
-| Donor (EA Trust) | david@eatrust.org | pass123 |
-| Reviewer | james@reviewer.org | pass123 |
-| Admin | admin@kuja.org | pass123 |
-
-## Deploy with Docker
-
-### Prerequisites
-- Docker & Docker Compose
-
-### Setup
-
-```bash
-# 1. Navigate to project
-cd kuja-grant
-
-# 2. (Optional) Set Claude API key for real AI features
-# Create a .env file with: ANTHROPIC_API_KEY=your-key-here
-
-# 3. Launch
-docker-compose up --build
-
-# The app will be available at http://localhost:5000
-```
-
-To stop: `docker-compose down`
-
-## Deploy to the Cloud (Team Access)
-
-### Option A: Railway (Recommended - Free Tier)
-
-1. Push code to a GitHub repo
-2. Go to [railway.app](https://railway.app)
-3. New Project → Deploy from GitHub repo
-4. Add PostgreSQL service
-5. Set environment variables (SECRET_KEY, ANTHROPIC_API_KEY)
-6. Deploy → get public URL to share with team
-
-### Option B: Render
-
-1. Push code to GitHub
-2. Go to [render.com](https://render.com)
-3. New Web Service → connect repo
-4. Build Command: `pip install -r requirements.txt && python seed.py`
-5. Start Command: `gunicorn server:app`
-6. Add PostgreSQL database
-7. Set environment variables
-8. Deploy → share URL
-
-### Option C: Any VPS/Server
-
-```bash
-# On your server:
-git clone <your-repo>
-cd kuja-grant
-docker-compose up -d
-# App available at http://your-server-ip:5000
-```
-
-## AI Features
-
-### With Claude API Key
-Set `ANTHROPIC_API_KEY` in your .env file to enable real AI features:
-- Document content analysis with detailed findings
-- Intelligent chat assistance contextual to your workflow
-- Application scoring with criterion-level breakdown
-- Field-specific guidance for grant applications
-
-### Without API Key (Demo Mode)
-All AI features work with intelligent simulated responses:
-- Pre-built document analysis per document type
-- Contextual chat responses based on keywords
-- Algorithmic scoring based on completeness and keywords
-- Template-based field guidance
-
-## Tech Stack
+## Architecture
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | Python / Flask |
-| Database | SQLite (dev) / PostgreSQL (prod) |
-| ORM | SQLAlchemy |
-| Frontend | Vanilla JavaScript SPA |
-| AI | Anthropic Claude API |
-| Deployment | Docker / Gunicorn |
+| Backend | Python 3.11 / Flask 3.x |
+| Frontend | Next.js 14 / React 18 / MUI |
+| Database | PostgreSQL (production) / SQLite (development) |
+| ORM | SQLAlchemy 2.x with Alembic migrations |
+| AI | Anthropic Claude API (claude-sonnet-4-20250514) |
+| Task Runner | Redis-backed (enterprise) / ThreadPoolExecutor (single-instance) |
+| Deployment | Railway with Gunicorn (gthread workers) |
 
-## Project Structure
+### Project Structure
 
 ```
 kuja-grant/
-├── server.py           # Flask backend (models, routes, services)
-├── seed.py             # Database seeding script
-├── run.py              # Development server entry point
-├── requirements.txt    # Python dependencies
-├── templates/
-│   └── index.html      # SPA shell template
+├── app/                    # Flask application package
+│   ├── __init__.py         # App factory
+│   ├── models.py           # SQLAlchemy models (10 tables)
+│   ├── routes/             # API endpoints (auth, grants, assessments, etc.)
+│   ├── services/           # Business logic (AI, scoring, compliance, tasks)
+│   ├── middleware.py        # Security headers, CSRF, rate limiting, audit
+│   └── utils/              # i18n, helpers
+├── frontend/               # Next.js 14 application
+│   └── src/app/(app)/      # Page components (dashboard, grants, apply, etc.)
 ├── static/
-│   ├── css/
-│   │   └── style.css   # Application styles
-│   └── js/
-│       └── app.js      # Frontend SPA logic
-├── uploads/            # File upload storage
-├── Dockerfile          # Docker image definition
-├── docker-compose.yml  # Docker Compose config
-├── .env.example        # Environment variable template
-└── README.md           # This file
+│   ├── nextjs/             # Built frontend (npm run build output)
+│   └── js/translations/    # i18n JSON files (en, fr, ar, es, sw, so)
+├── smoke_test.py           # Pre-deploy gate (runs before every deploy)
+├── test_e2e_final.py       # Full E2E regression suite
+├── requirements.txt        # Python dependencies
+├── railway.json            # Railway deployment config
+└── Procfile                # Gunicorn process definition
 ```
 
-## Roadmap to Production (Odoo 17 Integration)
+## Development Setup
 
-This standalone app is designed to convert cleanly into Odoo 17 modules:
+### Prerequisites
+- Python 3.9+
+- Node.js 18+ (for frontend builds)
+- PostgreSQL (production) or SQLite (development)
 
-| Standalone | Odoo 17 Equivalent |
-|-----------|-------------------|
-| SQLAlchemy models | Odoo ORM models |
-| Flask routes | Odoo controllers |
-| Jinja2 templates | QWeb XML views |
-| JavaScript SPA | OWL components |
-| Flask-Login | Odoo auth (res.users) |
-| SQLite/PostgreSQL | Odoo's PostgreSQL |
+### Quick Start
 
-The integration with Kuja Link will:
-- Replace standalone auth with Link's SSO
-- Read org profiles from Link's res.partner model
-- Share the same PostgreSQL database
-- Add grant features as a Link portal menu item
+```bash
+# Clone and setup
+git clone https://github.com/idirisloyan/kuja-grant.git
+cd kuja-grant
+python -m venv venv && source venv/bin/activate  # or venv\Scripts\activate on Windows
+pip install -r requirements.txt
+
+# Environment
+cp .env.example .env
+# Edit .env: set ANTHROPIC_API_KEY, OPENSANCTIONS_API_KEY, SECRET_KEY
+
+# Database
+python -c "from app import create_app; from app.extensions import db; app = create_app(); app.app_context().push(); db.create_all()"
+
+# Frontend (optional — pre-built files in static/nextjs/)
+cd frontend && npm install && npm run build && cd ..
+
+# Run
+python run.py
+```
+
+## Deployment
+
+### Railway (Production)
+
+The app is configured for Railway with automatic deploys from the `main` branch.
+
+**Required environment variables:**
+- `SECRET_KEY` — Flask session secret
+- `ANTHROPIC_API_KEY` — Anthropic Claude API key
+- `OPENSANCTIONS_API_KEY` — OpenSanctions API key
+- `DATABASE_URL` — PostgreSQL connection string (auto-provisioned by Railway)
+
+**Optional:**
+- `REDIS_URL` — Redis connection for durable task storage (enterprise mode)
+- `TASK_RUNNER_WORKERS` — Background worker thread count (default: 4)
+
+### Pre-Deploy Testing
+
+Every deployment is gated by `smoke_test.py` which runs automatically before `railway up`:
+- Health check and login verification (all 4 roles)
+- AI extraction returns non-zero requirements
+- Grant wizard publish flow (draft → upload → PUT → publish)
+- Assessment scoring with real framework keys
+- Language support for all 6 locales
+- Translation key parity across all languages
+
+## API Reference
+
+All API endpoints require authentication (session cookie) and the `X-Requested-With: XMLHttpRequest` header for CSRF protection.
+
+**Health & Readiness:**
+- `GET /api/health` — Health check (no auth required)
+- `GET /api/ready` — Readiness probe with DB + AI status
+
+**Core Endpoints:**
+- `POST /api/auth/login` — Authentication
+- `GET/POST /api/grants/` — Grant CRUD
+- `POST /api/grants/{id}/upload-grant-doc` — AI document extraction
+- `POST /api/grants/{id}/publish` — Publish grant
+- `GET/POST /api/applications/` — Application management
+- `GET/POST /api/assessments/` — Capacity assessment
+- `POST /api/compliance/screen` — Sanctions screening
+- `POST /api/compliance/verify-registration` — Registry verification
+- `POST /api/ai/chat` — AI assistant
+- `POST /api/ai/score-application` — Application scoring
+
+Full API documentation: see `SYSTEM_OVERVIEW.md` in test-files/.
+
+## Security
+
+- **CSRF:** `X-Requested-With` header required on all mutating requests
+- **CSP:** Strict Content-Security-Policy (no unsafe-inline on script-src)
+- **Rate Limiting:** Per-IP + per-account throttling on sensitive endpoints
+- **Account Lockout:** Progressive lockout after 5 failed login attempts
+- **HSTS:** Strict-Transport-Security with 1-year max-age
+- **Audit Logging:** All API mutations logged with user, IP, timestamp
+- **File Validation:** Type, size, and content validation on all uploads
 
 ## License
 
-Proprietary - Adeso / Kuja Link
+Proprietary — Adeso / Kuja Link
 
 ---
 
-*Built for Adeso by Claude | February 2026*
+*Kuja Grant Management System — Empowering grants through AI*

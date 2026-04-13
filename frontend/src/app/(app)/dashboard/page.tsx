@@ -471,9 +471,9 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
 
   const hasRisk = riskItems.length > 0;
 
-  // Application pipeline data (use real data if available, otherwise mock)
+  // Application pipeline data (real data only — no mock fallbacks)
   const pipelineRaw = s.application_status_breakdown as Record<string, number> | undefined;
-  const pipeline = pipelineRaw || { draft: 2, submitted: 4, under_review: 1, scored: 2, awarded: 3, rejected: 1 };
+  const pipeline = pipelineRaw || { draft: 0, submitted: 0, under_review: 0, scored: 0, awarded: 0, rejected: 0 };
   const pipelineTotal = Object.values(pipeline).reduce((sum, v) => sum + v, 0) || 1;
   const pipelineSegments: Array<{ key: string; label: string; count: number; color: string }> = [
     { key: 'draft', label: t('status.draft'), count: Number(pipeline.draft) || 0, color: '#9CA3AF' },
