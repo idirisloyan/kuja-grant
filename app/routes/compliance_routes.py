@@ -28,6 +28,7 @@ from app.services.compliance_service import ComplianceService
 from app.services.registry_service import RegistryService
 from app.services.ai_service import AIService
 from app.utils.helpers import get_request_json
+from app.utils.decorators import role_required
 
 logger = logging.getLogger('kuja')
 
@@ -215,6 +216,7 @@ def api_get_all_verifications():
 
 @compliance_bp.route('/verification/verify', methods=['POST'])
 @login_required
+@role_required('donor', 'admin')
 def api_verify_registration():
     """Run AI verification on an organization's registration.
     Can verify using existing uploaded document or registration number."""
@@ -316,6 +318,7 @@ def api_verify_registration():
 
 @compliance_bp.route('/verification/<int:verification_id>/update', methods=['PUT'])
 @login_required
+@role_required('admin')
 def api_update_verification(verification_id):
     """Update verification status (donor/admin manually verifies or flags)."""
     if current_user.role not in ('donor', 'admin'):

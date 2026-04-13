@@ -26,6 +26,7 @@ from app.models import Application, Grant, Report
 from app.services.ai_service import AIService
 from app.utils.helpers import get_request_json, paginate_query
 
+from app.utils.decorators import role_required
 from app.services.audit import log_action
 
 logger = logging.getLogger('kuja')
@@ -75,6 +76,7 @@ def api_list_reports():
 
 @reports_bp.route('/', methods=['POST'])
 @login_required
+@role_required('ngo')
 def api_create_report():
     """Create a new report (NGO)."""
     data = get_request_json()
@@ -155,6 +157,7 @@ def api_get_report(report_id):
 
 @reports_bp.route('/<int:report_id>', methods=['PUT'])
 @login_required
+@role_required('ngo')
 def api_update_report(report_id):
     """Update report content (NGO editing draft) or donor adding review notes."""
     report = db.session.get(Report, report_id)
@@ -194,6 +197,7 @@ def api_update_report(report_id):
 
 @reports_bp.route('/<int:report_id>/submit', methods=['POST'])
 @login_required
+@role_required('ngo')
 def api_submit_report(report_id):
     """Submit report to donor."""
     report = db.session.get(Report, report_id)
@@ -226,6 +230,7 @@ def api_submit_report(report_id):
 
 @reports_bp.route('/<int:report_id>/review', methods=['POST'])
 @login_required
+@role_required('donor', 'admin')
 def api_review_report(report_id):
     """Donor reviews a submitted report."""
     if current_user.role not in ('donor', 'admin'):

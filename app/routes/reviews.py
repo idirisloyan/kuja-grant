@@ -156,6 +156,7 @@ def api_create_review():
 
 @reviews_bp.route('/<int:review_id>', methods=['PUT'])
 @login_required
+@role_required('reviewer', 'admin')
 def api_update_review(review_id):
     """Update review scores and comments."""
     review = db.session.get(Review, review_id)
@@ -211,6 +212,7 @@ def api_update_review(review_id):
 
 @reviews_bp.route('/<int:review_id>/complete', methods=['POST'])
 @login_required
+@role_required('reviewer', 'admin')
 def api_complete_review(review_id):
     """Mark a review as complete and update application scores."""
     review = db.session.get(Review, review_id)

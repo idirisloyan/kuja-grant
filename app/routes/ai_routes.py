@@ -131,6 +131,7 @@ def api_ai_score_application():
 
 @ai_bp.route('/analyze-report', methods=['POST'])
 @login_required
+@role_required('ngo', 'donor', 'admin')
 def api_ai_analyze_report():
     """AI analyzes a submitted report against requirements."""
     data = get_request_json()
@@ -174,6 +175,7 @@ def api_ai_analyze_report():
 
 @ai_bp.route('/extract-reporting-requirements', methods=['POST'])
 @login_required
+@role_required('donor', 'admin')
 def api_ai_extract_reporting_requirements():
     """AI reads a grant document file and extracts reporting requirements."""
     data = get_request_json()
