@@ -125,15 +125,21 @@ def api_admin_canary():
 
     checks = {}
 
-    # OpenSanctions API
+    # OpenSanctions API (connectivity probe — no auth needed for base URL)
+    # The /health endpoint may 404; use base URL which returns API info on 200.
     try:
-        opensanctions_key = os.getenv('OPENSANCTIONS_API_KEY', '')
-        headers = {'Authorization': f'ApiKey {opensanctions_key}'} if opensanctions_key else {}
-        r = ext_requests.get('https://api.opensanctions.org/health', headers=headers, timeout=10)
+        r = ext_requests.get('https://api.opensanctions.org/', timeout=10)
+        if r.status_code == 200:
+            os_status = 'ok'
+        elif r.status_code < 500:
+            os_status = 'reachable'  # 3xx/4xx = server alive
+        else:
+            os_status = 'degraded'
         checks['opensanctions'] = {
-            'status': 'ok' if r.status_code == 200 else 'degraded',
+            'status': os_status,
             'http_code': r.status_code,
             'latency_ms': int(r.elapsed.total_seconds() * 1000),
+            'key_configured': bool(os.getenv('OPENSANCTIONS_API_KEY', '')),
         }
     except Exception as e:
         checks['opensanctions'] = {'status': 'down', 'error': str(e)[:100]}
@@ -568,57 +574,6 @@ def list_tasks():
     return jsonify({'tasks': tasks, 'count': len(tasks)})
 
 
-@admin_bp.route('/admin/reseed', methods=['POST'])
-@login_required
-def api_admin_reseed():
-    """Re-seed the database with demo data (admin only, production)."""
-    if current_user.role != 'admin':
-        return jsonify({'error': 'Admin access required'}), 403
-
-    import threading
-    from app.models import (
-        User, Organization, Grant, Application,
-        Assessment, Document, Review, ComplianceCheck, Report,
-        RegistrationVerification,
-    )
-
-    def do_seed():
-        from app import create_app
-        seed_app = create_app()
-        with seed_app.app_context():
-            try:
-                logger.info("Reseed: deleting all existing data...")
-                # Delete in FK-safe order (children first, parents last)
-                db.session.execute(text("DELETE FROM reviews"))
-                db.session.execute(text("DELETE FROM documents"))
-                db.session.execute(text("DELETE FROM reports"))
-                db.session.execute(text("DELETE FROM compliance_checks"))
-                db.session.execute(text("DELETE FROM registration_verifications"))
-                db.session.execute(text("DELETE FROM applications"))
-                db.session.execute(text("DELETE FROM assessments"))
-                db.session.execute(text("DELETE FROM grants"))
-                db.session.execute(text("DELETE FROM users"))
-                db.session.execute(text("DELETE FROM organizations"))
-                # Clear login attempts (brute-force lockout table)
-                try:
-                    db.session.execute(text("DELETE FROM login_attempts"))
-                except Exception:
-                    pass  # Table might not exist yet
-                db.session.commit()
-                logger.info("Reseed: all data cleared successfully")
-
-                # Now run seed logic — seed() will see no users and insert fresh data
-                import importlib
-                seed_mod = importlib.import_module('seed')
-                importlib.reload(seed_mod)
-                seed_mod.seed(force=False)
-                logger.info("Reseed completed successfully")
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"Background reseed failed: {e}")
-                import traceback
-                logger.error(traceback.format_exc())
-
-    t = threading.Thread(target=do_seed, daemon=True)
-    t.start()
-    return jsonify({'success': True, 'message': 'Re-seed started in background. Data will be ready in ~30 seconds.'})
+# Production reseed endpoint REMOVED — database seeding is a CLI-only
+# operation (python seed.py) and must never be exposed as an API route.
+# Retained as comment for audit trail: removed April 2026.
