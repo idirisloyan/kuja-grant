@@ -20,6 +20,11 @@ Usage:
     status  = get_task(task_id)  # {'id': '...', 'status': 'running'|'completed'|'failed', ...}
 """
 
+# PRODUCTION NOTE: Set REDIS_URL environment variable on Railway to enable
+# durable, shared task state across instances. Without Redis, falls back to
+# in-memory ThreadPoolExecutor (acceptable for single-instance pilot).
+# To provision: railway add --plugin redis
+
 import json
 import logging
 import os

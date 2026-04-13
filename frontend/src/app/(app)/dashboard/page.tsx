@@ -484,43 +484,53 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
     { key: 'rejected', label: t('status.rejected'), count: Number(pipeline.rejected) || 0, color: '#EF4444' },
   ];
 
+  const attentionCount = overdueReports + reportsDueSoon + flaggedCompliance;
+
   return (
     <Grid container spacing={3}>
-      {/* Row 1: Welcome Banner */}
+      {/* Row 1: Welcome Banner — compact, decision-oriented */}
       <Grid size={12}>
-        <Card sx={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 50%, #34D399 100%)', color: '#fff', position: 'relative', overflow: 'hidden' }}>
-          <CardContent sx={{ p: { xs: 3, md: 4 }, position: 'relative', zIndex: 1 }}>
+        <Card sx={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 40%, #334155 100%)', color: '#fff', position: 'relative', overflow: 'hidden' }}>
+          <CardContent sx={{ p: { xs: 2.5, md: 3 }, position: 'relative', zIndex: 1 }}>
             <Grid container alignItems="center" justifyContent="space-between" spacing={2}>
-              <Grid size={{ xs: 12, sm: 8 }}>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>{t('auth.welcome_back', { name: userName.split(' ')[0] })}</Typography>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', mt: 0.5 }}>
+              <Grid size={{ xs: 12, sm: 7 }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}>{t('auth.welcome_back', { name: userName.split(' ')[0] })}</Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.5 }}>
                   {t('dashboard.donor.subtitle')}
                 </Typography>
               </Grid>
-              <Grid size={{ xs: 12, sm: 4 }} sx={{ textAlign: { sm: 'right' } }}>
+              <Grid size={{ xs: 12, sm: 5 }} sx={{ textAlign: { sm: 'right' }, display: 'flex', gap: 1.5, justifyContent: { xs: 'flex-start', sm: 'flex-end' }, flexWrap: 'wrap' }}>
+                {attentionCount > 0 && (
+                  <Chip
+                    icon={<AlertTriangle size={14} />}
+                    label={`${attentionCount} item${attentionCount > 1 ? 's' : ''} need attention`}
+                    sx={{ bgcolor: 'rgba(239,68,68,0.15)', color: '#FCA5A5', fontWeight: 600, fontSize: '0.75rem', height: 30, '& .MuiChip-icon': { color: '#FCA5A5' } }}
+                  />
+                )}
                 <Button variant="contained" size="small" startIcon={<PlusCircle size={16} />} onClick={() => router.push('/grants/new')}
-                  sx={{ bgcolor: '#fff', color: '#059669', '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' } }}>
+                  sx={{ bgcolor: '#4F46E5', color: '#fff', '&:hover': { bgcolor: '#4338CA' } }}>
                   {t('nav.create_grant')}
                 </Button>
               </Grid>
             </Grid>
           </CardContent>
-          <Box sx={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.08)' }} />
+          <Box sx={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', bgcolor: 'rgba(79,70,229,0.08)' }} />
+          <Box sx={{ position: 'absolute', bottom: -40, left: '30%', width: 120, height: 120, borderRadius: '50%', bgcolor: 'rgba(99,102,241,0.06)' }} />
         </Card>
       </Grid>
 
-      {/* Row 2: Metric Cards */}
-      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={Briefcase} label={t('dashboard.stat.total_grants')} value={totalGrants} color="#4F46E5" bgColor="#EEF2FF" href="/grants" />
+      {/* Row 2: Compact Metrics Bar */}
+      <Grid size={{ xs: 6, sm: 3 }}>
+        <MetricCard icon={Briefcase} label={t('dashboard.stat.total_grants')} value={totalGrants} color="#4338CA" bgColor="#EEF2FF" href="/grants" />
       </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={FileText} label={t('dashboard.stat.total_applications')} value={totalApps} color="#3B82F6" bgColor="#EFF6FF" href="/reviews" />
+      <Grid size={{ xs: 6, sm: 3 }}>
+        <MetricCard icon={FileText} label={t('dashboard.stat.total_applications')} value={totalApps} color="#2563EB" bgColor="#EFF6FF" href="/reviews" />
       </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={Star} label={t('dashboard.stat.pending_reviews')} value={pendingReviews} color="#F59E0B" bgColor="#FFFBEB" href="/reviews" />
+      <Grid size={{ xs: 6, sm: 3 }}>
+        <MetricCard icon={Star} label={t('dashboard.stat.pending_reviews')} value={pendingReviews} color="#D97706" bgColor="#FFFBEB" href="/reviews" />
       </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <MetricCard icon={TrendingUp} label={t('dashboard.stat.total_awarded')} value={`$${(totalAwarded / 1000).toFixed(0)}K`} color="#10B981" bgColor="#ECFDF5" />
+      <Grid size={{ xs: 6, sm: 3 }}>
+        <MetricCard icon={TrendingUp} label={t('dashboard.stat.total_awarded')} value={`$${(totalAwarded / 1000).toFixed(0)}K`} color="#059669" bgColor="#ECFDF5" />
       </Grid>
 
       {/* Row 3: At Risk Now */}

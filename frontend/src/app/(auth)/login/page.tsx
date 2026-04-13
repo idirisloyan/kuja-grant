@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -39,7 +39,15 @@ export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((s) => s.login);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDev, setIsDev] = useState(false);
   const { t } = useTranslation();
+
+  useEffect(() => {
+    setIsDev(
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1'
+    );
+  }, []);
 
   // Demo accounts — built inside component to use t()
   const demoAccounts = [
@@ -114,7 +122,7 @@ export default function LoginPage() {
         sx={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(135deg, #4338CA 0%, #4F46E5 35%, #6366F1 70%, #818CF8 100%)',
+          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 30%, #312E81 70%, #4338CA 100%)',
         }}
       />
 
@@ -180,8 +188,11 @@ export default function LoginPage() {
           <Typography variant="h4" sx={{ color: '#fff', fontWeight: 700 }}>
             {t('auth.login_title')}
           </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(224,231,255,0.8)' }}>
+          <Typography variant="body2" sx={{ color: 'rgba(224,231,255,0.7)' }}>
             {t('auth.subtitle')}
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.35)', mt: 1, letterSpacing: '0.12em', textTransform: 'uppercase', fontSize: '0.625rem' }}>
+            Trusted across 7 African countries
           </Typography>
         </Stack>
 
@@ -294,79 +305,98 @@ export default function LoginPage() {
               </Stack>
             </form>
 
-            {/* Divider */}
-            <Divider
-              sx={{
-                my: 3,
-                '&::before, &::after': { borderColor: 'rgba(255,255,255,0.2)' },
-              }}
-            >
-              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', px: 1 }}>
-                {t('auth.demo_accounts')}
-              </Typography>
-            </Divider>
-
-            {/* Demo account cards */}
-            <Stack direction="row" spacing={1.5}>
-              {demoAccounts.map((account) => (
-                <Card
-                  key={account.email}
-                  onClick={() => !isLoading && handleDemoLogin(account.email)}
+            {/* Demo accounts — only visible on localhost */}
+            {isDev && (
+              <>
+                <Divider
                   sx={{
-                    flex: 1,
-                    cursor: isLoading ? 'default' : 'pointer',
-                    opacity: isLoading ? 0.5 : 1,
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 2,
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      background: isLoading ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.15)',
-                      borderColor: 'rgba(255,255,255,0.3)',
-                      transform: isLoading ? 'none' : 'translateY(-1px)',
-                    },
+                    my: 3,
+                    '&::before, &::after': { borderColor: 'rgba(255,255,255,0.2)' },
                   }}
                 >
-                  <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                    <Stack alignItems="center" spacing={1}>
-                      <Avatar
-                        sx={{
-                          bgcolor: account.color,
-                          width: 40,
-                          height: 40,
-                          boxShadow: `0 4px 12px ${account.color}40`,
-                        }}
-                      >
-                        {account.icon}
-                      </Avatar>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography
-                          variant="caption"
-                          sx={{ color: '#fff', fontWeight: 600, display: 'block' }}
-                        >
-                          {account.label}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.625rem', lineHeight: 1.3 }}
-                        >
-                          {account.description}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              ))}
-            </Stack>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', px: 1 }}>
+                    {t('auth.demo_accounts')}
+                  </Typography>
+                </Divider>
+
+                <Stack direction="row" spacing={1.5}>
+                  {demoAccounts.map((account) => (
+                    <Card
+                      key={account.email}
+                      onClick={() => !isLoading && handleDemoLogin(account.email)}
+                      sx={{
+                        flex: 1,
+                        cursor: isLoading ? 'default' : 'pointer',
+                        opacity: isLoading ? 0.5 : 1,
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 2,
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          background: isLoading ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.15)',
+                          borderColor: 'rgba(255,255,255,0.3)',
+                          transform: isLoading ? 'none' : 'translateY(-1px)',
+                        },
+                      }}
+                    >
+                      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                        <Stack alignItems="center" spacing={1}>
+                          <Avatar
+                            sx={{
+                              bgcolor: account.color,
+                              width: 40,
+                              height: 40,
+                              boxShadow: `0 4px 12px ${account.color}40`,
+                            }}
+                          >
+                            {account.icon}
+                          </Avatar>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Typography
+                              variant="caption"
+                              sx={{ color: '#fff', fontWeight: 600, display: 'block' }}
+                            >
+                              {account.label}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.625rem', lineHeight: 1.3 }}
+                            >
+                              {account.description}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              </>
+            )}
           </CardContent>
         </Card>
+
+        {/* Trust indicators */}
+        <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 3, flexWrap: 'wrap', gap: 1 }}>
+          {[
+            { icon: '🔒', label: 'Encrypted' },
+            { icon: '🌍', label: '6 Languages' },
+            { icon: '🤖', label: 'AI-Powered' },
+          ].map((badge) => (
+            <Box key={badge.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1.5, py: 0.5, borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', bgcolor: 'rgba(255,255,255,0.03)' }}>
+              <Typography sx={{ fontSize: '0.7rem' }}>{badge.icon}</Typography>
+              <Typography variant="caption" sx={{ color: 'rgba(199,210,254,0.5)', fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                {badge.label}
+              </Typography>
+            </Box>
+          ))}
+        </Stack>
 
         {/* Footer */}
         <Typography
           variant="caption"
-          sx={{ display: 'block', textAlign: 'center', mt: 3, color: 'rgba(199,210,254,0.5)' }}
+          sx={{ display: 'block', textAlign: 'center', mt: 2, color: 'rgba(199,210,254,0.35)' }}
         >
-          Kuja Link &middot; Empowering grants through AI
+          Adeso &mdash; African Development Solutions
         </Typography>
       </Box>
     </Box>

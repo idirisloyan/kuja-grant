@@ -21,7 +21,7 @@ from threading import Lock
 
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
-from sqlalchemy import text
+from sqlalchemy import text, bindparam
 
 from app.extensions import db
 from app.models import (
@@ -31,6 +31,16 @@ from app.models import (
 from app.middleware import APP_VERSION, APP_START_TIME, APP_BUILD
 
 logger = logging.getLogger('kuja')
+
+# ---------------------------------------------------------------------------
+# Known test/seed accounts — excluded from security alert calculations
+# to avoid QA traffic triggering brute-force warnings.
+# ---------------------------------------------------------------------------
+TEST_EMAILS = {
+    'fatima@amani.org', 'ahmed@salamrelief.org', 'thandi@ubuntu.org',
+    'peter@hopebridges.org', 'aisha@sahelwomen.org', 'sarah@globalhealth.org',
+    'david@eatrust.org', 'james@reviewer.org', 'maria@reviewer.org', 'admin@kuja.org',
+}
 
 # ---------------------------------------------------------------------------
 # AI availability flags (mirror what ai_service.py exposes)
@@ -368,42 +378,58 @@ def _get_security_metrics():
         h1_ago = now - timedelta(hours=1)
         h24_ago = now - timedelta(hours=24)
 
+        # Filter out QA/test account traffic from security metrics so
+        # seed-data logins don't trigger brute-force alerts.
+        _test_filter = " AND (email IS NULL OR email NOT IN :test_emails)"
+        _test_emails = list(TEST_EMAILS)
+
+        def _stmt(sql):
+            """Build a text() statement with an expanding bind for test_emails."""
+            return text(sql).bindparams(bindparam('test_emails', expanding=True))
+
         # Attempts in last hour
-        r = db.session.execute(text(
-            "SELECT COUNT(*) FROM login_attempts WHERE attempted_at > :cutoff"
-        ), {"cutoff": h1_ago})
+        r = db.session.execute(
+            _stmt("SELECT COUNT(*) FROM login_attempts WHERE attempted_at > :cutoff" + _test_filter),
+            {"cutoff": h1_ago, "test_emails": _test_emails},
+        )
         metrics['login_attempts_1h'] = r.scalar() or 0
 
         # Attempts in last 24h
-        r = db.session.execute(text(
-            "SELECT COUNT(*) FROM login_attempts WHERE attempted_at > :cutoff"
-        ), {"cutoff": h24_ago})
+        r = db.session.execute(
+            _stmt("SELECT COUNT(*) FROM login_attempts WHERE attempted_at > :cutoff" + _test_filter),
+            {"cutoff": h24_ago, "test_emails": _test_emails},
+        )
         metrics['login_attempts_24h'] = r.scalar() or 0
 
         # Unique IPs in last hour
-        r = db.session.execute(text(
-            "SELECT COUNT(DISTINCT ip) FROM login_attempts WHERE attempted_at > :cutoff"
-        ), {"cutoff": h1_ago})
+        r = db.session.execute(
+            _stmt("SELECT COUNT(DISTINCT ip) FROM login_attempts WHERE attempted_at > :cutoff" + _test_filter),
+            {"cutoff": h1_ago, "test_emails": _test_emails},
+        )
         metrics['unique_ips_1h'] = r.scalar() or 0
 
         # Unique IPs in last 24h
-        r = db.session.execute(text(
-            "SELECT COUNT(DISTINCT ip) FROM login_attempts WHERE attempted_at > :cutoff"
-        ), {"cutoff": h24_ago})
+        r = db.session.execute(
+            _stmt("SELECT COUNT(DISTINCT ip) FROM login_attempts WHERE attempted_at > :cutoff" + _test_filter),
+            {"cutoff": h24_ago, "test_emails": _test_emails},
+        )
         metrics['unique_ips_24h'] = r.scalar() or 0
 
         # Top IPs in last 24h (potential brute-force)
-        r = db.session.execute(text(
-            "SELECT ip, COUNT(*) as cnt FROM login_attempts "
-            "WHERE attempted_at > :cutoff GROUP BY ip ORDER BY cnt DESC LIMIT 10"
-        ), {"cutoff": h24_ago})
+        r = db.session.execute(
+            _stmt("SELECT ip, COUNT(*) as cnt FROM login_attempts "
+                  "WHERE attempted_at > :cutoff" + _test_filter + " GROUP BY ip ORDER BY cnt DESC LIMIT 10"),
+            {"cutoff": h24_ago, "test_emails": _test_emails},
+        )
         metrics['top_ips_24h'] = [{'ip': row[0], 'attempts': row[1]} for row in r.fetchall()]
 
-        # Recent login attempts (last 20)
-        r = db.session.execute(text(
-            "SELECT ip, attempted_at FROM login_attempts "
-            "ORDER BY attempted_at DESC LIMIT 20"
-        ))
+        # Recent login attempts (last 20, excluding test accounts)
+        r = db.session.execute(
+            _stmt("SELECT ip, attempted_at FROM login_attempts "
+                  "WHERE (email IS NULL OR email NOT IN :test_emails) "
+                  "ORDER BY attempted_at DESC LIMIT 20"),
+            {"test_emails": _test_emails},
+        )
         metrics['recent_attempts'] = [
             {'ip': row[0], 'time': row[1].isoformat() + 'Z' if row[1] else None}
             for row in r.fetchall()

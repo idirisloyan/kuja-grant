@@ -5,81 +5,83 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { ReactNode } from 'react';
 
 // ---------------------------------------------------------------------------
-// Custom MUI Theme — Google Cloud Console / Firebase Dashboard aesthetic
+// Kuja Grant — Premium Enterprise Theme
+// Institutional Modern + East Africa Professional aesthetic
 // ---------------------------------------------------------------------------
 
 const kujaTheme = createTheme({
   palette: {
     primary: {
-      main: '#4F46E5',
-      light: '#818CF8',
-      dark: '#4338CA',
+      main: '#4338CA',       // Deeper indigo — more authoritative
+      light: '#6366F1',
+      dark: '#3730A3',
       contrastText: '#FFFFFF',
     },
     secondary: {
-      main: '#10B981',
+      main: '#059669',       // Darker emerald — trust green
       light: '#34D399',
-      dark: '#059669',
+      dark: '#047857',
       contrastText: '#FFFFFF',
     },
     error: {
-      main: '#EF4444',
+      main: '#DC2626',       // Darker red — more serious
       light: '#FCA5A5',
-      dark: '#DC2626',
+      dark: '#B91C1C',
     },
     warning: {
-      main: '#F59E0B',
+      main: '#D97706',       // Darker amber — clearer urgency
       light: '#FCD34D',
-      dark: '#D97706',
+      dark: '#B45309',
     },
     info: {
-      main: '#3B82F6',
+      main: '#2563EB',       // Deeper blue
       light: '#93C5FD',
-      dark: '#2563EB',
+      dark: '#1D4ED8',
     },
     success: {
-      main: '#10B981',
+      main: '#059669',
       light: '#6EE7B7',
-      dark: '#059669',
+      dark: '#047857',
     },
     background: {
       default: '#F8FAFC',
       paper: '#FFFFFF',
     },
     text: {
-      primary: '#1E293B',
-      secondary: '#64748B',
+      primary: '#0F172A',    // Near-black — stronger authority
+      secondary: '#475569',  // Darker secondary — better readability
     },
     divider: '#E2E8F0',
   },
   typography: {
-    fontFamily: '"Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", sans-serif',
+    fontFamily: '"DM Sans", "Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", sans-serif',
     h1: {
-      fontSize: '2rem',
-      fontWeight: 600,
+      fontSize: '2.25rem',   // Larger — more presence
+      fontWeight: 700,       // Bolder
+      lineHeight: 1.15,
+      letterSpacing: '-0.025em',
+    },
+    h2: {
+      fontSize: '1.75rem',   // Larger
+      fontWeight: 700,
       lineHeight: 1.2,
       letterSpacing: '-0.02em',
     },
-    h2: {
-      fontSize: '1.5rem',
+    h3: {
+      fontSize: '1.375rem',
       fontWeight: 600,
       lineHeight: 1.3,
       letterSpacing: '-0.01em',
     },
-    h3: {
-      fontSize: '1.25rem',
-      fontWeight: 600,
-      lineHeight: 1.4,
-    },
     h4: {
       fontSize: '1.125rem',
       fontWeight: 600,
-      lineHeight: 1.4,
+      lineHeight: 1.35,
     },
     h5: {
       fontSize: '1rem',
       fontWeight: 600,
-      lineHeight: 1.5,
+      lineHeight: 1.4,
     },
     h6: {
       fontSize: '0.875rem',
@@ -88,11 +90,11 @@ const kujaTheme = createTheme({
     },
     body1: {
       fontSize: '0.875rem',
-      lineHeight: 1.6,
+      lineHeight: 1.65,      // Slightly more generous
     },
     body2: {
       fontSize: '0.8125rem',
-      lineHeight: 1.5,
+      lineHeight: 1.55,
     },
     caption: {
       fontSize: '0.75rem',
@@ -101,13 +103,15 @@ const kujaTheme = createTheme({
     },
     button: {
       textTransform: 'none',
-      fontWeight: 500,
+      fontWeight: 600,        // Bolder buttons
+      letterSpacing: '0.01em',
     },
     overline: {
       textTransform: 'uppercase',
       fontSize: '0.6875rem',
-      fontWeight: 600,
-      letterSpacing: '0.08em',
+      fontWeight: 700,
+      letterSpacing: '0.1em',
+      color: '#64748B',
     },
   },
   shape: {
@@ -166,11 +170,13 @@ const kujaTheme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 10,
-          padding: '8px 20px',
-          fontWeight: 500,
+          padding: '8px 22px',
+          fontWeight: 600,
           boxShadow: 'none',
+          transition: 'all 0.15s ease',
           '&:hover': {
             boxShadow: 'none',
+            transform: 'translateY(-0.5px)',
           },
         },
         sizeSmall: {
@@ -178,12 +184,20 @@ const kujaTheme = createTheme({
           fontSize: '0.8125rem',
         },
         sizeLarge: {
-          padding: '12px 28px',
+          padding: '12px 30px',
           fontSize: '0.9375rem',
+          fontWeight: 700,
         },
         containedPrimary: {
+          backgroundImage: 'linear-gradient(180deg, #4F46E5 0%, #4338CA 100%)',
           '&:hover': {
-            backgroundColor: '#4338CA',
+            backgroundImage: 'linear-gradient(180deg, #4338CA 0%, #3730A3 100%)',
+          },
+        },
+        containedSuccess: {
+          backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 100%)',
+          '&:hover': {
+            backgroundImage: 'linear-gradient(180deg, #059669 0%, #047857 100%)',
           },
         },
       },
@@ -194,12 +208,13 @@ const kujaTheme = createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 1px 3px 0 rgba(0,0,0,0.04)',
-          transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
+          borderRadius: 14,
+          border: '1px solid rgba(226,232,240,0.6)',
+          boxShadow: '0 1px 3px 0 rgba(0,0,0,0.03), 0 1px 2px -1px rgba(0,0,0,0.02)',
+          transition: 'box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease',
           '&:hover': {
-            boxShadow: '0 4px 6px -2px rgba(0,0,0,0.06), 0 2px 4px -1px rgba(0,0,0,0.04)',
+            boxShadow: '0 8px 16px -4px rgba(0,0,0,0.06), 0 4px 8px -2px rgba(0,0,0,0.03)',
+            borderColor: '#CBD5E1',
           },
         },
       },
@@ -351,14 +366,14 @@ const kujaTheme = createTheme({
       styleOverrides: {
         root: {
           '& .MuiTableCell-head': {
-            fontWeight: 600,
+            fontWeight: 700,
             fontSize: '0.6875rem',
             textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            color: '#64748B',
-            backgroundColor: '#F8FAFC',
-            borderBottom: '1px solid #E2E8F0',
-            padding: '10px 16px',
+            letterSpacing: '0.06em',
+            color: '#475569',
+            backgroundColor: '#F1F5F9',
+            borderBottom: '2px solid #E2E8F0',
+            padding: '12px 16px',
           },
         },
       },
