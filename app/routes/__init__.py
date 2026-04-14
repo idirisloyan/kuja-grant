@@ -19,8 +19,10 @@ def register_blueprints(app):
     from app.routes.reviews import reviews_bp
     from app.routes.reports import reports_bp
     from app.routes.admin import admin_bp
+    from app.routes.notifications import notifications_bp
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
-               compliance_bp, reviews_bp, reports_bp, admin_bp]:
+               compliance_bp, reviews_bp, reports_bp, admin_bp,
+               notifications_bp]:
         app.register_blueprint(bp)

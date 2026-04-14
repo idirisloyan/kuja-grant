@@ -210,6 +210,9 @@ def api_submit_report(report_id):
     if report.status not in ('draft', 'revision_requested'):
         return jsonify({'error': 'Report already submitted'}), 400
 
+    # Append current state to revision history before updating status
+    report.append_revision_snapshot()
+
     report.status = 'submitted'
     report.submitted_at = datetime.now(timezone.utc)
 
@@ -259,8 +262,13 @@ def api_review_report(report_id):
     else:
         return jsonify({'error': 'action must be "accept" or "request_revision"'}), 400
 
-    report.reviewer_notes = data.get('notes', '')
+    reviewer_notes = data.get('notes', '')
+    report.reviewer_notes = reviewer_notes
     report.reviewed_at = datetime.now(timezone.utc)
+
+    # Store reviewer notes in revision history when requesting revision
+    if action == 'request_revision':
+        report.append_revision_snapshot(reviewer_notes=reviewer_notes)
 
     db.session.commit()
 

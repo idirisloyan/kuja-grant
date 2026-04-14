@@ -214,6 +214,76 @@ def api_get_all_verifications():
     return jsonify({'success': True, 'organizations': results})
 
 
+@compliance_bp.route('/verification/expiring', methods=['GET'])
+@login_required
+@role_required('donor', 'admin')
+def api_expiring_registrations():
+    """Get organizations with registrations expiring within 90 days.
+
+    Returns results grouped by urgency:
+    - expired: already past expiry date
+    - expiring_30d: expiring within 30 days
+    - expiring_60d: expiring within 31-60 days
+    - expiring_90d: expiring within 61-90 days
+
+    Donor and admin only.
+    """
+    from datetime import date, timedelta
+    today = date.today()
+    cutoff_90d = today + timedelta(days=90)
+
+    # Find all verifications with an expiry date within the window
+    verifications = RegistrationVerification.query.filter(
+        RegistrationVerification.expiry_date.isnot(None),
+        RegistrationVerification.expiry_date <= cutoff_90d,
+    ).order_by(RegistrationVerification.expiry_date.asc()).all()
+
+    groups = {
+        'expired': [],
+        'expiring_30d': [],
+        'expiring_60d': [],
+        'expiring_90d': [],
+    }
+
+    for v in verifications:
+        org = db.session.get(Organization, v.org_id)
+        if not org:
+            continue
+
+        days_until = (v.expiry_date - today).days
+        entry = {
+            'org_id': org.id,
+            'org_name': org.name,
+            'country': v.country or org.country,
+            'registration_number': v.registration_number or org.registration_number,
+            'expiry_date': v.expiry_date.isoformat(),
+            'days_until_expiry': days_until,
+            'verification_status': v.status,
+            'verification_id': v.id,
+        }
+
+        if days_until < 0:
+            groups['expired'].append(entry)
+        elif days_until <= 30:
+            groups['expiring_30d'].append(entry)
+        elif days_until <= 60:
+            groups['expiring_60d'].append(entry)
+        else:
+            groups['expiring_90d'].append(entry)
+
+    total = sum(len(g) for g in groups.values())
+
+    return jsonify({
+        'success': True,
+        'total': total,
+        'expired_count': len(groups['expired']),
+        'expiring_30d_count': len(groups['expiring_30d']),
+        'expiring_60d_count': len(groups['expiring_60d']),
+        'expiring_90d_count': len(groups['expiring_90d']),
+        'groups': groups,
+    })
+
+
 @compliance_bp.route('/verification/verify', methods=['POST'])
 @login_required
 @role_required('donor', 'admin')

@@ -30,6 +30,8 @@ class Report(db.Model):
     reviewed_at = db.Column(db.DateTime, nullable=True)
     reviewer_notes = db.Column(db.Text, nullable=True)
     ai_analysis = db.Column(db.Text, nullable=True)  # JSON - AI review of the report
+    revision_number = db.Column(db.Integer, default=1)
+    revision_history = db.Column(db.Text, nullable=True)  # JSON array of revision snapshots
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
@@ -58,6 +60,28 @@ class Report(db.Model):
     def set_ai_analysis(self, value):
         self.ai_analysis = _json_dump(value)
 
+    def get_revision_history(self):
+        return _json_load(self.revision_history) or []
+
+    def set_revision_history(self, value):
+        self.revision_history = _json_dump(value)
+
+    def append_revision_snapshot(self, reviewer_notes=None):
+        """Append the current report state to revision_history and increment revision_number."""
+        history = self.get_revision_history()
+        snapshot = {
+            'version': self.revision_number,
+            'content_snapshot': self.get_content(),
+            'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
+            'ai_score': self.get_ai_analysis().get('overall_score'),
+            'reviewer_notes': reviewer_notes,
+            'status': self.status,
+            'recorded_at': datetime.now(timezone.utc).isoformat(),
+        }
+        history.append(snapshot)
+        self.set_revision_history(history)
+        self.revision_number = (self.revision_number or 1) + 1
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -77,6 +101,8 @@ class Report(db.Model):
             'ai_analysis': self.get_ai_analysis(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'revision_number': self.revision_number or 1,
+            'revision_count': len(self.get_revision_history()),
             'grant_title': self.grant.title if self.grant else None,
             'org_name': self.submitted_by_org.name if self.submitted_by_org else None,
         }

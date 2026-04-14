@@ -171,6 +171,26 @@ def api_upload_document():
                 'success': False,
             }), 400
 
+    # Version tracking: if a document of the same type already exists for this
+    # application/assessment, mark the new one as superseding the old one and
+    # increment the version number.
+    supersedes_id = None
+    version = 1
+    if application_id and doc_type != 'general':
+        prev_doc = Document.query.filter_by(
+            application_id=application_id, doc_type=doc_type
+        ).order_by(Document.uploaded_at.desc()).first()
+        if prev_doc:
+            supersedes_id = prev_doc.id
+            version = (prev_doc.version or 1) + 1
+    elif assessment_id and doc_type != 'general':
+        prev_doc = Document.query.filter_by(
+            assessment_id=assessment_id, doc_type=doc_type
+        ).order_by(Document.uploaded_at.desc()).first()
+        if prev_doc:
+            supersedes_id = prev_doc.id
+            version = (prev_doc.version or 1) + 1
+
     # Create document record
     document = Document(
         application_id=application_id,
@@ -180,6 +200,8 @@ def api_upload_document():
         stored_filename=stored_filename,
         file_size=file_size,
         mime_type=mime_type,
+        version=version,
+        supersedes_id=supersedes_id,
     )
 
     # Look up donor-specific requirements for this document type

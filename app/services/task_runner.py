@@ -172,10 +172,11 @@ def schedule_rescreening(app=None):
     """Re-screen all organizations with active grants against sanctions lists.
 
     For each org with grants in 'open' or 'awarded' status:
-    1. Runs compliance screening via ComplianceService
-    2. Compares results to previous screening
-    3. Logs warnings for new matches
-    4. Stores updated results and timestamps
+    1. Acquires a distributed lock to prevent duplicate runs across workers
+    2. Runs compliance screening via ComplianceService
+    3. Compares results to previous screening
+    4. Logs warnings for new matches
+    5. Stores updated results and timestamps
 
     Args:
         app: Flask app instance (required for app context in background threads).
@@ -187,10 +188,33 @@ def schedule_rescreening(app=None):
     from app.extensions import db
     from app.models import Organization, Grant, Application, ComplianceCheck
     from app.services.compliance_service import ComplianceService
+    from app.services.distributed_lock import acquire_rescreening_lock, release_rescreening_lock
 
     if app is None:
         from flask import current_app
         app = current_app._get_current_object()
+
+    # When called as a background task (via submit_task), acquire the
+    # distributed lock to prevent duplicate runs across workers.
+    lock_acquired = acquire_rescreening_lock()
+    if not lock_acquired:
+        logger.info("Rescreening: lock held by another worker, skipping this run")
+        return {'orgs_screened': 0, 'new_flags': 0, 'skipped': True,
+                'reason': 'lock_held_by_another_worker'}
+
+    logger.info("Rescreening: acquired lock, starting run")
+
+    try:
+        return _run_rescreening(app)
+    finally:
+        release_rescreening_lock()
+
+
+def _run_rescreening(app):
+    """Internal rescreening logic, called after lock is acquired."""
+    from app.extensions import db
+    from app.models import Organization, Grant, Application, ComplianceCheck
+    from app.services.compliance_service import ComplianceService
 
     with app.app_context():
         results = {

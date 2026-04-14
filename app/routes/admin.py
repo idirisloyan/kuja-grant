@@ -582,8 +582,45 @@ def get_task_status(task_id):
     from app.services.task_runner import get_task
     task = get_task(task_id)
     if not task:
-        return jsonify({'error': 'Task not found'}), 404
+        return jsonify({
+            'error': 'Task not found',
+            'task_id': task_id,
+            'hint': 'Task may have expired (24h TTL) or the ID may be incorrect. '
+                    'Use GET /api/tasks to list all active tasks.',
+        }), 404
     return jsonify(task)
+
+
+@admin_bp.route('/admin/task-status/<task_id>', methods=['GET'])
+@login_required
+def get_admin_task_status(task_id):
+    """Admin-only endpoint to check a background task status.
+
+    Queries TaskRunner for the task by ID. Falls back to Redis if not
+    found in memory. Returns task_id, status, result/error, and timestamps.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    from app.services.task_runner import get_task
+    task = get_task(task_id)
+    if not task:
+        return jsonify({
+            'error': 'Task not found',
+            'task_id': task_id,
+            'hint': 'Task may have expired (24h TTL), been cleaned up, or the ID '
+                    'may be incorrect. Use GET /api/tasks to list all active tasks.',
+        }), 404
+
+    return jsonify({
+        'task_id': task.get('id', task_id),
+        'status': task.get('status', 'unknown'),
+        'type': task.get('type'),
+        'result': task.get('result'),
+        'error': task.get('error'),
+        'submitted_at': task.get('created_at'),
+        'completed_at': task.get('completed_at'),
+    })
 
 
 @admin_bp.route('/tasks', methods=['GET'])
@@ -630,7 +667,9 @@ def api_admin_trigger_rescreening():
     return jsonify({
         'success': True,
         'job_id': task_id,
-        'message': 'Sanctions re-screening job submitted. Poll /api/tasks/{job_id} for status.',
+        'message': 'Sanctions re-screening job submitted.',
+        'poll_url': f'/api/admin/task-status/{task_id}',
+        'alt_poll_url': f'/api/tasks/{task_id}',
     })
 
 

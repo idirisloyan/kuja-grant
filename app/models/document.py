@@ -23,9 +23,14 @@ class Document(db.Model):
     mime_type = db.Column(db.String(200), nullable=True)
     ai_analysis = db.Column(db.Text, nullable=True)  # JSON with score, findings, recommendations
     score = db.Column(db.Float, nullable=True)
+    version = db.Column(db.Integer, default=1)
+    supersedes_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=True)
     uploaded_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationship to the document this one supersedes
+    supersedes = db.relationship('Document', remote_side=[id], backref='superseded_by')
 
     # --- JSON helpers ---
     def get_ai_analysis(self):
@@ -46,6 +51,8 @@ class Document(db.Model):
             'mime_type': self.mime_type,
             'ai_analysis': self.get_ai_analysis(),
             'score': self.score,
+            'version': self.version or 1,
+            'supersedes_id': self.supersedes_id,
             'uploaded_at': self.uploaded_at.isoformat() if self.uploaded_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

@@ -167,6 +167,11 @@ def create_app(config_name=None):
     # -----------------------------------------------------------------
     _register_rescreening_scheduler(app)
 
+    # -----------------------------------------------------------------
+    # Schedule daily notification checks (deadline reminders, overdue, expiry)
+    # -----------------------------------------------------------------
+    _register_notification_scheduler(app)
+
     return app
 
 
@@ -174,10 +179,32 @@ def _register_rescreening_scheduler(app):
     """Start a background daemon thread that periodically re-screens
     organizations with active grants against sanctions lists.
 
+    MULTI-WORKER SAFETY:
+    In production with Gunicorn (multiple workers), each worker process runs
+    create_app() independently. To prevent duplicate re-screening runs:
+    - Only start the scheduler when RESCREENING_SCHEDULER=true env var is set.
+      By default it is NOT set, so no worker starts the scheduler.
+    - In production, either:
+      (a) Set RESCREENING_SCHEDULER=true on exactly ONE worker (e.g. via
+          a dedicated scheduler process: gunicorn -w 1 --preload), OR
+      (b) Use a separate scheduler process (e.g. cron, Celery beat).
+    - A distributed lock (Redis or file-based) prevents concurrent runs
+      even if multiple workers accidentally have the scheduler enabled.
+
     Interval is controlled by RESCREENING_INTERVAL_HOURS env var (default 24).
     Set to 0 to disable automatic re-screening.
     """
     import threading
+
+    # Only start the scheduler if explicitly enabled via env var.
+    # This prevents duplicate runs across Gunicorn workers.
+    scheduler_enabled = os.getenv('RESCREENING_SCHEDULER', '').lower() == 'true'
+    if not scheduler_enabled:
+        app.logger.info(
+            "Rescreening scheduler disabled (set RESCREENING_SCHEDULER=true to enable). "
+            "In production, enable on exactly ONE worker or use a dedicated scheduler process."
+        )
+        return
 
     interval_hours = int(os.getenv('RESCREENING_INTERVAL_HOURS', '24'))
     if interval_hours <= 0:
@@ -193,13 +220,30 @@ def _register_rescreening_scheduler(app):
         while True:
             try:
                 from app.services.task_runner import schedule_rescreening
-                app.logger.info(f"Scheduled sanctions rescreening starting (interval={interval_hours}h)")
-                result = schedule_rescreening(app)
+                from app.services.distributed_lock import acquire_rescreening_lock, release_rescreening_lock
+
+                # Acquire distributed lock to prevent duplicate runs across workers
+                lock_acquired = acquire_rescreening_lock()
+                if not lock_acquired:
+                    app.logger.info(
+                        "Rescreening scheduler: lock held by another worker, skipping"
+                    )
+                    time.sleep(interval_seconds)
+                    continue
+
                 app.logger.info(
-                    f"Scheduled rescreening complete: "
-                    f"{result.get('orgs_screened', 0)} orgs, "
-                    f"{result.get('new_flags', 0)} new flags"
+                    "Rescreening scheduler: acquired lock, starting run "
+                    f"(interval={interval_hours}h)"
                 )
+                try:
+                    result = schedule_rescreening(app)
+                    app.logger.info(
+                        f"Scheduled rescreening complete: "
+                        f"{result.get('orgs_screened', 0)} orgs, "
+                        f"{result.get('new_flags', 0)} new flags"
+                    )
+                finally:
+                    release_rescreening_lock()
             except Exception as e:
                 app.logger.error(f"Scheduled rescreening failed: {e}")
             time.sleep(interval_seconds)
@@ -214,6 +258,45 @@ def _register_rescreening_scheduler(app):
         f"Sanctions rescreening scheduler started (interval={interval_hours}h, "
         f"first run in 60s)"
     )
+
+
+def _register_notification_scheduler(app):
+    """Start a lightweight background thread that runs daily notification checks.
+
+    Checks for deadline reminders (30/14/7 days), overdue reports, and
+    registration expiry alerts. Runs once daily (every 24 hours).
+
+    Controlled by the same RESCREENING_SCHEDULER env var as the rescreening
+    scheduler — only enabled when RESCREENING_SCHEDULER=true.
+    """
+    import threading
+
+    scheduler_enabled = os.getenv('RESCREENING_SCHEDULER', '').lower() == 'true'
+    if not scheduler_enabled:
+        return  # Only run on the designated scheduler worker
+
+    def _notification_loop():
+        import time
+        # Wait 5 minutes after startup before first check
+        time.sleep(300)
+        while True:
+            try:
+                from app.services.notification_service import run_all_notification_checks
+                app.logger.info("Running daily notification checks...")
+                run_all_notification_checks(app)
+                app.logger.info("Daily notification checks completed")
+            except Exception as e:
+                app.logger.error(f"Notification checks failed: {e}")
+            # Run once per day (24 hours)
+            time.sleep(86400)
+
+    thread = threading.Thread(
+        target=_notification_loop,
+        name='kuja-notifications',
+        daemon=True,
+    )
+    thread.start()
+    app.logger.info("Notification scheduler started (daily checks, first run in 5m)")
 
 
 def _setup_logging(app, config_name):
