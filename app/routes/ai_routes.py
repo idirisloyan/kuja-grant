@@ -173,6 +173,59 @@ def api_ai_analyze_report():
     })
 
 
+@ai_bp.route('/report-guidance', methods=['POST'])
+@login_required
+@role_required('ngo', 'donor', 'admin')
+def api_ai_report_guidance():
+    """AI guidance for NGOs writing report sections against donor requirements.
+
+    Provides real-time feedback on a specific report section, scoring how well
+    it addresses the donor requirement and suggesting improvements.
+    """
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return jsonify({'error': 'Too many AI requests. Please wait a moment.', 'success': False}), 429
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json()
+
+    section_content = data.get('section_content', '').strip()
+    requirement = data.get('requirement', {})
+    grant_title = data.get('grant_title', '').strip()
+    language = data.get('language', 'en')
+
+    if not section_content:
+        return jsonify({'error': 'section_content is required', 'success': False}), 400
+    if not requirement:
+        return jsonify({'error': 'requirement is required', 'success': False}), 400
+
+    # Limit input length to prevent token abuse
+    if len(section_content) > 10000:
+        section_content = section_content[:10000]
+
+    result = AIService.report_guidance(
+        section_content=section_content,
+        requirement=requirement,
+        grant_title=grant_title,
+        language=language,
+    )
+
+    source = result.get('source', 'unknown')
+    return jsonify({
+        'success': True,
+        'quality_score': result.get('quality_score', 0),
+        'completeness': result.get('completeness', 0),
+        'suggestions': result.get('suggestions', []),
+        'strengths': result.get('strengths', []),
+        'missing_elements': result.get('missing_elements', []),
+        'source': source,
+        'ai_transparency': {
+            'engine': 'Claude AI' if source == 'claude' else 'Rule-based heuristics',
+            'disclaimer': 'AI-generated guidance — always apply professional judgment.',
+        },
+    })
+
+
 @ai_bp.route('/extract-reporting-requirements', methods=['POST'])
 @login_required
 @role_required('donor', 'admin')

@@ -600,6 +600,40 @@ def list_tasks():
     return jsonify({'tasks': tasks, 'count': len(tasks)})
 
 
+# =============================================================================
+# SANCTIONS RE-SCREENING
+# =============================================================================
+
+@admin_bp.route('/admin/trigger-rescreening', methods=['POST'])
+@login_required
+def api_admin_trigger_rescreening():
+    """Trigger a manual sanctions re-screening of all orgs with active grants.
+
+    Admin-only. Submits the job as a background task and returns a job_id
+    that can be polled via GET /api/tasks/<job_id>.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    from app.services.task_runner import submit_task, schedule_rescreening
+    from flask import current_app
+
+    app = current_app._get_current_object()
+    task_id = submit_task(
+        schedule_rescreening,
+        app,
+        task_type='sanctions_rescreening',
+    )
+
+    logger.info(f"Admin {current_user.email} triggered sanctions rescreening (task_id={task_id})")
+
+    return jsonify({
+        'success': True,
+        'job_id': task_id,
+        'message': 'Sanctions re-screening job submitted. Poll /api/tasks/{job_id} for status.',
+    })
+
+
 # Production reseed endpoint REMOVED — database seeding is a CLI-only
 # operation (python seed.py) and must never be exposed as an API route.
 # Retained as comment for audit trail: removed April 2026.

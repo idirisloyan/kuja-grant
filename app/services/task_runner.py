@@ -168,6 +168,132 @@ def cleanup_old_tasks(max_age_hours: int = 24):
     return len(to_remove)
 
 
+def schedule_rescreening(app=None):
+    """Re-screen all organizations with active grants against sanctions lists.
+
+    For each org with grants in 'open' or 'awarded' status:
+    1. Runs compliance screening via ComplianceService
+    2. Compares results to previous screening
+    3. Logs warnings for new matches
+    4. Stores updated results and timestamps
+
+    Args:
+        app: Flask app instance (required for app context in background threads).
+
+    Returns:
+        dict with summary of rescreening results.
+    """
+    # Import here to avoid circular imports
+    from app.extensions import db
+    from app.models import Organization, Grant, Application, ComplianceCheck
+    from app.services.compliance_service import ComplianceService
+
+    if app is None:
+        from flask import current_app
+        app = current_app._get_current_object()
+
+    with app.app_context():
+        results = {
+            'orgs_screened': 0,
+            'new_flags': 0,
+            'cleared': 0,
+            'errors': 0,
+            'details': [],
+        }
+
+        try:
+            # Find all orgs with active grants (open or awarded)
+            # An org has active grants if it has grants it created (donor)
+            # or applications in 'awarded' status (NGO)
+            active_donor_org_ids = db.session.query(Grant.donor_org_id).filter(
+                Grant.status.in_(['open', 'awarded'])
+            ).distinct().all()
+
+            active_ngo_org_ids = db.session.query(Application.ngo_org_id).filter(
+                Application.status == 'awarded'
+            ).distinct().all()
+
+            org_ids = set()
+            for (oid,) in active_donor_org_ids:
+                if oid:
+                    org_ids.add(oid)
+            for (oid,) in active_ngo_org_ids:
+                if oid:
+                    org_ids.add(oid)
+
+            logger.info(f"Rescreening: {len(org_ids)} organizations with active grants")
+
+            for org_id in org_ids:
+                org = db.session.get(Organization, org_id)
+                if not org:
+                    continue
+
+                try:
+                    # Get previous screening results for comparison
+                    prev_checks = ComplianceCheck.query.filter_by(
+                        org_id=org_id
+                    ).order_by(ComplianceCheck.checked_at.desc()).all()
+
+                    prev_flagged = {
+                        c.check_type for c in prev_checks if c.status == 'flagged'
+                    }
+
+                    # Run new screening
+                    check_results = ComplianceService.screen_organization(
+                        org.name, org.country or '', org_id=org_id
+                    )
+
+                    # Compare with previous results
+                    new_flagged = {
+                        c['check_type'] for c in check_results if c['status'] == 'flagged'
+                    }
+                    newly_flagged = new_flagged - prev_flagged
+
+                    if newly_flagged:
+                        logger.warning(
+                            f"RESCREENING ALERT: Organization '{org.name}' (id={org_id}) "
+                            f"has NEW sanctions flags: {newly_flagged}"
+                        )
+                        results['new_flags'] += 1
+                    else:
+                        results['cleared'] += 1
+
+                    # Save updated checks (replace old ones)
+                    ComplianceCheck.query.filter_by(org_id=org_id).delete()
+                    ComplianceService.save_checks(org_id, check_results)
+
+                    results['orgs_screened'] += 1
+                    results['details'].append({
+                        'org_id': org_id,
+                        'org_name': org.name,
+                        'status': 'flagged' if new_flagged else 'clear',
+                        'new_flags': list(newly_flagged),
+                        'total_checks': len(check_results),
+                    })
+
+                except Exception as e:
+                    logger.error(f"Rescreening failed for org {org_id} ({org.name}): {e}")
+                    results['errors'] += 1
+                    results['details'].append({
+                        'org_id': org_id,
+                        'org_name': org.name,
+                        'status': 'error',
+                        'error': str(e)[:200],
+                    })
+
+            logger.info(
+                f"Rescreening complete: {results['orgs_screened']} screened, "
+                f"{results['new_flags']} new flags, {results['errors']} errors"
+            )
+
+        except Exception as e:
+            logger.error(f"Rescreening job failed: {e}")
+            results['errors'] += 1
+            results['error'] = str(e)[:500]
+
+        return results
+
+
 def get_backend_info() -> dict:
     """Return info about the current task storage backend."""
     return {

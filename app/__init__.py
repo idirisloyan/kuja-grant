@@ -162,7 +162,58 @@ def create_app(config_name=None):
     from app.utils.i18n import _load_translations
     _load_translations()
 
+    # -----------------------------------------------------------------
+    # Schedule periodic sanctions re-screening (background thread)
+    # -----------------------------------------------------------------
+    _register_rescreening_scheduler(app)
+
     return app
+
+
+def _register_rescreening_scheduler(app):
+    """Start a background daemon thread that periodically re-screens
+    organizations with active grants against sanctions lists.
+
+    Interval is controlled by RESCREENING_INTERVAL_HOURS env var (default 24).
+    Set to 0 to disable automatic re-screening.
+    """
+    import threading
+
+    interval_hours = int(os.getenv('RESCREENING_INTERVAL_HOURS', '24'))
+    if interval_hours <= 0:
+        app.logger.info("Sanctions rescreening scheduler disabled (RESCREENING_INTERVAL_HOURS=0)")
+        return
+
+    interval_seconds = interval_hours * 3600
+
+    def _rescreening_loop():
+        import time
+        # Wait for the app to fully start before first run
+        time.sleep(60)
+        while True:
+            try:
+                from app.services.task_runner import schedule_rescreening
+                app.logger.info(f"Scheduled sanctions rescreening starting (interval={interval_hours}h)")
+                result = schedule_rescreening(app)
+                app.logger.info(
+                    f"Scheduled rescreening complete: "
+                    f"{result.get('orgs_screened', 0)} orgs, "
+                    f"{result.get('new_flags', 0)} new flags"
+                )
+            except Exception as e:
+                app.logger.error(f"Scheduled rescreening failed: {e}")
+            time.sleep(interval_seconds)
+
+    thread = threading.Thread(
+        target=_rescreening_loop,
+        name='kuja-rescreening',
+        daemon=True,
+    )
+    thread.start()
+    app.logger.info(
+        f"Sanctions rescreening scheduler started (interval={interval_hours}h, "
+        f"first run in 60s)"
+    )
 
 
 def _setup_logging(app, config_name):

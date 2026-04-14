@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useGrants, useReports } from '@/lib/hooks/use-api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { StatCard } from '@/components/shared/stat-card';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -67,6 +68,7 @@ function formatDate(dateStr: string | null): string {
 // ---------------------------------------------------------------------------
 
 function GrantAccordionItem({ grant, reports }: { grant: Grant; reports: Report[] }) {
+  const { t } = useTranslation();
   // Group reports by org
   const orgMap = useMemo(() => {
     const map = new Map<string, Report[]>();
@@ -116,9 +118,9 @@ function GrantAccordionItem({ grant, reports }: { grant: Grant; reports: Report[
               {grant.title}
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}>
-              {orgMap.size} grantee{orgMap.size !== 1 ? 's' : ''} | {reports.length} deliverable{reports.length !== 1 ? 's' : ''}
+              {orgMap.size} {t('compliance.grantees')} | {reports.length} {t('report.deliverables')}
               {overdueCount > 0 && (
-                <Box component="span" sx={{ color: 'error.main', ml: 1 }}>| {overdueCount} overdue</Box>
+                <Box component="span" sx={{ color: 'error.main', ml: 1 }}>| {overdueCount} {t('compliance.overdue')}</Box>
               )}
             </Typography>
           </Box>
@@ -192,7 +194,7 @@ function GrantAccordionItem({ grant, reports }: { grant: Grant; reports: Report[
 
         {orgMap.size === 0 && (
           <Typography variant="body2" sx={{ color: 'text.disabled', textAlign: 'center', py: 3 }}>
-            No reports submitted for this grant yet.
+            {t('compliance.no_reports_for_grant')}
           </Typography>
         )}
       </AccordionDetails>
@@ -205,6 +207,7 @@ function GrantAccordionItem({ grant, reports }: { grant: Grant; reports: Report[
 // ---------------------------------------------------------------------------
 
 export default function CompliancePage() {
+  const { t } = useTranslation();
   const { data: grantsData, isLoading: grantsLoading } = useGrants();
   const { data: reportsData, isLoading: reportsLoading } = useReports();
 
@@ -280,10 +283,10 @@ export default function CompliancePage() {
       {/* Header with risk summary */}
       <Box>
         <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-          Compliance Dashboard
+          {t('compliance.dashboard_title')}
         </Typography>
         <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-          Track grantee compliance across all your grants
+          {t('compliance.dashboard_subtitle')}
         </Typography>
       </Box>
 
@@ -299,7 +302,7 @@ export default function CompliancePage() {
                     {summaryStats.overdueItems}
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'error.dark' }}>
-                    overdue
+                    {t('compliance.overdue')}
                   </Typography>
                 </Box>
               )}
@@ -318,7 +321,7 @@ export default function CompliancePage() {
                   {reports.filter((r) => r.status === 'accepted').length}
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  on track
+                  {t('compliance.on_track')}
                 </Typography>
               </Box>
             </Box>
@@ -330,25 +333,25 @@ export default function CompliancePage() {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 2 }}>
         <StatCard
           icon={ShieldCheck}
-          label="Total Grants"
+          label={t('compliance.total_grants')}
           value={summaryStats.totalGrants}
           color="brand"
         />
         <StatCard
           icon={TrendingUp}
-          label="Avg Compliance"
+          label={t('compliance.avg_compliance')}
           value={`${summaryStats.avgCompliance}%`}
           color="emerald"
         />
         <StatCard
           icon={Clock}
-          label="Overdue Items"
+          label={t('compliance.overdue_items')}
           value={summaryStats.overdueItems}
           color="amber"
         />
         <StatCard
           icon={AlertTriangle}
-          label="At Risk"
+          label={t('compliance.at_risk')}
           value={summaryStats.atRiskCount}
           color="rose"
         />
@@ -361,10 +364,10 @@ export default function CompliancePage() {
             <CardContent sx={{ py: 8, textAlign: 'center' }}>
               <BarChart3 size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
               <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-                No grants found
+                {t('compliance.no_grants')}
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
-                Create a grant to start tracking compliance.
+                {t('compliance.no_grants_hint')}
               </Typography>
             </CardContent>
           </Card>

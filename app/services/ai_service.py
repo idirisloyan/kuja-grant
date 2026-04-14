@@ -901,7 +901,14 @@ Analyze this registration document and extract the following information. Return
 
     @staticmethod
     def analyze_report(content, requirements, report_type):
-        """Analyze a submitted report against grant reporting requirements with per-requirement scoring."""
+        """Analyze a submitted report against grant reporting requirements with per-requirement scoring.
+
+        Scores each donor requirement individually using Completeness/Relevance/Depth,
+        then derives the overall compliance_score as the average of per-requirement scores.
+
+        Returns:
+            dict with per_requirement_scores array and overall scores.
+        """
         if HAS_ANTHROPIC and ANTHROPIC_API_KEY:
             try:
                 client = AIService._get_client()
@@ -911,16 +918,21 @@ Analyze this registration document and extract the following information. Return
                 # Build per-requirement context
                 req_context = ""
                 if requirements:
-                    # Filter requirements matching this report type
-                    matching_reqs = [r for r in requirements if r.get('type', '').lower() == report_type.lower() or r.get('type') == 'all']
+                    # Filter requirements matching this report type, fall back to all
+                    matching_reqs = [
+                        r for r in requirements
+                        if r.get('type', '').lower() == report_type.lower() or r.get('type') == 'all'
+                    ]
                     if not matching_reqs:
-                        matching_reqs = requirements  # Use all if no type match
+                        matching_reqs = requirements
                     req_context = f"""
-The donor has set these specific reporting requirements. Evaluate EACH requirement individually:
+The donor has set these specific reporting requirements. You MUST evaluate EACH requirement individually using three dimensions:
+- Completeness (0-100): How fully does the report address this requirement?
+- Relevance (0-100): How relevant is the report content to this requirement?
+- Depth (0-100): How detailed and substantive is the coverage?
 
+Requirements to evaluate:
 {json.dumps(matching_reqs, indent=2)}
-
-For each requirement, assess whether the report addresses it and give a score (0-100).
 """
 
                 prompt = f"""You are a grant compliance analyst. Analyze this grant report against the donor's reporting requirements.
@@ -938,31 +950,55 @@ Evaluate:
 5. Timeliness indicators - are there signs of late or rushed reporting?
 
 Return a JSON object with:
-- score (0-100, overall report score)
+- per_requirement_scores (array of objects, one per donor requirement, each with:
+    "requirement_title" (string - the requirement title),
+    "requirement_type" (string - the requirement type e.g. financial, narrative),
+    "score" (0-100, average of completeness/relevance/depth),
+    "completeness" (0-100),
+    "relevance" (0-100),
+    "depth" (0-100),
+    "status" ("met" if score>=70, "partially_met" if score>=40, "not_met" if score<40),
+    "feedback" (1-2 sentence assessment specific to this requirement))
+- compliance_score (0-100, the AVERAGE of all per_requirement_scores[].score values)
+- score (0-100, overall report quality score)
 - completeness_score (0-100)
 - quality_score (0-100)
-- compliance_score (0-100, how well it meets donor requirements)
 - findings (array of strings - positive observations)
 - missing_items (array of strings - what's missing or incomplete)
 - recommendations (array of strings - actionable improvements)
-- requirement_scores (array of objects, one per donor requirement, each with: "requirement" (the requirement title/description), "score" (0-100), "addressed" (boolean), "feedback" (1-2 sentence assessment))
 - summary (2-3 sentence overall assessment)
 - risk_flags (array of strings - any compliance or quality risks identified)
 
+IMPORTANT: compliance_score MUST equal the arithmetic average of all per_requirement_scores scores.
 Return ONLY valid JSON, no other text."""
 
                 response = client.messages.create(
                     model="claude-sonnet-4-20250514",
-                    max_tokens=2500,
+                    max_tokens=3000,
                     messages=[{"role": "user", "content": prompt}]
                 )
 
                 text = response.content[0].text.strip()
+                result = None
                 if text.startswith('{'):
-                    return json.loads(text)
-                json_match = re.search(r'\{[\s\S]*\}', text)
-                if json_match:
-                    return json.loads(json_match.group())
+                    result = json.loads(text)
+                else:
+                    json_match = re.search(r'\{[\s\S]*\}', text)
+                    if json_match:
+                        result = json.loads(json_match.group())
+
+                if result:
+                    # Ensure compliance_score is the average of per-requirement scores
+                    prs = result.get('per_requirement_scores', [])
+                    if prs:
+                        avg = round(sum(r.get('score', 0) for r in prs) / len(prs), 1)
+                        result['compliance_score'] = avg
+                        # Normalize status values
+                        for r in prs:
+                            s = r.get('score', 0)
+                            if 'status' not in r:
+                                r['status'] = 'met' if s >= 70 else ('partially_met' if s >= 40 else 'not_met')
+                    return result
             except Exception as e:
                 logger.error(f"AI report analysis failed: {e}")
 
@@ -971,7 +1007,7 @@ Return ONLY valid JSON, no other text."""
         completeness = min(100, num_sections * 20)
 
         # Generate per-requirement scores from requirements list
-        requirement_scores = []
+        per_requirement_scores = []
         if requirements:
             for req in requirements:
                 title = req.get('title', req.get('description', 'Unnamed requirement'))
@@ -979,18 +1015,38 @@ Return ONLY valid JSON, no other text."""
                 # Give higher scores if report type matches requirement type
                 base = 70 if req_type.lower() == report_type.lower() else 55
                 addressed = num_sections >= 3
-                requirement_scores.append({
-                    'requirement': title,
-                    'score': base if addressed else 30,
-                    'addressed': addressed,
+                score = base if addressed else 30
+                if score >= 70:
+                    status = 'met'
+                elif score >= 40:
+                    status = 'partially_met'
+                else:
+                    status = 'not_met'
+                per_requirement_scores.append({
+                    'requirement_title': title,
+                    'requirement_type': req_type,
+                    'score': score,
+                    'completeness': score,
+                    'relevance': min(score + 10, 100),
+                    'depth': max(score - 10, 0),
+                    'status': status,
                     'feedback': f'Report {"addresses" if addressed else "does not fully address"} this requirement. {"Content appears adequate." if addressed else "More detail needed."}',
                 })
+
+        # compliance_score = average of per-requirement scores
+        if per_requirement_scores:
+            compliance_score = round(
+                sum(r['score'] for r in per_requirement_scores) / len(per_requirement_scores), 1
+            )
+        else:
+            compliance_score = 60
 
         return {
             'score': max(50, completeness - 10),
             'completeness_score': completeness,
             'quality_score': 65,
-            'compliance_score': 60,
+            'compliance_score': compliance_score,
+            'per_requirement_scores': per_requirement_scores,
             'findings': [
                 'Report structure follows the expected format',
                 'Key sections are present',
@@ -1002,9 +1058,141 @@ Return ONLY valid JSON, no other text."""
                 'Add comparison with planned vs actual results',
                 'Strengthen the lessons learned section',
             ],
-            'requirement_scores': requirement_scores,
             'summary': f'The {report_type} report covers the basic requirements but could benefit from more detailed quantitative data and analysis.',
             'risk_flags': ['Limited quantitative data may affect donor confidence'] if completeness < 80 else [],
+        }
+
+    @classmethod
+    def report_guidance(cls, section_content, requirement, grant_title='', language='en'):
+        """Provide AI-powered writing guidance for a specific report section.
+
+        Evaluates how well the section addresses the donor requirement and
+        returns quality/completeness scores, suggestions, strengths, and gaps.
+
+        Args:
+            section_content: What the NGO has written so far.
+            requirement: Dict with title, type, description, frequency.
+            grant_title: Context about the grant.
+            language: Response language code (default 'en').
+
+        Returns:
+            dict with quality_score, completeness, suggestions, strengths, missing_elements.
+        """
+        req_title = requirement.get('title', 'Unnamed requirement')
+        req_type = requirement.get('type', 'general')
+        req_description = requirement.get('description', '')
+        req_frequency = requirement.get('frequency', '')
+
+        if HAS_ANTHROPIC and ANTHROPIC_API_KEY:
+            try:
+                system_prompt = (
+                    "You are a grant reporting coach helping NGOs write better reports for donors. "
+                    "You evaluate report sections against specific donor requirements and provide "
+                    "constructive, actionable feedback. Be encouraging but honest about gaps."
+                )
+
+                user_msg = f"""Evaluate this report section against the donor requirement below.
+
+Grant: {grant_title}
+Requirement Title: {req_title}
+Requirement Type: {req_type}
+{f'Requirement Description: {req_description}' if req_description else ''}
+{f'Reporting Frequency: {req_frequency}' if req_frequency else ''}
+
+NGO's draft section:
+---
+{section_content}
+---
+
+Return a JSON object with:
+- quality_score (0-100): How well the section addresses the requirement overall
+- completeness (0-100): How complete the response is relative to what the donor expects
+- suggestions (array of strings): 3-5 specific improvement recommendations
+- strengths (array of strings): 2-4 things that are good about the current response
+- missing_elements (array of strings): 2-4 things the donor would expect to see that are missing or weak
+
+Return ONLY valid JSON, no other text."""
+
+                # Apply language instruction if non-English
+                if language and language != 'en':
+                    from app.utils.i18n import LANG_NAMES
+                    lang_name = LANG_NAMES.get(language, language)
+                    system_prompt += (
+                        f"\n\nIMPORTANT: Respond entirely in {lang_name}. "
+                        f"All text, suggestions, and feedback must be in {lang_name}."
+                    )
+
+                response_text = cls._call_claude(system_prompt, user_msg, max_tokens=1200)
+                if response_text:
+                    # Parse JSON from response
+                    result = None
+                    text = response_text.strip()
+                    if text.startswith('{'):
+                        result = json.loads(text)
+                    else:
+                        json_match = re.search(r'\{[\s\S]*\}', text)
+                        if json_match:
+                            result = json.loads(json_match.group())
+                    if result:
+                        result['source'] = 'claude'
+                        return result
+            except Exception as e:
+                logger.error(f"AI report guidance failed: {e}")
+
+        # Fallback: heuristic-based guidance
+        word_count = len(section_content.split())
+        has_numbers = bool(re.search(r'\d+', section_content))
+        has_percent = bool(re.search(r'\d+\s*%', section_content))
+
+        # Simple quality heuristic
+        quality = 30
+        if word_count > 50:
+            quality += 15
+        if word_count > 150:
+            quality += 15
+        if has_numbers:
+            quality += 10
+        if has_percent:
+            quality += 10
+        if req_title.lower() in section_content.lower() or req_type.lower() in section_content.lower():
+            quality += 10
+        quality = min(quality, 95)
+
+        completeness = min(quality + 5, 95) if word_count > 100 else max(quality - 15, 10)
+
+        suggestions = [
+            f'Address the "{req_title}" requirement more directly in your opening paragraph',
+            'Include specific quantitative data and indicators where possible',
+            'Reference baseline values and targets set in the grant agreement',
+        ]
+        if not has_numbers:
+            suggestions.append('Add numerical data to support your narrative')
+        if word_count < 100:
+            suggestions.append('Expand your response with more detail and evidence')
+
+        strengths = ['Report section addresses the topic area']
+        if word_count > 100:
+            strengths.append('Provides a substantive level of detail')
+        if has_numbers:
+            strengths.append('Includes quantitative data points')
+        if has_percent:
+            strengths.append('Uses percentage-based metrics for comparison')
+
+        missing_elements = [
+            f'Specific metrics demonstrating progress on {req_type} requirements',
+            'Comparison of planned vs actual results',
+        ]
+        if not has_numbers:
+            missing_elements.append('Quantitative indicators and data')
+        missing_elements.append('Lessons learned and adaptive management actions')
+
+        return {
+            'quality_score': quality,
+            'completeness': completeness,
+            'suggestions': suggestions[:5],
+            'strengths': strengths[:4],
+            'missing_elements': missing_elements[:4],
+            'source': 'template',
         }
 
     @staticmethod
