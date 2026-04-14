@@ -53,9 +53,7 @@ def create_app(config_name=None):
     login_manager.session_protection = 'strong'
     migrate.init_app(app, db)
 
-    # Ensure all tables exist (handles new models like Notification)
-    with app.app_context():
-        db.create_all()
+    # NOTE: db.create_all() moved after model imports below
 
     # -----------------------------------------------------------------
     # CORS - origins from environment (comma-separated) or defaults
@@ -141,6 +139,8 @@ def create_app(config_name=None):
     # -----------------------------------------------------------------
     with app.app_context():
         from app import models  # noqa: F401 — ensure all models registered with SQLAlchemy
+        # Now that all models are registered, create any missing tables
+        db.create_all()
 
     # -----------------------------------------------------------------
     # Ensure lockout columns exist (safety net for migration timing)
