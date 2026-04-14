@@ -208,13 +208,15 @@ def register_middleware(app):
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
-        # CSP: Next.js frontend uses bundled JS/CSS (no inline scripts).
-        # 'unsafe-inline' only on style-src for MUI runtime style injection.
+        # CSP: Next.js static export requires 'unsafe-inline' for hydration
+        # bootstrap scripts. TODO: replace with build-time SHA-256 hashes
+        # of inline scripts (Option A in enterprise remediation plan).
+        # 'unsafe-inline' on style-src for MUI runtime style injection.
         # blob: in img-src covers chart libraries that render to blob URLs.
         # data: in font-src covers libraries that inline small icon fonts.
         response.headers['Content-Security-Policy'] = (
             "default-src 'self'; "
-            "script-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "img-src 'self' data: blob:; "
             "font-src 'self' https://fonts.gstatic.com data:; "
