@@ -786,5 +786,8 @@
   "dashboard.ngo.submit_pending_report": "Submit pending report",
   "dashboard.ngo.grant_report": "Grant reporting",
   "dashboard.ngo.complete_assessment": "Complete capacity assessment",
-  "dashboard.ngo.apply_to_grant": "Apply to an open grant"
+  "dashboard.ngo.apply_to_grant": "Apply to an open grant",
+  "common.item": "Item",
+  "common.grant": "Grant",
+  "common.status": "Status"
 }
