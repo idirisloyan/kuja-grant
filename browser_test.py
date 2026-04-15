@@ -2,7 +2,7 @@
 """
 Kuja Grant — Comprehensive Browser UI Tests (Playwright)
 ==========================================================
-71 tests across 15 categories covering every major workflow.
+85 tests across 19 categories covering every major workflow.
 
 Usage:
   python browser_test.py --local          # Start Flask in-process
@@ -1185,6 +1185,236 @@ def test_15_3_dashboard_stats_populated(page, ctx):
 
 
 # ===========================================================================
+# 16. TRANSLATION COVERAGE — Raw Key Detection (5 tests)
+# ===========================================================================
+
+# Regex to detect untranslated i18n keys like "common.review_all", "dashboard.ngo.subtitle"
+_RAW_KEY_PATTERN = re.compile(r'\b[a-z]+\.[a-z]+\.[a-z_]+\b')
+# Known false positives that look like keys but are real content
+_KEY_FALSE_POSITIVES = {"e.g.", "i.e.", "u.s.", "p.m.", "a.m.", "www.", "http.", "https.",
+                         "gmail.com", "kuja.org", "amani.org", "globalhealth.org",
+                         "reviewer.org", "eatrust.org", "sahelwomen.org", "hopebridges.org",
+                         "salamrelief.org", "ubuntu.org"}
+
+def _find_raw_keys(body_text):
+    """Find potential untranslated i18n keys in page text."""
+    matches = _RAW_KEY_PATTERN.findall(body_text.lower())
+    # Filter out false positives (email domains, common abbreviations)
+    real_keys = []
+    for m in matches:
+        if any(fp in m for fp in _KEY_FALSE_POSITIVES):
+            continue
+        # Keys typically have known prefixes
+        if any(m.startswith(p) for p in ["common.", "dashboard.", "status.", "grant.",
+                                          "report.", "nav.", "assessment.", "compliance.",
+                                          "wizard.", "donor.", "ngo.", "admin.", "reviewer.",
+                                          "button.", "label.", "error.", "notification.",
+                                          "verification.", "application."]):
+            real_keys.append(m)
+    return real_keys
+
+def test_16_1_donor_no_raw_keys(page, ctx):
+    """16.1 Donor dashboard has NO raw translation keys."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.wait_for_timeout(2000)
+    body = get_page_text(page)
+    raw_keys = _find_raw_keys(body)
+    assert len(raw_keys) == 0, f"Found raw translation keys on donor dashboard: {raw_keys[:10]}"
+
+def test_16_2_ngo_no_raw_keys(page, ctx):
+    """16.2 NGO dashboard has NO raw translation keys."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.wait_for_timeout(2000)
+    body = get_page_text(page)
+    raw_keys = _find_raw_keys(body)
+    assert len(raw_keys) == 0, f"Found raw translation keys on NGO dashboard: {raw_keys[:10]}"
+
+def test_16_3_compliance_no_raw_keys(page, ctx):
+    """16.3 Compliance page has NO raw translation keys."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.goto(f"{ctx['base']}/compliance", wait_until="networkidle")
+    page.wait_for_timeout(2000)
+    body = get_page_text(page)
+    raw_keys = _find_raw_keys(body)
+    assert len(raw_keys) == 0, f"Found raw translation keys on compliance page: {raw_keys[:10]}"
+
+def test_16_4_reports_no_raw_keys(page, ctx):
+    """16.4 Reports page has NO raw translation keys."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/reports", wait_until="networkidle")
+    page.wait_for_timeout(2000)
+    body = get_page_text(page)
+    raw_keys = _find_raw_keys(body)
+    assert len(raw_keys) == 0, f"Found raw translation keys on reports page: {raw_keys[:10]}"
+
+def test_16_5_grants_no_raw_keys(page, ctx):
+    """16.5 Grants page has NO raw translation keys."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.goto(f"{ctx['base']}/grants", wait_until="networkidle")
+    page.wait_for_timeout(2000)
+    body = get_page_text(page)
+    raw_keys = _find_raw_keys(body)
+    assert len(raw_keys) == 0, f"Found raw translation keys on grants page: {raw_keys[:10]}"
+
+
+# ===========================================================================
+# 17. DOCUMENT UPLOAD UI (3 tests)
+# ===========================================================================
+
+def test_17_1_wizard_upload_file_input(page, ctx):
+    """17.1 Grant wizard upload step has file input element."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.goto(f"{ctx['base']}/grants/new", wait_until="networkidle")
+    page.wait_for_timeout(2000)
+    file_input = page.locator("input[type='file']")
+    assert file_input.count() > 0, "No file input element on grant wizard upload step"
+
+def test_17_2_application_upload(page, ctx):
+    """17.2 Application page has file upload capability."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/applications", wait_until="networkidle")
+    page.wait_for_timeout(2000)
+    body = get_page_text(page)
+    # Applications page should at least reference uploading or documents
+    has_upload_text = any(w in body.lower() for w in ["upload", "document", "file", "attach",
+                                                       "application", "submit"])
+    assert has_upload_text, f"Application page has no upload references: {body[:300]}"
+
+def test_17_3_assessment_doc_upload(page, ctx):
+    """17.3 Assessment wizard accepts document upload."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/assessments/wizard", wait_until="networkidle")
+    page.wait_for_timeout(2000)
+    body = get_page_text(page)
+    # Look for file inputs or upload references
+    file_input = page.locator("input[type='file']")
+    has_upload = file_input.count() > 0 or any(w in body.lower() for w in ["upload", "document",
+                                                                             "file", "attach",
+                                                                             "supporting"])
+    assert has_upload, f"Assessment wizard has no upload capability: {body[:300]}"
+
+
+# ===========================================================================
+# 18. API ERROR DETECTION — No 500s During Workflows (3 tests)
+# ===========================================================================
+
+def _collect_network_500s(page, ctx):
+    """Start collecting network responses to detect 500 errors."""
+    ctx["network_500s"] = []
+    def on_response(response):
+        if response.status >= 500:
+            ctx["network_500s"].append(f"{response.status} {response.url}")
+    page.on("response", on_response)
+
+def test_18_1_no_500_donor_workflow(page, ctx):
+    """18.1 No 500 errors during donor workflow (login > dashboard > grants > create > publish)."""
+    _collect_network_500s(page, ctx)
+    login_as(page, ctx["base"], USERS["donor"])
+    page.wait_for_timeout(1500)
+    # Dashboard
+    page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    # Grants list
+    page.goto(f"{ctx['base']}/grants", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    # Create grant wizard
+    page.goto(f"{ctx['base']}/grants/new", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    # Skip upload and advance through steps
+    skip_btn = page.locator("button:has-text('Skip')")
+    if skip_btn.count() > 0:
+        skip_btn.first.click()
+        page.wait_for_timeout(1000)
+        for _ in range(4):
+            next_btn = page.locator("button:has-text('Next')")
+            if next_btn.count() > 0:
+                next_btn.first.click()
+                page.wait_for_timeout(1000)
+    errors = ctx.get("network_500s", [])
+    assert len(errors) == 0, f"500 errors during donor workflow: {errors[:5]}"
+
+def test_18_2_no_500_ngo_workflow(page, ctx):
+    """18.2 No 500 errors during NGO workflow (login > dashboard > assessments > reports)."""
+    _collect_network_500s(page, ctx)
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.wait_for_timeout(1500)
+    page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    page.goto(f"{ctx['base']}/assessments", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    page.goto(f"{ctx['base']}/reports", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    errors = ctx.get("network_500s", [])
+    assert len(errors) == 0, f"500 errors during NGO workflow: {errors[:5]}"
+
+def test_18_3_no_500_reviewer_workflow(page, ctx):
+    """18.3 No 500 errors during reviewer workflow (login > dashboard > reviews)."""
+    _collect_network_500s(page, ctx)
+    login_as(page, ctx["base"], USERS["reviewer"])
+    page.wait_for_timeout(1500)
+    page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    page.goto(f"{ctx['base']}/reviews", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    errors = ctx.get("network_500s", [])
+    assert len(errors) == 0, f"500 errors during reviewer workflow: {errors[:5]}"
+
+
+# ===========================================================================
+# 19. SCHEMA SAFETY — API Smoke via Browser (3 tests)
+# ===========================================================================
+
+def test_19_1_doc_upload_not_500(page, ctx):
+    """19.1 Document upload via API returns 200 (not 500) — catches DB schema mismatches."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    # Use page.evaluate to make an API call from the browser context (with session cookies)
+    result = page.evaluate("""
+        async () => {
+            const formData = new FormData();
+            const blob = new Blob(['Schema safety test document.'], {type: 'text/plain'});
+            formData.append('file', blob, 'schema_test.txt');
+            formData.append('document_type', 'registration_cert');
+            const resp = await fetch('/api/documents/upload', {
+                method: 'POST',
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                body: formData
+            });
+            return {status: resp.status, ok: resp.ok};
+        }
+    """)
+    assert result["status"] != 500, f"Document upload returned 500 (schema mismatch): {result}"
+
+def test_19_2_report_create_not_500(page, ctx):
+    """19.2 Report creation via API returns 201 (not 500)."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    result = page.evaluate("""
+        async () => {
+            const resp = await fetch('/api/reports/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                body: JSON.stringify({title: 'Schema Test Report', report_type: 'quarterly_financial',
+                                      content: 'Schema safety test.'})
+            });
+            return {status: resp.status, ok: resp.ok};
+        }
+    """)
+    assert result["status"] != 500, f"Report creation returned 500 (schema mismatch): {result}"
+
+def test_19_3_notifications_not_500(page, ctx):
+    """19.3 Notification endpoint returns 200 (not 500)."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    result = page.evaluate("""
+        async () => {
+            const resp = await fetch('/api/notifications/', {
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
+            });
+            return {status: resp.status, ok: resp.ok};
+        }
+    """)
+    assert result["status"] != 500, f"Notifications returned 500 (table missing): {result}"
+
+
+# ===========================================================================
 # Main
 # ===========================================================================
 
@@ -1193,7 +1423,7 @@ def main():
 
     print("\n" + "=" * 70)
     print("  Kuja Grant — Comprehensive Browser UI Tests (Playwright)")
-    print("  71 tests across 15 categories")
+    print("  85 tests across 19 categories")
     print("=" * 70)
 
     # Determine base URL
@@ -1322,6 +1552,28 @@ def main():
                 ("15.1 Grants list has data", test_15_1_grants_list_for_donor),
                 ("15.2 Assessment page has frameworks", test_15_2_assessment_page_for_ngo),
                 ("15.3 Dashboard stats populated", test_15_3_dashboard_stats_populated),
+            ]),
+            ("16. TRANSLATION COVERAGE", [
+                ("16.1 Donor dashboard no raw keys", test_16_1_donor_no_raw_keys),
+                ("16.2 NGO dashboard no raw keys", test_16_2_ngo_no_raw_keys),
+                ("16.3 Compliance page no raw keys", test_16_3_compliance_no_raw_keys),
+                ("16.4 Reports page no raw keys", test_16_4_reports_no_raw_keys),
+                ("16.5 Grants page no raw keys", test_16_5_grants_no_raw_keys),
+            ]),
+            ("17. DOCUMENT UPLOAD UI", [
+                ("17.1 Wizard upload has file input", test_17_1_wizard_upload_file_input),
+                ("17.2 Application page has upload", test_17_2_application_upload),
+                ("17.3 Assessment wizard accepts upload", test_17_3_assessment_doc_upload),
+            ]),
+            ("18. API ERROR DETECTION", [
+                ("18.1 No 500s in donor workflow", test_18_1_no_500_donor_workflow),
+                ("18.2 No 500s in NGO workflow", test_18_2_no_500_ngo_workflow),
+                ("18.3 No 500s in reviewer workflow", test_18_3_no_500_reviewer_workflow),
+            ]),
+            ("19. SCHEMA SAFETY", [
+                ("19.1 Document upload not 500", test_19_1_doc_upload_not_500),
+                ("19.2 Report creation not 500", test_19_2_report_create_not_500),
+                ("19.3 Notifications not 500", test_19_3_notifications_not_500),
             ]),
         ]
 

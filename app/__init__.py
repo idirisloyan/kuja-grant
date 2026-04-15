@@ -162,20 +162,34 @@ def create_app(config_name=None):
 
     # -----------------------------------------------------------------
     # Ensure document versioning columns exist (added in v3.4)
+    # Works on both PostgreSQL (ADD COLUMN IF NOT EXISTS) and SQLite (check pragma first)
     # -----------------------------------------------------------------
     with app.app_context():
         try:
-            from sqlalchemy import text
+            from sqlalchemy import text, inspect as sa_inspect
+            inspector = sa_inspect(db.engine)
             with db.engine.connect() as conn:
-                for col_sql in [
-                    "ALTER TABLE documents ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1",
-                    "ALTER TABLE documents ADD COLUMN IF NOT EXISTS supersedes_id INTEGER",
-                    "ALTER TABLE reports ADD COLUMN IF NOT EXISTS revision_number INTEGER DEFAULT 1",
-                    "ALTER TABLE reports ADD COLUMN IF NOT EXISTS revision_history TEXT",
-                ]:
-                    conn.execute(text(col_sql))
-                conn.commit()
-                app.logger.info("Document/report versioning columns verified")
+                # Check existing columns and only add missing ones
+                doc_cols = {c['name'] for c in inspector.get_columns('documents')}
+                report_cols = {c['name'] for c in inspector.get_columns('reports')}
+                added = []
+                if 'version' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN version INTEGER DEFAULT 1"))
+                    added.append('documents.version')
+                if 'supersedes_id' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN supersedes_id INTEGER"))
+                    added.append('documents.supersedes_id')
+                if 'revision_number' not in report_cols:
+                    conn.execute(text("ALTER TABLE reports ADD COLUMN revision_number INTEGER DEFAULT 1"))
+                    added.append('reports.revision_number')
+                if 'revision_history' not in report_cols:
+                    conn.execute(text("ALTER TABLE reports ADD COLUMN revision_history TEXT"))
+                    added.append('reports.revision_history')
+                if added:
+                    conn.commit()
+                    app.logger.info(f"Added missing columns: {', '.join(added)}")
+                else:
+                    app.logger.info("Document/report versioning columns already present")
         except Exception as e:
             app.logger.warning(f"Could not verify versioning columns: {e}")
 
