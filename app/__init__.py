@@ -161,6 +161,25 @@ def create_app(config_name=None):
             app.logger.warning(f"Could not verify lockout columns (non-PostgreSQL or migration pending): {e}")
 
     # -----------------------------------------------------------------
+    # Ensure document versioning columns exist (added in v3.4)
+    # -----------------------------------------------------------------
+    with app.app_context():
+        try:
+            from sqlalchemy import text
+            with db.engine.connect() as conn:
+                for col_sql in [
+                    "ALTER TABLE documents ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1",
+                    "ALTER TABLE documents ADD COLUMN IF NOT EXISTS supersedes_id INTEGER",
+                    "ALTER TABLE reports ADD COLUMN IF NOT EXISTS revision_number INTEGER DEFAULT 1",
+                    "ALTER TABLE reports ADD COLUMN IF NOT EXISTS revision_history TEXT",
+                ]:
+                    conn.execute(text(col_sql))
+                conn.commit()
+                app.logger.info("Document/report versioning columns verified")
+        except Exception as e:
+            app.logger.warning(f"Could not verify versioning columns: {e}")
+
+    # -----------------------------------------------------------------
     # Load i18n translation files
     # -----------------------------------------------------------------
     from app.utils.i18n import _load_translations
