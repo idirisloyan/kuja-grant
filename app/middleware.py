@@ -59,8 +59,9 @@ _endpoint_rate_limiter = EndpointRateLimiter()
 
 # Rate limit rules: (endpoint pattern, max_requests, window_seconds)
 # Patterns are matched against request.path using re.match.
+_LOGIN_RATE_PER_MIN = int(os.getenv('RATE_LIMIT_LOGIN_PER_IP_PER_MIN', '30'))
 _RATE_LIMIT_RULES = [
-    (r'^/api/auth/login$', 10, 60),
+    (r'^/api/auth/login$', _LOGIN_RATE_PER_MIN, 60),
     (r'^/api/ai/', 20, 60),
     (r'^/api/documents/upload$', 10, 60),
     (r'^/api/grants/\d+/upload-grant-doc$', 10, 60),

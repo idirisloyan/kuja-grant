@@ -90,8 +90,8 @@ function MetricCard({ icon: Icon, label, value, color, bgColor, href, trend }: {
     <Card sx={{ height: '100%', borderLeft: `4px solid ${color}` }}>
       {href ? (
         <CardActionArea onClick={() => router.push(href)} sx={{ height: '100%' }}>
-          <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+          <CardContent sx={{ px: 3, py: 2.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
               <Avatar sx={{ width: 48, height: 48, bgcolor: bgColor, borderRadius: 2 }}>
                 <Icon size={24} color={color} />
               </Avatar>
@@ -107,8 +107,8 @@ function MetricCard({ icon: Icon, label, value, color, bgColor, href, trend }: {
           </CardContent>
         </CardActionArea>
       ) : (
-        <CardContent sx={{ p: 3 }}>
-          <Avatar sx={{ width: 48, height: 48, bgcolor: bgColor, borderRadius: 2, mb: 2 }}>
+        <CardContent sx={{ px: 3, py: 2.5 }}>
+          <Avatar sx={{ width: 48, height: 48, bgcolor: bgColor, borderRadius: 2, mb: 1.5 }}>
             <Icon size={24} color={color} />
           </Avatar>
           <Typography variant="h4" sx={{ fontWeight: 700 }}>{value}</Typography>
@@ -267,12 +267,15 @@ function NGODashboard({ stats, userName }: { stats?: Record<string, unknown>; us
 
       {/* Row 3: What's Due Next */}
       <Grid size={12}>
-        <Card>
+        <Card sx={{ borderLeft: '4px solid', borderLeftColor: dueItems.some(item => item.dueDate && item.dueDate.getTime() < Date.now()) ? '#EF4444' : '#F59E0B' }}>
           <CardContent sx={{ p: 3 }}>
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Clock size={20} color="#4F46E5" />
+                <Clock size={20} color="#F59E0B" />
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>{t('dashboard.ngo.whats_due_next')}</Typography>
+                {dueItems.some(item => item.dueDate && item.dueDate.getTime() < Date.now()) && (
+                  <Chip label={t('common.overdue')} size="small" color="error" sx={{ fontWeight: 600, height: 22 }} />
+                )}
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                 {t('dashboard.ngo.upcoming_tasks_subtitle')}
@@ -535,14 +538,22 @@ function DonorDashboard({ stats, userName }: { stats?: Record<string, unknown>; 
 
       {/* Row 3: At Risk Now */}
       <Grid size={12}>
-        <Card sx={{ borderLeft: '4px solid', borderLeftColor: hasRisk ? '#EF4444' : '#10B981' }}>
+        <Card sx={{ borderLeft: '4px solid', borderLeftColor: hasRisk ? '#EF4444' : '#10B981', bgcolor: hasRisk ? 'rgba(239,68,68,0.02)' : undefined }}>
           <CardContent sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {hasRisk ? <AlertTriangle size={20} color="#EF4444" /> : <CheckCircle size={20} color="#10B981" />}
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {hasRisk ? t('dashboard.donor.attention_required') : t('dashboard.donor.attention_required')}
+                  {t('dashboard.donor.attention_required')}
                 </Typography>
+                {hasRisk && (
+                  <Chip
+                    label={riskItems.length}
+                    size="small"
+                    color="error"
+                    sx={{ fontWeight: 700, minWidth: 28, height: 24 }}
+                  />
+                )}
               </Box>
               {hasRisk && (
                 <Button size="small" variant="outlined" color="error" endIcon={<ArrowRight size={14} />} onClick={() => router.push('/compliance')}>

@@ -9,6 +9,7 @@ from app.models import Application, Assessment, Document
 from app.utils.helpers import get_request_json, allowed_file, ALLOWED_EXTENSIONS
 from app.utils.decorators import role_required
 from app.services.ai_service import AIService
+from app.services.task_runner import submit_task
 import logging
 
 logger = logging.getLogger('kuja')
@@ -215,28 +216,54 @@ def api_upload_document():
                     donor_requirements = req
                     break
 
-    # Run AI analysis (with donor requirements if available)
-    try:
-        analysis = AIService.analyze_document(
-            original_filename, doc_type, file_size,
-            file_path=filepath, requirements=donor_requirements,
-        )
-        document.set_ai_analysis(analysis)
-        document.score = analysis.get('score', 0)
-    except Exception as e:
-        logger.error(f"Document analysis failed: {e}")
-        document.set_ai_analysis({
-            'score': 50,
-            'findings': ['Analysis could not be completed'],
-            'recommendations': ['Manual review recommended'],
-        })
-        document.score = 50
-
+    # Save document immediately (AI analysis runs in background to avoid 502 timeouts)
     db.session.add(document)
     db.session.commit()
 
-    logger.info(f"Document uploaded: {original_filename} (id={document.id}, score={document.score})")
-    return jsonify({'success': True, 'document': document.to_dict()}), 201
+    doc_id = document.id
+    logger.info(f"Document uploaded: {original_filename} (id={doc_id}, AI analysis pending)")
+
+    # Submit AI analysis as a background task so the upload response returns fast
+    def _run_ai_analysis():
+        from flask import current_app
+        app = current_app._get_current_object()
+        with app.app_context():
+            try:
+                analysis = AIService.analyze_document(
+                    original_filename, doc_type, file_size,
+                    file_path=filepath, requirements=donor_requirements,
+                )
+                doc = db.session.get(Document, doc_id)
+                if doc:
+                    doc.set_ai_analysis(analysis)
+                    doc.score = analysis.get('score', 0)
+                    db.session.commit()
+                    logger.info(f"Document AI analysis complete: id={doc_id}, score={doc.score}")
+            except Exception as e:
+                logger.error(f"Background document analysis failed for id={doc_id}: {e}")
+                doc = db.session.get(Document, doc_id)
+                if doc:
+                    doc.set_ai_analysis({
+                        'score': 50,
+                        'findings': ['Analysis could not be completed'],
+                        'recommendations': ['Manual review recommended'],
+                    })
+                    doc.score = 50
+                    db.session.commit()
+
+    from flask import current_app as _ca
+    _app = _ca._get_current_object()
+
+    def _bg_wrapper():
+        with _app.app_context():
+            _run_ai_analysis()
+
+    submit_task(_bg_wrapper, task_type='doc_ai_analysis')
+
+    result = document.to_dict()
+    result['ai_analysis'] = None
+    result['ai_pending'] = True
+    return jsonify({'success': True, 'document': result}), 201
 
 
 @documents_bp.route('/<int:doc_id>', methods=['GET'])

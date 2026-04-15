@@ -149,43 +149,78 @@ function GrantAccordionItem({ grant, reports }: { grant: Grant; reports: Report[
                   : null;
                 const risk = getRiskLevel(score, report.status, report.due_date);
                 return (
-                  <Box
-                    key={report.id}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      py: 1,
-                      px: 1.5,
-                      borderRadius: 1,
-                      bgcolor: 'action.hover',
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-                      <RiskDot level={risk} />
-                      <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>
-                        {report.title}
-                      </Typography>
-                      <Chip label={report.report_type} size="small" variant="outlined" sx={{ fontSize: '0.6875rem', flexShrink: 0 }} />
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
-                      {score !== null && (
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontWeight: 500,
-                            color: score >= 80 ? 'success.main' : score >= 60 ? 'warning.main' : 'error.main',
-                          }}
-                        >
-                          {score}%
-                        </Typography>
-                      )}
-                      <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                        Due: {formatDate(report.due_date)}
-                      </Typography>
-                      <StatusBadge status={report.status} />
-                    </Box>
-                  </Box>
+                  (() => {
+                    const isOverdue = report.due_date && new Date(report.due_date) < new Date() && report.status !== 'accepted';
+                    const daysOverdue = isOverdue && report.due_date
+                      ? Math.floor((new Date().getTime() - new Date(report.due_date).getTime()) / (1000 * 60 * 60 * 24))
+                      : 0;
+                    return (
+                      <Box
+                        key={report.id}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          py: 1,
+                          px: 1.5,
+                          borderRadius: 1,
+                          bgcolor: isOverdue ? 'rgba(239,68,68,0.04)' : 'action.hover',
+                          borderLeft: isOverdue ? '3px solid' : 'none',
+                          borderLeftColor: isOverdue ? 'error.main' : undefined,
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                          {isOverdue ? (
+                            <Box
+                              sx={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: '50%',
+                                bgcolor: 'error.main',
+                                flexShrink: 0,
+                                animation: 'pulse 2s ease-in-out infinite',
+                                '@keyframes pulse': {
+                                  '0%, 100%': { opacity: 1 },
+                                  '50%': { opacity: 0.4 },
+                                },
+                              }}
+                            />
+                          ) : (
+                            <RiskDot level={risk} />
+                          )}
+                          <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>
+                            {report.title}
+                          </Typography>
+                          <Chip label={report.report_type} size="small" variant="outlined" sx={{ fontSize: '0.6875rem', flexShrink: 0 }} />
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
+                          {isOverdue && daysOverdue > 0 && (
+                            <Chip
+                              label={`${daysOverdue}d overdue`}
+                              size="small"
+                              color="error"
+                              sx={{ fontSize: '0.625rem', height: 20, fontWeight: 600 }}
+                            />
+                          )}
+                          {score !== null && (
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                fontWeight: 500,
+                                color: score >= 80 ? 'success.main' : score >= 60 ? 'warning.main' : 'error.main',
+                              }}
+                            >
+                              {score}%
+                            </Typography>
+                          )}
+                          <Typography variant="caption" sx={{ color: isOverdue ? 'error.main' : 'text.disabled' }}>
+                            Due: {formatDate(report.due_date)}
+                          </Typography>
+                          <StatusBadge status={report.status} />
+                        </Box>
+                      </Box>
+                    );
+                  })()
                 );
               })}
             </Stack>

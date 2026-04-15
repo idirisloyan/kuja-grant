@@ -438,7 +438,7 @@ def api_upload_grant_doc(grant_id):
 
     db.session.commit()
 
-    return jsonify({
+    response = jsonify({
         'success': True,
         'grant_document': stored_filename,
         'original_filename': original_filename,
@@ -447,3 +447,7 @@ def api_upload_grant_doc(grant_id):
         'content_extracted': len(file_content) > 100,
         'auto_saved': True,
     })
+    # Prevent proxy buffering so the connection stays alive during AI extraction
+    response.headers['X-Accel-Buffering'] = 'no'
+    response.headers['Connection'] = 'keep-alive'
+    return response

@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import text
 
@@ -19,7 +20,7 @@ LOCKOUT_DURATION_MINUTES = 15    # How long the lockout lasts
 
 # ---------- IP-based rate limiting (database-backed, works across all workers) ----------
 IP_RATE_LIMIT_WINDOW = 300       # 5-minute sliding window (seconds)
-IP_RATE_LIMIT_MAX = 20           # max login attempts per IP in sliding window
+IP_RATE_LIMIT_MAX = int(os.environ.get('RATE_LIMIT_LOGIN_PER_IP', '50'))  # configurable via env var
 _ip_table_ready = None
 
 

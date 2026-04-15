@@ -260,10 +260,10 @@ export default function ReviewDetailClient() {
         </Box>
       </Box>
 
-      {/* Application Summary */}
-      <Card>
+      {/* Score Summary */}
+      <Card sx={{ borderLeft: '4px solid', borderLeftColor: '#7C3AED' }}>
         <CardContent sx={{ py: 2.5, '&:last-child': { pb: 2.5 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
             <Box>
               <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>
                 {application.ngo_org_name || application.org_name || `Org #${application.ngo_org_id}`}
@@ -274,32 +274,63 @@ export default function ReviewDetailClient() {
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <StatusBadge status={application.status} />
-              <ScoreRing score={overallScore} size={64} strokeWidth={5} label="Total" />
             </Box>
           </Box>
-          {application.ai_score != null && (
-            <Box sx={{
-              mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: '#F5F3FF', border: '1px solid #E9E5FF',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1,
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Cpu size={14} style={{ color: '#fff' }} />
-                </Box>
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#7C3AED', display: 'block', letterSpacing: '0.04em' }}>
-                    AI PRE-SCORE
+
+          {/* Structured Score Summary */}
+          <Box sx={{ display: 'flex', gap: 2, mt: 2, flexWrap: 'wrap' }}>
+            {application.ai_score != null && (
+              <Card variant="outlined" sx={{ flex: 1, minWidth: 160, bgcolor: '#F5F3FF', border: '1px solid #E9E5FF' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, textAlign: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75, mb: 1 }}>
+                    <Box sx={{ width: 24, height: 24, borderRadius: '50%', bgcolor: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Cpu size={12} style={{ color: '#fff' }} />
+                    </Box>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#7C3AED', letterSpacing: '0.04em' }}>
+                      AI SCORE
+                    </Typography>
+                  </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: application.ai_score >= 70 ? 'success.main' : application.ai_score >= 50 ? 'warning.dark' : 'error.main' }}>
+                    {application.ai_score}%
                   </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
-                    Completeness (25%) + Relevance (35%) + Depth (40%)
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5, fontSize: '0.6rem' }}>
+                    Completeness 25% + Relevance 35% + Depth 40%
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
+            <Card variant="outlined" sx={{ flex: 1, minWidth: 160, bgcolor: overallScore > 0 ? '#ECFDF5' : '#F8FAFC', border: overallScore > 0 ? '1px solid #D1FAE5' : '1px solid #E2E8F0' }}>
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, textAlign: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75, mb: 1 }}>
+                  <Star size={14} style={{ color: overallScore > 0 ? '#059669' : '#94A3B8' }} />
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: overallScore > 0 ? '#059669' : '#94A3B8', letterSpacing: '0.04em' }}>
+                    REVIEWER SCORE
                   </Typography>
                 </Box>
-              </Box>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: application.ai_score >= 70 ? 'success.main' : application.ai_score >= 50 ? 'warning.dark' : 'error.main' }}>
-                {application.ai_score}%
-              </Typography>
-            </Box>
-          )}
+                <Typography variant="h4" sx={{ fontWeight: 700, color: overallScore > 0 ? (overallScore >= 70 ? 'success.main' : overallScore >= 50 ? 'warning.dark' : 'error.main') : 'text.disabled' }}>
+                  {overallScore > 0 ? `${overallScore}%` : '--'}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5, fontSize: '0.6rem' }}>
+                  {overallScore > 0 ? 'Weighted criterion scores' : 'Not yet scored'}
+                </Typography>
+              </CardContent>
+            </Card>
+            {application.ai_score != null && overallScore > 0 && (
+              <Card variant="outlined" sx={{ flex: 1, minWidth: 160, bgcolor: '#EFF6FF', border: '1px solid #DBEAFE' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, textAlign: 'center' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#2563EB', letterSpacing: '0.04em', display: 'block', mb: 1 }}>
+                    DUAL SCORE
+                  </Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#2563EB' }}>
+                    {Math.round((application.ai_score + overallScore) / 2)}%
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5, fontSize: '0.6rem' }}>
+                    Average of AI + Reviewer
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
+          </Box>
         </CardContent>
       </Card>
 
