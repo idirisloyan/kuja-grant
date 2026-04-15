@@ -623,6 +623,162 @@ def make_tests(base):
                        "X-Requested-With": "XMLHttpRequest"}, timeout=10)
     tests.append(("P0-3: Swahili and Somali language support", test_language_sw_so))
 
+    # =========================================================================
+    # I18N COMPLETENESS: All frontend translation keys exist in en.json
+    # =========================================================================
+    def test_i18n_completeness():
+        import re as _re
+        en = json.load(open(os.path.join(TRANSLATION_DIR, "en.json"), encoding="utf-8"))
+        # Scan ALL .js files under static/js/ for T('...') patterns
+        js_dir = os.path.join(os.path.dirname(__file__), "static", "js")
+        all_keys_used = set()
+        for root, dirs, files in os.walk(js_dir):
+            # Skip translations dir and vendor dir
+            dirs[:] = [d for d in dirs if d not in ("translations", "vendor")]
+            for fname in files:
+                if not fname.endswith(".js"):
+                    continue
+                fpath = os.path.join(root, fname)
+                with open(fpath, encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+                # Match T('key.name') pattern
+                keys = _re.findall(r"T\('([^']+)'\)", content)
+                all_keys_used.update(keys)
+        assert len(all_keys_used) > 0, "No T('...') keys found in any JS file"
+        missing = sorted(k for k in all_keys_used if k not in en)
+        assert len(missing) == 0, (
+            f"I18N COMPLETENESS: {len(missing)} keys used in code but missing from en.json:\n"
+            + "\n".join(f"  - {k}" for k in missing)
+        )
+    tests.append(("I18N-COMPLETENESS: All frontend translation keys exist in en.json", test_i18n_completeness))
+
+    # =========================================================================
+    # I18N PARITY: All non-EN translation files have same keys as EN
+    # =========================================================================
+    def test_i18n_parity():
+        en = json.load(open(os.path.join(TRANSLATION_DIR, "en.json"), encoding="utf-8"))
+        en_keys = set(en.keys())
+        all_missing = {}
+        for lang in ("es", "fr", "ar", "sw", "so"):
+            lang_file = os.path.join(TRANSLATION_DIR, f"{lang}.json")
+            if not os.path.exists(lang_file):
+                all_missing[lang] = ["FILE MISSING"]
+                continue
+            trans = json.load(open(lang_file, encoding="utf-8"))
+            missing = sorted(k for k in en_keys if k not in trans)
+            if missing:
+                all_missing[lang] = missing
+        if all_missing:
+            lines = []
+            for lang, keys in all_missing.items():
+                lines.append(f"  {lang}.json missing {len(keys)} keys: {keys[:10]}")
+            assert False, (
+                f"I18N PARITY: Translation files out of sync with en.json:\n"
+                + "\n".join(lines)
+            )
+    tests.append(("I18N-PARITY: All non-EN translation files have same keys as EN", test_i18n_parity))
+
+    # =========================================================================
+    # SCHEMA SAFETY: Verify critical DB tables/columns exist at runtime
+    # =========================================================================
+    def test_schema_documents():
+        """Verify Documents table has version and supersedes_id columns by uploading a doc."""
+        s = login_ok(base, USERS["ngo"])
+        content = ("Schema check document for version column verification.\n"
+                   "This tests that the documents table has all expected columns.\n"
+                   "Must be at least 100 bytes to pass server validation checks.\n").encode()
+        r = s.post(f"{base}/api/documents/upload",
+                   files={"file": ("schema_check.txt", io.BytesIO(content), "text/plain")},
+                   data={"document_type": "registration_cert"},
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=30)
+        assert r.status_code < 500, f"Documents upload returned {r.status_code} (schema issue): {r.text[:200]}"
+        if r.status_code in (200, 201):
+            doc = r.json().get("document", r.json())
+            # Verify version field exists in response
+            assert "version" in doc or "version_number" in doc, \
+                f"Document response missing version field: {list(doc.keys())}"
+    tests.append(("SCHEMA-001: Documents table has version column (upload succeeds)", test_schema_documents))
+
+    def test_schema_reports():
+        """Verify Reports table has revision_number and revision_history columns."""
+        sd = login_ok(base, USERS["donor"])
+        gr = sd.post(f"{base}/api/grants/",
+                     json={"title": "Schema Report Test", "description": "test",
+                           "total_funding": 10000, "currency": "USD",
+                           "deadline": "2026-12-31", "status": "draft"},
+                     headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert gr.status_code in (200, 201), f"Grant create: {gr.status_code}"
+        gid = gr.json()["grant"]["id"]
+        try:
+            sd.post(f"{base}/api/grants/{gid}/publish",
+                    headers={"Content-Type": "application/json",
+                             "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+            sn = login_ok(base, USERS["ngo"])
+            r = sn.post(f"{base}/api/reports/",
+                        json={"grant_id": gid, "title": "Schema Check Report",
+                              "report_type": "quarterly_financial",
+                              "content": "Schema check report content."},
+                        headers={"Content-Type": "application/json",
+                                 "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+            assert r.status_code < 500, f"Report create returned {r.status_code} (schema issue): {r.text[:200]}"
+        finally:
+            sd.delete(f"{base}/api/grants/{gid}",
+                      headers={"X-Requested-With": "XMLHttpRequest"}, timeout=5)
+    tests.append(("SCHEMA-002: Reports table accepts create (revision columns exist)", test_schema_reports))
+
+    def test_schema_notifications():
+        """Verify Notifications table exists by querying it."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/notifications/",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code < 500, f"Notifications returned {r.status_code} (table may not exist): {r.text[:200]}"
+        assert r.status_code == 200, f"Notifications returned {r.status_code}"
+    tests.append(("SCHEMA-003: Notifications table exists (GET returns 200)", test_schema_notifications))
+
+    # =========================================================================
+    # ENDPOINT SCAN: No 500 errors on any critical API endpoint
+    # =========================================================================
+    def test_endpoint_scan():
+        """Hit every critical API endpoint and assert none returns 500."""
+        endpoints = [
+            ("GET", "/api/grants/", "donor"),
+            ("GET", "/api/applications/", "ngo"),
+            ("GET", "/api/assessments/", "ngo"),
+            ("GET", "/api/assessments/frameworks", "ngo"),
+            ("GET", "/api/reviews/", "reviewer"),
+            ("GET", "/api/reports/", "ngo"),
+            ("GET", "/api/reports/upcoming", "ngo"),
+            ("GET", "/api/notifications/", "ngo"),
+            ("GET", "/api/notifications/unread-count", "ngo"),
+            ("GET", "/api/verification/all", "donor"),
+            ("GET", "/api/verification/expiring", "donor"),
+            ("GET", "/api/verification/registries", "donor"),
+            ("GET", "/api/admin/stats", "admin"),
+            ("GET", "/api/admin/canary", "admin"),
+            ("GET", "/api/auth/me", "ngo"),
+            ("GET", "/api/dashboard/stats", "donor"),
+        ]
+        errors_500 = []
+        for method, path, role in endpoints:
+            s = login_ok(base, USERS[role])
+            try:
+                if method == "GET":
+                    r = s.get(f"{base}{path}",
+                              headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+                else:
+                    r = s.post(f"{base}{path}", json={},
+                               headers={"Content-Type": "application/json",
+                                        "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+                if r.status_code >= 500:
+                    errors_500.append(f"{method} {path} ({role}): {r.status_code} - {r.text[:100]}")
+            except Exception as exc:
+                errors_500.append(f"{method} {path} ({role}): {type(exc).__name__}: {exc}")
+        assert len(errors_500) == 0, (
+            f"ENDPOINT-SCAN: {len(errors_500)} endpoint(s) returned 500:\n"
+            + "\n".join(f"  - {e}" for e in errors_500)
+        )
+    tests.append(("ENDPOINT-SCAN: No 500 errors on any critical endpoint", test_endpoint_scan))
+
     return tests
 
 

@@ -692,5 +692,17 @@
   "assessment.score": "Alama",
   "assessment.level": "Kiwango",
   "report.submitted_reports": "Ripoti Zilizowasilishwa",
-  "report.all_reports": "Ripoti Zote"
+  "report.all_reports": "Ripoti Zote",
+  "grant.apply_load_error": "Imeshindwa kupakia maelezo ya ruzuku. Tafadhali jaribu tena.",
+  "grant.create.draft_save_error": "Imeshindwa kuhifadhi rasimu. Tafadhali jaribu tena.",
+  "grant.create.title_required": "Tafadhali ingiza kichwa cha ruzuku kabla ya kuhifadhi.",
+  "toast.file_empty": "Faili ni tupu au ndogo sana. Tafadhali pakia hati halali.",
+  "toast.upload_timeout": "Muda wa kupakia umeisha. Faili inaweza kuwa kubwa sana.",
+  "upload.ai_analyzing": "AI inachambua hati\u2026",
+  "upload.analyzing_content": "Kutathmini ubora na uzingatiaji wa hati\u2026",
+  "upload.failed": "Kupakia kumeshindwa",
+  "upload.network_error": "Kupakia kumeshindwa",
+  "upload.success": "Kupakia na uchambuzi umekamilika",
+  "upload.transferring": "Kuhamisha faili kwenda kwenye seva\u2026",
+  "upload.uploading": "Inapakia hati\u2026"
 }

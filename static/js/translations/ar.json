@@ -692,5 +692,17 @@
   "assessment.score": "الدرجة",
   "assessment.level": "المستوى",
   "report.submitted_reports": "التقارير المقدمة",
-  "report.all_reports": "جميع التقارير"
+  "report.all_reports": "جميع التقارير",
+  "grant.apply_load_error": "تعذر تحميل تفاصيل المنحة. يرجى المحاولة مرة أخرى.",
+  "grant.create.draft_save_error": "فشل حفظ المسودة. يرجى المحاولة مرة أخرى.",
+  "grant.create.title_required": "يرجى إدخال عنوان المنحة قبل الحفظ.",
+  "toast.file_empty": "الملف فارغ أو صغير جدًا. يرجى تحميل مستند صالح.",
+  "toast.upload_timeout": "انتهت مهلة التحميل. قد يكون الملف كبيرًا جدًا أو الخادم مشغول.",
+  "upload.ai_analyzing": "الذكاء الاصطناعي يحلل المستند\u2026",
+  "upload.analyzing_content": "تقييم جودة المستند والامتثال\u2026",
+  "upload.failed": "فشل التحميل",
+  "upload.network_error": "فشل التحميل",
+  "upload.success": "اكتمل التحميل والتحليل",
+  "upload.transferring": "نقل الملف إلى الخادم\u2026",
+  "upload.uploading": "جاري تحميل المستند\u2026"
 }

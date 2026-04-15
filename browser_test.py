@@ -2,7 +2,7 @@
 """
 Kuja Grant — Comprehensive Browser UI Tests (Playwright)
 ==========================================================
-85 tests across 19 categories covering every major workflow.
+91 tests across 20 categories covering every major workflow.
 
 Usage:
   python browser_test.py --local          # Start Flask in-process
@@ -1185,76 +1185,142 @@ def test_15_3_dashboard_stats_populated(page, ctx):
 
 
 # ===========================================================================
-# 16. TRANSLATION COVERAGE — Raw Key Detection (5 tests)
+# 16. TRANSLATION COVERAGE — Strict Raw Key Detection (6 tests)
 # ===========================================================================
 
-# Regex to detect untranslated i18n keys like "common.review_all", "dashboard.ngo.subtitle"
-_RAW_KEY_PATTERN = re.compile(r'\b[a-z]+\.[a-z]+\.[a-z_]+\b')
-# Known false positives that look like keys but are real content
-_KEY_FALSE_POSITIVES = {"e.g.", "i.e.", "u.s.", "p.m.", "a.m.", "www.", "http.", "https.",
-                         "gmail.com", "kuja.org", "amani.org", "globalhealth.org",
-                         "reviewer.org", "eatrust.org", "sahelwomen.org", "hopebridges.org",
-                         "salamrelief.org", "ubuntu.org"}
+# Broad regex: matches "word.word" or "word.word.word" or "word.word_word.word"
+# where all parts are lowercase ASCII, min 2 chars each, up to 4 segments
+_RAW_KEY_PATTERN = re.compile(r'\b([a-z]{2,}(?:\.[a-z_]{2,}){1,3})\b')
+
+# Known false positives: version numbers, URLs, email domains, CSS classes, abbreviations
+_KEY_FALSE_POSITIVE_PATTERNS = [
+    re.compile(r'^\d'),                  # starts with digit (version numbers)
+    re.compile(r'\d\.\d'),              # contains version-like numbers
+    re.compile(r'\.com$|\.org$|\.net$|\.io$|\.gov$|\.edu$'),  # domain TLDs
+    re.compile(r'\.css$|\.js$|\.json$|\.html$|\.txt$|\.pdf$'),  # file extensions
+]
+_KEY_FALSE_POSITIVES_EXACT = {
+    "e.g", "i.e", "u.s", "p.m", "a.m", "vs.net", "node.js", "next.js",
+    "react.js", "vue.js", "express.js", "moment.js",
+    "gmail.com", "kuja.org", "amani.org", "globalhealth.org",
+    "reviewer.org", "eatrust.org", "sahelwomen.org", "hopebridges.org",
+    "salamrelief.org", "ubuntu.org", "material.ui", "mui.com",
+    "pypi.org", "npmjs.com", "github.com", "railway.app",
+    "border.slate", "bg.brand", "text.white", "text.slate", "bg.white",
+    "hover.bg", "hover.shadow", "hover.border", "rounded.lg", "rounded.xl",
+    "font.medium", "font.bold", "font.semibold", "transition.colors",
+    "transition.all", "inline.flex", "items.center",
+}
+
+# Known i18n key prefixes from the codebase
+_I18N_PREFIXES = [
+    "common.", "dashboard.", "status.", "grant.", "report.", "nav.",
+    "assessment.", "compliance.", "wizard.", "donor.", "ngo.", "admin.",
+    "reviewer.", "button.", "label.", "error.", "notification.",
+    "verification.", "application.", "auth.", "header.", "ai.",
+    "apply.", "toast.", "upload.", "org.", "document.", "review.",
+    "sanctions.", "capacity.", "framework.",
+]
 
 def _find_raw_keys(body_text):
-    """Find potential untranslated i18n keys in page text."""
-    matches = _RAW_KEY_PATTERN.findall(body_text.lower())
-    # Filter out false positives (email domains, common abbreviations)
+    """Find potential untranslated i18n keys in page text using strict matching."""
+    text_lower = body_text.lower()
+    matches = _RAW_KEY_PATTERN.findall(text_lower)
     real_keys = []
     for m in matches:
-        if any(fp in m for fp in _KEY_FALSE_POSITIVES):
+        # Skip exact false positives
+        if m in _KEY_FALSE_POSITIVES_EXACT:
             continue
-        # Keys typically have known prefixes
-        if any(m.startswith(p) for p in ["common.", "dashboard.", "status.", "grant.",
-                                          "report.", "nav.", "assessment.", "compliance.",
-                                          "wizard.", "donor.", "ngo.", "admin.", "reviewer.",
-                                          "button.", "label.", "error.", "notification.",
-                                          "verification.", "application."]):
+        # Skip pattern-based false positives
+        if any(p.search(m) for p in _KEY_FALSE_POSITIVE_PATTERNS):
+            continue
+        # Must start with a known i18n prefix to be flagged
+        if any(m.startswith(p) for p in _I18N_PREFIXES):
             real_keys.append(m)
-    return real_keys
+    return list(set(real_keys))  # deduplicate
 
-def test_16_1_donor_no_raw_keys(page, ctx):
-    """16.1 Donor dashboard has NO raw translation keys."""
+def _scan_all_pages_for_raw_keys(page, ctx):
+    """Scan ALL user-facing pages for raw translation keys. Returns {page: [keys]}."""
+    pages_to_scan = {
+        "donor_dashboard": (USERS["donor"], "/dashboard"),
+        "ngo_dashboard":   (USERS["ngo"], "/dashboard"),
+        "grants_list":     (USERS["donor"], "/grants"),
+        "grants_new":      (USERS["donor"], "/grants/new"),
+        "reports":         (USERS["ngo"], "/reports"),
+        "compliance":      (USERS["donor"], "/compliance"),
+        "verification":    (USERS["donor"], "/verification"),
+        "assessments":     (USERS["ngo"], "/assessments"),
+        "reviews":         (USERS["reviewer"], "/reviews"),
+        "org_search":      (USERS["donor"], "/organizations/search"),
+        "applications":    (USERS["ngo"], "/applications"),
+    }
+    all_findings = {}
+    current_user = None
+    for page_name, (user, path) in pages_to_scan.items():
+        if user != current_user:
+            login_as(page, ctx["base"], user)
+            current_user = user
+        page.goto(f"{ctx['base']}{path}", wait_until="networkidle")
+        page.wait_for_timeout(2000)
+        body = get_page_text(page)
+        raw_keys = _find_raw_keys(body)
+        if raw_keys:
+            all_findings[page_name] = raw_keys
+    return all_findings
+
+def test_16_1_all_pages_no_raw_keys(page, ctx):
+    """16.1 FULL SCAN: No raw translation keys on ANY user-facing page."""
+    findings = _scan_all_pages_for_raw_keys(page, ctx)
+    if findings:
+        lines = []
+        for pg, keys in findings.items():
+            lines.append(f"  {pg}: {keys}")
+        assert False, (
+            f"Raw translation keys found on {len(findings)} page(s):\n" + "\n".join(lines)
+        )
+
+def test_16_2_donor_dashboard_no_raw_keys(page, ctx):
+    """16.2 Donor dashboard has NO raw translation keys."""
     login_as(page, ctx["base"], USERS["donor"])
     page.wait_for_timeout(2000)
     body = get_page_text(page)
     raw_keys = _find_raw_keys(body)
-    assert len(raw_keys) == 0, f"Found raw translation keys on donor dashboard: {raw_keys[:10]}"
+    assert len(raw_keys) == 0, f"Raw keys on donor dashboard: {raw_keys}"
 
-def test_16_2_ngo_no_raw_keys(page, ctx):
-    """16.2 NGO dashboard has NO raw translation keys."""
+def test_16_3_ngo_dashboard_no_raw_keys(page, ctx):
+    """16.3 NGO dashboard has NO raw translation keys."""
     login_as(page, ctx["base"], USERS["ngo"])
     page.wait_for_timeout(2000)
     body = get_page_text(page)
     raw_keys = _find_raw_keys(body)
-    assert len(raw_keys) == 0, f"Found raw translation keys on NGO dashboard: {raw_keys[:10]}"
+    assert len(raw_keys) == 0, f"Raw keys on NGO dashboard: {raw_keys}"
 
-def test_16_3_compliance_no_raw_keys(page, ctx):
-    """16.3 Compliance page has NO raw translation keys."""
+def test_16_4_compliance_no_raw_keys(page, ctx):
+    """16.4 Compliance page has NO raw translation keys."""
     login_as(page, ctx["base"], USERS["donor"])
     page.goto(f"{ctx['base']}/compliance", wait_until="networkidle")
     page.wait_for_timeout(2000)
     body = get_page_text(page)
     raw_keys = _find_raw_keys(body)
-    assert len(raw_keys) == 0, f"Found raw translation keys on compliance page: {raw_keys[:10]}"
+    assert len(raw_keys) == 0, f"Raw keys on compliance page: {raw_keys}"
 
-def test_16_4_reports_no_raw_keys(page, ctx):
-    """16.4 Reports page has NO raw translation keys."""
+def test_16_5_reports_no_raw_keys(page, ctx):
+    """16.5 Reports page has NO raw translation keys."""
     login_as(page, ctx["base"], USERS["ngo"])
     page.goto(f"{ctx['base']}/reports", wait_until="networkidle")
     page.wait_for_timeout(2000)
     body = get_page_text(page)
     raw_keys = _find_raw_keys(body)
-    assert len(raw_keys) == 0, f"Found raw translation keys on reports page: {raw_keys[:10]}"
+    assert len(raw_keys) == 0, f"Raw keys on reports page: {raw_keys}"
 
-def test_16_5_grants_no_raw_keys(page, ctx):
-    """16.5 Grants page has NO raw translation keys."""
+def test_16_6_grants_no_raw_keys(page, ctx):
+    """16.6 Grants page has NO raw translation keys."""
     login_as(page, ctx["base"], USERS["donor"])
     page.goto(f"{ctx['base']}/grants", wait_until="networkidle")
     page.wait_for_timeout(2000)
     body = get_page_text(page)
     raw_keys = _find_raw_keys(body)
-    assert len(raw_keys) == 0, f"Found raw translation keys on grants page: {raw_keys[:10]}"
+    assert len(raw_keys) == 0, f"Raw keys on grants page: {raw_keys}"
 
 
 # ===========================================================================
@@ -1415,6 +1481,69 @@ def test_19_3_notifications_not_500(page, ctx):
 
 
 # ===========================================================================
+# 20. WORKFLOW DATA VERIFICATION — Real Content Checks (4 tests)
+# ===========================================================================
+
+def test_20_1_donor_dashboard_real_content(page, ctx):
+    """20.1 Donor dashboard shows real grant titles or meaningful content (not empty shell)."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.wait_for_timeout(2000)
+    body = get_page_text(page)
+    # Dashboard should have more than boilerplate — real names, stats, or actions
+    assert len(body) > 200, f"Donor dashboard has too little content ({len(body)} chars)"
+    # Should show either grant data, stats, or meaningful empty state
+    has_content = any(w in body.lower() for w in [
+        "grant", "create", "total", "application", "open", "draft",
+        "welcome", "sarah", "no grant", "get started"
+    ])
+    assert has_content, f"Donor dashboard lacks meaningful content: {body[:300]}"
+
+def test_20_2_ngo_dashboard_stats(page, ctx):
+    """20.2 NGO dashboard shows actual stats or meaningful empty state."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.wait_for_timeout(2000)
+    body = get_page_text(page)
+    assert len(body) > 200, f"NGO dashboard has too little content ({len(body)} chars)"
+    # Should show capacity score, assessment info, grants, or meaningful empty state
+    has_content = any(w in body.lower() for w in [
+        "assessment", "capacity", "grant", "application", "report",
+        "welcome", "fatima", "browse", "score", "get started", "no grant"
+    ])
+    assert has_content, f"NGO dashboard lacks meaningful data: {body[:300]}"
+
+def test_20_3_grants_list_content(page, ctx):
+    """20.3 Grants list shows at least page structure with real title or empty state."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.goto(f"{ctx['base']}/grants", wait_until="networkidle")
+    page.wait_for_timeout(2000)
+    body = get_page_text(page)
+    assert len(body) > 100, f"Grants page barely rendered ({len(body)} chars)"
+    # Should show grants, create button, or empty state — not an error
+    has_content = any(w in body.lower() for w in [
+        "grant", "create", "draft", "open", "published", "no grant",
+        "get started", "new grant"
+    ])
+    assert has_content, f"Grants list has no meaningful content: {body[:300]}"
+
+def test_20_4_reports_page_content(page, ctx):
+    """20.4 Reports page shows report data or meaningful empty state (not error)."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/reports", wait_until="networkidle")
+    page.wait_for_timeout(2000)
+    body = get_page_text(page)
+    assert len(body) > 100, f"Reports page barely rendered ({len(body)} chars)"
+    # Should NOT show error messages
+    assert "500" not in body or "error" not in body.lower(), \
+        f"Reports page shows error: {body[:300]}"
+    # Should show report content or meaningful empty state
+    has_content = any(w in body.lower() for w in [
+        "report", "calendar", "upcoming", "submit", "deadline",
+        "no report", "compliance", "no upcoming"
+    ])
+    assert has_content, f"Reports page has no meaningful content: {body[:300]}"
+
+
+# ===========================================================================
 # Main
 # ===========================================================================
 
@@ -1423,7 +1552,7 @@ def main():
 
     print("\n" + "=" * 70)
     print("  Kuja Grant — Comprehensive Browser UI Tests (Playwright)")
-    print("  85 tests across 19 categories")
+    print("  91 tests across 20 categories")
     print("=" * 70)
 
     # Determine base URL
@@ -1554,11 +1683,12 @@ def main():
                 ("15.3 Dashboard stats populated", test_15_3_dashboard_stats_populated),
             ]),
             ("16. TRANSLATION COVERAGE", [
-                ("16.1 Donor dashboard no raw keys", test_16_1_donor_no_raw_keys),
-                ("16.2 NGO dashboard no raw keys", test_16_2_ngo_no_raw_keys),
-                ("16.3 Compliance page no raw keys", test_16_3_compliance_no_raw_keys),
-                ("16.4 Reports page no raw keys", test_16_4_reports_no_raw_keys),
-                ("16.5 Grants page no raw keys", test_16_5_grants_no_raw_keys),
+                ("16.1 Full scan: all pages no raw keys", test_16_1_all_pages_no_raw_keys),
+                ("16.2 Donor dashboard no raw keys", test_16_2_donor_dashboard_no_raw_keys),
+                ("16.3 NGO dashboard no raw keys", test_16_3_ngo_dashboard_no_raw_keys),
+                ("16.4 Compliance page no raw keys", test_16_4_compliance_no_raw_keys),
+                ("16.5 Reports page no raw keys", test_16_5_reports_no_raw_keys),
+                ("16.6 Grants page no raw keys", test_16_6_grants_no_raw_keys),
             ]),
             ("17. DOCUMENT UPLOAD UI", [
                 ("17.1 Wizard upload has file input", test_17_1_wizard_upload_file_input),
@@ -1574,6 +1704,12 @@ def main():
                 ("19.1 Document upload not 500", test_19_1_doc_upload_not_500),
                 ("19.2 Report creation not 500", test_19_2_report_create_not_500),
                 ("19.3 Notifications not 500", test_19_3_notifications_not_500),
+            ]),
+            ("20. WORKFLOW DATA VERIFICATION", [
+                ("20.1 Donor dashboard real content", test_20_1_donor_dashboard_real_content),
+                ("20.2 NGO dashboard stats/content", test_20_2_ngo_dashboard_stats),
+                ("20.3 Grants list has content", test_20_3_grants_list_content),
+                ("20.4 Reports page meaningful content", test_20_4_reports_page_content),
             ]),
         ]
 

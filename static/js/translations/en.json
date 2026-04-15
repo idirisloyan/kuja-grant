@@ -692,5 +692,17 @@
   "assessment.score": "Score",
   "assessment.level": "Level",
   "report.submitted_reports": "Submitted Reports",
-  "report.all_reports": "All Reports"
+  "report.all_reports": "All Reports",
+  "grant.apply_load_error": "Could not load grant details. Please try again.",
+  "grant.create.draft_save_error": "Failed to save draft. Please try again.",
+  "grant.create.title_required": "Please enter a grant title before saving.",
+  "toast.file_empty": "File is empty or too small. Please upload a valid document.",
+  "toast.upload_timeout": "Upload timed out. The file may be too large or the server is busy. Please try again.",
+  "upload.ai_analyzing": "AI analyzing document\u2026",
+  "upload.analyzing_content": "Evaluating document quality and compliance\u2026",
+  "upload.failed": "Upload failed",
+  "upload.network_error": "Upload failed",
+  "upload.success": "Upload & analysis complete",
+  "upload.transferring": "Transferring file to server\u2026",
+  "upload.uploading": "Uploading document\u2026"
 }

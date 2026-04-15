@@ -692,5 +692,17 @@
   "assessment.score": "Dhibcaha",
   "assessment.level": "Heerka",
   "report.submitted_reports": "Warbixinadii La Gudbiyay",
-  "report.all_reports": "Dhammaan Warbixinaha"
+  "report.all_reports": "Dhammaan Warbixinaha",
+  "grant.apply_load_error": "Ma suurtogalin in la soo shuba faahfaahinta deeqda. Fadlan isku day mar kale.",
+  "grant.create.draft_save_error": "Waa lagu guul daraystay keydintiisa. Fadlan isku day mar kale.",
+  "grant.create.title_required": "Fadlan geli cinwaanka deeqda kahor inta aadan keydin.",
+  "toast.file_empty": "Faylku waa madhan yahay ama aad u yar yahay. Fadlan soo geli dukumenti sax ah.",
+  "toast.upload_timeout": "Waqtiga soo gelinta wuu dhacay. Faylku wuxuu noqon karaa mid weyn.",
+  "upload.ai_analyzing": "AI-gu wuu falanqeynayaa dukumentiga\u2026",
+  "upload.analyzing_content": "Qiimaynta tayada iyo waafaqsanaanta dukumentiga\u2026",
+  "upload.failed": "Soo gelinta way fashilantay",
+  "upload.network_error": "Soo gelinta way fashilantay",
+  "upload.success": "Soo gelinta iyo falanqaynta waa la dhammeeyay",
+  "upload.transferring": "Wareejinta faylka server-ka\u2026",
+  "upload.uploading": "Waa la soo gelinayaa dukumentiga\u2026"
 }

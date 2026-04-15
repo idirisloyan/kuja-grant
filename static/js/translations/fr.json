@@ -692,5 +692,17 @@
   "assessment.score": "Score",
   "assessment.level": "Niveau",
   "report.submitted_reports": "Rapports soumis",
-  "report.all_reports": "Tous les rapports"
+  "report.all_reports": "Tous les rapports",
+  "grant.apply_load_error": "Impossible de charger les détails de la subvention. Veuillez réessayer.",
+  "grant.create.draft_save_error": "Échec de l'enregistrement du brouillon. Veuillez réessayer.",
+  "grant.create.title_required": "Veuillez entrer un titre de subvention avant d'enregistrer.",
+  "toast.file_empty": "Le fichier est vide ou trop petit. Veuillez télécharger un document valide.",
+  "toast.upload_timeout": "Le téléchargement a expiré. Le fichier est peut-être trop volumineux.",
+  "upload.ai_analyzing": "L'IA analyse le document\u2026",
+  "upload.analyzing_content": "Évaluation de la qualité et de la conformité du document\u2026",
+  "upload.failed": "Échec du téléchargement",
+  "upload.network_error": "Échec du téléchargement",
+  "upload.success": "Téléchargement et analyse terminés",
+  "upload.transferring": "Transfert du fichier vers le serveur\u2026",
+  "upload.uploading": "Téléchargement du document\u2026"
 }

@@ -692,5 +692,17 @@
   "assessment.score": "Puntuación",
   "assessment.level": "Nivel",
   "report.submitted_reports": "Informes enviados",
-  "report.all_reports": "Todos los informes"
+  "report.all_reports": "Todos los informes",
+  "grant.apply_load_error": "No se pudieron cargar los detalles de la subvención. Inténtelo de nuevo.",
+  "grant.create.draft_save_error": "Error al guardar el borrador. Inténtelo de nuevo.",
+  "grant.create.title_required": "Ingrese un título para la subvención antes de guardar.",
+  "toast.file_empty": "El archivo está vacío o es demasiado pequeño. Suba un documento válido.",
+  "toast.upload_timeout": "La carga se agotó. El archivo puede ser demasiado grande o el servidor está ocupado.",
+  "upload.ai_analyzing": "IA analizando documento\u2026",
+  "upload.analyzing_content": "Evaluando calidad y cumplimiento del documento\u2026",
+  "upload.failed": "Error en la carga",
+  "upload.network_error": "Error en la carga",
+  "upload.success": "Carga y análisis completados",
+  "upload.transferring": "Transfiriendo archivo al servidor\u2026",
+  "upload.uploading": "Subiendo documento\u2026"
 }
