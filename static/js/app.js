@@ -6180,4 +6180,41 @@ function refreshAIPanel() {
             doLogin();
         }
     });
+
+    // ====================================================================
+    // Kuja Studio bridge — expose state + nav helpers to ES modules
+    // (bootstrap.js / copilot.js / charts.js / components.js).
+    // Without this, modules loaded with type="module" can't reach the
+    // const-scoped `S` object inside this classic-script IIFE.
+    // ====================================================================
+    window.S = S;
+    window.nav = nav;
+    window.api = api;
+    window.toast = window.toast || (typeof toast === 'function' ? toast : null);
+    window._currentLang = _currentLang;
+
+    // Wrap nav so we can also broadcast a kuja:nav event to the modules
+    var _nav_orig = nav;
+    window.nav = function(page, params) {
+        var r = _nav_orig.apply(null, arguments);
+        try {
+            document.dispatchEvent(new CustomEvent('kuja:nav', {
+                detail: { page: page, params: params || {} }
+            }));
+        } catch (e) {}
+        return r;
+    };
+
+    // Notify modules on auth changes (login/logout)
+    var _origRender = render;
+    var _lastUserId = (S.user && S.user.id) || null;
+    window.render = function() {
+        var r = _origRender.apply(null, arguments);
+        var nowUid = (S.user && S.user.id) || null;
+        if (nowUid !== _lastUserId) {
+            _lastUserId = nowUid;
+            try { document.dispatchEvent(new Event('kuja:auth-change')); } catch (e) {}
+        }
+        return r;
+    };
 })();

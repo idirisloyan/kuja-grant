@@ -3,15 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kuja Grant Management</title>
+    <title>Kuja — Grant intelligence for the Global South</title>
+    <meta name="description" content="Kuja is a unified grant management platform combining donor co-pilot, NGO readiness coaching, reviewer intelligence, and ongoing compliance — built for African organizations.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Inter (UI) + Fraunces (editorial serif for hero/numbers) + Noto Sans Arabic -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fraunces:opsz,wght,SOFT,WONK@9..144,400;9..144,500;9..144,600;9..144,700&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/tailwind.min.css?v=4.2.0">
     <link rel="stylesheet" href="/static/css/style.css?v=4.2.0">
+    <link rel="stylesheet" href="/static/css/kuja-studio.css?v=5.0.0">
     <script src="/static/js/vendor/lucide.min.js"></script>
     <script src="/static/js/vendor/chart.min.js"></script>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%234F46E5'/><stop offset='100%' stop-color='%236366F1'/></linearGradient></defs><rect rx='8' width='32' height='32' fill='url(%23g)'/><text x='16' y='22' text-anchor='middle' fill='white' font-size='18' font-family='Inter,Arial' font-weight='bold'>K</text></svg>">
+    <!-- Kuja-branded favicon: clay gradient, serif K -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23C2410C'/><stop offset='100%25' stop-color='%237C2D12'/></linearGradient></defs><rect rx='8' width='32' height='32' fill='url(%23g)'/><text x='16' y='23' text-anchor='middle' fill='white' font-size='20' font-family='Georgia,serif' font-weight='600'>K</text></svg>">
 </head>
 <body class="bg-slate-50 font-sans text-slate-900 antialiased">
     <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[999] focus:px-4 focus:py-2 focus:bg-brand-600 focus:text-white focus:rounded-lg focus:shadow-lg">Skip to main content</a>
@@ -20,6 +24,11 @@
     <div id="modal-overlay" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[200] hidden flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" onclick="closeModal(event)">
         <div id="modal-content" class="w-full max-w-xl" onclick="event.stopPropagation()"></div>
     </div>
-    <script src="/static/js/app.js?v=4.2.0"></script>
+    <!-- Co-pilot rail — mounted by static/js/modules/copilot.js once user is authenticated -->
+    <div id="kuja-copilot-root" aria-hidden="true"></div>
+    <script src="/static/js/app.js?v=5.0.0"></script>
+    <!-- New module-based code is loaded as a separate ES module so it doesn't
+         interfere with the existing global app.js until everything is ported. -->
+    <script type="module" src="/static/js/modules/bootstrap.js?v=5.0.0"></script>
 </body>
 </html>

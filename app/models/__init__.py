@@ -17,9 +17,11 @@ from app.models.review import Review
 from app.models.report import Report
 from app.models.compliance import ComplianceCheck, RegistrationVerification
 from app.models.notification import Notification
+from app.models.ai_thread import AIThread, AIMessage, AICallLog
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
     'Document', 'Review', 'Report', 'ComplianceCheck', 'RegistrationVerification',
     'Notification',
+    'AIThread', 'AIMessage', 'AICallLog',
 ]
