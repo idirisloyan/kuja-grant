@@ -16,6 +16,10 @@
 import { mountCopilot, refreshCopilot, openCopilot } from './copilot.js';
 import { renderVerdictCard, renderEmptyState, renderChartCard, renderAIPill } from './components.js';
 import { renderChart, renderInsightCaption } from './charts.js';
+import { installDashboardUpgrades } from './dashboard-upgrades.js';
+import { installOnboarding } from './onboarding.js';
+import { installLanguagePicker } from './language-picker.js';
+import './trust-ux.js'; // attaches window.KujaTrust = { typedConfirm, renderAuditTimeline, renderEvidencePanel }
 
 // Wait for the legacy app.js to set window.S (state) before initializing
 // modules that depend on auth.
@@ -37,10 +41,18 @@ whenReady(() => {
   // Mount co-pilot only when there's an authenticated user
   if (window.S.user) {
     mountCopilot();
+    installDashboardUpgrades();
+    installLanguagePicker();
+    installOnboarding();
   }
   // Re-mount on auth changes (login / logout)
   document.addEventListener('kuja:auth-change', () => {
-    if (window.S.user) mountCopilot();
+    if (window.S.user) {
+      mountCopilot();
+      installDashboardUpgrades();
+      installLanguagePicker();
+      installOnboarding();
+    }
   });
   // Page navigation triggers a co-pilot context refresh
   document.addEventListener('kuja:nav', (e) => {
