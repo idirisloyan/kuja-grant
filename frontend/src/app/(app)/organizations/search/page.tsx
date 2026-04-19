@@ -3,31 +3,9 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Chip from '@mui/material/Chip';
-import Stack from '@mui/material/Stack';
-import Skeleton from '@mui/material/Skeleton';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import InputAdornment from '@mui/material/InputAdornment';
-
-import {
-  Search, Building2, Eye, ShieldCheck, MapPin, Loader2,
-} from 'lucide-react';
+import { Search, Building2, Eye, ShieldCheck, MapPin, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Organization } from '@/lib/types';
-
-// ---------------------------------------------------------------------------
-// Main Page
-// ---------------------------------------------------------------------------
 
 export default function OrgSearchPage() {
   const router = useRouter();
@@ -52,189 +30,140 @@ export default function OrgSearchPage() {
     }
   }, [query]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSearch();
-  };
-
   return (
-    <Stack spacing={3}>
-      {/* Header */}
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-          Organization Search
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-          Search for organizations in the Kuja Grant system
-        </Typography>
-      </Box>
+    <div className="space-y-5">
+      <div>
+        <h1 className="kuja-display text-3xl">Organization search</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Find organizations in the Kuja Grant system
+        </p>
+      </div>
 
-      {/* Search Bar */}
-      <Box sx={{ display: 'flex', gap: 1.5 }}>
-        <TextField
-          placeholder="Search by name, country, or type..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          size="small"
-          sx={{ flex: 1, maxWidth: 480 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search size={16} style={{ color: '#94A3B8' }} />
-              </InputAdornment>
-            ),
-          }}
-        />
-        <Button
-          variant="contained"
-          disabled={searching || !query.trim()}
-          startIcon={
-            searching
-              ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-              : <Search size={16} />
-          }
+      {/* Search bar */}
+      <div className="flex gap-2 max-w-xl">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            placeholder="Search by name, country, or type…"
+            className="w-full h-10 pl-9 pr-3 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]"
+          />
+        </div>
+        <button
+          type="button"
           onClick={handleSearch}
+          disabled={searching || !query.trim()}
+          className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 disabled:opacity-50 disabled:cursor-not-allowed"
         >
+          {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           Search
-        </Button>
-      </Box>
-
-      {/* Loading */}
-      {searching && (
-        <Stack spacing={1.5}>
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} variant="rounded" height={64} sx={{ borderRadius: 2 }} />
-          ))}
-        </Stack>
-      )}
+        </button>
+      </div>
 
       {/* Results */}
+      {searching && (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => <div key={i} className="kuja-shimmer h-16 rounded-xl" />)}
+        </div>
+      )}
+
       {!searching && hasSearched && results.length === 0 && (
-        <Card>
-          <CardContent sx={{ py: 8, textAlign: 'center' }}>
-            <Building2 size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
-            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-              No organizations found
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
-              Try a different search term.
-            </Typography>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
+          <Building2 className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+          <p className="kuja-display text-xl">No organizations found</p>
+          <p className="text-sm text-muted-foreground mt-1">Try a different search term.</p>
+        </div>
       )}
 
       {!searching && results.length > 0 && (
-        <Card>
-          <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              {results.length} result{results.length !== 1 ? 's' : ''} found
-            </Typography>
-          </Box>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Organization</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Country</TableCell>
-                <TableCell>Verified</TableCell>
-                <TableCell align="right">Assessment Score</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {results.map((org) => (
-                <TableRow key={org.id} hover>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Building2 size={16} style={{ color: '#94A3B8', flexShrink: 0 }} />
-                      <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                        {org.name}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={org.org_type}
-                      size="small"
-                      variant="outlined"
-                      sx={{ fontSize: '0.6875rem', textTransform: 'capitalize' }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {org.country ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <MapPin size={12} style={{ color: '#94A3B8' }} />
-                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+        <div className="rounded-xl border border-border bg-background overflow-hidden">
+          <div className="px-4 py-2 border-b border-border bg-muted/20 text-sm text-muted-foreground">
+            {results.length} result{results.length !== 1 ? 's' : ''} found
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/30 border-b border-border text-left">
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Organization</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Type</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Country</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Verified</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Assessment</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((org) => (
+                  <tr key={org.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="font-medium text-foreground">{org.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="rounded-full border border-border text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-0.5">
+                        {org.org_type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {org.country ? (
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
                           {org.country}
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Typography variant="body2" sx={{ color: 'text.disabled' }}>--</Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {org.verified ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'success.main' }}>
-                        <ShieldCheck size={16} />
-                        <Typography variant="caption" sx={{ fontWeight: 500 }}>
-                          Verified
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                        Not verified
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell align="right">
-                    {org.assess_score != null ? (
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: 600,
-                          color:
-                            org.assess_score >= 80 ? 'success.main' :
-                            org.assess_score >= 60 ? 'warning.main' : 'error.main',
-                        }}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      {org.verified ? (
+                        <span className="inline-flex items-center gap-1 text-[hsl(var(--kuja-grow))] text-xs font-medium">
+                          <ShieldCheck className="h-4 w-4" /> Verified
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not verified</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {org.assess_score != null ? (
+                        <span className={cn(
+                          'kuja-numeric font-semibold',
+                          org.assess_score >= 80 ? 'text-[hsl(var(--kuja-grow))]' :
+                          org.assess_score >= 60 ? 'text-[hsl(var(--kuja-sun))]' : 'text-[hsl(var(--kuja-flag))]',
+                        )}>
+                          {org.assess_score}%
+                        </span>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/organizations/profile?id=${org.id}`)}
+                        className="inline-flex items-center gap-1.5 rounded border border-border hover:border-[hsl(var(--kuja-clay))] text-xs font-medium px-2.5 py-1"
                       >
-                        {org.assess_score}%
-                      </Typography>
-                    ) : (
-                      <Typography variant="body2" sx={{ color: 'text.disabled' }}>--</Typography>
-                    )}
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<Eye size={14} />}
-                      onClick={() => router.push(`/organizations/profile?id=${org.id}`)}
-                      sx={{ fontSize: '0.75rem', height: 28 }}
-                    >
-                      View
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+                        <Eye className="h-3.5 w-3.5" />
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
-      {/* Initial State */}
       {!hasSearched && (
-        <Card>
-          <CardContent sx={{ py: 8, textAlign: 'center' }}>
-            <Search size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
-            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-              Search for organizations
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
-              Enter a search term above to find organizations by name, country, or type.
-            </Typography>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
+          <Search className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+          <p className="kuja-display text-xl">Search for organizations</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Enter a name, country, or type to get started.
+          </p>
+        </div>
       )}
-    </Stack>
+    </div>
   );
 }

@@ -4,57 +4,35 @@ import { useRouter } from 'next/navigation';
 import { useAssessments, useAssessmentFrameworks } from '@/lib/hooks/use-api';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { StatusBadge } from '@/components/shared/status-badge';
-
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
-import Skeleton from '@mui/material/Skeleton';
-import Stack from '@mui/material/Stack';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import Avatar from '@mui/material/Avatar';
-
 import {
   ClipboardCheck, Clock, ListChecks, ArrowRight, Play, TrendingUp, Award,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { FrameworkInfo } from '@/lib/types';
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '-';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function formatDate(dateStr?: string | null): string {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function getLevelLabel(score: number): string {
   if (score >= 90) return 'Excellent';
-  if (score >= 80) return 'Very Good';
+  if (score >= 80) return 'Very good';
   if (score >= 70) return 'Good';
   if (score >= 60) return 'Satisfactory';
   if (score >= 40) return 'Developing';
-  return 'Needs Improvement';
+  return 'Needs improvement';
 }
 
-const FRAMEWORK_COLORS: Record<string, { bg: string; fg: string; border: string }> = {
-  kuja: { bg: '#EEF2FF', fg: '#4F46E5', border: '#C7D2FE' },
-  step: { bg: '#ECFDF5', fg: '#059669', border: '#A7F3D0' },
-  un_hact: { bg: '#EFF6FF', fg: '#2563EB', border: '#BFDBFE' },
-  chs: { bg: '#FFFBEB', fg: '#D97706', border: '#FDE68A' },
-  nupas: { bg: '#F5F3FF', fg: '#7C3AED', border: '#DDD6FE' },
+const FW_COLORS: Record<string, { bg: string; fg: string }> = {
+  kuja:    { bg: 'bg-[hsl(var(--kuja-sand-50))]',     fg: 'text-[hsl(var(--kuja-clay-dark))]' },
+  step:    { bg: 'bg-[hsl(142_68%_96%)]',             fg: 'text-[hsl(var(--kuja-grow))]' },
+  un_hact: { bg: 'bg-blue-50',                         fg: 'text-blue-700' },
+  chs:     { bg: 'bg-[hsl(32_100%_96%)]',             fg: 'text-[hsl(var(--kuja-sun))]' },
+  nupas:   { bg: 'bg-[hsl(var(--kuja-spark-soft))]',  fg: 'text-[hsl(var(--kuja-spark))]' },
 };
 
-const FRAMEWORK_ICONS: Record<string, string> = {
-  kuja: 'K',
-  step: 'S',
-  un_hact: 'U',
-  chs: 'C',
-  nupas: 'N',
-};
+const FW_ICON: Record<string, string> = { kuja: 'K', step: 'S', un_hact: 'U', chs: 'C', nupas: 'N' };
 
 export default function AssessmentsPage() {
   const router = useRouter();
@@ -63,276 +41,196 @@ export default function AssessmentsPage() {
 
   const assessments = assessData?.assessments ?? [];
   const frameworks = fwData?.frameworks ?? {};
-
   const isLoading = assessLoading || fwLoading;
 
-  // Calculate current score from most recent completed assessment
   const completedAssessments = assessments.filter((a) => a.status === 'completed' && a.overall_score !== null);
   const latestAssessment = completedAssessments.length > 0
     ? completedAssessments.sort((a, b) => {
-        const dateA = a.completed_at ? new Date(a.completed_at).getTime() : 0;
-        const dateB = b.completed_at ? new Date(b.completed_at).getTime() : 0;
-        return dateB - dateA;
+        const dA = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+        const dB = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+        return dB - dA;
       })[0]
     : null;
   const currentScore = latestAssessment?.overall_score ?? 0;
 
   if (isLoading) {
     return (
-      <Stack spacing={3}>
-        <Skeleton variant="text" width={260} height={40} />
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 3fr' }, gap: 2 }}>
-          <Skeleton variant="rounded" height={160} sx={{ borderRadius: 2 }} />
-          <Skeleton variant="rounded" height={160} sx={{ borderRadius: 2 }} />
-        </Box>
-        <Skeleton variant="rounded" height={260} sx={{ borderRadius: 2 }} />
-      </Stack>
+      <div className="space-y-4">
+        <div className="kuja-shimmer h-10 w-64 rounded" />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+          <div className="kuja-shimmer h-40 rounded-xl" />
+          <div className="kuja-shimmer h-40 rounded-xl lg:col-span-3" />
+        </div>
+        <div className="kuja-shimmer h-64 rounded-xl" />
+      </div>
     );
   }
 
   return (
-    <Stack spacing={3}>
+    <div className="space-y-5">
       {/* Header */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { sm: 'center' }, justifyContent: 'space-between', gap: 2 }}>
-        <Box>
-          <Typography variant="h2" sx={{ color: 'text.primary' }}>
-            Assessment Hub
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="kuja-display text-3xl">Assessment hub</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Measure and strengthen your organization&apos;s capacity
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={<Play size={16} />}
+          </p>
+        </div>
+        <button
+          type="button"
           onClick={() => router.push('/assessments/wizard')}
+          className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
         >
-          Start Assessment
-        </Button>
-      </Box>
+          <Play className="h-4 w-4" />
+          Start assessment
+        </button>
+      </div>
 
-      {/* Current Score Card + Summary */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 3fr' }, gap: 2 }}>
-        <Card>
-          <CardContent sx={{ py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', '&:last-child': { pb: 4 } }}>
-            <ScoreRing score={currentScore} size={120} strokeWidth={8} label="Score" />
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mt: 2 }}>
-              {getLevelLabel(currentScore)}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
-              Current Capacity Level
-            </Typography>
-            {latestAssessment && (
-              <Chip
-                label={`${latestAssessment.framework.toUpperCase()} Framework`}
-                variant="outlined"
-                size="small"
-                sx={{ mt: 1.5, fontSize: '0.6875rem', bgcolor: 'action.hover', borderColor: 'divider' }}
-              />
-            )}
-          </CardContent>
-        </Card>
+      {/* Score + summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="rounded-xl border border-border bg-background p-5 flex flex-col items-center text-center">
+          <ScoreRing score={currentScore} size={120} strokeWidth={8} label="Score" />
+          <p className="mt-3 text-sm font-semibold">{getLevelLabel(currentScore)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Current capacity level</p>
+          {latestAssessment && (
+            <span className="mt-3 rounded-full border border-border text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-0.5">
+              {latestAssessment.framework.toUpperCase()} framework
+            </span>
+          )}
+        </div>
+        <div className="rounded-xl border border-border bg-background p-5 lg:col-span-3">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold">Assessment summary</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Stat label="Total" value={assessments.length} />
+            <Stat label="Completed" value={completedAssessments.length} tone="success" />
+            <Stat label="In progress" value={assessments.filter((a) => a.status !== 'completed').length} tone="warn" />
+            <Stat label="Frameworks" value={Object.keys(frameworks).length} tone="primary" />
+          </div>
+        </div>
+      </div>
 
-        <Card>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <TrendingUp size={16} />
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                Assessment Summary
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 2 }}>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>{assessments.length}</Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>Total Assessments</Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#ECFDF5', borderRadius: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: '#059669' }}>{completedAssessments.length}</Typography>
-                <Typography variant="caption" sx={{ color: '#059669' }}>Completed</Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#FFFBEB', borderRadius: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: '#D97706' }}>
-                  {assessments.filter((a) => a.status !== 'completed').length}
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#D97706' }}>In Progress</Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#EEF2FF', borderRadius: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: '#4F46E5' }}>{Object.keys(frameworks).length}</Typography>
-                <Typography variant="caption" sx={{ color: '#4F46E5' }}>Frameworks</Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Box>
-
-      {/* Framework Cards */}
-      <Box>
-        <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary', mb: 2 }}>
-          Assessment Frameworks
-        </Typography>
+      {/* Frameworks */}
+      <div>
+        <h2 className="kuja-display text-xl mb-3">Assessment frameworks</h2>
         {Object.keys(frameworks).length === 0 ? (
-          <Card>
-            <CardContent sx={{ py: 6, textAlign: 'center' }}>
-              <ClipboardCheck size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>No frameworks available</Typography>
-            </CardContent>
-          </Card>
+          <EmptyBox icon={ClipboardCheck} label="No frameworks available" />
         ) : (
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(3, 1fr)', xl: 'repeat(5, 1fr)' }, gap: 2 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
             {Object.entries(frameworks).map(([key, fw]) => {
               const info = fw as FrameworkInfo;
-              const colors = FRAMEWORK_COLORS[key] || { bg: '#F8FAFC', fg: '#64748B', border: '#E2E8F0' };
-              const icon = FRAMEWORK_ICONS[key] || '?';
+              const c = FW_COLORS[key] ?? { bg: 'bg-muted', fg: 'text-muted-foreground' };
               return (
-                <Card key={key} sx={{ '&:hover': { boxShadow: 3 }, transition: 'box-shadow 0.2s' }}>
-                  <CardContent sx={{ py: 3, '&:last-child': { pb: 3 } }}>
-                    <Avatar
-                      variant="rounded"
-                      sx={{
-                        width: 40,
-                        height: 40,
-                        bgcolor: colors.bg,
-                        color: colors.fg,
-                        border: `1px solid ${colors.border}`,
-                        borderRadius: 2,
-                        fontWeight: 700,
-                        fontSize: '1.125rem',
-                        mb: 1.5,
-                      }}
-                    >
-                      {icon}
-                    </Avatar>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                      {info.name}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: 'text.secondary',
-                        mt: 0.5,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {info.description}
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1.5 }}>
-                      <Typography variant="caption" sx={{ color: 'text.disabled', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Clock size={12} /> {info.estimated_time}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'text.disabled', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <ListChecks size={12} /> {info.total_items} items
-                      </Typography>
-                    </Box>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      fullWidth
-                      startIcon={<Play size={12} />}
-                      onClick={() => router.push(`/assessments/wizard?framework=${key}`)}
-                      sx={{ mt: 1.5 }}
-                    >
-                      Start Assessment
-                    </Button>
-                  </CardContent>
-                </Card>
+                <div key={key} className="rounded-xl border border-border bg-background p-4 hover:shadow-md transition-all">
+                  <div className={cn('w-10 h-10 rounded-lg grid place-items-center font-bold text-lg mb-2', c.bg, c.fg)}>
+                    {FW_ICON[key] ?? '?'}
+                  </div>
+                  <p className="text-sm font-semibold">{info.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{info.description}</p>
+                  <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {info.estimated_time}</span>
+                    <span className="inline-flex items-center gap-1"><ListChecks className="h-3 w-3" /> {info.total_items} items</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/assessments/wizard?framework=${key}`)}
+                    className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand-50))] text-xs font-medium px-3 py-1.5"
+                  >
+                    <Play className="h-3 w-3" /> Start
+                  </button>
+                </div>
               );
             })}
-          </Box>
+          </div>
         )}
-      </Box>
+      </div>
 
-      {/* Previous Assessments */}
-      <Box>
-        <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary', mb: 2 }}>
-          Previous Assessments
-        </Typography>
+      {/* Previous assessments */}
+      <div>
+        <h2 className="kuja-display text-xl mb-3">Previous assessments</h2>
         {assessments.length === 0 ? (
-          <Card>
-            <CardContent sx={{ py: 6, textAlign: 'center' }}>
-              <Award size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>No assessments completed yet</Typography>
-              <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5, display: 'block' }}>
-                Start your first assessment to measure your capacity
-              </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                endIcon={<ArrowRight size={16} />}
-                onClick={() => router.push('/assessments/wizard')}
-                sx={{ mt: 2 }}
-              >
-                Start Assessment
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-dashed border-border bg-background px-6 py-12 text-center">
+            <Award className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
+            <p className="text-sm font-medium">No assessments completed yet</p>
+            <p className="text-xs text-muted-foreground mt-1">Start your first assessment to measure your capacity.</p>
+            <button
+              type="button"
+              onClick={() => router.push('/assessments/wizard')}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-4 py-2"
+            >
+              Start assessment <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         ) : (
-          <Card>
-            <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Framework</TableCell>
-                    <TableCell align="center">Score</TableCell>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Status</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
+          <div className="rounded-xl border border-border bg-background overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/30 border-b border-border text-left">
+                    <th className="px-4 py-3 font-medium text-muted-foreground">Framework</th>
+                    <th className="px-4 py-3 font-medium text-muted-foreground text-center">Score</th>
+                    <th className="px-4 py-3 font-medium text-muted-foreground">Date</th>
+                    <th className="px-4 py-3 font-medium text-muted-foreground">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {assessments.map((a) => {
-                    const colors = FRAMEWORK_COLORS[a.framework] || { bg: '#F8FAFC', fg: '#64748B', border: '#E2E8F0' };
+                    const c = FW_COLORS[a.framework] ?? { bg: 'bg-muted', fg: 'text-muted-foreground' };
                     return (
-                      <TableRow key={a.id}>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Avatar
-                              variant="rounded"
-                              sx={{
-                                width: 28,
-                                height: 28,
-                                bgcolor: colors.bg,
-                                color: colors.fg,
-                                border: `1px solid ${colors.border}`,
-                                borderRadius: 1,
-                                fontWeight: 700,
-                                fontSize: '0.75rem',
-                              }}
-                            >
-                              {FRAMEWORK_ICONS[a.framework] || '?'}
-                            </Avatar>
-                            <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', textTransform: 'uppercase' }}>
-                              {a.framework.replace('_', '-')}
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                        <TableCell align="center">
+                      <tr key={a.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className={cn('w-7 h-7 rounded grid place-items-center text-xs font-bold', c.bg, c.fg)}>
+                              {FW_ICON[a.framework] ?? '?'}
+                            </div>
+                            <span className="font-medium uppercase">{a.framework.replace('_', '-')}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
                           {a.overall_score !== null ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                            <div className="flex justify-center">
                               <ScoreRing score={Math.round(a.overall_score)} size={40} strokeWidth={3} />
-                            </Box>
-                          ) : (
-                            <Typography variant="caption" sx={{ color: 'text.disabled' }}>-</Typography>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                            {formatDate(a.completed_at || a.created_at)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={a.status} />
-                        </TableCell>
-                      </TableRow>
+                            </div>
+                          ) : <span className="text-xs text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{formatDate(a.completed_at || a.created_at)}</td>
+                        <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
+                      </tr>
                     );
                   })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
-      </Box>
-    </Stack>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: number; tone?: 'success' | 'warn' | 'primary' }) {
+  const cls = tone === 'success'
+    ? 'bg-[hsl(142_68%_96%)] text-[hsl(var(--kuja-grow))]'
+    : tone === 'warn'
+    ? 'bg-[hsl(32_100%_96%)] text-[hsl(var(--kuja-sun))]'
+    : tone === 'primary'
+    ? 'bg-[hsl(var(--kuja-sand-50))] text-[hsl(var(--kuja-clay-dark))]'
+    : 'bg-muted text-foreground';
+  return (
+    <div className={cn('rounded-lg p-3 text-center', cls)}>
+      <div className="kuja-numeric text-2xl font-semibold">{value}</div>
+      <div className="text-xs mt-0.5 opacity-80">{label}</div>
+    </div>
+  );
+}
+
+function EmptyBox({ icon: Icon, label }: { icon: typeof ClipboardCheck; label: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-background px-6 py-12 text-center">
+      <Icon className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
+      <p className="text-sm text-muted-foreground">{label}</p>
+    </div>
   );
 }

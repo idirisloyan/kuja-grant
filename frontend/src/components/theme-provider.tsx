@@ -12,15 +12,15 @@ import { ReactNode } from 'react';
 const kujaTheme = createTheme({
   palette: {
     primary: {
-      main: '#4338CA',       // Deeper indigo — more authoritative
-      light: '#6366F1',
-      dark: '#3730A3',
+      main: '#C2410C',       // Kuja Clay — warm earth-tone, Global South identity
+      light: '#F97316',
+      dark: '#7C2D12',
       contrastText: '#FFFFFF',
     },
     secondary: {
-      main: '#059669',       // Darker emerald — trust green
-      light: '#34D399',
-      dark: '#047857',
+      main: '#4A6741',       // Savanna green — muted, trust-building
+      light: '#7A9A71',
+      dark: '#2E4528',
       contrastText: '#FFFFFF',
     },
     error: {
@@ -54,24 +54,28 @@ const kujaTheme = createTheme({
     divider: '#E2E8F0',
   },
   typography: {
-    fontFamily: '"DM Sans", "Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", sans-serif',
+    // Body = Inter (matches Kuja Studio), hero serif = Fraunces (loaded via layout.tsx)
+    fontFamily: '"Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", sans-serif',
     h1: {
-      fontSize: '2.25rem',   // Larger — more presence
-      fontWeight: 700,       // Bolder
-      lineHeight: 1.15,
+      fontFamily: 'var(--font-serif, "Fraunces"), Georgia, serif',
+      fontSize: '2.25rem',
+      fontWeight: 600,
+      lineHeight: 1.1,
       letterSpacing: '-0.025em',
     },
     h2: {
-      fontSize: '1.75rem',   // Larger
-      fontWeight: 700,
-      lineHeight: 1.2,
+      fontFamily: 'var(--font-serif, "Fraunces"), Georgia, serif',
+      fontSize: '1.75rem',
+      fontWeight: 600,
+      lineHeight: 1.15,
       letterSpacing: '-0.02em',
     },
     h3: {
+      fontFamily: 'var(--font-serif, "Fraunces"), Georgia, serif',
       fontSize: '1.375rem',
       fontWeight: 600,
-      lineHeight: 1.3,
-      letterSpacing: '-0.01em',
+      lineHeight: 1.25,
+      letterSpacing: '-0.015em',
     },
     h4: {
       fontSize: '1.125rem',

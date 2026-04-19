@@ -2,142 +2,98 @@
 
 import { useRouter } from 'next/navigation';
 import { useReviews } from '@/lib/hooks/use-api';
-
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import Stack from '@mui/material/Stack';
-import Skeleton from '@mui/material/Skeleton';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-
-import { FileText, Eye, CheckCircle } from 'lucide-react';
+import { Eye, CheckCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Review } from '@/lib/types';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '--';
+function formatDate(dateStr?: string | null): string {
+  if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
-
-// ---------------------------------------------------------------------------
-// Main Page
-// ---------------------------------------------------------------------------
 
 export default function CompletedReviewsPage() {
   const router = useRouter();
   const { data, isLoading } = useReviews();
-
   const completed = (data?.completed ?? []) as Review[];
 
   if (isLoading) {
     return (
-      <Stack spacing={3}>
-        <Skeleton variant="text" width={260} height={36} />
-        <Skeleton variant="rounded" height={384} sx={{ borderRadius: 2 }} />
-      </Stack>
+      <div className="space-y-4">
+        <div className="kuja-shimmer h-10 w-64 rounded" />
+        <div className="kuja-shimmer h-96 rounded-xl" />
+      </div>
     );
   }
 
   return (
-    <Stack spacing={3}>
-      {/* Header */}
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-          Completed Reviews
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+    <div className="space-y-5">
+      <div>
+        <h1 className="kuja-display text-3xl">Completed reviews</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
           {completed.length} review{completed.length !== 1 ? 's' : ''} completed
-        </Typography>
-      </Box>
+        </p>
+      </div>
 
-      {/* Table */}
       {completed.length === 0 ? (
-        <Card>
-          <CardContent sx={{ py: 8, textAlign: 'center' }}>
-            <CheckCircle size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
-            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-              No completed reviews yet
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
-              Reviews you complete will be listed here for reference.
-            </Typography>
-            <Button
-              variant="outlined"
-              onClick={() => router.push('/reviews')}
-              sx={{ mt: 2 }}
-            >
-              View Pending Assignments
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
+          <CheckCircle className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+          <p className="kuja-display text-xl">No completed reviews yet</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Reviews you complete will be listed here for reference.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push('/reviews')}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand-50))] text-sm font-medium px-4 py-2"
+          >
+            View pending assignments
+          </button>
+        </div>
       ) : (
-        <Card>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Application</TableCell>
-                <TableCell>Grant</TableCell>
-                <TableCell align="right">Score</TableCell>
-                <TableCell>Completed</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {completed.map((review) => (
-                <TableRow key={review.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                      {review.ngo_org_name || `Application #${review.application_id}`}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      {review.grant_title || '--'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: 600,
-                        color:
-                          (review.overall_score ?? 0) >= 80 ? 'success.main' :
-                          (review.overall_score ?? 0) >= 60 ? 'warning.main' : 'error.main',
-                      }}
-                    >
-                      {review.overall_score != null ? `${review.overall_score}%` : '--'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      {formatDate(review.completed_at)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button
-                      size="small"
-                      startIcon={<Eye size={14} />}
-                      onClick={() => router.push(`/reviews/${review.application_id}`)}
-                      sx={{ fontSize: '0.75rem', height: 28, color: 'text.secondary' }}
-                    >
-                      View
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+        <div className="rounded-xl border border-border bg-background overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/30 border-b border-border text-left">
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Application</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Grant</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Score</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Completed</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {completed.map((r) => {
+                  const s = r.overall_score ?? 0;
+                  const color = s >= 80 ? 'text-[hsl(var(--kuja-grow))]' : s >= 60 ? 'text-[hsl(var(--kuja-sun))]' : 'text-[hsl(var(--kuja-flag))]';
+                  return (
+                    <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        {r.ngo_org_name || `Application #${r.application_id}`}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{r.grant_title || '—'}</td>
+                      <td className={cn('px-4 py-3 text-right kuja-numeric font-semibold', color)}>
+                        {r.overall_score != null ? `${r.overall_score}%` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{formatDate(r.completed_at)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/reviews/${r.application_id}`)}
+                          className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-[hsl(var(--kuja-clay))] text-sm"
+                        >
+                          <Eye className="h-4 w-4" />
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
-    </Stack>
+    </div>
   );
 }

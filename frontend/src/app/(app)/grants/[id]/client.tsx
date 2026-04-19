@@ -4,23 +4,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useGrant } from '@/lib/hooks/use-api';
 import { StatusBadge } from '@/components/shared/status-badge';
-
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
-import Skeleton from '@mui/material/Skeleton';
-import Stack from '@mui/material/Stack';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import Avatar from '@mui/material/Avatar';
-
 import {
   DollarSign, Calendar, MapPin, FileText, Target, ClipboardList,
   Upload, Users, ArrowLeft, CheckCircle, AlertCircle,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { EligibilityRequirement, Criterion, DocRequirement } from '@/lib/types';
 
 function formatFunding(amount: number | null, currency: string): string {
@@ -28,15 +16,14 @@ function formatFunding(amount: number | null, currency: string): string {
   return `${currency === 'USD' ? '$' : currency + ' '}${amount.toLocaleString()}`;
 }
 
-function formatDate(dateStr: string | null): string {
+function formatDate(dateStr?: string | null): string {
   if (!dateStr) return 'No deadline';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 type TabId = 'overview' | 'eligibility' | 'criteria' | 'documents' | 'applications';
 
-const TAB_ITEMS: { id: TabId; label: string }[] = [
+const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'eligibility', label: 'Eligibility' },
   { id: 'criteria', label: 'Criteria' },
@@ -50,7 +37,7 @@ export default function GrantDetailClient() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const { data, isLoading } = useGrant(id || null);
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [tab, setTab] = useState<TabId>('overview');
 
   const grant = data?.grant;
   const isNgo = user?.role === 'ngo';
@@ -58,457 +45,307 @@ export default function GrantDetailClient() {
 
   if (isLoading) {
     return (
-      <Stack spacing={3}>
-        <Skeleton variant="text" width={200} height={32} />
-        <Skeleton variant="text" width={400} height={24} />
-        <Skeleton variant="rounded" height={48} sx={{ borderRadius: 2 }} />
-        <Skeleton variant="rounded" height={260} sx={{ borderRadius: 2 }} />
-      </Stack>
+      <div className="space-y-3">
+        <div className="kuja-shimmer h-8 w-64 rounded" />
+        <div className="kuja-shimmer h-6 w-96 rounded" />
+        <div className="kuja-shimmer h-10 rounded" />
+        <div className="kuja-shimmer h-64 rounded-xl" />
+      </div>
     );
   }
 
   if (!grant) {
     return (
-      <Box sx={{ textAlign: 'center', py: 8 }}>
-        <AlertCircle size={48} color="#CBD5E1" style={{ margin: '0 auto 12px' }} />
-        <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>Grant not found</Typography>
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<ArrowLeft size={16} />}
+      <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
+        <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+        <p className="kuja-display text-xl">Grant not found</p>
+        <button
+          type="button"
           onClick={() => router.push('/grants')}
-          sx={{ mt: 2 }}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-4 py-2"
         >
-          Back to Grants
-        </Button>
-      </Box>
+          <ArrowLeft className="h-4 w-4" /> Back to grants
+        </button>
+      </div>
     );
   }
 
-  // Determine which tabs to show based on role
-  const visibleTabs = TAB_ITEMS.filter((t) => {
-    if (t.id === 'applications') return isDonor;
-    return true;
-  });
+  const visibleTabs = TABS.filter((t) => t.id !== 'applications' || isDonor);
 
   return (
-    <Stack spacing={3}>
-      {/* Back button */}
-      <Button
-        size="small"
-        startIcon={<ArrowLeft size={16} />}
+    <div className="space-y-5">
+      <button
+        type="button"
         onClick={() => router.push('/grants')}
-        sx={{ alignSelf: 'flex-start', color: 'text.secondary' }}
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        Back to Grants
-      </Button>
+        <ArrowLeft className="h-4 w-4" /> Back to grants
+      </button>
 
-      {/* Grant Header */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: { lg: 'flex-start' }, justifyContent: 'space-between', gap: 2 }}>
-        <Box sx={{ flex: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-            <Typography variant="h2" sx={{ color: 'text.primary' }}>
-              {grant.title}
-            </Typography>
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <h1 className="kuja-display text-3xl">{grant.title}</h1>
             <StatusBadge status={grant.status} />
-          </Box>
-          {grant.donor_org_name && (
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>{grant.donor_org_name}</Typography>
-          )}
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2.5, mt: 1.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-              <DollarSign size={16} color="#059669" />
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                {formatFunding(grant.total_funding, grant.currency)}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-              <Calendar size={16} color="#94A3B8" />
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>{formatDate(grant.deadline)}</Typography>
-            </Box>
+          </div>
+          {grant.donor_org_name && <p className="text-sm text-muted-foreground">{grant.donor_org_name}</p>}
+          <div className="mt-2 flex flex-wrap gap-4 text-sm">
+            <span className="inline-flex items-center gap-1.5 font-semibold text-[hsl(var(--kuja-grow))]">
+              <DollarSign className="h-4 w-4" /> {formatFunding(grant.total_funding, grant.currency)}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+              <Calendar className="h-4 w-4" /> {formatDate(grant.deadline)}
+            </span>
             {grant.countries && grant.countries.length > 0 && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                <MapPin size={16} color="#94A3B8" />
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>{grant.countries.join(', ')}</Typography>
-              </Box>
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                <MapPin className="h-4 w-4" /> {grant.countries.join(', ')}
+              </span>
             )}
-          </Box>
-        </Box>
+          </div>
+        </div>
         {isNgo && grant.status === 'open' && !grant.user_application_status && (
-          <Button
-            variant="contained"
-            startIcon={<FileText size={16} />}
+          <button
+            type="button"
             onClick={() => router.push(`/apply/${grant.id}`)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
           >
-            Apply Now
-          </Button>
+            <FileText className="h-4 w-4" /> Apply now
+          </button>
         )}
         {isNgo && grant.user_application_status && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>Your application:</Typography>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Your application:</span>
             <StatusBadge status={grant.user_application_status} />
-          </Box>
+          </div>
         )}
-      </Box>
+      </div>
 
       {/* Tabs */}
-      <Tabs
-        value={activeTab}
-        onChange={(_, newVal) => setActiveTab(newVal as TabId)}
-        sx={{ borderBottom: 1, borderColor: 'divider' }}
-      >
-        {visibleTabs.map((tab) => (
-          <Tab key={tab.id} value={tab.id} label={tab.label} sx={{ textTransform: 'none', fontWeight: 500 }} />
+      <div className="flex gap-1 border-b border-border overflow-x-auto">
+        {visibleTabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={cn(
+              'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
+              tab === t.id
+                ? 'text-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]'
+                : 'text-muted-foreground border-transparent hover:text-foreground',
+            )}
+          >
+            {t.label}
+          </button>
         ))}
-      </Tabs>
+      </div>
 
-      {/* Tab Content */}
-      {activeTab === 'overview' && <OverviewTab grant={grant} />}
-      {activeTab === 'eligibility' && <EligibilityTab requirements={grant.eligibility ?? []} />}
-      {activeTab === 'criteria' && <CriteriaTab criteria={grant.criteria ?? []} />}
-      {activeTab === 'documents' && <DocumentsTab requirements={grant.doc_requirements ?? []} />}
-      {activeTab === 'applications' && <ApplicationsTab grantId={grant.id} />}
-    </Stack>
+      {tab === 'overview' && <OverviewTab grant={grant} />}
+      {tab === 'eligibility' && <EligibilityTab requirements={grant.eligibility ?? []} />}
+      {tab === 'criteria' && <CriteriaTab criteria={grant.criteria ?? []} />}
+      {tab === 'documents' && <DocumentsTab requirements={grant.doc_requirements ?? []} />}
+      {tab === 'applications' && <ApplicationsTab grantId={grant.id} />}
+    </div>
   );
 }
 
 function OverviewTab({ grant }: { grant: NonNullable<ReturnType<typeof useGrant>['data']>['grant'] }) {
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' }, gap: 3 }}>
-      <Stack spacing={3}>
-        <Card>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
-              Description
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-              {grant.description || 'No description provided.'}
-            </Typography>
-          </CardContent>
-        </Card>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="lg:col-span-2 space-y-4">
+        <div className="rounded-xl border border-border bg-background p-5">
+          <div className="text-sm font-semibold mb-2">Description</div>
+          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+            {grant.description || 'No description provided.'}
+          </p>
+        </div>
 
         {grant.reporting_requirements && grant.reporting_requirements.length > 0 && (
-          <Card>
-            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
-                Reporting Requirements
-              </Typography>
-              <Stack spacing={1.5}>
-                {grant.reporting_requirements.map((r, i) => (
-                  <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, p: 1.5, bgcolor: 'action.hover', borderRadius: 2 }}>
-                    <FileText size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>{r.title}</Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}>
-                        {r.type} &middot; {r.frequency} &middot; Due {r.due_days_after_period} days after period
-                      </Typography>
-                      {r.description && (
-                        <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>
-                          {r.description}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                ))}
-              </Stack>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-border bg-background p-5">
+            <div className="text-sm font-semibold mb-3">Reporting requirements</div>
+            <div className="space-y-2">
+              {grant.reporting_requirements.map((r, i) => (
+                <div key={i} className="flex items-start gap-3 p-3 bg-muted/30 rounded-md">
+                  <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground mt-0.5" />
+                  <div>
+                    <div className="text-sm font-medium">{r.title}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {r.type} · {r.frequency} · Due {r.due_days_after_period} days after period
+                    </div>
+                    {r.description && (
+                      <div className="text-xs text-muted-foreground mt-1">{r.description}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
-      </Stack>
+      </div>
 
-      <Stack spacing={2}>
-        <Card>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
-              Quick Facts
-            </Typography>
-            <Stack spacing={1.5}>
-              <Box>
-                <Typography variant="caption" sx={{ color: 'text.disabled', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Funding
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mt: 0.25 }}>
-                  {formatFunding(grant.total_funding, grant.currency)}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography variant="caption" sx={{ color: 'text.disabled', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Deadline
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mt: 0.25 }}>
-                  {formatDate(grant.deadline)}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography variant="caption" sx={{ color: 'text.disabled', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Status
-                </Typography>
-                <Box sx={{ mt: 0.5 }}>
-                  <StatusBadge status={grant.status} />
-                </Box>
-              </Box>
-              {grant.application_count !== undefined && (
-                <Box>
-                  <Typography variant="caption" sx={{ color: 'text.disabled', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Applications
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mt: 0.25 }}>
-                    {grant.application_count}
-                  </Typography>
-                </Box>
-              )}
-            </Stack>
-          </CardContent>
-        </Card>
+      <div className="space-y-3">
+        <div className="rounded-xl border border-border bg-background p-5">
+          <div className="text-sm font-semibold mb-3">Quick facts</div>
+          <div className="space-y-3">
+            <Fact label="Funding" value={formatFunding(grant.total_funding, grant.currency)} strong />
+            <Fact label="Deadline" value={formatDate(grant.deadline)} />
+            <div>
+              <div className="kuja-label text-[10px]">Status</div>
+              <div className="mt-1"><StatusBadge status={grant.status} /></div>
+            </div>
+            {grant.application_count !== undefined && (
+              <Fact label="Applications" value={String(grant.application_count)} />
+            )}
+          </div>
+        </div>
 
         {grant.sectors && grant.sectors.length > 0 && (
-          <Card>
-            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
-                Sectors
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                {grant.sectors.map((s) => (
-                  <Chip
-                    key={s}
-                    label={s}
-                    size="small"
-                    variant="outlined"
-                    color="primary"
-                    sx={{ fontSize: '0.6875rem' }}
-                  />
-                ))}
-              </Box>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-border bg-background p-5">
+            <div className="text-sm font-semibold mb-2">Sectors</div>
+            <div className="flex flex-wrap gap-1.5">
+              {grant.sectors.map((s: string) => (
+                <span key={s} className="rounded-full border border-[hsl(var(--kuja-clay))] text-[hsl(var(--kuja-clay-dark))] text-[11px] px-2 py-0.5">
+                  {s}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
 
         {grant.countries && grant.countries.length > 0 && (
-          <Card>
-            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
-                Countries
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                {grant.countries.map((c) => (
-                  <Chip
-                    key={c}
-                    label={c}
-                    size="small"
-                    variant="outlined"
-                    sx={{ fontSize: '0.6875rem', borderColor: 'divider' }}
-                  />
-                ))}
-              </Box>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-border bg-background p-5">
+            <div className="text-sm font-semibold mb-2">Countries</div>
+            <div className="flex flex-wrap gap-1.5">
+              {grant.countries.map((c: string) => (
+                <span key={c} className="rounded-full border border-border text-muted-foreground text-[11px] px-2 py-0.5">
+                  {c}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
-      </Stack>
-    </Box>
+      </div>
+    </div>
+  );
+}
+
+function Fact({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div>
+      <div className="kuja-label text-[10px]">{label}</div>
+      <div className={cn('mt-0.5', strong ? 'kuja-numeric text-base font-semibold' : 'text-sm')}>{value}</div>
+    </div>
   );
 }
 
 function EligibilityTab({ requirements }: { requirements: EligibilityRequirement[] }) {
-  if (requirements.length === 0) {
-    return (
-      <Card>
-        <CardContent sx={{ py: 6, textAlign: 'center' }}>
-          <ClipboardList size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>No eligibility requirements specified</Typography>
-        </CardContent>
-      </Card>
-    );
-  }
-
+  if (requirements.length === 0) return <EmptyBlock icon={ClipboardList} label="No eligibility requirements specified" />;
   return (
-    <Stack spacing={1.5}>
+    <div className="space-y-2">
       {requirements.map((req, i) => (
-        <Card key={req.key || i}>
-          <CardContent sx={{ py: 2, px: 2.5, '&:last-child': { pb: 2 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-              <Avatar
-                sx={{
-                  width: 32,
-                  height: 32,
-                  bgcolor: '#EEF2FF',
-                  flexShrink: 0,
-                  mt: 0.25,
-                }}
-              >
-                <CheckCircle size={16} color="#4F46E5" />
-              </Avatar>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>{req.label}</Typography>
-                  {req.required && (
-                    <Chip
-                      label="Required"
-                      size="small"
-                      variant="outlined"
-                      color="error"
-                      sx={{ height: 20, fontSize: '0.625rem' }}
-                    />
-                  )}
-                  {req.weight && (
-                    <Chip
-                      label={`Weight: ${req.weight}`}
-                      size="small"
-                      variant="outlined"
-                      sx={{ height: 20, fontSize: '0.625rem', borderColor: 'divider' }}
-                    />
-                  )}
-                </Box>
-                {req.details && (
-                  <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{req.details}</Typography>
-                )}
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
+        <div key={req.key || i} className="rounded-xl border border-border bg-background p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-[hsl(var(--kuja-sand-50))] grid place-items-center flex-shrink-0">
+              <CheckCircle className="h-4 w-4 text-[hsl(var(--kuja-clay))]" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium">{req.label}</span>
+                {req.required && <span className="kuja-severity kuja-severity-critical">Required</span>}
+                {req.weight && <span className="kuja-severity kuja-severity-info">Weight: {req.weight}</span>}
+              </div>
+              {req.details && <p className="text-sm text-muted-foreground mt-1">{req.details}</p>}
+            </div>
+          </div>
+        </div>
       ))}
-    </Stack>
+    </div>
   );
 }
 
 function CriteriaTab({ criteria }: { criteria: Criterion[] }) {
-  if (criteria.length === 0) {
-    return (
-      <Card>
-        <CardContent sx={{ py: 6, textAlign: 'center' }}>
-          <Target size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>No scoring criteria specified</Typography>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const totalWeight = criteria.reduce((sum, c) => sum + c.weight, 0);
-
+  if (criteria.length === 0) return <EmptyBlock icon={Target} label="No scoring criteria specified" />;
+  const total = criteria.reduce((sum, c) => sum + c.weight, 0);
   return (
-    <Stack spacing={1.5}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-        <Target size={16} color="#94A3B8" />
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>Total weight: {totalWeight}</Typography>
-      </Box>
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+        <Target className="h-4 w-4" /> Total weight: {total}
+      </div>
       {criteria.map((c, i) => (
-        <Card key={c.key || i}>
-          <CardContent sx={{ py: 2, px: 2.5, '&:last-child': { pb: 2 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
-              <Box sx={{ flex: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>{c.label}</Typography>
-                {c.description && (
-                  <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{c.description}</Typography>
-                )}
-                {c.instructions && (
-                  <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1, display: 'block', fontStyle: 'italic' }}>
-                    {c.instructions}
-                  </Typography>
-                )}
-                {c.max_words && (
-                  <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5, display: 'block' }}>
-                    Max words: {c.max_words}
-                  </Typography>
-                )}
-              </Box>
-              <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>{c.weight}</Typography>
-                <Typography variant="caption" sx={{ color: 'text.disabled', textTransform: 'uppercase', fontSize: '0.625rem' }}>
-                  weight
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
+        <div key={c.key || i} className="rounded-xl border border-border bg-background p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium">{c.label}</div>
+              {c.description && <p className="text-sm text-muted-foreground mt-1">{c.description}</p>}
+              {c.instructions && <p className="text-xs italic text-muted-foreground mt-1">{c.instructions}</p>}
+              {c.max_words && <p className="text-xs text-muted-foreground mt-0.5">Max words: {c.max_words}</p>}
+            </div>
+            <div className="text-right flex-shrink-0">
+              <div className="kuja-numeric text-xl font-bold text-[hsl(var(--kuja-clay))]">{c.weight}</div>
+              <div className="kuja-label text-[10px]">weight</div>
+            </div>
+          </div>
+        </div>
       ))}
-    </Stack>
+    </div>
   );
 }
 
 function DocumentsTab({ requirements }: { requirements: DocRequirement[] }) {
-  if (requirements.length === 0) {
-    return (
-      <Card>
-        <CardContent sx={{ py: 6, textAlign: 'center' }}>
-          <Upload size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>No document requirements specified</Typography>
-        </CardContent>
-      </Card>
-    );
-  }
-
+  if (requirements.length === 0) return <EmptyBlock icon={Upload} label="No document requirements specified" />;
   return (
-    <Stack spacing={1.5}>
+    <div className="space-y-2">
       {requirements.map((doc, i) => (
-        <Card key={doc.key || i}>
-          <CardContent sx={{ py: 2, px: 2.5, '&:last-child': { pb: 2 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-              <Avatar
-                variant="rounded"
-                sx={{
-                  width: 32,
-                  height: 32,
-                  bgcolor: doc.required ? '#FFF1F2' : 'action.hover',
-                  borderRadius: 2,
-                  flexShrink: 0,
-                }}
-              >
-                <Upload size={16} color={doc.required ? '#E11D48' : '#94A3B8'} />
-              </Avatar>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>{doc.label}</Typography>
-                  {doc.required && (
-                    <Chip
-                      label="Required"
-                      size="small"
-                      variant="outlined"
-                      color="error"
-                      sx={{ height: 20, fontSize: '0.625rem' }}
-                    />
-                  )}
-                  {doc.ai_review && (
-                    <Chip
-                      label="AI Reviewed"
-                      size="small"
-                      variant="outlined"
-                      sx={{ height: 20, fontSize: '0.625rem', color: '#7C3AED', borderColor: '#DDD6FE', bgcolor: '#F5F3FF' }}
-                    />
-                  )}
-                </Box>
-                {doc.specific_requirements && (
-                  <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{doc.specific_requirements}</Typography>
-                )}
-                {doc.ai_criteria && (
-                  <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5, display: 'block' }}>
-                    AI criteria: {doc.ai_criteria}
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
+        <div key={doc.key || i} className="rounded-xl border border-border bg-background p-4">
+          <div className="flex items-start gap-3">
+            <div className={cn(
+              'w-8 h-8 rounded grid place-items-center flex-shrink-0',
+              doc.required ? 'bg-[hsl(0_85%_97%)]' : 'bg-muted',
+            )}>
+              <Upload className={cn('h-4 w-4', doc.required ? 'text-[hsl(var(--kuja-flag))]' : 'text-muted-foreground')} />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium">{doc.label}</span>
+                {doc.required && <span className="kuja-severity kuja-severity-critical">Required</span>}
+                {doc.ai_review && <span className="kuja-ai-pill">AI reviewed</span>}
+              </div>
+              {doc.specific_requirements && (
+                <p className="text-sm text-muted-foreground mt-1">{doc.specific_requirements}</p>
+              )}
+              {doc.ai_criteria && (
+                <p className="text-xs text-muted-foreground mt-1">AI criteria: {doc.ai_criteria}</p>
+              )}
+            </div>
+          </div>
+        </div>
       ))}
-    </Stack>
+    </div>
   );
 }
 
 function ApplicationsTab({ grantId }: { grantId: number }) {
   const router = useRouter();
   return (
-    <Card>
-      <CardContent sx={{ py: 6, textAlign: 'center' }}>
-        <Users size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
-        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-          View and manage applications for this grant
-        </Typography>
-        <Button
-          variant="outlined"
-          startIcon={<Users size={16} />}
-          onClick={() => router.push(`/applications?grant_id=${grantId}`)}
-        >
-          View Applications
-        </Button>
-      </CardContent>
-    </Card>
+    <div className="rounded-xl border border-border bg-background px-6 py-12 text-center">
+      <Users className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+      <p className="text-sm text-muted-foreground mb-3">View and manage applications for this grant</p>
+      <button
+        type="button"
+        onClick={() => router.push(`/applications?grant_id=${grantId}`)}
+        className="inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-4 py-2"
+      >
+        <Users className="h-4 w-4" /> View applications
+      </button>
+    </div>
+  );
+}
+
+function EmptyBlock({ icon: Icon, label }: { icon: typeof FileText; label: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-background px-6 py-12 text-center">
+      <Icon className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
+      <p className="text-sm text-muted-foreground">{label}</p>
+    </div>
   );
 }

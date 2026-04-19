@@ -3,274 +3,97 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useVerifications, useRegistries } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
-import { StatCard } from '@/components/shared/stat-card';
 import { StatusBadge } from '@/components/shared/status-badge';
-
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Chip from '@mui/material/Chip';
-import Stack from '@mui/material/Stack';
-import Skeleton from '@mui/material/Skeleton';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import InputAdornment from '@mui/material/InputAdornment';
-import Collapse from '@mui/material/Collapse';
-import IconButton from '@mui/material/IconButton';
-
 import {
   ShieldCheck, AlertTriangle, Clock, Eye, Search, RefreshCw,
   ChevronDown, ChevronRight, Loader2, CheckCircle, XCircle, Cpu,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { RegistrationVerification } from '@/lib/types';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '--';
+function formatDate(dateStr?: string | null): string {
+  if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function confidenceColor(confidence: number | null | undefined): string {
-  if (confidence == null) return 'text.disabled';
-  if (confidence >= 80) return 'success.main';
-  if (confidence >= 60) return 'warning.main';
-  return 'error.main';
+function confidenceCls(c: number | null | undefined): string {
+  if (c == null) return 'text-muted-foreground';
+  if (c >= 80) return 'text-[hsl(var(--kuja-grow))]';
+  if (c >= 60) return 'text-[hsl(var(--kuja-sun))]';
+  return 'text-[hsl(var(--kuja-flag))]';
 }
 
-// ---------------------------------------------------------------------------
-// Expanded Detail Row
-// ---------------------------------------------------------------------------
+function confidenceBar(c: number | null | undefined): string {
+  if (c == null) return 'bg-muted';
+  if (c >= 80) return 'bg-[hsl(var(--kuja-grow))]';
+  if (c >= 60) return 'bg-[hsl(var(--kuja-sun))]';
+  return 'bg-[hsl(var(--kuja-flag))]';
+}
 
 function VerificationDetail({ verification }: { verification: RegistrationVerification }) {
-  const analysis = verification.ai_analysis as Record<string, unknown> | null;
-  const findings = analysis?.findings as string[] | undefined;
-  const recommendations = analysis?.recommendations as string[] | undefined;
+  const a = verification.ai_analysis as Record<string, unknown> | null;
+  const findings = a?.findings as string[] | undefined;
+  const recommendations = a?.recommendations as string[] | undefined;
   const registryResult = verification.registry_check_result as Record<string, unknown> | null;
 
   return (
-    <Box sx={{ px: 3, py: 2.5, bgcolor: 'action.hover', borderTop: '1px solid', borderColor: 'divider' }}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
-        {/* AI Analysis */}
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-            <Cpu size={14} style={{ color: '#4F46E5' }} />
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-              AI Analysis
-            </Typography>
-          </Box>
+    <div className="px-5 py-4 bg-muted/30 border-t border-border">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Cpu className="h-3.5 w-3.5 text-[hsl(var(--kuja-clay))]" />
+            <span className="text-sm font-semibold">AI analysis</span>
+          </div>
           {findings && findings.length > 0 ? (
-            <Stack spacing={0.5}>
+            <ul className="space-y-1 text-sm text-muted-foreground">
               {findings.map((f, i) => (
-                <Typography key={i} variant="body2" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                  <Box component="span" sx={{ color: 'text.disabled', mt: 0.25 }}>-</Box>
-                  {f}
-                </Typography>
+                <li key={i} className="flex gap-2"><span className="text-muted-foreground">-</span>{f}</li>
               ))}
-            </Stack>
+            </ul>
           ) : (
-            <Typography variant="body2" sx={{ color: 'text.disabled' }}>No AI findings available.</Typography>
+            <p className="text-sm text-muted-foreground italic">No AI findings available.</p>
           )}
-        </Box>
-
-        {/* Recommendations */}
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-            <CheckCircle size={14} style={{ color: '#059669' }} />
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-              Recommendations
-            </Typography>
-          </Box>
+        </div>
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle className="h-3.5 w-3.5 text-[hsl(var(--kuja-grow))]" />
+            <span className="text-sm font-semibold">Recommendations</span>
+          </div>
           {recommendations && recommendations.length > 0 ? (
-            <Stack spacing={0.5}>
+            <ul className="space-y-1 text-sm text-muted-foreground">
               {recommendations.map((r, i) => (
-                <Typography key={i} variant="body2" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                  <Box component="span" sx={{ color: 'text.disabled', mt: 0.25 }}>-</Box>
-                  {r}
-                </Typography>
+                <li key={i} className="flex gap-2"><span>-</span>{r}</li>
               ))}
-            </Stack>
+            </ul>
           ) : (
-            <Typography variant="body2" sx={{ color: 'text.disabled' }}>No recommendations available.</Typography>
+            <p className="text-sm text-muted-foreground italic">No recommendations available.</p>
           )}
-        </Box>
-      </Box>
+        </div>
+      </div>
 
-      {/* Registry Check */}
       {registryResult && (
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1 }}>
-            Registry Check Result
-          </Typography>
-          <Box
-            sx={{
-              fontSize: '0.75rem',
-              color: 'text.secondary',
-              bgcolor: 'background.paper',
-              p: 1.5,
-              borderRadius: 1,
-              border: '1px solid',
-              borderColor: 'divider',
-              fontFamily: 'monospace',
-              overflow: 'auto',
-            }}
-          >
+        <div className="mt-4">
+          <div className="text-sm font-semibold mb-2">Registry check result</div>
+          <pre className="bg-background border border-border rounded p-3 text-xs font-mono overflow-auto max-h-64">
             {JSON.stringify(registryResult, null, 2)}
-          </Box>
-        </Box>
+          </pre>
+        </div>
       )}
 
-      {/* Metadata */}
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
+      <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
         {verification.registry_url && (
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Registry:{' '}
-            <Box
-              component="a"
-              href={verification.registry_url}
-              target="_blank"
-              rel="noreferrer"
-              sx={{ color: 'primary.main', textDecoration: 'underline' }}
-            >
-              {verification.registry_url}
-            </Box>
-          </Typography>
+          <span>
+            Registry: <a href={verification.registry_url} target="_blank" rel="noreferrer"
+              className="text-[hsl(var(--kuja-clay))] underline">{verification.registry_url}</a>
+          </span>
         )}
-        {verification.verified_by_name && (
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Verified by: {verification.verified_by_name}
-          </Typography>
-        )}
-        {verification.verified_at && (
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Verified: {formatDate(verification.verified_at)}
-          </Typography>
-        )}
-        {verification.notes && (
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Notes: {verification.notes}
-          </Typography>
-        )}
-      </Box>
-    </Box>
+        {verification.verified_by_name && <span>Verified by: {verification.verified_by_name}</span>}
+        {verification.verified_at && <span>Verified: {formatDate(verification.verified_at)}</span>}
+        {verification.notes && <span>Notes: {verification.notes}</span>}
+      </div>
+    </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Table Row
-// ---------------------------------------------------------------------------
-
-function VerificationRow({
-  verification,
-  isExpanded,
-  isRunning,
-  onToggle,
-  onRun,
-}: {
-  verification: RegistrationVerification;
-  isExpanded: boolean;
-  isRunning: boolean;
-  onToggle: () => void;
-  onRun: () => void;
-}) {
-  return (
-    <>
-      <TableRow
-        hover
-        onClick={onToggle}
-        sx={{ cursor: 'pointer' }}
-      >
-        <TableCell sx={{ width: 40 }}>
-          {isExpanded ? (
-            <ChevronDown size={16} style={{ color: '#94A3B8' }} />
-          ) : (
-            <ChevronRight size={16} style={{ color: '#94A3B8' }} />
-          )}
-        </TableCell>
-        <TableCell>
-          <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-            {verification.org_name || `Org #${verification.org_id}`}
-          </Typography>
-        </TableCell>
-        <TableCell>
-          <Chip label={verification.country} size="small" variant="outlined" sx={{ fontSize: '0.6875rem' }} />
-        </TableCell>
-        <TableCell>
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
-            {verification.registration_number || '--'}
-          </Typography>
-        </TableCell>
-        <TableCell>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {verification.registration_authority || '--'}
-          </Typography>
-        </TableCell>
-        <TableCell>
-          <StatusBadge status={verification.status} />
-        </TableCell>
-        <TableCell align="right">
-          {verification.ai_confidence != null ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'flex-end' }}>
-              <Box sx={{ width: 48, height: 6, borderRadius: 3, bgcolor: 'action.hover', overflow: 'hidden' }}>
-                <Box sx={{
-                  width: `${Math.min(verification.ai_confidence, 100)}%`,
-                  height: '100%',
-                  borderRadius: 3,
-                  bgcolor: confidenceColor(verification.ai_confidence),
-                  transition: 'width 0.3s ease',
-                }} />
-              </Box>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: confidenceColor(verification.ai_confidence), minWidth: 32, textAlign: 'right' }}>
-                {verification.ai_confidence}%
-              </Typography>
-            </Box>
-          ) : (
-            <Typography variant="body2" sx={{ color: 'text.disabled' }}>--</Typography>
-          )}
-        </TableCell>
-        <TableCell align="right">
-          <Button
-            variant="outlined"
-            size="small"
-            disabled={isRunning}
-            startIcon={
-              isRunning
-                ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                : <RefreshCw size={14} />
-            }
-            onClick={(e) => {
-              e.stopPropagation();
-              onRun();
-            }}
-            sx={{ fontSize: '0.75rem', height: 28 }}
-          >
-            {isRunning ? 'Running...' : 'Verify'}
-          </Button>
-        </TableCell>
-      </TableRow>
-
-      {isExpanded && (
-        <TableRow>
-          <TableCell colSpan={8} sx={{ p: 0 }}>
-            <VerificationDetail verification={verification} />
-          </TableCell>
-        </TableRow>
-      )}
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main Page
-// ---------------------------------------------------------------------------
 
 export default function VerificationPage() {
   const { data, isLoading, mutate } = useVerifications();
@@ -279,8 +102,6 @@ export default function VerificationPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [runningId, setRunningId] = useState<number | null>(null);
 
-  // Map API response fields to what the page expects
-  // API returns: verification_status, org_id; Page expects: status, id
   const verifications = useMemo(() => {
     const orgs = (data?.organizations ?? []) as unknown as Array<Record<string, unknown>>;
     return orgs.map((o) => ({
@@ -295,141 +116,193 @@ export default function VerificationPage() {
     })) as unknown as RegistrationVerification[];
   }, [data]);
 
-  // Summary stats
   const statCounts = useMemo(() => {
     const counts = { verified: 0, ai_reviewed: 0, pending: 0, flagged: 0, unverified: 0 };
     for (const v of verifications) {
-      if (v.status in counts) {
-        counts[v.status as keyof typeof counts]++;
-      }
+      if (v.status in counts) counts[v.status as keyof typeof counts]++;
     }
     return counts;
   }, [verifications]);
 
-  // Filtered list
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return verifications;
     const q = searchQuery.toLowerCase();
-    return verifications.filter(
-      (v) =>
-        (v.org_name ?? '').toLowerCase().includes(q) ||
-        (v.country ?? '').toLowerCase().includes(q) ||
-        (v.registration_number ?? '').toLowerCase().includes(q) ||
-        (v.registration_authority ?? '').toLowerCase().includes(q),
+    return verifications.filter((v) =>
+      (v.org_name ?? '').toLowerCase().includes(q) ||
+      (v.country ?? '').toLowerCase().includes(q) ||
+      (v.registration_number ?? '').toLowerCase().includes(q) ||
+      (v.registration_authority ?? '').toLowerCase().includes(q),
     );
   }, [verifications, searchQuery]);
 
-  // Run verification
   const runVerification = useCallback(async (orgId: number) => {
     setRunningId(orgId);
     try {
-      const org = verifications.find(v => (v as unknown as Record<string, unknown>).org_id === orgId || v.id === orgId);
-      await api.post('/verification/verify', {
-        org_id: orgId,
-        country: org?.country || '',
-      });
+      const org = verifications.find((v) => (v as unknown as Record<string, unknown>).org_id === orgId || v.id === orgId);
+      await api.post('/verification/verify', { org_id: orgId, country: org?.country || '' });
       await mutate();
-    } catch {
-      // Errors are handled by the API layer
-    } finally {
-      setRunningId(null);
-    }
+    } catch { /* noop */ } finally { setRunningId(null); }
   }, [mutate, verifications]);
 
   if (isLoading) {
     return (
-      <Stack spacing={3}>
-        <Skeleton variant="text" width={260} height={36} />
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(5, 1fr)' }, gap: 2 }}>
-          {[1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} variant="rounded" height={112} sx={{ borderRadius: 2 }} />
-          ))}
-        </Box>
-        <Skeleton variant="rounded" height={384} sx={{ borderRadius: 2 }} />
-      </Stack>
+      <div className="space-y-4">
+        <div className="kuja-shimmer h-10 w-64 rounded" />
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {[1,2,3,4,5].map((i) => <div key={i} className="kuja-shimmer h-24 rounded-xl" />)}
+        </div>
+        <div className="kuja-shimmer h-96 rounded-xl" />
+      </div>
     );
   }
 
   return (
-    <Stack spacing={3}>
-      {/* Header */}
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-          Registration Verification
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+    <div className="space-y-5">
+      <div>
+        <h1 className="kuja-display text-3xl">Registration verification</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
           Verify organization registrations across {Object.keys(registriesData?.registries ?? {}).length} supported countries
-        </Typography>
-      </Box>
+        </p>
+      </div>
 
-      {/* Summary Stats */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(3, 1fr)', lg: 'repeat(5, 1fr)' }, gap: 2 }}>
-        <StatCard icon={ShieldCheck} label="Verified" value={statCounts.verified} color="emerald" />
-        <StatCard icon={Cpu} label="AI Reviewed" value={statCounts.ai_reviewed} color="violet" />
-        <StatCard icon={Clock} label="Pending" value={statCounts.pending} color="amber" />
-        <StatCard icon={AlertTriangle} label="Flagged" value={statCounts.flagged} color="rose" />
-        <StatCard icon={XCircle} label="Unverified" value={statCounts.unverified} color="blue" />
-      </Box>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <StatBox icon={ShieldCheck} label="Verified" value={statCounts.verified} tone="success" />
+        <StatBox icon={Cpu} label="AI reviewed" value={statCounts.ai_reviewed} tone="spark" />
+        <StatBox icon={Clock} label="Pending" value={statCounts.pending} tone="warn" />
+        <StatBox icon={AlertTriangle} label="Flagged" value={statCounts.flagged} tone="danger" />
+        <StatBox icon={XCircle} label="Unverified" value={statCounts.unverified} />
+      </div>
 
-      {/* Search */}
-      <TextField
-        placeholder="Search by org, country, reg number..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        size="small"
-        sx={{ maxWidth: 400 }}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <Search size={16} style={{ color: '#94A3B8' }} />
-            </InputAdornment>
-          ),
-        }}
-      />
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by org, country, reg number…"
+          className="w-full h-10 pl-9 pr-3 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]"
+        />
+      </div>
 
-      {/* Table */}
       {filtered.length === 0 ? (
-        <Card>
-          <CardContent sx={{ py: 8, textAlign: 'center' }}>
-            <Eye size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
-            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-              No verifications found
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
-              {searchQuery ? 'Try a different search term.' : 'No organization verifications available.'}
-            </Typography>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
+          <Eye className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+          <p className="kuja-display text-xl">No verifications found</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {searchQuery ? 'Try a different search term.' : 'No organization verifications available.'}
+          </p>
+        </div>
       ) : (
-        <Card>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ width: 40 }} />
-                <TableCell>Organization</TableCell>
-                <TableCell>Country</TableCell>
-                <TableCell>Reg Number</TableCell>
-                <TableCell>Authority</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">AI Confidence</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filtered.map((v) => (
-                <VerificationRow
-                  key={v.id}
-                  verification={v}
-                  isExpanded={expandedId === v.id}
-                  isRunning={runningId === v.org_id}
-                  onToggle={() => setExpandedId(expandedId === v.id ? null : v.id)}
-                  onRun={() => runVerification(v.org_id)}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+        <div className="rounded-xl border border-border bg-background overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/30 border-b border-border text-left">
+                  <th className="w-10" />
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Organization</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Country</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Reg #</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Authority</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Status</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">AI confidence</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((v) => {
+                  const expanded = expandedId === v.id;
+                  const running = runningId === v.org_id;
+                  return (
+                    <Fragmentable key={v.id}>
+                      <tr
+                        onClick={() => setExpandedId(expanded ? null : v.id)}
+                        className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                      >
+                        <td className="px-2">
+                          {expanded
+                            ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                        </td>
+                        <td className="px-4 py-3 font-medium">{v.org_name || `Org #${v.org_id}`}</td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full border border-border text-[10px] uppercase tracking-wider px-2 py-0.5 text-muted-foreground">
+                            {v.country}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                          {v.registration_number || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          {v.registration_authority || '—'}
+                        </td>
+                        <td className="px-4 py-3"><StatusBadge status={v.status} /></td>
+                        <td className="px-4 py-3 text-right">
+                          {v.ai_confidence != null ? (
+                            <div className="flex items-center gap-2 justify-end">
+                              <div className="w-12 h-1.5 bg-muted rounded overflow-hidden">
+                                <div
+                                  className={cn('h-full transition-all', confidenceBar(v.ai_confidence))}
+                                  style={{ width: `${Math.min(v.ai_confidence, 100)}%` }}
+                                />
+                              </div>
+                              <span className={cn('font-semibold text-xs min-w-[32px] text-right', confidenceCls(v.ai_confidence))}>
+                                {v.ai_confidence}%
+                              </span>
+                            </div>
+                          ) : <span className="text-muted-foreground text-xs">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); runVerification(v.org_id); }}
+                            disabled={running}
+                            className="inline-flex items-center gap-1 rounded border border-border hover:border-[hsl(var(--kuja-clay))] text-xs font-medium px-2.5 py-1 disabled:opacity-50"
+                          >
+                            {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                            {running ? 'Running…' : 'Verify'}
+                          </button>
+                        </td>
+                      </tr>
+                      {expanded && (
+                        <tr>
+                          <td colSpan={8} className="p-0">
+                            <VerificationDetail verification={v} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragmentable>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
-    </Stack>
+    </div>
+  );
+}
+
+// React fragment wrapper for a two-row pattern — needed because bare <></>
+// isn't valid inside <tbody> with a key. Used only for map-keying.
+import { Fragment } from 'react';
+import type { ReactNode } from 'react';
+function Fragmentable({ children }: { children: ReactNode }) {
+  return <Fragment>{children}</Fragment>;
+}
+
+function StatBox({
+  icon: Icon, label, value, tone,
+}: { icon: typeof ShieldCheck; label: string; value: number; tone?: 'success' | 'warn' | 'danger' | 'spark' }) {
+  const cls = tone === 'success' ? 'text-[hsl(var(--kuja-grow))]'
+    : tone === 'warn' ? 'text-[hsl(var(--kuja-sun))]'
+    : tone === 'danger' ? 'text-[hsl(var(--kuja-flag))]'
+    : tone === 'spark' ? 'text-[hsl(var(--kuja-spark))]'
+    : 'text-[hsl(var(--kuja-clay-dark))]';
+  return (
+    <div className="rounded-xl border border-border bg-background p-4">
+      <Icon className={cn('h-5 w-5 mb-2', cls)} />
+      <div className={cn('kuja-numeric text-2xl font-semibold', cls)}>{value}</div>
+      <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+    </div>
   );
 }

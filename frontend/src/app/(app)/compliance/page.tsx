@@ -3,34 +3,15 @@
 import { useState, useMemo } from 'react';
 import { useGrants, useReports } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { StatCard } from '@/components/shared/stat-card';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { StatusBadge } from '@/components/shared/status-badge';
-
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Chip from '@mui/material/Chip';
-import Stack from '@mui/material/Stack';
-import Skeleton from '@mui/material/Skeleton';
-import Accordion from '@mui/material/Accordion';
-import AccordionSummary from '@mui/material/AccordionSummary';
-import AccordionDetails from '@mui/material/AccordionDetails';
-import LinearProgress from '@mui/material/LinearProgress';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-
 import {
-  ShieldCheck, AlertTriangle, Clock, BarChart3,
-  FileText, TrendingUp,
+  ShieldCheck, AlertTriangle, Clock, BarChart3, FileText, TrendingUp, ChevronDown, ChevronUp,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Grant, Report } from '@/lib/types';
 
-// ---------------------------------------------------------------------------
-// Risk indicator helper
-// ---------------------------------------------------------------------------
-
-function getRiskLevel(score: number | null, status: string, dueDate: string | null): 'green' | 'amber' | 'red' {
+function getRiskLevel(score: number | null, status: string, dueDate?: string | null): 'green' | 'amber' | 'red' {
   const isOverdue = dueDate ? new Date(dueDate) < new Date() : false;
   if (status === 'revision_requested' || isOverdue) return 'red';
   if (score !== null && score < 60) return 'red';
@@ -40,36 +21,21 @@ function getRiskLevel(score: number | null, status: string, dueDate: string | nu
 }
 
 function RiskDot({ level }: { level: 'green' | 'amber' | 'red' }) {
-  const colorMap = {
-    green: 'success.main',
-    amber: 'warning.main',
-    red: 'error.main',
-  };
-  return (
-    <Box
-      sx={{
-        width: 10,
-        height: 10,
-        borderRadius: '50%',
-        bgcolor: colorMap[level],
-        flexShrink: 0,
-      }}
-    />
-  );
+  const cls = level === 'green' ? 'bg-[hsl(var(--kuja-grow))]'
+    : level === 'amber' ? 'bg-[hsl(var(--kuja-sun))]'
+    : 'bg-[hsl(var(--kuja-flag))]';
+  return <span className={cn('inline-block w-2.5 h-2.5 rounded-full flex-shrink-0', cls)} />;
 }
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '--';
+function formatDate(dateStr?: string | null): string {
+  if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// ---------------------------------------------------------------------------
-// Grant Accordion Component
-// ---------------------------------------------------------------------------
-
-function GrantAccordionItem({ grant, reports }: { grant: Grant; reports: Report[] }) {
+function GrantAccordion({ grant, reports }: { grant: Grant; reports: Report[] }) {
   const { t } = useTranslation();
-  // Group reports by org
+  const [open, setOpen] = useState(false);
+
   const orgMap = useMemo(() => {
     const map = new Map<string, Report[]>();
     for (const r of reports) {
@@ -80,166 +46,106 @@ function GrantAccordionItem({ grant, reports }: { grant: Grant; reports: Report[
     return map;
   }, [reports]);
 
-  // Calculate grant-level compliance
-  const scores = reports
-    .map((r) => {
-      const analysis = r.ai_analysis as Record<string, unknown> | null;
-      return analysis && typeof analysis === 'object' && 'compliance_score' in analysis
-        ? Number(analysis.compliance_score)
-        : null;
-    })
-    .filter((s): s is number => s !== null);
-
-  const avgCompliance = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
-  const overdueCount = reports.filter((r) => r.due_date && new Date(r.due_date) < new Date() && r.status !== 'accepted').length;
+  const scores = reports.map((r) => {
+    const a = r.ai_analysis as Record<string, unknown> | null;
+    return a && typeof a === 'object' && 'compliance_score' in a ? Number(a.compliance_score) : null;
+  }).filter((s): s is number => s !== null);
+  const avg = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+  const overdue = reports.filter((r) => r.due_date && new Date(r.due_date) < new Date() && r.status !== 'accepted').length;
 
   return (
-    <Accordion
-      disableGutters
-      sx={{
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 2,
-        '&:before': { display: 'none' },
-        boxShadow: 'none',
-        '&:not(:last-child)': { mb: 0 },
-      }}
-    >
-      <AccordionSummary
-        expandIcon={<ExpandMoreIcon />}
-        sx={{
-          px: 2.5,
-          '&:hover': { bgcolor: 'action.hover' },
-        }}
+    <div className="rounded-xl border border-border bg-background overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors"
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mr: 2 }}>
-          <Box>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-              {grant.title}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}>
-              {orgMap.size} {t('compliance.grantees')} | {reports.length} {t('report.deliverables')}
-              {overdueCount > 0 && (
-                <Box component="span" sx={{ color: 'error.main', ml: 1 }}>| {overdueCount} {t('compliance.overdue')}</Box>
-              )}
-            </Typography>
-          </Box>
-
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <ScoreRing score={avgCompliance} size={48} strokeWidth={4} label="Compl." />
-            <StatusBadge status={grant.status} />
-          </Box>
-        </Box>
-      </AccordionSummary>
-
-      <AccordionDetails sx={{ px: 2.5, pb: 2.5 }}>
-        {Array.from(orgMap.entries()).map(([orgName, orgReports]) => (
-          <Box key={orgName} sx={{ mb: 2, '&:last-child': { mb: 0 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <FileText size={14} style={{ color: '#4F46E5' }} />
-              <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                {orgName}
-              </Typography>
-            </Box>
-            <Stack spacing={0.75} sx={{ ml: 3 }}>
-              {orgReports.map((report) => {
-                const analysis = report.ai_analysis as Record<string, unknown> | null;
-                const score = analysis && typeof analysis === 'object' && 'compliance_score' in analysis
-                  ? Number(analysis.compliance_score)
-                  : null;
-                const risk = getRiskLevel(score, report.status, report.due_date);
-                return (
-                  (() => {
-                    const isOverdue = report.due_date && new Date(report.due_date) < new Date() && report.status !== 'accepted';
-                    const daysOverdue = isOverdue && report.due_date
-                      ? Math.floor((new Date().getTime() - new Date(report.due_date).getTime()) / (1000 * 60 * 60 * 24))
-                      : 0;
+        <div className="flex-1 min-w-0 text-left">
+          <div className="font-semibold text-foreground truncate">{grant.title}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            {orgMap.size} {t('compliance.grantees') || 'grantees'} · {reports.length} {t('report.deliverables') || 'deliverables'}
+            {overdue > 0 && (
+              <span className="text-[hsl(var(--kuja-flag))] ml-1">
+                · {overdue} {t('compliance.overdue') || 'overdue'}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <ScoreRing score={avg} size={48} strokeWidth={4} label="Compl." />
+          <StatusBadge status={grant.status} />
+          {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </div>
+      </button>
+      {open && (
+        <div className="px-5 pb-5 border-t border-border">
+          {orgMap.size === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              {t('compliance.no_reports_for_grant') || 'No reports for this grant yet.'}
+            </p>
+          ) : (
+            Array.from(orgMap.entries()).map(([orgName, orgReports]) => (
+              <div key={orgName} className="mt-4 first:mt-4">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <FileText className="h-3.5 w-3.5 text-[hsl(var(--kuja-clay))]" />
+                  <span className="text-sm font-medium">{orgName}</span>
+                </div>
+                <div className="ml-5 space-y-1.5">
+                  {orgReports.map((r) => {
+                    const a = r.ai_analysis as Record<string, unknown> | null;
+                    const score = a && typeof a === 'object' && 'compliance_score' in a ? Number(a.compliance_score) : null;
+                    const risk = getRiskLevel(score, r.status, r.due_date);
+                    const isOverdue = r.due_date && new Date(r.due_date) < new Date() && r.status !== 'accepted';
+                    const daysOverdue = isOverdue && r.due_date
+                      ? Math.floor((Date.now() - new Date(r.due_date).getTime()) / 86400000) : 0;
                     return (
-                      <Box
-                        key={report.id}
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          py: 1,
-                          px: 1.5,
-                          borderRadius: 1,
-                          bgcolor: isOverdue ? 'rgba(239,68,68,0.04)' : 'action.hover',
-                          borderLeft: isOverdue ? '3px solid' : 'none',
-                          borderLeftColor: isOverdue ? 'error.main' : undefined,
-                        }}
+                      <div
+                        key={r.id}
+                        className={cn(
+                          'flex items-center justify-between gap-3 px-3 py-2 rounded-md text-sm',
+                          isOverdue
+                            ? 'bg-[hsl(0_85%_97%)] border-l-4 border-[hsl(var(--kuja-flag))]'
+                            : 'bg-muted/30',
+                        )}
                       >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-                          {isOverdue ? (
-                            <Box
-                              sx={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: '50%',
-                                bgcolor: 'error.main',
-                                flexShrink: 0,
-                                animation: 'pulse 2s ease-in-out infinite',
-                                '@keyframes pulse': {
-                                  '0%, 100%': { opacity: 1 },
-                                  '50%': { opacity: 0.4 },
-                                },
-                              }}
-                            />
-                          ) : (
-                            <RiskDot level={risk} />
-                          )}
-                          <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>
-                            {report.title}
-                          </Typography>
-                          <Chip label={report.report_type} size="small" variant="outlined" sx={{ fontSize: '0.6875rem', flexShrink: 0 }} />
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          {isOverdue ? <span className="kuja-pulse"><RiskDot level="red" /></span> : <RiskDot level={risk} />}
+                          <span className="truncate">{r.title}</span>
+                          <span className="text-[10px] uppercase tracking-wider rounded-full border border-border text-muted-foreground px-2 py-0.5 flex-shrink-0">
+                            {r.report_type}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0 text-xs">
                           {isOverdue && daysOverdue > 0 && (
-                            <Chip
-                              label={`${daysOverdue}d overdue`}
-                              size="small"
-                              color="error"
-                              sx={{ fontSize: '0.625rem', height: 20, fontWeight: 600 }}
-                            />
+                            <span className="rounded-full bg-[hsl(var(--kuja-flag))] text-white px-2 py-0.5 text-[10px] font-semibold">
+                              {daysOverdue}d overdue
+                            </span>
                           )}
                           {score !== null && (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                fontWeight: 500,
-                                color: score >= 80 ? 'success.main' : score >= 60 ? 'warning.main' : 'error.main',
-                              }}
-                            >
+                            <span className={cn(
+                              'font-medium',
+                              score >= 80 ? 'text-[hsl(var(--kuja-grow))]' : score >= 60 ? 'text-[hsl(var(--kuja-sun))]' : 'text-[hsl(var(--kuja-flag))]',
+                            )}>
                               {score}%
-                            </Typography>
+                            </span>
                           )}
-                          <Typography variant="caption" sx={{ color: isOverdue ? 'error.main' : 'text.disabled' }}>
-                            Due: {formatDate(report.due_date)}
-                          </Typography>
-                          <StatusBadge status={report.status} />
-                        </Box>
-                      </Box>
+                          <span className={cn(isOverdue ? 'text-[hsl(var(--kuja-flag))]' : 'text-muted-foreground')}>
+                            Due: {formatDate(r.due_date)}
+                          </span>
+                          <StatusBadge status={r.status} />
+                        </div>
+                      </div>
                     );
-                  })()
-                );
-              })}
-            </Stack>
-          </Box>
-        ))}
-
-        {orgMap.size === 0 && (
-          <Typography variant="body2" sx={{ color: 'text.disabled', textAlign: 'center', py: 3 }}>
-            {t('compliance.no_reports_for_grant')}
-          </Typography>
-        )}
-      </AccordionDetails>
-    </Accordion>
+                  })}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Main Page
-// ---------------------------------------------------------------------------
 
 export default function CompliancePage() {
   const { t } = useTranslation();
@@ -250,7 +156,6 @@ export default function CompliancePage() {
   const grants = grantsData?.grants ?? [];
   const reports = reportsData?.reports ?? [];
 
-  // Group reports by grant
   const reportsByGrant = useMemo(() => {
     const map = new Map<number, Report[]>();
     for (const r of reports) {
@@ -260,162 +165,106 @@ export default function CompliancePage() {
     return map;
   }, [reports]);
 
-  // Calculate summary stats
-  const summaryStats = useMemo(() => {
-    const allScores = reports
-      .map((r) => {
-        const analysis = r.ai_analysis as Record<string, unknown> | null;
-        return analysis && typeof analysis === 'object' && 'compliance_score' in analysis
-          ? Number(analysis.compliance_score)
-          : null;
-      })
-      .filter((s): s is number => s !== null);
-
-    const avgCompliance = allScores.length > 0
-      ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
-      : 0;
-
-    const overdueItems = reports.filter(
-      (r) => r.due_date && new Date(r.due_date) < new Date() && r.status !== 'accepted',
-    ).length;
-
-    const atRiskCount = reports.filter((r) => {
-      const analysis = r.ai_analysis as Record<string, unknown> | null;
-      const score = analysis && typeof analysis === 'object' && 'compliance_score' in analysis
-        ? Number(analysis.compliance_score)
-        : null;
-      return getRiskLevel(score, r.status, r.due_date) === 'red';
+  const summary = useMemo(() => {
+    const all = reports.map((r) => {
+      const a = r.ai_analysis as Record<string, unknown> | null;
+      return a && typeof a === 'object' && 'compliance_score' in a ? Number(a.compliance_score) : null;
+    }).filter((s): s is number => s !== null);
+    const avg = all.length > 0 ? Math.round(all.reduce((a, b) => a + b, 0) / all.length) : 0;
+    const overdueItems = reports.filter((r) => r.due_date && new Date(r.due_date) < new Date() && r.status !== 'accepted').length;
+    const atRisk = reports.filter((r) => {
+      const a = r.ai_analysis as Record<string, unknown> | null;
+      const s = a && typeof a === 'object' && 'compliance_score' in a ? Number(a.compliance_score) : null;
+      return getRiskLevel(s, r.status, r.due_date) === 'red';
     }).length;
-
-    return {
-      totalGrants: grants.length,
-      avgCompliance,
-      overdueItems,
-      atRiskCount,
-    };
+    return { totalGrants: grants.length, avgCompliance: avg, overdueItems, atRisk };
   }, [grants, reports]);
 
   if (isLoading) {
     return (
-      <Stack spacing={3}>
-        <Skeleton variant="text" width={260} height={36} />
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 2 }}>
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} variant="rounded" height={112} sx={{ borderRadius: 2 }} />
-          ))}
-        </Box>
-        <Stack spacing={2}>
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} variant="rounded" height={80} sx={{ borderRadius: 2 }} />
-          ))}
-        </Stack>
-      </Stack>
+      <div className="space-y-4">
+        <div className="kuja-shimmer h-10 w-64 rounded" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1,2,3,4].map((i) => <div key={i} className="kuja-shimmer h-24 rounded-xl" />)}
+        </div>
+        <div className="space-y-2">
+          {[1,2,3].map((i) => <div key={i} className="kuja-shimmer h-16 rounded-xl" />)}
+        </div>
+      </div>
     );
   }
 
   return (
-    <Stack spacing={3}>
-      {/* Header with risk summary */}
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-          {t('compliance.dashboard_title')}
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-          {t('compliance.dashboard_subtitle')}
-        </Typography>
-      </Box>
+    <div className="space-y-5">
+      <div>
+        <h1 className="kuja-display text-3xl">{t('compliance.dashboard_title') || 'Compliance'}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          {t('compliance.dashboard_subtitle') || 'Track grant compliance, deliverables, and risk.'}
+        </p>
+      </div>
 
-      {/* Risk Summary Banner */}
-      {(summaryStats.overdueItems > 0 || summaryStats.atRiskCount > 0) && (
-        <Card sx={{ borderLeft: '4px solid', borderLeftColor: 'error.main', bgcolor: 'error.50' }}>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <AlertTriangle size={20} style={{ color: '#DC2626' }} />
-            <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-              {summaryStats.overdueItems > 0 && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'error.dark' }}>
-                    {summaryStats.overdueItems}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'error.dark' }}>
-                    {t('compliance.overdue')}
-                  </Typography>
-                </Box>
-              )}
-              {summaryStats.atRiskCount > 0 && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'warning.dark' }}>
-                    {summaryStats.atRiskCount}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'warning.dark' }}>
-                    at risk
-                  </Typography>
-                </Box>
-              )}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                  {reports.filter((r) => r.status === 'accepted').length}
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  {t('compliance.on_track')}
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
+      {(summary.overdueItems > 0 || summary.atRisk > 0) && (
+        <div className="kuja-verdict kuja-verdict-danger flex items-center gap-3 flex-wrap">
+          <AlertTriangle className="h-5 w-5 text-[hsl(var(--kuja-flag))] flex-shrink-0" />
+          <div className="flex gap-6 flex-wrap text-sm">
+            {summary.overdueItems > 0 && (
+              <div className="flex items-baseline gap-1">
+                <span className="kuja-numeric text-xl font-semibold text-[hsl(var(--kuja-flag))]">{summary.overdueItems}</span>
+                <span className="text-[hsl(var(--kuja-flag))]">{t('compliance.overdue') || 'overdue'}</span>
+              </div>
+            )}
+            {summary.atRisk > 0 && (
+              <div className="flex items-baseline gap-1">
+                <span className="kuja-numeric text-xl font-semibold text-[hsl(var(--kuja-sun))]">{summary.atRisk}</span>
+                <span className="text-[hsl(var(--kuja-sun))]">at risk</span>
+              </div>
+            )}
+            <div className="flex items-baseline gap-1">
+              <span className="kuja-numeric text-xl font-semibold">{reports.filter((r) => r.status === 'accepted').length}</span>
+              <span className="text-muted-foreground">{t('compliance.on_track') || 'on track'}</span>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Summary Stats */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 2 }}>
-        <StatCard
-          icon={ShieldCheck}
-          label={t('compliance.total_grants')}
-          value={summaryStats.totalGrants}
-          color="brand"
-        />
-        <StatCard
-          icon={TrendingUp}
-          label={t('compliance.avg_compliance')}
-          value={`${summaryStats.avgCompliance}%`}
-          color="emerald"
-        />
-        <StatCard
-          icon={Clock}
-          label={t('compliance.overdue_items')}
-          value={summaryStats.overdueItems}
-          color="amber"
-        />
-        <StatCard
-          icon={AlertTriangle}
-          label={t('compliance.at_risk')}
-          value={summaryStats.atRiskCount}
-          color="rose"
-        />
-      </Box>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <SummaryStat icon={ShieldCheck} label={t('compliance.total_grants') || 'Total grants'} value={summary.totalGrants} />
+        <SummaryStat icon={TrendingUp} label={t('compliance.avg_compliance') || 'Avg compliance'} value={`${summary.avgCompliance}%`} tone="success" />
+        <SummaryStat icon={Clock} label={t('compliance.overdue_items') || 'Overdue items'} value={summary.overdueItems} tone="warn" />
+        <SummaryStat icon={AlertTriangle} label={t('compliance.at_risk') || 'At risk'} value={summary.atRisk} tone="danger" />
+      </div>
 
-      {/* Grant Accordions */}
-      <Stack spacing={1.5}>
+      <div className="space-y-2">
         {grants.length === 0 ? (
-          <Card>
-            <CardContent sx={{ py: 8, textAlign: 'center' }}>
-              <BarChart3 size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
-              <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-                {t('compliance.no_grants')}
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
-                {t('compliance.no_grants_hint')}
-              </Typography>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
+            <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+            <p className="kuja-display text-xl">{t('compliance.no_grants') || 'No grants yet'}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {t('compliance.no_grants_hint') || 'Grants will appear here as they are funded.'}
+            </p>
+          </div>
         ) : (
-          grants.map((grant) => (
-            <GrantAccordionItem
-              key={grant.id}
-              grant={grant}
-              reports={reportsByGrant.get(grant.id) ?? []}
-            />
+          grants.map((g) => (
+            <GrantAccordion key={g.id} grant={g} reports={reportsByGrant.get(g.id) ?? []} />
           ))
         )}
-      </Stack>
-    </Stack>
+      </div>
+    </div>
+  );
+}
+
+function SummaryStat({
+  icon: Icon, label, value, tone,
+}: { icon: typeof ShieldCheck; label: string; value: number | string; tone?: 'success' | 'warn' | 'danger' }) {
+  const cls = tone === 'success' ? 'text-[hsl(var(--kuja-grow))]'
+    : tone === 'warn' ? 'text-[hsl(var(--kuja-sun))]'
+    : tone === 'danger' ? 'text-[hsl(var(--kuja-flag))]'
+    : 'text-[hsl(var(--kuja-clay-dark))]';
+  return (
+    <div className="rounded-xl border border-border bg-background p-4">
+      <Icon className={cn('h-5 w-5 mb-2', cls)} />
+      <div className={cn('kuja-numeric text-2xl font-semibold', cls)}>{value}</div>
+      <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+    </div>
   );
 }

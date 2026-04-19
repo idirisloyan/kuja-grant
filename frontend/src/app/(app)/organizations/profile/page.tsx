@@ -3,37 +3,37 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
-
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Chip from '@mui/material/Chip';
-import Skeleton from '@mui/material/Skeleton';
-import Stack from '@mui/material/Stack';
-
 import {
   Building2, Save, Loader2, CheckCircle, MapPin, Calendar,
   DollarSign, Users, Target, Globe,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Organization } from '@/lib/types';
 
 const SECTOR_OPTIONS = [
-  'Health',
-  'Education',
-  'WASH',
-  'Food Security',
-  'Livelihoods',
-  'Protection',
-  'Shelter',
-  'Gender Equality',
-  'Climate',
-  'Governance',
-  'Peacebuilding',
-  'Emergency Response',
+  'Health', 'Education', 'WASH', 'Food Security', 'Livelihoods',
+  'Protection', 'Shelter', 'Gender Equality', 'Climate', 'Governance',
+  'Peacebuilding', 'Emergency Response',
 ];
+
+const inputCls =
+  'w-full h-9 pl-9 pr-3 text-sm rounded-md border border-input bg-background text-foreground ' +
+  'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 ' +
+  'focus-visible:ring-[hsl(var(--kuja-clay))] disabled:opacity-50';
+
+function Field({
+  label, icon: Icon, children,
+}: { label: string; icon?: typeof Building2; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+        {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
 
 export default function OrgProfilePage() {
   const user = useAuthStore((s) => s.user);
@@ -42,7 +42,6 @@ export default function OrgProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Form fields
   const [name, setName] = useState('');
   const [country, setCountry] = useState('');
   const [yearEstablished, setYearEstablished] = useState('');
@@ -52,13 +51,9 @@ export default function OrgProfilePage() {
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
   const [website, setWebsite] = useState('');
 
-  // Fetch org data
   useEffect(() => {
     async function fetchOrg() {
-      if (!user?.org_id) {
-        setLoading(false);
-        return;
-      }
+      if (!user?.org_id) { setLoading(false); return; }
       try {
         const res = await api.get<{ organization: Organization }>(`/organizations/${user.org_id}`);
         const o = res.organization;
@@ -72,10 +67,8 @@ export default function OrgProfilePage() {
         setSelectedSectors(o.sectors || []);
         setWebsite(o.website || '');
       } catch {
-        // Failed to fetch org
-      } finally {
-        setLoading(false);
-      }
+        // noop
+      } finally { setLoading(false); }
     }
     fetchOrg();
   }, [user?.org_id]);
@@ -93,261 +86,188 @@ export default function OrgProfilePage() {
     setSaved(false);
     try {
       await api.put(`/organizations/${user.org_id}`, {
-        name,
-        country,
+        name, country,
         year_established: yearEstablished ? Number(yearEstablished) : null,
         annual_budget: annualBudget,
         staff_count: staffCount,
-        mission,
-        sectors: selectedSectors,
-        website,
+        mission, sectors: selectedSectors, website,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch {
-      // Error handling
-    } finally {
-      setSaving(false);
-    }
+      // noop
+    } finally { setSaving(false); }
   }, [user?.org_id, name, country, yearEstablished, annualBudget, staffCount, mission, selectedSectors, website]);
 
   if (loading) {
     return (
-      <Stack spacing={3}>
-        <Skeleton variant="text" width={260} height={40} />
-        <Skeleton variant="rounded" height={400} sx={{ borderRadius: 2 }} />
-      </Stack>
+      <div className="space-y-4">
+        <div className="kuja-shimmer h-10 w-64 rounded" />
+        <div className="kuja-shimmer h-96 rounded-xl" />
+      </div>
     );
   }
 
   if (!user?.org_id) {
     return (
-      <Box sx={{ textAlign: 'center', py: 8 }}>
-        <Building2 size={48} color="#CBD5E1" style={{ margin: '0 auto 12px' }} />
-        <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>No organization linked</Typography>
-        <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
-          Contact an administrator to link your account to an organization
-        </Typography>
-      </Box>
+      <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
+        <Building2 className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+        <p className="kuja-display text-xl">No organization linked</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Contact an administrator to link your account to an organization.
+        </p>
+      </div>
     );
   }
 
   return (
-    <Stack spacing={3}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { sm: 'center' }, justifyContent: 'space-between', gap: 2 }}>
-        <Box>
-          <Typography variant="h2" sx={{ color: 'text.primary' }}>
-            Organization Profile
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+    <div className="space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="kuja-display text-3xl">Organization profile</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Manage your organization&apos;s information
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
           {saved && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <CheckCircle size={16} color="#059669" />
-              <Typography variant="body2" sx={{ color: '#059669' }}>Saved</Typography>
-            </Box>
+            <span className="inline-flex items-center gap-1 text-sm text-[hsl(var(--kuja-grow))]">
+              <CheckCircle className="h-4 w-4" /> Saved
+            </span>
           )}
-          <Button
-            variant="contained"
-            disabled={saving}
-            startIcon={saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          <button
+            type="button"
             onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
           >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </Box>
-      </Box>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
 
-      {/* Org Status */}
+      {/* Status badges */}
       {org && (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          <Chip
-            label={org.verified ? 'Verified' : 'Unverified'}
-            variant="outlined"
-            size="small"
-            color={org.verified ? 'success' : 'warning'}
-            sx={{ fontWeight: 500, fontSize: '0.6875rem' }}
-          />
-          <Chip
-            label={org.org_type?.toUpperCase() || 'NGO'}
-            variant="outlined"
-            size="small"
-            sx={{ fontWeight: 500, fontSize: '0.6875rem', borderColor: 'divider' }}
-          />
+        <div className="flex flex-wrap gap-2">
+          <span className={cn(
+            'kuja-severity border',
+            org.verified
+              ? 'bg-[hsl(142_68%_95%)] text-[hsl(var(--kuja-grow))] border-[hsl(142_55%_85%)]'
+              : 'bg-[hsl(32_100%_95%)] text-[hsl(32_80%_35%)] border-[hsl(32_80%_85%)]',
+          )}>
+            {org.verified ? 'Verified' : 'Unverified'}
+          </span>
+          <span className="kuja-severity bg-muted text-muted-foreground border-border uppercase">
+            {org.org_type || 'NGO'}
+          </span>
           {org.registration_number && (
-            <Chip
-              label={`Reg: ${org.registration_number}`}
-              variant="outlined"
-              size="small"
-              sx={{ fontWeight: 500, fontSize: '0.6875rem', borderColor: 'divider' }}
-            />
+            <span className="kuja-severity bg-muted text-muted-foreground border-border">
+              Reg: {org.registration_number}
+            </span>
           )}
-          {org.assess_score !== null && org.assess_score !== undefined && (
-            <Chip
-              label={`Capacity Score: ${org.assess_score}%`}
-              variant="outlined"
-              size="small"
-              color="primary"
-              sx={{ fontWeight: 500, fontSize: '0.6875rem' }}
-            />
+          {org.assess_score != null && (
+            <span className="kuja-severity bg-[hsl(var(--kuja-sand-50))] text-[hsl(var(--kuja-clay-dark))] border-[hsl(var(--kuja-sand))]">
+              Capacity {org.assess_score}%
+            </span>
           )}
-        </Box>
+        </div>
       )}
 
-      {/* Profile Form */}
-      <Card>
-        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
-            <Building2 size={16} />
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-              Basic Information
-            </Typography>
-          </Box>
-          <Stack spacing={2.5}>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
-              <TextField
-                label="Organization Name"
-                size="small"
-                fullWidth
-                value={name}
-                onChange={(e) => { setName(e.target.value); setSaved(false); }}
-                placeholder="Enter organization name"
-                InputProps={{
-                  startAdornment: <Building2 size={14} color="#94A3B8" style={{ marginRight: 8 }} />,
-                }}
-              />
-              <TextField
-                label="Country"
-                size="small"
-                fullWidth
-                value={country}
-                onChange={(e) => { setCountry(e.target.value); setSaved(false); }}
-                placeholder="e.g., Kenya"
-                InputProps={{
-                  startAdornment: <MapPin size={14} color="#94A3B8" style={{ marginRight: 8 }} />,
-                }}
-              />
-              <TextField
-                label="Year Established"
-                size="small"
-                fullWidth
-                type="number"
-                value={yearEstablished}
-                onChange={(e) => { setYearEstablished(e.target.value); setSaved(false); }}
-                placeholder="e.g., 2010"
-                InputProps={{
-                  startAdornment: <Calendar size={14} color="#94A3B8" style={{ marginRight: 8 }} />,
-                }}
-              />
-              <TextField
-                label="Annual Budget"
-                size="small"
-                fullWidth
-                value={annualBudget}
-                onChange={(e) => { setAnnualBudget(e.target.value); setSaved(false); }}
-                placeholder="e.g., $500,000"
-                InputProps={{
-                  startAdornment: <DollarSign size={14} color="#94A3B8" style={{ marginRight: 8 }} />,
-                }}
-              />
-              <TextField
-                label="Staff Count"
-                size="small"
-                fullWidth
-                value={staffCount}
-                onChange={(e) => { setStaffCount(e.target.value); setSaved(false); }}
-                placeholder="e.g., 50"
-                InputProps={{
-                  startAdornment: <Users size={14} color="#94A3B8" style={{ marginRight: 8 }} />,
-                }}
-              />
-              <TextField
-                label="Website"
-                size="small"
-                fullWidth
-                value={website}
-                onChange={(e) => { setWebsite(e.target.value); setSaved(false); }}
-                placeholder="https://example.org"
-                InputProps={{
-                  startAdornment: <Globe size={14} color="#94A3B8" style={{ marginRight: 8 }} />,
-                }}
-              />
-            </Box>
-
-            <TextField
-              label="Mission Statement"
-              size="small"
-              fullWidth
-              multiline
-              rows={4}
-              value={mission}
-              onChange={(e) => { setMission(e.target.value); setSaved(false); }}
-              placeholder="Describe your organization's mission..."
-            />
-          </Stack>
-        </CardContent>
-      </Card>
+      {/* Basic info */}
+      <div className="rounded-xl border border-border bg-background p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-semibold">Basic information</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Organization name" icon={Building2}>
+            <div className="relative">
+              <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <input type="text" value={name} onChange={(e) => { setName(e.target.value); setSaved(false); }}
+                placeholder="Enter organization name" className={inputCls} />
+            </div>
+          </Field>
+          <Field label="Country" icon={MapPin}>
+            <div className="relative">
+              <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <input type="text" value={country} onChange={(e) => { setCountry(e.target.value); setSaved(false); }}
+                placeholder="e.g., Kenya" className={inputCls} />
+            </div>
+          </Field>
+          <Field label="Year established" icon={Calendar}>
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <input type="number" value={yearEstablished} onChange={(e) => { setYearEstablished(e.target.value); setSaved(false); }}
+                placeholder="e.g., 2010" className={inputCls} />
+            </div>
+          </Field>
+          <Field label="Annual budget" icon={DollarSign}>
+            <div className="relative">
+              <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <input type="text" value={annualBudget} onChange={(e) => { setAnnualBudget(e.target.value); setSaved(false); }}
+                placeholder="e.g., $500,000" className={inputCls} />
+            </div>
+          </Field>
+          <Field label="Staff count" icon={Users}>
+            <div className="relative">
+              <Users className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <input type="text" value={staffCount} onChange={(e) => { setStaffCount(e.target.value); setSaved(false); }}
+                placeholder="e.g., 50" className={inputCls} />
+            </div>
+          </Field>
+          <Field label="Website" icon={Globe}>
+            <div className="relative">
+              <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <input type="text" value={website} onChange={(e) => { setWebsite(e.target.value); setSaved(false); }}
+                placeholder="https://example.org" className={inputCls} />
+            </div>
+          </Field>
+        </div>
+        <Field label="Mission statement">
+          <textarea
+            value={mission}
+            onChange={(e) => { setMission(e.target.value); setSaved(false); }}
+            placeholder="Describe your organization's mission…"
+            rows={4}
+            className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]"
+          />
+        </Field>
+      </div>
 
       {/* Sectors */}
-      <Card>
-        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-            <Target size={16} />
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-              Sectors
-            </Typography>
-          </Box>
-          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
-            Select the sectors your organization works in
-          </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {SECTOR_OPTIONS.map((sector) => {
-              const isSelected = selectedSectors.includes(sector);
-              return (
-                <Chip
-                  key={sector}
-                  label={sector}
-                  onClick={() => toggleSector(sector)}
-                  variant={isSelected ? 'filled' : 'outlined'}
-                  color={isSelected ? 'primary' : 'default'}
-                  size="small"
-                  sx={{
-                    fontWeight: isSelected ? 600 : 400,
-                    borderColor: isSelected ? 'primary.main' : 'divider',
-                  }}
-                />
-              );
-            })}
-          </Box>
-          {selectedSectors.length > 0 && (
-            <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1.5, display: 'block' }}>
-              {selectedSectors.length} sector{selectedSectors.length !== 1 ? 's' : ''} selected
-            </Typography>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Bottom Save */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-        {saved && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <CheckCircle size={16} color="#059669" />
-            <Typography variant="body2" sx={{ color: '#059669' }}>Changes saved</Typography>
-          </Box>
+      <div className="rounded-xl border border-border bg-background p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Target className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-semibold">Sectors</span>
+        </div>
+        <p className="text-xs text-muted-foreground">Select the sectors your organization works in</p>
+        <div className="flex flex-wrap gap-2">
+          {SECTOR_OPTIONS.map((sector) => {
+            const active = selectedSectors.includes(sector);
+            return (
+              <button
+                key={sector}
+                type="button"
+                onClick={() => toggleSector(sector)}
+                className={cn(
+                  'rounded-full border text-xs px-3 py-1.5 transition-colors',
+                  active
+                    ? 'bg-[hsl(var(--kuja-clay))] text-white border-transparent'
+                    : 'border-border text-foreground hover:bg-muted',
+                )}
+              >
+                {sector}
+              </button>
+            );
+          })}
+        </div>
+        {selectedSectors.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {selectedSectors.length} sector{selectedSectors.length !== 1 ? 's' : ''} selected
+          </p>
         )}
-        <Button
-          variant="contained"
-          disabled={saving}
-          startIcon={saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          onClick={handleSave}
-        >
-          {saving ? 'Saving...' : 'Save Changes'}
-        </Button>
-      </Box>
-    </Stack>
+      </div>
+    </div>
   );
 }
