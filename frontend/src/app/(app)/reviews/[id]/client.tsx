@@ -6,48 +6,13 @@ import { useApplication, useGrant } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { ScoreRing } from '@/components/shared/score-ring';
-
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Chip from '@mui/material/Chip';
-import Stack from '@mui/material/Stack';
-import Skeleton from '@mui/material/Skeleton';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import Slider from '@mui/material/Slider';
-import Alert from '@mui/material/Alert';
-
 import {
-  ArrowLeft, Send, Cpu, Loader2, FileText, Star, MessageSquare,
-  CheckCircle,
+  ArrowLeft, Send, Cpu, Loader2, FileText, Star, MessageSquare, CheckCircle,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Criterion, Document as DocType } from '@/lib/types';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface ScoreEntry {
-  score: number;
-  comment: string;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '--';
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-// ---------------------------------------------------------------------------
-// Main Page
-// ---------------------------------------------------------------------------
+interface ScoreEntry { score: number; comment: string; }
 
 export default function ReviewDetailClient() {
   const params = useParams();
@@ -61,35 +26,26 @@ export default function ReviewDetailClient() {
   const { data: grantData, isLoading: grantLoading } = useGrant(grantId);
   const grant = grantData?.grant ?? null;
 
-  const criteria = grant?.criteria ?? [];
-  const responses = application?.responses ?? {};
+  const criteria: Criterion[] = grant?.criteria ?? [];
+  const responses = (application?.responses ?? {}) as Record<string, string>;
 
-  // Scoring state
   const [scores, setScores] = useState<Record<string, ScoreEntry>>({});
   const [submitting, setSubmitting] = useState(false);
   const [aiScoring, setAiScoring] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-
-  // Documents state
   const [documents, setDocuments] = useState<DocType[]>([]);
   const [docsLoading, setDocsLoading] = useState(false);
+  const [tab, setTab] = useState<'responses' | 'documents' | 'scores'>('scores');
 
-  // Tab state
-  const [tab, setTab] = useState(2); // default to "Scores" tab (index 2)
-
-  // Initialize scores from criteria
   useEffect(() => {
     if (criteria.length > 0 && Object.keys(scores).length === 0) {
       const initial: Record<string, ScoreEntry> = {};
-      for (const c of criteria) {
-        initial[c.key] = { score: 0, comment: '' };
-      }
+      for (const c of criteria) initial[c.key] = { score: 0, comment: '' };
       setScores(initial);
     }
   }, [criteria, scores]);
 
-  // Fetch documents
   useEffect(() => {
     if (!id) return;
     setDocsLoading(true);
@@ -100,13 +56,9 @@ export default function ReviewDetailClient() {
   }, [id]);
 
   const updateScore = useCallback((key: string, field: 'score' | 'comment', value: number | string) => {
-    setScores((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], [field]: value },
-    }));
+    setScores((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
   }, []);
 
-  // AI Auto-Score
   const handleAiScore = useCallback(async () => {
     if (!id) return;
     setAiScoring(true);
@@ -114,20 +66,14 @@ export default function ReviewDetailClient() {
     try {
       const res = await api.post<{
         success: boolean;
-        scores: {
-          criterion_scores?: Record<string, { score: number; feedback: string }>;
-        };
+        scores: { criterion_scores?: Record<string, { score: number; feedback: string }> };
       }>(`/ai/score-application`, { application_id: id });
-
       if (res.success && res.scores?.criterion_scores) {
-        const aiScores = res.scores.criterion_scores;
+        const ai = res.scores.criterion_scores;
         setScores((prev) => {
           const updated = { ...prev };
-          for (const [key, val] of Object.entries(aiScores)) {
-            updated[key] = {
-              score: Math.round(val.score),
-              comment: val.feedback || updated[key]?.comment || '',
-            };
+          for (const [key, val] of Object.entries(ai)) {
+            updated[key] = { score: Math.round(val.score), comment: val.feedback || updated[key]?.comment || '' };
           }
           return updated;
         });
@@ -140,7 +86,6 @@ export default function ReviewDetailClient() {
     }
   }, [id, mutateApp]);
 
-  // Submit scores
   const handleSubmit = useCallback(async () => {
     if (!id) return;
     setSubmitting(true);
@@ -152,13 +97,7 @@ export default function ReviewDetailClient() {
         scoreMap[key] = val.score;
         commentMap[key] = val.comment;
       }
-
-      await api.post(`/reviews/`, {
-        application_id: id,
-        scores: scoreMap,
-        comments: commentMap,
-      });
-
+      await api.post('/reviews/', { application_id: id, scores: scoreMap, comments: commentMap });
       setSuccess(true);
       await mutateApp();
     } catch (err) {
@@ -168,506 +107,356 @@ export default function ReviewDetailClient() {
     }
   }, [id, scores, mutateApp]);
 
-  const isLoading = appLoading || grantLoading;
-
-  if (isLoading) {
+  if (appLoading || grantLoading) {
     return (
-      <Stack spacing={3} sx={{ maxWidth: 960, mx: 'auto' }}>
-        <Skeleton variant="text" width={260} height={36} />
-        <Skeleton variant="rounded" height={128} sx={{ borderRadius: 2 }} />
-        <Skeleton variant="rounded" height={40} width={200} />
-        <Skeleton variant="rounded" height={384} sx={{ borderRadius: 2 }} />
-      </Stack>
+      <div className="max-w-5xl mx-auto space-y-3">
+        <div className="kuja-shimmer h-8 w-64 rounded" />
+        <div className="kuja-shimmer h-32 rounded-xl" />
+        <div className="kuja-shimmer h-10 w-48 rounded" />
+        <div className="kuja-shimmer h-96 rounded-xl" />
+      </div>
     );
   }
 
   if (!application) {
     return (
-      <Stack spacing={2} sx={{ maxWidth: 960, mx: 'auto' }}>
-        <Button
-          size="small"
-          startIcon={<ArrowLeft size={16} />}
+      <div className="max-w-5xl mx-auto space-y-3">
+        <button
+          type="button"
           onClick={() => router.push('/reviews')}
-          sx={{ color: 'text.secondary', alignSelf: 'flex-start' }}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          Back
-        </Button>
-        <Card>
-          <CardContent sx={{ py: 8, textAlign: 'center' }}>
-            <FileText size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
-            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-              Application not found
-            </Typography>
-          </CardContent>
-        </Card>
-      </Stack>
+          <ArrowLeft className="h-4 w-4" /> Back
+        </button>
+        <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
+          <FileText className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+          <p className="kuja-display text-xl">Application not found</p>
+        </div>
+      </div>
     );
   }
 
   if (success) {
     return (
-      <Stack spacing={2} sx={{ maxWidth: 960, mx: 'auto' }}>
-        <Card>
-          <CardContent sx={{ py: 8, textAlign: 'center' }}>
-            <CheckCircle size={64} style={{ color: '#10B981', margin: '0 auto 16px' }} />
-            <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', mb: 1 }}>
-              Scores Submitted
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-              Your review has been recorded successfully.
-            </Typography>
-            <Button
-              variant="contained"
-              onClick={() => router.push('/reviews')}
-            >
-              Back to Reviews
-            </Button>
-          </CardContent>
-        </Card>
-      </Stack>
+      <div className="max-w-5xl mx-auto">
+        <div className="rounded-xl border border-border bg-background px-6 py-16 text-center">
+          <CheckCircle className="h-16 w-16 mx-auto text-[hsl(var(--kuja-grow))] mb-3" />
+          <p className="kuja-display text-2xl">Scores submitted</p>
+          <p className="text-sm text-muted-foreground mt-1">Your review has been recorded successfully.</p>
+          <button
+            type="button"
+            onClick={() => router.push('/reviews')}
+            className="mt-5 inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
+          >
+            Back to reviews
+          </button>
+        </div>
+      </div>
     );
   }
 
-  // Calculate overall score
   const overallScore = criteria.length > 0
-    ? Math.round(
-        criteria.reduce((sum, c) => {
-          const s = scores[c.key]?.score ?? 0;
-          return sum + (s * c.weight / 100);
-        }, 0),
-      )
+    ? Math.round(criteria.reduce((sum, c) => sum + ((scores[c.key]?.score ?? 0) * c.weight / 100), 0))
     : 0;
 
+  const toneBy = (s: number) =>
+    s >= 70 ? 'text-[hsl(var(--kuja-grow))]' : s >= 50 ? 'text-[hsl(var(--kuja-sun))]' : 'text-[hsl(var(--kuja-flag))]';
+
   return (
-    <Stack spacing={3} sx={{ maxWidth: 960, mx: 'auto' }}>
+    <div className="max-w-5xl mx-auto space-y-5">
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Button
-          size="small"
-          startIcon={<ArrowLeft size={16} />}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
           onClick={() => router.push('/reviews')}
-          sx={{ color: 'text.secondary' }}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          Back
-        </Button>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-            Score Application
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25 }}>
-            Application #{id}
-          </Typography>
-        </Box>
-      </Box>
+          <ArrowLeft className="h-4 w-4" /> Back
+        </button>
+        <div>
+          <h1 className="kuja-display text-2xl">Score application</h1>
+          <p className="text-sm text-muted-foreground">Application #{id}</p>
+        </div>
+      </div>
 
-      {/* Score Summary */}
-      <Card sx={{ borderLeft: '4px solid', borderLeftColor: '#7C3AED' }}>
-        <CardContent sx={{ py: 2.5, '&:last-child': { pb: 2.5 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-            <Box>
-              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                {application.ngo_org_name || application.org_name || `Org #${application.ngo_org_id}`}
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25 }}>
-                {grant?.title || `Grant #${application.grant_id}`}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <StatusBadge status={application.status} />
-            </Box>
-          </Box>
+      {/* Summary card */}
+      <div className="rounded-xl border border-border bg-background p-5 border-l-4 border-l-[hsl(var(--kuja-spark))]">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div className="font-semibold text-foreground">
+              {application.ngo_org_name || application.org_name || `Org #${application.ngo_org_id}`}
+            </div>
+            <div className="text-sm text-muted-foreground mt-0.5">
+              {grant?.title || `Grant #${application.grant_id}`}
+            </div>
+          </div>
+          <StatusBadge status={application.status} />
+        </div>
 
-          {/* Structured Score Summary */}
-          <Box sx={{ display: 'flex', gap: 2, mt: 2, flexWrap: 'wrap' }}>
-            {application.ai_score != null && (
-              <Card variant="outlined" sx={{ flex: 1, minWidth: 160, bgcolor: '#F5F3FF', border: '1px solid #E9E5FF' }}>
-                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, textAlign: 'center' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75, mb: 1 }}>
-                    <Box sx={{ width: 24, height: 24, borderRadius: '50%', bgcolor: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Cpu size={12} style={{ color: '#fff' }} />
-                    </Box>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#7C3AED', letterSpacing: '0.04em' }}>
-                      AI SCORE
-                    </Typography>
-                  </Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700, color: application.ai_score >= 70 ? 'success.main' : application.ai_score >= 50 ? 'warning.dark' : 'error.main' }}>
-                    {application.ai_score}%
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5, fontSize: '0.6rem' }}>
-                    Completeness 25% + Relevance 35% + Depth 40%
-                  </Typography>
-                </CardContent>
-              </Card>
-            )}
-            <Card variant="outlined" sx={{ flex: 1, minWidth: 160, bgcolor: overallScore > 0 ? '#ECFDF5' : '#F8FAFC', border: overallScore > 0 ? '1px solid #D1FAE5' : '1px solid #E2E8F0' }}>
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, textAlign: 'center' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75, mb: 1 }}>
-                  <Star size={14} style={{ color: overallScore > 0 ? '#059669' : '#94A3B8' }} />
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: overallScore > 0 ? '#059669' : '#94A3B8', letterSpacing: '0.04em' }}>
-                    REVIEWER SCORE
-                  </Typography>
-                </Box>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: overallScore > 0 ? (overallScore >= 70 ? 'success.main' : overallScore >= 50 ? 'warning.dark' : 'error.main') : 'text.disabled' }}>
-                  {overallScore > 0 ? `${overallScore}%` : '--'}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5, fontSize: '0.6rem' }}>
-                  {overallScore > 0 ? 'Weighted criterion scores' : 'Not yet scored'}
-                </Typography>
-              </CardContent>
-            </Card>
-            {application.ai_score != null && overallScore > 0 && (
-              <Card variant="outlined" sx={{ flex: 1, minWidth: 160, bgcolor: '#EFF6FF', border: '1px solid #DBEAFE' }}>
-                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, textAlign: 'center' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#2563EB', letterSpacing: '0.04em', display: 'block', mb: 1 }}>
-                    DUAL SCORE
-                  </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#2563EB' }}>
-                    {Math.round((application.ai_score + overallScore) / 2)}%
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5, fontSize: '0.6rem' }}>
-                    Average of AI + Reviewer
-                  </Typography>
-                </CardContent>
-              </Card>
-            )}
-          </Box>
-        </CardContent>
-      </Card>
+        <div className="flex gap-2 mt-4 flex-wrap">
+          {application.ai_score != null && (
+            <ScoreBox
+              tone="spark"
+              icon={<Cpu className="h-3 w-3" />}
+              label="AI Score"
+              value={`${application.ai_score}%`}
+              valueCls={toneBy(application.ai_score)}
+              footnote="Completeness 25% · Relevance 35% · Depth 40%"
+            />
+          )}
+          <ScoreBox
+            tone={overallScore > 0 ? 'success' : 'default'}
+            icon={<Star className="h-3 w-3" />}
+            label="Reviewer Score"
+            value={overallScore > 0 ? `${overallScore}%` : '—'}
+            valueCls={overallScore > 0 ? toneBy(overallScore) : 'text-muted-foreground'}
+            footnote={overallScore > 0 ? 'Weighted criterion scores' : 'Not yet scored'}
+          />
+          {application.ai_score != null && overallScore > 0 && (
+            <ScoreBox
+              tone="info"
+              label="Dual Score"
+              value={`${Math.round((application.ai_score + overallScore) / 2)}%`}
+              valueCls="text-[hsl(217_91%_45%)]"
+              footnote="Average of AI + Reviewer"
+            />
+          )}
+        </div>
+      </div>
 
       {/* Tabs */}
-      <Box>
-        <Tabs
-          value={tab}
-          onChange={(_, v) => setTab(v)}
-          sx={{ borderBottom: '1px solid', borderColor: 'divider', mb: 2 }}
-        >
-          <Tab
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <MessageSquare size={14} /> Responses
-              </Box>
-            }
-          />
-          <Tab
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <FileText size={14} /> Documents
-              </Box>
-            }
-          />
-          <Tab
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Star size={14} /> Scores
-              </Box>
-            }
-          />
-        </Tabs>
+      <div className="flex gap-1 border-b border-border">
+        {([
+          { id: 'responses', label: 'Responses', icon: MessageSquare },
+          { id: 'documents', label: 'Documents', icon: FileText },
+          { id: 'scores', label: 'Scores', icon: Star },
+        ] as const).map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={cn(
+                'flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
+                tab === t.id
+                  ? 'text-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]'
+                  : 'text-muted-foreground border-transparent hover:text-foreground',
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
 
-        {/* Responses Tab */}
-        {tab === 0 && (
-          <>
-            {criteria.length === 0 && Object.keys(responses).length === 0 ? (
-              <Card>
-                <CardContent sx={{ py: 6, textAlign: 'center' }}>
-                  <Typography variant="body2" sx={{ color: 'text.disabled' }}>
-                    No responses available for this application.
-                  </Typography>
-                </CardContent>
-              </Card>
-            ) : (
-              <Stack spacing={2}>
-                {criteria.map((c) => (
-                  <Card key={c.key}>
-                    <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                          {c.label}
-                        </Typography>
-                        <Chip
-                          label={`${c.weight}%`}
-                          size="small"
-                          variant="outlined"
-                          sx={{ fontSize: '0.6875rem' }}
-                        />
-                      </Box>
+      {/* Responses */}
+      {tab === 'responses' && (
+        <div className="space-y-3">
+          {criteria.length === 0 && Object.keys(responses).length === 0 ? (
+            <EmptyBox label="No responses available for this application." />
+          ) : (
+            <>
+              {criteria.map((c) => (
+                <div key={c.key} className="rounded-xl border border-border bg-background p-5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold">{c.label}</span>
+                    <span className="kuja-severity kuja-severity-info">{c.weight}%</span>
+                  </div>
+                  {c.description && <p className="text-xs text-muted-foreground mb-2">{c.description}</p>}
+                  <div className="bg-muted/30 rounded-md p-3 text-sm whitespace-pre-wrap">
+                    {responses[c.key] || (
+                      <span className="italic text-muted-foreground">No response provided</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {Object.entries(responses).filter(([key]) => !criteria.some((c) => c.key === key)).map(([key, val]) => (
+                <div key={key} className="rounded-xl border border-border bg-background p-5">
+                  <div className="text-sm font-semibold mb-2">{key}</div>
+                  <div className="bg-muted/30 rounded-md p-3 text-sm whitespace-pre-wrap">
+                    {val || <span className="italic text-muted-foreground">No response</span>}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Documents */}
+      {tab === 'documents' && (
+        <div className="space-y-2">
+          {docsLoading ? (
+            [1,2,3].map((i) => <div key={i} className="kuja-shimmer h-16 rounded-xl" />)
+          ) : documents.length === 0 ? (
+            <EmptyBox label="No documents uploaded for this application." />
+          ) : (
+            documents.map((doc) => (
+              <div key={doc.id} className="rounded-xl border border-border bg-background px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm font-medium">{doc.original_filename}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {doc.doc_type} · {(doc.file_size / 1024).toFixed(1)} KB
+                    </div>
+                  </div>
+                </div>
+                {doc.score != null && (
+                  <div className="flex items-center gap-1.5">
+                    <Cpu className="h-3.5 w-3.5 text-[hsl(var(--kuja-spark))]" />
+                    <span className={cn('font-semibold text-sm', toneBy(doc.score))}>{doc.score}%</span>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Scores */}
+      {tab === 'scores' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-muted-foreground">
+              Score each criterion below (0-100). The weighted total updates automatically.
+            </p>
+            <button
+              type="button"
+              onClick={handleAiScore}
+              disabled={aiScoring}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark))]/30 bg-[hsl(var(--kuja-spark-soft))] text-[hsl(var(--kuja-spark))] text-sm font-medium px-3 py-1.5 hover:bg-[hsl(var(--kuja-spark))]/15 disabled:opacity-50"
+            >
+              {aiScoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Cpu className="h-3.5 w-3.5" />}
+              {aiScoring ? 'Scoring…' : 'AI auto-score'}
+            </button>
+          </div>
+
+          {criteria.length === 0 ? (
+            <EmptyBox label="No evaluation criteria defined for this grant." />
+          ) : (
+            criteria.map((c) => {
+              const entry = scores[c.key] ?? { score: 0, comment: '' };
+              return (
+                <div key={c.key} className="rounded-xl border border-border bg-background p-5 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold">{c.label}</div>
                       {c.description && (
-                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
-                          {c.description}
-                        </Typography>
+                        <p className="text-xs text-muted-foreground mt-0.5">{c.description}</p>
                       )}
-                      <Box
-                        sx={{
-                          bgcolor: 'action.hover',
-                          borderRadius: 1,
-                          p: 1.5,
-                          whiteSpace: 'pre-wrap',
-                        }}
-                      >
-                        <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                          {responses[c.key] || (
-                            <Box component="span" sx={{ color: 'text.disabled', fontStyle: 'italic' }}>
-                              No response provided
-                            </Box>
-                          )}
-                        </Typography>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                ))}
+                    </div>
+                    <span className="kuja-severity kuja-severity-info">Weight: {c.weight}%</span>
+                  </div>
 
-                {/* Additional responses not mapped to criteria */}
-                {Object.entries(responses)
-                  .filter(([key]) => !criteria.some((c) => c.key === key))
-                  .map(([key, value]) => (
-                    <Card key={key}>
-                      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1 }}>
-                          {key}
-                        </Typography>
-                        <Box
-                          sx={{
-                            bgcolor: 'action.hover',
-                            borderRadius: 1,
-                            p: 1.5,
-                            whiteSpace: 'pre-wrap',
-                          }}
-                        >
-                          <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                            {value || (
-                              <Box component="span" sx={{ color: 'text.disabled', fontStyle: 'italic' }}>
-                                No response
-                              </Box>
-                            )}
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  ))}
-              </Stack>
-            )}
-          </>
-        )}
+                  {application.ai_score != null && (
+                    <div className="inline-flex items-center gap-1.5 rounded bg-[hsl(var(--kuja-spark-soft))] text-[hsl(var(--kuja-spark))] px-2 py-0.5 text-xs">
+                      <Cpu className="h-3 w-3" /> AI reference available
+                    </div>
+                  )}
 
-        {/* Documents Tab */}
-        {tab === 1 && (
-          <>
-            {docsLoading ? (
-              <Stack spacing={1.5}>
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} variant="rounded" height={64} sx={{ borderRadius: 2 }} />
-                ))}
-              </Stack>
-            ) : documents.length === 0 ? (
-              <Card>
-                <CardContent sx={{ py: 6, textAlign: 'center' }}>
-                  <Typography variant="body2" sx={{ color: 'text.disabled' }}>
-                    No documents uploaded for this application.
-                  </Typography>
-                </CardContent>
-              </Card>
-            ) : (
-              <Stack spacing={1.5}>
-                {documents.map((doc) => (
-                  <Card key={doc.id}>
-                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <FileText size={20} style={{ color: '#94A3B8' }} />
-                          <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                              {doc.original_filename}
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                              {doc.doc_type} | {(doc.file_size / 1024).toFixed(1)} KB
-                            </Typography>
-                          </Box>
-                        </Box>
-                        {doc.score != null && (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Cpu size={14} style={{ color: '#7C3AED' }} />
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontWeight: 600,
-                                color:
-                                  doc.score >= 80 ? 'success.main' :
-                                  doc.score >= 60 ? 'warning.main' : 'error.main',
-                              }}
-                            >
-                              {doc.score}%
-                            </Typography>
-                          </Box>
-                        )}
-                      </Box>
-                    </CardContent>
-                  </Card>
-                ))}
-              </Stack>
-            )}
-          </>
-        )}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <div className="kuja-label text-[10px] mb-1">Score (0-100)</div>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min={0} max={100}
+                          value={entry.score}
+                          onChange={(e) => updateScore(c.key, 'score', Number(e.target.value))}
+                          className="flex-1 accent-[hsl(var(--kuja-clay))]"
+                        />
+                        <input
+                          type="number"
+                          min={0} max={100}
+                          value={entry.score}
+                          onChange={(e) => updateScore(c.key, 'score', Math.min(100, Math.max(0, Number(e.target.value))))}
+                          className="w-16 h-8 px-2 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]"
+                        />
+                      </div>
+                    </div>
+                    <ScoreRing score={entry.score} size={56} strokeWidth={4} />
+                  </div>
 
-        {/* Scores Tab */}
-        {tab === 2 && (
-          <Stack spacing={2}>
-            {/* AI Auto-Score Button */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Score each criterion below (0-100). The weighted total updates automatically.
-              </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                disabled={aiScoring}
-                startIcon={
-                  aiScoring
-                    ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                    : <Cpu size={14} />
-                }
-                onClick={handleAiScore}
-              >
-                {aiScoring ? 'Scoring...' : 'AI Auto-Score'}
-              </Button>
-            </Box>
+                  <div>
+                    <div className="kuja-label text-[10px] mb-1">Comment</div>
+                    <textarea
+                      value={entry.comment}
+                      onChange={(e) => updateScore(c.key, 'comment', e.target.value)}
+                      placeholder="Provide feedback on this criterion…"
+                      rows={2}
+                      className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]"
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
 
-            {/* Criterion Scoring Cards */}
-            {criteria.length === 0 ? (
-              <Card>
-                <CardContent sx={{ py: 6, textAlign: 'center' }}>
-                  <Typography variant="body2" sx={{ color: 'text.disabled' }}>
-                    No evaluation criteria defined for this grant.
-                  </Typography>
-                </CardContent>
-              </Card>
-            ) : (
-              criteria.map((c) => {
-                const entry = scores[c.key] ?? { score: 0, comment: '' };
-                return (
-                  <Card key={c.key}>
-                    <CardContent sx={{ py: 2.5, '&:last-child': { pb: 2.5 } }}>
-                      <Stack spacing={2}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                              {c.label}
-                            </Typography>
-                            {c.description && (
-                              <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}>
-                                {c.description}
-                              </Typography>
-                            )}
-                          </Box>
-                          <Chip
-                            label={`Weight: ${c.weight}%`}
-                            size="small"
-                            variant="outlined"
-                            sx={{ fontSize: '0.6875rem' }}
-                          />
-                        </Box>
+          {error && (
+            <div className="rounded-md border border-[hsl(var(--kuja-flag))]/30 bg-[hsl(0_85%_97%)] text-[hsl(var(--kuja-flag))] px-4 py-2 text-sm">
+              {error}
+            </div>
+          )}
 
-                        {/* Reference: AI score if available */}
-                        {application.ai_score != null && (
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1,
-                              bgcolor: '#F5F3FF',
-                              color: '#7C3AED',
-                              px: 1.5,
-                              py: 0.5,
-                              borderRadius: 1,
-                            }}
-                          >
-                            <Cpu size={12} />
-                            <Typography variant="caption">AI reference available</Typography>
-                          </Box>
-                        )}
+          {/* Submit */}
+          <div className="flex items-center justify-between flex-wrap gap-3 pt-2">
+            <div className="flex items-center gap-3">
+              <ScoreRing score={overallScore} size={64} strokeWidth={5} label="Total" />
+              <div>
+                <div className="text-sm font-semibold">Weighted total: {overallScore}%</div>
+                <div className="text-xs text-muted-foreground">Based on {criteria.length} criteria</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting || criteria.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {submitting ? 'Submitting…' : 'Submit scores'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
-                        {/* Score Input */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <Box sx={{ flex: 1 }}>
-                            <Typography variant="caption" sx={{ color: 'text.secondary', mb: 0.5, display: 'block' }}>
-                              Score (0-100)
-                            </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                              <Slider
-                                value={entry.score}
-                                onChange={(_, val) => updateScore(c.key, 'score', val as number)}
-                                min={0}
-                                max={100}
-                                sx={{ flex: 1 }}
-                              />
-                              <TextField
-                                type="number"
-                                inputProps={{ min: 0, max: 100 }}
-                                value={entry.score}
-                                onChange={(e) => updateScore(c.key, 'score', Math.min(100, Math.max(0, Number(e.target.value))))}
-                                size="small"
-                                sx={{ width: 80 }}
-                              />
-                            </Box>
-                          </Box>
-                          <ScoreRing score={entry.score} size={56} strokeWidth={4} />
-                        </Box>
+function ScoreBox({
+  icon, label, value, valueCls, footnote, tone = 'default',
+}: {
+  icon?: React.ReactNode; label: string; value: string; valueCls?: string; footnote?: string;
+  tone?: 'spark' | 'success' | 'info' | 'default';
+}) {
+  const bgCls =
+    tone === 'spark' ? 'bg-[hsl(var(--kuja-spark-soft))] border-[hsl(var(--kuja-spark))]/20'
+    : tone === 'success' ? 'bg-[hsl(142_68%_96%)] border-[hsl(142_55%_85%)]'
+    : tone === 'info' ? 'bg-blue-50 border-blue-200'
+    : 'bg-muted/30 border-border';
+  const labelCls =
+    tone === 'spark' ? 'text-[hsl(var(--kuja-spark))]'
+    : tone === 'success' ? 'text-[hsl(var(--kuja-grow))]'
+    : tone === 'info' ? 'text-blue-700'
+    : 'text-muted-foreground';
+  return (
+    <div className={cn('flex-1 min-w-[160px] rounded-lg border px-3 py-2.5 text-center', bgCls)}>
+      <div className={cn('flex items-center justify-center gap-1 text-[10px] uppercase tracking-wider font-bold mb-1', labelCls)}>
+        {icon} {label}
+      </div>
+      <div className={cn('kuja-numeric text-2xl font-semibold', valueCls)}>{value}</div>
+      {footnote && <div className="text-[10px] text-muted-foreground mt-0.5">{footnote}</div>}
+    </div>
+  );
+}
 
-                        {/* Comment */}
-                        <Box>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', mb: 0.5, display: 'block' }}>
-                            Comment
-                          </Typography>
-                          <TextField
-                            placeholder="Provide feedback on this criterion..."
-                            value={entry.comment}
-                            onChange={(e) => updateScore(c.key, 'comment', e.target.value)}
-                            fullWidth
-                            multiline
-                            minRows={2}
-                            size="small"
-                          />
-                        </Box>
-                      </Stack>
-                    </CardContent>
-                  </Card>
-                );
-              })
-            )}
-
-            {/* Error */}
-            {error && (
-              <Alert severity="error">{error}</Alert>
-            )}
-
-            {/* Submit */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <ScoreRing score={overallScore} size={64} strokeWidth={5} label="Total" />
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                    Weighted Total: {overallScore}%
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                    Based on {criteria.length} criteria
-                  </Typography>
-                </Box>
-              </Box>
-              <Button
-                variant="contained"
-                disabled={submitting || criteria.length === 0}
-                startIcon={
-                  submitting
-                    ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                    : <Send size={16} />
-                }
-                onClick={handleSubmit}
-              >
-                {submitting ? 'Submitting...' : 'Submit Scores'}
-              </Button>
-            </Box>
-          </Stack>
-        )}
-      </Box>
-    </Stack>
+function EmptyBox({ label }: { label: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-background px-6 py-10 text-center">
+      <p className="text-sm text-muted-foreground">{label}</p>
+    </div>
   );
 }

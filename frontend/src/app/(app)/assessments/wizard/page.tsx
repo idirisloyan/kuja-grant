@@ -6,48 +6,19 @@ import { useAssessmentFrameworks } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { ScoreRing } from '@/components/shared/score-ring';
-
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Chip from '@mui/material/Chip';
-import Skeleton from '@mui/material/Skeleton';
-import Stack from '@mui/material/Stack';
-import Stepper from '@mui/material/Stepper';
-import Step from '@mui/material/Step';
-import StepLabel from '@mui/material/StepLabel';
-import Checkbox from '@mui/material/Checkbox';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import LinearProgress from '@mui/material/LinearProgress';
-import CircularProgress from '@mui/material/CircularProgress';
-
 import {
   ArrowLeft, ArrowRight, Building2, ClipboardList, Upload,
-  BarChart3, Play, CheckCircle, AlertCircle,
+  BarChart3, Play, CheckCircle, AlertCircle, Loader2,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { AssessmentFramework, FrameworkInfo } from '@/lib/types';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 interface OrgProfile {
-  name: string;
-  country: string;
-  year_established: string;
-  annual_budget: string;
-  staff_count: string;
-  mission: string;
-  sectors: string;
+  name: string; country: string; year_established: string;
+  annual_budget: string; staff_count: string; mission: string; sectors: string;
 }
 
-interface DocFile {
-  file: File | null;
-  fileName: string;
-}
+interface DocFile { file: File | null; fileName: string; }
 
 interface AssessmentResult {
   overall_score: number;
@@ -66,16 +37,15 @@ const FRAMEWORK_OPTIONS: { key: AssessmentFramework; label: string }[] = [
 ];
 
 const DOC_TYPES = [
-  { key: 'registration', label: 'Registration Certificate', description: 'Official registration document from government' },
-  { key: 'financial', label: 'Financial Statements', description: 'Most recent audited financial statements' },
-  { key: 'audit', label: 'Audit Report', description: 'External audit report (last 2 years)' },
-  { key: 'psea', label: 'PSEA Policy', description: 'Protection from Sexual Exploitation and Abuse policy' },
-  { key: 'strategic_plan', label: 'Strategic Plan', description: 'Current organizational strategic plan' },
+  { key: 'registration', label: 'Registration certificate', description: 'Official registration document from government' },
+  { key: 'financial', label: 'Financial statements', description: 'Most recent audited financial statements' },
+  { key: 'audit', label: 'Audit report', description: 'External audit report (last 2 years)' },
+  { key: 'psea', label: 'PSEA policy', description: 'Protection from Sexual Exploitation and Abuse policy' },
+  { key: 'strategic_plan', label: 'Strategic plan', description: 'Current organizational strategic plan' },
 ];
 
-// ---------------------------------------------------------------------------
-// Main Component
-// ---------------------------------------------------------------------------
+const inputCls =
+  'w-full h-9 px-3 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]';
 
 export default function AssessmentWizardPage() {
   const router = useRouter();
@@ -89,39 +59,21 @@ export default function AssessmentWizardPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
-  // Step 1: Org Profile
   const [orgProfile, setOrgProfile] = useState<OrgProfile>({
-    name: user?.org_name || '',
-    country: '',
-    year_established: '',
-    annual_budget: '',
-    staff_count: '',
-    mission: '',
-    sectors: '',
+    name: user?.org_name || '', country: '', year_established: '',
+    annual_budget: '', staff_count: '', mission: '', sectors: '',
   });
-
-  // Step 2: Checklist
   const [checklistResponses, setChecklistResponses] = useState<Record<string, boolean>>({});
-
-  // Step 3: Documents
   const [docUploads, setDocUploads] = useState<Record<string, DocFile>>({});
-
-  // Step 4: Results
   const [results, setResults] = useState<AssessmentResult | null>(null);
-
-  // ---------------------------------------------------------------------------
-  // Get framework info for checklist categories
-  // ---------------------------------------------------------------------------
 
   const frameworkInfo: FrameworkInfo | null = useMemo(() => {
     if (!selectedFramework || !frameworks[selectedFramework]) return null;
     return frameworks[selectedFramework] as FrameworkInfo;
   }, [selectedFramework, frameworks]);
 
-  // Generate checklist items from real backend framework keys
   const checklistCategories = useMemo(() => {
     if (!frameworkInfo) return [];
-    // Use real item keys from category_items (populated by scoring engine)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const catItems = (frameworkInfo as any).category_items as
       Record<string, { weight: number; label: string; items: { key: string; label: string }[] }> | undefined;
@@ -134,7 +86,6 @@ export default function AssessmentWizardPage() {
         })),
       }));
     }
-    // Fallback to generic items if category_items not available
     return frameworkInfo.categories.map((cat) => ({
       category: cat,
       items: [
@@ -146,30 +97,20 @@ export default function AssessmentWizardPage() {
     }));
   }, [frameworkInfo]);
 
-  // ---------------------------------------------------------------------------
-  // Handlers
-  // ---------------------------------------------------------------------------
-
   const handleProfileChange = useCallback((field: keyof OrgProfile, value: string) => {
     setOrgProfile((prev) => ({ ...prev, [field]: value }));
   }, []);
-
   const handleChecklistChange = useCallback((key: string, checked: boolean) => {
     setChecklistResponses((prev) => ({ ...prev, [key]: checked }));
   }, []);
-
   const handleDocChange = useCallback((key: string, file: File | null) => {
-    setDocUploads((prev) => ({
-      ...prev,
-      [key]: { file, fileName: file?.name ?? '' },
-    }));
+    setDocUploads((prev) => ({ ...prev, [key]: { file, fileName: file?.name ?? '' } }));
   }, []);
 
   const handleSubmitAssessment = useCallback(async () => {
     if (!selectedFramework) return;
     setSubmitting(true);
     try {
-      // Backend returns {success, assessment: {...}} — assessment has scores inside
       const res = await api.post<{
         success: boolean;
         assessment: {
@@ -185,14 +126,9 @@ export default function AssessmentWizardPage() {
       });
 
       const assessmentId = res.assessment?.id;
-
-      // Upload documents using the correct endpoint + doc type mapping
       const docTypeMap: Record<string, string> = {
-        registration: 'registration_certificate',
-        financial: 'financial_report',
-        audit: 'audit_report',
-        psea: 'policy_document',
-        strategic_plan: 'policy_document',
+        registration: 'registration_certificate', financial: 'financial_report',
+        audit: 'audit_report', psea: 'policy_document', strategic_plan: 'policy_document',
       };
       if (assessmentId) {
         for (const [docType, upload] of Object.entries(docUploads)) {
@@ -206,156 +142,130 @@ export default function AssessmentWizardPage() {
         }
       }
 
-      // Map category_scores from {score,met,total,weight} objects to flat numbers
       const catScores: Record<string, number> = {};
       for (const [k, v] of Object.entries(res.assessment?.category_scores ?? {})) {
         catScores[k] = typeof v === 'number' ? v : v.score;
       }
-
       setResults({
         overall_score: res.assessment?.overall_score ?? 0,
         category_scores: catScores,
-        gaps: (res.assessment?.gaps ?? []).map((g) =>
-          typeof g === 'string' ? g : g.label,
-        ),
+        gaps: (res.assessment?.gaps ?? []).map((g) => typeof g === 'string' ? g : g.label),
       });
       setCurrentStep(4);
-    } catch {
-      // Error handling
-    } finally {
-      setSubmitting(false);
-    }
+    } catch { /* noop */ } finally { setSubmitting(false); }
   }, [selectedFramework, orgProfile, checklistResponses, docUploads]);
-
-  // ---------------------------------------------------------------------------
-  // Loading
-  // ---------------------------------------------------------------------------
 
   if (fwLoading) {
     return (
-      <Stack spacing={3}>
-        <Skeleton variant="text" width={200} height={32} />
-        <Skeleton variant="rounded" height={260} sx={{ borderRadius: 2 }} />
-      </Stack>
+      <div className="space-y-3">
+        <div className="kuja-shimmer h-8 w-48 rounded" />
+        <div className="kuja-shimmer h-64 rounded-xl" />
+      </div>
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Framework Selection (before wizard starts)
-  // ---------------------------------------------------------------------------
-
+  // Framework selection
   if (!selectedFramework) {
     return (
-      <Stack spacing={3}>
-        <Button
-          size="small"
-          startIcon={<ArrowLeft size={16} />}
+      <div className="space-y-5">
+        <button
+          type="button"
           onClick={() => router.push('/assessments')}
-          sx={{ alignSelf: 'flex-start', color: 'text.secondary' }}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          Back to Assessments
-        </Button>
-
-        <Box>
-          <Typography variant="h2" sx={{ color: 'text.primary' }}>
-            Select Framework
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+          <ArrowLeft className="h-4 w-4" /> Back to assessments
+        </button>
+        <div>
+          <h1 className="kuja-display text-3xl">Select framework</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Choose a capacity assessment framework to begin
-          </Typography>
-        </Box>
-
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {FRAMEWORK_OPTIONS.map((opt) => {
             const info = frameworks[opt.key] as FrameworkInfo | undefined;
             return (
-              <Card
+              <button
                 key={opt.key}
+                type="button"
                 onClick={() => setSelectedFramework(opt.key)}
-                sx={{
-                  cursor: 'pointer',
-                  '&:hover': { boxShadow: 3, borderColor: 'primary.light' },
-                  transition: 'all 0.2s',
-                }}
+                className="text-left rounded-xl border border-border bg-background p-5 hover:border-[hsl(var(--kuja-clay))] hover:shadow-md transition-all"
               >
-                <CardContent sx={{ py: 4, '&:last-child': { pb: 4 } }}>
-                  <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                    {opt.label}
-                  </Typography>
-                  {info && (
-                    <>
-                      <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                        {info.description}
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 2, mt: 1.5 }}>
-                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>{info.estimated_time}</Typography>
-                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>{info.total_items} items</Typography>
-                      </Box>
-                    </>
-                  )}
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    startIcon={<Play size={12} />}
-                    sx={{ mt: 2 }}
-                  >
-                    Select
-                  </Button>
-                </CardContent>
-              </Card>
+                <div className="text-sm font-semibold">{opt.label}</div>
+                {info && (
+                  <>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{info.description}</p>
+                    <div className="flex gap-3 mt-3 text-xs text-muted-foreground">
+                      <span>{info.estimated_time}</span>
+                      <span>{info.total_items} items</span>
+                    </div>
+                  </>
+                )}
+                <div className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[hsl(var(--kuja-clay))]">
+                  <Play className="h-3.5 w-3.5" /> Select
+                </div>
+              </button>
             );
           })}
-        </Box>
-      </Stack>
+        </div>
+      </div>
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Wizard
-  // ---------------------------------------------------------------------------
-
   return (
-    <Stack spacing={3}>
-      {/* Back & Title */}
-      <Button
-        size="small"
-        startIcon={<ArrowLeft size={16} />}
+    <div className="space-y-5">
+      <button
+        type="button"
         onClick={() => router.push('/assessments')}
-        sx={{ alignSelf: 'flex-start', color: 'text.secondary' }}
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        Back to Assessments
-      </Button>
+        <ArrowLeft className="h-4 w-4" /> Back to assessments
+      </button>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Box>
-          <Typography variant="h2" sx={{ color: 'text.primary' }}>
-            Capacity Assessment
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="kuja-display text-3xl">Capacity assessment</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Framework: {FRAMEWORK_OPTIONS.find((f) => f.key === selectedFramework)?.label}
-          </Typography>
-        </Box>
+          </p>
+        </div>
         {currentStep < 4 && (
-          <Button variant="outlined" size="small" onClick={() => setSelectedFramework('')}>
-            Change Framework
-          </Button>
+          <button
+            type="button"
+            onClick={() => setSelectedFramework('')}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-3 py-1.5"
+          >
+            Change framework
+          </button>
         )}
-      </Box>
+      </div>
 
-      {/* MUI Stepper */}
-      <Stepper activeStep={currentStep - 1} alternativeLabel>
-        {STEPS.map((label) => (
-          <Step key={label}>
-            <StepLabel>{label}</StepLabel>
-          </Step>
-        ))}
-      </Stepper>
+      {/* Stepper */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {STEPS.map((label, i) => {
+          const n = i + 1;
+          const done = currentStep > n;
+          const active = currentStep === n;
+          return (
+            <div key={label} className="flex items-center gap-2 whitespace-nowrap">
+              <div className={cn(
+                'w-7 h-7 rounded-full grid place-items-center text-xs font-semibold',
+                done ? 'bg-[hsl(var(--kuja-grow))] text-white'
+                  : active ? 'bg-[hsl(var(--kuja-clay))] text-white'
+                  : 'bg-muted text-muted-foreground',
+              )}>
+                {done ? <CheckCircle className="h-4 w-4" /> : n}
+              </div>
+              <span className={cn('text-sm', active ? 'font-semibold' : 'text-muted-foreground')}>
+                {label}
+              </span>
+              {n < STEPS.length && <div className="w-6 h-px bg-border" />}
+            </div>
+          );
+        })}
+      </div>
 
-      {/* Step Content */}
-      {currentStep === 1 && (
-        <OrgProfileStep profile={orgProfile} onChange={handleProfileChange} />
-      )}
+      {currentStep === 1 && <OrgProfileStep profile={orgProfile} onChange={handleProfileChange} />}
       {currentStep === 2 && (
         <ComplianceStep
           categories={checklistCategories}
@@ -363,158 +273,122 @@ export default function AssessmentWizardPage() {
           onChange={handleChecklistChange}
         />
       )}
-      {currentStep === 3 && (
-        <DocumentUploadStep uploads={docUploads} onChange={handleDocChange} />
-      )}
-      {currentStep === 4 && results && (
-        <ResultsStep results={results} framework={selectedFramework} />
-      )}
+      {currentStep === 3 && <DocumentUploadStep uploads={docUploads} onChange={handleDocChange} />}
+      {currentStep === 4 && results && <ResultsStep results={results} framework={selectedFramework} />}
 
       {/* Navigation */}
       {currentStep < 4 && (
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Button
-            variant="outlined"
+        <div className="flex justify-between pt-3 border-t border-border">
+          <button
+            type="button"
             disabled={currentStep === 1}
-            startIcon={<ArrowLeft size={16} />}
             onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Previous
-          </Button>
+            <ArrowLeft className="h-4 w-4" /> Previous
+          </button>
           {currentStep < 3 ? (
-            <Button
-              variant="contained"
-              endIcon={<ArrowRight size={16} />}
+            <button
+              type="button"
               onClick={() => setCurrentStep((s) => s + 1)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
             >
-              Next
-            </Button>
+              Next <ArrowRight className="h-4 w-4" />
+            </button>
           ) : (
-            <Button
-              variant="contained"
+            <button
+              type="button"
               disabled={submitting}
-              startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <BarChart3 size={16} />}
               onClick={handleSubmitAssessment}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
             >
-              {submitting ? 'Analyzing...' : 'Submit & Get Results'}
-            </Button>
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
+              {submitting ? 'Analyzing…' : 'Submit & get results'}
+            </button>
           )}
-        </Box>
+        </div>
       )}
 
       {currentStep === 4 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Button variant="outlined" onClick={() => router.push('/assessments')}>
-            Back to Assessments
-          </Button>
-          <Button variant="contained" onClick={() => router.push('/grants')}>
-            Browse Grants
-          </Button>
-        </Box>
+        <div className="flex justify-center gap-2 pt-3 border-t border-border">
+          <button
+            type="button"
+            onClick={() => router.push('/assessments')}
+            className="rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-4 py-2"
+          >
+            Back to assessments
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/grants')}
+            className="rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
+          >
+            Browse grants
+          </button>
+        </div>
       )}
-    </Stack>
+    </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Step 1: Org Profile
-// ---------------------------------------------------------------------------
 
 function OrgProfileStep({
-  profile,
-  onChange,
-}: {
-  profile: OrgProfile;
-  onChange: (field: keyof OrgProfile, value: string) => void;
-}) {
+  profile, onChange,
+}: { profile: OrgProfile; onChange: (field: keyof OrgProfile, value: string) => void }) {
   return (
-    <Card>
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <Building2 size={16} />
-          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-            Organization Profile
-          </Typography>
-        </Box>
-        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2.5 }}>
-          Provide basic information about your organization
-        </Typography>
-        <Stack spacing={2.5}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
-            <TextField
-              label="Organization Name"
-              size="small"
-              fullWidth
-              value={profile.name}
-              onChange={(e) => onChange('name', e.target.value)}
-              placeholder="Enter organization name"
-            />
-            <TextField
-              label="Country"
-              size="small"
-              fullWidth
-              value={profile.country}
-              onChange={(e) => onChange('country', e.target.value)}
-              placeholder="e.g., Kenya"
-            />
-            <TextField
-              label="Year Established"
-              size="small"
-              fullWidth
-              type="number"
-              value={profile.year_established}
-              onChange={(e) => onChange('year_established', e.target.value)}
-              placeholder="e.g., 2010"
-            />
-            <TextField
-              label="Annual Budget (USD)"
-              size="small"
-              fullWidth
-              value={profile.annual_budget}
-              onChange={(e) => onChange('annual_budget', e.target.value)}
-              placeholder="e.g., 500000"
-            />
-            <TextField
-              label="Staff Count"
-              size="small"
-              fullWidth
-              value={profile.staff_count}
-              onChange={(e) => onChange('staff_count', e.target.value)}
-              placeholder="e.g., 50"
-            />
-            <TextField
-              label="Sectors (comma-separated)"
-              size="small"
-              fullWidth
-              value={profile.sectors}
-              onChange={(e) => onChange('sectors', e.target.value)}
-              placeholder="e.g., Health, Education, WASH"
-            />
-          </Box>
-          <TextField
-            label="Mission Statement"
-            size="small"
-            fullWidth
-            multiline
-            rows={3}
-            value={profile.mission}
-            onChange={(e) => onChange('mission', e.target.value)}
-            placeholder="Describe your organization's mission..."
-          />
-        </Stack>
-      </CardContent>
-    </Card>
+    <div className="rounded-xl border border-border bg-background p-5">
+      <div className="flex items-center gap-2 mb-1">
+        <Building2 className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-semibold">Organization profile</span>
+      </div>
+      <p className="text-xs text-muted-foreground mb-4">Provide basic information about your organization</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Organization name">
+          <input type="text" value={profile.name} onChange={(e) => onChange('name', e.target.value)}
+            placeholder="Enter organization name" className={inputCls} />
+        </Field>
+        <Field label="Country">
+          <input type="text" value={profile.country} onChange={(e) => onChange('country', e.target.value)}
+            placeholder="e.g., Kenya" className={inputCls} />
+        </Field>
+        <Field label="Year established">
+          <input type="number" value={profile.year_established} onChange={(e) => onChange('year_established', e.target.value)}
+            placeholder="e.g., 2010" className={inputCls} />
+        </Field>
+        <Field label="Annual budget (USD)">
+          <input type="text" value={profile.annual_budget} onChange={(e) => onChange('annual_budget', e.target.value)}
+            placeholder="e.g., 500000" className={inputCls} />
+        </Field>
+        <Field label="Staff count">
+          <input type="text" value={profile.staff_count} onChange={(e) => onChange('staff_count', e.target.value)}
+            placeholder="e.g., 50" className={inputCls} />
+        </Field>
+        <Field label="Sectors (comma-separated)">
+          <input type="text" value={profile.sectors} onChange={(e) => onChange('sectors', e.target.value)}
+            placeholder="e.g., Health, Education, WASH" className={inputCls} />
+        </Field>
+      </div>
+      <div className="mt-3">
+        <Field label="Mission statement">
+          <textarea value={profile.mission} onChange={(e) => onChange('mission', e.target.value)}
+            rows={3} placeholder="Describe your organization's mission…"
+            className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]" />
+        </Field>
+      </div>
+    </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Step 2: Compliance Checklist
-// ---------------------------------------------------------------------------
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium">{label}</label>
+      {children}
+    </div>
+  );
+}
 
 function ComplianceStep({
-  categories,
-  responses,
-  onChange,
+  categories, responses, onChange,
 }: {
   categories: { category: string; items: { key: string; label: string }[] }[];
   responses: Record<string, boolean>;
@@ -522,259 +396,165 @@ function ComplianceStep({
 }) {
   if (categories.length === 0) {
     return (
-      <Card>
-        <CardContent sx={{ py: 6, textAlign: 'center' }}>
-          <ClipboardList size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>No checklist items for this framework</Typography>
-        </CardContent>
-      </Card>
+      <div className="rounded-xl border border-border bg-background px-6 py-12 text-center">
+        <ClipboardList className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
+        <p className="text-sm text-muted-foreground">No checklist items for this framework</p>
+      </div>
     );
   }
 
-  const totalItems = categories.reduce((sum, cat) => sum + cat.items.length, 0);
-  const checkedItems = Object.values(responses).filter(Boolean).length;
-  const progressPct = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0;
+  const total = categories.reduce((s, c) => s + c.items.length, 0);
+  const checked = Object.values(responses).filter(Boolean).length;
+  const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
 
   return (
-    <Stack spacing={2}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          {checkedItems} of {totalItems} items checked
-        </Typography>
-        <Chip
-          label={`${progressPct}% Complete`}
-          size="small"
-          variant="outlined"
-          color={checkedItems === totalItems ? 'success' : 'default'}
-          sx={{ fontWeight: 500, fontSize: '0.6875rem' }}
-        />
-      </Box>
-
-      <LinearProgress
-        variant="determinate"
-        value={progressPct}
-        sx={{ borderRadius: 1, height: 6 }}
-      />
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">{checked} of {total} items checked</p>
+        <span className={cn(
+          'kuja-severity',
+          checked === total ? 'kuja-severity-good' : 'kuja-severity-info',
+        )}>
+          {pct}% complete
+        </span>
+      </div>
+      <div className="h-1.5 bg-muted rounded overflow-hidden">
+        <div className="h-full bg-[hsl(var(--kuja-clay))] transition-all" style={{ width: `${pct}%` }} />
+      </div>
 
       {categories.map((cat) => (
-        <Card key={cat.category}>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1.5 }}>
-              {cat.category}
-            </Typography>
-            <Stack spacing={0.5}>
-              {cat.items.map((item) => (
-                <FormControlLabel
-                  key={item.key}
-                  control={
-                    <Checkbox
-                      checked={responses[item.key] || false}
-                      onChange={(e) => onChange(item.key, e.target.checked)}
-                      size="small"
-                    />
-                  }
-                  label={
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      {item.label}
-                    </Typography>
-                  }
+        <div key={cat.category} className="rounded-xl border border-border bg-background p-5">
+          <div className="kuja-label text-[11px] mb-2">{cat.category}</div>
+          <div className="space-y-1.5">
+            {cat.items.map((item) => (
+              <label key={item.key} className="flex items-start gap-2.5 cursor-pointer py-1">
+                <input
+                  type="checkbox"
+                  checked={responses[item.key] || false}
+                  onChange={(e) => onChange(item.key, e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-input accent-[hsl(var(--kuja-clay))]"
                 />
-              ))}
-            </Stack>
-          </CardContent>
-        </Card>
+                <span className="text-sm text-muted-foreground">{item.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
       ))}
-    </Stack>
+    </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Step 3: Document Upload
-// ---------------------------------------------------------------------------
 
 function DocumentUploadStep({
-  uploads,
-  onChange,
-}: {
-  uploads: Record<string, DocFile>;
-  onChange: (key: string, file: File | null) => void;
-}) {
+  uploads, onChange,
+}: { uploads: Record<string, DocFile>; onChange: (key: string, file: File | null) => void }) {
   return (
-    <Card>
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <Upload size={16} />
-          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-            Supporting Documents
-          </Typography>
-        </Box>
-        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2.5 }}>
-          Upload documents to support your assessment (optional but recommended)
-        </Typography>
-        <Stack spacing={2}>
-          {DOC_TYPES.map((doc) => {
-            const upload = uploads[doc.key];
-            return (
-              <Box key={doc.key} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                <Box sx={{ mb: 1.5 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>{doc.label}</Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>{doc.description}</Typography>
-                </Box>
-                {upload?.file ? (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, bgcolor: '#ECFDF5', borderRadius: 2, border: '1px solid #A7F3D0' }}>
-                    <CheckCircle size={20} color="#059669" />
-                    <Typography variant="body2" noWrap sx={{ flex: 1, color: '#059669' }}>{upload.fileName}</Typography>
-                    <Button size="small" onClick={() => onChange(doc.key, null)} sx={{ color: 'text.secondary' }}>
-                      Remove
-                    </Button>
-                  </Box>
-                ) : (
-                  <Box
-                    component="label"
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      p: 2.5,
-                      border: '2px dashed',
-                      borderColor: 'divider',
-                      borderRadius: 2,
-                      cursor: 'pointer',
-                      '&:hover': { borderColor: 'primary.light', bgcolor: 'action.hover' },
-                      transition: 'all 0.2s',
-                    }}
+    <div className="rounded-xl border border-border bg-background p-5">
+      <div className="flex items-center gap-2 mb-1">
+        <Upload className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-semibold">Supporting documents</span>
+      </div>
+      <p className="text-xs text-muted-foreground mb-4">
+        Upload documents to support your assessment (optional but recommended)
+      </p>
+      <div className="space-y-3">
+        {DOC_TYPES.map((doc) => {
+          const upload = uploads[doc.key];
+          return (
+            <div key={doc.key} className="border border-border rounded-lg p-4">
+              <div className="mb-2">
+                <div className="text-sm font-medium">{doc.label}</div>
+                <div className="text-xs text-muted-foreground">{doc.description}</div>
+              </div>
+              {upload?.file ? (
+                <div className="flex items-center gap-3 p-3 bg-[hsl(142_68%_96%)] border border-[hsl(142_55%_85%)] rounded-md">
+                  <CheckCircle className="h-5 w-5 text-[hsl(var(--kuja-grow))] flex-shrink-0" />
+                  <span className="flex-1 truncate text-sm text-[hsl(var(--kuja-grow))]">{upload.fileName}</span>
+                  <button
+                    type="button"
+                    onClick={() => onChange(doc.key, null)}
+                    className="text-xs text-muted-foreground hover:text-foreground"
                   >
-                    <Upload size={20} color="#94A3B8" />
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Click to upload</Typography>
-                    <input
-                      type="file"
-                      hidden
-                      accept=".pdf,.doc,.docx"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] ?? null;
-                        onChange(doc.key, file);
-                      }}
-                    />
-                  </Box>
-                )}
-              </Box>
-            );
-          })}
-        </Stack>
-      </CardContent>
-    </Card>
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center gap-1 p-5 border-2 border-dashed border-border rounded-md cursor-pointer hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand-50))] transition-all">
+                  <Upload className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Click to upload</span>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => onChange(doc.key, e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Step 4: Results
-// ---------------------------------------------------------------------------
-
-function ResultsStep({
-  results,
-  framework,
-}: {
-  results: AssessmentResult;
-  framework: string;
-}) {
+function ResultsStep({ results, framework }: { results: AssessmentResult; framework: string }) {
   const categoryEntries = Object.entries(results.category_scores);
+  const levelLabel =
+    results.overall_score >= 80 ? 'Excellent capacity'
+    : results.overall_score >= 60 ? 'Good capacity'
+    : results.overall_score >= 40 ? 'Developing capacity'
+    : 'Needs improvement';
 
   return (
-    <Stack spacing={3}>
-      {/* Overall Score */}
-      <Card>
-        <CardContent sx={{ py: 6, '&:last-child': { pb: 6 } }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <ScoreRing score={Math.round(results.overall_score)} size={140} strokeWidth={10} label="Overall" />
-            <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mt: 3 }}>
-              {results.overall_score >= 80
-                ? 'Excellent Capacity'
-                : results.overall_score >= 60
-                ? 'Good Capacity'
-                : results.overall_score >= 40
-                ? 'Developing Capacity'
-                : 'Needs Improvement'}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-              {framework.toUpperCase().replace('_', '-')} Framework Assessment
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div className="rounded-xl border border-border bg-background p-10 flex flex-col items-center text-center">
+        <ScoreRing score={Math.round(results.overall_score)} size={140} strokeWidth={10} label="Overall" />
+        <h2 className="kuja-display text-2xl mt-5">{levelLabel}</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          {framework.toUpperCase().replace('_', '-')} framework assessment
+        </p>
+      </div>
 
-      {/* Category Breakdown */}
       {categoryEntries.length > 0 && (
-        <Card>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 2 }}>
-              Category Breakdown
-            </Typography>
-            <Stack spacing={2}>
-              {categoryEntries.map(([category, score]) => {
-                const color = score >= 80 ? '#059669' : score >= 60 ? '#D97706' : '#E11D48';
-                return (
-                  <Box key={category}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.75 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary' }}>{category}</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color }}>{Math.round(score)}%</Typography>
-                    </Box>
-                    <LinearProgress
-                      variant="determinate"
-                      value={Math.min(100, score)}
-                      sx={{
-                        borderRadius: 1,
-                        height: 8,
-                        bgcolor: 'action.hover',
-                        '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 1 },
-                      }}
-                    />
-                  </Box>
-                );
-              })}
-            </Stack>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-border bg-background p-5">
+          <div className="text-sm font-semibold mb-3">Category breakdown</div>
+          <div className="space-y-3">
+            {categoryEntries.map(([category, score]) => {
+              const color = score >= 80 ? 'hsl(var(--kuja-grow))' : score >= 60 ? 'hsl(var(--kuja-sun))' : 'hsl(var(--kuja-flag))';
+              return (
+                <div key={category}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-muted-foreground">{category}</span>
+                    <span className="kuja-numeric font-semibold" style={{ color }}>{Math.round(score)}%</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded overflow-hidden">
+                    <div className="h-full transition-all" style={{ width: `${Math.min(100, score)}%`, background: color }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
-      {/* Gaps */}
       {results.gaps.length > 0 && (
-        <Card>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <AlertCircle size={16} color="#D97706" />
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                Areas for Improvement
-              </Typography>
-            </Box>
-            <Stack spacing={1.5}>
-              {results.gaps.map((gap, i) => (
-                <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-                  <Box
-                    sx={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: '50%',
-                      bgcolor: '#FFFBEB',
-                      color: '#D97706',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.6875rem',
-                      fontWeight: 700,
-                      flexShrink: 0,
-                      mt: 0.25,
-                    }}
-                  >
-                    {i + 1}
-                  </Box>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>{gap}</Typography>
-                </Box>
-              ))}
-            </Stack>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-border bg-background p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle className="h-4 w-4 text-[hsl(var(--kuja-sun))]" />
+            <span className="text-sm font-semibold">Areas for improvement</span>
+          </div>
+          <ul className="space-y-2">
+            {results.gaps.map((gap, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full bg-[hsl(32_100%_95%)] text-[hsl(var(--kuja-sun))] grid place-items-center text-[11px] font-bold flex-shrink-0 mt-0.5">
+                  {i + 1}
+                </span>
+                <span className="text-sm text-muted-foreground">{gap}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
-    </Stack>
+    </div>
   );
 }

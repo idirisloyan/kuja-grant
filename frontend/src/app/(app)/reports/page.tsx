@@ -6,88 +6,71 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
 import { ScoreRing } from '@/components/shared/score-ring';
 import type { Report } from '@/lib/types';
-
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Skeleton from '@mui/material/Skeleton';
-import Stack from '@mui/material/Stack';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import Accordion from '@mui/material/Accordion';
-import AccordionSummary from '@mui/material/AccordionSummary';
-import AccordionDetails from '@mui/material/AccordionDetails';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import Chip from '@mui/material/Chip';
-import LinearProgress from '@mui/material/LinearProgress';
-import Button from '@mui/material/Button';
-import CircularProgress from '@mui/material/CircularProgress';
-import IconButton from '@mui/material/IconButton';
-import Popover from '@mui/material/Popover';
-import TextField from '@mui/material/TextField';
-import Collapse from '@mui/material/Collapse';
-
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Sparkles,
+  Upload,
+  Loader2,
+  CheckCircle2,
+} from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatDate(dateStr: string | null): string {
+function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-';
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function getDaysUntil(dateStr: string | null): number {
+function getDaysUntil(dateStr: string | null | undefined): number {
   if (!dateStr) return 999;
   const d = new Date(dateStr);
   const now = new Date();
   return Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-function getDeadlineText(dateStr: string | null): { label: string; color: string } {
-  if (!dateStr) return { label: '', color: 'text.secondary' };
+function getDeadlineText(dateStr: string | null | undefined): { label: string; cls: string } {
+  if (!dateStr) return { label: '', cls: 'text-muted-foreground' };
   const days = getDaysUntil(dateStr);
-  if (days < 0) return { label: `${Math.abs(days)}d overdue`, color: 'error.main' };
-  if (days === 0) return { label: 'Due today', color: 'error.main' };
-  if (days <= 7) return { label: `${days}d left`, color: 'error.main' };
-  if (days <= 30) return { label: `${days}d left`, color: 'warning.main' };
-  return { label: `${days}d left`, color: 'text.secondary' };
+  if (days < 0) return { label: `${Math.abs(days)}d overdue`, cls: 'text-red-600' };
+  if (days === 0) return { label: 'Due today', cls: 'text-red-600' };
+  if (days <= 7) return { label: `${days}d left`, cls: 'text-red-600' };
+  if (days <= 30) return { label: `${days}d left`, cls: 'text-amber-600' };
+  return { label: `${days}d left`, cls: 'text-muted-foreground' };
 }
 
 function getUrgencyColor(dateStr: string): string {
   const days = getDaysUntil(dateStr);
-  if (days < 0) return '#EF4444'; // red - overdue
-  if (days <= 7) return '#F59E0B'; // amber - due within 7 days
-  if (days <= 30) return '#3B82F6'; // blue - due within 30 days
-  return '#9CA3AF'; // gray - future
+  if (days < 0) return '#EF4444';
+  if (days <= 7) return '#F59E0B';
+  if (days <= 30) return '#3B82F6';
+  return '#9CA3AF';
 }
 
 // ---------------------------------------------------------------------------
-// Report Status Chip
+// Primitives
 // ---------------------------------------------------------------------------
 
-function ReportStatusChip({ status }: { status: string }) {
-  const colorMap: Record<string, 'success' | 'info' | 'warning' | 'default'> = {
-    accepted: 'success',
-    submitted: 'info',
-    under_review: 'warning',
-    revision_requested: 'warning',
-    draft: 'default',
-  };
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-[10px] border border-border bg-card shadow-[var(--kuja-elev-1)] ${className}`}>
+      {children}
+    </div>
+  );
+}
 
+function StatusChip({ status }: { status: string }) {
+  const palette: Record<string, string> = {
+    accepted: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    submitted: 'bg-sky-50 text-sky-700 border-sky-200',
+    under_review: 'bg-amber-50 text-amber-700 border-amber-200',
+    revision_requested: 'bg-amber-50 text-amber-700 border-amber-200',
+    draft: 'bg-muted text-muted-foreground border-border',
+  };
   const labels: Record<string, string> = {
     accepted: 'Accepted',
     submitted: 'Submitted',
@@ -95,19 +78,24 @@ function ReportStatusChip({ status }: { status: string }) {
     revision_requested: 'Revise',
     draft: 'Draft',
   };
-
+  const cls = palette[status] ?? palette.draft;
   return (
-    <Chip
-      label={labels[status] ?? status}
-      color={colorMap[status] ?? 'default'}
-      size="small"
-      variant="outlined"
-    />
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${cls}`}>
+      {labels[status] ?? status}
+    </span>
+  );
+}
+
+function TypeChip({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
+      {label}
+    </span>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Compliance Calendar Component
+// Compliance Calendar
 // ---------------------------------------------------------------------------
 
 interface CalendarDeadline {
@@ -115,8 +103,7 @@ interface CalendarDeadline {
   grantTitle: string;
 }
 
-function ComplianceCalendar({ reports, reportsByGrant }: {
-  reports: Report[];
+function ComplianceCalendar({ reportsByGrant }: {
   reportsByGrant: Array<{ grantId: number; grantTitle: string; reports: Report[] }>;
 }) {
   const { t } = useTranslation();
@@ -124,11 +111,10 @@ function ComplianceCalendar({ reports, reportsByGrant }: {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const [selectedDay, setSelectedDay] = useState<CalendarDeadline[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [popoverDate, setPopoverDate] = useState<string | null>(null);
+  const [popoverDeadlines, setPopoverDeadlines] = useState<CalendarDeadline[]>([]);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
 
-  // Build a map of date -> deadlines for the current month
   const deadlineMap = useMemo(() => {
     const map = new Map<string, CalendarDeadline[]>();
     reportsByGrant.forEach((group) => {
@@ -143,241 +129,177 @@ function ComplianceCalendar({ reports, reportsByGrant }: {
     return map;
   }, [reportsByGrant]);
 
-  // Calendar grid computation
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
   const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
   const firstDayOfMonth = new Date(year, month, 1);
-  // Monday = 0
   const startDow = (firstDayOfMonth.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-  // Build weeks
   const cells: Array<{ day: number | null; dateKey: string }> = [];
-  for (let i = 0; i < startDow; i++) {
-    cells.push({ day: null, dateKey: '' });
-  }
+  for (let i = 0; i < startDow; i++) cells.push({ day: null, dateKey: '' });
   for (let d = 1; d <= daysInMonth; d++) {
     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     cells.push({ day: d, dateKey });
   }
-  // Pad to complete week
-  while (cells.length % 7 !== 0) {
-    cells.push({ day: null, dateKey: '' });
-  }
+  while (cells.length % 7 !== 0) cells.push({ day: null, dateKey: '' });
 
-  const handleDayClick = (event: React.MouseEvent<HTMLElement>, dateKey: string) => {
+  const handleDayClick = (event: React.MouseEvent<HTMLButtonElement>, dateKey: string) => {
     const deadlines = deadlineMap.get(dateKey);
     if (deadlines && deadlines.length > 0) {
-      setAnchorEl(event.currentTarget);
-      setSelectedDay(deadlines);
-      setSelectedDate(dateKey);
+      const rect = event.currentTarget.getBoundingClientRect();
+      setPopoverPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX });
+      setPopoverDate(dateKey);
+      setPopoverDeadlines(deadlines);
     }
   };
-
-  const handleClosePopover = () => {
-    setAnchorEl(null);
-    setSelectedDay([]);
-  };
-
-  const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
-  const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
 
   const dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   return (
-    <Card>
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-        {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box>
-            <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>
-              {t('report.calendar')}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              {t('report.calendar_subtitle')}
-            </Typography>
-          </Box>
-          {/* Legend */}
-          <Stack direction="row" spacing={1.5} sx={{ display: { xs: 'none', sm: 'flex' } }}>
-            {[
-              { color: '#EF4444', label: t('common.overdue') },
-              { color: '#F59E0B', label: '< 7d' },
-              { color: '#3B82F6', label: '< 30d' },
-              { color: '#9CA3AF', label: '30d+' },
-            ].map((item) => (
-              <Box key={item.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: item.color }} />
-                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
-                  {item.label}
-                </Typography>
-              </Box>
-            ))}
-          </Stack>
-        </Box>
-
-        {/* Month navigation */}
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1.5 }}>
-          <IconButton size="small" onClick={prevMonth}>
-            <ChevronLeftIcon fontSize="small" />
-          </IconButton>
-          <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 140, textAlign: 'center' }}>
-            {monthName}
-          </Typography>
-          <IconButton size="small" onClick={nextMonth}>
-            <ChevronRightIcon fontSize="small" />
-          </IconButton>
-        </Box>
-
-        {/* Day headers */}
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: 0,
-          }}
-        >
-          {dayHeaders.map((d) => (
-            <Box key={d} sx={{ textAlign: 'center', py: 0.5 }}>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.65rem' }}>
-                {d}
-              </Typography>
-            </Box>
+    <Card className="p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <div className="text-sm font-semibold text-foreground">{t('report.calendar')}</div>
+          <div className="text-xs text-muted-foreground">{t('report.calendar_subtitle')}</div>
+        </div>
+        <div className="hidden items-center gap-3 sm:flex">
+          {[
+            { color: '#EF4444', label: t('common.overdue') },
+            { color: '#F59E0B', label: '< 7d' },
+            { color: '#3B82F6', label: '< 30d' },
+            { color: '#9CA3AF', label: '30d+' },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
+              <span className="text-[10px] text-muted-foreground">{item.label}</span>
+            </div>
           ))}
+        </div>
+      </div>
 
-          {/* Calendar cells */}
-          {cells.map((cell, i) => {
-            if (cell.day === null) {
-              return <Box key={`empty-${i}`} sx={{ py: 1 }} />;
-            }
-            const deadlines = deadlineMap.get(cell.dateKey);
-            const hasDeadlines = deadlines && deadlines.length > 0;
-            const isToday = cell.dateKey === todayKey;
-
-            // Get the most urgent color for multi-deadline days
-            let dotColor = '';
-            if (hasDeadlines) {
-              const colors = deadlines.map((dl) => getUrgencyColor(dl.report.due_date!));
-              // Priority: red > amber > blue > gray
-              if (colors.includes('#EF4444')) dotColor = '#EF4444';
-              else if (colors.includes('#F59E0B')) dotColor = '#F59E0B';
-              else if (colors.includes('#3B82F6')) dotColor = '#3B82F6';
-              else dotColor = '#9CA3AF';
-            }
-
-            return (
-              <Box
-                key={cell.dateKey}
-                onClick={hasDeadlines ? (e) => handleDayClick(e, cell.dateKey) : undefined}
-                sx={{
-                  textAlign: 'center',
-                  py: 0.75,
-                  cursor: hasDeadlines ? 'pointer' : 'default',
-                  borderRadius: 1,
-                  position: 'relative',
-                  '&:hover': hasDeadlines ? { bgcolor: 'action.hover' } : {},
-                  ...(isToday && {
-                    bgcolor: 'primary.50',
-                    border: '1px solid',
-                    borderColor: 'primary.200',
-                  }),
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: isToday ? 700 : 400,
-                    color: isToday ? 'primary.main' : 'text.primary',
-                    fontSize: '0.75rem',
-                  }}
-                >
-                  {cell.day}
-                </Typography>
-                {hasDeadlines && (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      gap: 0.25,
-                      mt: 0.25,
-                    }}
-                  >
-                    {deadlines.length <= 3 ? (
-                      deadlines.map((dl, idx) => (
-                        <Box
-                          key={idx}
-                          sx={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: '50%',
-                            bgcolor: getUrgencyColor(dl.report.due_date!),
-                          }}
-                        />
-                      ))
-                    ) : (
-                      <>
-                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: dotColor }} />
-                        <Typography variant="caption" sx={{ fontSize: '0.55rem', color: 'text.secondary', lineHeight: '6px' }}>
-                          +{deadlines.length - 1}
-                        </Typography>
-                      </>
-                    )}
-                  </Box>
-                )}
-              </Box>
-            );
-          })}
-        </Box>
-
-        {/* Popover for day details */}
-        <Popover
-          open={Boolean(anchorEl)}
-          anchorEl={anchorEl}
-          onClose={handleClosePopover}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          transformOrigin={{ vertical: 'top', horizontal: 'center' }}
-          slotProps={{ paper: { sx: { p: 2, maxWidth: 320, borderRadius: 2 } } }}
+      <div className="mb-2 flex items-center justify-center gap-2">
+        <button
+          className="rounded-md p-1 hover:bg-muted"
+          onClick={() => setCurrentMonth(new Date(year, month - 1, 1))}
+          aria-label="Previous month"
         >
-          <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5 }}>
-            {selectedDate && new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </Typography>
-          <Stack spacing={1}>
-            {selectedDay.map((dl, i) => {
-              const urgencyColor = getUrgencyColor(dl.report.due_date!);
-              return (
-                <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: urgencyColor, flexShrink: 0 }} />
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-                      {dl.report.title}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
-                      {dl.grantTitle}
-                    </Typography>
-                  </Box>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    sx={{ fontSize: '0.65rem', minWidth: 0, px: 1 }}
-                  >
-                    {dl.report.status === 'draft' ? t('report.continue_draft') : t('report.start_report')}
-                  </Button>
-                </Box>
-              );
-            })}
-          </Stack>
-        </Popover>
-      </CardContent>
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="min-w-[140px] text-center text-sm font-semibold">{monthName}</span>
+        <button
+          className="rounded-md p-1 hover:bg-muted"
+          onClick={() => setCurrentMonth(new Date(year, month + 1, 1))}
+          aria-label="Next month"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7">
+        {dayHeaders.map((d) => (
+          <div key={d} className="py-1 text-center text-[10px] font-semibold text-muted-foreground">
+            {d}
+          </div>
+        ))}
+        {cells.map((cell, i) => {
+          if (cell.day === null) return <div key={`e-${i}`} className="py-2" />;
+          const deadlines = deadlineMap.get(cell.dateKey);
+          const hasDeadlines = deadlines && deadlines.length > 0;
+          const isToday = cell.dateKey === todayKey;
+
+          let dotColor = '';
+          if (hasDeadlines) {
+            const colors = deadlines.map((dl) => getUrgencyColor(dl.report.due_date!));
+            if (colors.includes('#EF4444')) dotColor = '#EF4444';
+            else if (colors.includes('#F59E0B')) dotColor = '#F59E0B';
+            else if (colors.includes('#3B82F6')) dotColor = '#3B82F6';
+            else dotColor = '#9CA3AF';
+          }
+
+          return (
+            <button
+              key={cell.dateKey}
+              onClick={hasDeadlines ? (e) => handleDayClick(e, cell.dateKey) : undefined}
+              disabled={!hasDeadlines}
+              className={`relative rounded-md py-1.5 text-center transition ${
+                hasDeadlines ? 'cursor-pointer hover:bg-muted' : 'cursor-default'
+              } ${isToday ? 'bg-[hsl(var(--kuja-clay)/0.08)] ring-1 ring-[hsl(var(--kuja-clay)/0.25)]' : ''}`}
+            >
+              <span
+                className={`text-xs ${
+                  isToday ? 'font-bold text-[hsl(var(--kuja-clay))]' : 'text-foreground'
+                }`}
+              >
+                {cell.day}
+              </span>
+              {hasDeadlines && (
+                <div className="mt-0.5 flex items-center justify-center gap-0.5">
+                  {deadlines.length <= 3 ? (
+                    deadlines.map((dl, idx) => (
+                      <span
+                        key={idx}
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ background: getUrgencyColor(dl.report.due_date!) }}
+                      />
+                    ))
+                  ) : (
+                    <>
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: dotColor }} />
+                      <span className="text-[8px] leading-none text-muted-foreground">
+                        +{deadlines.length - 1}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {popoverDate && popoverPos && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setPopoverDate(null)} />
+          <div
+            className="absolute z-50 max-w-[320px] rounded-[10px] border border-border bg-card p-3 shadow-[var(--kuja-elev-3)]"
+            style={{ top: popoverPos.top, left: popoverPos.left }}
+          >
+            <div className="mb-2 text-sm font-semibold">
+              {new Date(popoverDate + 'T00:00:00').toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </div>
+            <div className="space-y-1.5">
+              {popoverDeadlines.map((dl, i) => {
+                const urgencyColor = getUrgencyColor(dl.report.due_date!);
+                return (
+                  <div key={i} className="flex items-center gap-2 rounded-md bg-muted/50 p-2">
+                    <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ background: urgencyColor }} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{dl.report.title}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">{dl.grantTitle}</div>
+                    </div>
+                    <button className="rounded-md border border-border px-2 py-0.5 text-[10px] hover:bg-background">
+                      {dl.report.status === 'draft' ? t('report.continue_draft') : t('report.start_report')}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </Card>
   );
 }
 
 // ---------------------------------------------------------------------------
-// AI Report Guidance Panel
+// AI Guidance Panel
 // ---------------------------------------------------------------------------
 
 function AIReportGuidancePanel({ report }: { report: Report }) {
@@ -386,45 +308,29 @@ function AIReportGuidancePanel({ report }: { report: Report }) {
   const [sectionContent, setSectionContent] = useState('');
   const [requirement, setRequirement] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{
-    quality_score: number;
-    guidance: string;
-  } | null>(null);
+  const [result, setResult] = useState<{ quality_score: number; guidance: string } | null>(null);
 
   const handleGetFeedback = async () => {
     if (!sectionContent.trim()) return;
     setLoading(true);
     setResult(null);
     try {
-      const resp = await api.post<{
-        success: boolean;
-        guidance: string;
-        quality_score: number;
-      }>('/ai/guidance', {
-        field_name: report.report_type || 'report_section',
-        grant_criteria: requirement || undefined,
-        current_text: sectionContent,
-      });
-      setResult({
-        quality_score: resp.quality_score || 0,
-        guidance: resp.guidance || '',
-      });
+      const resp = await api.post<{ success: boolean; guidance: string; quality_score: number }>(
+        '/ai/guidance',
+        {
+          field_name: report.report_type || 'report_section',
+          grant_criteria: requirement || undefined,
+          current_text: sectionContent,
+        },
+      );
+      setResult({ quality_score: resp.quality_score || 0, guidance: resp.guidance || '' });
     } catch {
-      // silently handle
+      /* noop */
     } finally {
       setLoading(false);
     }
   };
 
-  const scoreColor = result
-    ? result.quality_score >= 80
-      ? 'success'
-      : result.quality_score >= 60
-        ? 'warning'
-        : 'error'
-    : 'default';
-
-  // Parse guidance into strengths and suggestions
   const { strengths, suggestions } = useMemo(() => {
     if (!result?.guidance) return { strengths: [] as string[], suggestions: [] as string[] };
     const lines = result.guidance.split('\n').filter((l) => l.trim());
@@ -433,134 +339,131 @@ function AIReportGuidancePanel({ report }: { report: Report }) {
     let section = 'suggestions';
     for (const line of lines) {
       const lower = line.toLowerCase();
-      if (lower.includes('strength') || lower.includes('good') || lower.includes('well')) {
-        section = 'strengths';
-      }
-      if (lower.includes('suggestion') || lower.includes('improve') || lower.includes('consider') || lower.includes('recommend')) {
+      if (lower.includes('strength') || lower.includes('good') || lower.includes('well')) section = 'strengths';
+      if (
+        lower.includes('suggestion') ||
+        lower.includes('improve') ||
+        lower.includes('consider') ||
+        lower.includes('recommend')
+      )
         section = 'suggestions';
-      }
       const cleaned = line.replace(/^[-*\u2022]\s*/, '').trim();
       if (cleaned.length < 5) continue;
       if (section === 'strengths') s.push(cleaned);
       else sugg.push(cleaned);
     }
-    // If no clear separation, put everything as suggestions
     if (s.length === 0 && sugg.length === 0) {
-      return { strengths: [], suggestions: lines.map((l) => l.replace(/^[-*\u2022]\s*/, '').trim()).filter((l) => l.length > 4) };
+      return {
+        strengths: [],
+        suggestions: lines
+          .map((l) => l.replace(/^[-*\u2022]\s*/, '').trim())
+          .filter((l) => l.length > 4),
+      };
     }
     return { strengths: s, suggestions: sugg };
   }, [result]);
 
   if (report.status !== 'draft') return null;
 
+  const scoreCls = result
+    ? result.quality_score >= 80
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      : result.quality_score >= 60
+        ? 'bg-amber-50 text-amber-700 border-amber-200'
+        : 'bg-red-50 text-red-700 border-red-200'
+    : '';
+
+  const ta =
+    'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]';
+
   return (
-    <Box sx={{ mt: 1 }}>
-      <Button
-        size="small"
-        startIcon={<AutoAwesomeIcon sx={{ fontSize: 14 }} />}
+    <div className="mt-1">
+      <button
         onClick={() => setOpen(!open)}
-        sx={{ fontSize: '0.75rem', color: 'primary.main' }}
+        className="inline-flex items-center gap-1 text-xs font-medium text-[hsl(var(--kuja-spark))] hover:underline"
       >
+        <Sparkles className="h-3.5 w-3.5" />
         {t('report.ai_guidance')}
-      </Button>
-      <Collapse in={open}>
-        <Card variant="outlined" sx={{ mt: 1, borderColor: 'primary.100' }}>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            <Typography variant="caption" sx={{ fontWeight: 600, color: 'primary.main', mb: 1, display: 'block' }}>
-              {t('report.ai_guidance_subtitle')}
-            </Typography>
+      </button>
+      {open && (
+        <div className="mt-1 rounded-[10px] border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] p-3">
+          <div className="mb-2 text-xs font-semibold text-[hsl(var(--kuja-spark))]">
+            {t('report.ai_guidance_subtitle')}
+          </div>
+          <div className="mb-2 space-y-2">
+            <div>
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {t('report.donor_requirement')}
+              </label>
+              <textarea
+                rows={2}
+                value={requirement}
+                onChange={(e) => setRequirement(e.target.value)}
+                className={ta}
+                placeholder={t('report.donor_requirement')}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {t('report.section_content')}
+              </label>
+              <textarea
+                rows={3}
+                value={sectionContent}
+                onChange={(e) => setSectionContent(e.target.value)}
+                className={ta}
+                placeholder={t('report.section_content')}
+              />
+            </div>
+          </div>
+          <button
+            onClick={handleGetFeedback}
+            disabled={loading || !sectionContent.trim()}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-3 py-1.5 text-xs font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {loading ? t('report.analyzing') : t('report.get_ai_feedback')}
+          </button>
 
-            <TextField
-              size="small"
-              fullWidth
-              multiline
-              minRows={2}
-              maxRows={4}
-              placeholder={t('report.donor_requirement')}
-              value={requirement}
-              onChange={(e) => setRequirement(e.target.value)}
-              sx={{ mb: 1 }}
-              label={t('report.donor_requirement')}
-            />
-            <TextField
-              size="small"
-              fullWidth
-              multiline
-              minRows={3}
-              maxRows={6}
-              placeholder={t('report.section_content')}
-              value={sectionContent}
-              onChange={(e) => setSectionContent(e.target.value)}
-              sx={{ mb: 1.5 }}
-              label={t('report.section_content')}
-            />
-
-            <Button
-              size="small"
-              variant="contained"
-              onClick={handleGetFeedback}
-              disabled={loading || !sectionContent.trim()}
-              startIcon={loading ? <CircularProgress size={14} /> : <AutoAwesomeIcon sx={{ fontSize: 14 }} />}
-              sx={{ fontSize: '0.75rem' }}
-            >
-              {loading ? t('report.analyzing') : t('report.get_ai_feedback')}
-            </Button>
-
-            {result && (
-              <Box sx={{ mt: 2 }}>
-                {/* Score chip */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                    {t('report.quality_score')}:
-                  </Typography>
-                  <Chip
-                    label={`${result.quality_score}/100`}
-                    size="small"
-                    color={scoreColor as 'success' | 'warning' | 'error' | 'default'}
-                  />
-                </Box>
-
-                {/* Strengths */}
-                {strengths.length > 0 && (
-                  <Box sx={{ mb: 1.5 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: 'success.main', mb: 0.5, display: 'block' }}>
-                      {t('report.strengths')}
-                    </Typography>
-                    {strengths.map((s, i) => (
-                      <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 0.5 }}>
-                        <CheckCircleOutlineIcon sx={{ fontSize: 14, color: 'success.main', mt: 0.25 }} />
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>{s}</Typography>
-                      </Box>
+          {result && (
+            <div className="mt-3">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-xs font-semibold">{t('report.quality_score')}:</span>
+                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${scoreCls}`}>
+                  {result.quality_score}/100
+                </span>
+              </div>
+              {strengths.length > 0 && (
+                <div className="mb-2">
+                  <div className="mb-1 text-xs font-semibold text-emerald-700">{t('report.strengths')}</div>
+                  {strengths.map((s, i) => (
+                    <div key={i} className="mb-0.5 flex items-start gap-1 text-xs text-muted-foreground">
+                      <CheckCircle2 className="mt-0.5 h-3 w-3 flex-shrink-0 text-emerald-600" />
+                      <span>{s}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {suggestions.length > 0 && (
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-amber-700">{t('report.suggestions')}</div>
+                  <ul className="ml-4 list-disc space-y-0.5 text-xs text-muted-foreground">
+                    {suggestions.map((s, i) => (
+                      <li key={i}>{s}</li>
                     ))}
-                  </Box>
-                )}
-
-                {/* Suggestions */}
-                {suggestions.length > 0 && (
-                  <Box>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: 'warning.main', mb: 0.5, display: 'block' }}>
-                      {t('report.suggestions')}
-                    </Typography>
-                    <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                      {suggestions.map((s, i) => (
-                        <Typography key={i} component="li" variant="caption" sx={{ color: 'text.secondary', mb: 0.25 }}>
-                          {s}
-                        </Typography>
-                      ))}
-                    </Box>
-                  </Box>
-                )}
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-      </Collapse>
-    </Box>
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Main Component
+// Main Page
 // ---------------------------------------------------------------------------
 
 export default function ReportsPage() {
@@ -573,7 +476,6 @@ export default function ReportsPage() {
   const overdueCount = upcomingData?.overdue_count ?? 0;
   const isLoading = reportsLoading || upcomingLoading;
 
-  // Group reports by grant
   const reportsByGrant = useMemo(() => {
     const groups: Record<string, { grantId: number; grantTitle: string; reports: Report[] }> = {};
     for (const r of reports) {
@@ -590,7 +492,6 @@ export default function ReportsPage() {
     return Object.values(groups);
   }, [reports]);
 
-  // Overall compliance
   const overallCompliance = useMemo(() => {
     const scored = reports.filter(
       (r) => r.ai_analysis && (r.ai_analysis as Record<string, unknown>).score !== undefined,
@@ -603,226 +504,179 @@ export default function ReportsPage() {
     return Math.round(total / scored.length);
   }, [reports]);
 
-  // Timeline items (next 90 days)
   const timelineItems = useMemo(() => {
-    const items: Array<{
-      report: Report;
-      grantTitle: string;
-      daysLeft: number;
-    }> = [];
-
+    const items: Array<{ report: Report; grantTitle: string; daysLeft: number }> = [];
     reportsByGrant.forEach((group) => {
       group.reports.forEach((r) => {
         if (!r.due_date) return;
         const days = getDaysUntil(r.due_date);
-        if (days >= -7 && days <= 90) {
-          items.push({ report: r, grantTitle: group.grantTitle, daysLeft: days });
-        }
+        if (days >= -7 && days <= 90) items.push({ report: r, grantTitle: group.grantTitle, daysLeft: days });
       });
     });
-
     items.sort((a, b) => a.daysLeft - b.daysLeft);
     return items;
   }, [reportsByGrant]);
 
   if (isLoading) {
     return (
-      <Stack spacing={3} sx={{ maxWidth: 960 }}>
-        <Skeleton variant="text" width={260} height={36} />
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 3 }}>
+      <div className="max-w-[960px] space-y-6">
+        <div className="h-9 w-64 animate-pulse rounded-md bg-muted" />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} variant="rounded" height={80} sx={{ borderRadius: 2 }} />
+            <div key={i} className="h-20 animate-pulse rounded-[10px] bg-muted" />
           ))}
-        </Box>
-        <Skeleton variant="rounded" height={260} sx={{ borderRadius: 2 }} />
-      </Stack>
+        </div>
+        <div className="h-60 animate-pulse rounded-[10px] bg-muted" />
+      </div>
     );
   }
 
   const submittedCount = reports.filter((r) => r.status === 'submitted' || r.status === 'accepted').length;
   const pendingCount = reports.filter((r) => r.status === 'draft').length;
 
+  const complianceBarCls =
+    overallCompliance >= 80
+      ? 'bg-emerald-500'
+      : overallCompliance >= 60
+        ? 'bg-amber-500'
+        : 'bg-red-500';
+
   return (
-    <Stack spacing={4} sx={{ maxWidth: 960 }}>
-      {/* Header */}
-      <Box>
-        <Typography variant="h2" sx={{ color: 'text.primary' }}>
+    <div className="max-w-[960px] space-y-7">
+      <div>
+        <h1 className="kuja-display text-[2.25rem] font-semibold leading-[1.1] text-foreground">
           {t('report.reports_compliance')}
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 0.5 }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+        </h1>
+        <div className="mt-1 flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">
             {overallCompliance > 0
               ? t('report.compliant', { score: overallCompliance })
               : t('report.reports_total', { count: reports.length })}
-          </Typography>
+          </span>
           {overdueCount > 0 && (
-            <Chip
-              label={`${overdueCount} ${t('common.overdue').toLowerCase()}`}
-              color="error"
-              size="small"
-              variant="outlined"
-            />
+            <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">
+              {overdueCount} {String(t('common.overdue')).toLowerCase()}
+            </span>
           )}
-        </Box>
-      </Box>
+        </div>
+      </div>
 
-      {/* Compliance Calendar */}
-      <ComplianceCalendar reports={reports} reportsByGrant={reportsByGrant} />
+      <ComplianceCalendar reportsByGrant={reportsByGrant} />
 
-      {/* Stat cards */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 3 }}>
-        <Card>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>{reports.length}</Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{t('report.total_reports')}</Typography>
-          </CardContent>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Card className="p-5">
+          <div className="kuja-numeric text-3xl font-bold">{reports.length}</div>
+          <div className="mt-1 text-sm text-muted-foreground">{t('report.total_reports')}</div>
         </Card>
-        <Card>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>{submittedCount}</Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{t('report.submitted')}</Typography>
-          </CardContent>
+        <Card className="p-5">
+          <div className="kuja-numeric text-3xl font-bold">{submittedCount}</div>
+          <div className="mt-1 text-sm text-muted-foreground">{t('report.submitted')}</div>
         </Card>
-        <Card>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>{pendingCount}</Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{t('report.pending')}</Typography>
-          </CardContent>
+        <Card className="p-5">
+          <div className="kuja-numeric text-3xl font-bold">{pendingCount}</div>
+          <div className="mt-1 text-sm text-muted-foreground">{t('report.pending')}</div>
         </Card>
-        <Card>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: overdueCount > 0 ? 'error.main' : 'text.primary' }}>
-              {overdueCount}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{t('common.overdue')}</Typography>
-          </CardContent>
+        <Card className="p-5">
+          <div className={`kuja-numeric text-3xl font-bold ${overdueCount > 0 ? 'text-red-600' : ''}`}>
+            {overdueCount}
+          </div>
+          <div className="mt-1 text-sm text-muted-foreground">{t('common.overdue')}</div>
         </Card>
-      </Box>
+      </div>
 
-      {/* Overall Compliance Progress */}
       {overallCompliance > 0 && (
-        <Card>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                {t('report.overall_compliance')}
-              </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                {overallCompliance}%
-              </Typography>
-            </Box>
-            <LinearProgress
-              variant="determinate"
-              value={overallCompliance}
-              color={overallCompliance >= 80 ? 'success' : overallCompliance >= 60 ? 'warning' : 'error'}
-              sx={{ height: 8, borderRadius: 1 }}
+        <Card className="p-5">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-semibold">{t('report.overall_compliance')}</span>
+            <span className="kuja-numeric text-sm font-semibold">{overallCompliance}%</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className={`h-full rounded-full ${complianceBarCls}`}
+              style={{ width: `${overallCompliance}%` }}
             />
-          </CardContent>
+          </div>
         </Card>
       )}
 
-      {/* Tabs */}
-      <Box>
-        <Tabs
-          value={tabValue}
-          onChange={(_, v) => setTabValue(v)}
-          sx={{
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-          }}
-        >
-          <Tab label={t('report.by_grant')} />
-          <Tab label={t('report.timeline')} />
-        </Tabs>
+      <div>
+        <div className="border-b border-border">
+          <button
+            onClick={() => setTabValue(0)}
+            className={`relative -mb-px px-4 py-2 text-sm font-medium transition ${
+              tabValue === 0
+                ? 'border-b-2 border-[hsl(var(--kuja-clay))] text-[hsl(var(--kuja-clay))]'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {t('report.by_grant')}
+          </button>
+          <button
+            onClick={() => setTabValue(1)}
+            className={`relative -mb-px px-4 py-2 text-sm font-medium transition ${
+              tabValue === 1
+                ? 'border-b-2 border-[hsl(var(--kuja-clay))] text-[hsl(var(--kuja-clay))]'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {t('report.timeline')}
+          </button>
+        </div>
 
-        {/* By Grant Tab */}
         {tabValue === 0 && (
-          <Stack spacing={2} sx={{ mt: 3 }}>
+          <div className="mt-5 space-y-3">
             {reportsByGrant.length === 0 ? (
-              <Box sx={{ py: 10, textAlign: 'center' }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  {t('report.no_reports_yet')}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>
-                  {t('report.no_reports_hint')}
-                </Typography>
-              </Box>
+              <div className="py-10 text-center">
+                <div className="text-sm text-muted-foreground">{t('report.no_reports_yet')}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{t('report.no_reports_hint')}</div>
+              </div>
             ) : (
               reportsByGrant.map((group) => (
-                <GrantReportGroup
-                  key={group.grantId}
-                  group={group}
-                  mutateReports={mutateReports}
-                />
+                <GrantReportGroup key={group.grantId} group={group} mutateReports={mutateReports} />
               ))
             )}
-          </Stack>
+          </div>
         )}
 
-        {/* Timeline Tab */}
         {tabValue === 1 && (
-          <Box sx={{ mt: 3 }}>
+          <div className="mt-5">
             {timelineItems.length === 0 ? (
-              <Box sx={{ py: 10, textAlign: 'center' }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  {t('report.no_upcoming_deadlines')}
-                </Typography>
-              </Box>
+              <div className="py-10 text-center">
+                <div className="text-sm text-muted-foreground">{t('report.no_upcoming_deadlines')}</div>
+              </div>
             ) : (
-              <Stack spacing={0}>
+              <div>
                 {timelineItems.map((item) => {
                   const dl = getDeadlineText(item.report.due_date);
                   return (
-                    <Box
+                    <div
                       key={item.report.id}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 2,
-                        py: 1.5,
-                        borderBottom: '1px solid',
-                        borderColor: 'divider',
-                        '&:last-child': { borderBottom: 'none' },
-                      }}
+                      className="flex items-center gap-3 border-b border-border py-3 last:border-b-0"
                     >
-                      <Typography variant="caption" sx={{ color: 'text.secondary', width: 80, flexShrink: 0 }}>
+                      <span className="w-20 flex-shrink-0 text-xs text-muted-foreground">
                         {formatDate(item.report.due_date)}
-                      </Typography>
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>
-                          {item.report.title}
-                        </Typography>
-                        <Typography variant="caption" noWrap sx={{ color: 'text.secondary' }}>
-                          {item.grantTitle}
-                        </Typography>
-                      </Box>
-                      <Chip
-                        label={item.report.report_type}
-                        size="small"
-                        variant="outlined"
-                        sx={{ fontSize: '0.6875rem', borderColor: 'divider' }}
-                      />
-                      <ReportStatusChip status={item.report.status} />
-                      <Typography
-                        variant="caption"
-                        sx={{ fontWeight: 600, color: dl.color, flexShrink: 0 }}
-                      >
-                        {dl.label}
-                      </Typography>
-                    </Box>
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm">{item.report.title}</div>
+                        <div className="truncate text-xs text-muted-foreground">{item.grantTitle}</div>
+                      </div>
+                      <TypeChip label={item.report.report_type} />
+                      <StatusChip status={item.report.status} />
+                      <span className={`flex-shrink-0 text-xs font-semibold ${dl.cls}`}>{dl.label}</span>
+                    </div>
                   );
                 })}
-              </Stack>
+              </div>
             )}
-          </Box>
+          </div>
         )}
-      </Box>
-    </Stack>
+      </div>
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Grant Report Group (Accordion)
+// Grant Group (Accordion)
 // ---------------------------------------------------------------------------
 
 function GrantReportGroup({
@@ -833,69 +687,79 @@ function GrantReportGroup({
   mutateReports: () => void;
 }) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(true);
+
   const scored = group.reports.filter(
     (r) => r.ai_analysis && (r.ai_analysis as Record<string, unknown>).score !== undefined,
   );
-  const grantCompliance = scored.length > 0
-    ? Math.round(
-        scored.reduce(
-          (sum, r) => sum + (Number((r.ai_analysis as Record<string, unknown>).score) || 0),
-          0,
-        ) / scored.length,
-      )
-    : 0;
+  const grantCompliance =
+    scored.length > 0
+      ? Math.round(
+          scored.reduce(
+            (sum, r) => sum + (Number((r.ai_analysis as Record<string, unknown>).score) || 0),
+            0,
+          ) / scored.length,
+        )
+      : 0;
 
   const completedCount = group.reports.filter(
     (r) => r.status === 'accepted' || r.status === 'submitted',
   ).length;
 
+  const chipCls =
+    grantCompliance >= 80
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      : grantCompliance >= 60
+        ? 'border-amber-200 bg-amber-50 text-amber-700'
+        : 'border-red-200 bg-red-50 text-red-700';
+
   return (
-    <Accordion defaultExpanded>
-      <AccordionSummary
-        expandIcon={<ExpandMoreIcon />}
-        sx={{ px: 2.5 }}
+    <Card>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-muted/30"
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, mr: 2 }}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }} noWrap>
-              {group.grantTitle}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              {group.reports.length} {t('report.deliverables')} / {completedCount} {t('report.completed')}
-            </Typography>
-          </Box>
-          {grantCompliance > 0 && (
-            <Chip
-              label={`${grantCompliance}%`}
-              size="small"
-              color={grantCompliance >= 80 ? 'success' : grantCompliance >= 60 ? 'warning' : 'error'}
-              variant="outlined"
-            />
-          )}
-        </Box>
-      </AccordionSummary>
-      <AccordionDetails sx={{ p: 0 }}>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>{t('report.title')}</TableCell>
-                <TableCell>{t('report.type')}</TableCell>
-                <TableCell>{t('report.due_date')}</TableCell>
-                <TableCell align="center">{t('report.status')}</TableCell>
-                <TableCell align="center">{t('report.score')}</TableCell>
-                <TableCell align="right">{t('report.action')}</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+        <ChevronDown
+          className={`h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform ${
+            expanded ? '' : '-rotate-90'
+          }`}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold">{group.grantTitle}</div>
+          <div className="text-xs text-muted-foreground">
+            {group.reports.length} {t('report.deliverables')} / {completedCount} {t('report.completed')}
+          </div>
+        </div>
+        {grantCompliance > 0 && (
+          <span
+            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${chipCls}`}
+          >
+            {grantCompliance}%
+          </span>
+        )}
+      </button>
+      {expanded && (
+        <div className="overflow-x-auto border-t border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/30">
+              <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                <th className="px-4 py-2 font-medium">{t('report.title')}</th>
+                <th className="px-4 py-2 font-medium">{t('report.type')}</th>
+                <th className="px-4 py-2 font-medium">{t('report.due_date')}</th>
+                <th className="px-4 py-2 text-center font-medium">{t('report.status')}</th>
+                <th className="px-4 py-2 text-center font-medium">{t('report.score')}</th>
+                <th className="px-4 py-2 text-right font-medium">{t('report.action')}</th>
+              </tr>
+            </thead>
+            <tbody>
               {group.reports.map((report) => (
                 <ReportRow key={report.id} report={report} mutateReports={mutateReports} />
               ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </AccordionDetails>
-    </Accordion>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -903,13 +767,7 @@ function GrantReportGroup({
 // Report Row
 // ---------------------------------------------------------------------------
 
-function ReportRow({
-  report,
-  mutateReports,
-}: {
-  report: Report;
-  mutateReports: () => void;
-}) {
+function ReportRow({ report, mutateReports }: { report: Report; mutateReports: () => void }) {
   const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -927,7 +785,7 @@ function ReportRow({
       await api.upload(`/reports/${report.id}/attachments`, formData);
       mutateReports();
     } catch {
-      // Error handling
+      /* noop */
     } finally {
       setUploading(false);
     }
@@ -935,70 +793,51 @@ function ReportRow({
 
   return (
     <>
-      <TableRow sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-        {/* Title */}
-        <TableCell>
-          <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-            {report.title}
-          </Typography>
+      <tr className="border-t border-border hover:bg-muted/20">
+        <td className="max-w-[220px] px-4 py-2.5">
+          <div className="truncate">{report.title}</div>
           {report.reporting_period && (
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }} noWrap>
-              {report.reporting_period}
-            </Typography>
+            <div className="truncate text-[11px] text-muted-foreground">{report.reporting_period}</div>
           )}
-        </TableCell>
-
-        {/* Type */}
-        <TableCell>
-          <Chip
-            label={report.report_type}
-            size="small"
-            variant="outlined"
-            sx={{ fontSize: '0.6875rem', borderColor: 'divider' }}
-          />
-        </TableCell>
-
-        {/* Due Date */}
-        <TableCell>
-          <Typography variant="body2" sx={{ color: 'text.primary' }}>
-            {formatDate(report.due_date)}
-          </Typography>
-          <Typography variant="caption" sx={{ color: dl.color, fontWeight: 500 }}>
-            {dl.label}
-          </Typography>
-        </TableCell>
-
-        {/* Status */}
-        <TableCell align="center">
-          <ReportStatusChip status={report.status} />
-        </TableCell>
-
-        {/* Score */}
-        <TableCell align="center">
+        </td>
+        <td className="px-4 py-2.5">
+          <TypeChip label={report.report_type} />
+        </td>
+        <td className="px-4 py-2.5">
+          <div>{formatDate(report.due_date)}</div>
+          <div className={`text-[11px] font-medium ${dl.cls}`}>{dl.label}</div>
+        </td>
+        <td className="px-4 py-2.5 text-center">
+          <StatusChip status={report.status} />
+        </td>
+        <td className="px-4 py-2.5 text-center">
           {aiScore !== null ? (
-            <ScoreRing score={Math.round(aiScore)} size={28} strokeWidth={2.5} />
+            <div className="inline-block">
+              <ScoreRing score={Math.round(aiScore)} size={28} strokeWidth={2.5} />
+            </div>
           ) : (
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>--</Typography>
+            <span className="text-xs text-muted-foreground">--</span>
           )}
-        </TableCell>
-
-        {/* Upload */}
-        <TableCell align="right">
+        </td>
+        <td className="px-4 py-2.5 text-right">
           {report.status === 'draft' ? (
             <>
-              <Button
-                size="small"
-                startIcon={uploading ? <CircularProgress size={14} /> : <UploadFileOutlined sx={{ fontSize: 16 }} />}
+              <button
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                sx={{ fontSize: '0.75rem' }}
+                className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
               >
+                {uploading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Upload className="h-3.5 w-3.5" />
+                )}
                 {t('common.upload')}
-              </Button>
+              </button>
               <input
                 ref={fileRef}
                 type="file"
-                style={{ display: 'none' }}
+                className="hidden"
                 accept=".pdf,.doc,.docx,.xls,.xlsx"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -1007,19 +846,16 @@ function ReportRow({
               />
             </>
           ) : (
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              {report.status === 'accepted' ? t('report.submitted') : t('report.submitted')}
-            </Typography>
+            <span className="text-xs text-muted-foreground">{t('report.submitted')}</span>
           )}
-        </TableCell>
-      </TableRow>
-      {/* AI Guidance row for draft reports */}
+        </td>
+      </tr>
       {report.status === 'draft' && (
-        <TableRow>
-          <TableCell colSpan={6} sx={{ py: 0, borderBottom: 'none' }}>
+        <tr>
+          <td colSpan={6} className="border-t-0 px-4 py-0">
             <AIReportGuidancePanel report={report} />
-          </TableCell>
-        </TableRow>
+          </td>
+        </tr>
       )}
     </>
   );

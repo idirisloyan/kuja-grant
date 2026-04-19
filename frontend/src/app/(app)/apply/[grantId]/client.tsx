@@ -5,26 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useGrant } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Chip from '@mui/material/Chip';
-import Skeleton from '@mui/material/Skeleton';
-import Stack from '@mui/material/Stack';
-import Stepper from '@mui/material/Stepper';
-import Step from '@mui/material/Step';
-import StepLabel from '@mui/material/StepLabel';
-import Checkbox from '@mui/material/Checkbox';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import CircularProgress from '@mui/material/CircularProgress';
-import Alert from '@mui/material/Alert';
-import LinearProgress from '@mui/material/LinearProgress';
-import Divider from '@mui/material/Divider';
-
+import { ScoreRing } from '@/components/shared/score-ring';
 import {
   ArrowLeft,
   ArrowRight,
@@ -37,6 +18,7 @@ import {
   Download,
   X,
   Eye,
+  Loader2,
 } from 'lucide-react';
 
 import type {
@@ -56,22 +38,18 @@ function wordCount(text: string): number {
 }
 
 function wordCountColor(count: number, maxWords?: number): string {
-  if (!maxWords || maxWords === 0) return '#94A3B8';
+  if (!maxWords || maxWords === 0) return 'text-muted-foreground';
   const ratio = count / maxWords;
-  if (ratio < 0.5) return '#EF4444'; // red
-  if (ratio < 0.7) return '#F59E0B'; // amber
-  return '#22C55E'; // green
+  if (ratio < 0.5) return 'text-red-600';
+  if (ratio < 0.7) return 'text-amber-600';
+  return 'text-emerald-600';
 }
 
-function scoreColor(score: number): string {
-  if (score >= 80) return '#059669';
-  if (score >= 60) return '#D97706';
-  return '#DC2626';
+function scoreToneCls(score: number): string {
+  if (score >= 80) return 'text-emerald-600';
+  if (score >= 60) return 'text-amber-600';
+  return 'text-red-600';
 }
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 interface EligibilityResponse {
   checked: boolean;
@@ -95,6 +73,59 @@ interface UploadedDoc {
 
 const STEPS = ['Eligibility', 'Proposal', 'Documents', 'Review & Submit'];
 
+const TA_CLS =
+  'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))] placeholder:text-muted-foreground';
+
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-[10px] border border-border bg-card shadow-[var(--kuja-elev-1)] ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+function Alert({
+  tone,
+  children,
+}: {
+  tone: 'success' | 'warning' | 'error' | 'info';
+  children: React.ReactNode;
+}) {
+  const palette: Record<typeof tone, string> = {
+    success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+    warning: 'bg-amber-50 border-amber-200 text-amber-900',
+    error: 'bg-red-50 border-red-200 text-red-800',
+    info: 'bg-sky-50 border-sky-200 text-sky-800',
+  };
+  return (
+    <div className={`rounded-md border px-3 py-2 text-sm ${palette[tone]}`}>{children}</div>
+  );
+}
+
+function Chip({
+  children,
+  tone = 'default',
+  className = '',
+}: {
+  children: React.ReactNode;
+  tone?: 'default' | 'red' | 'spark' | 'emerald' | 'amber' | 'clay';
+  className?: string;
+}) {
+  const palette: Record<string, string> = {
+    default: 'bg-background border-border text-foreground',
+    red: 'bg-red-50 border-red-200 text-red-700',
+    spark: 'bg-[hsl(var(--kuja-spark-soft))] border-[hsl(var(--kuja-spark-soft))] text-[hsl(var(--kuja-spark))]',
+    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+    amber: 'bg-amber-50 border-amber-200 text-amber-700',
+    clay: 'bg-[hsl(var(--kuja-sand-50))] border-[hsl(var(--kuja-clay)/0.25)] text-[hsl(var(--kuja-clay))]',
+  };
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${palette[tone]} ${className}`}>
+      {children}
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
@@ -106,33 +137,23 @@ export default function ApplyWizardClient() {
   const { data, isLoading } = useGrant(grantId || null);
   const grant = data?.grant;
 
-  // Wizard state
   const [step, setStep] = useState(0);
   const [applicationId, setApplicationId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submissionScore, setSubmissionScore] = useState<number | null>(null);
 
-  // Step 1: Eligibility
   const [eligibility, setEligibility] = useState<Record<string, EligibilityResponse>>({});
   const [profileImported, setProfileImported] = useState(false);
   const [importingProfile, setImportingProfile] = useState(false);
 
-  // Step 2: Proposal
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [guidanceResults, setGuidanceResults] = useState<Record<string, GuidanceResult>>({});
   const [guidanceLoading, setGuidanceLoading] = useState<Record<string, boolean>>({});
   const [profileImportedProposal, setProfileImportedProposal] = useState(false);
 
-  // Step 3: Documents
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, UploadedDoc>>({});
-
-  // Org profile cache
   const [orgProfile, setOrgProfile] = useState<Organization | null>(null);
-
-  // ---------------------------------------------------------------------------
-  // Org Profile Loader
-  // ---------------------------------------------------------------------------
 
   const fetchOrgProfile = useCallback(async (): Promise<Organization | null> => {
     if (orgProfile) return orgProfile;
@@ -146,10 +167,6 @@ export default function ApplyWizardClient() {
     }
   }, [orgProfile]);
 
-  // ---------------------------------------------------------------------------
-  // Application lifecycle
-  // ---------------------------------------------------------------------------
-
   const ensureApplication = useCallback(async (): Promise<number | null> => {
     if (applicationId) return applicationId;
     try {
@@ -157,8 +174,8 @@ export default function ApplyWizardClient() {
         grant_id: grantId,
       });
       const id = res.application_id ?? res.id;
-      setApplicationId(id);
-      return id;
+      setApplicationId(id as number);
+      return id as number;
     } catch {
       toast.error('Failed to create application draft');
       return null;
@@ -177,15 +194,11 @@ export default function ApplyWizardClient() {
           eligibility_responses: eligibilityPayload,
         });
       } catch {
-        // Auto-save is best-effort; don't block the user
+        /* best-effort */
       }
     },
     [eligibility, responses],
   );
-
-  // ---------------------------------------------------------------------------
-  // Step Navigation
-  // ---------------------------------------------------------------------------
 
   const canProceedFromEligibility = useCallback((): boolean => {
     const requirements = grant?.eligibility ?? [];
@@ -194,19 +207,13 @@ export default function ApplyWizardClient() {
   }, [grant, eligibility]);
 
   const handleNext = useCallback(async () => {
-    // Validate eligibility step
     if (step === 0 && !canProceedFromEligibility()) {
       toast.error('Please confirm all required eligibility items before proceeding');
       return;
     }
-
-    // Create application on first forward navigation if needed
     const appId = await ensureApplication();
     if (!appId) return;
-
-    // Auto-save current state
     await autoSave(appId);
-
     setStep((s) => Math.min(3, s + 1));
   }, [step, canProceedFromEligibility, ensureApplication, autoSave]);
 
@@ -214,18 +221,11 @@ export default function ApplyWizardClient() {
     setStep((s) => Math.max(0, s - 1));
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // Step 1: Eligibility handlers
-  // ---------------------------------------------------------------------------
-
   const handleEligibilityChange = useCallback(
     (key: string, field: 'checked' | 'evidence', value: boolean | string) => {
       setEligibility((prev) => ({
         ...prev,
-        [key]: {
-          ...(prev[key] || { checked: false, evidence: '' }),
-          [field]: value,
-        },
+        [key]: { ...(prev[key] || { checked: false, evidence: '' }), [field]: value },
       }));
     },
     [],
@@ -238,86 +238,46 @@ export default function ApplyWizardClient() {
       setImportingProfile(false);
       return;
     }
-
     const updated = { ...eligibility };
     for (const req of grant.eligibility ?? []) {
       const key = req.key.toLowerCase();
       const label = req.label.toLowerCase();
       let autoChecked = false;
       let autoEvidence = '';
-
-      // Country match
-      if (
-        (key.includes('country') || label.includes('country') || label.includes('region')) &&
-        org.country
-      ) {
+      if ((key.includes('country') || label.includes('country') || label.includes('region')) && org.country) {
         autoChecked = true;
         autoEvidence = `Registered in ${org.country}`;
       }
-
-      // Sector match
-      if (
-        (key.includes('sector') || label.includes('sector') || label.includes('focus')) &&
-        org.sectors?.length
-      ) {
+      if ((key.includes('sector') || label.includes('sector') || label.includes('focus')) && org.sectors?.length) {
         autoChecked = true;
         autoEvidence = `Organization sectors: ${org.sectors.join(', ')}`;
       }
-
-      // Budget match
-      if (
-        (key.includes('budget') || label.includes('budget') || label.includes('financial')) &&
-        org.annual_budget
-      ) {
+      if ((key.includes('budget') || label.includes('budget') || label.includes('financial')) && org.annual_budget) {
         autoChecked = true;
         autoEvidence = `Annual budget: ${org.annual_budget}`;
       }
-
-      // Registration / legal
-      if (
-        (key.includes('regist') || label.includes('regist') || label.includes('legal')) &&
-        org.registration_number
-      ) {
+      if ((key.includes('regist') || label.includes('regist') || label.includes('legal')) && org.registration_number) {
         autoChecked = true;
         autoEvidence = `Registration #${org.registration_number} (${org.registration_status})`;
       }
-
-      // Years established
-      if (
-        (key.includes('year') || label.includes('established') || label.includes('experience')) &&
-        org.year_established
-      ) {
+      if ((key.includes('year') || label.includes('established') || label.includes('experience')) && org.year_established) {
         const years = new Date().getFullYear() - org.year_established;
         autoChecked = true;
         autoEvidence = `Established ${org.year_established} (${years} years of experience)`;
       }
-
-      // Staff count
-      if (
-        (key.includes('staff') || label.includes('staff') || label.includes('capacity')) &&
-        org.staff_count
-      ) {
+      if ((key.includes('staff') || label.includes('staff') || label.includes('capacity')) && org.staff_count) {
         autoChecked = true;
         autoEvidence = `Staff count: ${org.staff_count}`;
       }
-
       if (autoChecked) {
-        updated[req.key] = {
-          checked: true,
-          evidence: updated[req.key]?.evidence || autoEvidence,
-        };
+        updated[req.key] = { checked: true, evidence: updated[req.key]?.evidence || autoEvidence };
       }
     }
-
     setEligibility(updated);
     setProfileImported(true);
     setImportingProfile(false);
     toast.success('Profile data imported successfully');
   }, [eligibility, grant, fetchOrgProfile]);
-
-  // ---------------------------------------------------------------------------
-  // Step 2: Proposal handlers
-  // ---------------------------------------------------------------------------
 
   const handleResponseChange = useCallback((key: string, text: string) => {
     setResponses((prev) => ({ ...prev, [key]: text }));
@@ -356,10 +316,7 @@ export default function ApplyWizardClient() {
   );
 
   const handleDismissGuidance = useCallback((key: string) => {
-    setGuidanceResults((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], visible: false },
-    }));
+    setGuidanceResults((prev) => ({ ...prev, [key]: { ...prev[key], visible: false } }));
   }, []);
 
   const handleApplySuggestions = useCallback(
@@ -367,15 +324,11 @@ export default function ApplyWizardClient() {
       const guidance = guidanceResults[key];
       if (!guidance) return;
       const current = responses[key] ?? '';
-      // Append guidance as a note for the user to integrate
       const updated = current
         ? `${current}\n\n[AI Suggestions]\n${guidance.guidance}`
         : guidance.guidance;
       setResponses((prev) => ({ ...prev, [key]: updated }));
-      setGuidanceResults((prev) => ({
-        ...prev,
-        [key]: { ...prev[key], visible: false },
-      }));
+      setGuidanceResults((prev) => ({ ...prev, [key]: { ...prev[key], visible: false } }));
       toast.success('AI suggestions applied to your response');
     },
     [guidanceResults, responses],
@@ -384,13 +337,10 @@ export default function ApplyWizardClient() {
   const handleImportProfileProposal = useCallback(async () => {
     const org = await fetchOrgProfile();
     if (!org || !grant) return;
-
     const updated = { ...responses };
     for (const c of grant.criteria ?? []) {
       const key = c.key.toLowerCase();
       const label = c.label.toLowerCase();
-
-      // Experience / background criteria
       if (
         key.includes('experience') ||
         key.includes('background') ||
@@ -410,45 +360,34 @@ export default function ApplyWizardClient() {
         }
         if (org.sectors?.length) parts.push(`Key sectors: ${org.sectors.join(', ')}.`);
         if (org.staff_count) parts.push(`Team size: ${org.staff_count} staff.`);
-        if (org.geographic_areas?.length)
-          parts.push(`Operating in: ${org.geographic_areas.join(', ')}.`);
-
+        if (org.geographic_areas?.length) parts.push(`Operating in: ${org.geographic_areas.join(', ')}.`);
         if (parts.length > 0 && !updated[c.key]?.trim()) {
           updated[c.key] = parts.join('\n');
         }
       }
     }
-
     setResponses(updated);
     setProfileImportedProposal(true);
     toast.success('Organization profile imported into relevant responses');
   }, [responses, grant, fetchOrgProfile]);
 
-  // ---------------------------------------------------------------------------
-  // Step 3: Document upload
-  // ---------------------------------------------------------------------------
-
   const handleFileUpload = useCallback(
     async (docKey: string, docType: string, file: File) => {
       const appId = applicationId ?? (await ensureApplication());
       if (!appId) return;
-
       setUploadedDocs((prev) => ({
         ...prev,
         [docKey]: { fileName: file.name, uploading: true, uploaded: false },
       }));
-
       try {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('application_id', String(appId));
         formData.append('doc_type', docType);
-
         const res = await api.upload<{ document_id?: number; score?: number }>(
           '/documents/upload',
           formData,
         );
-
         setUploadedDocs((prev) => ({
           ...prev,
           [docKey]: {
@@ -479,14 +418,8 @@ export default function ApplyWizardClient() {
     });
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // Step 4: Submit
-  // ---------------------------------------------------------------------------
-
   const handleSubmit = useCallback(async () => {
     if (!grant) return;
-
-    // Check completeness
     const requirements = grant.eligibility ?? [];
     const requiredEligibility = requirements.filter((r) => r.required);
     const unmetEligibility = requiredEligibility.filter((r) => !eligibility[r.key]?.checked);
@@ -494,14 +427,12 @@ export default function ApplyWizardClient() {
       toast.error('Some required eligibility items are not confirmed');
       return;
     }
-
     const requiredDocs = (grant.doc_requirements ?? []).filter((d) => d.required);
     const missingDocs = requiredDocs.filter((d) => !uploadedDocs[d.key]?.uploaded);
     if (missingDocs.length > 0) {
       toast.error('Please upload all required documents before submitting');
       return;
     }
-
     setSubmitting(true);
     try {
       const appId = applicationId ?? (await ensureApplication());
@@ -509,8 +440,6 @@ export default function ApplyWizardClient() {
         setSubmitting(false);
         return;
       }
-
-      // Final save
       const eligibilityPayload: Record<string, { met: boolean; evidence: string }> = {};
       for (const [key, val] of Object.entries(eligibility)) {
         eligibilityPayload[key] = { met: val.checked, evidence: val.evidence };
@@ -519,14 +448,11 @@ export default function ApplyWizardClient() {
         responses,
         eligibility_responses: eligibilityPayload,
       });
-
-      // Submit
       const result = await api.post<{
         success: boolean;
         ai_score?: number;
         scores?: { overall_score?: number };
       }>(`/applications/${appId}/submit`);
-
       const score = result.ai_score ?? result.scores?.overall_score ?? null;
       setSubmissionScore(score);
       setSubmitted(true);
@@ -539,122 +465,76 @@ export default function ApplyWizardClient() {
   }, [grant, eligibility, responses, uploadedDocs, applicationId, ensureApplication]);
 
   // ---------------------------------------------------------------------------
-  // Loading State
+  // States
   // ---------------------------------------------------------------------------
 
   if (isLoading) {
     return (
-      <Stack spacing={3}>
-        <Skeleton variant="text" width={200} height={32} />
-        <Skeleton variant="text" width={400} height={20} />
-        <Skeleton variant="rounded" height={64} sx={{ borderRadius: 2 }} />
-        <Skeleton variant="rounded" height={260} sx={{ borderRadius: 2 }} />
-      </Stack>
+      <div className="space-y-4">
+        <div className="h-8 w-48 animate-pulse rounded-md bg-muted" />
+        <div className="h-5 w-96 animate-pulse rounded-md bg-muted" />
+        <div className="h-16 animate-pulse rounded-[10px] bg-muted" />
+        <div className="h-64 animate-pulse rounded-[10px] bg-muted" />
+      </div>
     );
   }
 
   if (!grant) {
     return (
-      <Box sx={{ textAlign: 'center', py: 8 }}>
-        <AlertCircle size={48} color="#CBD5E1" style={{ margin: '0 auto 12px' }} />
-        <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-          Grant not found
-        </Typography>
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<ArrowLeft size={16} />}
+      <div className="py-16 text-center">
+        <AlertCircle className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
+        <div className="text-sm font-medium text-muted-foreground">Grant not found</div>
+        <button
           onClick={() => router.push('/grants')}
-          sx={{ mt: 2 }}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
         >
-          Back to Grants
-        </Button>
-      </Box>
+          <ArrowLeft className="h-4 w-4" /> Back to Grants
+        </button>
+      </div>
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // Submitted State
-  // ---------------------------------------------------------------------------
 
   if (submitted) {
     return (
-      <Box sx={{ textAlign: 'center', py: 10 }}>
-        <Box
-          sx={{
-            width: 80,
-            height: 80,
-            borderRadius: '50%',
-            bgcolor: '#ECFDF5',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            mx: 'auto',
-            mb: 3,
-          }}
-        >
-          <CheckCircle size={40} color="#059669" />
-        </Box>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mb: 1 }}>
-          Application Submitted!
-        </Typography>
-        <Typography
-          variant="body2"
-          sx={{ color: 'text.secondary', maxWidth: 440, mx: 'auto', mb: 2 }}
-        >
-          Your application for &quot;{grant.title}&quot; has been submitted and is now being
-          reviewed. You will be notified when scoring is complete.
-        </Typography>
+      <div className="py-20 text-center">
+        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
+          <CheckCircle className="h-10 w-10 text-emerald-600" />
+        </div>
+        <h2 className="kuja-display text-2xl font-bold">Application Submitted!</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          Your application for &quot;{grant.title}&quot; has been submitted and is now being reviewed.
+          You will be notified when scoring is complete.
+        </p>
         {submissionScore !== null && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-            <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-              <CircularProgress
-                variant="determinate"
-                value={submissionScore}
-                size={96}
-                thickness={4}
-                sx={{ color: scoreColor(submissionScore) }}
-              />
-              <Box
-                sx={{
-                  top: 0,
-                  left: 0,
-                  bottom: 0,
-                  right: 0,
-                  position: 'absolute',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Typography
-                  variant="h6"
-                  sx={{ fontWeight: 700, color: scoreColor(submissionScore) }}
-                >
-                  {submissionScore}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.625rem' }}>
-                  AI Score
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
+          <div className="mt-4 flex justify-center">
+            <div className="flex flex-col items-center">
+              <ScoreRing score={submissionScore} size={96} strokeWidth={6} />
+              <span className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                AI Score
+              </span>
+            </div>
+          </div>
         )}
-        <Stack direction="row" spacing={1.5} justifyContent="center">
-          <Button variant="outlined" onClick={() => router.push('/applications')}>
+        <div className="mt-5 flex justify-center gap-2">
+          <button
+            onClick={() => router.push('/applications')}
+            className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+          >
             View My Applications
-          </Button>
-          <Button variant="contained" onClick={() => router.push('/grants')}>
+          </button>
+          <button
+            onClick={() => router.push('/grants')}
+            className="rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))]"
+          >
             Browse More Grants
-          </Button>
-        </Stack>
-      </Box>
+          </button>
+        </div>
+      </div>
     );
   }
 
   // ---------------------------------------------------------------------------
-  // Completeness calculations for review step
+  // Completeness
   // ---------------------------------------------------------------------------
 
   const eligibilityReqs = grant.eligibility ?? [];
@@ -671,41 +551,61 @@ export default function ApplyWizardClient() {
 
   const hasMissingItems = !requiredEligMet || !allCriteriaAnswered || !requiredDocsUploaded;
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
-
   return (
-    <Stack spacing={3}>
-      {/* Back & Title */}
-      <Button
-        size="small"
-        startIcon={<ArrowLeft size={16} />}
+    <div className="max-w-[960px] space-y-5">
+      <button
         onClick={() => router.push(`/grants/${grantId}`)}
-        sx={{ alignSelf: 'flex-start', color: 'text.secondary' }}
+        className="inline-flex items-center gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground"
       >
-        Back to Grant
-      </Button>
+        <ArrowLeft className="h-4 w-4" /> Back to Grant
+      </button>
 
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
+      <div>
+        <h1 className="kuja-display text-[2rem] font-semibold leading-[1.1] text-foreground">
           Apply: {grant.title}
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-          {grant.donor_org_name}
-        </Typography>
-      </Box>
+        </h1>
+        <div className="mt-1 text-sm text-muted-foreground">{grant.donor_org_name}</div>
+      </div>
 
-      {/* MUI Stepper */}
-      <Stepper activeStep={step} alternativeLabel>
-        {STEPS.map((label) => (
-          <Step key={label}>
-            <StepLabel>{label}</StepLabel>
-          </Step>
-        ))}
-      </Stepper>
+      {/* Custom stepper */}
+      <div className="flex items-center gap-0 overflow-x-auto py-2">
+        {STEPS.map((label, i) => {
+          const active = i === step;
+          const complete = i < step;
+          return (
+            <div key={label} className="flex flex-1 items-center">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold transition ${
+                    active
+                      ? 'bg-[hsl(var(--kuja-clay))] text-white'
+                      : complete
+                        ? 'bg-[hsl(var(--kuja-savanna))] text-white'
+                        : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  {complete ? <CheckCircle className="h-4 w-4" /> : i + 1}
+                </div>
+                <span
+                  className={`hidden text-xs font-medium sm:inline ${
+                    active || complete ? 'text-foreground' : 'text-muted-foreground'
+                  }`}
+                >
+                  {label}
+                </span>
+              </div>
+              {i < STEPS.length - 1 && (
+                <div
+                  className={`mx-2 h-px flex-1 ${
+                    complete ? 'bg-[hsl(var(--kuja-savanna))]' : 'bg-border'
+                  }`}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
 
-      {/* Step Content */}
       {step === 0 && (
         <EligibilityStep
           requirements={eligibilityReqs}
@@ -749,47 +649,38 @@ export default function ApplyWizardClient() {
         />
       )}
 
-      {/* Navigation */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          pt: 2,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-        }}
-      >
-        <Button
-          variant="outlined"
-          disabled={step === 0}
-          startIcon={<ArrowLeft size={16} />}
+      <div className="flex items-center justify-between border-t border-border pt-4">
+        <button
           onClick={handleBack}
+          disabled={step === 0}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
         >
-          Previous
-        </Button>
+          <ArrowLeft className="h-4 w-4" /> Previous
+        </button>
         {step < 3 ? (
-          <Button variant="contained" endIcon={<ArrowRight size={16} />} onClick={handleNext}>
-            Next
-          </Button>
-        ) : (
-          <Button
-            variant="contained"
-            disabled={submitting || hasMissingItems}
-            startIcon={
-              submitting ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />
-            }
-            onClick={handleSubmit}
+          <button
+            onClick={handleNext}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))]"
           >
+            Next <ArrowRight className="h-4 w-4" />
+          </button>
+        ) : (
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || hasMissingItems}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50"
+          >
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             {submitting ? 'Submitting...' : 'Submit Application'}
-          </Button>
+          </button>
         )}
-      </Box>
-    </Stack>
+      </div>
+    </div>
   );
 }
 
 // =============================================================================
-// Step 1: Eligibility Check
+// Step 1: Eligibility
 // =============================================================================
 
 function EligibilityStep({
@@ -809,123 +700,81 @@ function EligibilityStep({
 }) {
   if (requirements.length === 0) {
     return (
-      <Card>
-        <CardContent sx={{ py: 6, textAlign: 'center' }}>
-          <CheckCircle size={40} color="#A7F3D0" style={{ margin: '0 auto 8px' }} />
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            No specific eligibility requirements. Proceed to the next step.
-          </Typography>
-        </CardContent>
+      <Card className="py-10 text-center">
+        <CheckCircle className="mx-auto mb-2 h-10 w-10 text-emerald-400" />
+        <p className="text-sm text-muted-foreground">
+          No specific eligibility requirements. Proceed to the next step.
+        </p>
       </Card>
     );
   }
 
   return (
-    <Stack spacing={2}>
-      {/* Import from Profile */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Box>
-          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-            Eligibility Requirements
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-sm font-semibold text-foreground">Eligibility Requirements</div>
+          <div className="text-xs text-muted-foreground">
             Confirm your organization meets each requirement
-          </Typography>
-        </Box>
-        <Button
-          variant="outlined"
-          size="small"
-          disabled={importingProfile}
-          startIcon={
-            importingProfile ? <CircularProgress size={14} /> : <Download size={14} />
-          }
+          </div>
+        </div>
+        <button
           onClick={onImportProfile}
-          sx={{
-            borderColor: '#C7D2FE',
-            color: '#4F46E5',
-            '&:hover': { bgcolor: '#EEF2FF', borderColor: '#A5B4FC' },
-          }}
+          disabled={importingProfile}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark-soft))]/80 disabled:opacity-50"
         >
+          {importingProfile ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           Import from Profile
-        </Button>
-      </Box>
+        </button>
+      </div>
 
       {profileImported && (
-        <Alert severity="success" sx={{ py: 0.5 }}>
-          Profile data imported. Review and confirm each item below.
-        </Alert>
+        <Alert tone="success">Profile data imported. Review and confirm each item below.</Alert>
       )}
 
-      <Card>
-        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-          <Stack
-            spacing={2.5}
-            divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'divider' }} />}
-          >
-            {requirements.map((req) => {
-              const resp = responses[req.key] || { checked: false, evidence: '' };
-              return (
-                <Box key={req.key}>
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={resp.checked}
-                          onChange={(e) => onChange(req.key, 'checked', e.target.checked)}
-                          size="small"
-                        />
-                      }
-                      label=""
-                      sx={{ mr: 0, ml: -0.5 }}
-                    />
-                    <Box sx={{ flex: 1, pt: 0.5 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                          {req.label}
-                        </Typography>
-                        {req.required && (
-                          <Chip
-                            label="Required"
-                            size="small"
-                            color="error"
-                            variant="outlined"
-                            sx={{ height: 20, fontSize: '0.625rem' }}
-                          />
-                        )}
-                      </Box>
-                      {req.details && (
-                        <Typography
-                          variant="caption"
-                          sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}
-                        >
-                          {req.details}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                  <Box sx={{ ml: 5, mt: 1 }}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      multiline
-                      rows={2}
-                      placeholder="Provide evidence or explanation..."
-                      value={resp.evidence}
-                      onChange={(e) => onChange(req.key, 'evidence', e.target.value)}
-                    />
-                  </Box>
-                </Box>
-              );
-            })}
-          </Stack>
-        </CardContent>
+      <Card className="p-5">
+        <div className="divide-y divide-border">
+          {requirements.map((req, idx) => {
+            const resp = responses[req.key] || { checked: false, evidence: '' };
+            return (
+              <div key={req.key} className={idx === 0 ? 'pb-4' : idx === requirements.length - 1 ? 'pt-4' : 'py-4'}>
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={resp.checked}
+                    onChange={(e) => onChange(req.key, 'checked', e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-input accent-[hsl(var(--kuja-clay))]"
+                  />
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium">{req.label}</span>
+                      {req.required && <Chip tone="red">Required</Chip>}
+                    </div>
+                    {req.details && (
+                      <div className="mt-0.5 text-xs text-muted-foreground">{req.details}</div>
+                    )}
+                  </div>
+                </div>
+                <div className="ml-7 mt-2">
+                  <textarea
+                    rows={2}
+                    placeholder="Provide evidence or explanation..."
+                    value={resp.evidence}
+                    onChange={(e) => onChange(req.key, 'evidence', e.target.value)}
+                    className={TA_CLS}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </Card>
-    </Stack>
+    </div>
   );
 }
 
 // =============================================================================
-// Step 2: Proposal Responses (Key Step)
+// Step 2: Proposal
 // =============================================================================
 
 function ProposalStep({
@@ -953,46 +802,35 @@ function ProposalStep({
 }) {
   if (criteria.length === 0) {
     return (
-      <Card>
-        <CardContent sx={{ py: 6, textAlign: 'center' }}>
-          <FileText size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            No proposal criteria defined. Proceed to the next step.
-          </Typography>
-        </CardContent>
+      <Card className="py-10 text-center">
+        <FileText className="mx-auto mb-2 h-10 w-10 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          No proposal criteria defined. Proceed to the next step.
+        </p>
       </Card>
     );
   }
 
   return (
-    <Stack spacing={2}>
-      {/* Header with Import */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Box>
-          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-            Proposal Responses
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-sm font-semibold text-foreground">Proposal Responses</div>
+          <div className="text-xs text-muted-foreground">
             Address each criterion. Use AI Help for real-time scoring and suggestions.
-          </Typography>
-        </Box>
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<Download size={14} />}
+          </div>
+        </div>
+        <button
           onClick={onImportProfile}
-          sx={{
-            borderColor: '#C7D2FE',
-            color: '#4F46E5',
-            '&:hover': { bgcolor: '#EEF2FF', borderColor: '#A5B4FC' },
-          }}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark-soft))]/80"
         >
+          <Download className="h-3.5 w-3.5" />
           Import from Profile
-        </Button>
-      </Box>
+        </button>
+      </div>
 
       {profileImported && (
-        <Alert severity="success" sx={{ py: 0.5 }}>
+        <Alert tone="success">
           Organization data imported into relevant criteria. Edit to strengthen your responses.
         </Alert>
       )}
@@ -1002,269 +840,106 @@ function ProposalStep({
         const wc = wordCount(text);
         const isLoadingGuidance = guidanceLoading[c.key] || false;
         const guidance = guidanceResults[c.key];
+        const wcCls = wordCountColor(wc, c.max_words);
 
         return (
-          <Card key={c.key}>
-            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-              {/* Criterion Header */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'space-between',
-                  gap: 1.5,
-                  mb: 2,
-                }}
-              >
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                    {c.label}
-                  </Typography>
-                  {c.description && (
-                    <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                      {c.description}
-                    </Typography>
-                  )}
-                  {c.instructions && (
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: 'text.disabled',
-                        mt: 0.5,
-                        display: 'block',
-                        fontStyle: 'italic',
-                      }}
-                    >
-                      {c.instructions}
-                    </Typography>
-                  )}
-                </Box>
-                <Chip
-                  label={`${c.weight}%`}
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  sx={{ flexShrink: 0, fontWeight: 600, fontSize: '0.75rem' }}
-                />
-              </Box>
+          <Card key={c.key} className="p-5">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-foreground">{c.label}</div>
+                {c.description && (
+                  <div className="mt-1 text-sm text-muted-foreground">{c.description}</div>
+                )}
+                {c.instructions && (
+                  <div className="mt-1 text-xs italic text-muted-foreground/70">{c.instructions}</div>
+                )}
+              </div>
+              <Chip tone="clay">{c.weight}%</Chip>
+            </div>
 
-              {/* Response TextField */}
-              <TextField
-                size="small"
-                fullWidth
-                multiline
-                rows={8}
-                placeholder={c.example || `Write your response for "${c.label}"...`}
-                value={text}
-                onChange={(e) => onResponseChange(c.key, e.target.value)}
-              />
+            <textarea
+              rows={8}
+              placeholder={c.example || `Write your response for "${c.label}"...`}
+              value={text}
+              onChange={(e) => onResponseChange(c.key, e.target.value)}
+              className={TA_CLS}
+            />
 
-              {/* Word Count + AI Help */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  mt: 1.5,
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: wordCountColor(wc, c.max_words),
-                      fontWeight: 500,
-                    }}
-                  >
-                    {wc} words{c.max_words ? ` / ${c.max_words} max` : ''}
-                  </Typography>
-                  {c.max_words && c.max_words > 0 && (
-                    <LinearProgress
-                      variant="determinate"
-                      value={Math.min(100, (wc / c.max_words) * 100)}
-                      sx={{
-                        width: 60,
-                        height: 4,
-                        borderRadius: 2,
-                        bgcolor: '#F1F5F9',
-                        '& .MuiLinearProgress-bar': {
-                          bgcolor: wordCountColor(wc, c.max_words),
-                          borderRadius: 2,
-                        },
-                      }}
+            <div className="mt-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className={`text-xs font-medium ${wcCls}`}>
+                  {wc} words{c.max_words ? ` / ${c.max_words} max` : ''}
+                </span>
+                {c.max_words && c.max_words > 0 && (
+                  <div className="h-1 w-16 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full ${
+                        wc / c.max_words < 0.5
+                          ? 'bg-red-500'
+                          : wc / c.max_words < 0.7
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, (wc / c.max_words) * 100)}%` }}
                     />
-                  )}
-                  {/* Inline score from last guidance */}
-                  {guidance && guidance.quality_score !== undefined && (
-                    <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                      <CircularProgress
-                        variant="determinate"
-                        value={guidance.quality_score}
-                        size={36}
-                        thickness={3}
-                        sx={{ color: scoreColor(guidance.quality_score) }}
-                      />
-                      <Box
-                        sx={{
-                          top: 0,
-                          left: 0,
-                          bottom: 0,
-                          right: 0,
-                          position: 'absolute',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontWeight: 700,
-                            fontSize: '0.625rem',
-                            color: scoreColor(guidance.quality_score),
-                          }}
-                        >
-                          {guidance.quality_score}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  )}
-                </Box>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={!text.trim() || isLoadingGuidance}
-                  startIcon={
-                    isLoadingGuidance ? (
-                      <CircularProgress size={14} />
-                    ) : (
-                      <Sparkles size={14} />
-                    )
-                  }
-                  onClick={() => onGetGuidance(c)}
-                  sx={{
-                    color: '#7C3AED',
-                    borderColor: '#DDD6FE',
-                    '&:hover': { bgcolor: '#F5F3FF', borderColor: '#C4B5FD' },
-                  }}
-                >
-                  {isLoadingGuidance ? 'Analyzing...' : 'AI Help'}
-                </Button>
-              </Box>
+                  </div>
+                )}
+                {guidance && guidance.quality_score !== undefined && (
+                  <ScoreRing score={guidance.quality_score} size={36} strokeWidth={3} />
+                )}
+              </div>
+              <button
+                onClick={() => onGetGuidance(c)}
+                disabled={!text.trim() || isLoadingGuidance}
+                className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark-soft))]/80 disabled:opacity-50"
+              >
+                {isLoadingGuidance ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                {isLoadingGuidance ? 'Analyzing...' : 'AI Help'}
+              </button>
+            </div>
 
-              {/* AI Guidance Card */}
-              {guidance?.visible && (
-                <Card
-                  variant="outlined"
-                  sx={{
-                    mt: 2,
-                    bgcolor: '#F5F3FF',
-                    borderColor: '#EDE9FE',
-                  }}
-                >
-                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        mb: 1.5,
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Sparkles size={14} color="#7C3AED" />
-                        <Typography variant="caption" sx={{ fontWeight: 600, color: '#7C3AED' }}>
-                          AI Guidance
-                        </Typography>
-                      </Box>
-                      {/* Score ring */}
-                      <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                        <CircularProgress
-                          variant="determinate"
-                          value={guidance.quality_score}
-                          size={48}
-                          thickness={3.5}
-                          sx={{ color: scoreColor(guidance.quality_score) }}
-                        />
-                        <Box
-                          sx={{
-                            top: 0,
-                            left: 0,
-                            bottom: 0,
-                            right: 0,
-                            position: 'absolute',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              fontWeight: 700,
-                              fontSize: '0.75rem',
-                              lineHeight: 1,
-                              color: scoreColor(guidance.quality_score),
-                            }}
-                          >
-                            {guidance.quality_score}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{ fontSize: '0.5rem', color: 'text.disabled', lineHeight: 1 }}
-                          >
-                            score
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </Box>
-
-                    <Typography
-                      variant="body2"
-                      sx={{ color: '#4C1D95', whiteSpace: 'pre-line', mb: 2 }}
-                    >
-                      {guidance.guidance}
-                    </Typography>
-
-                    <Divider sx={{ mb: 1.5 }} />
-
-                    <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      <Button
-                        size="small"
-                        variant="text"
-                        startIcon={<X size={14} />}
-                        onClick={() => onDismissGuidance(c.key)}
-                        sx={{ color: 'text.secondary' }}
-                      >
-                        Dismiss
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        startIcon={<Sparkles size={14} />}
-                        onClick={() => onApplySuggestions(c.key)}
-                        sx={{
-                          bgcolor: '#7C3AED',
-                          '&:hover': { bgcolor: '#6D28D9' },
-                        }}
-                      >
-                        Apply Suggestions
-                      </Button>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              )}
-            </CardContent>
+            {guidance?.visible && (
+              <div className="mt-3 rounded-[10px] border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-[hsl(var(--kuja-spark))]">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    AI Guidance
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <ScoreRing score={guidance.quality_score} size={48} strokeWidth={3.5} />
+                    <span className={`text-[9px] uppercase ${scoreToneCls(guidance.quality_score)}`}>score</span>
+                  </div>
+                </div>
+                <p className="mb-3 whitespace-pre-line text-sm text-[#4C1D95]">{guidance.guidance}</p>
+                <div className="flex justify-end gap-1.5 border-t border-[hsl(var(--kuja-spark)/0.15)] pt-2">
+                  <button
+                    onClick={() => onDismissGuidance(c.key)}
+                    className="inline-flex items-center gap-1 rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-background"
+                  >
+                    <X className="h-3 w-3" /> Dismiss
+                  </button>
+                  <button
+                    onClick={() => onApplySuggestions(c.key)}
+                    className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--kuja-spark))] px-3 py-1 text-xs font-medium text-white hover:opacity-90"
+                  >
+                    <Sparkles className="h-3 w-3" /> Apply Suggestions
+                  </button>
+                </div>
+              </div>
+            )}
           </Card>
         );
       })}
-    </Stack>
+    </div>
   );
 }
 
 // =============================================================================
-// Step 3: Document Upload
+// Step 3: Documents
 // =============================================================================
 
 function DocumentsStep({
@@ -1282,204 +957,113 @@ function DocumentsStep({
 
   if (requirements.length === 0) {
     return (
-      <Card>
-        <CardContent sx={{ py: 6, textAlign: 'center' }}>
-          <Upload size={40} color="#CBD5E1" style={{ margin: '0 auto 8px' }} />
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            No documents required. Proceed to review.
-          </Typography>
-        </CardContent>
+      <Card className="py-10 text-center">
+        <Upload className="mx-auto mb-2 h-10 w-10 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          No documents required. Proceed to review.
+        </p>
       </Card>
     );
   }
 
   return (
-    <Stack spacing={2}>
-      <Box>
-        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-          Document Upload
-        </Typography>
-        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+    <div className="space-y-3">
+      <div>
+        <div className="text-sm font-semibold text-foreground">Document Upload</div>
+        <div className="text-xs text-muted-foreground">
           Upload the required documents for your application
-        </Typography>
-      </Box>
+        </div>
+      </div>
 
-      <Card>
-        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-          <Stack spacing={2}>
-            {requirements.map((doc) => {
-              const upload = uploadedDocs[doc.key];
-              return (
-                <Box
-                  key={doc.key}
-                  sx={{
-                    p: 2,
-                    border: '1px solid',
-                    borderColor: upload?.uploaded ? '#A7F3D0' : 'divider',
-                    borderRadius: 2,
-                    bgcolor: upload?.uploaded ? '#F0FDF4' : 'transparent',
-                  }}
-                >
-                  {/* Doc header */}
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      justifyContent: 'space-between',
-                      gap: 1.5,
-                      mb: 1.5,
-                    }}
-                  >
-                    <Box sx={{ flex: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        <Typography
-                          variant="body2"
-                          sx={{ fontWeight: 500, color: 'text.primary' }}
-                        >
-                          {doc.label}
-                        </Typography>
-                        {doc.required && (
-                          <Chip
-                            label="Required"
-                            size="small"
-                            color="error"
-                            variant="outlined"
-                            sx={{ height: 20, fontSize: '0.625rem' }}
-                          />
-                        )}
-                        {doc.ai_review && (
-                          <Chip
-                            label="AI Review"
-                            size="small"
-                            variant="outlined"
-                            sx={{
-                              height: 20,
-                              fontSize: '0.625rem',
-                              color: '#7C3AED',
-                              borderColor: '#DDD6FE',
-                              bgcolor: '#F5F3FF',
-                            }}
-                          />
-                        )}
-                      </Box>
-                      {doc.specific_requirements && (
-                        <Typography
-                          variant="caption"
-                          sx={{ color: 'text.secondary', mt: 0.25, display: 'block' }}
-                        >
-                          {doc.specific_requirements}
-                        </Typography>
-                      )}
-                    </Box>
-                    {/* Score badge if AI analysis returned */}
-                    {upload?.uploaded && upload.score !== null && upload.score !== undefined && (
-                      <Chip
-                        label={`Score: ${upload.score}`}
-                        size="small"
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: '0.6875rem',
-                          bgcolor: scoreColor(upload.score) + '15',
-                          color: scoreColor(upload.score),
-                          border: `1px solid ${scoreColor(upload.score)}40`,
-                        }}
-                      />
+      <Card className="p-5">
+        <div className="space-y-3">
+          {requirements.map((doc) => {
+            const upload = uploadedDocs[doc.key];
+            return (
+              <div
+                key={doc.key}
+                className={`rounded-[10px] border p-3 ${
+                  upload?.uploaded
+                    ? 'border-emerald-200 bg-emerald-50/30'
+                    : 'border-border bg-transparent'
+                }`}
+              >
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium">{doc.label}</span>
+                      {doc.required && <Chip tone="red">Required</Chip>}
+                      {doc.ai_review && <Chip tone="spark">AI Review</Chip>}
+                    </div>
+                    {doc.specific_requirements && (
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {doc.specific_requirements}
+                      </div>
                     )}
-                  </Box>
-
-                  {/* Upload state */}
-                  {upload?.uploading ? (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 2,
-                        p: 3,
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <CircularProgress size={24} />
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        Uploading {upload.fileName}...
-                      </Typography>
-                    </Box>
-                  ) : upload?.uploaded ? (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1.5,
-                        p: 1.5,
-                        bgcolor: '#ECFDF5',
-                        borderRadius: 2,
-                        border: '1px solid #A7F3D0',
-                      }}
-                    >
-                      <CheckCircle size={20} color="#059669" />
-                      <Typography variant="body2" noWrap sx={{ flex: 1, color: '#059669' }}>
-                        {upload.fileName}
-                      </Typography>
-                      <Button
-                        size="small"
-                        onClick={() => onRemove(doc.key)}
-                        sx={{ color: 'text.secondary', minWidth: 'auto' }}
-                      >
-                        Remove
-                      </Button>
-                    </Box>
-                  ) : (
-                    <Box>
-                      <input
-                        type="file"
-                        hidden
-                        ref={(el) => {
-                          fileInputRefs.current[doc.key] = el;
-                        }}
-                        accept=".pdf,.doc,.docx,.xls,.xlsx"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) onUpload(doc.key, doc.key, file);
-                          e.target.value = '';
-                        }}
-                      />
-                      <Box
-                        onClick={() => fileInputRefs.current[doc.key]?.click()}
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: 1,
-                          p: 4,
-                          border: '2px dashed',
-                          borderColor: 'divider',
-                          borderRadius: 2,
-                          cursor: 'pointer',
-                          '&:hover': { borderColor: 'primary.light', bgcolor: 'action.hover' },
-                          transition: 'all 0.2s',
-                        }}
-                      >
-                        <Upload size={24} color="#94A3B8" />
-                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                          Click to upload
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                          PDF, DOC, DOCX, XLS, XLSX up to 10MB
-                        </Typography>
-                      </Box>
-                    </Box>
+                  </div>
+                  {upload?.uploaded && upload.score !== null && upload.score !== undefined && (
+                    <Chip tone={upload.score >= 80 ? 'emerald' : upload.score >= 60 ? 'amber' : 'red'}>
+                      Score: {upload.score}
+                    </Chip>
                   )}
-                </Box>
-              );
-            })}
-          </Stack>
-        </CardContent>
+                </div>
+
+                {upload?.uploading ? (
+                  <div className="flex items-center justify-center gap-2 p-6">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Uploading {upload.fileName}...
+                    </span>
+                  </div>
+                ) : upload?.uploaded ? (
+                  <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-2.5">
+                    <CheckCircle className="h-5 w-5 flex-shrink-0 text-emerald-600" />
+                    <span className="flex-1 truncate text-sm text-emerald-700">{upload.fileName}</span>
+                    <button
+                      onClick={() => onRemove(doc.key)}
+                      className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-background"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      type="file"
+                      className="hidden"
+                      ref={(el) => {
+                        fileInputRefs.current[doc.key] = el;
+                      }}
+                      accept=".pdf,.doc,.docx,.xls,.xlsx"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) onUpload(doc.key, doc.key, file);
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      onClick={() => fileInputRefs.current[doc.key]?.click()}
+                      className="flex w-full flex-col items-center gap-2 rounded-[10px] border-2 border-dashed border-border p-8 transition hover:border-[hsl(var(--kuja-clay))] hover:bg-muted/30"
+                    >
+                      <Upload className="h-6 w-6 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Click to upload</span>
+                      <span className="text-xs text-muted-foreground/70">
+                        PDF, DOC, DOCX, XLS, XLSX up to 10MB
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </Card>
-    </Stack>
+    </div>
   );
 }
 
 // =============================================================================
-// Step 4: Review & Submit
+// Step 4: Review
 // =============================================================================
 
 function ReviewStep({
@@ -1511,221 +1095,142 @@ function ReviewStep({
   const requiredDocs = docs.filter((d) => d.required);
   const requiredUploaded = requiredDocs.filter((d) => uploadedDocs[d.key]?.uploaded).length;
 
+  const Section = ({
+    title,
+    chipText,
+    chipTone,
+    children,
+  }: {
+    title: string;
+    chipText: string;
+    chipTone: 'emerald' | 'amber';
+    children: React.ReactNode;
+  }) => (
+    <div className="rounded-md bg-muted/40 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-sm font-semibold">{title}</span>
+        <Chip tone={chipTone}>{chipText}</Chip>
+      </div>
+      <div className="space-y-1">{children}</div>
+    </div>
+  );
+
   return (
-    <Stack spacing={2}>
+    <div className="space-y-3">
       {hasMissingItems && (
-        <Alert severity="warning" sx={{ mb: 1 }}>
+        <Alert tone="warning">
           Some required items are missing. Please go back and complete them before submitting.
         </Alert>
       )}
 
-      <Card>
-        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-            <Eye size={16} />
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-              Review Your Application
-            </Typography>
-          </Box>
-          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2.5 }}>
-            Verify everything looks correct before submitting
-          </Typography>
+      <Card className="p-5">
+        <div className="mb-1 flex items-center gap-1.5">
+          <Eye className="h-4 w-4" />
+          <span className="text-sm font-semibold">Review Your Application</span>
+        </div>
+        <p className="mb-4 text-xs text-muted-foreground">
+          Verify everything looks correct before submitting
+        </p>
 
-          <Stack spacing={3}>
-            {/* Eligibility Summary */}
-            <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  mb: 1.5,
-                }}
-              >
-                <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                  Eligibility
-                </Typography>
-                <Chip
-                  label={`${metCount} / ${eligibilityReqs.length} confirmed`}
-                  size="small"
-                  variant="outlined"
-                  color={
-                    metCount === eligibilityReqs.length && eligibilityReqs.length > 0
-                      ? 'success'
-                      : 'warning'
-                  }
-                  sx={{ fontWeight: 500, fontSize: '0.6875rem' }}
-                />
-              </Box>
-              <Stack spacing={0.75}>
-                {eligibilityReqs.map((req) => {
-                  const resp = eligibility[req.key];
-                  const checked = resp?.checked;
-                  return (
-                    <Box key={req.key} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {checked ? (
-                        <CheckCircle size={16} color="#059669" />
-                      ) : (
-                        <AlertCircle
-                          size={16}
-                          color={req.required ? '#EF4444' : '#CBD5E1'}
-                        />
-                      )}
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: checked
-                            ? 'text.secondary'
-                            : req.required
-                              ? 'error.main'
-                              : 'text.disabled',
-                        }}
-                      >
-                        {req.label}
-                        {req.required && !checked && ' (required)'}
-                      </Typography>
-                    </Box>
-                  );
-                })}
-              </Stack>
-            </Box>
+        <div className="space-y-3">
+          <Section
+            title="Eligibility"
+            chipText={`${metCount} / ${eligibilityReqs.length} confirmed`}
+            chipTone={metCount === eligibilityReqs.length && eligibilityReqs.length > 0 ? 'emerald' : 'amber'}
+          >
+            {eligibilityReqs.map((req) => {
+              const resp = eligibility[req.key];
+              const checked = resp?.checked;
+              return (
+                <div key={req.key} className="flex items-center gap-2 text-sm">
+                  {checked ? (
+                    <CheckCircle className="h-4 w-4 text-emerald-600" />
+                  ) : (
+                    <AlertCircle className={`h-4 w-4 ${req.required ? 'text-red-500' : 'text-muted-foreground'}`} />
+                  )}
+                  <span
+                    className={
+                      checked
+                        ? 'text-muted-foreground'
+                        : req.required
+                          ? 'text-red-600'
+                          : 'text-muted-foreground/70'
+                    }
+                  >
+                    {req.label}
+                    {req.required && !checked && ' (required)'}
+                  </span>
+                </div>
+              );
+            })}
+          </Section>
 
-            {/* Proposal Summary */}
-            <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  mb: 1.5,
-                }}
-              >
-                <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                  Proposal Responses
-                </Typography>
-                <Chip
-                  label={`${answeredCount} / ${criteria.length} answered`}
-                  size="small"
-                  variant="outlined"
-                  color={
-                    answeredCount === criteria.length && criteria.length > 0
-                      ? 'success'
-                      : 'warning'
-                  }
-                  sx={{ fontWeight: 500, fontSize: '0.6875rem' }}
-                />
-              </Box>
-              <Stack spacing={0.75}>
-                {criteria.map((c) => {
-                  const text = responses[c.key] ?? '';
-                  const hasText = text.trim().length > 0;
-                  const wc = wordCount(text);
-                  return (
-                    <Box
-                      key={c.key}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {hasText ? (
-                          <CheckCircle size={16} color="#059669" />
-                        ) : (
-                          <AlertCircle size={16} color="#EF4444" />
-                        )}
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: hasText ? 'text.secondary' : 'error.main',
-                          }}
-                        >
-                          {c.label}
-                          {!hasText && ' (missing)'}
-                        </Typography>
-                      </Box>
-                      {hasText && (
-                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                          {wc} words
-                        </Typography>
-                      )}
-                    </Box>
-                  );
-                })}
-              </Stack>
-            </Box>
+          <Section
+            title="Proposal Responses"
+            chipText={`${answeredCount} / ${criteria.length} answered`}
+            chipTone={answeredCount === criteria.length && criteria.length > 0 ? 'emerald' : 'amber'}
+          >
+            {criteria.map((c) => {
+              const text = responses[c.key] ?? '';
+              const hasText = text.trim().length > 0;
+              const wc = wordCount(text);
+              return (
+                <div key={c.key} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    {hasText ? (
+                      <CheckCircle className="h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className={hasText ? 'text-muted-foreground' : 'text-red-600'}>
+                      {c.label}
+                      {!hasText && ' (missing)'}
+                    </span>
+                  </div>
+                  {hasText && (
+                    <span className="text-xs text-muted-foreground/70">{wc} words</span>
+                  )}
+                </div>
+              );
+            })}
+          </Section>
 
-            {/* Documents Summary */}
-            <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  mb: 1.5,
-                }}
-              >
-                <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                  Documents
-                </Typography>
-                <Chip
-                  label={`${uploadedCount} / ${docs.length} uploaded`}
-                  size="small"
-                  variant="outlined"
-                  color={
-                    requiredUploaded === requiredDocs.length && requiredDocs.length > 0
-                      ? 'success'
-                      : 'warning'
-                  }
-                  sx={{ fontWeight: 500, fontSize: '0.6875rem' }}
-                />
-              </Box>
-              <Stack spacing={0.75}>
-                {docs.map((d) => {
-                  const upload = uploadedDocs[d.key];
-                  const uploaded = upload?.uploaded;
-                  return (
-                    <Box key={d.key} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {uploaded ? (
-                        <CheckCircle size={16} color="#059669" />
-                      ) : (
-                        <AlertCircle
-                          size={16}
-                          color={d.required ? '#EF4444' : '#CBD5E1'}
-                        />
-                      )}
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: uploaded
-                            ? 'text.secondary'
-                            : d.required
-                              ? 'error.main'
-                              : 'text.disabled',
-                          flex: 1,
-                        }}
-                      >
-                        {d.label}
-                        {d.required && !uploaded && ' (required)'}
-                      </Typography>
-                      {uploaded && (
-                        <Typography
-                          variant="caption"
-                          noWrap
-                          sx={{ color: 'text.disabled', ml: 'auto' }}
-                        >
-                          {upload.fileName}
-                        </Typography>
-                      )}
-                    </Box>
-                  );
-                })}
-              </Stack>
-            </Box>
-          </Stack>
-        </CardContent>
+          <Section
+            title="Documents"
+            chipText={`${uploadedCount} / ${docs.length} uploaded`}
+            chipTone={requiredUploaded === requiredDocs.length && requiredDocs.length > 0 ? 'emerald' : 'amber'}
+          >
+            {docs.map((d) => {
+              const upload = uploadedDocs[d.key];
+              const uploaded = upload?.uploaded;
+              return (
+                <div key={d.key} className="flex items-center gap-2 text-sm">
+                  {uploaded ? (
+                    <CheckCircle className="h-4 w-4 text-emerald-600" />
+                  ) : (
+                    <AlertCircle className={`h-4 w-4 ${d.required ? 'text-red-500' : 'text-muted-foreground'}`} />
+                  )}
+                  <span
+                    className={`flex-1 ${
+                      uploaded
+                        ? 'text-muted-foreground'
+                        : d.required
+                          ? 'text-red-600'
+                          : 'text-muted-foreground/70'
+                    }`}
+                  >
+                    {d.label}
+                    {d.required && !uploaded && ' (required)'}
+                  </span>
+                  {uploaded && (
+                    <span className="truncate text-xs text-muted-foreground/70">{upload.fileName}</span>
+                  )}
+                </div>
+              );
+            })}
+          </Section>
+        </div>
       </Card>
-    </Stack>
+    </div>
   );
 }

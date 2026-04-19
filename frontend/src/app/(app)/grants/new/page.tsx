@@ -4,36 +4,23 @@ import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Chip from '@mui/material/Chip';
-import Stack from '@mui/material/Stack';
-import Stepper from '@mui/material/Stepper';
-import Step from '@mui/material/Step';
-import StepLabel from '@mui/material/StepLabel';
-import Switch from '@mui/material/Switch';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import InputLabel from '@mui/material/InputLabel';
-import FormControl from '@mui/material/FormControl';
-import IconButton from '@mui/material/IconButton';
-import Slider from '@mui/material/Slider';
-import InputAdornment from '@mui/material/InputAdornment';
-import Alert from '@mui/material/Alert';
-import CircularProgress from '@mui/material/CircularProgress';
-import LinearProgress from '@mui/material/LinearProgress';
-
 import {
-  ArrowLeft, ArrowRight, Check, Plus, Trash2, Info,
-  FileText, DollarSign, ClipboardList, Upload, BarChart3, Send,
-  Sparkles, CheckCircle2, CloudUpload, X,
+  ArrowLeft,
+  ArrowRight,
+  Plus,
+  Trash2,
+  Info,
+  FileText,
+  DollarSign,
+  ClipboardList,
+  Upload,
+  BarChart3,
+  Send,
+  Sparkles,
+  CheckCircle2,
+  CloudUpload,
+  X,
+  Loader2,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -149,7 +136,68 @@ interface AIChatResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Multi-Select Toggle Component
+// Primitives
+// ---------------------------------------------------------------------------
+
+const INPUT_CLS =
+  'w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))] placeholder:text-muted-foreground';
+const TA_CLS =
+  'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))] placeholder:text-muted-foreground';
+
+function Card({ children, className = '', onClick }: { children: React.ReactNode; className?: string; onClick?: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-[10px] border border-border bg-card shadow-[var(--kuja-elev-1)] ${onClick ? 'cursor-pointer' : ''} ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+  hint,
+}: {
+  label: string;
+  children: React.ReactNode;
+  hint?: string;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-foreground">{label}</label>
+      {children}
+      {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function Alert({
+  tone,
+  icon,
+  children,
+}: {
+  tone: 'success' | 'warning' | 'error' | 'info';
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const palette: Record<typeof tone, string> = {
+    success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+    warning: 'bg-amber-50 border-amber-200 text-amber-900',
+    error: 'bg-red-50 border-red-200 text-red-800',
+    info: 'bg-[hsl(var(--kuja-spark-soft))] border-[hsl(var(--kuja-spark-soft))] text-[hsl(var(--kuja-spark))]',
+  };
+  return (
+    <div className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${palette[tone]}`}>
+      {icon && <span className="flex-shrink-0 pt-0.5">{icon}</span>}
+      <div className="flex-1">{children}</div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Multi-Select Toggle
 // ---------------------------------------------------------------------------
 
 function MultiSelectToggle({
@@ -162,61 +210,51 @@ function MultiSelectToggle({
   onChange: (val: string[]) => void;
 }) {
   const toggle = (opt: string) => {
-    onChange(
-      selected.includes(opt) ? selected.filter((s) => s !== opt) : [...selected, opt],
-    );
+    onChange(selected.includes(opt) ? selected.filter((s) => s !== opt) : [...selected, opt]);
   };
-
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+    <div className="flex flex-wrap gap-1.5">
       {options.map((opt) => {
         const isActive = selected.includes(opt);
         return (
-          <Chip
+          <button
             key={opt}
-            label={opt}
+            type="button"
             onClick={() => toggle(opt)}
-            variant={isActive ? 'filled' : 'outlined'}
-            color={isActive ? 'primary' : 'default'}
-            size="small"
-            sx={{
-              fontWeight: isActive ? 600 : 400,
-              borderColor: isActive ? 'primary.main' : 'divider',
-              cursor: 'pointer',
-            }}
-          />
+            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition ${
+              isActive
+                ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-clay))] text-white'
+                : 'border-border bg-background text-foreground hover:bg-muted'
+            }`}
+          >
+            {opt}
+          </button>
         );
       })}
-    </Box>
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Main Page Component
+// Main Page
 // ---------------------------------------------------------------------------
 
 export default function CreateGrantPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Wizard state
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
-
-  // Grant ID (created on first upload or manual draft creation)
   const [grantId, setGrantId] = useState<number | null>(null);
 
-  // Upload state
   const [uploading, setUploading] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<ExtractedData | null>(null);
   const [uploadError, setUploadError] = useState('');
 
-  // AI suggestion state
   const [suggestingCriteria, setSuggestingCriteria] = useState(false);
 
-  // Step 2: Basic Info
   const [basic, setBasic] = useState<BasicInfo>({
     title: '',
     description: '',
@@ -227,7 +265,6 @@ export default function CreateGrantPage() {
     countries: [],
   });
 
-  // Step 3: Eligibility
   const [eligibility, setEligibility] = useState<EligibilityItem[]>(
     ELIGIBILITY_CATEGORIES.map((c) => ({
       key: c.key,
@@ -238,12 +275,10 @@ export default function CreateGrantPage() {
     })),
   );
 
-  // Step 4: Criteria
   const [criteria, setCriteria] = useState<CriterionItem[]>([
     { key: 'criterion_1', label: '', weight: 100, description: '', instructions: '', max_words: 500 },
   ]);
 
-  // Step 5: Document Requirements
   const [docReqs, setDocReqs] = useState<DocReqItem[]>(
     DOC_TYPES.map((d) => ({
       key: d.key,
@@ -255,17 +290,11 @@ export default function CreateGrantPage() {
     })),
   );
 
-  // ---------------------------------------------------------------------------
-  // File Upload Handler (AI-First)
-  // ---------------------------------------------------------------------------
-
   const handleFileUpload = async (file: File) => {
     setUploading(true);
     setUploadError('');
     setUploadedFileName(file.name);
-
     try {
-      // Step 1: Create a draft grant if we don't have one yet
       let id = grantId;
       if (!id) {
         const grantTitle = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
@@ -277,8 +306,6 @@ export default function CreateGrantPage() {
           throw new Error('Failed to create draft grant');
         }
       }
-
-      // Step 2: Upload the grant document for AI extraction
       const formData = new FormData();
       formData.append('file', file);
       const uploadRes = await fetch(`/api/grants/${id}/upload-grant-doc`, {
@@ -286,40 +313,27 @@ export default function CreateGrantPage() {
         body: formData,
         credentials: 'include',
       });
-
       if (!uploadRes.ok) {
         const errData = await uploadRes.json().catch(() => ({ error: 'Upload failed' }));
         throw new Error((errData as { error?: string }).error || `HTTP ${uploadRes.status}`);
       }
-
       const data = (await uploadRes.json()) as UploadResponse;
-
       if (data.success) {
         const extractedData = data.extracted_requirements || null;
         setExtracted(extractedData);
-
-        // Pre-fill basic info: use the filename-derived title we created the draft with
         const draftTitle = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
-        setBasic((prev) => ({
-          ...prev,
-          title: prev.title || draftTitle,
-        }));
-
-        // Pre-fill eligibility from extracted requirements
+        setBasic((prev) => ({ ...prev, title: prev.title || draftTitle }));
         if (extractedData?.requirements && extractedData.requirements.length > 0) {
           setEligibility((prev) =>
             prev.map((e) => {
               const match = extractedData.requirements?.find(
                 (r) => r.type?.toLowerCase().includes(e.key) || r.title?.toLowerCase().includes(e.key),
               );
-              if (match) {
-                return { ...e, enabled: true, details: match.description || match.title || '' };
-              }
+              if (match) return { ...e, enabled: true, details: match.description || match.title || '' };
               return e;
             }),
           );
         }
-
         const reqCount = extractedData?.requirements?.length || 0;
         const indCount = extractedData?.indicators?.length || 0;
         toast.success(
@@ -347,16 +361,10 @@ export default function CreateGrantPage() {
     if (file) handleFileUpload(file);
   }, [grantId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---------------------------------------------------------------------------
-  // Auto-Save on Step Change
-  // ---------------------------------------------------------------------------
-
   const autoSave = async () => {
     if (!grantId) return;
     setSaving(true);
     try {
-      // Only include fields that the user has actually filled in,
-      // so we never overwrite server data with empty strings
       const payload: Record<string, unknown> = {};
       if (basic.title) payload.title = basic.title;
       if (basic.description) payload.description = basic.description;
@@ -388,61 +396,42 @@ export default function CreateGrantPage() {
         }));
       await api.put(`/grants/${grantId}`, payload);
     } catch {
-      // Silent fail for auto-save; user can still proceed
+      /* best-effort */
     } finally {
       setSaving(false);
     }
   };
 
   const goNext = async () => {
-    // Ensure a draft exists before leaving step 0
     if (step === 0 && !grantId) {
       try {
         const draftTitle = basic.title || 'Draft Grant';
         const res = await api.post<GrantCreateResponse>('/grants/', { title: draftTitle });
         if (res.success) {
           setGrantId(res.grant.id);
-          // Sync basic state so title is never empty after draft creation
-          if (!basic.title) {
-            setBasic((prev) => ({ ...prev, title: draftTitle }));
-          }
+          if (!basic.title) setBasic((prev) => ({ ...prev, title: draftTitle }));
         }
       } catch {
         toast.error('Failed to create draft grant');
         return;
       }
     }
-
-    // Auto-save current step data
-    if (grantId && step > 0) {
-      await autoSave();
-    }
-
+    if (grantId && step > 0) await autoSave();
     setStep((s) => Math.min(STEPS.length - 1, s + 1));
   };
 
   const goBack = () => setStep((s) => Math.max(0, s - 1));
-
-  // ---------------------------------------------------------------------------
-  // Form Handlers
-  // ---------------------------------------------------------------------------
 
   const updateBasic = useCallback((field: keyof BasicInfo, value: string | string[]) => {
     setBasic((prev) => ({ ...prev, [field]: value }));
   }, []);
 
   const toggleEligibility = (index: number) => {
-    setEligibility((prev) =>
-      prev.map((e, i) => (i === index ? { ...e, enabled: !e.enabled } : e)),
-    );
+    setEligibility((prev) => prev.map((e, i) => (i === index ? { ...e, enabled: !e.enabled } : e)));
   };
-
   const updateEligibility = (index: number, field: 'details' | 'weight', value: string | number) => {
-    setEligibility((prev) =>
-      prev.map((e, i) => (i === index ? { ...e, [field]: value } : e)),
-    );
+    setEligibility((prev) => prev.map((e, i) => (i === index ? { ...e, [field]: value } : e)));
   };
-
   const addCriterion = () => {
     setCriteria((prev) => [
       ...prev,
@@ -456,35 +445,21 @@ export default function CreateGrantPage() {
       },
     ]);
   };
-
   const removeCriterion = (index: number) => {
     if (criteria.length <= 1) return;
     setCriteria((prev) => prev.filter((_, i) => i !== index));
   };
-
   const updateCriterion = (index: number, field: keyof CriterionItem, value: string | number) => {
-    setCriteria((prev) =>
-      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c)),
-    );
+    setCriteria((prev) => prev.map((c, i) => (i === index ? { ...c, [field]: value } : c)));
   };
-
   const toggleDocReq = (index: number) => {
-    setDocReqs((prev) =>
-      prev.map((d, i) => (i === index ? { ...d, enabled: !d.enabled } : d)),
-    );
+    setDocReqs((prev) => prev.map((d, i) => (i === index ? { ...d, enabled: !d.enabled } : d)));
   };
-
   const updateDocReq = (index: number, field: 'specific_requirements' | 'required', value: string | boolean) => {
-    setDocReqs((prev) =>
-      prev.map((d, i) => (i === index ? { ...d, [field]: value } : d)),
-    );
+    setDocReqs((prev) => prev.map((d, i) => (i === index ? { ...d, [field]: value } : d)));
   };
 
   const criteriaWeightTotal = criteria.reduce((sum, c) => sum + c.weight, 0);
-
-  // ---------------------------------------------------------------------------
-  // AI Suggest Criteria
-  // ---------------------------------------------------------------------------
 
   const handleSuggestCriteria = async () => {
     setSuggestingCriteria(true);
@@ -492,14 +467,11 @@ export default function CreateGrantPage() {
       const sectorsText = basic.sectors.length > 0 ? basic.sectors.join(', ') : 'humanitarian';
       const titleText = basic.title || 'a humanitarian grant';
       const message = `Suggest 5 evaluation criteria for a grant titled "${titleText}" in the sectors: ${sectorsText}. For each criterion, provide: label, weight (percentages totaling 100), description, instructions for applicants, and recommended max words. Format as JSON array with keys: label, weight, description, instructions, max_words.`;
-
       const res = await api.post<AIChatResponse>('/ai/chat', {
         message,
         context: { page: 'grant_wizard' },
       });
-
       if (res.response) {
-        // Try to parse JSON from the AI response
         const jsonMatch = res.response.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           try {
@@ -527,7 +499,7 @@ export default function CreateGrantPage() {
             toast.error('Could not parse AI suggestions. Please add criteria manually.');
           }
         } else {
-          toast.error('AI response did not contain structured criteria. Please add criteria manually.');
+          toast.error('AI response did not contain structured criteria.');
         }
       }
     } catch {
@@ -536,10 +508,6 @@ export default function CreateGrantPage() {
       setSuggestingCriteria(false);
     }
   };
-
-  // ---------------------------------------------------------------------------
-  // Publish / Save Draft
-  // ---------------------------------------------------------------------------
 
   const handleSaveDraft = async () => {
     setSaving(true);
@@ -564,13 +532,9 @@ export default function CreateGrantPage() {
       toast.error('No grant to publish. Please complete the wizard first.');
       return;
     }
-
     setPublishing(true);
     try {
-      // Save all data first
       await autoSave();
-
-      // Then publish — the server controls what's required
       await api.post(`/grants/${grantId}/publish`);
       toast.success('Grant published successfully!');
       router.push('/grants');
@@ -587,338 +551,274 @@ export default function CreateGrantPage() {
   // ---------------------------------------------------------------------------
 
   const renderStep0Upload = () => (
-    <Stack spacing={3} sx={{ alignItems: 'center', py: 2 }}>
-      {/* Hero section */}
-      <Box sx={{ textAlign: 'center', maxWidth: 560 }}>
-        <Box
-          sx={{
-            width: 64,
-            height: 64,
-            borderRadius: '50%',
-            bgcolor: 'primary.50',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            mx: 'auto',
-            mb: 2,
-          }}
-        >
-          <Sparkles size={32} style={{ color: 'var(--mui-palette-primary-main, #1976d2)' }} />
-        </Box>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mb: 1 }}>
-          Upload Your Grant Agreement
-        </Typography>
-        <Typography variant="body1" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
-          Our AI will extract eligibility requirements, reporting schedules, and KPIs automatically
-          — saving you hours of manual data entry.
-        </Typography>
-      </Box>
+    <div className="flex flex-col items-center gap-5 py-2">
+      <div className="max-w-[560px] text-center">
+        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--kuja-spark-soft))]">
+          <Sparkles className="h-8 w-8 text-[hsl(var(--kuja-spark))]" />
+        </div>
+        <h2 className="kuja-display mb-2 text-2xl font-bold">Upload Your Grant Agreement</h2>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Our AI will extract eligibility requirements, reporting schedules, and KPIs automatically —
+          saving you hours of manual data entry.
+        </p>
+      </div>
 
-      {/* Upload area */}
       {!uploadedFileName || uploadError ? (
-        <Box
-          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          onDrop={handleFileDrop}
-          onClick={() => fileInputRef.current?.click()}
-          sx={{
-            width: '100%',
-            maxWidth: 560,
-            border: '2px dashed',
-            borderColor: uploading ? 'primary.main' : 'divider',
-            borderRadius: 3,
-            py: 6,
-            px: 4,
-            textAlign: 'center',
-            cursor: uploading ? 'default' : 'pointer',
-            transition: 'all 0.2s ease',
-            bgcolor: uploading ? 'primary.50' : 'background.default',
-            '&:hover': uploading
-              ? {}
-              : {
-                  borderColor: 'primary.light',
-                  bgcolor: 'action.hover',
-                },
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
           }}
+          onDrop={handleFileDrop}
+          onClick={() => !uploading && fileInputRef.current?.click()}
+          className={`w-full max-w-[560px] rounded-[16px] border-2 border-dashed px-6 py-12 text-center transition ${
+            uploading
+              ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-sand-50))]'
+              : 'cursor-pointer border-border hover:border-[hsl(var(--kuja-clay))] hover:bg-muted/30'
+          }`}
         >
           <input
             ref={fileInputRef}
             type="file"
             accept={ACCEPTED_FILE_TYPES}
             onChange={handleFileSelect}
-            style={{ display: 'none' }}
+            className="hidden"
           />
-
           {uploading ? (
-            <Stack spacing={2} sx={{ alignItems: 'center' }}>
-              <CircularProgress size={48} />
-              <Typography variant="body1" sx={{ fontWeight: 500, color: 'primary.main' }}>
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-10 w-10 animate-spin text-[hsl(var(--kuja-clay))]" />
+              <div className="text-sm font-medium text-[hsl(var(--kuja-clay))]">
                 AI is analyzing your document...
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              </div>
+              <div className="text-xs text-muted-foreground">
                 Extracting requirements, KPIs, and reporting schedules
-              </Typography>
-              <LinearProgress sx={{ width: '80%', mt: 1, borderRadius: 1 }} />
-            </Stack>
+              </div>
+              <div className="kuja-shimmer h-1 w-[80%] rounded-full bg-muted" />
+            </div>
           ) : (
-            <Stack spacing={1.5} sx={{ alignItems: 'center' }}>
-              <CloudUpload size={48} style={{ color: '#94a3b8' }} />
-              <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                Drag & drop your grant document here
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                or click to browse
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+            <div className="flex flex-col items-center gap-2">
+              <CloudUpload className="h-12 w-12 text-muted-foreground" />
+              <div className="text-sm font-medium">Drag & drop your grant document here</div>
+              <div className="text-xs text-muted-foreground">or click to browse</div>
+              <div className="mt-1 flex gap-1">
                 {['PDF', 'DOC', 'DOCX', 'TXT'].map((fmt) => (
-                  <Chip
+                  <span
                     key={fmt}
-                    label={fmt}
-                    size="small"
-                    variant="outlined"
-                    sx={{ fontSize: '0.75rem', color: 'text.secondary' }}
-                  />
+                    className="inline-flex items-center rounded-full border border-border bg-background px-2 py-0.5 text-[10px] text-muted-foreground"
+                  >
+                    {fmt}
+                  </span>
                 ))}
-              </Box>
-            </Stack>
+              </div>
+            </div>
           )}
-        </Box>
+        </div>
       ) : null}
 
-      {/* Upload error */}
       {uploadError && (
-        <Alert severity="error" sx={{ width: '100%', maxWidth: 560 }}>
-          {uploadError}
-        </Alert>
+        <div className="w-full max-w-[560px]">
+          <Alert tone="error">{uploadError}</Alert>
+        </div>
       )}
 
-      {/* Upload success */}
       {uploadedFileName && !uploadError && !uploading && (
-        <Card
-          sx={{
-            width: '100%',
-            maxWidth: 560,
-            border: '1px solid',
-            borderColor: 'success.light',
-            bgcolor: 'success.50',
-          }}
-        >
-          <CardContent sx={{ py: 3, '&:last-child': { pb: 3 } }}>
-            <Stack spacing={2}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <CheckCircle2 size={24} style={{ color: '#16a34a' }} />
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.dark' }}>
-                    Document analyzed successfully
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    {uploadedFileName}
-                  </Typography>
-                </Box>
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    setUploadedFileName(null);
-                    setExtracted(null);
-                    if (fileInputRef.current) fileInputRef.current.value = '';
-                  }}
-                  sx={{ color: 'text.secondary' }}
-                >
-                  <X size={16} />
-                </IconButton>
-              </Box>
+        <Card className="w-full max-w-[560px] border-emerald-200 bg-emerald-50/30">
+          <div className="p-5">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-6 w-6 flex-shrink-0 text-emerald-600" />
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-emerald-800">
+                  Document analyzed successfully
+                </div>
+                <div className="truncate text-xs text-muted-foreground">{uploadedFileName}</div>
+              </div>
+              <button
+                onClick={() => {
+                  setUploadedFileName(null);
+                  setExtracted(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-              {extracted && (
-                <Stack spacing={2} sx={{ pt: 1 }}>
-                  {/* Summary stats */}
-                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2 }}>
-                    <Box sx={{ textAlign: 'center', p: 1.5, borderRadius: 2, bgcolor: 'primary.50' }}>
-                      <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                        {extracted.requirements?.length || 0}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                        Requirements
-                      </Typography>
-                    </Box>
-                    <Box sx={{ textAlign: 'center', p: 1.5, borderRadius: 2, bgcolor: 'info.50' }}>
-                      <Typography variant="h4" sx={{ fontWeight: 700, color: 'info.main' }}>
-                        {extracted.template_sections?.length || 0}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                        Sections
-                      </Typography>
-                    </Box>
-                    <Box sx={{ textAlign: 'center', p: 1.5, borderRadius: 2, bgcolor: 'warning.50' }}>
-                      <Typography variant="h4" sx={{ fontWeight: 700, color: 'warning.dark' }}>
-                        {extracted.indicators?.length || 0}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                        Indicators
-                      </Typography>
-                    </Box>
-                  </Box>
+            {extracted && (
+              <div className="mt-4 space-y-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-md bg-[hsl(var(--kuja-sand-50))] p-3 text-center">
+                    <div className="kuja-numeric text-2xl font-bold text-[hsl(var(--kuja-clay))]">
+                      {extracted.requirements?.length || 0}
+                    </div>
+                    <div className="text-[10px] font-semibold uppercase text-muted-foreground">
+                      Requirements
+                    </div>
+                  </div>
+                  <div className="rounded-md bg-sky-50 p-3 text-center">
+                    <div className="kuja-numeric text-2xl font-bold text-sky-600">
+                      {extracted.template_sections?.length || 0}
+                    </div>
+                    <div className="text-[10px] font-semibold uppercase text-muted-foreground">
+                      Sections
+                    </div>
+                  </div>
+                  <div className="rounded-md bg-amber-50 p-3 text-center">
+                    <div className="kuja-numeric text-2xl font-bold text-amber-700">
+                      {extracted.indicators?.length || 0}
+                    </div>
+                    <div className="text-[10px] font-semibold uppercase text-muted-foreground">
+                      Indicators
+                    </div>
+                  </div>
+                </div>
 
-                  {/* Extracted requirements detail */}
-                  {extracted.requirements && extracted.requirements.length > 0 && (
-                    <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 1.5 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'text.secondary', mb: 1, display: 'block' }}>
-                        Reporting Requirements
-                      </Typography>
-                      {extracted.requirements.slice(0, 4).map((req, i) => (
-                        <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
-                          <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0 }} />
-                          <Typography variant="body2" sx={{ color: 'text.primary', fontSize: '0.8rem' }}>
-                            {(req as Record<string, string>).title || (req as Record<string, string>).type || 'Requirement'}
-                          </Typography>
-                          {(req as Record<string, string>).frequency && (
-                            <Chip label={(req as Record<string, string>).frequency} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-                          )}
-                        </Box>
+                {extracted.requirements && extracted.requirements.length > 0 && (
+                  <div className="border-t border-border pt-3">
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Reporting Requirements
+                    </div>
+                    {extracted.requirements.slice(0, 4).map((req, i) => (
+                      <div key={i} className="flex items-center gap-2 py-0.5">
+                        <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[hsl(var(--kuja-clay))]" />
+                        <span className="text-xs">{req.title || req.type || 'Requirement'}</span>
+                        {req.frequency && (
+                          <span className="inline-flex items-center rounded-full border border-border bg-background px-1.5 py-0 text-[10px] text-muted-foreground">
+                            {req.frequency}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    {extracted.requirements.length > 4 && (
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">
+                        +{extracted.requirements.length - 4} more
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {extracted.indicators && extracted.indicators.length > 0 && (
+                  <div className="border-t border-border pt-3">
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Key Performance Indicators
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {extracted.indicators.slice(0, 6).map((ind, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700"
+                        >
+                          {ind.name || 'KPI'}
+                          {ind.target ? ` — ${ind.target}` : ''}
+                        </span>
                       ))}
-                      {extracted.requirements.length > 4 && (
-                        <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>
-                          +{extracted.requirements.length - 4} more
-                        </Typography>
-                      )}
-                    </Box>
-                  )}
-
-                  {/* KPI indicators */}
-                  {extracted.indicators && extracted.indicators.length > 0 && (
-                    <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 1.5 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'text.secondary', mb: 1, display: 'block' }}>
-                        Key Performance Indicators
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                        {extracted.indicators.slice(0, 6).map((ind, i) => (
-                          <Chip
-                            key={i}
-                            label={`${(ind as Record<string, string>).name || 'KPI'}${(ind as Record<string, string>).target ? ` — ${(ind as Record<string, string>).target}` : ''}`}
-                            size="small"
-                            variant="outlined"
-                            color="warning"
-                            sx={{ fontSize: '0.7rem', height: 24 }}
-                          />
-                        ))}
-                      </Box>
-                    </Box>
-                  )}
-                </Stack>
-              )}
-            </Stack>
-          </CardContent>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </Card>
       )}
 
-      {/* Skip link */}
-      <Button
-        variant="text"
-        size="small"
+      <button
         onClick={goNext}
-        sx={{ color: 'text.secondary', textTransform: 'none', mt: 1 }}
+        className="mt-2 text-xs text-muted-foreground hover:text-foreground"
       >
         Skip — I&apos;ll enter details manually
-      </Button>
-    </Stack>
+      </button>
+    </div>
   );
 
   const renderStep1BasicInfo = () => (
-    <Stack spacing={3}>
+    <div className="space-y-4">
       {extracted && (
-        <Alert severity="info" icon={<Sparkles size={18} />} sx={{ mb: 1 }}>
+        <Alert tone="info" icon={<Sparkles className="h-4 w-4" />}>
           Fields below have been pre-filled from your uploaded document. Review and adjust as needed.
         </Alert>
       )}
 
-      <TextField
-        label="Grant Title *"
-        placeholder="e.g., Community Health Resilience Program 2026"
-        value={basic.title}
-        onChange={(e) => updateBasic('title', e.target.value)}
-        fullWidth
-        size="small"
-      />
-
-      <TextField
-        label="Description"
-        placeholder="Describe the grant purpose, objectives, and target outcomes..."
-        value={basic.description}
-        onChange={(e) => updateBasic('description', e.target.value)}
-        fullWidth
-        multiline
-        minRows={4}
-        size="small"
-      />
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2 }}>
-        <TextField
-          label="Total Funding Amount"
-          type="number"
-          placeholder="500000"
-          value={basic.total_funding}
-          onChange={(e) => updateBasic('total_funding', e.target.value)}
-          size="small"
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <DollarSign size={16} />
-              </InputAdornment>
-            ),
-          }}
+      <Field label="Grant Title *">
+        <input
+          value={basic.title}
+          onChange={(e) => updateBasic('title', e.target.value)}
+          placeholder="e.g., Community Health Resilience Program 2026"
+          className={INPUT_CLS}
         />
-        <FormControl size="small">
-          <InputLabel>Currency</InputLabel>
-          <Select
-            label="Currency"
+      </Field>
+
+      <Field label="Description">
+        <textarea
+          rows={4}
+          value={basic.description}
+          onChange={(e) => updateBasic('description', e.target.value)}
+          placeholder="Describe the grant purpose, objectives, and target outcomes..."
+          className={TA_CLS}
+        />
+      </Field>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Field label="Total Funding Amount">
+          <div className="relative">
+            <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="number"
+              value={basic.total_funding}
+              onChange={(e) => updateBasic('total_funding', e.target.value)}
+              placeholder="500000"
+              className={`${INPUT_CLS} pl-8`}
+            />
+          </div>
+        </Field>
+        <Field label="Currency">
+          <select
             value={basic.currency}
             onChange={(e) => updateBasic('currency', e.target.value)}
+            className={INPUT_CLS}
           >
             {CURRENCY_OPTIONS.map((c) => (
-              <MenuItem key={c} value={c}>{c}</MenuItem>
+              <option key={c} value={c}>
+                {c}
+              </option>
             ))}
-          </Select>
-        </FormControl>
-        <TextField
-          label="Application Deadline"
-          type="date"
-          value={basic.deadline}
-          onChange={(e) => updateBasic('deadline', e.target.value)}
-          size="small"
-          InputLabelProps={{ shrink: true }}
-        />
-      </Box>
+          </select>
+        </Field>
+        <Field label="Application Deadline">
+          <input
+            type="date"
+            value={basic.deadline}
+            onChange={(e) => updateBasic('deadline', e.target.value)}
+            className={INPUT_CLS}
+          />
+        </Field>
+      </div>
 
-      <Box>
-        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mb: 1 }}>
-          Sectors
-        </Typography>
+      <Field label="Sectors">
         <MultiSelectToggle
           options={SECTOR_OPTIONS}
           selected={basic.sectors}
           onChange={(val) => updateBasic('sectors', val)}
         />
-      </Box>
+      </Field>
 
-      <Box>
-        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mb: 1 }}>
-          Target Countries
-        </Typography>
+      <Field label="Target Countries">
         <MultiSelectToggle
           options={COUNTRY_OPTIONS}
           selected={basic.countries}
           onChange={(val) => updateBasic('countries', val)}
         />
-      </Box>
-    </Stack>
+      </Field>
+    </div>
   );
 
   const renderStep2Eligibility = () => (
-    <Stack spacing={2}>
-      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
         Toggle the eligibility categories you want applicants to meet. Add details and set relative weights.
-      </Typography>
+      </p>
 
       {extracted && eligibility.some((e) => e.enabled) && (
-        <Alert severity="info" icon={<Sparkles size={18} />} sx={{ mb: 1 }}>
+        <Alert tone="info" icon={<Sparkles className="h-4 w-4" />}>
           Some requirements have been pre-filled from your uploaded document.
         </Alert>
       )}
@@ -926,83 +826,57 @@ export default function CreateGrantPage() {
       {eligibility.map((item, i) => (
         <Card
           key={item.key}
-          sx={{
-            border: '1px solid',
-            borderColor: item.enabled ? 'primary.light' : 'divider',
-            bgcolor: item.enabled ? 'primary.50' : 'background.paper',
-          }}
+          className={item.enabled ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-sand-50))]' : ''}
         >
-          <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                mb: item.enabled ? 1.5 : 0,
-              }}
-            >
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={item.enabled}
-                    onChange={() => toggleEligibility(i)}
-                    size="small"
-                  />
-                }
-                label={
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontWeight: 500,
-                      color: item.enabled ? 'text.primary' : 'text.disabled',
-                    }}
-                  >
-                    {item.label}
-                  </Typography>
-                }
-              />
+          <div className="p-4">
+            <div className={`flex items-center justify-between ${item.enabled ? 'mb-2' : ''}`}>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={item.enabled}
+                  onChange={() => toggleEligibility(i)}
+                  className="h-4 w-4 rounded border-input accent-[hsl(var(--kuja-clay))]"
+                />
+                <span
+                  className={`text-sm font-medium ${
+                    item.enabled ? 'text-foreground' : 'text-muted-foreground'
+                  }`}
+                >
+                  {item.label}
+                </span>
+              </label>
               {item.enabled && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                    Weight:
-                  </Typography>
-                  <Slider
-                    value={item.weight}
-                    onChange={(_, val) => updateEligibility(i, 'weight', val as number)}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Weight:</span>
+                  <input
+                    type="range"
                     min={0}
                     max={100}
-                    size="small"
-                    sx={{ width: 100 }}
+                    value={item.weight}
+                    onChange={(e) => updateEligibility(i, 'weight', Number(e.target.value))}
+                    className="w-24 accent-[hsl(var(--kuja-clay))]"
                   />
-                  <Typography
-                    variant="body2"
-                    sx={{ fontWeight: 600, color: 'primary.main', minWidth: 40, textAlign: 'right' }}
-                  >
+                  <span className="kuja-numeric min-w-[36px] text-right text-sm font-semibold text-[hsl(var(--kuja-clay))]">
                     {item.weight}%
-                  </Typography>
-                </Box>
+                  </span>
+                </div>
               )}
-            </Box>
+            </div>
             {item.enabled && (
-              <Box sx={{ ml: 6 }}>
-                <TextField
-                  placeholder="Describe specific requirements..."
+              <div className="ml-6">
+                <input
                   value={item.details}
                   onChange={(e) => updateEligibility(i, 'details', e.target.value)}
-                  fullWidth
-                  size="small"
+                  placeholder="Describe specific requirements..."
+                  className={INPUT_CLS}
                 />
-              </Box>
+              </div>
             )}
-          </CardContent>
+          </div>
         </Card>
       ))}
 
-      <Button
-        variant="outlined"
-        size="small"
-        startIcon={<Plus size={14} />}
-        sx={{ alignSelf: 'flex-start' }}
+      <button
         onClick={() => {
           const newKey = `custom_${Date.now()}`;
           setEligibility((prev) => [
@@ -1010,225 +884,206 @@ export default function CreateGrantPage() {
             { key: newKey, label: 'Custom Requirement', enabled: true, details: '', weight: 10 },
           ]);
         }}
+        className="inline-flex items-center gap-1.5 self-start rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
       >
-        Add Custom Requirement
-      </Button>
-    </Stack>
+        <Plus className="h-3.5 w-3.5" /> Add Custom Requirement
+      </button>
+    </div>
   );
 
   const renderStep3Evaluation = () => (
-    <Stack spacing={2}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
           Define the criteria reviewers will use to evaluate applications.
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: 500,
-              color: criteriaWeightTotal === 100 ? 'success.main' : 'error.main',
-            }}
+        </p>
+        <div className="flex items-center gap-2">
+          <span
+            className={`text-sm font-medium ${
+              criteriaWeightTotal === 100 ? 'text-emerald-600' : 'text-red-600'
+            }`}
           >
             Total: {criteriaWeightTotal}%
             {criteriaWeightTotal !== 100 && ' (must = 100%)'}
-          </Typography>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={suggestingCriteria ? <CircularProgress size={14} /> : <Sparkles size={14} />}
+          </span>
+          <button
             onClick={handleSuggestCriteria}
             disabled={suggestingCriteria}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-spark))] hover:opacity-90 disabled:opacity-50"
           >
+            {suggestingCriteria ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" />
+            )}
             {suggestingCriteria ? 'Suggesting...' : 'AI Suggest Criteria'}
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<Plus size={14} />}
+          </button>
+          <button
             onClick={addCriterion}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
           >
-            Add
-          </Button>
-        </Box>
-      </Box>
+            <Plus className="h-3.5 w-3.5" /> Add
+          </button>
+        </div>
+      </div>
 
       {criteria.map((criterion, i) => (
-        <Card key={i} sx={{ border: '1px solid', borderColor: 'divider' }}>
-          <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
-            <Stack spacing={2}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-                  Criterion {i + 1}
-                </Typography>
-                {criteria.length > 1 && (
-                  <IconButton size="small" onClick={() => removeCriterion(i)} sx={{ color: 'error.main' }}>
-                    <Trash2 size={14} />
-                  </IconButton>
-                )}
-              </Box>
+        <Card key={i}>
+          <div className="space-y-3 p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Criterion {i + 1}</span>
+              {criteria.length > 1 && (
+                <button
+                  onClick={() => removeCriterion(i)}
+                  className="rounded-md p-1 text-red-600 hover:bg-red-50"
+                  aria-label="Remove criterion"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '3fr 1fr' }, gap: 2 }}>
-                <TextField
-                  label="Label *"
-                  placeholder="e.g., Technical Approach"
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[3fr_1fr]">
+              <Field label="Label *">
+                <input
                   value={criterion.label}
                   onChange={(e) => updateCriterion(i, 'label', e.target.value)}
-                  size="small"
-                  fullWidth
+                  placeholder="e.g., Technical Approach"
+                  className={INPUT_CLS}
                 />
-                <TextField
-                  label="Weight %"
+              </Field>
+              <Field label="Weight %">
+                <input
                   type="number"
-                  inputProps={{ min: 0, max: 100 }}
+                  min={0}
+                  max={100}
                   value={criterion.weight}
                   onChange={(e) => updateCriterion(i, 'weight', Number(e.target.value))}
-                  size="small"
+                  className={INPUT_CLS}
                 />
-              </Box>
+              </Field>
+            </div>
 
-              <TextField
-                label="Description"
-                placeholder="What should applicants address..."
+            <Field label="Description">
+              <textarea
+                rows={2}
                 value={criterion.description}
                 onChange={(e) => updateCriterion(i, 'description', e.target.value)}
-                fullWidth
-                multiline
-                minRows={2}
-                size="small"
+                placeholder="What should applicants address..."
+                className={TA_CLS}
               />
+            </Field>
 
-              <TextField
-                label="Instructions for Applicants"
-                placeholder="Guidance on how to respond..."
+            <Field label="Instructions for Applicants">
+              <textarea
+                rows={2}
                 value={criterion.instructions}
                 onChange={(e) => updateCriterion(i, 'instructions', e.target.value)}
-                fullWidth
-                multiline
-                minRows={2}
-                size="small"
+                placeholder="Guidance on how to respond..."
+                className={TA_CLS}
               />
+            </Field>
 
-              <TextField
-                label="Max Words"
-                type="number"
-                inputProps={{ min: 50, max: 5000 }}
-                value={criterion.max_words}
-                onChange={(e) => updateCriterion(i, 'max_words', Number(e.target.value))}
-                size="small"
-                sx={{ maxWidth: 140 }}
-              />
-            </Stack>
-          </CardContent>
+            <div className="max-w-[140px]">
+              <Field label="Max Words">
+                <input
+                  type="number"
+                  min={50}
+                  max={5000}
+                  value={criterion.max_words}
+                  onChange={(e) => updateCriterion(i, 'max_words', Number(e.target.value))}
+                  className={INPUT_CLS}
+                />
+              </Field>
+            </div>
+          </div>
         </Card>
       ))}
-    </Stack>
+    </div>
   );
 
   const renderStep4Documents = () => (
-    <Stack spacing={2}>
-      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
         Select which documents applicants must upload. Click a card to toggle it on, then add specific requirements.
-      </Typography>
+      </p>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {docReqs.map((doc, i) => (
           <Card
             key={doc.key}
-            onClick={() => toggleDocReq(i)}
-            sx={{
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              border: '1px solid',
-              borderColor: doc.enabled ? 'primary.light' : 'divider',
-              bgcolor: doc.enabled ? 'primary.50' : 'background.paper',
-              '&:hover': {
-                borderColor: doc.enabled ? 'primary.main' : 'action.hover',
-                boxShadow: 1,
-              },
-            }}
+            className={`transition hover:shadow-[var(--kuja-elev-2)] ${
+              doc.enabled ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-sand-50))]' : ''
+            }`}
           >
-            <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Checkbox
+            <div className="p-4">
+              <div
+                className="flex cursor-pointer items-center gap-2"
+                onClick={() => toggleDocReq(i)}
+              >
+                <input
+                  type="checkbox"
                   checked={doc.enabled}
-                  size="small"
-                  sx={{ p: 0 }}
+                  readOnly
                   tabIndex={-1}
+                  className="h-4 w-4 rounded border-input accent-[hsl(var(--kuja-clay))]"
                 />
-                <Typography sx={{ fontSize: '1.25rem', lineHeight: 1 }}>{doc.icon}</Typography>
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                    {doc.label}
-                  </Typography>
-                </Box>
-              </Box>
-
+                <span className="text-lg">{doc.icon}</span>
+                <span className="text-sm font-medium">{doc.label}</span>
+              </div>
               {doc.enabled && (
-                <Box
-                  sx={{ mt: 1.5, ml: 4.5 }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <TextField
-                    placeholder="Specific requirements for this document..."
+                <div className="ml-7 mt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
+                  <input
                     value={doc.specific_requirements}
                     onChange={(e) => updateDocReq(i, 'specific_requirements', e.target.value)}
-                    fullWidth
-                    size="small"
-                    sx={{ mb: 1 }}
+                    placeholder="Specific requirements for this document..."
+                    className={INPUT_CLS}
                   />
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={doc.required}
-                        onChange={(e) => updateDocReq(i, 'required', e.target.checked)}
-                        size="small"
-                      />
-                    }
-                    label={
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        Required (applicants must upload)
-                      </Typography>
-                    }
-                  />
-                </Box>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={doc.required}
+                      onChange={(e) => updateDocReq(i, 'required', e.target.checked)}
+                      className="h-4 w-4 rounded border-input accent-[hsl(var(--kuja-clay))]"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      Required (applicants must upload)
+                    </span>
+                  </label>
+                </div>
               )}
-            </CardContent>
+            </div>
           </Card>
         ))}
-      </Box>
-    </Stack>
+      </div>
+    </div>
   );
 
   const renderStep5Review = () => (
-    <Stack spacing={3}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main', mb: 1 }}>
-        <Info size={16} />
-        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-          Review your grant before publishing
-        </Typography>
-      </Box>
+    <div className="space-y-4">
+      <div className="flex items-center gap-1.5 text-sm font-medium text-[hsl(var(--kuja-clay))]">
+        <Info className="h-4 w-4" />
+        Review your grant before publishing
+      </div>
 
-      {/* Validation warning if required fields are missing */}
       {(!basic.title.trim() || !basic.total_funding || !basic.deadline) && (
-        <Alert severity="warning" sx={{ mb: 0 }}>
+        <Alert tone="warning">
           <strong>Required fields missing:</strong>{' '}
           {[
             !basic.title.trim() && 'Title',
             !basic.total_funding && 'Funding Amount',
             !basic.deadline && 'Deadline',
-          ].filter(Boolean).join(', ')}
+          ]
+            .filter(Boolean)
+            .join(', ')}
           . Go back to <strong>Basic Info</strong> (Step 2) to complete them before publishing.
         </Alert>
       )}
 
-      {/* Basic Info Summary */}
-      <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
-        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-          <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
-            Basic Information
-          </Typography>
-          <Stack spacing={1}>
+      <Card>
+        <div className="p-5">
+          <div className="mb-3 text-sm font-semibold">Basic Information</div>
+          <div className="space-y-1.5 text-sm">
             <SummaryRow label="Title" value={basic.title || '(not set)'} />
             <SummaryRow
               label="Funding"
@@ -1240,203 +1095,182 @@ export default function CreateGrantPage() {
             />
             <SummaryRow label="Deadline" value={basic.deadline || '(not set)'} />
             {basic.sectors.length > 0 && (
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>Sectors</Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end', maxWidth: '60%' }}>
+              <div className="flex items-start justify-between">
+                <span className="text-muted-foreground">Sectors</span>
+                <div className="flex max-w-[60%] flex-wrap justify-end gap-1">
                   {basic.sectors.map((s) => (
-                    <Chip key={s} label={s} size="small" variant="outlined" sx={{ fontSize: '0.6875rem' }} />
+                    <span
+                      key={s}
+                      className="inline-flex items-center rounded-full border border-border bg-background px-2 py-0.5 text-[11px]"
+                    >
+                      {s}
+                    </span>
                   ))}
-                </Box>
-              </Box>
+                </div>
+              </div>
             )}
             {basic.countries.length > 0 && (
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>Countries</Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end', maxWidth: '60%' }}>
+              <div className="flex items-start justify-between">
+                <span className="text-muted-foreground">Countries</span>
+                <div className="flex max-w-[60%] flex-wrap justify-end gap-1">
                   {basic.countries.map((c) => (
-                    <Chip key={c} label={c} size="small" variant="outlined" sx={{ fontSize: '0.6875rem' }} />
+                    <span
+                      key={c}
+                      className="inline-flex items-center rounded-full border border-border bg-background px-2 py-0.5 text-[11px]"
+                    >
+                      {c}
+                    </span>
                   ))}
-                </Box>
-              </Box>
+                </div>
+              </div>
             )}
-          </Stack>
-        </CardContent>
+          </div>
+        </div>
       </Card>
 
-      {/* Eligibility Summary */}
       {eligibility.some((e) => e.enabled) && (
-        <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
-              Eligibility Requirements
-            </Typography>
-            <Stack spacing={1}>
+        <Card>
+          <div className="p-5">
+            <div className="mb-3 text-sm font-semibold">Eligibility Requirements</div>
+            <div className="space-y-1.5">
               {eligibility
                 .filter((e) => e.enabled)
                 .map((e) => (
-                  <Box key={e.key} sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="body2" sx={{ color: 'text.primary' }}>{e.label}</Typography>
-                      {e.details && (
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                          {e.details}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Typography variant="body2" sx={{ color: 'text.secondary', whiteSpace: 'nowrap', ml: 2 }}>
-                      {e.weight}%
-                    </Typography>
-                  </Box>
+                  <div key={e.key} className="flex items-start justify-between gap-3 text-sm">
+                    <div>
+                      <div>{e.label}</div>
+                      {e.details && <div className="text-xs text-muted-foreground">{e.details}</div>}
+                    </div>
+                    <span className="whitespace-nowrap text-muted-foreground">{e.weight}%</span>
+                  </div>
                 ))}
-            </Stack>
-          </CardContent>
+            </div>
+          </div>
         </Card>
       )}
 
-      {/* Criteria Summary */}
       {criteria.some((c) => c.label.trim()) && (
-        <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                Evaluation Criteria
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 400,
-                  color: criteriaWeightTotal === 100 ? 'success.main' : 'error.main',
-                }}
+        <Card>
+          <div className="p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-sm font-semibold">Evaluation Criteria</span>
+              <span
+                className={`text-xs ${
+                  criteriaWeightTotal === 100 ? 'text-emerald-600' : 'text-red-600'
+                }`}
               >
                 ({criteriaWeightTotal}%)
-              </Typography>
-            </Box>
-            <Stack spacing={1}>
+              </span>
+            </div>
+            <div className="space-y-1.5 text-sm">
               {criteria
                 .filter((c) => c.label.trim())
                 .map((c, i) => (
-                  <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: 'text.primary' }}>{c.label}</Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>{c.weight}%</Typography>
-                  </Box>
+                  <div key={i} className="flex justify-between">
+                    <span>{c.label}</span>
+                    <span className="text-muted-foreground">{c.weight}%</span>
+                  </div>
                 ))}
-            </Stack>
-          </CardContent>
+            </div>
+          </div>
         </Card>
       )}
 
-      {/* Document Requirements Summary */}
       {docReqs.some((d) => d.enabled) && (
-        <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
-              Required Documents
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+        <Card>
+          <div className="p-5">
+            <div className="mb-3 text-sm font-semibold">Required Documents</div>
+            <div className="flex flex-wrap gap-1.5">
               {docReqs
                 .filter((d) => d.enabled)
                 .map((d) => (
-                  <Chip
+                  <span
                     key={d.key}
-                    label={d.label}
-                    size="small"
-                    variant="outlined"
-                    color={d.required ? 'primary' : 'default'}
-                    sx={{ fontSize: '0.6875rem' }}
-                  />
+                    className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${
+                      d.required
+                        ? 'border-[hsl(var(--kuja-clay)/0.25)] bg-[hsl(var(--kuja-sand-50))] text-[hsl(var(--kuja-clay))]'
+                        : 'border-border bg-background text-foreground'
+                    }`}
+                  >
+                    {d.label}
+                  </span>
                 ))}
-            </Box>
-          </CardContent>
+            </div>
+          </div>
         </Card>
       )}
 
-      {/* AI Extracted Data Summary */}
       {extracted && (
-        <Card sx={{ border: '1px solid', borderColor: 'info.light', bgcolor: 'info.50' }}>
-          <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-              <Sparkles size={16} style={{ color: 'var(--mui-palette-info-main, #0288d1)' }} />
-              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                AI Extracted Data
-              </Typography>
-            </Box>
-
+        <Card className="border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]">
+          <div className="p-5">
+            <div className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-[hsl(var(--kuja-spark))]">
+              <Sparkles className="h-4 w-4" />
+              AI Extracted Data
+            </div>
             {extracted.requirements && extracted.requirements.length > 0 && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mb: 0.5 }}>
+              <div className="mb-3">
+                <div className="mb-1 text-xs font-medium">
                   Reporting Requirements ({extracted.requirements.length})
-                </Typography>
-                <Stack spacing={0.5}>
+                </div>
+                <div className="space-y-0.5">
                   {extracted.requirements.map((req, i) => (
-                    <Typography key={i} variant="caption" sx={{ color: 'text.secondary' }}>
+                    <div key={i} className="text-xs text-muted-foreground">
                       {i + 1}. {req.title || req.description || 'Requirement'}
                       {req.frequency ? ` (${req.frequency})` : ''}
-                    </Typography>
+                    </div>
                   ))}
-                </Stack>
-              </Box>
+                </div>
+              </div>
             )}
-
             {extracted.indicators && extracted.indicators.length > 0 && (
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', mb: 0.5 }}>
+              <div>
+                <div className="mb-1 text-xs font-medium">
                   KPIs / Indicators ({extracted.indicators.length})
-                </Typography>
-                <Stack spacing={0.5}>
+                </div>
+                <div className="space-y-0.5">
                   {extracted.indicators.map((ind, i) => (
-                    <Typography key={i} variant="caption" sx={{ color: 'text.secondary' }}>
+                    <div key={i} className="text-xs text-muted-foreground">
                       {i + 1}. {ind.name || ind.description || 'Indicator'}
                       {ind.target ? ` — Target: ${ind.target}` : ''}
-                    </Typography>
+                    </div>
                   ))}
-                </Stack>
-              </Box>
+                </div>
+              </div>
             )}
-          </CardContent>
+          </div>
         </Card>
       )}
 
-      {/* Action Buttons — prominent publish */}
-      <Card sx={{ border: '2px solid', borderColor: 'success.light', bgcolor: 'success.50', p: 0 }}>
-        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 }, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          <Box>
-            <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.dark' }}>
-              Ready to publish?
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+      <Card className="border-2 border-emerald-200 bg-emerald-50/40">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-5">
+          <div>
+            <div className="text-sm font-semibold text-emerald-800">Ready to publish?</div>
+            <div className="text-xs text-muted-foreground">
               Your grant will be visible to matched NGOs immediately
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <Button
-              variant="outlined"
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
               onClick={handleSaveDraft}
               disabled={saving || publishing}
-              startIcon={saving ? <CircularProgress size={16} /> : <FileText size={16} />}
-              sx={{ borderColor: 'divider' }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
             >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
               {saving ? 'Saving...' : 'Save Draft'}
-            </Button>
-            <Button
-              variant="contained"
-              color="success"
-              size="large"
+            </button>
+            <button
               onClick={handlePublish}
               disabled={publishing || saving}
-              startIcon={publishing ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />}
-              sx={{ fontWeight: 700, px: 4 }}
+              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-5 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
+              {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               {publishing ? 'Publishing...' : 'Publish Grant'}
-            </Button>
-          </Box>
-        </CardContent>
+            </button>
+          </div>
+        </div>
       </Card>
-    </Stack>
+    </div>
   );
-
-  // ---------------------------------------------------------------------------
-  // Step Router
-  // ---------------------------------------------------------------------------
 
   const renderCurrentStep = () => {
     switch (step) {
@@ -1450,109 +1284,113 @@ export default function CreateGrantPage() {
     }
   };
 
-  // ---------------------------------------------------------------------------
-  // Main Render
-  // ---------------------------------------------------------------------------
-
   return (
-    <Stack spacing={3} sx={{ maxWidth: 960, mx: 'auto' }}>
+    <div className="mx-auto max-w-[960px] space-y-5">
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Button
-          size="small"
-          startIcon={<ArrowLeft size={16} />}
+      <div className="flex items-center gap-3">
+        <button
           onClick={() => router.push('/grants')}
-          sx={{ color: 'text.secondary' }}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
         >
-          Back
-        </Button>
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-            Create New Grant
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25 }}>
+          <ArrowLeft className="h-4 w-4" /> Back
+        </button>
+        <div className="flex-1">
+          <h1 className="kuja-display text-2xl font-bold text-foreground">Create New Grant</h1>
+          <div className="mt-0.5 text-xs text-muted-foreground">
             Step {step + 1} of {STEPS.length}: {STEPS[step].label}
-            {saving && (
-              <Box component="span" sx={{ ml: 1, color: 'info.main' }}>
-                (Saving...)
-              </Box>
-            )}
-          </Typography>
-        </Box>
+            {saving && <span className="ml-1 text-sky-600">(Saving...)</span>}
+          </div>
+        </div>
         {grantId && (
-          <Chip
-            label={`Draft #${grantId}`}
-            size="small"
-            variant="outlined"
-            color="info"
-            sx={{ fontSize: '0.75rem' }}
-          />
+          <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs text-sky-700">
+            Draft #{grantId}
+          </span>
         )}
-      </Box>
+      </div>
 
-      {/* MUI Stepper */}
-      <Stepper activeStep={step} alternativeLabel>
-        {STEPS.map((s) => (
-          <Step key={s.label}>
-            <StepLabel>{s.label}</StepLabel>
-          </Step>
-        ))}
-      </Stepper>
+      {/* Custom Stepper */}
+      <div className="flex items-center gap-0 overflow-x-auto py-2">
+        {STEPS.map((s, i) => {
+          const Icon = s.icon;
+          const active = i === step;
+          const complete = i < step;
+          return (
+            <div key={s.label} className="flex flex-1 items-center">
+              <div className="flex min-w-0 items-center gap-2">
+                <div
+                  className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold transition ${
+                    active
+                      ? 'bg-[hsl(var(--kuja-clay))] text-white'
+                      : complete
+                        ? 'bg-[hsl(var(--kuja-savanna))] text-white'
+                        : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                </div>
+                <span
+                  className={`hidden truncate text-xs font-medium sm:inline ${
+                    active || complete ? 'text-foreground' : 'text-muted-foreground'
+                  }`}
+                >
+                  {s.label}
+                </span>
+              </div>
+              {i < STEPS.length - 1 && (
+                <div
+                  className={`mx-2 h-px flex-1 ${
+                    complete ? 'bg-[hsl(var(--kuja-savanna))]' : 'bg-border'
+                  }`}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {/* Step Content */}
       <Card>
-        <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
-          {renderCurrentStep()}
-        </CardContent>
+        <div className="p-6">{renderCurrentStep()}</div>
       </Card>
 
-      {/* Navigation (hidden on review step which has its own buttons) */}
+      {/* Navigation */}
       {step < STEPS.length - 1 && (
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Button
-            variant="outlined"
-            startIcon={<ArrowLeft size={16} />}
+        <div className="flex items-center justify-between">
+          <button
             onClick={goBack}
             disabled={step === 0}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
           >
-            Previous
-          </Button>
-
-          <Button
-            variant="contained"
-            endIcon={<ArrowRight size={16} />}
+            <ArrowLeft className="h-4 w-4" /> Previous
+          </button>
+          <button
             onClick={goNext}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))]"
           >
-            Next
-          </Button>
-        </Box>
+            Next <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
       )}
 
-      {/* Back button on the review step */}
       {step === STEPS.length - 1 && (
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Button
-            variant="outlined"
-            startIcon={<ArrowLeft size={16} />}
+        <div className="flex">
+          <button
             onClick={goBack}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
           >
-            Previous
-          </Button>
-        </Box>
+            <ArrowLeft className="h-4 w-4" /> Previous
+          </button>
+        </div>
       )}
-    </Stack>
+    </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Helper: Summary Row
-// ---------------------------------------------------------------------------
-
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-      <Typography variant="body2" sx={{ color: 'text.secondary' }}>{label}</Typography>
-      <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>{value}</Typography>
-    </Box>
+    <div className="flex justify-between">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">{value}</span>
+    </div>
   );
 }
