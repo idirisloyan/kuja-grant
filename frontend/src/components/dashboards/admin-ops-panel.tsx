@@ -15,16 +15,25 @@ import { GitMerge, Activity, HeartPulse } from 'lucide-react';
 import { VerdictCard, type VerdictAction } from './verdict-card';
 import { ChartCard } from './chart-card';
 import { fetchSuggestions, fetchAiHealth, type AiHealth, type Suggestion } from '@/lib/copilot-api';
+import { api } from '@/lib/api';
 
 const CLAY = 'hsl(19, 82%, 41%)';
 const CLAY_LIGHT = 'hsl(24, 88%, 64%)';
 const SAVANNA = 'hsl(100, 22%, 33%)';
 const GROW = 'hsl(142, 68%, 29%)';
 
+interface AdminStatsResp {
+  stats?: {
+    conversion_funnel?: { opportunities: number; applications: number; reviewed: number; awarded: number };
+    activity_14d?: Array<{ label: string; count: number }>;
+  };
+}
+
 export function AdminOpsPanel() {
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
   const [loadingSugg, setLoadingSugg] = useState(true);
   const [aiHealth, setAiHealth] = useState<AiHealth | null>(null);
+  const [adminStats, setAdminStats] = useState<AdminStatsResp['stats'] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,17 +46,30 @@ export function AdminOpsPanel() {
       if (cancelled) return;
       if (res.ok) setAiHealth(res.data);
     });
+    api.get<AdminStatsResp>('/dashboard/stats').then((d) => {
+      if (!cancelled) setAdminStats(d.stats ?? null);
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
-  const funnelData = useMemo(() => [
-    { stage: 'Opps',     count: 24, fill: CLAY_LIGHT },
-    { stage: 'Apps',     count: 12, fill: CLAY },
-    { stage: 'Reviewed', count:  8, fill: SAVANNA },
-    { stage: 'Awarded',  count:  3, fill: GROW },
-  ], []);
+  // Real funnel from /api/dashboard/stats. Zeros if endpoint hasn't
+  // loaded yet — charts still render cleanly.
+  const funnelData = useMemo(() => {
+    const f = adminStats?.conversion_funnel;
+    return [
+      { stage: 'Opps',     count: f?.opportunities ?? 0, fill: CLAY_LIGHT },
+      { stage: 'Apps',     count: f?.applications  ?? 0, fill: CLAY },
+      { stage: 'Reviewed', count: f?.reviewed      ?? 0, fill: SAVANNA },
+      { stage: 'Awarded',  count: f?.awarded       ?? 0, fill: GROW },
+    ];
+  }, [adminStats]);
 
-  const activityData = useMemo(() => last14Days(), []);
+  // Real 14-day activity series (daily submission counts) from the
+  // admin stats endpoint.
+  const activityData = useMemo(() => {
+    if (adminStats?.activity_14d?.length) return adminStats.activity_14d;
+    return last14Days().map((d) => ({ ...d, count: 0 }));
+  }, [adminStats]);
 
   const actions: VerdictAction[] = (suggestions ?? []).slice(0, 3).map((s) => ({
     label: s.title,
@@ -81,7 +103,7 @@ export function AdminOpsPanel() {
             context: 'Org-wide grant conversion pipeline',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <BarChart data={funnelData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="stage" tick={{ fontSize: 11 }} />
@@ -104,7 +126,7 @@ export function AdminOpsPanel() {
             context: 'Daily submission volume, last 14 days',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <LineChart data={activityData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="label" tick={{ fontSize: 10 }} />

@@ -1,0 +1,21 @@
+# Nixpacks build configuration — pins Python version and captures the
+# git commit SHA into `.build-sha` at build time so `/api/version` can
+# read it at runtime. Railway exposes RAILWAY_GIT_COMMIT_SHA during the
+# build phase but does NOT always expose it to the runtime container.
+
+[phases.setup]
+nixPkgs = ["python311", "gcc"]
+
+[phases.build]
+cmds = [
+  "pip install -r requirements.txt",
+  # Capture the commit SHA from Railway's build env var. Falls back to
+  # NIXPACKS_METADATA if available. Written as 'unknown' only if both
+  # are missing, in which case middleware.py logs a warning.
+  "echo \"${RAILWAY_GIT_COMMIT_SHA:-${NIXPACKS_METADATA:-unknown}}\" | head -c 12 > .build-sha",
+  "cat .build-sha",
+]
+
+[start]
+# Defined separately via Procfile / railway.json startCommand.
+cmd = ""

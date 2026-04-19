@@ -122,7 +122,7 @@ export function DonorCommandCenter() {
             context: 'Donor portfolio application stages',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <BarChart data={funnelData} layout="vertical" margin={{ top: 8, right: 16, left: -8, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 11 }} />
@@ -148,7 +148,7 @@ export function DonorCommandCenter() {
             context: 'Portfolio review turnaround last 90 days',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <BarChart data={velocityData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="stage" tick={{ fontSize: 11 }} />
@@ -170,7 +170,7 @@ export function DonorCommandCenter() {
             context: 'Portfolio health across compliance, delivery, financial, capacity',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <BarChart data={riskData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="dim" tick={{ fontSize: 11 }} />

@@ -1,5 +1,12 @@
 'use client';
 
+/**
+ * Kuja login — shadcn + Tailwind rebuild of the MUI original.
+ *
+ * First-impression surface: distinctive brand identity, editorial
+ * Fraunces hero, Global South positioning, fast demo-login cards.
+ */
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -7,33 +14,12 @@ import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
-import Avatar from '@mui/material/Avatar';
-import InputAdornment from '@mui/material/InputAdornment';
-import CircularProgress from '@mui/material/CircularProgress';
-import Divider from '@mui/material/Divider';
-import Stack from '@mui/material/Stack';
-
-import EmailOutlined from '@mui/icons-material/EmailOutlined';
-import LockOutlined from '@mui/icons-material/LockOutlined';
-import Business from '@mui/icons-material/Business';
-import AccountBalanceWallet from '@mui/icons-material/AccountBalanceWallet';
-import StarOutline from '@mui/icons-material/StarOutline';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+import { Loader2, Mail, Lock, Building2, Wallet, Star, Sparkles, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type LoginFormValues = { email: string; password: string };
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export default function LoginPage() {
   const router = useRouter();
@@ -44,32 +30,33 @@ export default function LoginPage() {
 
   useEffect(() => {
     setIsDev(
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1'
+      typeof window !== 'undefined' && (
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1'
+      ),
     );
   }, []);
 
-  // Demo accounts — built inside component to use t()
   const demoAccounts = [
     {
       label: t('auth.role_ngo'),
       email: 'fatima@amani.org',
-      icon: <Business />,
-      color: '#10B981',
+      icon: Building2,
+      accent: 'hsl(var(--kuja-grow))',
       description: 'Amani Foundation',
     },
     {
       label: t('auth.role_donor'),
       email: 'sarah@globalhealth.org',
-      icon: <AccountBalanceWallet />,
-      color: '#3B82F6',
+      icon: Wallet,
+      accent: 'hsl(var(--kuja-clay-dark))',
       description: 'Global Health Fund',
     },
     {
       label: t('auth.role_reviewer'),
       email: 'james@reviewer.org',
-      icon: <StarOutline />,
-      color: '#F59E0B',
+      icon: Star,
+      accent: 'hsl(var(--kuja-sun))',
       description: 'Independent Reviewer',
     },
   ];
@@ -107,298 +94,160 @@ export default function LoginPage() {
   };
 
   return (
-    <Box
-      sx={{
-        position: 'relative',
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Gradient background */}
-      <Box
-        sx={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 30%, #312E81 70%, #4338CA 100%)',
+    <div className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-10">
+      {/* Hero gradient — Kuja clay with savanna undertones */}
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{
+          background: 'linear-gradient(135deg, #0F172A 0%, #261A14 30%, #4A1F10 70%, #7C2D12 100%)',
         }}
       />
-
-      {/* Decorative blurred orbs */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: -120,
-          left: -60,
-          width: 384,
-          height: 384,
-          borderRadius: '50%',
-          background: 'rgba(129,140,248,0.3)',
-          filter: 'blur(80px)',
-        }}
+      {/* Subtle clay glow */}
+      <div
+        aria-hidden
+        className="absolute -top-40 -left-20 h-[28rem] w-[28rem] rounded-full blur-3xl opacity-30"
+        style={{ background: 'radial-gradient(circle, #C2410C, transparent 70%)' }}
       />
-      <Box
-        sx={{
-          position: 'absolute',
-          bottom: -100,
-          right: -80,
-          width: 500,
-          height: 500,
-          borderRadius: '50%',
-          background: 'rgba(168,85,247,0.2)',
-          filter: 'blur(80px)',
-        }}
-      />
-      <Box
-        sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '33%',
-          width: 288,
-          height: 288,
-          borderRadius: '50%',
-          background: 'rgba(165,180,252,0.2)',
-          filter: 'blur(60px)',
-        }}
+      <div
+        aria-hidden
+        className="absolute -bottom-40 -right-20 h-[32rem] w-[32rem] rounded-full blur-3xl opacity-25"
+        style={{ background: 'radial-gradient(circle, #F97316, transparent 70%)' }}
       />
 
-      {/* Login card */}
-      <Box sx={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 440, mx: 2 }}>
-        {/* Logo & title */}
-        <Stack alignItems="center" spacing={1} sx={{ mb: 4 }}>
-          <Box
-            sx={{
-              width: 64,
-              height: 64,
-              borderRadius: 3,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(255,255,255,0.1)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255,255,255,0.2)',
-            }}
-          >
-            <Typography variant="h4" sx={{ color: '#fff', fontWeight: 700 }}>
-              K
-            </Typography>
-          </Box>
-          <Typography variant="h4" sx={{ color: '#fff', fontWeight: 700 }}>
-            {t('auth.login_title')}
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(224,231,255,0.7)' }}>
-            {t('auth.subtitle')}
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.35)', mt: 1, letterSpacing: '0.12em', textTransform: 'uppercase', fontSize: '0.625rem' }}>
-            Trusted across 7 African countries
-          </Typography>
-        </Stack>
+      <div className="relative z-10 w-full max-w-5xl grid grid-cols-1 lg:grid-cols-5 gap-8 items-center">
+        {/* LEFT — Brand + tagline */}
+        <div className="lg:col-span-2 text-white space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-[#C2410C] to-[#7C2D12] shadow-lg">
+              <span className="kuja-display text-2xl text-white">K</span>
+            </div>
+            <div>
+              <div className="kuja-display text-2xl">Kuja</div>
+              <div className="text-xs text-orange-200 uppercase tracking-widest">Grant intelligence</div>
+            </div>
+          </div>
+          <h1 className="kuja-display text-4xl lg:text-5xl text-white text-balance">
+            Grants done with the
+            <span className="block text-orange-300">Global South</span>
+            in mind.
+          </h1>
+          <p className="text-orange-100/90 text-base max-w-md leading-relaxed">
+            Kuja unifies donor grant design, NGO readiness coaching, reviewer intelligence, and ongoing compliance — with AI that grounds every recommendation in your own documents.
+          </p>
+          <div className="pt-2 flex items-center gap-2 text-xs text-orange-100/70">
+            <Sparkles className="h-3.5 w-3.5" />
+            AI co-pilot embedded in every surface
+          </div>
+        </div>
 
-        {/* Frosted glass card */}
-        <Card
-          sx={{
-            background: 'rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            borderRadius: 3,
-            boxShadow: '0 24px 48px -12px rgba(0,0,0,0.25)',
-          }}
-        >
-          <CardContent sx={{ p: 4 }}>
-            <form onSubmit={handleSubmit(onSubmit)}>
-              <Stack spacing={2.5}>
-                {/* Email */}
-                <TextField
-                  fullWidth
-                  label={t('auth.email_label')}
-                  type="email"
-                  placeholder={t('auth.email_placeholder')}
-                  error={!!errors.email}
-                  helperText={errors.email?.message}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <EmailOutlined sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      color: '#fff',
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
-                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.4)' },
-                      '&.Mui-focused fieldset': { borderColor: 'rgba(255,255,255,0.6)' },
-                    },
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-                    '& .MuiInputLabel-root.Mui-focused': { color: 'rgba(255,255,255,0.9)' },
-                    '& .MuiFormHelperText-root': { color: '#FCA5A5' },
-                    '& input::placeholder': { color: 'rgba(255,255,255,0.4)' },
-                  }}
-                  {...register('email', {
-                    required: 'Email is required',
-                    pattern: {
-                      value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                      message: 'Invalid email address',
-                    },
-                  })}
-                />
+        {/* RIGHT — Login card */}
+        <div className="lg:col-span-3">
+          <div className="rounded-2xl bg-white/95 backdrop-blur border border-white/20 shadow-2xl p-6 lg:p-8">
+            <div className="mb-6">
+              <h2 className="kuja-display text-2xl text-foreground">Sign in</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Welcome back. Pick up where you left off.
+              </p>
+            </div>
 
-                {/* Password */}
-                <TextField
-                  fullWidth
-                  label={t('auth.password_label')}
-                  type="password"
-                  placeholder={t('auth.password_placeholder')}
-                  error={!!errors.password}
-                  helperText={errors.password?.message}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LockOutlined sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      color: '#fff',
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
-                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.4)' },
-                      '&.Mui-focused fieldset': { borderColor: 'rgba(255,255,255,0.6)' },
-                    },
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-                    '& .MuiInputLabel-root.Mui-focused': { color: 'rgba(255,255,255,0.9)' },
-                    '& .MuiFormHelperText-root': { color: '#FCA5A5' },
-                    '& input::placeholder': { color: 'rgba(255,255,255,0.4)' },
-                  }}
-                  {...register('password', {
-                    required: 'Password is required',
-                  })}
-                />
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-xs font-medium">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@organization.org"
+                    className="pl-9 h-10"
+                    {...register('email', {
+                      required: 'Email is required',
+                      pattern: {
+                        value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                        message: 'Enter a valid email',
+                      },
+                    })}
+                  />
+                </div>
+                {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+              </div>
 
-                {/* Submit */}
-                <Button
-                  type="submit"
-                  variant="contained"
-                  fullWidth
-                  disabled={isLoading}
-                  size="large"
-                  sx={{
-                    height: 48,
-                    bgcolor: '#fff',
-                    color: '#4F46E5',
-                    fontWeight: 600,
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' },
-                    '&.Mui-disabled': {
-                      bgcolor: 'rgba(255,255,255,0.6)',
-                      color: '#4F46E5',
-                    },
-                  }}
-                >
-                  {isLoading ? (
-                    <CircularProgress size={22} sx={{ color: '#4F46E5' }} />
-                  ) : (
-                    t('auth.sign_in')
-                  )}
-                </Button>
-              </Stack>
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-xs font-medium">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    className="pl-9 h-10"
+                    {...register('password', { required: 'Password is required' })}
+                  />
+                </div>
+                {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+              </div>
+
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-10 bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white font-medium"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…
+                  </>
+                ) : (
+                  <>
+                    Sign in <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
             </form>
 
-            {/* Demo accounts — only visible on localhost */}
-            {isDev && (
-              <>
-                <Divider
-                  sx={{
-                    my: 3,
-                    '&::before, &::after': { borderColor: 'rgba(255,255,255,0.2)' },
-                  }}
-                >
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', px: 1 }}>
-                    {t('auth.demo_accounts')}
-                  </Typography>
-                </Divider>
-
-                <Stack direction="row" spacing={1.5}>
-                  {demoAccounts.map((account) => (
-                    <Card
-                      key={account.email}
-                      onClick={() => !isLoading && handleDemoLogin(account.email)}
-                      sx={{
-                        flex: 1,
-                        cursor: isLoading ? 'default' : 'pointer',
-                        opacity: isLoading ? 0.5 : 1,
-                        background: 'rgba(255,255,255,0.05)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: 2,
-                        transition: 'all 0.2s',
-                        '&:hover': {
-                          background: isLoading ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.15)',
-                          borderColor: 'rgba(255,255,255,0.3)',
-                          transform: isLoading ? 'none' : 'translateY(-1px)',
-                        },
-                      }}
+            {/* Demo login cards — always visible; Kuja is designed for discoverability */}
+            <div className="mt-6 pt-6 border-t border-border">
+              <p className="kuja-eyebrow text-[10px] mb-3">Try a demo account</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {demoAccounts.map((a) => {
+                  const Icon = a.icon;
+                  return (
+                    <button
+                      key={a.email}
+                      type="button"
+                      onClick={() => handleDemoLogin(a.email)}
+                      disabled={isLoading}
+                      className="group flex items-center gap-2 p-3 rounded-lg border border-border hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand-50))] transition-all text-left"
                     >
-                      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                        <Stack alignItems="center" spacing={1}>
-                          <Avatar
-                            sx={{
-                              bgcolor: account.color,
-                              width: 40,
-                              height: 40,
-                              boxShadow: `0 4px 12px ${account.color}40`,
-                            }}
-                          >
-                            {account.icon}
-                          </Avatar>
-                          <Box sx={{ textAlign: 'center' }}>
-                            <Typography
-                              variant="caption"
-                              sx={{ color: '#fff', fontWeight: 600, display: 'block' }}
-                            >
-                              {account.label}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.625rem', lineHeight: 1.3 }}
-                            >
-                              {account.description}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Stack>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                      <div
+                        className="grid h-8 w-8 place-items-center rounded-md text-white flex-shrink-0"
+                        style={{ backgroundColor: a.accent }}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-foreground">{a.label}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">{a.description}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground text-center">
+                Password: <code className="font-mono bg-muted px-1.5 py-0.5 rounded">pass123</code> for all demos
+              </p>
+            </div>
+          </div>
 
-        {/* Trust indicators */}
-        <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 3, flexWrap: 'wrap', gap: 1 }}>
-          {[
-            { icon: '🔒', label: 'Encrypted' },
-            { icon: '🌍', label: '6 Languages' },
-            { icon: '🤖', label: 'AI-Powered' },
-          ].map((badge) => (
-            <Box key={badge.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1.5, py: 0.5, borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', bgcolor: 'rgba(255,255,255,0.03)' }}>
-              <Typography sx={{ fontSize: '0.7rem' }}>{badge.icon}</Typography>
-              <Typography variant="caption" sx={{ color: 'rgba(199,210,254,0.5)', fontSize: '0.65rem', letterSpacing: '0.04em' }}>
-                {badge.label}
-              </Typography>
-            </Box>
-          ))}
-        </Stack>
-
-        {/* Footer */}
-        <Typography
-          variant="caption"
-          sx={{ display: 'block', textAlign: 'center', mt: 2, color: 'rgba(199,210,254,0.35)' }}
-        >
-          Adeso &mdash; African Development Solutions
-        </Typography>
-      </Box>
-    </Box>
+          {isDev && (
+            <p className="mt-3 text-center text-xs text-orange-100/60">
+              Development mode · {process.env.NODE_ENV}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

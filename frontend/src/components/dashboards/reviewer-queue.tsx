@@ -4,7 +4,7 @@
  * Reviewer Queue — AI-prioritized queue + SLA breakdown + compare entry.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
@@ -13,6 +13,7 @@ import { AlarmClock, GitCompare } from 'lucide-react';
 import { VerdictCard, type VerdictAction } from './verdict-card';
 import { ChartCard } from './chart-card';
 import { fetchSuggestions, type Suggestion } from '@/lib/copilot-api';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Sparkles } from 'lucide-react';
 
@@ -21,10 +22,20 @@ const SAVANNA = 'hsl(100, 22%, 33%)';
 const SUN = 'hsl(32, 95%, 44%)';
 const FLAG = 'hsl(0, 74%, 42%)';
 
+interface DashboardStatsResp {
+  stats?: {
+    sla_breakdown?: Array<{ age: string; count: number }>;
+    assigned_reviews?: number;
+    in_progress_reviews?: number;
+    total_reviews?: number;
+  };
+}
+
 export function ReviewerQueue() {
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<DashboardStatsResp['stats'] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,16 +45,24 @@ export function ReviewerQueue() {
       else setError(res.message);
       setLoading(false);
     });
+    api.get<DashboardStatsResp>('/dashboard/stats').then((d) => {
+      if (!cancelled) setStats(d.stats ?? null);
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
-  // Placeholder SLA buckets until wired to real data
-  const slaData = [
-    { age: '<3d',   count: 5, fill: GROW },
-    { age: '3-7d',  count: 3, fill: SAVANNA },
-    { age: '7-14d', count: 2, fill: SUN },
-    { age: '14d+',  count: 1, fill: FLAG },
-  ];
+  // Real SLA data from /api/dashboard/stats. Falls back to zeros if
+  // the endpoint hasn't loaded yet — charts show cleanly either way.
+  const slaData = useMemo(() => {
+    const raw = stats?.sla_breakdown ?? [
+      { age: '<3d', count: 0 }, { age: '3-7d', count: 0 },
+      { age: '7-14d', count: 0 }, { age: '14d+', count: 0 },
+    ];
+    const colorFor: Record<string, string> = {
+      '<3d': GROW, '3-7d': SAVANNA, '7-14d': SUN, '14d+': FLAG,
+    };
+    return raw.map((b) => ({ ...b, fill: colorFor[b.age] ?? SAVANNA }));
+  }, [stats]);
 
   const actions: VerdictAction[] = (suggestions ?? []).slice(0, 3).map((s) => ({
     label: s.title,
@@ -76,7 +95,7 @@ export function ReviewerQueue() {
             context: 'Reviewer queue SLA distribution',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <PieChart>
               <Pie data={slaData} dataKey="count" nameKey="age" innerRadius={50} outerRadius={80} paddingAngle={2}>
                 {slaData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}

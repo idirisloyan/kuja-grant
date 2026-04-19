@@ -273,6 +273,7 @@ def _build_donor_stats(org_id):
 
 def _build_reviewer_stats(user_id):
     """Build reviewer dashboard stats with consolidated queries."""
+    from datetime import datetime, timezone, timedelta
     stats = {}
 
     # -- Single GROUP BY for review status counts --
@@ -307,6 +308,33 @@ def _build_reviewer_stats(user_id):
     ).order_by(Review.created_at.desc()).limit(5).all()
     stats['recent_reviews'] = [r.to_dict() for r in recent_reviews]
 
+    # -- SLA breakdown: open reviews bucketed by age in queue --
+    # Buckets: <3d, 3-7d, 7-14d, 14d+. Used by the ReviewerQueue
+    # command center so the SLA doughnut reflects real data, not demo.
+    now = datetime.now(timezone.utc)
+    open_reviews = Review.query.filter(
+        Review.reviewer_user_id == user_id,
+        Review.status.in_(['assigned', 'in_progress']),
+    ).all()
+    buckets = {'<3d': 0, '3-7d': 0, '7-14d': 0, '14d+': 0}
+    for r in open_reviews:
+        created = r.created_at
+        if not created:
+            continue
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        age_days = (now - created).days
+        if age_days < 3: buckets['<3d'] += 1
+        elif age_days < 7: buckets['3-7d'] += 1
+        elif age_days < 14: buckets['7-14d'] += 1
+        else: buckets['14d+'] += 1
+    stats['sla_breakdown'] = [
+        {'age': '<3d',  'count': buckets['<3d']},
+        {'age': '3-7d', 'count': buckets['3-7d']},
+        {'age': '7-14d','count': buckets['7-14d']},
+        {'age': '14d+', 'count': buckets['14d+']},
+    ]
+
     return stats
 
 
@@ -316,6 +344,7 @@ def _build_reviewer_stats(user_id):
 
 def _build_admin_stats():
     """Build admin dashboard stats with consolidated queries."""
+    from datetime import datetime, timezone, timedelta
     stats = {}
 
     # -- Single GROUP BY for users by role --
@@ -345,5 +374,39 @@ def _build_admin_stats():
     stats['total_reviews'] = Review.query.count()
     stats['total_assessments'] = Assessment.query.count()
     stats['flagged_compliance'] = ComplianceCheck.query.filter_by(status='flagged').count()
+
+    # -- Conversion funnel for the AdminOpsPanel chart --
+    stats['conversion_funnel'] = {
+        'opportunities': stats['open_grants'],
+        'applications':  stats['total_applications'],
+        'reviewed':      Application.query.filter(
+            Application.status.in_(['under_review', 'scored', 'awarded', 'rejected'])
+        ).count(),
+        'awarded':       Application.query.filter_by(status='awarded').count(),
+    }
+
+    # -- Activity over last 14 days: daily submission counts --
+    # Feeds the AdminOpsPanel line chart (was hardcoded placeholder).
+    now = datetime.now(timezone.utc)
+    fourteen_days_ago = now - timedelta(days=14)
+    daily = (db.session.query(
+                func.date(Application.created_at).label('day'),
+                func.count(Application.id).label('n'))
+             .filter(Application.created_at >= fourteen_days_ago)
+             .group_by(func.date(Application.created_at))
+             .all())
+    by_day = {str(row.day): int(row.n) for row in daily}
+    activity = []
+    for i in range(13, -1, -1):
+        dt = now - timedelta(days=i)
+        label = dt.strftime('%b %-d') if hasattr(dt, 'strftime') else dt.isoformat()[:10]
+        # Windows %-d isn't supported on every locale; fall back gracefully
+        try:
+            label = dt.strftime('%b ') + str(dt.day)
+        except Exception:
+            label = dt.isoformat()[:10]
+        key = dt.date().isoformat()
+        activity.append({'label': label, 'count': by_day.get(key, 0)})
+    stats['activity_14d'] = activity
 
     return stats

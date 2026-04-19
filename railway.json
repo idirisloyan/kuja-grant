@@ -1,8 +1,10 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
-  "build": {},
+  "build": {
+    "buildCommand": "echo \"${RAILWAY_GIT_COMMIT_SHA:-unknown}\" | head -c 12 > .build-sha && cat .build-sha && echo ''"
+  },
   "deploy": {
-    "startCommand": "python -c \"import os;open('.build-sha','w').write(os.environ.get('RAILWAY_GIT_COMMIT_SHA','unknown')[:12])\" && python pre_deploy.py && flask db upgrade && gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 4 --threads 4 --timeout 180 --worker-class gthread --max-requests 1000 --max-requests-jitter 50 --preload -c gunicorn.conf.py server:app",
+    "startCommand": "python -c \"import os;open('.build-sha','w').write(os.environ.get('RAILWAY_GIT_COMMIT_SHA','unknown')[:12]) if not os.path.exists('.build-sha') or open('.build-sha').read().strip()=='unknown' else None\" && python pre_deploy.py && flask db upgrade && gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 4 --threads 4 --timeout 180 --worker-class gthread --max-requests 1000 --max-requests-jitter 50 --preload -c gunicorn.conf.py server:app",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5
   }
