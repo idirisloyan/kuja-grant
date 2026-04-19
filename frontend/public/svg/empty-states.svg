@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <!-- Sprite of all empty-state illustrations.
+       Use with: <svg class="kuja-empty-illo"><use href="/static/svg/empty-states.svg#illo-grant"/></svg> -->
+
+  <defs>
+    <linearGradient id="kuja-illo-clay" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FED7AA"/>
+      <stop offset="100%" stop-color="#FB923C"/>
+    </linearGradient>
+    <linearGradient id="kuja-illo-savanna" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#DCEBD9"/>
+      <stop offset="100%" stop-color="#A8C7A0"/>
+    </linearGradient>
+    <linearGradient id="kuja-illo-spark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#DDD6FE"/>
+      <stop offset="100%" stop-color="#A78BFA"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 1. Grants — "no grants yet" / "browse grants" -->
+  <symbol id="illo-grant" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="78" fill="#FFF7ED"/>
+    <path d="M62 70 L138 70 L138 152 L62 152 Z" fill="white" stroke="#C2410C" stroke-width="2.5"/>
+    <path d="M62 70 L100 50 L138 70" fill="url(#kuja-illo-clay)" stroke="#C2410C" stroke-width="2.5" stroke-linejoin="round"/>
+    <line x1="74" y1="92" x2="126" y2="92" stroke="#9A3412" stroke-width="2" stroke-linecap="round"/>
+    <line x1="74" y1="106" x2="118" y2="106" stroke="#9A3412" stroke-width="2" stroke-linecap="round"/>
+    <line x1="74" y1="120" x2="122" y2="120" stroke="#9A3412" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="100" cy="138" r="6" fill="#15803D"/>
+    <path d="M97 138 L99 140 L103 136" stroke="white" stroke-width="1.6" fill="none"/>
+  </symbol>
+
+  <!-- 2. Applications — "no applications yet" -->
+  <symbol id="illo-application" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="78" fill="#F4E8DC"/>
+    <rect x="58" y="58" width="64" height="84" rx="6" fill="white" stroke="#C2410C" stroke-width="2.5"/>
+    <rect x="78" y="78" width="64" height="84" rx="6" fill="white" stroke="#C2410C" stroke-width="2.5"/>
+    <line x1="90" y1="100" x2="130" y2="100" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
+    <line x1="90" y1="114" x2="124" y2="114" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
+    <line x1="90" y1="128" x2="128" y2="128" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="142" cy="68" r="14" fill="#7C3AED"/>
+    <path d="M138 68 L140 70 L146 64" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  </symbol>
+
+  <!-- 3. Reviews — "no reviews assigned" -->
+  <symbol id="illo-review" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="78" fill="#FBF7F1"/>
+    <rect x="52" y="76" width="96" height="60" rx="8" fill="white" stroke="#4A6741" stroke-width="2.5"/>
+    <circle cx="76" cy="106" r="8" fill="url(#kuja-illo-savanna)" stroke="#4A6741" stroke-width="2"/>
+    <text x="76" y="111" font-family="serif" font-size="11" font-weight="700" text-anchor="middle" fill="#2E4528">8</text>
+    <line x1="92" y1="100" x2="138" y2="100" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
+    <line x1="92" y1="112" x2="128" y2="112" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
+    <path d="M128 50 L132 62 L144 62 L134 70 L138 82 L128 75 L118 82 L122 70 L112 62 L124 62 Z" fill="#D97706" stroke="#92400E" stroke-width="1.5" stroke-linejoin="round"/>
+  </symbol>
+
+  <!-- 4. Reports — "no reports due" / "all caught up" -->
+  <symbol id="illo-report" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="78" fill="#ECFDF5"/>
+    <rect x="62" y="60" width="76" height="92" rx="6" fill="white" stroke="#15803D" stroke-width="2.5"/>
+    <line x1="74" y1="80" x2="118" y2="80" stroke="#15803D" stroke-width="2" stroke-linecap="round"/>
+    <rect x="74" y="92" width="52" height="6" rx="2" fill="#A8C7A0"/>
+    <rect x="74" y="104" width="42" height="6" rx="2" fill="#DCEBD9"/>
+    <rect x="74" y="116" width="48" height="6" rx="2" fill="#A8C7A0"/>
+    <circle cx="138" cy="70" r="14" fill="#15803D"/>
+    <path d="M132 70 L137 75 L146 65" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+
+  <!-- 5. Assessment — "ready for first assessment" -->
+  <symbol id="illo-assessment" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="78" fill="#FFEDD5"/>
+    <circle cx="100" cy="100" r="38" fill="white" stroke="#C2410C" stroke-width="3"/>
+    <path d="M70 100 A30 30 0 0 1 100 70" fill="none" stroke="#15803D" stroke-width="6" stroke-linecap="round"/>
+    <path d="M100 70 A30 30 0 0 1 130 100" fill="none" stroke="#D97706" stroke-width="6" stroke-linecap="round"/>
+    <text x="100" y="106" font-family="serif" font-size="20" font-weight="700" text-anchor="middle" fill="#0F172A">?</text>
+    <circle cx="62" cy="62" r="6" fill="#7C3AED"/>
+    <circle cx="138" cy="62" r="6" fill="#15803D"/>
+    <circle cx="62" cy="138" r="6" fill="#D97706"/>
+    <circle cx="138" cy="138" r="6" fill="#C2410C"/>
+  </symbol>
+
+  <!-- 6. Documents — "no documents uploaded" -->
+  <symbol id="illo-document" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="78" fill="#F8FAFC"/>
+    <path d="M72 60 L120 60 L138 78 L138 148 L72 148 Z" fill="white" stroke="#475569" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M120 60 L120 78 L138 78" fill="#E2E8F0" stroke="#475569" stroke-width="2.5" stroke-linejoin="round"/>
+    <line x1="84" y1="100" x2="124" y2="100" stroke="#94A3B8" stroke-width="2" stroke-linecap="round"/>
+    <line x1="84" y1="112" x2="118" y2="112" stroke="#94A3B8" stroke-width="2" stroke-linecap="round"/>
+    <line x1="84" y1="124" x2="120" y2="124" stroke="#94A3B8" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="148" cy="148" r="16" fill="#C2410C"/>
+    <line x1="142" y1="148" x2="154" y2="148" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="148" y1="142" x2="148" y2="154" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  </symbol>
+
+  <!-- 7. Co-pilot welcome — "ask AI anything" -->
+  <symbol id="illo-copilot" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="78" fill="url(#kuja-illo-spark)"/>
+    <circle cx="100" cy="96" r="36" fill="white" stroke="#5B21B6" stroke-width="2.5"/>
+    <path d="M88 100 Q100 110 112 100" fill="none" stroke="#5B21B6" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="88" cy="92" r="3" fill="#5B21B6"/>
+    <circle cx="112" cy="92" r="3" fill="#5B21B6"/>
+    <path d="M62 60 L66 70 L76 74 L66 78 L62 88 L58 78 L48 74 L58 70 Z" fill="#A78BFA" opacity="0.85"/>
+    <path d="M148 132 L151 140 L159 143 L151 146 L148 154 L145 146 L137 143 L145 140 Z" fill="#A78BFA" opacity="0.85"/>
+    <path d="M148 60 L150 65 L155 67 L150 69 L148 74 L146 69 L141 67 L146 65 Z" fill="#7C3AED"/>
+  </symbol>
+
+  <!-- 8. Portfolio — "no grants in portfolio yet" -->
+  <symbol id="illo-portfolio" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="78" fill="#F4E8DC"/>
+    <rect x="48" y="92" width="32" height="56" rx="4" fill="#FB923C"/>
+    <rect x="84" y="72" width="32" height="76" rx="4" fill="#C2410C"/>
+    <rect x="120" y="100" width="32" height="48" rx="4" fill="#FED7AA"/>
+    <line x1="42" y1="148" x2="158" y2="148" stroke="#9A3412" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="64" cy="80" r="6" fill="#15803D"/>
+    <circle cx="100" cy="58" r="6" fill="#D97706"/>
+    <circle cx="136" cy="86" r="6" fill="#7C3AED"/>
+    <path d="M64 80 L100 58 L136 86" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 4"/>
+  </symbol>
+
+  <!-- 9. Welcome / first-run -->
+  <symbol id="illo-welcome" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="78" fill="#FFF7ED"/>
+    <path d="M48 138 Q100 80 152 138" fill="url(#kuja-illo-clay)" stroke="#9A3412" stroke-width="2.5"/>
+    <circle cx="100" cy="64" r="22" fill="#FED7AA" stroke="#C2410C" stroke-width="2.5"/>
+    <path d="M88 64 Q92 56 96 64" fill="none" stroke="#C2410C" stroke-width="2" stroke-linecap="round"/>
+    <path d="M104 64 Q108 56 112 64" fill="none" stroke="#C2410C" stroke-width="2" stroke-linecap="round"/>
+    <path d="M88 72 Q100 80 112 72" fill="none" stroke="#C2410C" stroke-width="2" stroke-linecap="round"/>
+    <line x1="100" y1="86" x2="100" y2="98" stroke="#C2410C" stroke-width="2.5" stroke-linecap="round"/>
+  </symbol>
+
+  <!-- 10. Compliance / verified -->
+  <symbol id="illo-compliance" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="78" fill="#ECFDF5"/>
+    <path d="M100 56 L138 70 L138 110 Q138 140 100 152 Q62 140 62 110 L62 70 Z" fill="white" stroke="#15803D" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M82 102 L94 114 L120 88" stroke="#15803D" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+</svg>

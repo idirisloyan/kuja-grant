@@ -7,7 +7,7 @@ import { useUIStore } from '@/stores/ui-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
-import { AIPanel } from '@/components/layout/ai-panel';
+import { CopilotRail } from '@/components/copilot/copilot-rail';
 
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -126,7 +126,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </Container>
           </Box>
         </Box>
-        <AIPanel />
+        <CopilotRail />
       </Box>
     </>
   );

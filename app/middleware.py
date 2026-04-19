@@ -71,13 +71,59 @@ _RATE_LIMIT_RULES = [
 APP_VERSION = '3.3.4'
 APP_START_TIME = datetime.now(timezone.utc)
 
-# Git commit hash for build verification (set at build time)
-import subprocess as _sp
-try:
-    APP_BUILD = _sp.check_output(['git', 'rev-parse', '--short', 'HEAD'],
-                                  stderr=_sp.DEVNULL, timeout=2).decode().strip()
-except Exception:
-    APP_BUILD = os.getenv('RAILWAY_GIT_COMMIT_SHA', 'unknown')[:8]
+
+def _resolve_build_sha():
+    """Find the git commit SHA of this build, in decreasing order of
+    reliability:
+      1. `.build-sha` file written at build time (see Dockerfile / Procfile)
+      2. Live `git rev-parse` (works in dev, fails in slim runtime containers)
+      3. Railway-provided env vars (set in build env, sometimes absent at runtime)
+      4. 'unknown' — but we log this so the regression is visible.
+    """
+    # 1. Build-time file (most reliable)
+    try:
+        from pathlib import Path
+        p = Path(__file__).resolve().parent.parent / '.build-sha'
+        if p.exists():
+            sha = p.read_text().strip()
+            if sha:
+                return sha[:12]
+    except Exception:
+        pass
+
+    # 2. Live git (works in dev)
+    try:
+        import subprocess as _sp
+        sha = _sp.check_output(
+            ['git', 'rev-parse', '--short=12', 'HEAD'],
+            stderr=_sp.DEVNULL, timeout=2,
+        ).decode().strip()
+        if sha:
+            return sha
+    except Exception:
+        pass
+
+    # 3. Railway env vars (may or may not be present at runtime)
+    for var in (
+        'RAILWAY_GIT_COMMIT_SHA', 'RAILWAY_GIT_COMMIT_HASH',
+        'GIT_COMMIT_SHA', 'COMMIT_SHA', 'SOURCE_COMMIT',
+    ):
+        val = os.getenv(var)
+        if val:
+            return val[:12]
+
+    return 'unknown'
+
+
+APP_BUILD = _resolve_build_sha()
+if APP_BUILD == 'unknown':
+    # Log so devops notices missing build traceability
+    import logging as _logging
+    _logging.getLogger('kuja').warning(
+        'APP_BUILD could not be resolved (no .build-sha file, no git, no env var). '
+        'Fix by writing git rev-parse to .build-sha during build, or ensure '
+        'RAILWAY_GIT_COMMIT_SHA is exposed to the runtime environment.'
+    )
 
 
 class OversizedUploadGuard:

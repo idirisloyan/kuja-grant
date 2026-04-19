@@ -2,57 +2,251 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ================================================================
+   Kuja Studio design tokens
+   --------------------------------------------------------------
+   Distinctive warm earth-tone identity. Clay primary replaces the
+   generic indigo most grant platforms ship with.
+   HSL values so shadcn's hsl(var(--x)) pattern keeps working.
+   ================================================================ */
+
 @layer base {
   :root {
+    /* Surface */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 222 47% 11%;         /* near-ink, slate-900 */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 243 75% 59%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 243 75% 59%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary — Kuja Clay (earth-tone) */
+    --primary: 19 82% 41%;             /* #C2410C */
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary — Savanna (muted sand-quartz) */
+    --secondary: 30 40% 94%;           /* sand-50 */
+    --secondary-foreground: 24 40% 20%;
+
+    /* Muted */
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    /* Accent — Savanna green for success-leaning affordances */
+    --accent: 30 30% 92%;
+    --accent-foreground: 24 60% 28%;
+
+    /* Destructive */
+    --destructive: 0 74% 42%;          /* Kuja flag #B91C1C */
+    --destructive-foreground: 0 0% 100%;
+
+    /* Lines */
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 19 82% 41%;                /* matches primary */
+
+    /* Kuja-specific tokens (non-shadcn) */
+    --kuja-clay: 19 82% 41%;
+    --kuja-clay-dark: 19 74% 31%;
+    --kuja-sand: 30 58% 90%;
+    --kuja-sand-50: 30 58% 96%;
+    --kuja-savanna: 100 22% 33%;
+    --kuja-savanna-soft: 100 30% 88%;
+    --kuja-ink: 222 47% 11%;
+    --kuja-ink-soft: 215 20% 35%;
+    --kuja-quartz: 210 40% 98%;
+    --kuja-grow: 142 68% 29%;          /* success #15803D */
+    --kuja-sun: 32 95% 44%;            /* warn #D97706 */
+    --kuja-flag: 0 74% 42%;             /* danger #B91C1C */
+    --kuja-spark: 262 83% 58%;          /* AI purple #7C3AED */
+    --kuja-spark-soft: 262 90% 96%;
+
     --radius: 0.625rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 243 75% 59%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 243 75% 59%;
+    --background: 222 47% 5%;
+    --foreground: 0 0% 98%;
+    --card: 222 47% 8%;
+    --card-foreground: 0 0% 98%;
+    --popover: 222 47% 8%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 20 90% 54%;             /* slightly brighter clay for dark */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 20 90% 54%;
   }
 
   * {
     @apply border-border;
   }
+  html {
+    font-feature-settings: "cv11", "ss01";
+  }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans, 'Inter'), system-ui, sans-serif;
+  }
+}
+
+/* ================================================================
+   Kuja-branded components
+   ================================================================ */
+
+@layer components {
+  /* Editorial serif — reserved for hero / big numbers */
+  .kuja-display {
+    font-family: var(--font-serif, 'Fraunces'), Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: hsl(var(--kuja-ink));
+  }
+  .kuja-numeric {
+    font-family: var(--font-serif, 'Fraunces'), Georgia, serif;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .kuja-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: hsl(var(--kuja-ink-soft));
+  }
+  .kuja-eyebrow {
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: hsl(var(--kuja-clay-dark));
+  }
+
+  /* Verdict — decision-driving hero card. Tone-coded. */
+  .kuja-verdict {
+    position: relative;
+    border-radius: 0.75rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(90deg, hsl(var(--kuja-sand-50)), hsl(var(--background)));
+    border: 1px solid hsl(var(--border));
+    border-left: 4px solid hsl(var(--primary));
+  }
+  .kuja-verdict-success { border-left-color: hsl(var(--kuja-grow));
+    background: linear-gradient(90deg, hsl(142 68% 97%), hsl(var(--background))); }
+  .kuja-verdict-warn    { border-left-color: hsl(var(--kuja-sun));
+    background: linear-gradient(90deg, hsl(32 100% 97%), hsl(var(--background))); }
+  .kuja-verdict-danger  { border-left-color: hsl(var(--kuja-flag));
+    background: linear-gradient(90deg, hsl(0 85% 97%), hsl(var(--background))); }
+  .kuja-verdict-spark   { border-left-color: hsl(var(--kuja-spark));
+    background: linear-gradient(90deg, hsl(var(--kuja-spark-soft)), hsl(var(--background))); }
+
+  /* AI affordances */
+  .kuja-ai-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: hsl(var(--kuja-spark));
+  }
+  .kuja-ai-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: hsl(var(--kuja-spark-soft));
+    color: hsl(var(--kuja-spark));
+    border: 1px solid hsl(262 40% 88%);
+    border-radius: 9999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  /* Grounded-in badge — green trust signal under AI answers */
+  .kuja-grounded {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: hsl(142 68% 96%);
+    color: hsl(var(--kuja-grow));
+    border: 1px solid hsl(142 55% 85%);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  /* Severity pills */
+  .kuja-severity {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 4px;
+    padding: 2px 6px;
+  }
+  .kuja-severity-critical { background: hsl(0 85% 95%); color: hsl(0 72% 35%); border: 1px solid hsl(0 75% 85%); }
+  .kuja-severity-major    { background: hsl(20 92% 95%); color: hsl(20 80% 35%); border: 1px solid hsl(20 80% 85%); }
+  .kuja-severity-minor    { background: hsl(32 100% 95%); color: hsl(32 80% 35%); border: 1px solid hsl(32 80% 85%); }
+  .kuja-severity-info     { background: hsl(210 40% 96%); color: hsl(215 20% 35%); border: 1px solid hsl(214 32% 91%); }
+  .kuja-severity-good     { background: hsl(142 68% 95%); color: hsl(var(--kuja-grow)); border: 1px solid hsl(142 55% 85%); }
+
+  /* Citation chip used in AI answers */
+  .kuja-cite {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: super;
+    min-width: 16px;
+    height: 16px;
+    font-size: 10px;
+    font-weight: 700;
+    background: hsl(var(--kuja-spark));
+    color: white;
+    border-radius: 4px;
+    padding: 0 4px;
+    margin: 0 2px;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .kuja-cite:hover { background: hsl(262 70% 45%); }
+
+  /* Chart card shell */
+  .kuja-chart-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+  }
+  .kuja-chart-caption {
+    margin-top: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    background: hsl(var(--kuja-spark-soft));
+    border-radius: 0.375rem;
+    border-left: 3px solid hsl(var(--kuja-spark));
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: hsl(var(--kuja-ink-soft));
+  }
+  .kuja-chart-caption-loading {
+    background: hsl(var(--muted));
+    border-left-color: hsl(var(--border));
+    opacity: 0.75;
   }
 }
 
@@ -60,9 +254,16 @@
   .text-balance {
     text-wrap: balance;
   }
+  .kuja-shimmer {
+    background: linear-gradient(90deg, hsl(var(--muted)) 0%, hsl(var(--background)) 50%, hsl(var(--muted)) 100%);
+    background-size: 200% 100%;
+    animation: kuja-shimmer 1.4s ease-in-out infinite;
+  }
 }
 
-/* Custom animations */
+/* ================================================================
+   Animations
+   ================================================================ */
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -75,7 +276,26 @@
   from { opacity: 0; transform: translateX(40px); }
   to { opacity: 1; transform: translateX(0); }
 }
+@keyframes kuja-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes kuja-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
 
 .animate-fade-in { animation: fade-in 0.3s ease both; }
 .animate-fade-in-up { animation: fade-in-up 0.4s ease both; }
 .animate-slide-in-right { animation: slide-in-right 0.3s ease both; }
+.kuja-pulse { animation: kuja-pulse 1.6s ease-in-out infinite; }
+
+/* ================================================================
+   RTL handling (Arabic)
+   ================================================================ */
+[dir="rtl"] .kuja-verdict { border-left: none; border-right: 4px solid hsl(var(--primary)); }
+[dir="rtl"] .kuja-verdict-success { border-right-color: hsl(var(--kuja-grow)); }
+[dir="rtl"] .kuja-verdict-warn    { border-right-color: hsl(var(--kuja-sun)); }
+[dir="rtl"] .kuja-verdict-danger  { border-right-color: hsl(var(--kuja-flag)); }
+[dir="rtl"] .kuja-verdict-spark   { border-right-color: hsl(var(--kuja-spark)); }
+[dir="rtl"] .kuja-chart-caption   { border-left: none; border-right: 3px solid hsl(var(--kuja-spark)); }
