@@ -6,13 +6,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   RadialBarChart, RadialBar, PolarAngleAxis, Cell,
 } from 'recharts';
 import { Send, Gauge } from 'lucide-react';
 
 import { VerdictCard, type VerdictAction } from './verdict-card';
 import { ChartCard } from './chart-card';
+import { SizedChart } from './sized-chart';
 import { fetchNgoReadiness, type NgoReadiness } from '@/lib/copilot-api';
 import { api } from '@/lib/api';
 
@@ -97,7 +98,7 @@ export function NgoReadinessConsole() {
             context: 'Holistic NGO readiness',
           } : undefined}
         >
-          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={50}>
+          <SizedChart height={220}>
             <RadialBarChart
               innerRadius="70%"
               outerRadius="100%"
@@ -117,7 +118,7 @@ export function NgoReadinessConsole() {
                 style={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', letterSpacing: '0.1em' }}
               >of 100</text>
             </RadialBarChart>
-          </ResponsiveContainer>
+          </SizedChart>
         </ChartCard>
 
         <div className="lg:col-span-2">
@@ -131,7 +132,7 @@ export function NgoReadinessConsole() {
               context: 'NGO application pipeline across stages',
             }}
           >
-            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={50}>
+            <SizedChart height={220}>
               <BarChart data={pipelineData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="stage" tick={{ fontSize: 11 }} />
@@ -141,7 +142,7 @@ export function NgoReadinessConsole() {
                   {pipelineData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
+            </SizedChart>
           </ChartCard>
         </div>
       </div>

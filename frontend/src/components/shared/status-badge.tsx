@@ -1,15 +1,25 @@
 'use client';
 
-import Chip from '@mui/material/Chip';
-import type { SxProps, Theme } from '@mui/material/styles';
+/**
+ * StatusBadge — shadcn/Tailwind replacement of the MUI <Chip>.
+ *
+ * Renders a small outlined pill with tone-coded color. The `sx` prop from
+ * the old MUI version is intentionally dropped — callers should use
+ * `className` instead. No external consumers pass `sx` today.
+ */
 
-// ---------------------------------------------------------------------------
-// Status color mapping — maps each status to a color category
-// ---------------------------------------------------------------------------
+type Tone = 'success' | 'error' | 'warning' | 'info' | 'primary' | 'default';
 
-type ChipColor = 'success' | 'error' | 'warning' | 'info' | 'primary' | 'default';
+const TONE_CLS: Record<Tone, string> = {
+  success: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+  error: 'border-red-300 bg-red-50 text-red-800',
+  warning: 'border-amber-300 bg-amber-50 text-amber-800',
+  info: 'border-sky-300 bg-sky-50 text-sky-800',
+  primary: 'border-[hsl(var(--kuja-clay)/0.35)] bg-[hsl(var(--kuja-sand-50))] text-[hsl(var(--kuja-clay))]',
+  default: 'border-border bg-background text-foreground',
+};
 
-const statusColorMap: Record<string, ChipColor> = {
+const STATUS_TONE: Record<string, Tone> = {
   // Grant
   draft: 'default',
   open: 'success',
@@ -40,7 +50,7 @@ const statusColorMap: Record<string, ChipColor> = {
   expired: 'error',
 };
 
-const statusLabels: Record<string, string> = {
+const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft',
   open: 'Open',
   review: 'In Review',
@@ -65,33 +75,19 @@ const statusLabels: Record<string, string> = {
   expired: 'Expired',
 };
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 interface StatusBadgeProps {
   status: string;
   className?: string;
-  sx?: SxProps<Theme>;
 }
 
-export function StatusBadge({ status, className, sx }: StatusBadgeProps) {
-  const color = statusColorMap[status] || 'default';
-  const label = statusLabels[status] || status;
-
+export function StatusBadge({ status, className = '' }: StatusBadgeProps) {
+  const tone = STATUS_TONE[status] ?? 'default';
+  const label = STATUS_LABEL[status] ?? status;
   return (
-    <Chip
-      label={label}
-      color={color}
-      size="small"
-      variant="outlined"
-      className={className}
-      sx={{
-        fontWeight: 500,
-        fontSize: '0.6875rem',
-        height: 24,
-        ...sx,
-      }}
-    />
+    <span
+      className={`inline-flex h-6 items-center rounded-full border px-2 text-[11px] font-medium ${TONE_CLS[tone]} ${className}`}
+    >
+      {label}
+    </span>
   );
 }

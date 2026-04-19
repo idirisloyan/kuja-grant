@@ -1,19 +1,22 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from 'sonner';
 
 // ---------------------------------------------------------------------------
-// AppRegistry wraps the app with MUI ThemeProvider + CssBaseline and Sonner.
-// This is a client component because MUI ThemeProvider requires 'use client'.
+// AppRegistry — thin client wrapper.
+//
+// Previously wrapped children in an MUI <ThemeProvider> + <CssBaseline>.
+// With the migration to shadcn/Tailwind complete, we no longer need MUI's
+// theme engine. Design tokens now live in globals.css (Kuja-Studio CSS
+// custom properties) and Tailwind utility classes.
 // ---------------------------------------------------------------------------
 
 export function AppRegistry({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider>
+    <>
       {children}
       <Toaster richColors position="top-right" />
-    </ThemeProvider>
+    </>
   );
 }

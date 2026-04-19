@@ -23,7 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import {
   Sparkles, Send, X, ChevronsRight, RotateCcw, MessageSquare,
-  Lightbulb, AlertTriangle, CheckCircle2, Loader2,
+  Lightbulb, CheckCircle2, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -49,7 +49,6 @@ interface CopilotScope {
 export function CopilotRail({ scope }: { scope?: CopilotScope }) {
   const user = useAuthStore((s) => s.user);
   const [open, setOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const [tab, setTab] = useState<Tab>('now');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -68,7 +67,6 @@ export function CopilotRail({ scope }: { scope?: CopilotScope }) {
   useEffect(() => {
     const handler = (e: Event) => {
       setOpen(true);
-      setCollapsed(false);
       // Switch to Ask tab when opening from an action
       const custom = e as CustomEvent<{ tab?: Tab }>;
       if (custom.detail?.tab) setTab(custom.detail.tab);
@@ -124,7 +122,7 @@ export function CopilotRail({ scope }: { scope?: CopilotScope }) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setCollapsed(true)}
+            onClick={() => setOpen(false)}
             className="h-8 w-8"
             aria-label="Minimize"
           >
@@ -139,11 +137,22 @@ export function CopilotRail({ scope }: { scope?: CopilotScope }) {
           <TabButton active={tab === 'insights'} onClick={() => setTab('insights')} label="Insights" icon={<Sparkles className="h-3.5 w-3.5" />} />
         </div>
 
-        {/* Body */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto">
-          {tab === 'now' && <NowTab scope={effectiveScope} role={user.role} />}
+        {/* Body — overflow-hidden lets each tab own its own scrolling.
+            Previously `overflow-y-auto` here fought with AskTab's flex
+            column and could push the input off-screen in narrow viewports
+            or when the body was shorter than the nested scroller. */}
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-hidden">
+          {tab === 'now' && (
+            <div className="h-full overflow-y-auto">
+              <NowTab scope={effectiveScope} role={user.role} />
+            </div>
+          )}
           {tab === 'ask' && <AskTab scope={effectiveScope} />}
-          {tab === 'insights' && <InsightsTab scope={effectiveScope} role={user.role} />}
+          {tab === 'insights' && (
+            <div className="h-full overflow-y-auto">
+              <InsightsTab scope={effectiveScope} role={user.role} />
+            </div>
+          )}
         </div>
       </aside>
     </>
@@ -347,8 +356,8 @@ function AskTab({ scope }: { scope: CopilotScope }) {
   };
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex-1 min-h-0 space-y-3 overflow-y-auto p-4">
         {messages.length === 0 && (
           <div className="pt-4 text-center">
             <svg className="mx-auto h-24 w-24">

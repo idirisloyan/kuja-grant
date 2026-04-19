@@ -15,7 +15,6 @@ interface Props {
   title: string;
   subtitle?: string;
   icon?: LucideIcon;
-  height?: number;
   children: ReactNode;
   // AI narration inputs — if provided, renders an AI caption below.
   caption?: {
@@ -27,7 +26,7 @@ interface Props {
 }
 
 export function ChartCard({
-  title, subtitle, icon: Icon, height = 220, children, caption, className,
+  title, subtitle, icon: Icon, children, caption, className,
 }: Props) {
   const [loading, setLoading] = useState(!!caption);
   const [text, setText] = useState<string | null>(null);
@@ -75,10 +74,9 @@ export function ChartCard({
         )}
       </div>
       {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
-      {/* Chart viewport — minWidth:1 prevents Recharts' ResponsiveContainer
-          from logging "width(-1)/height(-1)" warnings during the first
-          paint before the grid column has measured. */}
-      <div style={{ height, minWidth: 1, minHeight: 1 }} className="mt-3 w-full">
+      {/* Chart viewport — SizedChart children provide their own sized
+          <div>, so ChartCard just needs a min-width:0 flex/grid child. */}
+      <div className="mt-3 w-full min-w-0">
         {children}
       </div>
       {caption && (

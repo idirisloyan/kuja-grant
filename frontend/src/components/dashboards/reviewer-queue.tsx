@@ -6,12 +6,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
+  PieChart, Pie, Cell, Tooltip, Legend,
 } from 'recharts';
 import { AlarmClock, GitCompare } from 'lucide-react';
 
 import { VerdictCard, type VerdictAction } from './verdict-card';
 import { ChartCard } from './chart-card';
+import { SizedChart } from './sized-chart';
 import { fetchSuggestions, type Suggestion } from '@/lib/copilot-api';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -95,7 +96,7 @@ export function ReviewerQueue() {
             context: 'Reviewer queue SLA distribution',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={50}>
+          <SizedChart height={220}>
             <PieChart>
               <Pie data={slaData} dataKey="count" nameKey="age" innerRadius={50} outerRadius={80} paddingAngle={2}>
                 {slaData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
@@ -103,7 +104,7 @@ export function ReviewerQueue() {
               <Tooltip contentStyle={{ border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }} />
               <Legend verticalAlign="bottom" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
             </PieChart>
-          </ResponsiveContainer>
+          </SizedChart>
         </ChartCard>
 
         <div className="kuja-chart-card">

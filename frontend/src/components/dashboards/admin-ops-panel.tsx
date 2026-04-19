@@ -7,13 +7,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   LineChart, Line, Cell,
 } from 'recharts';
 import { GitMerge, Activity, HeartPulse } from 'lucide-react';
 
 import { VerdictCard, type VerdictAction } from './verdict-card';
 import { ChartCard } from './chart-card';
+import { SizedChart } from './sized-chart';
 import { fetchSuggestions, fetchAiHealth, type AiHealth, type Suggestion } from '@/lib/copilot-api';
 import { api } from '@/lib/api';
 
@@ -103,7 +104,7 @@ export function AdminOpsPanel() {
             context: 'Org-wide grant conversion pipeline',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={50}>
+          <SizedChart height={220}>
             <BarChart data={funnelData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="stage" tick={{ fontSize: 11 }} />
@@ -113,7 +114,7 @@ export function AdminOpsPanel() {
                 {funnelData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </SizedChart>
         </ChartCard>
 
         <ChartCard
@@ -126,7 +127,7 @@ export function AdminOpsPanel() {
             context: 'Daily submission volume, last 14 days',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={50}>
+          <SizedChart height={220}>
             <LineChart data={activityData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="label" tick={{ fontSize: 10 }} />
@@ -134,7 +135,7 @@ export function AdminOpsPanel() {
               <Tooltip contentStyle={{ border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }} />
               <Line type="monotone" dataKey="count" stroke={CLAY} strokeWidth={2.5} dot={{ r: 3, fill: 'white', stroke: CLAY, strokeWidth: 2 }} />
             </LineChart>
-          </ResponsiveContainer>
+          </SizedChart>
         </ChartCard>
 
         <div className="kuja-chart-card">

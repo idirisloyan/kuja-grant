@@ -12,13 +12,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Cell,
 } from 'recharts';
 import { GitMerge, Clock4, ShieldAlert } from 'lucide-react';
 
 import { VerdictCard, type VerdictAction } from './verdict-card';
 import { ChartCard } from './chart-card';
+import { SizedChart } from './sized-chart';
 import { fetchDonorPortfolioInsights, type DonorPortfolioInsights } from '@/lib/copilot-api';
 import { api } from '@/lib/api';
 
@@ -122,7 +123,7 @@ export function DonorCommandCenter() {
             context: 'Donor portfolio application stages',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={50}>
+          <SizedChart height={220}>
             <BarChart data={funnelData} layout="vertical" margin={{ top: 8, right: 16, left: -8, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 11 }} />
@@ -135,7 +136,7 @@ export function DonorCommandCenter() {
                 ))}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </SizedChart>
         </ChartCard>
 
         <ChartCard
@@ -148,7 +149,7 @@ export function DonorCommandCenter() {
             context: 'Portfolio review turnaround last 90 days',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={50}>
+          <SizedChart height={220}>
             <BarChart data={velocityData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="stage" tick={{ fontSize: 11 }} />
@@ -157,7 +158,7 @@ export function DonorCommandCenter() {
               <Bar dataKey="median" fill={SAVANNA} radius={[6, 6, 0, 0]} name="Median days" />
               <Bar dataKey="p75"    fill={SUN}     radius={[6, 6, 0, 0]} name="p75 days" />
             </BarChart>
-          </ResponsiveContainer>
+          </SizedChart>
         </ChartCard>
 
         <ChartCard
@@ -170,7 +171,7 @@ export function DonorCommandCenter() {
             context: 'Portfolio health across compliance, delivery, financial, capacity',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={50}>
+          <SizedChart height={220}>
             <BarChart data={riskData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="dim" tick={{ fontSize: 11 }} />
@@ -182,7 +183,7 @@ export function DonorCommandCenter() {
                 ))}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </SizedChart>
         </ChartCard>
       </div>
     </div>

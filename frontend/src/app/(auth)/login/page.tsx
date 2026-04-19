@@ -1,15 +1,17 @@
 'use client';
 
 /**
- * Kuja login — shadcn + Tailwind rebuild of the MUI original.
+ * Kuja login — shadcn + Tailwind.
  *
- * First-impression surface: distinctive brand identity, editorial
- * Fraunces hero, Global South positioning, fast demo-login cards.
+ * Uses plain `useState` + controlled inputs. react-hook-form's register()
+ * was previously missing password-manager autofill events in some browsers
+ * (the value hit the DOM but never reached RHF state), which left users
+ * on /login after clicking Sign in. Controlled state captures every
+ * browser autofill and manual keystroke reliably.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -18,12 +20,6 @@ import { Loader2, Mail, Lock, Building2, Wallet, Star, Sparkles, ArrowRight } fr
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
-// Note on the native <input>:
-// The shadcn Input in this project wraps @base-ui/react/input, which does
-// not forward refs in the way react-hook-form's register() needs. That
-// caused "required field" validation to fire on manual submit even with
-// valid values. We use a plain <input> styled to match the design tokens
-// — same visual, reliable registration.
 const INPUT_CLS =
   'block w-full h-10 pl-9 pr-3 text-sm bg-background text-foreground ' +
   'rounded-md border border-input transition-colors ' +
@@ -31,13 +27,14 @@ const INPUT_CLS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))] focus-visible:border-[hsl(var(--kuja-clay))] ' +
   'disabled:opacity-50 disabled:cursor-not-allowed';
 
-type LoginFormValues = { email: string; password: string };
-
 export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((s) => s.login);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isDev, setIsDev] = useState(false);
+  const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({});
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -73,22 +70,18 @@ export default function LoginPage() {
     },
   ];
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    formState: { errors },
-  } = useForm<LoginFormValues>({
-    defaultValues: { email: '', password: '' },
-  });
-
-  const onSubmit = async (data: LoginFormValues) => {
+  const attemptLogin = async (submittedEmail: string, submittedPassword: string) => {
     setIsLoading(true);
+    setFieldError({});
     try {
-      const success = await login(data.email, data.password);
+      const success = await login(submittedEmail, submittedPassword);
       if (success) {
         toast.success('Welcome back!');
-        router.replace('/dashboard');
+        // Hard navigate — next/router.replace inside a static export
+        // sometimes stalls when the target layout runs its own session
+        // check on mount. window.location guarantees the full shell
+        // reload with the authenticated cookie set.
+        window.location.href = '/dashboard/';
       } else {
         toast.error('Invalid email or password');
       }
@@ -99,15 +92,46 @@ export default function LoginPage() {
     }
   };
 
-  const handleDemoLogin = (email: string) => {
-    setValue('email', email);
-    setValue('password', 'pass123');
-    handleSubmit(onSubmit)();
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    // Read values straight off the DOM so password-manager autofill that
+    // skipped React state is still captured.
+    const form = e.currentTarget;
+    const emailInput = form.elements.namedItem('email') as HTMLInputElement | null;
+    const passwordInput = form.elements.namedItem('password') as HTMLInputElement | null;
+    const submittedEmail = (emailInput?.value ?? email).trim();
+    const submittedPassword = passwordInput?.value ?? password;
+
+    const errors: { email?: string; password?: string } = {};
+    if (!submittedEmail) errors.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submittedEmail)) errors.email = 'Enter a valid email';
+    if (!submittedPassword) errors.password = 'Password is required';
+
+    if (Object.keys(errors).length > 0) {
+      setFieldError(errors);
+      return;
+    }
+
+    // Sync state back so the UI reflects what was actually submitted
+    if (submittedEmail !== email) setEmail(submittedEmail);
+    if (submittedPassword !== password) setPassword(submittedPassword);
+
+    void attemptLogin(submittedEmail, submittedPassword);
   };
+
+  const handleDemoLogin = (demoEmail: string) => {
+    setEmail(demoEmail);
+    setPassword('pass123');
+    setFieldError({});
+    void attemptLogin(demoEmail, 'pass123');
+  };
+
+  // Router prefetch hint (unused but kept to preserve file contract)
+  void router;
 
   return (
     <div className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-10">
-      {/* Hero gradient — Kuja clay with savanna undertones */}
+      {/* Hero gradient */}
       <div
         aria-hidden
         className="absolute inset-0"
@@ -115,7 +139,6 @@ export default function LoginPage() {
           background: 'linear-gradient(135deg, #0F172A 0%, #261A14 30%, #4A1F10 70%, #7C2D12 100%)',
         }}
       />
-      {/* Subtle clay glow */}
       <div
         aria-hidden
         className="absolute -top-40 -left-20 h-[28rem] w-[28rem] rounded-full blur-3xl opacity-30"
@@ -163,27 +186,24 @@ export default function LoginPage() {
               </p>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="email" className="text-xs font-medium">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
                   <input
                     id="email"
+                    name="email"
                     type="email"
                     autoComplete="email"
                     placeholder="you@organization.org"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
                     className={INPUT_CLS}
-                    {...register('email', {
-                      required: 'Email is required',
-                      pattern: {
-                        value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                        message: 'Enter a valid email',
-                      },
-                    })}
                   />
                 </div>
-                {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                {fieldError.email && <p className="text-xs text-destructive">{fieldError.email}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -192,14 +212,17 @@ export default function LoginPage() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
                   <input
                     id="password"
+                    name="password"
                     type="password"
                     autoComplete="current-password"
                     placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
                     className={INPUT_CLS}
-                    {...register('password', { required: 'Password is required' })}
                   />
                 </div>
-                {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+                {fieldError.password && <p className="text-xs text-destructive">{fieldError.password}</p>}
               </div>
 
               <Button
@@ -219,7 +242,7 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            {/* Demo login cards — always visible; Kuja is designed for discoverability */}
+            {/* Demo login cards */}
             <div className="mt-6 pt-6 border-t border-border">
               <p className="kuja-eyebrow text-[10px] mb-3">Try a demo account</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
