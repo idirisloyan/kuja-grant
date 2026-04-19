@@ -103,7 +103,7 @@ export function AdminOpsPanel() {
             context: 'Org-wide grant conversion pipeline',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={50}>
             <BarChart data={funnelData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="stage" tick={{ fontSize: 11 }} />
@@ -126,7 +126,7 @@ export function AdminOpsPanel() {
             context: 'Daily submission volume, last 14 days',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={50}>
             <LineChart data={activityData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="label" tick={{ fontSize: 10 }} />

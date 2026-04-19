@@ -16,8 +16,20 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 
 import { Loader2, Mail, Lock, Building2, Wallet, Star, Sparkles, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+
+// Note on the native <input>:
+// The shadcn Input in this project wraps @base-ui/react/input, which does
+// not forward refs in the way react-hook-form's register() needs. That
+// caused "required field" validation to fire on manual submit even with
+// valid values. We use a plain <input> styled to match the design tokens
+// — same visual, reliable registration.
+const INPUT_CLS =
+  'block w-full h-10 pl-9 pr-3 text-sm bg-background text-foreground ' +
+  'rounded-md border border-input transition-colors ' +
+  'placeholder:text-muted-foreground ' +
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))] focus-visible:border-[hsl(var(--kuja-clay))] ' +
+  'disabled:opacity-50 disabled:cursor-not-allowed';
 
 type LoginFormValues = { email: string; password: string };
 
@@ -155,13 +167,13 @@ export default function LoginPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="email" className="text-xs font-medium">Email</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
+                  <input
                     id="email"
                     type="email"
                     autoComplete="email"
                     placeholder="you@organization.org"
-                    className="pl-9 h-10"
+                    className={INPUT_CLS}
                     {...register('email', {
                       required: 'Email is required',
                       pattern: {
@@ -177,13 +189,13 @@ export default function LoginPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="password" className="text-xs font-medium">Password</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
+                  <input
                     id="password"
                     type="password"
                     autoComplete="current-password"
                     placeholder="••••••••"
-                    className="pl-9 h-10"
+                    className={INPUT_CLS}
                     {...register('password', { required: 'Password is required' })}
                   />
                 </div>

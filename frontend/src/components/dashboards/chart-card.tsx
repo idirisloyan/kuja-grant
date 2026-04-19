@@ -75,7 +75,10 @@ export function ChartCard({
         )}
       </div>
       {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
-      <div style={{ height }} className="mt-3">
+      {/* Chart viewport — minWidth:1 prevents Recharts' ResponsiveContainer
+          from logging "width(-1)/height(-1)" warnings during the first
+          paint before the grid column has measured. */}
+      <div style={{ height, minWidth: 1, minHeight: 1 }} className="mt-3 w-full">
         {children}
       </div>
       {caption && (

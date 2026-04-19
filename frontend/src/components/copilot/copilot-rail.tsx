@@ -26,7 +26,10 @@ import {
   Lightbulb, AlertTriangle, CheckCircle2, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+
+// Native input — the shadcn Input wraps @base-ui/react/input which has
+// inconsistent rendering when combined with MUI's stacking context.
+// Plain <input> with matching Tailwind classes is reliable.
 
 type Tab = 'now' | 'ask' | 'insights';
 
@@ -80,28 +83,34 @@ export function CopilotRail({ scope }: { scope?: CopilotScope }) {
 
   return (
     <>
-      {/* Persistent sparkle toggle — always visible */}
+      {/* Persistent sparkle toggle — always visible.
+          z-[1251] keeps it above MUI's Drawer (1200) and header (1100)
+          so it never gets buried by layout chrome. */}
       <button
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          'fixed right-0 top-24 z-40 flex h-11 w-11 items-center justify-center rounded-l-full',
+          'fixed right-0 top-24 flex h-12 w-12 items-center justify-center rounded-l-full',
           'bg-gradient-to-br from-[hsl(var(--kuja-spark))] to-[hsl(262_70%_45%)]',
-          'text-white shadow-lg transition-transform hover:scale-105',
+          'text-white shadow-xl transition-all hover:scale-105',
           open && 'right-[380px]',
         )}
+        style={{ zIndex: 1251 }}
         aria-label={open ? 'Close co-pilot' : 'Open co-pilot'}
       >
         {open ? <X className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
       </button>
 
-      {/* Rail */}
+      {/* Rail — z-[1250] so it sits above MUI's sidebar/header but below
+          MUI modals (1300). Guarantees the Ask tab input is never
+          occluded by layout chrome. */}
       <aside
         className={cn(
-          'fixed right-0 top-16 bottom-0 z-30 flex w-[380px] flex-col border-l border-border bg-background shadow-xl',
+          'fixed right-0 top-0 bottom-0 flex w-[380px] flex-col border-l border-border bg-background shadow-2xl',
           'transition-transform duration-300 ease-in-out',
           open ? 'translate-x-0' : 'translate-x-full',
         )}
+        style={{ zIndex: 1250 }}
         aria-label="Kuja Co-pilot"
       >
         {/* Header */}
@@ -356,17 +365,19 @@ function AskTab({ scope }: { scope: CopilotScope }) {
         ))}
         <div ref={bottomRef} />
       </div>
-      <div className="border-t border-border p-3">
+      <div className="border-t border-border p-3 bg-background">
         <form
           onSubmit={(e) => { e.preventDefault(); send(); }}
           className="flex gap-2"
         >
-          <Input
+          <input
+            type="text"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="Ask Co-pilot…"
             disabled={streaming}
-            className="h-9 text-sm"
+            autoComplete="off"
+            className="flex-1 h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-spark))] focus-visible:border-[hsl(var(--kuja-spark))] disabled:opacity-50"
           />
           {streaming ? (
             <Button type="button" size="sm" variant="outline" onClick={cancel}>
@@ -377,7 +388,7 @@ function AskTab({ scope }: { scope: CopilotScope }) {
               type="submit"
               size="sm"
               disabled={!question.trim()}
-              className="bg-[hsl(var(--kuja-spark))] text-white hover:bg-[hsl(262_70%_45%)]"
+              className="bg-[hsl(var(--kuja-spark))] text-white hover:bg-[hsl(262_70%_45%)] disabled:opacity-50"
             >
               <Send className="h-4 w-4" />
             </Button>

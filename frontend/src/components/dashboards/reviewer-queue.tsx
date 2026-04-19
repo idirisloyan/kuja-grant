@@ -95,7 +95,7 @@ export function ReviewerQueue() {
             context: 'Reviewer queue SLA distribution',
           }}
         >
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={50}>
             <PieChart>
               <Pie data={slaData} dataKey="count" nameKey="age" innerRadius={50} outerRadius={80} paddingAngle={2}>
                 {slaData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
