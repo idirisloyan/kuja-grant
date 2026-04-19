@@ -89,10 +89,13 @@ def api_health():
 @admin_bp.route('/version', methods=['GET'])
 def api_version():
     """Version information for the deployed application."""
+    from app.middleware import APP_FRONTEND_BUILD  # lazy import to pick up latest
     uptime_seconds = int((datetime.now(timezone.utc) - APP_START_TIME).total_seconds())
     return jsonify({
         'version': APP_VERSION,
         'build': APP_BUILD,
+        'frontend_build': APP_FRONTEND_BUILD,
+        'release': f'Kuja Studio {APP_VERSION}',
         'name': 'Kuja Grant Management System',
         'environment': 'production' if os.getenv('DATABASE_URL') else 'development',
         'uptime_seconds': uptime_seconds,

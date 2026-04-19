@@ -68,8 +68,31 @@ _RATE_LIMIT_RULES = [
     (r'^/api/compliance/screen$', 5, 60),
 ]
 
-APP_VERSION = '3.3.4'
+APP_VERSION = '5.0.0'  # Kuja-Studio release — shadcn frontend, co-pilot rail, 4 command centers
 APP_START_TIME = datetime.now(timezone.utc)
+
+
+def _resolve_nextjs_build_id():
+    """Read the current Next.js build ID from the bundled static output.
+
+    This is a strong deploy fingerprint — changes every time the frontend
+    is rebuilt. Lives in static/nextjs/_next/static/<buildId>/ so we pick
+    the most recently modified directory.
+    """
+    try:
+        from pathlib import Path
+        static_root = Path(__file__).resolve().parent.parent / 'static' / 'nextjs' / '_next' / 'static'
+        if not static_root.is_dir():
+            return None
+        # Exclude well-known non-buildId subdirs
+        candidates = [p for p in static_root.iterdir()
+                      if p.is_dir() and p.name not in ('chunks', 'css', 'media', 'development')]
+        if not candidates:
+            return None
+        candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        return candidates[0].name
+    except Exception:
+        return None
 
 
 def _resolve_build_sha():
@@ -116,13 +139,21 @@ def _resolve_build_sha():
 
 
 APP_BUILD = _resolve_build_sha()
+# Next.js buildId is a strong deploy fingerprint — it changes every
+# time the frontend is rebuilt, which is on every deploy.
+APP_FRONTEND_BUILD = _resolve_nextjs_build_id() or 'unknown'
+
+# If we couldn't resolve the git SHA (Railway slim runtime), use the
+# frontend build ID as the "build" signal. It's less semantic but
+# gives the ops team something that changes per deploy.
+if APP_BUILD == 'unknown' and APP_FRONTEND_BUILD != 'unknown':
+    APP_BUILD = APP_FRONTEND_BUILD
+
 if APP_BUILD == 'unknown':
-    # Log so devops notices missing build traceability
     import logging as _logging
     _logging.getLogger('kuja').warning(
-        'APP_BUILD could not be resolved (no .build-sha file, no git, no env var). '
-        'Fix by writing git rev-parse to .build-sha during build, or ensure '
-        'RAILWAY_GIT_COMMIT_SHA is exposed to the runtime environment.'
+        'APP_BUILD could not be resolved (no .build-sha file, no git, no env var, '
+        'no Next.js buildId). Check Railway env configuration or frontend build.'
     )
 
 
