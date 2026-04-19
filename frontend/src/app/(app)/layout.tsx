@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * App shell layout — shadcn + Tailwind rewrite.
+ * Replaces the MUI Box/Container shell with semantic HTML + Tailwind.
+ */
+
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -8,31 +13,16 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { CopilotRail } from '@/components/copilot/copilot-rail';
-
-import Box from '@mui/material/Box';
-import CircularProgress from '@mui/material/CircularProgress';
-import Typography from '@mui/material/Typography';
-import Stack from '@mui/material/Stack';
-import Container from '@mui/material/Container';
-import GlobalStyles from '@mui/material/GlobalStyles';
-
-// ---------------------------------------------------------------------------
-// Constants — matching Devias Kit / Materio pattern
-// ---------------------------------------------------------------------------
+import { OnboardingTourProvider } from '@/components/onboarding/tour-provider';
 
 const SIDEBAR_WIDTH = 280;
-const NAV_HEIGHT = 64;
-
-// ---------------------------------------------------------------------------
-// App Layout
-// ---------------------------------------------------------------------------
+const COLLAPSED_WIDTH = 72;
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, loading, checkSession } = useAuthStore();
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
 
-  // Initialize i18n at the app shell level — sets dir="rtl" on <html> for Arabic
   useTranslation();
 
   useEffect(() => {
@@ -47,87 +37,38 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: '#F8FAFC',
-        }}
-      >
-        <Stack alignItems="center" spacing={2}>
-          <Box
-            sx={{
-              width: 48,
-              height: 48,
-              bgcolor: 'primary.main',
-              borderRadius: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '1.25rem' }}>K</Typography>
-          </Box>
-          <CircularProgress size={28} sx={{ color: 'primary.main' }} />
-        </Stack>
-      </Box>
+      <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--kuja-quartz))]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-[#C2410C] to-[#7C2D12] shadow-lg">
+            <span className="kuja-display text-2xl text-white">K</span>
+          </div>
+          <div className="h-1 w-24 bg-gradient-to-r from-[#C2410C] via-[#F97316] to-[#C2410C] rounded animate-pulse" />
+        </div>
+      </div>
     );
   }
 
   if (!user) return null;
 
-  const currentWidth = sidebarCollapsed ? 72 : SIDEBAR_WIDTH;
+  const currentWidth = sidebarCollapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
   return (
-    <>
-      <GlobalStyles
-        styles={{
-          ':root': {
-            '--SideNav-width': `${SIDEBAR_WIDTH}px`,
-            '--SideNav-collapsed': '72px',
-            '--MainNav-height': `${NAV_HEIGHT}px`,
-          },
-        }}
-      />
-      <Box
-        sx={{
-          bgcolor: '#F8FAFC',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
-          minHeight: '100vh',
-        }}
-      >
-        <Sidebar width={SIDEBAR_WIDTH} collapsedWidth={72} />
-        <Box
-          sx={{
-            display: 'flex',
-            flex: '1 1 auto',
-            flexDirection: 'column',
-            pl: { lg: `${currentWidth}px` },
-            transition: 'padding-left 0.25s ease',
-          }}
+    <OnboardingTourProvider>
+      <div className="relative min-h-screen bg-[hsl(var(--kuja-quartz))]">
+        <Sidebar width={SIDEBAR_WIDTH} collapsedWidth={COLLAPSED_WIDTH} />
+        <div
+          className="flex flex-col min-h-screen transition-[padding-left] duration-200 ease-in-out"
+          style={{ paddingLeft: currentWidth }}
         >
           <Header />
-          <Box
-            component="main"
-            sx={{
-              display: 'flex',
-              flex: '1 1 auto',
-              flexDirection: 'column',
-              py: 3,
-              px: { xs: 2, sm: 3, md: 4 },
-            }}
-          >
-            <Container maxWidth="xl" disableGutters>
+          <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-[1400px]">
               {children}
-            </Container>
-          </Box>
-        </Box>
+            </div>
+          </main>
+        </div>
         <CopilotRail />
-      </Box>
-    </>
+      </div>
+    </OnboardingTourProvider>
   );
 }

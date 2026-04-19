@@ -1,210 +1,148 @@
 'use client';
 
+/**
+ * Reviews — shadcn + Tailwind.
+ * Reviewer view: pending / completed tabs with assignments.
+ * Donor view: all applications filtered by grant.
+ */
+
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useReviews, useApplications, useGrants } from '@/lib/hooks/use-api';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { cn } from '@/lib/utils';
+import { ClipboardCheck, FileText, Star, Filter, ChevronDown } from 'lucide-react';
+import type { Review } from '@/lib/types';
 
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import Skeleton from '@mui/material/Skeleton';
-import Stack from '@mui/material/Stack';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-
-import {
-  ClipboardCheck, FileText, Star, Eye, Filter,
-} from 'lucide-react';
-import type { Review, Application } from '@/lib/types';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '--';
+function formatDate(dateStr?: string | null): string {
+  if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// ---------------------------------------------------------------------------
-// Reviewer View
-// ---------------------------------------------------------------------------
+export default function ReviewsPage() {
+  const user = useAuthStore((s) => s.user);
+  if (!user) return null;
+  return user.role === 'reviewer' ? <ReviewerView /> : <DonorView />;
+}
+
+// --------------------------------------------------------------------------
+// Reviewer view
+// --------------------------------------------------------------------------
 
 function ReviewerView() {
   const router = useRouter();
   const { data, isLoading } = useReviews();
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState<'pending' | 'completed'>('pending');
 
   const pending = (data?.pending ?? []) as Review[];
   const completed = (data?.completed ?? []) as Review[];
 
   if (isLoading) {
     return (
-      <Stack spacing={2}>
-        <Skeleton variant="rounded" height={40} width={200} />
-        <Skeleton variant="rounded" height={260} sx={{ borderRadius: 2 }} />
-      </Stack>
+      <div className="space-y-3">
+        <div className="kuja-shimmer h-10 w-48 rounded" />
+        <div className="kuja-shimmer h-64 rounded-xl" />
+      </div>
     );
   }
 
   return (
-    <Box>
-      <Tabs
-        value={tab}
-        onChange={(_, v) => setTab(v)}
-        sx={{ mb: 2, borderBottom: '1px solid', borderColor: 'divider' }}
-      >
-        <Tab label={`Pending (${pending.length})`} />
-        <Tab label={`Completed (${completed.length})`} />
-      </Tabs>
+    <div className="space-y-4">
+      <div>
+        <h1 className="kuja-display text-3xl">Review assignments</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">AI-prioritized queue with comparison support</p>
+      </div>
 
-      {/* Pending Tab */}
-      {tab === 0 && (
-        <>
-          {pending.length === 0 ? (
-            <Card>
-              <CardContent sx={{ py: 8, textAlign: 'center' }}>
-                <ClipboardCheck size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
-                <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-                  No pending assignments
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
-                  You have no applications to review right now.
-                </Typography>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Applicant</TableCell>
-                    <TableCell>Grant</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {pending.map((review) => (
-                    <TableRow key={review.id} hover>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                          {review.ngo_org_name || `Application #${review.application_id}`}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                          {review.grant_title || '--'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={review.status} />
-                      </TableCell>
-                      <TableCell align="right">
-                        <Button
-                          variant="contained"
-                          size="small"
-                          startIcon={<Star size={14} />}
-                          onClick={() => router.push(`/reviews/${review.application_id}`)}
-                          sx={{ fontSize: '0.75rem', height: 28 }}
-                        >
-                          Start Review
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-          )}
-        </>
+      <div className="flex gap-1 border-b border-border">
+        {(['pending', 'completed'] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setTab(k)}
+            className={cn(
+              'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
+              tab === k
+                ? 'text-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]'
+                : 'text-muted-foreground border-transparent hover:text-foreground',
+            )}
+          >
+            {k === 'pending' ? `Pending (${pending.length})` : `Completed (${completed.length})`}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'pending' && (
+        pending.length === 0 ? (
+          <EmptyState icon={ClipboardCheck} title="No pending assignments" body="You have no applications to review right now." />
+        ) : (
+          <TableWrap>
+            <tr className="bg-muted/30 border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-2.5">Applicant</th>
+              <th className="px-4 py-2.5">Grant</th>
+              <th className="px-4 py-2.5">Status</th>
+              <th className="px-4 py-2.5 text-right">Actions</th>
+            </tr>
+            {pending.map((r) => (
+              <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                <td className="px-4 py-3 font-medium text-foreground">
+                  {r.ngo_org_name || `Application #${r.application_id}`}
+                </td>
+                <td className="px-4 py-3 text-muted-foreground">{r.grant_title || '—'}</td>
+                <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/reviews/${r.application_id}`)}
+                    className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-xs font-medium px-3 py-1.5"
+                  >
+                    <Star className="h-3.5 w-3.5" />
+                    Start review
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </TableWrap>
+        )
       )}
 
-      {/* Completed Tab */}
-      {tab === 1 && (
-        <>
-          {completed.length === 0 ? (
-            <Card>
-              <CardContent sx={{ py: 8, textAlign: 'center' }}>
-                <FileText size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
-                <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-                  No completed reviews
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
-                  Reviews you complete will appear here.
-                </Typography>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Applicant</TableCell>
-                    <TableCell>Grant</TableCell>
-                    <TableCell align="right">Score</TableCell>
-                    <TableCell>Completed</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {completed.map((review) => (
-                    <TableRow key={review.id} hover>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                          {review.ngo_org_name || `Application #${review.application_id}`}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                          {review.grant_title || '--'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontWeight: 600,
-                            color:
-                              (review.overall_score ?? 0) >= 80 ? 'success.main' :
-                              (review.overall_score ?? 0) >= 60 ? 'warning.main' : 'error.main',
-                          }}
-                        >
-                          {review.overall_score ?? '--'}%
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                          {formatDate(review.completed_at)}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-          )}
-        </>
+      {tab === 'completed' && (
+        completed.length === 0 ? (
+          <EmptyState icon={FileText} title="No completed reviews" body="Reviews you complete will appear here." />
+        ) : (
+          <TableWrap>
+            <tr className="bg-muted/30 border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-2.5">Applicant</th>
+              <th className="px-4 py-2.5">Grant</th>
+              <th className="px-4 py-2.5 text-right">Score</th>
+              <th className="px-4 py-2.5">Completed</th>
+            </tr>
+            {completed.map((r) => {
+              const s = r.overall_score ?? 0;
+              const color = s >= 80 ? 'text-[hsl(var(--kuja-grow))]' : s >= 60 ? 'text-[hsl(var(--kuja-sun))]' : 'text-[hsl(var(--kuja-flag))]';
+              return (
+                <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3 font-medium text-foreground">
+                    {r.ngo_org_name || `Application #${r.application_id}`}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{r.grant_title || '—'}</td>
+                  <td className={cn('px-4 py-3 text-right kuja-numeric font-semibold', color)}>
+                    {r.overall_score ?? '—'}%
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatDate(r.completed_at)}</td>
+                </tr>
+              );
+            })}
+          </TableWrap>
+        )
       )}
-    </Box>
+    </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Donor View
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
+// Donor view
+// --------------------------------------------------------------------------
 
 function DonorView() {
   const router = useRouter();
@@ -212,7 +150,6 @@ function DonorView() {
   const { data: grantsData, isLoading: grantsLoading } = useGrants();
   const [grantFilter, setGrantFilter] = useState<string>('all');
 
-  const isLoading = appsLoading || grantsLoading;
   const applications = appsData?.applications ?? [];
   const grants = grantsData?.grants ?? [];
 
@@ -221,184 +158,91 @@ function DonorView() {
     return applications.filter((a) => String(a.grant_id) === grantFilter);
   }, [applications, grantFilter]);
 
-  if (isLoading) {
+  if (appsLoading || grantsLoading) {
     return (
-      <Stack spacing={2}>
-        <Skeleton variant="rounded" height={40} width={200} />
-        <Skeleton variant="rounded" height={260} sx={{ borderRadius: 2 }} />
-      </Stack>
+      <div className="space-y-3">
+        <div className="kuja-shimmer h-10 w-48 rounded" />
+        <div className="kuja-shimmer h-64 rounded-xl" />
+      </div>
     );
   }
 
   return (
-    <Stack spacing={2}>
-      {/* Grant Filter */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Filter size={16} style={{ color: '#94A3B8' }} />
-        <FormControl size="small" sx={{ minWidth: 280 }}>
-          <InputLabel>Filter by Grant</InputLabel>
-          <Select
-            label="Filter by Grant"
+    <div className="space-y-4">
+      <div>
+        <h1 className="kuja-display text-3xl">Applications to review</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{filtered.length} of {applications.length}</p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Filter className="h-4 w-4 text-muted-foreground" />
+        <div className="relative">
+          <select
             value={grantFilter}
             onChange={(e) => setGrantFilter(e.target.value)}
+            className="h-9 pl-3 pr-8 text-sm rounded-md border border-input bg-background appearance-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]"
           >
-            <MenuItem value="all">All Grants ({applications.length})</MenuItem>
+            <option value="all">All grants ({applications.length})</option>
             {grants.map((g) => (
-              <MenuItem key={g.id} value={String(g.id)}>
+              <option key={g.id} value={String(g.id)}>
                 {g.title} ({applications.filter((a) => a.grant_id === g.id).length})
-              </MenuItem>
+              </option>
             ))}
-          </Select>
-        </FormControl>
-      </Box>
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        </div>
+      </div>
 
-      {/* Applications Table */}
       {filtered.length === 0 ? (
-        <Card>
-          <CardContent sx={{ py: 8, textAlign: 'center' }}>
-            <FileText size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
-            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-              No applications found
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
-              Applications for your grants will appear here.
-            </Typography>
-          </CardContent>
-        </Card>
+        <EmptyState icon={FileText} title="No applications" body="Applications will appear here as NGOs submit them." />
       ) : (
-        <Card>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Applicant</TableCell>
-                <TableCell>Grant</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">AI Score</TableCell>
-                <TableCell align="right">Human Score</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filtered.map((app) => (
-                <TableRow key={app.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                      {app.ngo_org_name || app.org_name || `Org #${app.ngo_org_id}`}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      {app.grant_title || `Grant #${app.grant_id}`}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={app.status} />
-                  </TableCell>
-                  <TableCell align="right">
-                    {app.ai_score != null ? (
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: 600,
-                          color:
-                            app.ai_score >= 80 ? 'success.main' :
-                            app.ai_score >= 60 ? 'warning.main' : 'error.main',
-                        }}
-                      >
-                        {app.ai_score}%
-                      </Typography>
-                    ) : (
-                      <Typography variant="body2" sx={{ color: 'text.disabled' }}>--</Typography>
-                    )}
-                  </TableCell>
-                  <TableCell align="right">
-                    {app.human_score != null ? (
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: 600,
-                          color:
-                            app.human_score >= 80 ? 'success.main' :
-                            app.human_score >= 60 ? 'warning.main' : 'error.main',
-                        }}
-                      >
-                        {app.human_score}%
-                      </Typography>
-                    ) : (
-                      <Typography variant="body2" sx={{ color: 'text.disabled' }}>--</Typography>
-                    )}
-                  </TableCell>
-                  <TableCell align="right">
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<Star size={14} />}
-                        onClick={() => router.push(`/reviews/${app.id}`)}
-                        sx={{ fontSize: '0.75rem', height: 28 }}
-                      >
-                        Score
-                      </Button>
-                      <Button
-                        size="small"
-                        startIcon={<Eye size={14} />}
-                        onClick={() => router.push(`/applications/${app.id}`)}
-                        sx={{ fontSize: '0.75rem', height: 28, color: 'text.secondary' }}
-                      >
-                        View
-                      </Button>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+        <TableWrap>
+          <tr className="bg-muted/30 border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <th className="px-4 py-2.5">Applicant</th>
+            <th className="px-4 py-2.5">Grant</th>
+            <th className="px-4 py-2.5">Status</th>
+            <th className="px-4 py-2.5 text-right">Submitted</th>
+          </tr>
+          {filtered.map((a) => (
+            <tr
+              key={a.id}
+              className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
+              onClick={() => router.push(`/applications/${a.id}`)}
+            >
+              <td className="px-4 py-3 font-medium text-foreground">{a.org_name || '—'}</td>
+              <td className="px-4 py-3 text-muted-foreground">{a.grant_title || '—'}</td>
+              <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
+              <td className="px-4 py-3 text-right text-muted-foreground">{formatDate(a.submitted_at)}</td>
+            </tr>
+          ))}
+        </TableWrap>
       )}
-    </Stack>
+    </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main Page
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
+// Shared helpers
+// --------------------------------------------------------------------------
 
-export default function ReviewsPage() {
-  const user = useAuthStore((s) => s.user);
-
-  const isReviewer = user?.role === 'reviewer';
-  const isDonor = user?.role === 'donor';
-
+function EmptyState({ icon: Icon, title, body }: { icon: typeof ClipboardCheck; title: string; body: string }) {
   return (
-    <Stack spacing={3}>
-      {/* Header */}
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-          {isReviewer ? 'My Review Assignments' : 'Review Applications'}
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-          {isReviewer
-            ? 'Review and score assigned applications'
-            : 'View and score applications for your grants'}
-        </Typography>
-      </Box>
+    <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
+      <Icon className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+      <p className="kuja-display text-xl">{title}</p>
+      <p className="text-sm text-muted-foreground mt-1">{body}</p>
+    </div>
+  );
+}
 
-      {/* Role-specific views */}
-      {isReviewer && <ReviewerView />}
-      {isDonor && <DonorView />}
-      {!isReviewer && !isDonor && (
-        <Card>
-          <CardContent sx={{ py: 8, textAlign: 'center' }}>
-            <ClipboardCheck size={48} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
-            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-              Access Restricted
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
-              This page is available for Donor and Reviewer roles.
-            </Typography>
-          </CardContent>
-        </Card>
-      )}
-    </Stack>
+function TableWrap({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-border bg-background overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <tbody>{children}</tbody>
+        </table>
+      </div>
+    </div>
   );
 }

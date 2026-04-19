@@ -10,6 +10,8 @@ import enTranslations from './en.json';
 import frTranslations from './fr.json';
 import arTranslations from './ar.json';
 import esTranslations from './es.json';
+import swTranslations from './sw.json';
+import soTranslations from './so.json';
 
 type TranslationMap = Record<string, string>;
 
@@ -18,6 +20,8 @@ const translations: Record<string, TranslationMap> = {
   fr: frTranslations as TranslationMap,
   ar: arTranslations as TranslationMap,
   es: esTranslations as TranslationMap,
+  sw: swTranslations as TranslationMap,
+  so: soTranslations as TranslationMap,
 };
 
 export const RTL_LANGUAGES = ['ar'];
@@ -50,8 +54,10 @@ export function translate(
 }
 
 export const supportedLanguages = [
-  { code: 'en', label: 'English', short: 'EN' },
-  { code: 'fr', label: 'Fran\u00e7ais', short: 'FR' },
-  { code: 'ar', label: '\u0627\u0644\u0639\u0631\u0628\u064a\u0629', short: 'AR' },
-  { code: 'es', label: 'Espa\u00f1ol', short: 'ES' },
+  { code: 'en', label: 'English',    short: 'EN', flag: '\ud83c\uddec\ud83c\udde7' },
+  { code: 'fr', label: 'Fran\u00e7ais',   short: 'FR', flag: '\ud83c\uddeb\ud83c\uddf7' },
+  { code: 'ar', label: '\u0627\u0644\u0639\u0631\u0628\u064a\u0629',     short: 'AR', flag: '\ud83c\uddf8\ud83c\udde6' },
+  { code: 'sw', label: 'Kiswahili',  short: 'SW', flag: '\ud83c\uddf0\ud83c\uddea' },
+  { code: 'so', label: 'Soomaali',   short: 'SO', flag: '\ud83c\uddf8\ud83c\uddf4' },
+  { code: 'es', label: 'Espa\u00f1ol',    short: 'ES', flag: '\ud83c\uddea\ud83c\uddf8' },
 ];

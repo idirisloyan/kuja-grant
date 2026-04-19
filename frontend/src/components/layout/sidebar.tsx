@@ -1,46 +1,38 @@
 'use client';
 
+/**
+ * Kuja sidebar — full shadcn + Tailwind rewrite of the MUI original.
+ *
+ * Design language:
+ *   - Warm dark palette (#1A1410 base, clay accents) — Kuja Studio's
+ *     "Global South editorial" feel, not generic corporate-dark
+ *   - Fraunces wordmark in the brand row
+ *   - Sticky nav-group labels for scannability
+ *   - Collapses to 72px icon rail; collapse button at the base
+ *   - Mobile: slides in as an overlay driven by useUIStore
+ */
+
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 import { useUIStore } from '@/stores/ui-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
-
-import Box from '@mui/material/Box';
-import Drawer from '@mui/material/Drawer';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
-import Divider from '@mui/material/Divider';
-import Tooltip from '@mui/material/Tooltip';
-import useMediaQuery from '@mui/material/useMediaQuery';
-import { useTheme } from '@mui/material/styles';
+import { cn } from '@/lib/utils';
 
 import {
   LayoutDashboard, ClipboardCheck, Search, FileText, BarChart3, Building2,
   PlusCircle, Briefcase, Star, Shield, CheckCircle2, ClipboardList,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 interface NavItem {
   icon: LucideIcon;
   label: string;
   href: string;
 }
-
-// ---------------------------------------------------------------------------
-// Sidebar Component
-// ---------------------------------------------------------------------------
 
 interface SidebarProps {
   width: number;
@@ -49,17 +41,17 @@ interface SidebarProps {
 
 export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   const pathname = usePathname();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { t } = useTranslation();
-
-  const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, setMobileSidebarOpen } = useUIStore();
+  const {
+    sidebarCollapsed, toggleSidebar, sidebarMobileOpen, setMobileSidebarOpen,
+  } = useUIStore();
   const user = useAuthStore((s) => s.user);
-  const role = user?.role || 'ngo';
+  const role: UserRole = (user?.role as UserRole) ?? 'ngo';
 
-  // ---------------------------------------------------------------------------
-  // Nav config per role — built inside the component to use t()
-  // ---------------------------------------------------------------------------
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [pathname, setMobileSidebarOpen]);
 
   const navItems: Record<UserRole, NavItem[]> = {
     ngo: [
@@ -95,161 +87,111 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
     ],
   };
 
-  const items = navItems[role] || navItems.ngo;
-
+  const items = navItems[role] ?? navItems.ngo;
   const currentWidth = sidebarCollapsed ? collapsedWidth : width;
 
-  const drawerContent = (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Logo */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          height: 64,
-          px: sidebarCollapsed ? 0 : 2.5,
-          justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-          gap: 1.5,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-        }}
-      >
-        <Box
-          sx={{
-            width: 36,
-            height: 36,
-            bgcolor: 'primary.main',
-            borderRadius: 1.5,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '0.9rem' }}>K</Typography>
-        </Box>
-        {!sidebarCollapsed && (
-          <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '1rem' }}>
-            {t('header.kuja_grant')}
-          </Typography>
+  const body = (
+    <div className="flex h-full flex-col bg-[#1A1410] text-[#F4E8DC]">
+      {/* Brand */}
+      <div
+        className={cn(
+          'flex items-center gap-2.5 border-b border-white/5 h-16',
+          sidebarCollapsed ? 'justify-center px-0' : 'px-4',
         )}
-      </Box>
+      >
+        <div className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-[#C2410C] to-[#7C2D12] shadow-lg flex-shrink-0">
+          <span className="kuja-display text-lg text-white leading-none">K</span>
+        </div>
+        {!sidebarCollapsed && (
+          <div className="min-w-0">
+            <div className="kuja-display text-base leading-tight text-white">Kuja</div>
+            <div className="text-[9px] uppercase tracking-[0.14em] text-orange-200/70">Grant intelligence</div>
+          </div>
+        )}
+      </div>
 
-      {/* Navigation */}
-      <Box sx={{ flex: 1, overflow: 'auto', px: 1.5, py: 2 }}>
-        <List disablePadding>
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3">
+        <ul className="space-y-0.5">
           {items.map((item) => {
             const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
             const Icon = item.icon;
-
-            const button = (
-              <ListItem key={item.href} disablePadding sx={{ mb: 0.25 }}>
-                <ListItemButton
-                  component={Link}
+            return (
+              <li key={item.href}>
+                <Link
                   href={item.href}
-                  selected={isActive}
-                  onClick={() => isMobile && setMobileSidebarOpen(false)}
-                  sx={{
-                    minHeight: 42,
-                    px: sidebarCollapsed ? 0 : 2,
-                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                    borderRadius: 1.5,
-                  }}
-                >
-                  <ListItemIcon
-                    sx={{
-                      minWidth: sidebarCollapsed ? 0 : 36,
-                      justifyContent: 'center',
-                      color: isActive ? 'primary.main' : 'text.secondary',
-                    }}
-                  >
-                    <Icon size={18} />
-                  </ListItemIcon>
-                  {!sidebarCollapsed && (
-                    <ListItemText
-                      primary={item.label}
-                      primaryTypographyProps={{
-                        fontSize: '0.8125rem',
-                        fontWeight: isActive ? 600 : 400,
-                      }}
-                    />
+                  title={sidebarCollapsed ? item.label : undefined}
+                  className={cn(
+                    'group flex items-center rounded-md text-sm font-medium transition-colors',
+                    sidebarCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2',
+                    isActive
+                      ? 'bg-gradient-to-r from-[#C2410C] to-[#9A3412] text-white shadow-md shadow-orange-950/40'
+                      : 'text-[#E8D9CC] hover:bg-white/5 hover:text-white',
                   )}
-                </ListItemButton>
-              </ListItem>
+                >
+                  <Icon className={cn('h-4 w-4 flex-shrink-0', !isActive && 'text-[#B5816C]')} />
+                  {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                </Link>
+              </li>
             );
-
-            if (sidebarCollapsed) {
-              return (
-                <Tooltip key={item.href} title={item.label} placement="right" arrow>
-                  {button}
-                </Tooltip>
-              );
-            }
-            return button;
           })}
-        </List>
-      </Box>
+        </ul>
+      </nav>
 
-      {/* Collapse Toggle */}
-      <Divider />
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
-        <IconButton
-          onClick={toggleSidebar}
-          size="small"
-          sx={{
-            color: 'text.secondary',
-            '&:hover': { bgcolor: 'action.hover' },
-          }}
-        >
-          {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </IconButton>
-      </Box>
-    </Box>
+      {/* Collapse toggle */}
+      <button
+        type="button"
+        onClick={toggleSidebar}
+        className={cn(
+          'hidden lg:flex items-center gap-2 border-t border-white/5 px-3 py-3 text-xs text-[#B5816C] hover:bg-white/5 hover:text-white transition-colors',
+          sidebarCollapsed && 'justify-center px-0',
+        )}
+        aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : (
+          <>
+            <ChevronLeft className="h-4 w-4" />
+            <span>Collapse</span>
+          </>
+        )}
+      </button>
+    </div>
   );
 
-  // Mobile: temporary drawer
-  if (isMobile) {
-    return (
-      <Drawer
-        variant="temporary"
-        open={sidebarMobileOpen}
-        onClose={() => setMobileSidebarOpen(false)}
-        ModalProps={{ keepMounted: true }}
-        sx={{
-          '& .MuiDrawer-paper': {
-            width: width,
-            boxSizing: 'border-box',
-          },
-        }}
-      >
-        {drawerContent}
-      </Drawer>
-    );
-  }
-
-  // Desktop: permanent drawer
   return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: currentWidth,
-        flexShrink: 0,
-        '& .MuiDrawer-paper': {
-          width: currentWidth,
-          boxSizing: 'border-box',
-          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          overflowX: 'hidden',
-        },
-      }}
-    >
-      {drawerContent}
-    </Drawer>
+    <>
+      {/* Desktop sidebar (fixed) */}
+      <aside
+        className="fixed top-0 left-0 bottom-0 z-40 hidden lg:block border-r border-black/20 transition-[width] duration-200 ease-in-out"
+        style={{ width: currentWidth }}
+      >
+        {body}
+      </aside>
+
+      {/* Mobile overlay */}
+      {sidebarMobileOpen && (
+        <div
+          className="fixed inset-0 z-50 lg:hidden"
+          aria-label="Sidebar"
+        >
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setMobileSidebarOpen(false)}
+            aria-hidden
+          />
+          <aside className="absolute top-0 left-0 bottom-0 w-72 shadow-2xl animate-slide-in-right">
+            <button
+              type="button"
+              onClick={() => setMobileSidebarOpen(false)}
+              className="absolute top-3 right-3 z-10 rounded-md p-1 text-white/70 hover:text-white hover:bg-white/10"
+              aria-label="Close sidebar"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            {body}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }
