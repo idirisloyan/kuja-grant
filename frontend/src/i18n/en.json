@@ -1551,5 +1551,17 @@
   "application.activity.ai_call": "AI assistant invoked",
   "application.activity.provenance": "Source citation recorded",
   "application.activity.review": "Review activity",
-  "application.activity.document_uploaded": "Document uploaded"
+  "application.activity.document_uploaded": "Document uploaded",
+  "preview_reviewer.cta.open": "Preview as reviewer",
+  "preview_reviewer.cta.back_to_edit": "Back to editing",
+  "preview_reviewer.heading": "How the reviewer will see this",
+  "preview_reviewer.subtitle": "This is what the donor's reviewer sees when scoring your application — same layout, same per-criterion order, same word counts. Use this to spot thin responses before submitting.",
+  "preview_reviewer.empty_response": "No response yet — the reviewer will see this section as empty.",
+  "preview_reviewer.count.strong": "{n} strong",
+  "preview_reviewer.count.adequate": "{n} adequate",
+  "preview_reviewer.count.thin": "{n} thin",
+  "preview_reviewer.level.strong": "Strong",
+  "preview_reviewer.level.adequate": "Adequate",
+  "preview_reviewer.level.thin": "Thin",
+  "preview_reviewer.thin_warning": "{n} response(s) are thin — they'll likely score lower with the reviewer. Consider adding specific examples, numbers, or evidence before submitting."
 }

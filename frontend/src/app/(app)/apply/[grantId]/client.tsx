@@ -11,6 +11,7 @@ import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
+import { PreviewAsReviewer } from '@/components/apply/PreviewAsReviewer';
 import { useFlag } from '@/lib/hooks/use-feature-flags';
 import {
   ArrowLeft,
@@ -840,14 +841,21 @@ export default function ApplyWizardClient() {
             {t('common.next')} <ArrowRight className="h-4 w-4" />
           </button>
         ) : (
-          <button
-            onClick={handleSubmit}
-            disabled={submitting || hasMissingItems}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50"
-          >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {submitting ? 'Submitting...' : 'Submit Application'}
-          </button>
+          <div className="flex items-center gap-2">
+            <PreviewAsReviewer
+              criteria={criteria}
+              responses={responses}
+              grantTitle={grant?.title}
+            />
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || hasMissingItems}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {submitting ? 'Submitting...' : 'Submit Application'}
+            </button>
+          </div>
         )}
       </div>
     </div>

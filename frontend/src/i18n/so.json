@@ -1571,5 +1571,17 @@
   "application.activity.ai_call": "Kaaliyaha AI waa la wacay",
   "application.activity.provenance": "Tixraac il ah waa la diiwaangeliyay",
   "application.activity.review": "Hawsha eegista",
-  "application.activity.document_uploaded": "Dukumeenti waa la soo dhejiyay"
+  "application.activity.document_uploaded": "Dukumeenti waa la soo dhejiyay",
+  "preview_reviewer.cta.open": "Eeg sida eegaha u arki doono",
+  "preview_reviewer.cta.back_to_edit": "Ku noqo wax beddelka",
+  "preview_reviewer.heading": "Sida eegaha u arki doono",
+  "preview_reviewer.subtitle": "Tani waa sida eegaha deeq-bixiyaha u arkayo codsigaaga marka uu qiimaynayo — qaab isku mid ah, kala dambeyn isku mid ah ee cabbirrada, tirinta erayada isku mid ah. Isticmaal tan si aad u ogaato jawaabaha tabar yar ka hor inta aadan gudbin.",
+  "preview_reviewer.empty_response": "Wali ma jirto jawaab — eegaha wuxuu arki doonaa qaybtan oo madhan.",
+  "preview_reviewer.count.strong": "{n} xooggan",
+  "preview_reviewer.count.adequate": "{n} ku filan",
+  "preview_reviewer.count.thin": "{n} tabar yar",
+  "preview_reviewer.level.strong": "Xooggan",
+  "preview_reviewer.level.adequate": "Ku filan",
+  "preview_reviewer.level.thin": "Tabar yar",
+  "preview_reviewer.thin_warning": "{n} jawaab tabar yar — waxay u badan tahay inay buundo hooseeyaan ka helaan eegaha. Ku dar tusaalooyin gaar ah, lambaro, ama caddayn ka hor inta aadan gudbin."
 }

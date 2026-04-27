@@ -1551,5 +1551,17 @@
   "application.activity.ai_call": "Assistant IA invoqué",
   "application.activity.provenance": "Citation de source enregistrée",
   "application.activity.review": "Activité d'évaluation",
-  "application.activity.document_uploaded": "Document téléversé"
+  "application.activity.document_uploaded": "Document téléversé",
+  "preview_reviewer.cta.open": "Aperçu côté évaluateur",
+  "preview_reviewer.cta.back_to_edit": "Retour à l'édition",
+  "preview_reviewer.heading": "Ce que verra l'évaluateur",
+  "preview_reviewer.subtitle": "Voici ce que voit l'évaluateur du bailleur lorsqu'il note votre candidature — même mise en page, même ordre des critères, mêmes décomptes de mots. Utilisez-le pour détecter les réponses minces avant de soumettre.",
+  "preview_reviewer.empty_response": "Pas encore de réponse — l'évaluateur verra cette section vide.",
+  "preview_reviewer.count.strong": "{n} solide(s)",
+  "preview_reviewer.count.adequate": "{n} correcte(s)",
+  "preview_reviewer.count.thin": "{n} mince(s)",
+  "preview_reviewer.level.strong": "Solide",
+  "preview_reviewer.level.adequate": "Correcte",
+  "preview_reviewer.level.thin": "Mince",
+  "preview_reviewer.thin_warning": "{n} réponse(s) minces — probablement notées plus bas. Ajoutez des exemples concrets, chiffres ou preuves avant la soumission."
 }

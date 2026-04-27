@@ -1551,5 +1551,17 @@
   "application.activity.ai_call": "تشغيل مساعد الذكاء الاصطناعي",
   "application.activity.provenance": "تم تسجيل مرجع للمصدر",
   "application.activity.review": "نشاط المراجعة",
-  "application.activity.document_uploaded": "تم رفع مستند"
+  "application.activity.document_uploaded": "تم رفع مستند",
+  "preview_reviewer.cta.open": "عاين كما يراه المراجع",
+  "preview_reviewer.cta.back_to_edit": "ارجع للتحرير",
+  "preview_reviewer.heading": "كيف سيراه المراجع",
+  "preview_reviewer.subtitle": "هذه هي الطريقة التي سيرى بها مراجع المانح طلبك عند التقييم — نفس التخطيط، نفس ترتيب المعايير، نفس عدد الكلمات. استخدم هذا لاكتشاف الإجابات الضعيفة قبل التقديم.",
+  "preview_reviewer.empty_response": "لا توجد إجابة بعد — سيرى المراجع هذا القسم فارغاً.",
+  "preview_reviewer.count.strong": "{n} قوية",
+  "preview_reviewer.count.adequate": "{n} مقبولة",
+  "preview_reviewer.count.thin": "{n} ضعيفة",
+  "preview_reviewer.level.strong": "قوية",
+  "preview_reviewer.level.adequate": "مقبولة",
+  "preview_reviewer.level.thin": "ضعيفة",
+  "preview_reviewer.thin_warning": "{n} إجابة ضعيفة — على الأرجح ستحصل على درجة أقل من المراجع. أضف أمثلة محددة أو أرقاماً أو أدلّة قبل التقديم."
 }

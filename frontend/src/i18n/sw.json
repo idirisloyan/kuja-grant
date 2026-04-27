@@ -1571,5 +1571,17 @@
   "application.activity.ai_call": "Msaidizi wa AI ameitwa",
   "application.activity.provenance": "Marejeleo ya chanzo yameandikwa",
   "application.activity.review": "Shughuli ya ukaguzi",
-  "application.activity.document_uploaded": "Hati imepakiwa"
+  "application.activity.document_uploaded": "Hati imepakiwa",
+  "preview_reviewer.cta.open": "Onyesha kama mkaguzi",
+  "preview_reviewer.cta.back_to_edit": "Rudi kuhariri",
+  "preview_reviewer.heading": "Jinsi mkaguzi atakavyoona",
+  "preview_reviewer.subtitle": "Hivi ndivyo mkaguzi wa mfadhili anavyoona ombi lako akipanga alama — mpangilio uleule, mpangilio uleule wa vigezo, hesabu zilezile za maneno. Tumia hii kugundua majibu dhaifu kabla ya kuwasilisha.",
+  "preview_reviewer.empty_response": "Bado hakuna jibu — mkaguzi ataona sehemu hii ikiwa tupu.",
+  "preview_reviewer.count.strong": "{n} imara",
+  "preview_reviewer.count.adequate": "{n} ya kutosha",
+  "preview_reviewer.count.thin": "{n} dhaifu",
+  "preview_reviewer.level.strong": "Imara",
+  "preview_reviewer.level.adequate": "Ya kutosha",
+  "preview_reviewer.level.thin": "Dhaifu",
+  "preview_reviewer.thin_warning": "{n} jibu dhaifu — pengine litapokea alama ya chini. Ongeza mifano halisi, idadi, au ushahidi kabla ya kuwasilisha."
 }

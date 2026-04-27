@@ -1551,5 +1551,17 @@
   "application.activity.ai_call": "Asistente IA invocado",
   "application.activity.provenance": "Cita de fuente registrada",
   "application.activity.review": "Actividad de revisión",
-  "application.activity.document_uploaded": "Documento cargado"
+  "application.activity.document_uploaded": "Documento cargado",
+  "preview_reviewer.cta.open": "Previsualizar como evaluador",
+  "preview_reviewer.cta.back_to_edit": "Volver a editar",
+  "preview_reviewer.heading": "Cómo lo verá el evaluador",
+  "preview_reviewer.subtitle": "Así verá el evaluador del donante tu postulación al puntuarla — el mismo diseño, el mismo orden de criterios, los mismos conteos de palabras. Úsalo para detectar respuestas débiles antes de enviar.",
+  "preview_reviewer.empty_response": "Aún sin respuesta — el evaluador verá esta sección vacía.",
+  "preview_reviewer.count.strong": "{n} sólida(s)",
+  "preview_reviewer.count.adequate": "{n} adecuada(s)",
+  "preview_reviewer.count.thin": "{n} débil(es)",
+  "preview_reviewer.level.strong": "Sólida",
+  "preview_reviewer.level.adequate": "Adecuada",
+  "preview_reviewer.level.thin": "Débil",
+  "preview_reviewer.thin_warning": "{n} respuesta(s) débiles — probablemente serán puntuadas más bajo. Agrega ejemplos concretos, cifras o evidencia antes de enviar."
 }
