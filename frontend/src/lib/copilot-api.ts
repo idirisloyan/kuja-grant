@@ -322,7 +322,129 @@ export function fetchThread(id: number) {
 }
 
 // ---------------------------------------------------------------------------
-// 10. AI health (admin only)
+// 10. Application co-author (Phase 1.1) — first-draft generation
+// ---------------------------------------------------------------------------
+
+export interface DraftClaimProvenance {
+  criterion_key?: string;
+  section_key?: string;
+  claim: string;
+  source_kind: 'profile' | 'document' | 'application' | 'report' | 'note' | 'ai_general';
+  source_id?: number | null;
+  source_locator?: string | null;
+  source_excerpt?: string | null;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface ApplicationDraft {
+  responses: Record<string, string>;
+  eligibility_responses?: Record<string, { met: boolean; evidence: string }>;
+  confidence_per_criterion: Record<string, 'high' | 'medium' | 'low'>;
+  claim_provenance: DraftClaimProvenance[];
+  voice_note?: string;
+  source: 'claude' | 'template';
+}
+
+export interface DraftApplicationResult {
+  draft: ApplicationDraft;
+  application_id: number | null;
+  provenance_saved: number;
+}
+
+export function fetchDraftApplication(input: {
+  grant_id: number;
+  application_id?: number;
+  brief?: string;
+  replace_existing?: boolean;
+  save?: boolean;
+}) {
+  return safeCall<DraftApplicationResult>(() =>
+    api.post<CopilotResult<DraftApplicationResult>>('/ai/draft-application', input),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 11. Report co-author (Phase 1.3)
+// ---------------------------------------------------------------------------
+
+export interface ReportDraft {
+  sections: Record<string, string>;
+  gaps: Array<{ section_key: string; issue: string; what_to_provide: string }>;
+  kpi_values: Record<string, number | null>;
+  confidence_per_section: Record<string, 'high' | 'medium' | 'low'>;
+  claim_provenance: DraftClaimProvenance[];
+  source: 'claude' | 'template';
+}
+
+export interface DraftReportResult {
+  draft: ReportDraft;
+  report_id: number;
+  provenance_saved: number;
+}
+
+export function fetchDraftReport(input: {
+  report_id: number;
+  notes?: string;
+  replace_existing?: boolean;
+}) {
+  return safeCall<DraftReportResult>(() =>
+    api.post<CopilotResult<DraftReportResult>>('/ai/draft-report', input),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 12. Provenance read (Phase 5.1)
+// ---------------------------------------------------------------------------
+
+export interface ProvenanceRow {
+  id: number;
+  ai_call_id: number | null;
+  subject: { kind: string; id: number | null; field: string | null };
+  claim: string;
+  source: {
+    kind: string;
+    id: number | null;
+    locator: string | null;
+    excerpt: string | null;
+  };
+  confidence: 'high' | 'medium' | 'low' | string;
+  created_at: string;
+}
+
+export function fetchProvenance(input: {
+  subject_kind: 'application' | 'report' | 'grant';
+  subject_id?: number;
+  subject_field?: string;
+}) {
+  const qs = new URLSearchParams();
+  qs.set('subject_kind', input.subject_kind);
+  if (input.subject_id != null) qs.set('subject_id', String(input.subject_id));
+  if (input.subject_field) qs.set('subject_field', input.subject_field);
+  return safeCall<{ provenance: ProvenanceRow[] }>(() =>
+    api.get<CopilotResult<{ provenance: ProvenanceRow[] }>>(
+      `/ai/provenance?${qs.toString()}`,
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 13. AI call helpfulness feedback (Phase 0.5 closer)
+// ---------------------------------------------------------------------------
+
+export function postAiHelpfulness(
+  callId: number,
+  helpfulness: 'used' | 'edited' | 'dismissed',
+) {
+  return safeCall<{ helpfulness: string }>(() =>
+    api.post<CopilotResult<{ helpfulness: string }>>(
+      `/ai/calls/${callId}/feedback`,
+      { helpfulness },
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 14. AI health (admin only)
 // ---------------------------------------------------------------------------
 
 export interface AiHealth {

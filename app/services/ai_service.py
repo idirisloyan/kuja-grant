@@ -727,6 +727,330 @@ class AIService:
         }
 
     @classmethod
+    def draft_application(
+        cls,
+        *,
+        grant,
+        org,
+        brief='',
+        prior_applications=None,
+        prior_documents=None,
+        language=None,
+        existing_responses=None,
+    ):
+        """Phase 1.1 — generate a complete first-draft application.
+
+        Inputs:
+            grant: dict-like with title, description, criteria[], eligibility[]
+            org:   dict-like with name, mission, sectors, countries, capacity
+            brief: free-text user brief (≤500 chars), e.g. "we want to focus
+                   on female farmers in Kakamega using SMS-based agronomy
+                   coaching, drawing on our 2024 maize program"
+            prior_applications: list of recent application dicts (responses
+                                excerpt) the AI uses for voice signal — Phase
+                                1.2 will harden this; first cut just inlines.
+            prior_documents:    list of {id, title, excerpt} the AI may cite
+            existing_responses: optional dict of already-drafted responses
+                                that the AI should improve rather than
+                                replace (regenerate-with-context mode).
+
+        Output dict:
+            {
+              'responses': { criterion_key: drafted_text, ... },
+              'eligibility_responses': { eligibility_key: {met, evidence}, ... },
+              'confidence_per_criterion': { criterion_key: 'high'|'medium'|'low' },
+              'claim_provenance': [
+                { 'criterion_key': str,
+                  'claim': str,
+                  'source_kind': 'profile'|'document'|'application'|'ai_general',
+                  'source_id': int|None,
+                  'source_locator': str|None,
+                  'source_excerpt': str|None,
+                  'confidence': str },
+                ...
+              ],
+              'voice_note': short string explaining tonal choices,
+              'source': 'claude'|'template'
+            }
+
+        Provenance rows are NOT auto-persisted here — the caller (route
+        handler) decides which subject_id to attach them to (the
+        application's id once it's saved).
+        """
+        grant = grant or {}
+        org = org or {}
+        brief = (brief or '').strip()[:1500]
+        existing_responses = existing_responses or {}
+        prior_applications = prior_applications or []
+        prior_documents = prior_documents or []
+
+        criteria = grant.get('criteria') or []
+        eligibility = grant.get('eligibility') or []
+
+        # Cap context size — Claude takes 200k but we want speed + low cost.
+        prior_apps_str = json.dumps(prior_applications, default=str)[:4000]
+        prior_docs_str = json.dumps(prior_documents, default=str)[:4000]
+        existing_str = json.dumps(existing_responses, default=str)[:3000]
+
+        system = (
+            "You are Kuja's grant writing co-pilot, drafting a first-cut "
+            "application FOR an NGO applicant. The applicant will edit your "
+            "draft — your job is to give them 80% of a strong submission so "
+            "they can sharpen the last 20%. Be specific, quantitative, and "
+            "honest. Use the applicant's actual mission, prior projects, "
+            "and uploaded documents as your source material. NEVER invent "
+            "specific numbers, partners, beneficiary counts, or program "
+            "names that aren't grounded in the applicant's profile, prior "
+            "applications, or uploaded documents.\n\n"
+            "When you cite a specific fact (e.g. 'we trained 1,200 CHWs'), "
+            "include it in claim_provenance with the source. When you make "
+            "a generic claim that anyone could make (e.g. 'we will use a "
+            "results-based monitoring framework'), source_kind='ai_general' "
+            "and confidence='low'.\n\n"
+            "Per-criterion confidence:\n"
+            "  high   — claim is directly supported by named source (doc/profile/prior app)\n"
+            "  medium — claim is reasonable extrapolation from sources\n"
+            "  low    — claim is generic / requires applicant verification\n\n"
+            "Length: each criterion response ~150-250 words. Eligibility "
+            "responses: 1-3 sentences with explicit evidence.\n\n"
+            "Return ONLY a JSON object matching the schema."
+        )
+
+        schema = """{
+  "responses": {
+    "<criterion_key>": "<drafted text 150-250 words>",
+    ...
+  },
+  "eligibility_responses": {
+    "<eligibility_key>": {
+      "met": true|false,
+      "evidence": "<1-3 sentences with specifics>"
+    },
+    ...
+  },
+  "confidence_per_criterion": {
+    "<criterion_key>": "high|medium|low",
+    ...
+  },
+  "claim_provenance": [
+    {
+      "criterion_key": "<criterion key the claim belongs to>",
+      "claim": "<short snippet of the drafted text supporting one factual claim, ≤200 chars>",
+      "source_kind": "profile|document|application|ai_general",
+      "source_id": <id or null>,
+      "source_locator": "<page X / section Y / null>",
+      "source_excerpt": "<≤200 chars verbatim from source / null>",
+      "confidence": "high|medium|low"
+    },
+    ...
+  ],
+  "voice_note": "<one sentence on tonal choices, ≤120 chars>"
+}"""
+
+        user_msg = (
+            "GRANT:\n"
+            f"  title: {grant.get('title')}\n"
+            f"  description: {(grant.get('description') or '')[:1500]}\n"
+            f"  criteria: {json.dumps(criteria, default=str)[:3000]}\n"
+            f"  eligibility: {json.dumps(eligibility, default=str)[:1500]}\n\n"
+            "APPLICANT NGO:\n"
+            f"  name: {org.get('name')}\n"
+            f"  mission: {(org.get('mission') or '')[:800]}\n"
+            f"  sectors: {org.get('sectors')}\n"
+            f"  countries: {org.get('countries')}\n"
+            f"  capacity: {json.dumps(org.get('capacity') or {}, default=str)[:1500]}\n\n"
+            f"PRIOR APPLICATIONS (voice anchor + facts):\n{prior_apps_str}\n\n"
+            f"UPLOADED DOCUMENTS (cite when relevant):\n{prior_docs_str}\n\n"
+            f"EXISTING DRAFT TO IMPROVE (preserve verified facts):\n{existing_str}\n\n"
+            f"USER BRIEF:\n{brief or '(none — generate a strong default first cut)'}\n\n"
+            "Return the JSON now."
+        )
+
+        text = cls._call_claude(
+            system + "\n\n" + schema,
+            user_msg,
+            max_tokens=4096,
+            language=language,
+            role='ngo',
+            endpoint='draft_application',
+        )
+
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    parsed['source'] = 'claude'
+                    # Defensive normalization
+                    parsed.setdefault('responses', {})
+                    parsed.setdefault('eligibility_responses', {})
+                    parsed.setdefault('confidence_per_criterion', {})
+                    parsed.setdefault('claim_provenance', [])
+                    parsed.setdefault('voice_note', '')
+                    return parsed
+            except Exception as e:
+                logger.warning(f"draft_application JSON parse failed: {e}")
+
+        # Template fallback: empty draft + per-criterion stub.
+        return {
+            'responses': {c.get('key', f'criterion_{i+1}'): '' for i, c in enumerate(criteria)},
+            'eligibility_responses': {},
+            'confidence_per_criterion': {c.get('key', f'criterion_{i+1}'): 'low' for i, c in enumerate(criteria)},
+            'claim_provenance': [],
+            'voice_note': 'AI draft unavailable — start from your strongest prior application.',
+            'source': 'template',
+        }
+
+    @classmethod
+    def draft_report(
+        cls,
+        *,
+        grant,
+        org,
+        report_period,
+        report_type,
+        prior_reports=None,
+        evidence_uploads=None,
+        notes='',
+        language=None,
+    ):
+        """Phase 1.3 — generate a complete first-draft report.
+
+        Inputs mirror draft_application but for reports. The grant carries
+        reporting_requirements + report template; we produce a section-by-
+        section draft from the NGO's evidence (prior reports, uploaded
+        photos/spreadsheets/notes, and their free-form notes).
+
+        Output dict:
+            {
+              'sections': { section_key: drafted_text, ... },
+              'gaps': [{ section_key, issue, what_to_provide }, ...],
+              'kpi_values': { kpi_name: value_or_null, ... },
+              'confidence_per_section': { section_key: 'high|medium|low', ... },
+              'claim_provenance': [...],   # same shape as draft_application
+              'source': 'claude'|'template'
+            }
+        """
+        grant = grant or {}
+        org = org or {}
+        prior_reports = prior_reports or []
+        evidence_uploads = evidence_uploads or []
+        notes = (notes or '').strip()[:3000]
+
+        requirements = grant.get('reporting_requirements') or []
+        template_sections = grant.get('report_template_sections') or []
+        indicators = grant.get('report_template_indicators') or []
+
+        prior_reports_str = json.dumps(prior_reports, default=str)[:4000]
+        evidence_str = json.dumps(evidence_uploads, default=str)[:4000]
+
+        system = (
+            "You are Kuja's reporting co-pilot, drafting a first-cut "
+            "donor report FOR an NGO. The reporter will edit your draft. "
+            "Your job: produce a credible, evidence-backed draft that "
+            "covers every reporting requirement and indicator the grant "
+            "asks for. NEVER invent metrics, beneficiary counts, partner "
+            "names, or activity dates. If the evidence is missing, leave "
+            "the section honest about what's not yet captured and add "
+            "an entry to 'gaps' explaining what the NGO must provide.\n\n"
+            "Per-section confidence:\n"
+            "  high   — section is grounded in named uploaded evidence\n"
+            "  medium — section synthesizes from notes + prior patterns\n"
+            "  low    — section is mostly placeholder pending evidence\n\n"
+            "Return ONLY a JSON object matching the schema."
+        )
+
+        schema = """{
+  "sections": {
+    "<section_key>": "<drafted text>",
+    ...
+  },
+  "gaps": [
+    {
+      "section_key": "<key>",
+      "issue": "<what's missing>",
+      "what_to_provide": "<concrete ask, e.g. 'attendance sheet for the Q3 training'>"
+    },
+    ...
+  ],
+  "kpi_values": {
+    "<indicator_name>": <number or null if unknown>,
+    ...
+  },
+  "confidence_per_section": {
+    "<section_key>": "high|medium|low",
+    ...
+  },
+  "claim_provenance": [
+    {
+      "section_key": "<section key>",
+      "claim": "<short snippet, ≤200 chars>",
+      "source_kind": "report|document|note|ai_general",
+      "source_id": <id or null>,
+      "source_locator": "<file/page or null>",
+      "source_excerpt": "<≤200 chars or null>",
+      "confidence": "high|medium|low"
+    },
+    ...
+  ]
+}"""
+
+        user_msg = (
+            "GRANT:\n"
+            f"  title: {grant.get('title')}\n"
+            f"  reporting_frequency: {grant.get('reporting_frequency')}\n"
+            f"  reporting_requirements: {json.dumps(requirements, default=str)[:2500]}\n"
+            f"  template_sections: {json.dumps(template_sections, default=str)[:1500]}\n"
+            f"  indicators: {json.dumps(indicators, default=str)[:1500]}\n\n"
+            "REPORT META:\n"
+            f"  period: {report_period}\n"
+            f"  type:   {report_type}\n\n"
+            "ORG:\n"
+            f"  name: {org.get('name')}\n"
+            f"  mission: {(org.get('mission') or '')[:600]}\n\n"
+            f"PRIOR REPORTS (voice + continuity anchor):\n{prior_reports_str}\n\n"
+            f"EVIDENCE UPLOADED THIS PERIOD:\n{evidence_str}\n\n"
+            f"REPORTER NOTES:\n{notes or '(none)'}\n\n"
+            "Return the JSON now."
+        )
+
+        text = cls._call_claude(
+            system + "\n\n" + schema,
+            user_msg,
+            max_tokens=4096,
+            language=language,
+            role='ngo',
+            endpoint='draft_report',
+        )
+
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    parsed['source'] = 'claude'
+                    parsed.setdefault('sections', {})
+                    parsed.setdefault('gaps', [])
+                    parsed.setdefault('kpi_values', {})
+                    parsed.setdefault('confidence_per_section', {})
+                    parsed.setdefault('claim_provenance', [])
+                    return parsed
+            except Exception as e:
+                logger.warning(f"draft_report JSON parse failed: {e}")
+
+        return {
+            'sections': {},
+            'gaps': [{'section_key': 'overall', 'issue': 'AI draft unavailable',
+                      'what_to_provide': 'Start with your prior report as a template.'}],
+            'kpi_values': {},
+            'confidence_per_section': {},
+            'claim_provenance': [],
+            'source': 'template',
+        }
+
+    @classmethod
     def extract_evidence(cls, *, criteria, application_responses, application_summary=None):
         """Reviewer evidence synthesis: pull short verbatim quotes from
         the applicant's responses that SUPPORT or CONTRADICT each criterion,

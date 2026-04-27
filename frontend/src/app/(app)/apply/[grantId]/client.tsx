@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
+import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
 import {
   ArrowLeft,
   ArrowRight,
@@ -774,6 +775,8 @@ export default function ApplyWizardClient() {
       )}
       {step === 1 && (
         <ProposalStep
+          grantId={grantId}
+          applicationId={applicationId}
           criteria={criteria}
           responses={responses}
           onResponseChange={handleResponseChange}
@@ -790,6 +793,12 @@ export default function ApplyWizardClient() {
           strengthenResults={strengthenResults}
           onStrengthenSection={handleStrengthenSection}
           onDismissStrengthen={handleDismissStrengthen}
+          onDraftApplied={(newResponses) => {
+            // Merge AI draft into local form state. The backend has already
+            // persisted the draft; this updates the visible textareas so the
+            // user can edit immediately.
+            setResponses((prev) => ({ ...prev, ...newResponses }));
+          }}
         />
       )}
       {step === 2 && (
@@ -947,6 +956,8 @@ function EligibilityStep({
 // =============================================================================
 
 function ProposalStep({
+  grantId,
+  applicationId,
   criteria,
   responses,
   onResponseChange,
@@ -963,7 +974,10 @@ function ProposalStep({
   strengthenResults,
   onStrengthenSection,
   onDismissStrengthen,
+  onDraftApplied,
 }: {
+  grantId: number | null;
+  applicationId: number | null;
   criteria: Criterion[];
   responses: Record<string, string>;
   onResponseChange: (key: string, text: string) => void;
@@ -980,6 +994,7 @@ function ProposalStep({
   strengthenResults: Record<string, StrengthenResult>;
   onStrengthenSection: (criterion: Criterion) => void;
   onDismissStrengthen: (key: string) => void;
+  onDraftApplied: (responses: Record<string, string>) => void;
 }) {
   const { t } = useTranslation();
   if (criteria.length === 0) {
@@ -1015,6 +1030,14 @@ function ProposalStep({
         <Alert tone="success">
           Organization data imported into relevant criteria. Edit to strengthen your responses.
         </Alert>
+      )}
+
+      {grantId != null && (
+        <DraftCoAuthor
+          grantId={grantId}
+          applicationId={applicationId}
+          onApplied={(d) => onDraftApplied(d.responses || {})}
+        />
       )}
 
       {criteria.map((c) => {
