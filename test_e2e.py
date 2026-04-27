@@ -145,7 +145,18 @@ def test_brute_force_real_account():
 # ===========================================================================
 
 def login(email, password='pass123'):
+    """Authenticate the shared session as `email`.
+
+    If the login fails (e.g. 429 from IP rate-limiting in long suites), we
+    clear the session cookies so subsequent calls hit /api as anonymous
+    (401) rather than impersonating whoever the session previously held.
+    Without this, a failed login left stale credentials in place and made
+    role-restricted endpoints return phantom 403s that looked like product
+    bugs but were actually test-harness artifacts.
+    """
     r = session.post(f'{BASE}/api/auth/login', json={'email': email, 'password': password})
+    if r.status_code != 200:
+        session.cookies.clear()
     return r
 
 def test_auth_flow():

@@ -422,3 +422,103 @@ def api_set_language():
     db.session.commit()
     logger.info(f"User {current_user.email} changed language to {lang}")
     return jsonify({'success': True, 'language': lang})
+
+
+@auth_bp.route('/admin/reset-lockouts', methods=['POST'])
+@login_required
+def api_admin_reset_lockouts():
+    """Admin-only: clear IP + per-email lockouts so QA can resume testing.
+
+    The new enumeration guard + per-email lockout (RATE_LIMIT_ENUM_PER_IP=15
+    distinct emails per 5 min, MAX_LOGIN_ATTEMPTS=5 per email) is intentionally
+    aggressive for production, but a long shared-IP retest cycle can lock out
+    QA mid-pass. This endpoint gives the admin a controlled escape hatch:
+
+      POST /api/auth/admin/reset-lockouts
+        body: {"email": "<email>"}      → clear lockouts for one email
+        body: {"ip": "<ip>"}            → clear all attempts from one IP
+        body: {"all": true}             → clear every entry (use sparingly)
+        body: {"email": "<e>", "user": true}
+                                        → also reset users.failed_login_count
+                                          / locked_until for that email
+
+    Always callable from a logged-in admin session — no anonymous reset, no
+    public endpoint. Logs every reset for audit.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Admin access required'}), 403
+
+    data = get_request_json() or {}
+    email = (data.get('email') or '').strip().lower()
+    ip = (data.get('ip') or '').strip()
+    reset_all = bool(data.get('all'))
+    reset_user_lock = bool(data.get('user'))
+
+    if not (email or ip or reset_all):
+        return jsonify({
+            'success': False,
+            'error': 'Specify at least one of: email, ip, all',
+        }), 400
+
+    # Make sure the table exists (no-op if already there).
+    try:
+        _ensure_ip_table()
+    except Exception:
+        pass  # _check_email_lockout/_record_ip_attempt handle the missing-table case
+
+    cleared_attempts = 0
+    cleared_user_locks = 0
+    try:
+        if reset_all:
+            r = db.session.execute(text("DELETE FROM login_attempts"))
+            cleared_attempts = r.rowcount or 0
+        else:
+            if email:
+                r = db.session.execute(
+                    text("DELETE FROM login_attempts WHERE email = :email"),
+                    {"email": email},
+                )
+                cleared_attempts += r.rowcount or 0
+            if ip:
+                r = db.session.execute(
+                    text("DELETE FROM login_attempts WHERE ip = :ip"),
+                    {"ip": ip},
+                )
+                cleared_attempts += r.rowcount or 0
+
+        # Optionally clear the per-user account lockout columns too.
+        if reset_user_lock and email and _lockout_enabled():
+            r = db.session.execute(
+                text(
+                    "UPDATE users SET failed_login_count = 0, last_failed_login = NULL, "
+                    "locked_until = NULL WHERE LOWER(email) = :email"
+                ),
+                {"email": email},
+            )
+            cleared_user_locks = r.rowcount or 0
+        elif reset_all and _lockout_enabled():
+            r = db.session.execute(
+                text(
+                    "UPDATE users SET failed_login_count = 0, last_failed_login = NULL, "
+                    "locked_until = NULL"
+                )
+            )
+            cleared_user_locks = r.rowcount or 0
+
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Lockout reset failed: {e}")
+        return jsonify({'success': False, 'error': 'Reset failed', 'detail': str(e)}), 500
+
+    logger.warning(
+        f"Lockout reset by admin={current_user.email} "
+        f"email={email or '-'} ip={ip or '-'} all={reset_all} "
+        f"cleared_attempts={cleared_attempts} cleared_user_locks={cleared_user_locks}"
+    )
+    return jsonify({
+        'success': True,
+        'cleared_login_attempts': cleared_attempts,
+        'cleared_user_locks': cleared_user_locks,
+        'scope': {'email': email or None, 'ip': ip or None, 'all': reset_all},
+    })
