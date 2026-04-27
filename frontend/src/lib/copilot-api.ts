@@ -687,6 +687,49 @@ export function fetchApplicationActivity(applicationId: number) {
 }
 
 // ---------------------------------------------------------------------------
+// 13f. Donor portfolio diagnostics — Phase 2.3
+// ---------------------------------------------------------------------------
+
+export interface PortfolioDiagnostics {
+  aggregate: {
+    total_grants: number;
+    total_submissions: number;
+    total_awarded: number;
+    total_rejected: number;
+    avg_ai_score_pct: number | null;
+  };
+  per_grant: Array<{
+    grant_id: number;
+    title: string;
+    submissions: number;
+    awarded: number;
+    rejected: number;
+    avg_ai_score: number | null;
+    min_ai_score: number | null;
+    max_ai_score: number | null;
+    score_spread: number | null;
+  }>;
+  anomalies: Array<{
+    kind: 'low_interest' | 'low_discrimination' | 'criteria_too_easy' | 'high_decline' | string;
+    grant_id: number;
+    title: string;
+    detail_key: string;
+    submissions?: number;
+    spread?: number;
+    avg_score?: number;
+    decline_rate_pct?: number;
+  }>;
+}
+
+export function fetchPortfolioDiagnostics() {
+  return safeCall<PortfolioDiagnostics>(() =>
+    api.get<CopilotResult<PortfolioDiagnostics>>(
+      '/grants/portfolio-diagnostics',
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 13d. Live drafters — Phase 4.2
 // ---------------------------------------------------------------------------
 

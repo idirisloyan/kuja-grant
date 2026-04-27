@@ -1162,6 +1162,19 @@ class AIService:
         # the directive (no fabricated voice).
         voice_profile = cls._extract_voice_profile(prior_applications)
 
+        # Phase 1.4 — count the NGO's prior outcome signals so we can tell
+        # the AI 'this org has won X grants before' and cue confident
+        # framing. 'lost' apps inform voice but should NOT be treated as
+        # positive patterns.
+        won_count = sum(
+            1 for a in (prior_applications or [])
+            if (a.get('outcome_signal') == 'won')
+        )
+        lost_count = sum(
+            1 for a in (prior_applications or [])
+            if (a.get('outcome_signal') == 'lost')
+        )
+
         system = (
             "You are Kuja's grant writing co-pilot, drafting a first-cut "
             "application FOR an NGO applicant. The applicant will edit your "
@@ -1225,6 +1238,26 @@ class AIService:
                     f"  • Common sentence openings the applicant uses: "
                     f"{', '.join(repr(o) for o in voice_profile['openings'])}.\n"
                 )
+
+        # Phase 1.4 — cross-application learning directive.
+        if won_count > 0:
+            system += (
+                f"\n\nTRACK RECORD — this applicant has WON {won_count} prior "
+                f"grant(s) on Kuja. Where their winning submissions used a "
+                f"specific framing, structure, or piece of evidence that fits "
+                f"the current criteria, emulate that pattern. Treat their "
+                f"awarded applications (outcome_signal='won' in PRIOR APPLICATIONS) "
+                f"as positive examples; treat outcome_signal='lost' as voice-only "
+                f"references. Do not copy verbatim text from prior submissions."
+            )
+        elif lost_count > 0:
+            system += (
+                f"\n\nTRACK RECORD — this applicant has prior submissions "
+                f"(outcome_signal='lost'). Use them ONLY as a voice anchor, "
+                f"not as a structural template — those framings did not win. "
+                f"Lean on the grant criteria and applicant profile for "
+                f"substance."
+            )
 
         schema = """{
   "responses": {

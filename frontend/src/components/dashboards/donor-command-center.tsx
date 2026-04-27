@@ -20,6 +20,7 @@ import { GitMerge, Clock4, ShieldAlert } from 'lucide-react';
 import { VerdictCard, type VerdictAction } from './verdict-card';
 import { ChartCard } from './chart-card';
 import { SizedChart } from './sized-chart';
+import { PortfolioDiagnosticsCard } from './portfolio-diagnostics-card';
 import { fetchDonorPortfolioInsights, type DonorPortfolioInsights, type DonorActionType } from '@/lib/copilot-api';
 import { api } from '@/lib/api';
 
@@ -179,6 +180,9 @@ export function DonorCommandCenter() {
         actions={verdictActions}
         loading={verdictLoading}
       />
+
+      {/* Phase 2.3 — cross-grant diagnostics with anomalies + per-grant rollup */}
+      <PortfolioDiagnosticsCard />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ChartCard

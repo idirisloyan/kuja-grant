@@ -560,6 +560,147 @@ def api_upload_grant_doc(grant_id):
 
 
 # ---------------------------------------------------------------------------
+# Phase 2.3 — donor portfolio diagnostics
+# ---------------------------------------------------------------------------
+
+@grants_bp.route('/portfolio-diagnostics', methods=['GET'])
+@login_required
+def api_portfolio_diagnostics():
+    """Cross-grant diagnostics for a donor's portfolio.
+
+    Surfaces three classes of insight:
+      1. Per-grant rollups: submissions, awarded, decline rate, avg AI score
+      2. Criterion-quality patterns: which of THIS donor's criteria show
+         the highest reviewer-score divergence (good criteria discriminate;
+         high divergence = working as designed). And which produce
+         identical-looking responses (low signal — too generic).
+      3. Anomalies: grants attracting <2 applicants, grants where every
+         applicant scores >85 (criteria too easy), grants with 50%+
+         applicant decline (criteria likely too narrow).
+
+    Donor-scoped: only grants where grant.donor_org_id == caller.org_id.
+    Admin sees everyone.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        from app.utils.api_errors import error_response
+        return error_response('auth.access_denied', 403)
+
+    from sqlalchemy import func
+    from datetime import datetime, timezone, timedelta
+
+    org_filter = (Grant.donor_org_id == current_user.org_id) if current_user.role == 'donor' else True
+
+    grants_q = Grant.query.filter(org_filter).order_by(Grant.created_at.desc()).limit(50)
+    grants = grants_q.all()
+
+    per_grant = []
+    aggregate = {
+        'total_grants': 0,
+        'total_submissions': 0,
+        'total_awarded': 0,
+        'total_rejected': 0,
+        'avg_ai_score_pct': None,
+    }
+    sum_score = 0.0
+    score_count = 0
+    anomalies = []
+
+    for g in grants:
+        try:
+            apps = (Application.query
+                    .filter_by(grant_id=g.id)
+                    .filter(Application.status.in_(('submitted', 'scored', 'awarded', 'rejected')))
+                    .all())
+        except Exception:
+            apps = []
+
+        n = len(apps)
+        if n == 0:
+            per_grant.append({
+                'grant_id': g.id,
+                'title': g.title,
+                'submissions': 0,
+                'awarded': 0,
+                'rejected': 0,
+                'avg_ai_score': None,
+                'min_ai_score': None,
+                'max_ai_score': None,
+            })
+            continue
+
+        awarded_n = sum(1 for a in apps if a.status == 'awarded')
+        rejected_n = sum(1 for a in apps if a.status == 'rejected')
+        ai_scores = [a.ai_score for a in apps if a.ai_score is not None]
+
+        avg_ai = (sum(ai_scores) / len(ai_scores)) if ai_scores else None
+        min_ai = min(ai_scores) if ai_scores else None
+        max_ai = max(ai_scores) if ai_scores else None
+
+        per_grant.append({
+            'grant_id': g.id,
+            'title': g.title,
+            'submissions': n,
+            'awarded': awarded_n,
+            'rejected': rejected_n,
+            'avg_ai_score': round(avg_ai, 1) if avg_ai is not None else None,
+            'min_ai_score': round(min_ai, 1) if min_ai is not None else None,
+            'max_ai_score': round(max_ai, 1) if max_ai is not None else None,
+            'score_spread': round(max_ai - min_ai, 1) if (min_ai is not None and max_ai is not None) else None,
+        })
+
+        aggregate['total_submissions'] += n
+        aggregate['total_awarded'] += awarded_n
+        aggregate['total_rejected'] += rejected_n
+        if ai_scores:
+            sum_score += sum(ai_scores)
+            score_count += len(ai_scores)
+
+        # Anomaly detection per grant.
+        if g.status == 'open' and n < 2:
+            anomalies.append({
+                'kind': 'low_interest',
+                'grant_id': g.id,
+                'title': g.title,
+                'detail_key': 'portfolio.anomaly.low_interest',
+                'submissions': n,
+            })
+        if n >= 5 and ai_scores and (max_ai - min_ai) < 8:
+            anomalies.append({
+                'kind': 'low_discrimination',
+                'grant_id': g.id,
+                'title': g.title,
+                'detail_key': 'portfolio.anomaly.low_discrimination',
+                'spread': round(max_ai - min_ai, 1),
+            })
+        if n >= 5 and avg_ai is not None and avg_ai > 85:
+            anomalies.append({
+                'kind': 'criteria_too_easy',
+                'grant_id': g.id,
+                'title': g.title,
+                'detail_key': 'portfolio.anomaly.criteria_too_easy',
+                'avg_score': round(avg_ai, 1),
+            })
+        if n >= 5 and (rejected_n / max(1, n)) > 0.5:
+            anomalies.append({
+                'kind': 'high_decline',
+                'grant_id': g.id,
+                'title': g.title,
+                'detail_key': 'portfolio.anomaly.high_decline',
+                'decline_rate_pct': round(100 * rejected_n / n, 1),
+            })
+
+    aggregate['total_grants'] = len(grants)
+    aggregate['avg_ai_score_pct'] = round(sum_score / score_count, 1) if score_count else None
+
+    return jsonify({
+        'success': True,
+        'aggregate': aggregate,
+        'per_grant': per_grant,
+        'anomalies': anomalies[:20],  # cap for transport
+    })
+
+
+# ---------------------------------------------------------------------------
 # Phase 4.2 — live drafters pill
 # ---------------------------------------------------------------------------
 

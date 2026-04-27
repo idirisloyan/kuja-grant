@@ -624,26 +624,72 @@ def _gather_org_context(org_id):
 
 
 def _gather_prior_applications(org_id, exclude_id=None, limit=3):
-    """Pull recent application responses to anchor voice + facts."""
-    q = (Application.query
-         .filter_by(ngo_org_id=org_id)
-         .filter(Application.status.in_(('submitted', 'awarded', 'rejected', 'scored')))
-         .order_by(Application.submitted_at.desc().nullslast(),
-                   Application.created_at.desc()))
+    """Pull recent application responses to anchor voice + facts.
+
+    Phase 1.4 — cross-application learning:
+    prefer 'awarded' applications first (the NGO's winning patterns
+    are higher-signal than rejected ones), then 'submitted' / 'scored',
+    then everything else. Keep the most recent within each tier.
+    Each row carries an `outcome_signal` flag so draft_application can
+    treat winners differently in the prompt.
+    """
+    base = (Application.query
+            .filter_by(ngo_org_id=org_id)
+            .filter(Application.status.in_(('submitted', 'awarded', 'rejected', 'scored'))))
     if exclude_id:
-        q = q.filter(Application.id != exclude_id)
+        base = base.filter(Application.id != exclude_id)
+
+    # Tier 1: awarded (winning patterns, highest signal).
+    awarded = (base.filter(Application.status == 'awarded')
+               .order_by(Application.submitted_at.desc().nullslast(),
+                         Application.created_at.desc())
+               .limit(2).all())
+    # Tier 2: scored / submitted but not yet decided (recent activity).
+    pending_or_scored = (base.filter(Application.status.in_(('submitted', 'scored')))
+                         .order_by(Application.submitted_at.desc().nullslast(),
+                                   Application.created_at.desc())
+                         .limit(2).all())
+    # Tier 3: rejected — useful for voice but flagged so AI doesn't
+    # over-anchor on losing patterns.
+    rejected = (base.filter(Application.status == 'rejected')
+                .order_by(Application.submitted_at.desc().nullslast())
+                .limit(1).all())
+
+    seen = set()
+    ordered: list[Application] = []
+    for tier in (awarded, pending_or_scored, rejected):
+        for a in tier:
+            if a.id in seen:
+                continue
+            seen.add(a.id)
+            ordered.append(a)
+            if len(ordered) >= limit:
+                break
+        if len(ordered) >= limit:
+            break
+
     out = []
-    for a in q.limit(limit).all():
+    for a in ordered:
         try:
             responses = a.get_responses() or {}
         except Exception:
             responses = {}
+        # outcome_signal lets the AI weigh tone — 'won' submissions are
+        # treated as positive examples; 'lost' as voice-only references.
+        if a.status == 'awarded':
+            signal = 'won'
+        elif a.status == 'rejected':
+            signal = 'lost'
+        elif a.status in ('submitted', 'scored'):
+            signal = 'pending'
+        else:
+            signal = 'other'
         out.append({
             'id': a.id,
             'grant_id': a.grant_id,
             'status': a.status,
             'final_score': a.final_score,
-            # Trim each response so the prompt stays under budget.
+            'outcome_signal': signal,
             'responses_excerpt': {k: (v[:600] if isinstance(v, str) else v)
                                   for k, v in list(responses.items())[:6]},
         })
