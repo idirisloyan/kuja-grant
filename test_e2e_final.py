@@ -87,9 +87,41 @@ def login_ok(email):
 
 
 # =========================================================================
+def reset_lockouts_via_admin():
+    """Clear IP + per-email lockouts so the suite starts (and resumes) clean.
+
+    The brute-force section deliberately creates lockouts that would otherwise
+    cascade into phantom 429s in later sections. Production thresholds stay
+    strict; this is the QA escape hatch via the admin-only reset endpoint.
+    """
+    try:
+        s = requests.Session()
+        s.headers.update({"X-Requested-With": "XMLHttpRequest"})
+        r = s.post(f"{BASE}/api/auth/login",
+                   json={"email": "admin@kuja.org", "password": PASS},
+                   timeout=10)
+        if r.status_code != 200:
+            return False
+        r = s.post(f"{BASE}/api/auth/admin/reset-lockouts",
+                   json={"all": True},
+                   timeout=10)
+        if r.status_code == 200:
+            d = r.json()
+            print(f"  [reset] cleared {d.get('cleared_login_attempts', 0)} attempts, "
+                  f"{d.get('cleared_user_locks', 0)} user locks")
+            return True
+    except Exception:
+        pass
+    return False
+
+
 print("\n" + "=" * 70)
 print("SECTION 1: DEFECT RETESTS (except IP rate limit)")
 print("=" * 70)
+# Pre-suite reset so accumulated state from earlier QA passes doesn't poison
+# the first few logins. The reset endpoint requires admin auth, so it can
+# only run from a known-good admin session.
+reset_lockouts_via_admin()
 
 # --- DEF-SEC-001: Per-account lockout (uses fresh logins, not cached) ---
 print("\n--- DEF-SEC-001: Per-account lockout ---")
@@ -119,6 +151,10 @@ def test_other_accounts_unaffected():
     assert r.json().get("user", {}).get("email") == DONOR2
 
 run("DEF-SEC-001: Other accounts unaffected", test_other_accounts_unaffected)
+
+# Clear lockouts the brute-force tests just created so happy-path AUTH
+# checks in SECTION 2 don't trip the 15-min account lockout window.
+reset_lockouts_via_admin()
 
 
 # --- DEF-UPL-001: Empty/invalid PDF ---
@@ -623,6 +659,36 @@ run("I18N: Language preference set/get", test_language_switch)
 print("\n--- DONOR WIZARD LIFECYCLE ---")
 
 _wizard_grant_id = None
+
+def _purge_stale_wizard_grants():
+    """Delete any leftover 'Wizard E2E Grant' drafts from prior runs that
+    skipped cleanup (e.g. due to IP rate-limit). Without this guard the
+    donor's compliance view fills up with orphan test rows over time."""
+    try:
+        s = login_ok(DONOR1)
+        r = s.get(f"{BASE}/api/grants", timeout=10)
+        if r.status_code != 200:
+            return
+        data = r.json()
+        grants = data if isinstance(data, list) else data.get("grants", [])
+        purged = 0
+        for g in grants:
+            if g.get("title") == "Wizard E2E Grant":
+                gid = g.get("id")
+                if not gid:
+                    continue
+                try:
+                    s.put(f"{BASE}/api/grants/{gid}", json={"status": "draft"}, timeout=10)
+                    s.delete(f"{BASE}/api/grants/{gid}", timeout=10)
+                    purged += 1
+                except Exception:
+                    pass
+        if purged:
+            print(f"    [pre-cleanup] purged {purged} stale 'Wizard E2E Grant' draft(s) from prior runs")
+    except Exception:
+        pass
+
+_purge_stale_wizard_grants()
 
 def test_wizard_step1_create():
     """Wizard Step 1: Create grant with basic info."""
