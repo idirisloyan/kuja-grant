@@ -727,6 +727,128 @@ class AIService:
         }
 
     @classmethod
+    def median_ngo_preview(
+        cls,
+        *,
+        grant,
+        language=None,
+    ):
+        """Phase 2.1 — generate a 'what the median qualifying NGO will produce'
+        preview application. Donor-facing diagnostic, NOT a real submission.
+
+        For each criterion, AI imagines a plausible mid-tier applicant's
+        response and rates how DISCRIMINATING the criterion is — i.e. how
+        well it would actually separate strong applicants from weak ones.
+        Criteria that produce identical-looking responses across applicants
+        are red flags: they don't help reviewers pick a winner.
+
+        Output:
+          {
+            'preview_responses': { criterion_key: drafted text },
+            'discrimination_score': { criterion_key: 'high|medium|low' },
+            'common_pitfalls':       [ {criterion_key, issue, suggestion} ],
+            'tightenings':           [ {criterion_key, current_problem, rewrite_hint} ],
+            'overall_health':        'strong | mixed | weak',
+            'rationale':             '<≤200 chars on the design's strengths/weaknesses>'
+          }
+        """
+        grant = grant or {}
+        criteria = grant.get('criteria') or []
+        eligibility = grant.get('eligibility') or []
+
+        system = (
+            "You are Kuja's grant-design strategist. The donor has just "
+            "finished drafting a grant call. BEFORE they publish, your job "
+            "is to predict how this call will work in practice. Imagine a "
+            "plausible mid-tier qualifying NGO and write what THEY would "
+            "submit. Then evaluate the GRANT DESIGN, not the applicant.\n\n"
+            "Per-criterion 'discrimination_score' rates how well the "
+            "criterion separates strong from weak applicants:\n"
+            "  high   — the criterion forces specific, verifiable claims; "
+            "           applicants will produce visibly different responses\n"
+            "  medium — the criterion gets some signal but rewards generic "
+            "           narrative\n"
+            "  low    — most NGOs will produce nearly identical responses; "
+            "           THIS IS A RED FLAG — the criterion doesn't pick a "
+            "           winner\n\n"
+            "Be opinionated and concrete. Your output goes to the donor "
+            "BEFORE publish — they will use it to tighten the criteria. "
+            "Return ONLY a JSON object matching the schema."
+        )
+
+        schema = """{
+  "preview_responses": {
+    "<criterion_key>": "<150-200 word response a median NGO would submit>",
+    ...
+  },
+  "discrimination_score": {
+    "<criterion_key>": "high|medium|low",
+    ...
+  },
+  "common_pitfalls": [
+    {
+      "criterion_key": "<key>",
+      "issue": "<what most applicants will do wrong>",
+      "suggestion": "<concrete suggestion to the donor or applicant>"
+    }
+  ],
+  "tightenings": [
+    {
+      "criterion_key": "<key>",
+      "current_problem": "<why this criterion is too vague / generic>",
+      "rewrite_hint": "<how the donor could rewrite to discriminate better>"
+    }
+  ],
+  "overall_health": "strong|mixed|weak",
+  "rationale": "<≤200 chars summary>"
+}"""
+
+        user_msg = (
+            "GRANT:\n"
+            f"  title: {grant.get('title')}\n"
+            f"  description: {(grant.get('description') or '')[:1500]}\n"
+            f"  criteria: {json.dumps(criteria, default=str)[:3500]}\n"
+            f"  eligibility: {json.dumps(eligibility, default=str)[:1500]}\n\n"
+            "Imagine a mid-tier NGO and produce the JSON now."
+        )
+
+        text = cls._call_claude(
+            system + "\n\n" + schema,
+            user_msg,
+            max_tokens=4000,
+            language=language,
+            role='donor',
+            endpoint='median_ngo_preview',
+        )
+
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    parsed['source'] = 'claude'
+                    parsed.setdefault('preview_responses', {})
+                    parsed.setdefault('discrimination_score', {})
+                    parsed.setdefault('common_pitfalls', [])
+                    parsed.setdefault('tightenings', [])
+                    parsed.setdefault('overall_health', 'mixed')
+                    parsed.setdefault('rationale', '')
+                    return parsed
+            except Exception as e:
+                logger.warning(f"median_ngo_preview JSON parse failed: {e}")
+
+        return {
+            'preview_responses': {},
+            'discrimination_score': {},
+            'common_pitfalls': [],
+            'tightenings': [],
+            'overall_health': 'mixed',
+            'rationale': '',
+            'source': 'template',
+        }
+
+    @classmethod
     def generate_grant_brief(
         cls,
         *,

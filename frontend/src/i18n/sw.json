@@ -1583,5 +1583,19 @@
   "preview_reviewer.level.strong": "Imara",
   "preview_reviewer.level.adequate": "Ya kutosha",
   "preview_reviewer.level.thin": "Dhaifu",
-  "preview_reviewer.thin_warning": "{n} jibu dhaifu — pengine litapokea alama ya chini. Ongeza mifano halisi, idadi, au ushahidi kabla ya kuwasilisha."
+  "preview_reviewer.thin_warning": "{n} jibu dhaifu — pengine litapokea alama ya chini. Ongeza mifano halisi, idadi, au ushahidi kabla ya kuwasilisha.",
+  "median_preview.cta.open": "Onyesha kundi linalotarajiwa la waombaji",
+  "median_preview.heading": "Kundi linalotarajiwa la waombaji",
+  "median_preview.subtitle": "AI inawazia kile NGO ya wastani inayotosheleza ingewasilisha na inakadiria jinsi kila kigezo kitaweza kutofautisha waombaji wenye nguvu na dhaifu.",
+  "median_preview.loading": "Inazalisha utabiri wa kundi…",
+  "median_preview.discrimination_label": "Utenganishaji wa kila kigezo",
+  "median_preview.tightenings_label": "Vigezo vinavyohitaji kuimarishwa kabla ya kuchapisha",
+  "median_preview.pitfalls_label": "Makosa ya kawaida ya waombaji",
+  "median_preview.sample_responses_label": "Mifano ya majibu ({n})",
+  "median_preview.health.strong": "Muundo unaonekana imara",
+  "median_preview.health.mixed": "Muundo wa mchanganyiko",
+  "median_preview.health.weak": "Muundo unahitaji kazi",
+  "median_preview.discrimination.high": "Juu",
+  "median_preview.discrimination.medium": "Wastani",
+  "median_preview.discrimination.low": "Chini — rekebisha"
 }

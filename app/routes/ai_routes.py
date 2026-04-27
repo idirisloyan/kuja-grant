@@ -1023,6 +1023,70 @@ def api_ai_provenance():
 
 
 # ---------------------------------------------------------------------------
+# Phase 2.1 — donor median-NGO preview (predict applicant pool quality)
+# ---------------------------------------------------------------------------
+
+@ai_bp.route('/median-ngo-preview', methods=['POST'])
+@login_required
+@role_required('donor', 'admin')
+def api_ai_median_ngo_preview():
+    """Donor-facing diagnostic: predict what the median qualifying NGO will
+    submit AND rate how well each criterion will discriminate between
+    strong and weak applicants. Helps donors tighten criteria BEFORE
+    publishing.
+
+    Body: {"grant_id": <int>}  OR  {"grant": <full grant dict for unsaved drafts>}
+    """
+    from app.utils.feature_flags import is_enabled
+    if not is_enabled('ai.median_ngo_preview',
+                      user_id=current_user.id,
+                      org_id=getattr(current_user, 'org_id', None)):
+        return error_response('auth.access_denied', 403,
+                              default='This feature is not enabled for your account.')
+
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return error_response('ai.rate_limited', 429)
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json() or {}
+    grant_payload = None
+    if data.get('grant_id'):
+        grant = db.session.get(Grant, int(data['grant_id']))
+        if not grant:
+            return error_response('grant.not_found', 404)
+        if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
+            return error_response('auth.access_denied', 403)
+        grant_payload = {
+            'id': grant.id,
+            'title': grant.title,
+            'description': grant.description,
+            'criteria': grant.get_criteria() if hasattr(grant, 'get_criteria') else [],
+            'eligibility': grant.get_eligibility() if hasattr(grant, 'get_eligibility') else [],
+        }
+    elif isinstance(data.get('grant'), dict):
+        # Unsaved-draft mode: donor passes the full payload from the wizard
+        # before the grant has a database id.
+        grant_payload = data['grant']
+    else:
+        return error_response('validation.missing_field', 400, field='grant_id|grant')
+
+    parsed = AIService.median_ngo_preview(
+        grant=grant_payload,
+        language=current_user.language or 'en',
+    )
+
+    return jsonify({
+        'success': True,
+        'preview': parsed,
+        'ai_transparency': {
+            'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
+            'disclaimer': 'AI prediction — verify against your actual applicant pool after publishing.',
+        },
+    })
+
+
+# ---------------------------------------------------------------------------
 # Phase 2.2 — donor auto-generated grant brief
 # ---------------------------------------------------------------------------
 

@@ -428,6 +428,45 @@ export function fetchProvenance(input: {
 }
 
 // ---------------------------------------------------------------------------
+// 12a. Donor median-NGO preview (Phase 2.1)
+// ---------------------------------------------------------------------------
+
+export interface MedianNGOPreview {
+  preview_responses: Record<string, string>;
+  discrimination_score: Record<string, 'high' | 'medium' | 'low'>;
+  common_pitfalls: Array<{
+    criterion_key: string;
+    issue: string;
+    suggestion: string;
+  }>;
+  tightenings: Array<{
+    criterion_key: string;
+    current_problem: string;
+    rewrite_hint: string;
+  }>;
+  overall_health: 'strong' | 'mixed' | 'weak';
+  rationale: string;
+  source: 'claude' | 'template';
+}
+
+export function fetchMedianNGOPreview(input: {
+  grant_id?: number;
+  grant?: {
+    title?: string;
+    description?: string;
+    criteria?: Array<{ key: string; label: string; weight: number; description?: string }>;
+    eligibility?: Array<{ key: string; label: string; details?: string }>;
+  };
+}) {
+  return safeCall<{ preview: MedianNGOPreview }>(() =>
+    api.post<CopilotResult<{ preview: MedianNGOPreview }>>(
+      '/ai/median-ngo-preview',
+      input,
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 12b. Donor grant-brief generator (Phase 2.2)
 // ---------------------------------------------------------------------------
 

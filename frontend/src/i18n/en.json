@@ -1563,5 +1563,19 @@
   "preview_reviewer.level.strong": "Strong",
   "preview_reviewer.level.adequate": "Adequate",
   "preview_reviewer.level.thin": "Thin",
-  "preview_reviewer.thin_warning": "{n} response(s) are thin — they'll likely score lower with the reviewer. Consider adding specific examples, numbers, or evidence before submitting."
+  "preview_reviewer.thin_warning": "{n} response(s) are thin — they'll likely score lower with the reviewer. Consider adding specific examples, numbers, or evidence before submitting.",
+  "median_preview.cta.open": "Preview applicant pool",
+  "median_preview.heading": "Predicted applicant pool",
+  "median_preview.subtitle": "AI imagines what a median qualifying NGO will submit and rates how well each criterion will discriminate between strong and weak applicants.",
+  "median_preview.loading": "Generating predicted applicant pool…",
+  "median_preview.discrimination_label": "How well each criterion discriminates",
+  "median_preview.tightenings_label": "Criteria to tighten before publish",
+  "median_preview.pitfalls_label": "Common applicant pitfalls",
+  "median_preview.sample_responses_label": "Sample responses ({n})",
+  "median_preview.health.strong": "Design looks strong",
+  "median_preview.health.mixed": "Design is mixed",
+  "median_preview.health.weak": "Design needs work",
+  "median_preview.discrimination.high": "High",
+  "median_preview.discrimination.medium": "Medium",
+  "median_preview.discrimination.low": "Low — fix"
 }

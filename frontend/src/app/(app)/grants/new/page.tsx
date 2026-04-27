@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { GrantBriefPrompt } from '@/components/grants/GrantBriefPrompt';
+import { MedianNGOPreview } from '@/components/grants/MedianNGOPreview';
 import type { GeneratedGrantBrief } from '@/lib/copilot-api';
 import {
   ArrowLeft,
@@ -1543,6 +1544,23 @@ export default function CreateGrantPage() {
           </div>
         </Card>
       )}
+
+      {/* Phase 2.1 — donor predicts the applicant pool BEFORE publishing.
+          Renders inline in the review step; donor can spot non-discriminating
+          criteria and tighten them before going live. */}
+      <MedianNGOPreview
+        grantId={grantId ?? null}
+        grantDraft={!grantId ? {
+          title: basic.title,
+          description: basic.description,
+          criteria: criteria.filter((c) => c.label.trim()).map((c) => ({
+            key: c.key, label: c.label, weight: c.weight, description: c.description,
+          })),
+          eligibility: eligibility.filter((e) => e.enabled).map((e) => ({
+            key: e.key, label: e.labelKey || e.label, details: e.details,
+          })),
+        } : undefined}
+      />
 
       <Card className="border-2 border-emerald-200 bg-emerald-50/40">
         <div className="flex flex-wrap items-center justify-between gap-3 p-5">

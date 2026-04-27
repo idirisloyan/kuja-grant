@@ -1563,5 +1563,19 @@
   "preview_reviewer.level.strong": "Solide",
   "preview_reviewer.level.adequate": "Correcte",
   "preview_reviewer.level.thin": "Mince",
-  "preview_reviewer.thin_warning": "{n} réponse(s) minces — probablement notées plus bas. Ajoutez des exemples concrets, chiffres ou preuves avant la soumission."
+  "preview_reviewer.thin_warning": "{n} réponse(s) minces — probablement notées plus bas. Ajoutez des exemples concrets, chiffres ou preuves avant la soumission.",
+  "median_preview.cta.open": "Aperçu du pool de candidats",
+  "median_preview.heading": "Pool de candidats prédit",
+  "median_preview.subtitle": "L'IA imagine ce qu'une ONG médiane qualifiée soumettrait et évalue dans quelle mesure chaque critère discriminera entre candidats forts et faibles.",
+  "median_preview.loading": "Génération du pool prédit…",
+  "median_preview.discrimination_label": "Discrimination par critère",
+  "median_preview.tightenings_label": "Critères à resserrer avant publication",
+  "median_preview.pitfalls_label": "Pièges fréquents pour les candidats",
+  "median_preview.sample_responses_label": "Exemples de réponses ({n})",
+  "median_preview.health.strong": "Conception solide",
+  "median_preview.health.mixed": "Conception mitigée",
+  "median_preview.health.weak": "Conception à retravailler",
+  "median_preview.discrimination.high": "Élevée",
+  "median_preview.discrimination.medium": "Moyenne",
+  "median_preview.discrimination.low": "Faible — à corriger"
 }

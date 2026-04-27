@@ -1563,5 +1563,19 @@
   "preview_reviewer.level.strong": "قوية",
   "preview_reviewer.level.adequate": "مقبولة",
   "preview_reviewer.level.thin": "ضعيفة",
-  "preview_reviewer.thin_warning": "{n} إجابة ضعيفة — على الأرجح ستحصل على درجة أقل من المراجع. أضف أمثلة محددة أو أرقاماً أو أدلّة قبل التقديم."
+  "preview_reviewer.thin_warning": "{n} إجابة ضعيفة — على الأرجح ستحصل على درجة أقل من المراجع. أضف أمثلة محددة أو أرقاماً أو أدلّة قبل التقديم.",
+  "median_preview.cta.open": "عاين فئة المتقدمين المتوقعة",
+  "median_preview.heading": "فئة المتقدمين المتوقعة",
+  "median_preview.subtitle": "يتخيّل الذكاء الاصطناعي ما ستقدمه منظمة مؤهلة متوسطة، ويُقيّم مدى قدرة كل معيار على التمييز بين المتقدمين الأقوى والأضعف.",
+  "median_preview.loading": "جارٍ إنشاء توقّع فئة المتقدمين…",
+  "median_preview.discrimination_label": "قدرة كل معيار على التمييز",
+  "median_preview.tightenings_label": "المعايير المطلوب إحكامها قبل النشر",
+  "median_preview.pitfalls_label": "أخطاء شائعة لدى المتقدمين",
+  "median_preview.sample_responses_label": "إجابات نموذجية ({n})",
+  "median_preview.health.strong": "التصميم يبدو قوياً",
+  "median_preview.health.mixed": "التصميم متوسط",
+  "median_preview.health.weak": "التصميم يحتاج إلى تحسين",
+  "median_preview.discrimination.high": "مرتفعة",
+  "median_preview.discrimination.medium": "متوسطة",
+  "median_preview.discrimination.low": "منخفضة — أحكِم"
 }

@@ -1563,5 +1563,19 @@
   "preview_reviewer.level.strong": "Sólida",
   "preview_reviewer.level.adequate": "Adecuada",
   "preview_reviewer.level.thin": "Débil",
-  "preview_reviewer.thin_warning": "{n} respuesta(s) débiles — probablemente serán puntuadas más bajo. Agrega ejemplos concretos, cifras o evidencia antes de enviar."
+  "preview_reviewer.thin_warning": "{n} respuesta(s) débiles — probablemente serán puntuadas más bajo. Agrega ejemplos concretos, cifras o evidencia antes de enviar.",
+  "median_preview.cta.open": "Vista previa del pool de postulantes",
+  "median_preview.heading": "Pool de postulantes predicho",
+  "median_preview.subtitle": "La IA imagina lo que enviaría una ONG mediana calificada y evalúa qué tan bien cada criterio discriminará entre postulantes fuertes y débiles.",
+  "median_preview.loading": "Generando pool predicho…",
+  "median_preview.discrimination_label": "Discriminación por criterio",
+  "median_preview.tightenings_label": "Criterios a ajustar antes de publicar",
+  "median_preview.pitfalls_label": "Errores comunes de los postulantes",
+  "median_preview.sample_responses_label": "Respuestas de muestra ({n})",
+  "median_preview.health.strong": "Diseño sólido",
+  "median_preview.health.mixed": "Diseño mixto",
+  "median_preview.health.weak": "Diseño necesita trabajo",
+  "median_preview.discrimination.high": "Alta",
+  "median_preview.discrimination.medium": "Media",
+  "median_preview.discrimination.low": "Baja — corregir"
 }

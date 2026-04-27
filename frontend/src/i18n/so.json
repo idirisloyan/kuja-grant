@@ -1583,5 +1583,19 @@
   "preview_reviewer.level.strong": "Xooggan",
   "preview_reviewer.level.adequate": "Ku filan",
   "preview_reviewer.level.thin": "Tabar yar",
-  "preview_reviewer.thin_warning": "{n} jawaab tabar yar — waxay u badan tahay inay buundo hooseeyaan ka helaan eegaha. Ku dar tusaalooyin gaar ah, lambaro, ama caddayn ka hor inta aadan gudbin."
+  "preview_reviewer.thin_warning": "{n} jawaab tabar yar — waxay u badan tahay inay buundo hooseeyaan ka helaan eegaha. Ku dar tusaalooyin gaar ah, lambaro, ama caddayn ka hor inta aadan gudbin.",
+  "median_preview.cta.open": "Eeg kooxda codsadayaasha la saadaaliyay",
+  "median_preview.heading": "Kooxda codsadayaasha la saadaaliyay",
+  "median_preview.subtitle": "AI-gu wuxuu malayn doonaa waxa NGO dhexdhexaad u qalantaa ay gudbinayso, oo wuxuu qiimeyn doonaa sida cabbir kasta u kala saari karo codsadayaasha xoogga leh iyo kuwa daciifka ah.",
+  "median_preview.loading": "Waxaa la sameynayaa saadaalinta kooxda…",
+  "median_preview.discrimination_label": "Awoodda kala-saaridda ee cabbir kasta",
+  "median_preview.tightenings_label": "Cabbirrada loo baahan yahay in la sii xoojiyo ka hor daabacaadda",
+  "median_preview.pitfalls_label": "Khaladaadka caadiga ah ee codsadayaasha",
+  "median_preview.sample_responses_label": "Tusaalooyin jawaabaha ({n})",
+  "median_preview.health.strong": "Naqshaddu way xoog leedahay",
+  "median_preview.health.mixed": "Naqshaddu waa isku qasan",
+  "median_preview.health.weak": "Naqshaddu waxay u baahan tahay shaqo",
+  "median_preview.discrimination.high": "Sare",
+  "median_preview.discrimination.medium": "Dhexdhexaad",
+  "median_preview.discrimination.low": "Hoose — hagaaji"
 }
