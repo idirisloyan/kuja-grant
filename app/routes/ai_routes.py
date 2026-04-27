@@ -1023,6 +1023,74 @@ def api_ai_provenance():
 
 
 # ---------------------------------------------------------------------------
+# Phase 2.2 — donor auto-generated grant brief
+# ---------------------------------------------------------------------------
+
+@ai_bp.route('/grant-brief', methods=['POST'])
+@login_required
+@role_required('donor', 'admin')
+def api_ai_grant_brief():
+    """Generate a complete grant scaffold from a 1-2 line donor prompt.
+
+    Body: {"prompt": "...", "thematic": "...", "geography": "...",
+           "budget_usd": <int>}
+
+    Returns the full design (title, description, criteria, eligibility,
+    doc_requirements, reporting frequency, burden score, recommended
+    deadline). Donor edits in the wizard before publishing.
+
+    Gated by feature flag ai.grant_brief_generator.
+    """
+    from app.utils.feature_flags import is_enabled
+    if not is_enabled('ai.grant_brief_generator',
+                      user_id=current_user.id,
+                      org_id=getattr(current_user, 'org_id', None)):
+        return error_response('auth.access_denied', 403,
+                              default='This feature is not enabled for your account.')
+
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return error_response('ai.rate_limited', 429)
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json() or {}
+    prompt = (data.get('prompt') or '').strip()
+    if not prompt:
+        return error_response('validation.missing_field', 400, field='prompt')
+
+    donor_org = None
+    try:
+        if current_user.org_id:
+            org = db.session.get(Organization, current_user.org_id)
+            if org:
+                donor_org = {
+                    'name': org.name,
+                    'sectors': getattr(org, 'sectors', None),
+                    'countries': getattr(org, 'countries', None),
+                }
+    except Exception:
+        pass
+
+    parsed = AIService.generate_grant_brief(
+        donor_org=donor_org,
+        prompt=prompt,
+        thematic=data.get('thematic'),
+        geography=data.get('geography'),
+        budget_usd=data.get('budget_usd'),
+        language=current_user.language or 'en',
+    )
+
+    return jsonify({
+        'success': True,
+        'brief': parsed,
+        'ai_transparency': {
+            'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
+            'disclaimer': 'AI-designed grant — review every choice before publishing.',
+        },
+    })
+
+
+# ---------------------------------------------------------------------------
 # AI call helpfulness feedback (Phase 0.5 closer)
 # ---------------------------------------------------------------------------
 

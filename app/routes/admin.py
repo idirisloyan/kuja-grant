@@ -728,3 +728,79 @@ def api_admin_trigger_rescreening():
 # Production reseed endpoint REMOVED — database seeding is a CLI-only
 # operation (python seed.py) and must never be exposed as an API route.
 # Retained as comment for audit trail: removed April 2026.
+
+
+# ===========================================================================
+# Feature flag management (Phase 9.1) — admin only
+# ===========================================================================
+
+@admin_bp.route('/admin/flags', methods=['GET'])
+@login_required
+def api_admin_flags_list():
+    """List all defined feature flags + their current global value."""
+    if current_user.role != 'admin':
+        from app.utils.api_errors import error_response
+        return error_response('auth.admin_only', 403)
+    from app.utils.feature_flags import list_flags
+    return jsonify({'success': True, 'flags': list_flags()})
+
+
+@admin_bp.route('/admin/flags/<key>', methods=['PUT'])
+@login_required
+def api_admin_flag_set(key):
+    """Set the global value for a flag.
+
+    Body: {"value": <bool|str|int>}
+       or {"scope_kind": "user"|"org", "scope_id": <int>, "value": <...>}
+       to set a per-user/per-org override.
+    """
+    if current_user.role != 'admin':
+        from app.utils.api_errors import error_response
+        return error_response('auth.admin_only', 403)
+    from app.utils.feature_flags import set_global, set_override
+    from app.utils.helpers import get_request_json
+    data = get_request_json() or {}
+    if 'value' not in data:
+        from app.utils.api_errors import error_response
+        return error_response('validation.missing_field', 400, field='value')
+
+    scope_kind = data.get('scope_kind')
+    scope_id = data.get('scope_id')
+
+    if scope_kind and scope_id is not None:
+        ok = set_override(key, scope_kind=scope_kind, scope_id=int(scope_id), value=data['value'])
+    else:
+        ok = set_global(key, data['value'])
+
+    if not ok:
+        from app.utils.api_errors import error_response
+        return error_response('server.unexpected', 500)
+
+    logger.warning(
+        f"Feature flag updated: key={key} scope={scope_kind or 'global'}"
+        f"{':' + str(scope_id) if scope_id else ''} value={data['value']} "
+        f"by admin={current_user.email}"
+    )
+    return jsonify({'success': True, 'key': key})
+
+
+@admin_bp.route('/admin/flags/me', methods=['GET'])
+@login_required
+def api_admin_flags_me():
+    """Returns the effective values of every flag for the current caller.
+
+    Frontend uses this to gate UI surfaces — e.g. only render the Match
+    Engine card when ai.match_engine resolves true for this user/org.
+    Available to all logged-in users (the values are read-only and per-user
+    by design — no admin gate needed for reading own scope).
+    """
+    from app.utils.feature_flags import is_enabled, DEFAULT_FLAGS
+    out = {}
+    for key, spec in DEFAULT_FLAGS.items():
+        if spec['kind'] == 'bool':
+            out[key] = is_enabled(
+                key,
+                user_id=current_user.id,
+                org_id=getattr(current_user, 'org_id', None),
+            )
+    return jsonify({'success': True, 'flags': out})

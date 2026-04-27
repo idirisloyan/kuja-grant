@@ -727,6 +727,156 @@ class AIService:
         }
 
     @classmethod
+    def generate_grant_brief(
+        cls,
+        *,
+        donor_org,
+        prompt,
+        thematic=None,
+        geography=None,
+        budget_usd=None,
+        language=None,
+    ):
+        """Phase 2.2 — generate a complete grant brief from a 1-2 line donor prompt.
+
+        Donor types: "$500k for women-led climate adaptation in coastal Kenya"
+        AI returns: complete grant scaffold incl. title, description, criteria,
+        eligibility, doc requirements, reporting cadence, recommended deadline,
+        burden score. Donor reviews, edits, and publishes — the heavy lift
+        is gone.
+
+        Output dict:
+            {
+              'title': str,
+              'description': str,
+              'criteria': [{key, label, weight, description, instructions, max_words}],
+              'eligibility': [{key, label, details, weight, required}],
+              'doc_requirements': [{key, label, required, specific_requirements, icon}],
+              'reporting_frequency': 'monthly|quarterly|biannual|annual',
+              'reporting_requirements': [{title, frequency, detail}],
+              'burden': {score, drivers, simplifications},
+              'recommended_deadline_days': int,
+              'rationale': str (≤200 chars on why these choices),
+              'source': 'claude'|'template'
+            }
+        """
+        prompt = (prompt or '').strip()[:1500]
+
+        system = (
+            "You are Kuja's grant design strategist. From a short donor "
+            "prompt, design a complete, publishable grant call for "
+            "humanitarian / Global South funders. Be opinionated about "
+            "criteria choice — recommend criteria that DISCRIMINATE "
+            "between strong and weak applicants, not generic ones. Set "
+            "weights that reflect what actually matters for outcomes.\n\n"
+            "Burden score reflects the time + complexity for an NGO to "
+            "apply. Lower burden attracts more applicants and reduces "
+            "incomplete submissions. Simplifications: concrete moves the "
+            "donor could make to lower burden (e.g. 'allow video instead "
+            "of written narrative for one section').\n\n"
+            "Return ONLY a JSON object matching the schema."
+        )
+
+        schema = """{
+  "title": "<concise grant title, ≤80 chars>",
+  "description": "<2-4 sentence summary of intent + outcomes>",
+  "criteria": [
+    {
+      "key": "<snake_case_key>",
+      "label": "<criterion label>",
+      "weight": <int summing to 100 across all criteria>,
+      "description": "<what this criterion evaluates>",
+      "instructions": "<guidance to applicants>",
+      "max_words": <int 200-600>
+    }
+  ],
+  "eligibility": [
+    {
+      "key": "<snake_case_key>",
+      "label": "<eligibility requirement label>",
+      "details": "<specific requirement>",
+      "weight": <int>,
+      "required": true|false
+    }
+  ],
+  "doc_requirements": [
+    {
+      "key": "<snake_case_key>",
+      "label": "<doc type label>",
+      "required": true|false,
+      "specific_requirements": "<what the doc must cover>",
+      "icon": "📊"
+    }
+  ],
+  "reporting_frequency": "monthly|quarterly|biannual|annual",
+  "reporting_requirements": [
+    { "title": "<report title>", "frequency": "<period>", "detail": "<scope>" }
+  ],
+  "burden": {
+    "score": "low|medium|high",
+    "drivers": ["..."],
+    "simplifications": ["..."]
+  },
+  "recommended_deadline_days": <int 30-180>,
+  "rationale": "<short, ≤200 chars, why these specific choices>"
+}"""
+
+        donor_summary = json.dumps({
+            'name': (donor_org or {}).get('name'),
+            'sectors': (donor_org or {}).get('sectors'),
+            'countries': (donor_org or {}).get('countries'),
+        }, default=str)[:600]
+
+        user_msg = (
+            f"DONOR ORG:\n{donor_summary}\n\n"
+            f"DONOR PROMPT:\n{prompt}\n\n"
+            "Optional context:\n"
+            f"  thematic: {thematic or '-'}\n"
+            f"  geography: {geography or '-'}\n"
+            f"  budget_usd: {budget_usd or '-'}\n\n"
+            "Design the grant. Return the JSON now."
+        )
+
+        text = cls._call_claude(
+            system + "\n\n" + schema,
+            user_msg,
+            max_tokens=3500,
+            language=language,
+            role='donor',
+            endpoint='generate_grant_brief',
+        )
+
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    parsed['source'] = 'claude'
+                    parsed.setdefault('criteria', [])
+                    parsed.setdefault('eligibility', [])
+                    parsed.setdefault('doc_requirements', [])
+                    parsed.setdefault('reporting_requirements', [])
+                    parsed.setdefault('burden', {})
+                    return parsed
+            except Exception as e:
+                logger.warning(f"generate_grant_brief JSON parse failed: {e}")
+
+        return {
+            'title': '',
+            'description': '',
+            'criteria': [],
+            'eligibility': [],
+            'doc_requirements': [],
+            'reporting_frequency': 'quarterly',
+            'reporting_requirements': [],
+            'burden': {'score': 'medium', 'drivers': [], 'simplifications': []},
+            'recommended_deadline_days': 60,
+            'rationale': '',
+            'source': 'template',
+        }
+
+    @classmethod
     def draft_application(
         cls,
         *,

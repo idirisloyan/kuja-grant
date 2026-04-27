@@ -10,6 +10,7 @@ import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
+import { useFlag } from '@/lib/hooks/use-feature-flags';
 import {
   ArrowLeft,
   ArrowRight,
@@ -997,6 +998,7 @@ function ProposalStep({
   onDraftApplied: (responses: Record<string, string>) => void;
 }) {
   const { t } = useTranslation();
+  const { enabled: coAuthorEnabled } = useFlag('ai.draft_application');
   if (criteria.length === 0) {
     return (
       <Card className="py-10 text-center">
@@ -1032,7 +1034,7 @@ function ProposalStep({
         </Alert>
       )}
 
-      {grantId != null && (
+      {coAuthorEnabled && grantId != null && (
         <DraftCoAuthor
           grantId={grantId}
           applicationId={applicationId}

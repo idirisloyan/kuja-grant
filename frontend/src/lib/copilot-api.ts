@@ -428,6 +428,54 @@ export function fetchProvenance(input: {
 }
 
 // ---------------------------------------------------------------------------
+// 12b. Donor grant-brief generator (Phase 2.2)
+// ---------------------------------------------------------------------------
+
+export interface GeneratedGrantBrief {
+  title: string;
+  description: string;
+  criteria: Array<{
+    key: string;
+    label: string;
+    weight: number;
+    description?: string;
+    instructions?: string;
+    max_words?: number;
+  }>;
+  eligibility: Array<{
+    key: string;
+    label: string;
+    details?: string;
+    weight?: number;
+    required?: boolean;
+  }>;
+  doc_requirements: Array<{
+    key: string;
+    label: string;
+    required?: boolean;
+    specific_requirements?: string;
+    icon?: string;
+  }>;
+  reporting_frequency?: string;
+  reporting_requirements?: Array<{ title: string; frequency: string; detail: string }>;
+  burden?: { score?: 'low' | 'medium' | 'high'; drivers?: string[]; simplifications?: string[] };
+  recommended_deadline_days?: number;
+  rationale?: string;
+  source: 'claude' | 'template';
+}
+
+export function fetchGrantBrief(input: {
+  prompt: string;
+  thematic?: string;
+  geography?: string;
+  budget_usd?: number;
+}) {
+  return safeCall<{ brief: GeneratedGrantBrief }>(() =>
+    api.post<CopilotResult<{ brief: GeneratedGrantBrief }>>('/ai/grant-brief', input),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 13. AI call helpfulness feedback (Phase 0.5 closer)
 // ---------------------------------------------------------------------------
 
