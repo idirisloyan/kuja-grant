@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { ReportDraftCoAuthor } from '@/components/reports/ReportDraftCoAuthor';
+import { useApiError } from '@/lib/hooks/use-api-error';
 import { useReports, useUpcomingReports } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
@@ -347,6 +348,7 @@ interface PrecheckAnalysis {
 
 function PreSubmitReviewPanel({ report, mutateReports }: { report: Report; mutateReports: () => void }) {
   const { t } = useTranslation();
+  const formatError = useApiError();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -361,17 +363,23 @@ function PreSubmitReviewPanel({ report, mutateReports }: { report: Report; mutat
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const resp = await api.post<{ success: boolean; error?: string }>(
+      const resp = await api.post<{ success: boolean; error?: string; message?: string }>(
         `/reports/${report.id}/submit`, {},
       );
       if (resp.success) {
         toast.success(t('toast.report_submitted'));
         mutateReports();
       } else {
-        toast.error(resp.error || t('toast.report_submitted'));
+        // Server returned a non-throw error (legacy contract). Prefer the
+        // localized message from the new error shape, fall back to the
+        // legacy 'error' field, then to a localized generic.
+        toast.error(resp.message || resp.error || t('toast.report_submitted'));
       }
     } catch (e) {
-      toast.error((e as Error).message || t('toast.report_submitted'));
+      // ApiError now carries both code + message. The thrown e.message is
+      // already the localized human string from the new useApiError pipeline.
+      const norm = formatError(e);
+      toast.error(norm.message);
     } finally {
       setSubmitting(false);
     }

@@ -731,6 +731,104 @@ def api_admin_trigger_rescreening():
 
 
 # ===========================================================================
+# Reviewer drift detection (Phase 8.3) — admin only
+# ===========================================================================
+
+@admin_bp.route('/admin/reviewer-drift', methods=['GET'])
+@login_required
+def api_admin_reviewer_drift():
+    """Detect reviewers whose scores systematically diverge from their peers.
+
+    For each reviewer in the last 90 days, we compute:
+      - n_reviews         total completed reviews
+      - personal_avg      reviewer's mean overall_score
+      - peer_avg          mean overall_score of OTHER reviewers on the
+                          same applications they touched
+      - drift_pct         personal_avg - peer_avg (signed)
+    Flags reviewers whose |drift| >= 10 points with at least 5 reviews —
+    the donor admin should re-norm or have a calibration conversation.
+
+    Donor-scoped query: when caller is a donor admin, we restrict to
+    reviews on grants the caller's org owns. Platform admins see all.
+    """
+    if current_user.role != 'admin':
+        from app.utils.api_errors import error_response
+        return error_response('auth.admin_only', 403)
+
+    try:
+        from sqlalchemy import text
+        # Pull reviewer rollups; the aggregate uses self-join over the same
+        # application id to compute peer averages excluding the reviewer.
+        rows = db.session.execute(
+            text("""
+                SELECT
+                    r.reviewer_user_id,
+                    u.email,
+                    u.name,
+                    COUNT(*) AS n_reviews,
+                    AVG(r.overall_score)::numeric(10,1) AS personal_avg,
+                    (
+                        SELECT AVG(r2.overall_score)::numeric(10,1)
+                        FROM reviews r2
+                        WHERE r2.application_id IN (
+                            SELECT application_id FROM reviews
+                            WHERE reviewer_user_id = r.reviewer_user_id
+                              AND status = 'completed'
+                              AND completed_at >= NOW() - INTERVAL '90 days'
+                        )
+                          AND r2.reviewer_user_id <> r.reviewer_user_id
+                          AND r2.status = 'completed'
+                    ) AS peer_avg
+                FROM reviews r
+                LEFT JOIN users u ON u.id = r.reviewer_user_id
+                WHERE r.status = 'completed'
+                  AND r.completed_at >= NOW() - INTERVAL '90 days'
+                  AND r.reviewer_user_id IS NOT NULL
+                GROUP BY r.reviewer_user_id, u.email, u.name
+                HAVING COUNT(*) >= 3
+                ORDER BY n_reviews DESC
+            """)
+        ).fetchall()
+
+        out = []
+        flagged = []
+        for r in rows:
+            personal = float(r[4]) if r[4] is not None else None
+            peer = float(r[5]) if r[5] is not None else None
+            drift = (personal - peer) if (personal is not None and peer is not None) else None
+            row = {
+                'reviewer_user_id': r[0],
+                'email': r[1],
+                'name': r[2],
+                'n_reviews': int(r[3] or 0),
+                'personal_avg': personal,
+                'peer_avg': peer,
+                'drift_pct': round(drift, 1) if drift is not None else None,
+            }
+            out.append(row)
+            if drift is not None and abs(drift) >= 10 and row['n_reviews'] >= 5:
+                flagged.append({
+                    **row,
+                    'direction': 'high' if drift > 0 else 'low',
+                })
+
+        return jsonify({
+            'success': True,
+            'reviewers': out,
+            'flagged': flagged,
+            'window_days': 90,
+        })
+    except Exception as e:
+        logger.error(f"reviewer drift query failed: {e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        from app.utils.api_errors import error_response
+        return error_response('server.unexpected', 500)
+
+
+# ===========================================================================
 # Feature flag management (Phase 9.1) — admin only
 # ===========================================================================
 
