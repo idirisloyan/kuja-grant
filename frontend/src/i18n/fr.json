@@ -1489,5 +1489,16 @@
   "matches.subtitle": "Subventions ouvertes classées par probabilité de succès",
   "matches.recompute": "Actualiser",
   "matches.empty.title": "Aucune correspondance pour l'instant",
-  "matches.empty.body": "Nous afficherons des subventions classées dès que nous vous aurons évalué par rapport aux appels ouverts."
+  "matches.empty.body": "Nous afficherons des subventions classées dès que nous vous aurons évalué par rapport aux appels ouverts.",
+  "report_coauthor.cta.open": "Générer brouillon de rapport",
+  "report_coauthor.cta.generate": "Générer le brouillon",
+  "report_coauthor.cta.generating": "Génération…",
+  "report_coauthor.heading": "Brouillon de rapport IA",
+  "report_coauthor.subtitle": "Ajoutez quelques notes sur cette période — réunions, jalons, nombre de bénéficiaires. L'IA rédigera chaque section à partir de vos rapports précédents et documents téléversés, et signalera les lacunes nécessitant des preuves.",
+  "report_coauthor.notes_placeholder": "Ex. : nous avons formé 60 ASC au T3 dans 3 comtés. Feuilles de présence téléversées. Deux formations reportées pour raisons électorales.",
+  "report_coauthor.replace_existing": "Remplacer mon brouillon actuel",
+  "report_coauthor.sections_summary": "{n} sections rédigées",
+  "report_coauthor.gaps_label": "{n} lacunes à documenter",
+  "report_coauthor.applied_to_form": "Brouillon enregistré — relisez et éditez",
+  "report_coauthor.toast.draft_ready": "Brouillon prêt : {n} sections · {gaps} lacunes"
 }

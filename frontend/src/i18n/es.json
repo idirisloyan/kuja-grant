@@ -1489,5 +1489,16 @@
   "matches.subtitle": "Subvenciones abiertas ordenadas por probabilidad de éxito",
   "matches.recompute": "Actualizar",
   "matches.empty.title": "Aún no hay coincidencias",
-  "matches.empty.body": "Mostraremos subvenciones priorizadas en cuanto tengamos tu evaluación frente a las convocatorias abiertas."
+  "matches.empty.body": "Mostraremos subvenciones priorizadas en cuanto tengamos tu evaluación frente a las convocatorias abiertas.",
+  "report_coauthor.cta.open": "Generar borrador de informe",
+  "report_coauthor.cta.generate": "Generar borrador",
+  "report_coauthor.cta.generating": "Generando…",
+  "report_coauthor.heading": "Borrador de informe IA",
+  "report_coauthor.subtitle": "Agrega notas sobre lo ocurrido en este período: reuniones, hitos, número de beneficiarios. La IA redactará cada sección basándose en tus informes previos y documentos cargados, y marcará brechas que necesitan evidencia.",
+  "report_coauthor.notes_placeholder": "Ej.: capacitamos a 60 ACS en Q3 en 3 condados. Listas de asistencia cargadas. Dos capacitaciones se aplazaron por logística electoral.",
+  "report_coauthor.replace_existing": "Reemplazar mi borrador actual",
+  "report_coauthor.sections_summary": "{n} secciones redactadas",
+  "report_coauthor.gaps_label": "{n} brechas requieren evidencia",
+  "report_coauthor.applied_to_form": "Borrador guardado — revisa y edita",
+  "report_coauthor.toast.draft_ready": "Borrador listo: {n} secciones · {gaps} brechas"
 }

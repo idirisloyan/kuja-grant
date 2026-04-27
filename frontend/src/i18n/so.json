@@ -1509,5 +1509,16 @@
   "matches.subtitle": "Deeqaha furan oo loo kala saaray itimaalka aad ku guulaysan karto",
   "matches.recompute": "Cusboonaysii",
   "matches.empty.title": "Wali ma jiraan deeqo ku habboon",
-  "matches.empty.body": "Waxaan halkan ku tusi doonaa deeqaha la kala saaray markii aan kuu qiimeyno liiska deeqaha furan."
+  "matches.empty.body": "Waxaan halkan ku tusi doonaa deeqaha la kala saaray markii aan kuu qiimeyno liiska deeqaha furan.",
+  "report_coauthor.cta.open": "Soo saar qabyada warbixinta",
+  "report_coauthor.cta.generate": "Soo saar qabyada",
+  "report_coauthor.cta.generating": "Waxaa la sameynayaa…",
+  "report_coauthor.heading": "Qabyada warbixinta ee AI",
+  "report_coauthor.subtitle": "Ku dar qoraallo gaagaaban oo ku saabsan waxa dhacay xilligan — kulamo, marxalado, tirada dadka faa'iidaystay. AI-gu wuxuu qori doonaa qayb kasta isagoo ku tiirsanaya warbixinadaadii hore iyo dukumeentiyada la soo dhejiyay, oo wuxuu calaamadinayaa daldalool kasta oo u baahan caddayn.",
+  "report_coauthor.notes_placeholder": "Tusaale: waxaan tababarnay 60 CHW Q3 saddex degmood. Liisaska sooxaadirka waa la soo dhejiyay. Laba tababar oo lala qorsheeyay ayaa la dib u dhigay sababo doorashada awgeed.",
+  "report_coauthor.replace_existing": "Beddel qabyadayda jirta",
+  "report_coauthor.sections_summary": "qaybaha la sameeyay {n}",
+  "report_coauthor.gaps_label": "daldaloolo {n} oo u baahan caddayn",
+  "report_coauthor.applied_to_form": "Qabyada waa la kaydiyay — eeg oo wax ka beddel",
+  "report_coauthor.toast.draft_ready": "Qabyada diyaar: qaybo {n} · daldaloolo {gaps}"
 }

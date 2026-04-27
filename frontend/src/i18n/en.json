@@ -1489,5 +1489,16 @@
   "matches.subtitle": "Open grants ranked by your win probability",
   "matches.recompute": "Refresh",
   "matches.empty.title": "No matches yet",
-  "matches.empty.body": "We'll surface ranked grants once we've scored you against the open call list."
+  "matches.empty.body": "We'll surface ranked grants once we've scored you against the open call list.",
+  "report_coauthor.cta.open": "Generate report draft",
+  "report_coauthor.cta.generate": "Generate draft",
+  "report_coauthor.cta.generating": "Generating…",
+  "report_coauthor.heading": "AI report draft",
+  "report_coauthor.subtitle": "Add a few notes about what happened this period — meetings, milestones, beneficiary numbers. AI will draft every section grounded in your prior reports + uploaded documents, and flag any gaps that need evidence.",
+  "report_coauthor.notes_placeholder": "e.g. We trained 60 new CHWs in Q3 across 3 counties. Attendance sheets uploaded. Two scheduled trainings were postponed due to election logistics.",
+  "report_coauthor.replace_existing": "Replace my existing draft",
+  "report_coauthor.sections_summary": "{n} drafted sections",
+  "report_coauthor.gaps_label": "{n} gaps need evidence",
+  "report_coauthor.applied_to_form": "Draft saved — review and edit",
+  "report_coauthor.toast.draft_ready": "Draft ready: {n} sections · {gaps} gaps flagged"
 }

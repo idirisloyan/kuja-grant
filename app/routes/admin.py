@@ -784,6 +784,131 @@ def api_admin_flag_set(key):
     return jsonify({'success': True, 'key': key})
 
 
+# ===========================================================================
+# AI cost + helpfulness dashboard (Phase 9.2) — admin only
+# ===========================================================================
+
+@admin_bp.route('/admin/ai/dashboard', methods=['GET'])
+@login_required
+def api_admin_ai_dashboard():
+    """Per-endpoint AI cost + helpfulness rollups for the admin observability tab.
+
+    Query: ?hours=24 (default) | max 168.
+    Pulls from the ai_call_logs table populated by AIService._record_call.
+    """
+    if current_user.role != 'admin':
+        from app.utils.api_errors import error_response
+        return error_response('auth.admin_only', 403)
+
+    try:
+        hours = int(request.args.get('hours', 24))
+    except (TypeError, ValueError):
+        hours = 24
+    hours = max(1, min(168, hours))
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+
+    rows = []
+    try:
+        # Per-endpoint rollup: count, success rate, p50/p95 latency, tokens,
+        # helpfulness breakdown.
+        result = db.session.execute(
+            text("""
+                SELECT
+                    endpoint,
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN success THEN 1 ELSE 0 END) AS ok_count,
+                    AVG(duration_ms)::INT AS avg_ms,
+                    PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY duration_ms)::INT AS p50_ms,
+                    PERCENTILE_DISC(0.95) WITHIN GROUP (ORDER BY duration_ms)::INT AS p95_ms,
+                    COALESCE(SUM(tokens_in), 0) AS tokens_in,
+                    COALESCE(SUM(tokens_out), 0) AS tokens_out,
+                    SUM(CASE WHEN helpfulness = 'used' THEN 1 ELSE 0 END) AS used_count,
+                    SUM(CASE WHEN helpfulness = 'edited' THEN 1 ELSE 0 END) AS edited_count,
+                    SUM(CASE WHEN helpfulness = 'dismissed' THEN 1 ELSE 0 END) AS dismissed_count,
+                    SUM(CASE WHEN helpfulness IS NULL THEN 1 ELSE 0 END) AS no_signal_count
+                FROM ai_call_logs
+                WHERE created_at >= :cutoff
+                GROUP BY endpoint
+                ORDER BY total DESC
+            """),
+            {"cutoff": cutoff},
+        ).fetchall()
+
+        for r in result:
+            total = r[1] or 0
+            ok = r[2] or 0
+            with_signal = (r[8] or 0) + (r[9] or 0) + (r[10] or 0)
+            helpfulness_pct = None
+            if with_signal > 0:
+                # 'used' counts as 1.0, 'edited' as 0.5, 'dismissed' as 0.0
+                weighted = (r[8] or 0) + 0.5 * (r[9] or 0)
+                helpfulness_pct = round(100 * weighted / with_signal, 1)
+            rows.append({
+                'endpoint': r[0],
+                'total': total,
+                'success_rate_pct': round(100 * ok / total, 1) if total else None,
+                'avg_ms': r[3],
+                'p50_ms': r[4],
+                'p95_ms': r[5],
+                'tokens_in': r[6],
+                'tokens_out': r[7],
+                'helpfulness': {
+                    'used': r[8],
+                    'edited': r[9],
+                    'dismissed': r[10],
+                    'no_signal': r[11],
+                    'helpfulness_pct': helpfulness_pct,
+                },
+            })
+
+        # Top users by call volume (top 10).
+        top_users_result = db.session.execute(
+            text("""
+                SELECT user_id, COUNT(*) AS calls,
+                       COALESCE(SUM(tokens_in + tokens_out), 0) AS tokens
+                FROM ai_call_logs
+                WHERE created_at >= :cutoff AND user_id IS NOT NULL
+                GROUP BY user_id
+                ORDER BY calls DESC
+                LIMIT 10
+            """),
+            {"cutoff": cutoff},
+        ).fetchall()
+        top_users = [{'user_id': r[0], 'calls': r[1], 'tokens': r[2]} for r in top_users_result]
+
+        # Per-language breakdown.
+        lang_result = db.session.execute(
+            text("""
+                SELECT language, COUNT(*) AS calls
+                FROM ai_call_logs
+                WHERE created_at >= :cutoff AND language IS NOT NULL
+                GROUP BY language
+                ORDER BY calls DESC
+            """),
+            {"cutoff": cutoff},
+        ).fetchall()
+        by_language = [{'language': r[0], 'calls': r[1]} for r in lang_result]
+
+    except Exception as e:
+        logger.error(f"AI dashboard query failed: {e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        rows = []
+        top_users = []
+        by_language = []
+
+    return jsonify({
+        'success': True,
+        'window_hours': hours,
+        'by_endpoint': rows,
+        'top_users': top_users,
+        'by_language': by_language,
+    })
+
+
 @admin_bp.route('/admin/flags/me', methods=['GET'])
 @login_required
 def api_admin_flags_me():

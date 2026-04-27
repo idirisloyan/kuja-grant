@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
+import { ReportDraftCoAuthor } from '@/components/reports/ReportDraftCoAuthor';
 import { useReports, useUpcomingReports } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
@@ -1119,6 +1120,7 @@ function ReportRow({ report, mutateReports }: { report: Report; mutateReports: (
       {report.status === 'draft' && (
         <tr>
           <td colSpan={6} className="border-t-0 px-4 py-0 space-y-1">
+            <ReportDraftCoAuthor reportId={report.id} onApplied={() => mutateReports()} />
             <PreSubmitReviewPanel report={report} mutateReports={mutateReports} />
             <AIReportGuidancePanel report={report} />
           </td>

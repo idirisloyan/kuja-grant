@@ -1489,5 +1489,16 @@
   "matches.subtitle": "المنح المفتوحة مرتّبة حسب احتمال الفوز بها",
   "matches.recompute": "تحديث",
   "matches.empty.title": "لا توجد توافقات بعد",
-  "matches.empty.body": "سنعرض هنا المنح المرتّبة بمجرد تقييم منظمتك مقابل قائمة المنح المفتوحة."
+  "matches.empty.body": "سنعرض هنا المنح المرتّبة بمجرد تقييم منظمتك مقابل قائمة المنح المفتوحة.",
+  "report_coauthor.cta.open": "أنشئ مسودة تقرير",
+  "report_coauthor.cta.generate": "أنشئ المسودة",
+  "report_coauthor.cta.generating": "جارٍ الإنشاء…",
+  "report_coauthor.heading": "مسودة التقرير بالذكاء الاصطناعي",
+  "report_coauthor.subtitle": "أضف بعض الملاحظات عما حدث في هذه الفترة — اجتماعات، إنجازات، أعداد المستفيدين. سيقوم الذكاء الاصطناعي بصياغة كل قسم مستنداً إلى تقاريرك السابقة والمستندات المرفوعة، وتحديد أي ثغرات تحتاج إلى أدلة.",
+  "report_coauthor.notes_placeholder": "مثال: درّبنا 60 من العاملين الصحيين في الربع الثالث في 3 محافظات. كشوف الحضور مرفوعة. تأجّلت تدريبتان بسبب لوجستيات الانتخابات.",
+  "report_coauthor.replace_existing": "استبدال المسودة الحالية",
+  "report_coauthor.sections_summary": "{n} قسم مسوّد",
+  "report_coauthor.gaps_label": "{n} ثغرة تحتاج إلى أدلّة",
+  "report_coauthor.applied_to_form": "تم حفظ المسودة — راجع وعدّل",
+  "report_coauthor.toast.draft_ready": "المسودة جاهزة: {n} أقسام · {gaps} ثغرات"
 }

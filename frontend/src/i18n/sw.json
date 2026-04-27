@@ -1509,5 +1509,16 @@
   "matches.subtitle": "Ruzuku zilizo wazi zikiwa zimepangwa kulingana na uwezekano wa kufaulu",
   "matches.recompute": "Onyesha upya",
   "matches.empty.title": "Bado hakuna ulingano",
-  "matches.empty.body": "Tutaonyesha ruzuku zilizopangwa mara baada ya kukutathmini dhidi ya ruzuku zilizo wazi."
+  "matches.empty.body": "Tutaonyesha ruzuku zilizopangwa mara baada ya kukutathmini dhidi ya ruzuku zilizo wazi.",
+  "report_coauthor.cta.open": "Tengeneza rasimu ya ripoti",
+  "report_coauthor.cta.generate": "Tengeneza rasimu",
+  "report_coauthor.cta.generating": "Inatengeneza…",
+  "report_coauthor.heading": "Rasimu ya ripoti ya AI",
+  "report_coauthor.subtitle": "Ongeza maelezo machache kuhusu kile kilichotokea kipindi hiki — mikutano, hatua, idadi ya wanufaika. AI itatayarisha kila sehemu ikitegemea ripoti zako za awali na hati zilizopakiwa, na kutaja mapengo yanayohitaji ushahidi.",
+  "report_coauthor.notes_placeholder": "Mfano: tulifundisha CHWs 60 katika robo ya tatu katika kaunti 3. Karatasi za mahudhurio zimepakiwa. Mafunzo mawili yaliahirishwa kwa sababu za uchaguzi.",
+  "report_coauthor.replace_existing": "Badilisha rasimu yangu iliyopo",
+  "report_coauthor.sections_summary": "sehemu zilizotayarishwa {n}",
+  "report_coauthor.gaps_label": "mapengo {n} yanahitaji ushahidi",
+  "report_coauthor.applied_to_form": "Rasimu imehifadhiwa — kagua na hariri",
+  "report_coauthor.toast.draft_ready": "Rasimu tayari: sehemu {n} · mapengo {gaps}"
 }
