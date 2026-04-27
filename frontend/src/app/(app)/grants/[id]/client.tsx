@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useGrant } from '@/lib/hooks/use-api';
@@ -33,24 +33,39 @@ export default function GrantDetailClient() {
     d ? formatDate(d, { month: 'long', day: 'numeric', year: 'numeric' }) : 'No deadline';
   const params = useParams();
   // Static-export workaround: only /grants/0/ is prerendered, so params.id
-  // hydrates as "0" for any real id. Trust the URL pathname.
-  const id = useMemo(() => {
+  // hydrates as "0" for any real id. Track resolved id in state, re-resolve
+  // from URL on each params change so SWR sees a stable id.
+  const [id, setId] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
       const m = window.location.pathname.match(/\/grants\/(\d+)/);
       if (m && m[1] !== '0') return Number(m[1]);
     }
-    return Number(params.id);
-  }, [params.id]);
+    const fromParams = Number(params.id);
+    return Number.isFinite(fromParams) && fromParams > 0 ? fromParams : null;
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const m = window.location.pathname.match(/\/grants\/(\d+)/);
+    if (m && m[1] !== '0') {
+      const n = Number(m[1]);
+      if (n !== id) setId(n);
+      return;
+    }
+    const fromParams = Number(params.id);
+    if (Number.isFinite(fromParams) && fromParams > 0 && fromParams !== id) {
+      setId(fromParams);
+    }
+  }, [params.id, id]);
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const { data, isLoading } = useGrant(id || null);
+  const { data, isLoading } = useGrant(id);
   const [tab, setTab] = useState<TabId>('overview');
 
   const grant = data?.grant;
   const isNgo = user?.role === 'ngo';
   const isDonor = user?.role === 'donor' || user?.role === 'admin';
 
-  if (isLoading) {
+  if (id == null || isLoading) {
     return (
       <div className="space-y-3">
         <div className="kuja-shimmer h-8 w-64 rounded" />

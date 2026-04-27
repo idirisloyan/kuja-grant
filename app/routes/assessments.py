@@ -147,6 +147,10 @@ def api_update_assessment(assess_id):
 @login_required
 def api_get_assessment_frameworks():
     """Return available assessment frameworks and their structures."""
+    # Time ranges are returned as structured min/max minute pairs so the
+    # frontend can format them with the user's locale (e.g. Arabic numerals,
+    # Swahili "dakika"). The legacy `estimated_time` string is kept for
+    # backward compatibility with any caller that still parses it.
     frameworks = {
         'kuja': {
             'name': 'Kuja Standard Assessment',
@@ -154,6 +158,8 @@ def api_get_assessment_frameworks():
             'categories': ['Governance', 'Financial Management', 'Program Management', 'Human Resources', 'Monitoring & Evaluation'],
             'total_items': 26,
             'estimated_time': '30-45 minutes',
+            'estimated_minutes_min': 30,
+            'estimated_minutes_max': 45,
         },
         'step': {
             'name': 'STEP Assessment',
@@ -161,6 +167,8 @@ def api_get_assessment_frameworks():
             'categories': ['Organizational Governance', 'Financial Systems', 'Administration', 'Human Resource Management', 'Program Quality'],
             'total_items': 26,
             'estimated_time': '45-60 minutes',
+            'estimated_minutes_min': 45,
+            'estimated_minutes_max': 60,
         },
         'un_hact': {
             'name': 'UN HACT Micro Assessment',
@@ -168,6 +176,8 @@ def api_get_assessment_frameworks():
             'categories': ['Implementing Partner Info', 'Internal Control', 'Accounting Policies', 'Fixed Assets', 'Procurement'],
             'total_items': 22,
             'estimated_time': '45-60 minutes',
+            'estimated_minutes_min': 45,
+            'estimated_minutes_max': 60,
         },
         'chs': {
             'name': 'CHS Self-Assessment',
@@ -175,6 +185,8 @@ def api_get_assessment_frameworks():
             'categories': ['Humanitarian Response', 'Effectiveness', 'Accountability', 'Coordination', 'Staff Competency', 'Management Support', 'Learning'],
             'total_items': 27,
             'estimated_time': '60-90 minutes',
+            'estimated_minutes_min': 60,
+            'estimated_minutes_max': 90,
         },
         'nupas': {
             'name': 'NUPAS Assessment',
@@ -182,6 +194,8 @@ def api_get_assessment_frameworks():
             'categories': ['Governance & Leadership', 'Financial Stewardship', 'Program Delivery', 'People & Culture', 'Learning & Adaptation'],
             'total_items': 27,
             'estimated_time': '60-90 minutes',
+            'estimated_minutes_min': 60,
+            'estimated_minutes_max': 90,
         },
     }
     # Attach real checklist item keys from the scoring engine so frontends

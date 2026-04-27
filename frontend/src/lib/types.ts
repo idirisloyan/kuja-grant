@@ -353,7 +353,9 @@ export interface AIScoringResponse {
 export interface FrameworkInfo {
   name: string;
   description: string;
-  estimated_time: string;
+  estimated_time: string; // legacy, English. Use estimated_minutes_* for i18n.
+  estimated_minutes_min?: number;
+  estimated_minutes_max?: number;
   total_items: number;
   categories: string[];
 }

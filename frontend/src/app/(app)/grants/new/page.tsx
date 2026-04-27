@@ -30,13 +30,16 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
+// Step labels live in i18n; we resolve them at render time so the donor
+// wizard tracks the user's language. Icons stay in this constant since
+// they don't translate.
 const STEPS = [
-  { label: 'Upload Document', icon: CloudUpload },
-  { label: 'Basic Info', icon: FileText },
-  { label: 'Eligibility', icon: ClipboardList },
-  { label: 'Evaluation', icon: BarChart3 },
-  { label: 'Documents', icon: Upload },
-  { label: 'Review & Publish', icon: Send },
+  { labelKey: 'grant.wizard.step.upload_document', icon: CloudUpload },
+  { labelKey: 'grant.wizard.step.basic_info', icon: FileText },
+  { labelKey: 'grant.wizard.step.eligibility', icon: ClipboardList },
+  { labelKey: 'grant.wizard.step.evaluation', icon: BarChart3 },
+  { labelKey: 'grant.wizard.step.documents', icon: Upload },
+  { labelKey: 'grant.wizard.step.review_publish', icon: Send },
 ];
 
 const SECTOR_OPTIONS = [
@@ -1406,18 +1409,18 @@ export default function CreateGrantPage() {
           onClick={() => router.push('/grants')}
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" /> Back
+          <ArrowLeft className="h-4 w-4" /> {t('common.back')}
         </button>
         <div className="flex-1">
-          <h1 className="kuja-display text-2xl font-bold text-foreground">Create New Grant</h1>
+          <h1 className="kuja-display text-2xl font-bold text-foreground">{t('grant.create.title')}</h1>
           <div className="mt-0.5 text-xs text-muted-foreground">
-            Step {step + 1} of {STEPS.length}: {STEPS[step].label}
-            {saving && <span className="ml-1 text-sky-600">(Saving...)</span>}
+            {t('grant.wizard.step_progress', { current: step + 1, total: STEPS.length, label: t(STEPS[step].labelKey) })}
+            {saving && <span className="ml-1 text-sky-600">{t('grant.wizard.saving')}</span>}
           </div>
         </div>
         {grantId && (
           <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs text-sky-700">
-            Draft #{grantId}
+            {t('grant.wizard.draft_label', { id: grantId })}
           </span>
         )}
       </div>
@@ -1428,8 +1431,9 @@ export default function CreateGrantPage() {
           const Icon = s.icon;
           const active = i === step;
           const complete = i < step;
+          const label = t(s.labelKey);
           return (
-            <div key={s.label} className="flex flex-1 items-center">
+            <div key={s.labelKey} className="flex flex-1 items-center">
               <div className="flex min-w-0 items-center gap-2">
                 <div
                   className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold transition ${
@@ -1447,7 +1451,7 @@ export default function CreateGrantPage() {
                     active || complete ? 'text-foreground' : 'text-muted-foreground'
                   }`}
                 >
-                  {s.label}
+                  {label}
                 </span>
               </div>
               {i < STEPS.length - 1 && (
@@ -1475,13 +1479,13 @@ export default function CreateGrantPage() {
             disabled={step === 0}
             className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
           >
-            <ArrowLeft className="h-4 w-4" /> Previous
+            <ArrowLeft className="h-4 w-4" /> {t('common.previous')}
           </button>
           <button
             onClick={goNext}
             className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))]"
           >
-            Next <ArrowRight className="h-4 w-4" />
+            {t('common.next')} <ArrowRight className="h-4 w-4" />
           </button>
         </div>
       )}
@@ -1492,7 +1496,7 @@ export default function CreateGrantPage() {
             onClick={goBack}
             className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
           >
-            <ArrowLeft className="h-4 w-4" /> Previous
+            <ArrowLeft className="h-4 w-4" /> {t('common.previous')}
           </button>
         </div>
       )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApplication, useGrant } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -42,16 +42,35 @@ export default function ReviewDetailClient() {
   const params = useParams();
   const router = useRouter();
   // Static-export workaround: the placeholder /reviews/0/ is the only
-  // prerendered HTML, so params.id always hydrates as "0". Trust the URL.
-  const id = useMemo(() => {
+  // prerendered HTML, so params.id hydrates as "0" for any real id. The URL
+  // is the source of truth. We use useState so the resolved id is stable
+  // across re-renders and SWR doesn't thrash on a derived value.
+  const [id, setId] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
       const m = window.location.pathname.match(/\/reviews\/(\d+)/);
       if (m && m[1] !== '0') return Number(m[1]);
     }
-    return Number(params.id);
-  }, [params.id]);
+    const fromParams = Number(params.id);
+    return Number.isFinite(fromParams) && fromParams > 0 ? fromParams : null;
+  });
 
-  const { data: appData, isLoading: appLoading, mutate: mutateApp } = useApplication(id || null);
+  // Re-resolve from URL whenever params change (client-side nav between
+  // /reviews/A and /reviews/B). Falls back gracefully when params is "0".
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const m = window.location.pathname.match(/\/reviews\/(\d+)/);
+    if (m && m[1] !== '0') {
+      const n = Number(m[1]);
+      if (n !== id) setId(n);
+      return;
+    }
+    const fromParams = Number(params.id);
+    if (Number.isFinite(fromParams) && fromParams > 0 && fromParams !== id) {
+      setId(fromParams);
+    }
+  }, [params.id, id]);
+
+  const { data: appData, isLoading: appLoading, mutate: mutateApp } = useApplication(id);
   const application = appData?.application ?? null;
 
   const grantId = application?.grant_id ?? null;
@@ -192,7 +211,10 @@ export default function ReviewDetailClient() {
     }
   }, [id, scores, mutateApp]);
 
-  if (appLoading || grantLoading) {
+  // Show skeleton while we resolve id from URL OR while SWR is fetching.
+  // Without the `id == null` guard, the static-export placeholder briefly
+  // fires the not-found UI before window.location is read.
+  if (id == null || appLoading || grantLoading) {
     return (
       <div className="max-w-5xl mx-auto space-y-3">
         <div className="kuja-shimmer h-8 w-64 rounded" />

@@ -206,7 +206,11 @@ export default function AssessmentWizardPage() {
                   <>
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{t(`framework.${opt.key}.description`)}</p>
                     <div className="flex gap-3 mt-3 text-xs text-muted-foreground">
-                      <span>{info.estimated_time}</span>
+                      <span>
+                        {info.estimated_minutes_min != null && info.estimated_minutes_max != null
+                          ? t('framework.minutes_range', { min: info.estimated_minutes_min, max: info.estimated_minutes_max })
+                          : info.estimated_time}
+                      </span>
                       <span>{t('framework.items_count', { n: info.total_items })}</span>
                     </div>
                   </>
@@ -229,7 +233,7 @@ export default function AssessmentWizardPage() {
         onClick={() => router.push('/assessments')}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to assessments
+        <ArrowLeft className="h-4 w-4" /> {t('assessment.back_to_assessments')}
       </button>
 
       <div className="flex items-center justify-between flex-wrap gap-3">

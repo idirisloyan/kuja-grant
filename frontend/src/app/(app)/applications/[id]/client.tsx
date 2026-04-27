@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApplication } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -25,17 +25,31 @@ export default function ApplicationDetailClient() {
   const { t, formatDate } = useTranslation();
   const params = useParams();
   // Same static-export fix as /apply/[grantId]: Next.js prerenders only
-  // /applications/0/, so params.id hydrates as "0" for any real id. Read
-  // the real id from window.location.pathname.
-  const id = useMemo(() => {
+  // /applications/0/, so params.id hydrates as "0" for any real id. The URL
+  // is the source of truth, and we keep it in state so SWR sees a stable id.
+  const [id, setId] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
       const m = window.location.pathname.match(/\/applications\/(\d+)/);
       if (m && m[1] !== '0') return Number(m[1]);
     }
-    return Number(params.id);
-  }, [params.id]);
+    const fromParams = Number(params.id);
+    return Number.isFinite(fromParams) && fromParams > 0 ? fromParams : null;
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const m = window.location.pathname.match(/\/applications\/(\d+)/);
+    if (m && m[1] !== '0') {
+      const n = Number(m[1]);
+      if (n !== id) setId(n);
+      return;
+    }
+    const fromParams = Number(params.id);
+    if (Number.isFinite(fromParams) && fromParams > 0 && fromParams !== id) {
+      setId(fromParams);
+    }
+  }, [params.id, id]);
   const router = useRouter();
-  const { data, isLoading } = useApplication(id || null);
+  const { data, isLoading } = useApplication(id);
   const [tab, setTab] = useState<TabId>('responses');
   const application = data?.application;
 
@@ -48,7 +62,7 @@ export default function ApplicationDetailClient() {
     }
   }, [application]);
 
-  if (isLoading) {
+  if (id == null || isLoading) {
     return (
       <div className="space-y-3">
         <div className="kuja-shimmer h-8 w-64 rounded" />

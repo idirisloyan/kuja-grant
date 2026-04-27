@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useParams, useRouter } from 'next/navigation';
 import { useGrant } from '@/lib/hooks/use-api';
@@ -152,17 +152,31 @@ export default function ApplyWizardClient() {
   const params = useParams();
   // The Next.js static export only generates /apply/0/ as the placeholder
   // page — Flask serves that HTML for any /apply/<id>. So `params.grantId`
-  // hydrates as "0" even when the URL is /apply/266. Trust the URL pathname
-  // first; fall back to params for the placeholder build itself.
-  const grantId = useMemo(() => {
+  // hydrates as "0" even when the URL is /apply/266. Track real id in state,
+  // re-resolved from the URL on every params change so SWR sees a stable id.
+  const [grantId, setGrantId] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
       const m = window.location.pathname.match(/\/apply\/(\d+)/);
       if (m && m[1] !== '0') return Number(m[1]);
     }
-    return Number(params.grantId);
-  }, [params.grantId]);
+    const fromParams = Number(params.grantId);
+    return Number.isFinite(fromParams) && fromParams > 0 ? fromParams : null;
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const m = window.location.pathname.match(/\/apply\/(\d+)/);
+    if (m && m[1] !== '0') {
+      const n = Number(m[1]);
+      if (n !== grantId) setGrantId(n);
+      return;
+    }
+    const fromParams = Number(params.grantId);
+    if (Number.isFinite(fromParams) && fromParams > 0 && fromParams !== grantId) {
+      setGrantId(fromParams);
+    }
+  }, [params.grantId, grantId]);
   const router = useRouter();
-  const { data, isLoading } = useGrant(grantId || null);
+  const { data, isLoading } = useGrant(grantId);
   const grant = data?.grant;
 
   const [step, setStep] = useState(0);
@@ -609,7 +623,7 @@ export default function ApplyWizardClient() {
   // States
   // ---------------------------------------------------------------------------
 
-  if (isLoading) {
+  if (grantId == null || isLoading) {
     return (
       <div className="space-y-4">
         <div className="h-8 w-48 animate-pulse rounded-md bg-muted" />

@@ -109,11 +109,21 @@ export function useAssessmentFrameworks() {
 // Reviews
 // ---------------------------------------------------------------------------
 
+// API returns { reviews, total, page, pages }. Reviewer queue page needs
+// pending/completed buckets — derive them client-side from review.status so
+// the page works without a backend round-trip change.
 export function useReviews() {
-  return useSWR<{ pending?: Review[]; completed?: Review[] }>(
+  const swr = useSWR<{ reviews: Review[]; total: number; page: number; pages: number }>(
     '/reviews/',
     fetcher,
   );
+  const reviews = swr.data?.reviews ?? [];
+  const completed = reviews.filter((r) => r.status === 'completed');
+  const pending = reviews.filter((r) => r.status !== 'completed');
+  return {
+    ...swr,
+    data: swr.data ? { ...swr.data, pending, completed } : undefined,
+  } as typeof swr & { data?: { reviews: Review[]; pending: Review[]; completed: Review[]; total: number; page: number; pages: number } };
 }
 
 // ---------------------------------------------------------------------------

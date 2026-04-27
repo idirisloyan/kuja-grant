@@ -128,18 +128,23 @@ export default function AssessmentsPage() {
                   <div className={cn('w-10 h-10 rounded-lg grid place-items-center font-bold text-lg mb-2', c.bg, c.fg)}>
                     {FW_ICON[key] ?? '?'}
                   </div>
-                  <p className="text-sm font-semibold">{info.name}</p>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{info.description}</p>
+                  <p className="text-sm font-semibold">{t(`framework.${key}.label`)}</p>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{t(`framework.${key}.description`)}</p>
                   <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
-                    <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {info.estimated_time}</span>
-                    <span className="inline-flex items-center gap-1"><ListChecks className="h-3 w-3" /> {info.total_items} items</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {info.estimated_minutes_min != null && info.estimated_minutes_max != null
+                        ? t('framework.minutes_range', { min: info.estimated_minutes_min, max: info.estimated_minutes_max })
+                        : info.estimated_time}
+                    </span>
+                    <span className="inline-flex items-center gap-1"><ListChecks className="h-3 w-3" /> {t('framework.items_count', { n: info.total_items })}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => router.push(`/assessments/wizard?framework=${key}`)}
                     className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand-50))] text-xs font-medium px-3 py-1.5"
                   >
-                    <Play className="h-3 w-3" /> Start
+                    <Play className="h-3 w-3" /> {t('framework.select_cta')}
                   </button>
                 </div>
               );

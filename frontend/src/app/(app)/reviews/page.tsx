@@ -193,7 +193,11 @@ function ReviewerView() {
               const s = r.overall_score ?? 0;
               const color = s >= 80 ? 'text-[hsl(var(--kuja-grow))]' : s >= 60 ? 'text-[hsl(var(--kuja-sun))]' : 'text-[hsl(var(--kuja-flag))]';
               return (
-                <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                <tr
+                  key={r.id}
+                  className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/reviews/${r.application_id}`)}
+                >
                   <td className="px-4 py-3 font-medium text-foreground">
                     {r.ngo_org_name || `Application #${r.application_id}`}
                   </td>
