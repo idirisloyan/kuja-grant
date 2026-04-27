@@ -1597,5 +1597,14 @@
   "median_preview.health.weak": "Muundo unahitaji kazi",
   "median_preview.discrimination.high": "Juu",
   "median_preview.discrimination.medium": "Wastani",
-  "median_preview.discrimination.low": "Chini — rekebisha"
+  "median_preview.discrimination.low": "Chini — rekebisha",
+  "score_breakdown.tooltip": "Bofya kuona jinsi alama hii imegawanywa",
+  "score_breakdown.empty": "Hakuna data ya vipengele kwa alama hii.",
+  "score_breakdown.max_total": "Vipengele vinajumlisha pointi {n} za juu",
+  "match.component.eligibility": "Kufanana kwa ustahiki",
+  "match.component.sector": "Kufanana kwa sekta",
+  "match.component.geography": "Kufanana kwa eneo",
+  "match.component.capacity": "Uwezo dhidi ya mzigo wa ruzuku",
+  "match.component.track_record": "Rekodi ya zamani",
+  "matches.score_label": "ulinganifu"
 }

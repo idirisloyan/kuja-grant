@@ -1577,5 +1577,14 @@
   "median_preview.health.weak": "التصميم يحتاج إلى تحسين",
   "median_preview.discrimination.high": "مرتفعة",
   "median_preview.discrimination.medium": "متوسطة",
-  "median_preview.discrimination.low": "منخفضة — أحكِم"
+  "median_preview.discrimination.low": "منخفضة — أحكِم",
+  "score_breakdown.tooltip": "انقر لمعرفة كيفية حساب هذه الدرجة",
+  "score_breakdown.empty": "لا توجد بيانات مكوّنات لهذه الدرجة.",
+  "score_breakdown.max_total": "مجموع نقاط المكونات الأقصى: {n}",
+  "match.component.eligibility": "تطابق الأهلية",
+  "match.component.sector": "تطابق القطاع",
+  "match.component.geography": "تطابق الجغرافيا",
+  "match.component.capacity": "القدرة مقابل عبء المنحة",
+  "match.component.track_record": "السجل السابق",
+  "matches.score_label": "توافق"
 }

@@ -1577,5 +1577,14 @@
   "median_preview.health.weak": "Conception à retravailler",
   "median_preview.discrimination.high": "Élevée",
   "median_preview.discrimination.medium": "Moyenne",
-  "median_preview.discrimination.low": "Faible — à corriger"
+  "median_preview.discrimination.low": "Faible — à corriger",
+  "score_breakdown.tooltip": "Cliquez pour voir la décomposition du score",
+  "score_breakdown.empty": "Aucune donnée de composante disponible.",
+  "score_breakdown.max_total": "Les composantes totalisent {n} points max",
+  "match.component.eligibility": "Correspondance d'éligibilité",
+  "match.component.sector": "Recoupement sectoriel",
+  "match.component.geography": "Recoupement géographique",
+  "match.component.capacity": "Capacité vs charge de la subvention",
+  "match.component.track_record": "Historique",
+  "matches.score_label": "correspondance"
 }

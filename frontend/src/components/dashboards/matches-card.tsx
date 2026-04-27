@@ -19,7 +19,17 @@ import { Sparkles, ArrowUpRight, Loader2, Trophy, ShieldAlert, RefreshCw } from 
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useFlag } from '@/lib/hooks/use-feature-flags';
 import { fetchMatchesForMe, type MatchForOrg } from '@/lib/copilot-api';
+import { ScoreBreakdown } from '@/components/shared/score-breakdown';
 import { cn } from '@/lib/utils';
+
+// Component max points must mirror the backend match_engine weights.
+const MATCH_COMPONENT_MAX: Record<string, number> = {
+  eligibility: 25,
+  sector: 20,
+  geography: 20,
+  capacity: 20,
+  track_record: 15,
+};
 
 const SCORE_TONE = (s: number) =>
   s >= 75
@@ -128,14 +138,18 @@ export function MatchesCard({ limit = 5, className = '' }: Props) {
                     {m.grant.deadline ? ` · ${formatDate(m.grant.deadline)}` : ''}
                   </div>
                 </div>
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold',
-                    SCORE_TONE(m.score),
-                  )}
-                >
-                  {m.score}%
-                </span>
+                <ScoreBreakdown
+                  score={m.score}
+                  label={t('matches.score_label')}
+                  components={Object.entries(m.components).map(([key, value]) => ({
+                    key,
+                    label: t(`match.component.${key}`),
+                    value: typeof value === 'number' ? value : 0,
+                    max: MATCH_COMPONENT_MAX[key],
+                  }))}
+                  variant="pill"
+                  className="flex-shrink-0"
+                />
               </div>
 
               {(m.top_strength || m.top_blocker) && (

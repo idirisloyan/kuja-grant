@@ -1597,5 +1597,14 @@
   "median_preview.health.weak": "Naqshaddu waxay u baahan tahay shaqo",
   "median_preview.discrimination.high": "Sare",
   "median_preview.discrimination.medium": "Dhexdhexaad",
-  "median_preview.discrimination.low": "Hoose — hagaaji"
+  "median_preview.discrimination.low": "Hoose — hagaaji",
+  "score_breakdown.tooltip": "Guji si aad u aragto sida buundadan loo qaybiyey",
+  "score_breakdown.empty": "Ma jiraan xog qayb-qayb ah oo buundadan u diyaar ah.",
+  "score_breakdown.max_total": "Qaybaha waxay isku gaadhayaan dhibco {n} oo ugu badan",
+  "match.component.eligibility": "Isku-dhigan xaq-u-yeelashada",
+  "match.component.sector": "Isku-dhigan qaybeed",
+  "match.component.geography": "Isku-dhigan juqraafi",
+  "match.component.capacity": "Awoodda iyo culayska deeqda",
+  "match.component.track_record": "Taariikhda hore",
+  "matches.score_label": "isku-dhig"
 }

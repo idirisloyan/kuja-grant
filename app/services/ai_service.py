@@ -727,6 +727,98 @@ class AIService:
         }
 
     @classmethod
+    def _extract_voice_profile(cls, prior_applications):
+        """Phase 1.2 — derive a deterministic voice signature from prior apps.
+
+        We pre-compute structural features so the AI gets a concrete brief
+        instead of vague 'match the user's voice' instructions. Returns a
+        small dict the prompt embeds verbatim.
+
+        Features (all simple, no NLP libraries):
+          - avg_sentence_length     — short/medium/long bucketed
+          - person                  — 'first_plural' (we/our), 'third' (the organization), 'mixed'
+          - formality               — 'plain' / 'formal' (heuristic via complex words)
+          - openings                — top 3 sentence-starting bigrams from prior apps
+          - signature_phrases       — top 3 multi-word phrases that recur
+
+        When prior_applications is empty, returns None (caller should drop
+        the voice instruction entirely rather than fabricate one).
+        """
+        import re
+        from collections import Counter
+
+        # Concatenate all responses we have access to.
+        texts: list[str] = []
+        for a in prior_applications or []:
+            resps = a.get('responses_excerpt') or {}
+            for v in resps.values():
+                if isinstance(v, str) and v.strip():
+                    texts.append(v)
+
+        if not texts:
+            return None
+
+        full = ' '.join(texts)
+        if len(full.strip()) < 200:
+            return None  # not enough signal
+
+        # Sentence split (rough — good enough for voice signal).
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', full) if s.strip()]
+        if not sentences:
+            return None
+
+        word_lens = [len(s.split()) for s in sentences]
+        avg_len = sum(word_lens) / len(word_lens)
+        if avg_len < 12:
+            sent_bucket = 'short'
+        elif avg_len < 22:
+            sent_bucket = 'medium'
+        else:
+            sent_bucket = 'long'
+
+        lower = full.lower()
+        first_plural = sum(lower.count(w) for w in (' we ', ' our ', ' us ', ' we\'', ' our\''))
+        third_org = sum(lower.count(w) for w in ('the organization', 'the organisation', 'the team', 'the program'))
+        if first_plural > third_org * 2:
+            person = 'first_plural'
+        elif third_org > first_plural * 2:
+            person = 'third'
+        else:
+            person = 'mixed'
+
+        # Formality heuristic: count 4+ syllable words (rough).
+        words = re.findall(r"[A-Za-z']{4,}", full)
+        long_words = sum(1 for w in words if len(w) >= 8)
+        formality = 'formal' if (len(words) > 0 and long_words / len(words) > 0.18) else 'plain'
+
+        # Sentence-opening bigrams (first 2 tokens).
+        openings = Counter()
+        for s in sentences:
+            tokens = s.split()
+            if len(tokens) >= 2:
+                bg = (tokens[0] + ' ' + tokens[1]).lower().strip(",.")
+                if 4 <= len(bg) <= 40:
+                    openings[bg] += 1
+        top_openings = [b for b, _ in openings.most_common(3)]
+
+        # Recurring 3-grams (signature phrases).
+        trigrams = Counter()
+        toks = re.findall(r"[A-Za-z']+", lower)
+        for i in range(len(toks) - 2):
+            tg = ' '.join(toks[i:i + 3])
+            if 8 <= len(tg) <= 50 and not all(t in {'the', 'a', 'an', 'and', 'or', 'of', 'to', 'in'} for t in toks[i:i + 3]):
+                trigrams[tg] += 1
+        signature_phrases = [p for p, c in trigrams.most_common(8) if c >= 2][:3]
+
+        return {
+            'avg_sentence_length': sent_bucket,
+            'person': person,
+            'formality': formality,
+            'openings': top_openings,
+            'signature_phrases': signature_phrases,
+        }
+
+    @classmethod
     def median_ngo_preview(
         cls,
         *,
@@ -1064,6 +1156,12 @@ class AIService:
         prior_docs_str = json.dumps(prior_documents, default=str)[:4000]
         existing_str = json.dumps(existing_responses, default=str)[:3000]
 
+        # Phase 1.2 — extract a deterministic voice profile from the NGO's
+        # prior applications so the AI matches their actual writing style.
+        # When the NGO has no prior apps, voice_profile is None and we drop
+        # the directive (no fabricated voice).
+        voice_profile = cls._extract_voice_profile(prior_applications)
+
         system = (
             "You are Kuja's grant writing co-pilot, drafting a first-cut "
             "application FOR an NGO applicant. The applicant will edit your "
@@ -1087,6 +1185,46 @@ class AIService:
             "responses: 1-3 sentences with explicit evidence.\n\n"
             "Return ONLY a JSON object matching the schema."
         )
+
+        if voice_profile:
+            # Concrete voice signature so the AI matches the applicant's
+            # actual style instead of producing generic donor-speak. The
+            # signature is structural; the model should follow it but never
+            # copy literal phrases out of context.
+            person_label = {
+                'first_plural': "first-person plural ('we'/'our')",
+                'third': "third-person ('the organization'/'the team')",
+                'mixed': "mixed (mostly first-person plural, occasionally third)",
+            }.get(voice_profile['person'], voice_profile['person'])
+            sent_label = {
+                'short': 'short sentences (avg <12 words)',
+                'medium': 'medium sentences (12–22 words)',
+                'long': 'long, layered sentences (>22 words)',
+            }.get(voice_profile['avg_sentence_length'], voice_profile['avg_sentence_length'])
+            formality_label = {
+                'plain': 'plain, accessible register',
+                'formal': 'formal, technical register',
+            }.get(voice_profile['formality'], voice_profile['formality'])
+
+            system += (
+                "\n\nVOICE PROFILE — match this applicant's writing style "
+                "across every drafted response. Do NOT invent new voice; "
+                "follow the structural signal:\n"
+                f"  • Person: {person_label}\n"
+                f"  • Sentence length: {sent_label}\n"
+                f"  • Register: {formality_label}\n"
+            )
+            if voice_profile.get('signature_phrases'):
+                system += (
+                    f"  • The applicant's prior submissions repeat phrases like: "
+                    f"{', '.join(repr(p) for p in voice_profile['signature_phrases'])}. "
+                    f"Reuse where natural — do NOT force them.\n"
+                )
+            if voice_profile.get('openings'):
+                system += (
+                    f"  • Common sentence openings the applicant uses: "
+                    f"{', '.join(repr(o) for o in voice_profile['openings'])}.\n"
+                )
 
         schema = """{
   "responses": {

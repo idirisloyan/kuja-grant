@@ -1577,5 +1577,14 @@
   "median_preview.health.weak": "Diseño necesita trabajo",
   "median_preview.discrimination.high": "Alta",
   "median_preview.discrimination.medium": "Media",
-  "median_preview.discrimination.low": "Baja — corregir"
+  "median_preview.discrimination.low": "Baja — corregir",
+  "score_breakdown.tooltip": "Haz clic para ver cómo se desglosa este puntaje",
+  "score_breakdown.empty": "No hay datos de componentes disponibles.",
+  "score_breakdown.max_total": "Los componentes suman {n} puntos máx.",
+  "match.component.eligibility": "Coincidencia de elegibilidad",
+  "match.component.sector": "Coincidencia sectorial",
+  "match.component.geography": "Coincidencia geográfica",
+  "match.component.capacity": "Capacidad vs carga de la subvención",
+  "match.component.track_record": "Trayectoria",
+  "matches.score_label": "coincidencia"
 }
