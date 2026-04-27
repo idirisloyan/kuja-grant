@@ -1538,5 +1538,18 @@
   "observability.helpfulness.col.dismissed": "مرفوض",
   "observability.helpfulness.footnote": "نسبة الفائدة تحسب 'مستخدم' = 1.0، 'محرّر' = 0.5، 'مرفوض' = 0. الاستدعاءات بلا إشارة مستثناة من النسبة.",
   "drafters.label": "يحضّرون الآن",
-  "drafters.tooltip": "مسوّدات نشطة خلال آخر {days} يوم"
+  "drafters.tooltip": "مسوّدات نشطة خلال آخر {days} يوم",
+  "application.tab.activity": "النشاط",
+  "application.activity.heading": "خط زمني للنشاط",
+  "application.activity.subtitle": "كل حدث على هذا الطلب — تغييرات الحالة، تشغيل الذكاء الاصطناعي، تدخّل المراجعين، رفع المستندات.",
+  "application.activity.loading": "جارٍ تحميل النشاط…",
+  "application.activity.empty": "لا يوجد نشاط بعد.",
+  "application.activity.coming_soon": "خط النشاط قيد التحضير لحسابك.",
+  "application.activity.created": "تم إنشاء الطلب",
+  "application.activity.last_edited": "آخر تعديل",
+  "application.activity.submitted": "تم تقديمه إلى المانح",
+  "application.activity.ai_call": "تشغيل مساعد الذكاء الاصطناعي",
+  "application.activity.provenance": "تم تسجيل مرجع للمصدر",
+  "application.activity.review": "نشاط المراجعة",
+  "application.activity.document_uploaded": "تم رفع مستند"
 }

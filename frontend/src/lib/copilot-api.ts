@@ -629,6 +629,25 @@ export function moderateGrantQuestion(grantId: number, qid: number, reason?: str
 }
 
 // ---------------------------------------------------------------------------
+// 13e. Application activity timeline — Phase 5.3
+// ---------------------------------------------------------------------------
+
+export interface ActivityEvent {
+  ts: string;
+  kind: 'lifecycle' | 'ai_call' | 'provenance' | 'review' | 'document' | string;
+  label: string; // i18n key
+  detail?: Record<string, unknown>;
+}
+
+export function fetchApplicationActivity(applicationId: number) {
+  return safeCall<{ events: ActivityEvent[]; application_id: number }>(() =>
+    api.get<CopilotResult<{ events: ActivityEvent[]; application_id: number }>>(
+      `/applications/${applicationId}/activity`,
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 13d. Live drafters — Phase 4.2
 // ---------------------------------------------------------------------------
 

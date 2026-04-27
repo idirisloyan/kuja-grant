@@ -1538,5 +1538,18 @@
   "observability.helpfulness.col.dismissed": "Descartado",
   "observability.helpfulness.footnote": "Útil % pondera 'Usado' = 1.0, 'Editado' = 0.5, 'Descartado' = 0. Las llamadas sin señal se excluyen del porcentaje.",
   "drafters.label": "redactando ahora",
-  "drafters.tooltip": "Borradores activos en los últimos {days} días"
+  "drafters.tooltip": "Borradores activos en los últimos {days} días",
+  "application.tab.activity": "Actividad",
+  "application.activity.heading": "Línea de actividad",
+  "application.activity.subtitle": "Cada evento en esta postulación — cambios de estado, llamadas IA, acciones del evaluador, cargas de documentos.",
+  "application.activity.loading": "Cargando actividad…",
+  "application.activity.empty": "Aún no hay actividad.",
+  "application.activity.coming_soon": "La línea de actividad se está preparando para tu cuenta.",
+  "application.activity.created": "Postulación creada",
+  "application.activity.last_edited": "Última edición",
+  "application.activity.submitted": "Enviada al donante",
+  "application.activity.ai_call": "Asistente IA invocado",
+  "application.activity.provenance": "Cita de fuente registrada",
+  "application.activity.review": "Actividad de revisión",
+  "application.activity.document_uploaded": "Documento cargado"
 }

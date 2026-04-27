@@ -1558,5 +1558,18 @@
   "observability.helpfulness.col.dismissed": "La diiday",
   "observability.helpfulness.footnote": "Boqolkiiba faa'iido waxay miisaamaysaa 'La isticmaalay' = 1.0, 'La beddelay' = 0.5, 'La diiday' = 0. Wicitaannada aan calaamad lahayn waa laga reebaa.",
   "drafters.label": "qoraya hadda",
-  "drafters.tooltip": "Qabyada firfircoon {days} maalmood ee la soo dhaafay"
+  "drafters.tooltip": "Qabyada firfircoon {days} maalmood ee la soo dhaafay",
+  "application.tab.activity": "Howsha",
+  "application.activity.heading": "Wakhtiga hawl-galka",
+  "application.activity.subtitle": "Dhacdo kasta oo codsigan ku saabsan — beddelka xaaladda, wicitaannada AI, taabashada eegayaasha, soo dejinta dukumeentiyada.",
+  "application.activity.loading": "Waxaa la soo dejinayaa hawl-galka…",
+  "application.activity.empty": "Wali ma jirto howl.",
+  "application.activity.coming_soon": "Wakhtiga hawl-galka waa la diyaarinayaa akoonkaaga.",
+  "application.activity.created": "Codsiga waa la abuuray",
+  "application.activity.last_edited": "Markii ugu dambeysay ee la beddelay",
+  "application.activity.submitted": "Waxaa loo gudbiyey deeq-bixiyaha",
+  "application.activity.ai_call": "Kaaliyaha AI waa la wacay",
+  "application.activity.provenance": "Tixraac il ah waa la diiwaangeliyay",
+  "application.activity.review": "Hawsha eegista",
+  "application.activity.document_uploaded": "Dukumeenti waa la soo dhejiyay"
 }

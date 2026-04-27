@@ -12,13 +12,15 @@ import {
 import { cn } from '@/lib/utils';
 import type { Application } from '@/lib/types';
 import { InfoTip } from '@/components/shared/info-tip';
+import { ActivityTimeline } from '@/components/applications/ActivityTimeline';
 
-type TabId = 'responses' | 'documents' | 'scores' | 'reviews';
+type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
 const TAB_KEYS: { id: TabId; key: string }[] = [
   { id: 'responses', key: 'application.tab.responses' },
   { id: 'documents', key: 'application.tab.documents' },
   { id: 'scores', key: 'application.tab.scores' },
   { id: 'reviews', key: 'application.tab.reviews' },
+  { id: 'activity', key: 'application.tab.activity' },
 ];
 
 export default function ApplicationDetailClient() {
@@ -179,6 +181,7 @@ export default function ApplicationDetailClient() {
       {tab === 'documents' && <EmptyTab icon={Upload} label={t('applications.documents_empty')} />}
       {tab === 'scores' && <ScoresTab application={application} />}
       {tab === 'reviews' && <EmptyTab icon={MessageSquare} label={t('applications.reviews_empty')} />}
+      {tab === 'activity' && <ActivityTimeline applicationId={application.id} />}
     </div>
   );
 }

@@ -1538,5 +1538,18 @@
   "observability.helpfulness.col.dismissed": "Rejeté",
   "observability.helpfulness.footnote": "Utilité % pondère « Utilisé » à 1.0, « Édité » à 0.5, « Rejeté » à 0. Les appels sans signal sont exclus du pourcentage.",
   "drafters.label": "rédigent maintenant",
-  "drafters.tooltip": "Brouillons actifs dans les {days} derniers jours"
+  "drafters.tooltip": "Brouillons actifs dans les {days} derniers jours",
+  "application.tab.activity": "Activité",
+  "application.activity.heading": "Chronologie d'activité",
+  "application.activity.subtitle": "Chaque événement sur cette candidature — changements d'état, appels IA, interactions évaluateurs, téléversements.",
+  "application.activity.loading": "Chargement de l'activité…",
+  "application.activity.empty": "Aucune activité pour l'instant.",
+  "application.activity.coming_soon": "La chronologie est en préparation pour votre compte.",
+  "application.activity.created": "Candidature créée",
+  "application.activity.last_edited": "Dernière modification",
+  "application.activity.submitted": "Soumise au bailleur",
+  "application.activity.ai_call": "Assistant IA invoqué",
+  "application.activity.provenance": "Citation de source enregistrée",
+  "application.activity.review": "Activité d'évaluation",
+  "application.activity.document_uploaded": "Document téléversé"
 }

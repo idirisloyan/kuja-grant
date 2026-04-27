@@ -1558,5 +1558,18 @@
   "observability.helpfulness.col.dismissed": "Imekataliwa",
   "observability.helpfulness.footnote": "Asilimia ya manufaa inapima 'Imetumika' = 1.0, 'Imehaririwa' = 0.5, 'Imekataliwa' = 0. Miito bila ishara haijajumuishwa.",
   "drafters.label": "wanaandika sasa",
-  "drafters.tooltip": "Rasimu zinazoendelea katika siku {days} zilizopita"
+  "drafters.tooltip": "Rasimu zinazoendelea katika siku {days} zilizopita",
+  "application.tab.activity": "Shughuli",
+  "application.activity.heading": "Mstari wa shughuli",
+  "application.activity.subtitle": "Kila tukio kwenye ombi hili — mabadiliko ya hali, miito ya AI, hatua za mkaguzi, upakiaji wa hati.",
+  "application.activity.loading": "Inapakia shughuli…",
+  "application.activity.empty": "Bado hakuna shughuli.",
+  "application.activity.coming_soon": "Mstari wa shughuli unaandaliwa kwa akaunti yako.",
+  "application.activity.created": "Ombi limeundwa",
+  "application.activity.last_edited": "Imehaririwa mara ya mwisho",
+  "application.activity.submitted": "Limewasilishwa kwa mfadhili",
+  "application.activity.ai_call": "Msaidizi wa AI ameitwa",
+  "application.activity.provenance": "Marejeleo ya chanzo yameandikwa",
+  "application.activity.review": "Shughuli ya ukaguzi",
+  "application.activity.document_uploaded": "Hati imepakiwa"
 }

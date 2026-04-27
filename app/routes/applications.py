@@ -256,3 +256,166 @@ def api_submit_application(app_id):
 
     logger.info(f"Application submitted: id={app_id} by org {current_user.org_id} (score: {application.ai_score})")
     return jsonify({'success': True, 'application': application.to_dict()})
+
+
+# ---------------------------------------------------------------------------
+# Phase 5.3 — NGO-visible audit trail
+# ---------------------------------------------------------------------------
+
+@applications_bp.route('/<int:app_id>/activity', methods=['GET'])
+@login_required
+def api_application_activity(app_id):
+    """Aggregated event log for an application — visible to the NGO that owns it.
+
+    Surfaces what we already store, no new schema:
+      - lifecycle: created, last edited, submitted (from Application timestamps)
+      - AI calls run by anyone in this org (from ai_call_logs)
+      - provenance rows attached to this application (ai_provenance)
+      - reviews submitted (from reviews + reviewer name)
+      - documents uploaded (from documents)
+
+    Each event has {ts, kind, label, detail?, actor?}. UI renders as a
+    timeline. This makes the application's history transparent to the NGO,
+    answering 'what happened on my application' in plain language.
+    """
+    from app.utils.api_errors import error_response
+    application = db.session.get(Application, app_id)
+    if not application:
+        return error_response('application.not_found', 404)
+
+    # Access control: NGO sees their own; donor (of this grant) + reviewer
+    # + admin all see it for transparency.
+    if current_user.role == 'ngo' and application.ngo_org_id != current_user.org_id:
+        return error_response('auth.access_denied', 403)
+    if current_user.role == 'donor':
+        from app.models import Grant
+        grant = db.session.get(Grant, application.grant_id)
+        if not grant or grant.donor_org_id != current_user.org_id:
+            return error_response('auth.access_denied', 403)
+
+    events = []
+
+    # 1. Lifecycle from Application timestamps.
+    if application.created_at:
+        events.append({
+            'ts': application.created_at.isoformat(),
+            'kind': 'lifecycle',
+            'label': 'application.activity.created',
+        })
+    if application.updated_at and application.updated_at != application.created_at:
+        events.append({
+            'ts': application.updated_at.isoformat(),
+            'kind': 'lifecycle',
+            'label': 'application.activity.last_edited',
+        })
+    if application.submitted_at:
+        events.append({
+            'ts': application.submitted_at.isoformat(),
+            'kind': 'lifecycle',
+            'label': 'application.activity.submitted',
+            'detail': {'status': application.status},
+        })
+
+    # 2. AI calls. We log endpoint + role + language at each call. We attach
+    # call rows whose user belongs to the same org and that occurred between
+    # application.created_at and now.
+    try:
+        from sqlalchemy import text
+        rows = db.session.execute(
+            text("""
+                SELECT created_at, endpoint, role, language, success
+                FROM ai_call_logs
+                WHERE org_id = :oid
+                  AND created_at >= COALESCE(:since, NOW() - INTERVAL '90 days')
+                ORDER BY created_at DESC
+                LIMIT 200
+            """),
+            {"oid": application.ngo_org_id, "since": application.created_at},
+        ).fetchall()
+        for r in rows:
+            events.append({
+                'ts': r[0].isoformat() if r[0] else None,
+                'kind': 'ai_call',
+                'label': 'application.activity.ai_call',
+                'detail': {
+                    'endpoint': r[1],
+                    'role': r[2],
+                    'language': r[3],
+                    'success': bool(r[4]) if r[4] is not None else None,
+                },
+            })
+    except Exception:
+        pass  # ai_call_logs may not exist in older deploys; non-critical
+
+    # 3. Provenance rows for this application (per-criterion citations).
+    try:
+        from app.services.ai_service import AIService
+        prov_rows = AIService.get_provenance(subject_kind='application', subject_id=app_id, limit=100)
+        # Group by ai_call_id (or by claim hash when no call id) so the UI
+        # surfaces "AI cited 7 sources for criterion X" rather than 7 rows.
+        for p in prov_rows[:50]:
+            events.append({
+                'ts': p.get('created_at'),
+                'kind': 'provenance',
+                'label': 'application.activity.provenance',
+                'detail': {
+                    'criterion': (p.get('subject') or {}).get('field'),
+                    'source_kind': (p.get('source') or {}).get('kind'),
+                    'confidence': p.get('confidence'),
+                },
+            })
+    except Exception:
+        pass
+
+    # 4. Reviews on this application.
+    try:
+        from app.models import Review, User
+        reviews = (Review.query.filter_by(application_id=app_id)
+                   .order_by(Review.created_at.desc())
+                   .all())
+        for rv in reviews:
+            reviewer_name = None
+            if rv.reviewer_user_id:
+                u = db.session.get(User, rv.reviewer_user_id)
+                if u:
+                    reviewer_name = u.name
+            events.append({
+                'ts': (rv.completed_at or rv.created_at).isoformat() if (rv.completed_at or rv.created_at) else None,
+                'kind': 'review',
+                'label': 'application.activity.review',
+                'detail': {
+                    'status': rv.status,
+                    'overall_score': rv.overall_score,
+                    # Reviewer name visible to the NGO when the review is
+                    # complete; pending reviews stay anonymous.
+                    'reviewer': reviewer_name if rv.status == 'completed' else None,
+                },
+            })
+    except Exception:
+        pass
+
+    # 5. Documents uploaded.
+    try:
+        from app.models import Document
+        docs = (Document.query.filter_by(application_id=app_id)
+                .order_by(Document.created_at.desc())
+                .limit(50).all())
+        for d in docs:
+            events.append({
+                'ts': d.created_at.isoformat() if d.created_at else None,
+                'kind': 'document',
+                'label': 'application.activity.document_uploaded',
+                'detail': {
+                    'filename': getattr(d, 'filename', None) or getattr(d, 'title', None),
+                    'doc_type': getattr(d, 'doc_type', None),
+                },
+            })
+    except Exception:
+        pass
+
+    # Sort newest first; trim to 100 for transport.
+    events = [e for e in events if e.get('ts')]
+    events.sort(key=lambda e: e['ts'], reverse=True)
+    events = events[:100]
+
+    return jsonify({'success': True, 'events': events, 'application_id': app_id})
