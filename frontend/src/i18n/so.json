@@ -1542,5 +1542,21 @@
   "grant_qa.toast.asked": "Su'aasha waxaa loo diray deeq-bixiyaha",
   "grant_qa.toast.answered": "Jawaabta waa la daabacay — waxay u muuqataa codsadayaasha oo dhan",
   "grant_qa.toast.moderated": "Su'aashii waxaa laga qariyey Q&A-da dadweynaha",
-  "grant.tab.qa": "Su'aalo"
+  "grant.tab.qa": "Su'aalo",
+  "observability.helpfulness.heading": "Calaamadda waxtarka AI",
+  "observability.helpfulness.window": "Daaqada saacadood {h}",
+  "observability.helpfulness.loading": "Waxaa la soo dejinayaa xogta waxtarka…",
+  "observability.helpfulness.empty": "Ma jiraan wicitaanno AI ah daaqadan.",
+  "observability.helpfulness.by_language": "Wicitaanno luqad",
+  "observability.helpfulness.col.endpoint": "Endpoint",
+  "observability.helpfulness.col.calls": "Wicitaano",
+  "observability.helpfulness.col.success": "Guul",
+  "observability.helpfulness.col.p95": "p95",
+  "observability.helpfulness.col.helpfulness": "Faa'iido %",
+  "observability.helpfulness.col.used": "La isticmaalay",
+  "observability.helpfulness.col.edited": "La beddelay",
+  "observability.helpfulness.col.dismissed": "La diiday",
+  "observability.helpfulness.footnote": "Boqolkiiba faa'iido waxay miisaamaysaa 'La isticmaalay' = 1.0, 'La beddelay' = 0.5, 'La diiday' = 0. Wicitaannada aan calaamad lahayn waa laga reebaa.",
+  "drafters.label": "qoraya hadda",
+  "drafters.tooltip": "Qabyada firfircoon {days} maalmood ee la soo dhaafay"
 }

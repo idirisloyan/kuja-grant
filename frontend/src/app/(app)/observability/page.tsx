@@ -22,6 +22,7 @@ import {
 import {
   Activity, AlertTriangle, AlertCircle, TrendingDown, Clock4, RotateCcw, Loader2,
 } from 'lucide-react';
+import { AIHelpfulnessPanel } from '@/components/observability/AIHelpfulnessPanel';
 
 interface EndpointStats {
   total: number;
@@ -320,6 +321,8 @@ export default function ObservabilityPage() {
               )}
             </Section>
           </div>
+
+          <AIHelpfulnessPanel hours={24} />
 
           <Section title={t('observability.top_users')}>
             {data.top_users_24h.length === 0 ? (

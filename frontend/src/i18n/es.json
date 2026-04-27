@@ -1522,5 +1522,21 @@
   "grant_qa.toast.asked": "Pregunta enviada al donante",
   "grant_qa.toast.answered": "Respuesta publicada — visible para todos los postulantes",
   "grant_qa.toast.moderated": "Pregunta ocultada del Q&A público",
-  "grant.tab.qa": "P&R"
+  "grant.tab.qa": "P&R",
+  "observability.helpfulness.heading": "Señal de utilidad de la IA",
+  "observability.helpfulness.window": "Ventana de {h}h",
+  "observability.helpfulness.loading": "Cargando datos de utilidad…",
+  "observability.helpfulness.empty": "No hay llamadas a IA en esta ventana.",
+  "observability.helpfulness.by_language": "Llamadas por idioma",
+  "observability.helpfulness.col.endpoint": "Endpoint",
+  "observability.helpfulness.col.calls": "Llamadas",
+  "observability.helpfulness.col.success": "Éxito",
+  "observability.helpfulness.col.p95": "p95",
+  "observability.helpfulness.col.helpfulness": "Útil %",
+  "observability.helpfulness.col.used": "Usado",
+  "observability.helpfulness.col.edited": "Editado",
+  "observability.helpfulness.col.dismissed": "Descartado",
+  "observability.helpfulness.footnote": "Útil % pondera 'Usado' = 1.0, 'Editado' = 0.5, 'Descartado' = 0. Las llamadas sin señal se excluyen del porcentaje.",
+  "drafters.label": "redactando ahora",
+  "drafters.tooltip": "Borradores activos en los últimos {days} días"
 }

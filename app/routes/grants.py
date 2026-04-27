@@ -557,3 +557,59 @@ def api_upload_grant_doc(grant_id):
     response.headers['X-Accel-Buffering'] = 'no'
     response.headers['Connection'] = 'keep-alive'
     return response
+
+
+# ---------------------------------------------------------------------------
+# Phase 4.2 — live drafters pill
+# ---------------------------------------------------------------------------
+
+@grants_bp.route('/<int:grant_id>/drafters', methods=['GET'])
+@login_required
+def api_grant_drafters(grant_id):
+    """Return how many NGOs currently have a draft application open.
+
+    Donor-only (or admin). The donor's grant detail page shows a "12 NGOs
+    are drafting now" pill — anonymized but real signal that the call is
+    attracting interest. Excludes the donor's own org id and any soft-
+    deleted apps.
+
+    We define "currently drafting" as: status='draft' AND updated within
+    the last 14 days AND the grant's deadline (if any) hasn't passed.
+    """
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        from app.utils.api_errors import error_response
+        return error_response('grant.not_found', 404)
+
+    if current_user.role not in ('donor', 'admin'):
+        from app.utils.api_errors import error_response
+        return error_response('auth.access_denied', 403)
+    if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
+        from app.utils.api_errors import error_response
+        return error_response('auth.access_denied', 403)
+
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+
+    try:
+        # Distinct count of NGO orgs with an active draft.
+        from sqlalchemy import func, distinct
+        q = (db.session.query(func.count(distinct(Application.ngo_org_id)))
+             .filter(Application.grant_id == grant_id)
+             .filter(Application.status == 'draft')
+             .filter(Application.updated_at >= cutoff))
+        if grant.deadline:
+            from datetime import date
+            if grant.deadline < date.today():
+                # Closed call — return 0; the pill should hide.
+                return jsonify({'success': True, 'count': 0, 'window_days': 14})
+        count = q.scalar() or 0
+    except Exception as e:
+        logger.error(f"drafters count failed: {e}")
+        count = 0
+
+    return jsonify({
+        'success': True,
+        'count': int(count),
+        'window_days': 14,
+    })

@@ -1522,5 +1522,21 @@
   "grant_qa.toast.asked": "Question envoyée au bailleur",
   "grant_qa.toast.answered": "Réponse publiée — visible par tous les candidats",
   "grant_qa.toast.moderated": "Question masquée des Q&R publiques",
-  "grant.tab.qa": "Q&R"
+  "grant.tab.qa": "Q&R",
+  "observability.helpfulness.heading": "Signal d'utilité de l'IA",
+  "observability.helpfulness.window": "Fenêtre {h}h",
+  "observability.helpfulness.loading": "Chargement des données d'utilité…",
+  "observability.helpfulness.empty": "Aucun appel IA dans cette fenêtre.",
+  "observability.helpfulness.by_language": "Appels par langue",
+  "observability.helpfulness.col.endpoint": "Endpoint",
+  "observability.helpfulness.col.calls": "Appels",
+  "observability.helpfulness.col.success": "Succès",
+  "observability.helpfulness.col.p95": "p95",
+  "observability.helpfulness.col.helpfulness": "Utilité %",
+  "observability.helpfulness.col.used": "Utilisé",
+  "observability.helpfulness.col.edited": "Édité",
+  "observability.helpfulness.col.dismissed": "Rejeté",
+  "observability.helpfulness.footnote": "Utilité % pondère « Utilisé » à 1.0, « Édité » à 0.5, « Rejeté » à 0. Les appels sans signal sont exclus du pourcentage.",
+  "drafters.label": "rédigent maintenant",
+  "drafters.tooltip": "Brouillons actifs dans les {days} derniers jours"
 }

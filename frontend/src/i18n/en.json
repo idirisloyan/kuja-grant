@@ -1522,5 +1522,21 @@
   "grant_qa.toast.asked": "Question sent to the donor",
   "grant_qa.toast.answered": "Answer published — visible to all applicants",
   "grant_qa.toast.moderated": "Question hidden from public Q&A",
-  "grant.tab.qa": "Q&A"
+  "grant.tab.qa": "Q&A",
+  "observability.helpfulness.heading": "AI helpfulness signal",
+  "observability.helpfulness.window": "{h}h window",
+  "observability.helpfulness.loading": "Loading helpfulness data…",
+  "observability.helpfulness.empty": "No AI calls in this window.",
+  "observability.helpfulness.by_language": "Calls by language",
+  "observability.helpfulness.col.endpoint": "Endpoint",
+  "observability.helpfulness.col.calls": "Calls",
+  "observability.helpfulness.col.success": "Success",
+  "observability.helpfulness.col.p95": "p95",
+  "observability.helpfulness.col.helpfulness": "Helpful %",
+  "observability.helpfulness.col.used": "Used",
+  "observability.helpfulness.col.edited": "Edited",
+  "observability.helpfulness.col.dismissed": "Dismissed",
+  "observability.helpfulness.footnote": "Helpful % weights 'used' as 1.0, 'edited' as 0.5, 'dismissed' as 0. Calls without a feedback signal are excluded from the percentage.",
+  "drafters.label": "drafting now",
+  "drafters.tooltip": "Active drafts in the last {days} days"
 }

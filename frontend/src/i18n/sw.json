@@ -1542,5 +1542,21 @@
   "grant_qa.toast.asked": "Swali limetumwa kwa mfadhili",
   "grant_qa.toast.answered": "Jibu limechapishwa — linaonekana kwa waombaji wote",
   "grant_qa.toast.moderated": "Swali limefichwa kutoka kwa Q&A ya umma",
-  "grant.tab.qa": "Maswali"
+  "grant.tab.qa": "Maswali",
+  "observability.helpfulness.heading": "Ishara ya manufaa ya AI",
+  "observability.helpfulness.window": "Dirisha la saa {h}",
+  "observability.helpfulness.loading": "Inapakia data ya manufaa…",
+  "observability.helpfulness.empty": "Hakuna miito ya AI katika dirisha hili.",
+  "observability.helpfulness.by_language": "Miito kulingana na lugha",
+  "observability.helpfulness.col.endpoint": "Endpoint",
+  "observability.helpfulness.col.calls": "Miito",
+  "observability.helpfulness.col.success": "Mafanikio",
+  "observability.helpfulness.col.p95": "p95",
+  "observability.helpfulness.col.helpfulness": "Yenye manufaa %",
+  "observability.helpfulness.col.used": "Imetumika",
+  "observability.helpfulness.col.edited": "Imehaririwa",
+  "observability.helpfulness.col.dismissed": "Imekataliwa",
+  "observability.helpfulness.footnote": "Asilimia ya manufaa inapima 'Imetumika' = 1.0, 'Imehaririwa' = 0.5, 'Imekataliwa' = 0. Miito bila ishara haijajumuishwa.",
+  "drafters.label": "wanaandika sasa",
+  "drafters.tooltip": "Rasimu zinazoendelea katika siku {days} zilizopita"
 }

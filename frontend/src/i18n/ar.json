@@ -1522,5 +1522,21 @@
   "grant_qa.toast.asked": "تم إرسال السؤال إلى المانح",
   "grant_qa.toast.answered": "تم نشر الإجابة — مرئية لكل المتقدمين",
   "grant_qa.toast.moderated": "تم إخفاء السؤال من الأسئلة العامة",
-  "grant.tab.qa": "أسئلة وأجوبة"
+  "grant.tab.qa": "أسئلة وأجوبة",
+  "observability.helpfulness.heading": "إشارة جودة الذكاء الاصطناعي",
+  "observability.helpfulness.window": "نافذة {h} ساعة",
+  "observability.helpfulness.loading": "جارٍ تحميل بيانات الجودة…",
+  "observability.helpfulness.empty": "لا توجد استدعاءات للذكاء الاصطناعي في هذه النافذة.",
+  "observability.helpfulness.by_language": "الاستدعاءات حسب اللغة",
+  "observability.helpfulness.col.endpoint": "نقطة النهاية",
+  "observability.helpfulness.col.calls": "الاستدعاءات",
+  "observability.helpfulness.col.success": "النجاح",
+  "observability.helpfulness.col.p95": "p95",
+  "observability.helpfulness.col.helpfulness": "نسبة الفائدة %",
+  "observability.helpfulness.col.used": "مستخدم",
+  "observability.helpfulness.col.edited": "محرّر",
+  "observability.helpfulness.col.dismissed": "مرفوض",
+  "observability.helpfulness.footnote": "نسبة الفائدة تحسب 'مستخدم' = 1.0، 'محرّر' = 0.5، 'مرفوض' = 0. الاستدعاءات بلا إشارة مستثناة من النسبة.",
+  "drafters.label": "يحضّرون الآن",
+  "drafters.tooltip": "مسوّدات نشطة خلال آخر {days} يوم"
 }

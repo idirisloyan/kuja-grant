@@ -629,6 +629,18 @@ export function moderateGrantQuestion(grantId: number, qid: number, reason?: str
 }
 
 // ---------------------------------------------------------------------------
+// 13d. Live drafters — Phase 4.2
+// ---------------------------------------------------------------------------
+
+export function fetchGrantDrafters(grantId: number) {
+  return safeCall<{ count: number; window_days: number }>(() =>
+    api.get<CopilotResult<{ count: number; window_days: number }>>(
+      `/grants/${grantId}/drafters`,
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 14. AI health (admin only)
 // ---------------------------------------------------------------------------
 

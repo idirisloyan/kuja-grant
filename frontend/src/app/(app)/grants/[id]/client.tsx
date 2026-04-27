@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { EligibilityRequirement, Criterion, DocRequirement } from '@/lib/types';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
+import { LiveDraftersPill } from '@/components/grants/LiveDraftersPill';
 
 function formatFunding(amount: number | null, currency: string): string {
   if (!amount) return 'TBD';
@@ -112,6 +113,7 @@ export default function GrantDetailClient() {
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <h1 className="kuja-display text-3xl">{grant.title}</h1>
             <StatusBadge status={grant.status} kind="grant" />
+            {isDonor && <LiveDraftersPill grantId={grant.id} />}
           </div>
           {grant.donor_org_name && <p className="text-sm text-muted-foreground">{grant.donor_org_name}</p>}
           <div className="mt-2 flex flex-wrap gap-4 text-sm">
