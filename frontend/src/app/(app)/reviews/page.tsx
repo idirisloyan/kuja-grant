@@ -81,8 +81,8 @@ function ReviewerView() {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="kuja-display text-3xl">Review assignments</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">AI-prioritized queue with comparison support</p>
+          <h1 className="kuja-display text-3xl">{t('review.title_assignments')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('review.subtitle_queue')}</p>
         </div>
         {tab === 'pending' && pending.length >= 2 && (
           <button
@@ -123,22 +123,24 @@ function ReviewerView() {
                 : 'text-muted-foreground border-transparent hover:text-foreground',
             )}
           >
-            {k === 'pending' ? `Pending (${pending.length})` : `Completed (${completed.length})`}
+            {k === 'pending'
+              ? t('review.tab.pending_count', { n: pending.length })
+              : t('review.tab.completed_count', { n: completed.length })}
           </button>
         ))}
       </div>
 
       {tab === 'pending' && (
         pending.length === 0 ? (
-          <EmptyState icon={ClipboardCheck} title="No pending assignments" body="You have no applications to review right now." />
+          <EmptyState icon={ClipboardCheck} title={t('review.no_pending_title')} body={t('review.no_pending_body')} />
         ) : (
           <TableWrap>
             <tr className="bg-muted/30 border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-2.5 w-8" />
-              <th className="px-4 py-2.5">Applicant</th>
-              <th className="px-4 py-2.5">Grant</th>
-              <th className="px-4 py-2.5">Status</th>
-              <th className="px-4 py-2.5 text-right">Actions</th>
+              <th className="px-4 py-2.5">{t('common.col.applicant')}</th>
+              <th className="px-4 py-2.5">{t('common.col.grant')}</th>
+              <th className="px-4 py-2.5">{t('common.col.status')}</th>
+              <th className="px-4 py-2.5 text-right">{t('common.col.actions')}</th>
             </tr>
             {pending.map((r) => {
               const checked = selectedAppIds.has(r.application_id);
@@ -157,7 +159,7 @@ function ReviewerView() {
                     />
                   </td>
                   <td className="px-4 py-3 font-medium text-foreground">
-                    {r.ngo_org_name || `Application #${r.application_id}`}
+                    {r.ngo_org_name || t('applications.label_fallback', { n: r.application_id })}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{r.grant_title || '—'}</td>
                   <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
@@ -168,7 +170,7 @@ function ReviewerView() {
                       className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-xs font-medium px-3 py-1.5"
                     >
                       <Star className="h-3.5 w-3.5" />
-                      Start review
+                      {t('review.start_review_btn')}
                     </button>
                   </td>
                 </tr>
@@ -180,14 +182,14 @@ function ReviewerView() {
 
       {tab === 'completed' && (
         completed.length === 0 ? (
-          <EmptyState icon={FileText} title="No completed reviews" body="Reviews you complete will appear here." />
+          <EmptyState icon={FileText} title={t('review.no_completed_title')} body={t('review.no_completed_body')} />
         ) : (
           <TableWrap>
             <tr className="bg-muted/30 border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-2.5">Applicant</th>
-              <th className="px-4 py-2.5">Grant</th>
-              <th className="px-4 py-2.5 text-right">Score</th>
-              <th className="px-4 py-2.5">Completed</th>
+              <th className="px-4 py-2.5">{t('common.col.applicant')}</th>
+              <th className="px-4 py-2.5">{t('common.col.grant')}</th>
+              <th className="px-4 py-2.5 text-right">{t('common.col.score')}</th>
+              <th className="px-4 py-2.5">{t('common.col.completed')}</th>
             </tr>
             {completed.map((r) => {
               const s = r.overall_score ?? 0;
@@ -199,7 +201,7 @@ function ReviewerView() {
                   onClick={() => router.push(`/reviews/${r.application_id}`)}
                 >
                   <td className="px-4 py-3 font-medium text-foreground">
-                    {r.ngo_org_name || `Application #${r.application_id}`}
+                    {r.ngo_org_name || t('applications.label_fallback', { n: r.application_id })}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{r.grant_title || '—'}</td>
                   <td className={cn('px-4 py-3 text-right kuja-numeric font-semibold', color)}>
@@ -338,7 +340,7 @@ function ReviewerCompareCard({
 
 function DonorView() {
   const router = useRouter();
-  const { formatDate } = useTranslation();
+  const { t, formatDate } = useTranslation();
   const { data: appsData, isLoading: appsLoading } = useApplications();
   const { data: grantsData, isLoading: grantsLoading } = useGrants();
   const [grantFilter, setGrantFilter] = useState<string>('all');
@@ -363,8 +365,8 @@ function DonorView() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="kuja-display text-3xl">Applications to review</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{filtered.length} of {applications.length}</p>
+        <h1 className="kuja-display text-3xl">{t('review.donor_title')}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{filtered.length} / {applications.length}</p>
       </div>
 
       <div className="flex items-center gap-2">
@@ -375,7 +377,7 @@ function DonorView() {
             onChange={(e) => setGrantFilter(e.target.value)}
             className="h-9 pl-3 pr-8 text-sm rounded-md border border-input bg-background appearance-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]"
           >
-            <option value="all">All grants ({applications.length})</option>
+            <option value="all">{t('review.filter_all_grants', { n: applications.length })}</option>
             {grants.map((g) => (
               <option key={g.id} value={String(g.id)}>
                 {g.title} ({applications.filter((a) => a.grant_id === g.id).length})
@@ -387,14 +389,14 @@ function DonorView() {
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={FileText} title="No applications" body="Applications will appear here as NGOs submit them." />
+        <EmptyState icon={FileText} title={t('review.no_apps_donor_title')} body={t('review.no_apps_donor_body')} />
       ) : (
         <TableWrap>
           <tr className="bg-muted/30 border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <th className="px-4 py-2.5">Applicant</th>
-            <th className="px-4 py-2.5">Grant</th>
-            <th className="px-4 py-2.5">Status</th>
-            <th className="px-4 py-2.5 text-right">Submitted</th>
+            <th className="px-4 py-2.5">{t('common.col.applicant')}</th>
+            <th className="px-4 py-2.5">{t('common.col.grant')}</th>
+            <th className="px-4 py-2.5">{t('common.col.status')}</th>
+            <th className="px-4 py-2.5 text-right">{t('application.col.submitted')}</th>
           </tr>
           {filtered.map((a) => (
             <tr

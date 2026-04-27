@@ -123,8 +123,11 @@ export default function ReviewDetailClient() {
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [documents, setDocuments] = useState<DocType[]>([]);
-  const [docsLoading, setDocsLoading] = useState(false);
+  // Documents come back as part of /api/applications/<id>; no separate fetch
+  // is needed (the prior `/applications/<id>/documents` call 404'd in the
+  // browser console because that endpoint doesn't exist).
+  const documents: DocType[] = (application?.documents ?? []) as DocType[];
+  const docsLoading = appLoading;
   const [tab, setTab] = useState<'responses' | 'documents' | 'scores'>('scores');
 
   useEffect(() => {
@@ -134,15 +137,6 @@ export default function ReviewDetailClient() {
       setScores(initial);
     }
   }, [criteria, scores]);
-
-  useEffect(() => {
-    if (!appId) return;
-    setDocsLoading(true);
-    api.get<{ documents: DocType[] }>(`/applications/${appId}/documents`)
-      .then((res) => setDocuments(res.documents ?? []))
-      .catch(() => setDocuments([]))
-      .finally(() => setDocsLoading(false));
-  }, [appId]);
 
   const updateScore = useCallback((key: string, field: 'score' | 'comment', value: number | string) => {
     setScores((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
@@ -263,7 +257,7 @@ export default function ReviewDetailClient() {
           onClick={() => router.push('/reviews')}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" /> Back
+          <ArrowLeft className="h-4 w-4" /> {t('common.back')}
         </button>
         <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
           <FileText className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
@@ -308,7 +302,7 @@ export default function ReviewDetailClient() {
           onClick={() => router.push('/reviews')}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" /> Back
+          <ArrowLeft className="h-4 w-4" /> {t('common.back')}
         </button>
         <div>
           <h1 className="kuja-display text-2xl">{t('review.detail.score_app')}</h1>
@@ -364,25 +358,25 @@ export default function ReviewDetailClient() {
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
         {([
-          { id: 'responses', label: 'Responses', icon: MessageSquare },
-          { id: 'documents', label: 'Documents', icon: FileText },
-          { id: 'scores', label: 'Scores', icon: Star },
-        ] as const).map((t) => {
-          const Icon = t.icon;
+          { id: 'responses', labelKey: 'review.detail.tab.responses', icon: MessageSquare },
+          { id: 'documents', labelKey: 'review.detail.tab.documents', icon: FileText },
+          { id: 'scores', labelKey: 'review.detail.tab.scores', icon: Star },
+        ] as const).map((tabItem) => {
+          const Icon = tabItem.icon;
           return (
             <button
-              key={t.id}
+              key={tabItem.id}
               type="button"
-              onClick={() => setTab(t.id)}
+              onClick={() => setTab(tabItem.id)}
               className={cn(
                 'flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
-                tab === t.id
+                tab === tabItem.id
                   ? 'text-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]'
                   : 'text-muted-foreground border-transparent hover:text-foreground',
               )}
             >
               <Icon className="h-3.5 w-3.5" />
-              {t.label}
+              {t(tabItem.labelKey)}
             </button>
           );
         })}
@@ -652,10 +646,10 @@ export default function ReviewDetailClient() {
           {/* Submit */}
           <div className="flex items-center justify-between flex-wrap gap-3 pt-2">
             <div className="flex items-center gap-3">
-              <ScoreRing score={overallScore} size={64} strokeWidth={5} label="Total" />
+              <ScoreRing score={overallScore} size={64} strokeWidth={5} label={t('review.detail.total_label')} />
               <div>
-                <div className="text-sm font-semibold">Weighted total: {overallScore}%</div>
-                <div className="text-xs text-muted-foreground">Based on {criteria.length} criteria</div>
+                <div className="text-sm font-semibold">{t('review.detail.weighted_total', { n: overallScore })}</div>
+                <div className="text-xs text-muted-foreground">{t('review.detail.based_on_criteria', { n: criteria.length })}</div>
               </div>
             </div>
             <button
@@ -665,7 +659,7 @@ export default function ReviewDetailClient() {
               className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {submitting ? 'Submitting…' : 'Submit scores'}
+              {submitting ? t('review.submitting') : t('review.detail.submit_btn')}
             </button>
           </div>
         </div>

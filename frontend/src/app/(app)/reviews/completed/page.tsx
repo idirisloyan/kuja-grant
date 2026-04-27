@@ -25,28 +25,28 @@ export default function CompletedReviewsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="kuja-display text-3xl">Completed reviews</h1>
+        <h1 className="kuja-display text-3xl">{t('review.completed_title')}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
           {t('review.completed.subtitle')}
         </p>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {completed.length} review{completed.length !== 1 ? 's' : ''} completed
+          {t('review.tab.completed_count', { n: completed.length })}
         </p>
       </div>
 
       {completed.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
           <CheckCircle className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="kuja-display text-xl">No completed reviews yet</p>
+          <p className="kuja-display text-xl">{t('review.completed.empty_title')}</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Reviews you complete will be listed here for reference.
+            {t('review.completed.empty_body')}
           </p>
           <button
             type="button"
             onClick={() => router.push('/reviews')}
             className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand-50))] text-sm font-medium px-4 py-2"
           >
-            View pending assignments
+            {t('review.completed.view_pending_btn')}
           </button>
         </div>
       ) : (
@@ -55,10 +55,10 @@ export default function CompletedReviewsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/30 border-b border-border text-left">
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Application</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Grant</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Score</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Actions</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">{t('common.col.application')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">{t('common.col.grant')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">{t('common.col.score')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">{t('common.col.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -68,9 +68,9 @@ export default function CompletedReviewsPage() {
                   return (
                     <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground">
-                        <div>{r.ngo_org_name || `Application #${r.application_id}`}</div>
+                        <div>{r.ngo_org_name || t('applications.label_fallback', { n: r.application_id })}</div>
                         <div className="text-[11px] text-muted-foreground mt-0.5">
-                          Completed: {formatDate(r.completed_at)}
+                          {t('common.col.completed')}: {formatDate(r.completed_at)}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{r.grant_title || '—'}</td>
@@ -84,7 +84,7 @@ export default function CompletedReviewsPage() {
                           className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-[hsl(var(--kuja-clay))] text-sm"
                         >
                           <Eye className="h-4 w-4" />
-                          View
+                          {t('common.col.view')}
                         </button>
                       </td>
                     </tr>

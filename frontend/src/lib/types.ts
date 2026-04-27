@@ -169,6 +169,8 @@ export interface Application {
   country?: string;
   responses?: Record<string, string>;
   eligibility_responses?: Record<string, unknown>;
+  // Documents are included by /api/applications/<id> (full detail response).
+  documents?: Document[];
 }
 
 // ---------------------------------------------------------------------------

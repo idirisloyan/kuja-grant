@@ -29,14 +29,21 @@ function getDaysUntil(dateStr: string | null | undefined): number {
   return Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-function getDeadlineText(dateStr: string | null | undefined): { label: string; cls: string } {
+// Returns the deadline as a translation lookup so the label stays in the
+// user's language. Color class is independent of locale.
+function getDeadlineText(
+  dateStr: string | null | undefined,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): { label: string; cls: string } {
   if (!dateStr) return { label: '', cls: 'text-muted-foreground' };
   const days = getDaysUntil(dateStr);
-  if (days < 0) return { label: `${Math.abs(days)}d overdue`, cls: 'text-red-600' };
-  if (days === 0) return { label: 'Due today', cls: 'text-red-600' };
-  if (days <= 7) return { label: `${days}d left`, cls: 'text-red-600' };
-  if (days <= 30) return { label: `${days}d left`, cls: 'text-amber-600' };
-  return { label: `${days}d left`, cls: 'text-muted-foreground' };
+  if (days < 0) {
+    return { label: t('deadline.overdue', { n: Math.abs(days) }), cls: 'text-red-600' };
+  }
+  if (days === 0) return { label: t('deadline.due_today'), cls: 'text-red-600' };
+  if (days <= 7) return { label: t('deadline.days_left', { n: days }), cls: 'text-red-600' };
+  if (days <= 30) return { label: t('deadline.days_left', { n: days }), cls: 'text-amber-600' };
+  return { label: t('deadline.days_left', { n: days }), cls: 'text-muted-foreground' };
 }
 
 function getUrgencyColor(dateStr: string): string {
@@ -60,6 +67,7 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 }
 
 function StatusChip({ status }: { status: string }) {
+  const { t } = useTranslation();
   const palette: Record<string, string> = {
     accepted: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     submitted: 'bg-sky-50 text-sky-700 border-sky-200',
@@ -67,17 +75,21 @@ function StatusChip({ status }: { status: string }) {
     revision_requested: 'bg-amber-50 text-amber-700 border-amber-200',
     draft: 'bg-muted text-muted-foreground border-border',
   };
-  const labels: Record<string, string> = {
-    accepted: 'Accepted',
-    submitted: 'Submitted',
-    under_review: 'Review',
-    revision_requested: 'Revise',
-    draft: 'Draft',
+  // Resolve via i18n key. Falls back to the raw status if no key exists,
+  // so a new backend status doesn't crash the render.
+  const labelMap: Record<string, string> = {
+    accepted: 'status.accepted',
+    submitted: 'status.submitted',
+    under_review: 'status.under_review',
+    revision_requested: 'status.revision_requested',
+    draft: 'status.draft',
   };
+  const labelKey = labelMap[status];
+  const label = labelKey ? t(labelKey) : status;
   const cls = palette[status] ?? palette.draft;
   return (
     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${cls}`}>
-      {labels[status] ?? status}
+      {label}
     </span>
   );
 }
@@ -152,7 +164,19 @@ function ComplianceCalendar({ reportsByGrant }: {
     }
   };
 
-  const dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  // Day headers in the user's locale. We pick a known Monday (2024-01-01)
+  // and step through the week, using Intl.DateTimeFormat with the active
+  // language so Arabic shows اث/ثل/أر/خم/جم/سب/أح, etc.
+  const lang = (typeof document !== 'undefined' && document.documentElement.lang) || 'en';
+  const dayHeaders = (() => {
+    const fmt = new Intl.DateTimeFormat(lang, { weekday: 'short' });
+    const monday = new Date(2024, 0, 1); // Mon, Jan 1 2024
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return fmt.format(d);
+    });
+  })();
 
   return (
     <Card className="p-5">
@@ -164,9 +188,9 @@ function ComplianceCalendar({ reportsByGrant }: {
         <div className="hidden items-center gap-3 sm:flex">
           {[
             { color: '#EF4444', label: t('common.overdue') },
-            { color: '#F59E0B', label: '< 7d' },
-            { color: '#3B82F6', label: '< 30d' },
-            { color: '#9CA3AF', label: '30d+' },
+            { color: '#F59E0B', label: t('deadline.legend.under_7d') },
+            { color: '#3B82F6', label: t('deadline.legend.under_30d') },
+            { color: '#9CA3AF', label: t('deadline.legend.over_30d') },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-1">
               <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
@@ -889,7 +913,7 @@ export default function ReportsPage() {
             ) : (
               <div>
                 {timelineItems.map((item) => {
-                  const dl = getDeadlineText(item.report.due_date);
+                  const dl = getDeadlineText(item.report.due_date, t);
                   return (
                     <div
                       key={item.report.id}
@@ -1013,7 +1037,7 @@ function ReportRow({ report, mutateReports }: { report: Report; mutateReports: (
   const { t, formatDate } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const dl = getDeadlineText(report.due_date);
+  const dl = getDeadlineText(report.due_date, t);
 
   const aiScore = report.ai_analysis
     ? Number((report.ai_analysis as Record<string, unknown>).score) || null

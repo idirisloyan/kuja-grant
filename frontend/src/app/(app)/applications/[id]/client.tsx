@@ -103,7 +103,7 @@ export default function ApplicationDetailClient() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <h1 className="kuja-display text-3xl">
-              {application.grant_title || `Application #${application.id}`}
+              {application.grant_title || t('applications.label_fallback', { n: application.id })}
             </h1>
             <StatusBadge status={application.status} kind="app" />
           </div>
@@ -176,18 +176,19 @@ export default function ApplicationDetailClient() {
       </div>
 
       {tab === 'responses' && <ResponsesTab application={application} />}
-      {tab === 'documents' && <EmptyTab icon={Upload} label="Documents uploaded with this application will appear here" />}
+      {tab === 'documents' && <EmptyTab icon={Upload} label={t('applications.documents_empty')} />}
       {tab === 'scores' && <ScoresTab application={application} />}
-      {tab === 'reviews' && <EmptyTab icon={MessageSquare} label="Reviewer scores and comments will appear here" />}
+      {tab === 'reviews' && <EmptyTab icon={MessageSquare} label={t('applications.reviews_empty')} />}
     </div>
   );
 }
 
 function ResponsesTab({ application }: { application: Application }) {
+  const { t } = useTranslation();
   const responses = (application.responses ?? {}) as Record<string, string>;
   const entries = Object.entries(responses);
   if (entries.length === 0) {
-    return <EmptyTab icon={FileText} label="No responses submitted" />;
+    return <EmptyTab icon={FileText} label={t('applications.no_responses')} />;
   }
   return (
     <div className="space-y-3">
@@ -203,7 +204,7 @@ function ResponsesTab({ application }: { application: Application }) {
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold capitalize">{key.replace(/_/g, ' ')}</span>
               <span className={`text-[10px] rounded-full border px-2 py-0.5 uppercase tracking-wider ${wcCls}`}>
-                {wordCount} words
+                {t('applications.word_count', { n: wordCount })}
               </span>
             </div>
             <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">{value}</p>
@@ -213,7 +214,7 @@ function ResponsesTab({ application }: { application: Application }) {
 
       {application.eligibility_responses && Object.keys(application.eligibility_responses).length > 0 && (
         <div className="rounded-xl border border-border bg-background p-4">
-          <div className="text-sm font-semibold mb-3">Eligibility responses</div>
+          <div className="text-sm font-semibold mb-3">{t('applications.eligibility_responses')}</div>
           <div className="space-y-1.5">
             {Object.entries(application.eligibility_responses).map(([key, val]) => {
               const item = val as Record<string, unknown>;
@@ -243,21 +244,22 @@ function ResponsesTab({ application }: { application: Application }) {
 }
 
 function ScoresTab({ application }: { application: Application }) {
+  const { t } = useTranslation();
   const hasScores =
     application.ai_score != null || application.human_score != null || application.final_score != null;
-  if (!hasScores) return <EmptyTab icon={BarChart3} label="Scores will appear after AI and reviewer evaluation" />;
+  if (!hasScores) return <EmptyTab icon={BarChart3} label={t('applications.scores_empty')} />;
   return (
     <div className="rounded-xl border border-border bg-background p-5">
-      <div className="text-sm font-semibold mb-4">Score overview</div>
+      <div className="text-sm font-semibold mb-4">{t('applications.score_overview')}</div>
       <div className="flex items-center justify-center gap-10 flex-wrap">
         {application.ai_score != null && (
-          <ScoreRing score={Math.round(application.ai_score)} size={100} label="AI Score" />
+          <ScoreRing score={Math.round(application.ai_score)} size={100} label={t('applications.score.ai')} />
         )}
         {application.human_score != null && (
-          <ScoreRing score={Math.round(application.human_score)} size={100} label="Human" />
+          <ScoreRing score={Math.round(application.human_score)} size={100} label={t('applications.score.human')} />
         )}
         {application.final_score != null && (
-          <ScoreRing score={Math.round(application.final_score)} size={100} label="Final" />
+          <ScoreRing score={Math.round(application.final_score)} size={100} label={t('applications.score.final')} />
         )}
       </div>
     </div>

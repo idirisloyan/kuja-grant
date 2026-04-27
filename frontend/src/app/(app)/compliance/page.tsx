@@ -114,7 +114,7 @@ function GrantAccordion({ grant, reports }: { grant: Grant; reports: Report[] })
                         <div className="flex items-center gap-3 flex-shrink-0 text-xs">
                           {isOverdue && daysOverdue > 0 && (
                             <span className="rounded-full bg-[hsl(var(--kuja-flag))] text-white px-2 py-0.5 text-[10px] font-semibold">
-                              {daysOverdue}d overdue
+                              {t('deadline.overdue', { n: daysOverdue })}
                             </span>
                           )}
                           {score !== null && (
