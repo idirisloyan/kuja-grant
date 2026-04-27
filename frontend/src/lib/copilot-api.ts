@@ -568,6 +568,67 @@ export function postRecomputeMatches(input: {
 }
 
 // ---------------------------------------------------------------------------
+// 13c. Grant Q&A — Phase 4.3 (NGO ↔ donor inline questions)
+// ---------------------------------------------------------------------------
+
+export interface GrantQuestion {
+  id: number;
+  grant_id: number;
+  ngo_org_id?: number;
+  asked_by_user_id?: number;
+  anchor_kind: string | null;
+  anchor_key: string | null;
+  question: string;
+  answer: string | null;
+  answered_by_user_id?: number;
+  answered_at: string | null;
+  status: 'pending' | 'answered' | 'moderated';
+  created_at: string;
+  updated_at: string;
+}
+
+export function fetchGrantQuestions(grantId: number) {
+  return safeCall<{ questions: GrantQuestion[] }>(() =>
+    api.get<CopilotResult<{ questions: GrantQuestion[] }>>(
+      `/grants/${grantId}/questions`,
+    ),
+  );
+}
+
+export function postGrantQuestion(input: {
+  grant_id: number;
+  question: string;
+  anchor_kind?: 'criterion' | 'eligibility' | 'document';
+  anchor_key?: string;
+}) {
+  const { grant_id, ...body } = input;
+  return safeCall<{ question: GrantQuestion }>(() =>
+    api.post<CopilotResult<{ question: GrantQuestion }>>(
+      `/grants/${grant_id}/questions`,
+      body,
+    ),
+  );
+}
+
+export function answerGrantQuestion(grantId: number, qid: number, answer: string) {
+  return safeCall<{ question: GrantQuestion }>(() =>
+    api.post<CopilotResult<{ question: GrantQuestion }>>(
+      `/grants/${grantId}/questions/${qid}/answer`,
+      { answer },
+    ),
+  );
+}
+
+export function moderateGrantQuestion(grantId: number, qid: number, reason?: string) {
+  return safeCall<{ question: GrantQuestion }>(() =>
+    api.post<CopilotResult<{ question: GrantQuestion }>>(
+      `/grants/${grantId}/questions/${qid}/moderate`,
+      reason ? { reason } : {},
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 14. AI health (admin only)
 // ---------------------------------------------------------------------------
 
