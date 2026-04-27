@@ -24,6 +24,14 @@ IP_RATE_LIMIT_WINDOW = 300       # 5-minute sliding window (seconds)
 # Adeso retest cohort specifically) were locked out during normal multi-role
 # verification passes. Still env-configurable for stricter prod hardening.
 IP_RATE_LIMIT_MAX = int(os.environ.get('RATE_LIMIT_LOGIN_PER_IP', '100'))
+
+# Enumeration guard: trips when one IP attempts logins against many DIFFERENT
+# email addresses in the window. The high IP_RATE_LIMIT_MAX (100) intentionally
+# accommodates legit multi-role retests (~10 unique seed accounts), but it
+# leaves a credential-stuffing / enumeration path open. This check is the
+# tighter rail: 15 unique unknown emails from one IP within 5 min is not
+# normal QA behavior — it's enumeration.
+IP_ENUMERATION_THRESHOLD = int(os.environ.get('RATE_LIMIT_ENUM_PER_IP', '15'))
 _ip_table_ready = None
 
 
@@ -87,6 +95,33 @@ def _check_ip_rate_limit(ip):
         return count >= IP_RATE_LIMIT_MAX
     except Exception as e:
         logger.error(f"IP rate limit check failed: {e}")
+        db.session.rollback()
+        return False
+
+
+def _check_ip_enumeration(ip):
+    """Detect credential enumeration: one IP, many distinct email targets.
+
+    Legit multi-role QA (10 seed accounts) won't trip this; an attacker
+    cycling through usernames will. Defaults to 15 distinct emails per
+    5-minute window before 429.
+    """
+    if not _ensure_ip_table():
+        return False
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=IP_RATE_LIMIT_WINDOW)
+        result = db.session.execute(
+            text(
+                "SELECT COUNT(DISTINCT email) FROM login_attempts "
+                "WHERE ip = :ip AND attempted_at > :cutoff "
+                "AND email IS NOT NULL AND email <> ''"
+            ),
+            {"ip": ip, "cutoff": cutoff},
+        )
+        count = result.scalar() or 0
+        return count >= IP_ENUMERATION_THRESHOLD
+    except Exception as e:
+        logger.error(f"IP enumeration check failed: {e}")
         db.session.rollback()
         return False
 
@@ -200,6 +235,21 @@ def api_login():
         }), 429
 
     _record_ip_attempt(client_ip, email)
+
+    # --- Enumeration guard (catches an IP cycling through distinct emails) ---
+    # Runs AFTER recording so the current attempt counts toward the unique-
+    # email tally. Caller's threshold trip + 429 happens before any further
+    # credential check, denying both correct and incorrect passwords once
+    # enumeration is detected.
+    if _check_ip_enumeration(client_ip):
+        logger.warning(
+            f"IP enumeration detected: {client_ip} "
+            f"(>={IP_ENUMERATION_THRESHOLD} distinct emails in {IP_RATE_LIMIT_WINDOW}s)"
+        )
+        return jsonify({
+            'success': False,
+            'error': 'Too many login attempts from this address. Please wait a few minutes before trying again.',
+        }), 429
 
     user = User.query.filter_by(email=email).first()
 

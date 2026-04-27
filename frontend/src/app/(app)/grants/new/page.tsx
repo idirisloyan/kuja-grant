@@ -606,10 +606,9 @@ export default function CreateGrantPage() {
         <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--kuja-spark-soft))]">
           <Sparkles className="h-8 w-8 text-[hsl(var(--kuja-spark))]" />
         </div>
-        <h2 className="kuja-display mb-2 text-2xl font-bold">Upload Your Grant Agreement</h2>
+        <h2 className="kuja-display mb-2 text-2xl font-bold">{t('grant.wizard.upload_title')}</h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Our AI will extract eligibility requirements, reporting schedules, and KPIs automatically —
-          saving you hours of manual data entry.
+          {t('grant.wizard.upload_subtitle')}
         </p>
       </div>
 
@@ -648,8 +647,8 @@ export default function CreateGrantPage() {
           ) : (
             <div className="flex flex-col items-center gap-2">
               <CloudUpload className="h-12 w-12 text-muted-foreground" />
-              <div className="text-sm font-medium">Drag & drop your grant document here</div>
-              <div className="text-xs text-muted-foreground">or click to browse</div>
+              <div className="text-sm font-medium">{t('grant.wizard.dropzone_primary')}</div>
+              <div className="text-xs text-muted-foreground">{t('grant.wizard.dropzone_secondary')}</div>
               <div className="mt-1 flex gap-1">
                 {['PDF', 'DOC', 'DOCX', 'TXT'].map((fmt) => (
                   <span
@@ -775,7 +774,7 @@ export default function CreateGrantPage() {
         onClick={goNext}
         className="mt-2 text-xs text-muted-foreground hover:text-foreground"
       >
-        Skip — I&apos;ll enter details manually
+        {t('grant.wizard.skip_manual')}
       </button>
     </div>
   );
@@ -788,27 +787,27 @@ export default function CreateGrantPage() {
         </Alert>
       )}
 
-      <Field label="Grant Title *">
+      <Field label={t('grant.wizard.title_required')}>
         <input
           value={basic.title}
           onChange={(e) => updateBasic('title', e.target.value)}
-          placeholder="e.g., Community Health Resilience Program 2026"
+          placeholder={t('grant.create.grant_title_placeholder')}
           className={INPUT_CLS}
         />
       </Field>
 
-      <Field label="Description">
+      <Field label={t('grant.create.description')}>
         <textarea
           rows={4}
           value={basic.description}
           onChange={(e) => updateBasic('description', e.target.value)}
-          placeholder="Describe the grant purpose, objectives, and target outcomes..."
+          placeholder={t('grant.create.description_placeholder')}
           className={TA_CLS}
         />
       </Field>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Field label="Total Funding Amount">
+        <Field label={t('grant.create.total_funding')}>
           <div className="relative">
             <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -820,7 +819,7 @@ export default function CreateGrantPage() {
             />
           </div>
         </Field>
-        <Field label="Currency">
+        <Field label={t('grant.create.currency')}>
           <select
             value={basic.currency}
             onChange={(e) => updateBasic('currency', e.target.value)}
@@ -833,7 +832,7 @@ export default function CreateGrantPage() {
             ))}
           </select>
         </Field>
-        <Field label="Application Deadline">
+        <Field label={t('grant.create.deadline')}>
           <input
             type="date"
             value={basic.deadline}
@@ -843,7 +842,7 @@ export default function CreateGrantPage() {
         </Field>
       </div>
 
-      <Field label="Sectors">
+      <Field label={t('grant.create.sectors')}>
         <MultiSelectToggle
           options={SECTOR_OPTIONS}
           selected={basic.sectors}
@@ -851,7 +850,7 @@ export default function CreateGrantPage() {
         />
       </Field>
 
-      <Field label="Target Countries">
+      <Field label={t('grant.create.countries')}>
         <MultiSelectToggle
           options={COUNTRY_OPTIONS}
           selected={basic.countries}
@@ -1199,21 +1198,21 @@ export default function CreateGrantPage() {
 
       <Card>
         <div className="p-5">
-          <div className="mb-3 text-sm font-semibold">Basic Information</div>
+          <div className="mb-3 text-sm font-semibold">{t('grant.create.basic_information')}</div>
           <div className="space-y-1.5 text-sm">
-            <SummaryRow label="Title" value={basic.title || '(not set)'} />
+            <SummaryRow label={t('grant.create.title_label')} value={basic.title || '—'} />
             <SummaryRow
-              label="Funding"
+              label={t('grant.create.total_funding')}
               value={
                 basic.total_funding
                   ? `${basic.currency} ${Number(basic.total_funding).toLocaleString()}`
-                  : '(not set)'
+                  : '—'
               }
             />
-            <SummaryRow label="Deadline" value={basic.deadline || '(not set)'} />
+            <SummaryRow label={t('grant.create.deadline')} value={basic.deadline || '—'} />
             {basic.sectors.length > 0 && (
               <div className="flex items-start justify-between">
-                <span className="text-muted-foreground">Sectors</span>
+                <span className="text-muted-foreground">{t('grant.create.sectors')}</span>
                 <div className="flex max-w-[60%] flex-wrap justify-end gap-1">
                   {basic.sectors.map((s) => (
                     <span
@@ -1228,7 +1227,7 @@ export default function CreateGrantPage() {
             )}
             {basic.countries.length > 0 && (
               <div className="flex items-start justify-between">
-                <span className="text-muted-foreground">Countries</span>
+                <span className="text-muted-foreground">{t('grant.create.countries')}</span>
                 <div className="flex max-w-[60%] flex-wrap justify-end gap-1">
                   {basic.countries.map((c) => (
                     <span
@@ -1248,7 +1247,7 @@ export default function CreateGrantPage() {
       {eligibility.some((e) => e.enabled) && (
         <Card>
           <div className="p-5">
-            <div className="mb-3 text-sm font-semibold">Eligibility Requirements</div>
+            <div className="mb-3 text-sm font-semibold">{t('grant.wizard.eligibility_requirements')}</div>
             <div className="space-y-1.5">
               {eligibility
                 .filter((e) => e.enabled)
@@ -1270,7 +1269,7 @@ export default function CreateGrantPage() {
         <Card>
           <div className="p-5">
             <div className="mb-3 flex items-center gap-2">
-              <span className="text-sm font-semibold">Evaluation Criteria</span>
+              <span className="text-sm font-semibold">{t('grant.wizard.evaluation_criteria')}</span>
               <span
                 className={`text-xs ${
                   criteriaWeightTotal === 100 ? 'text-emerald-600' : 'text-red-600'
@@ -1296,7 +1295,7 @@ export default function CreateGrantPage() {
       {docReqs.some((d) => d.enabled) && (
         <Card>
           <div className="p-5">
-            <div className="mb-3 text-sm font-semibold">Required Documents</div>
+            <div className="mb-3 text-sm font-semibold">{t('grant.wizard.required_documents')}</div>
             <div className="flex flex-wrap gap-1.5">
               {docReqs
                 .filter((d) => d.enabled)

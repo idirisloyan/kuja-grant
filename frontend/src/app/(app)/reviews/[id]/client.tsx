@@ -45,7 +45,7 @@ export default function ReviewDetailClient() {
   // prerendered HTML, so params.id hydrates as "0" for any real id. The URL
   // is the source of truth. We use useState so the resolved id is stable
   // across re-renders and SWR doesn't thrash on a derived value.
-  const [id, setId] = useState<number | null>(() => {
+  const [urlId, setUrlId] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
       const m = window.location.pathname.match(/\/reviews\/(\d+)/);
       if (m && m[1] !== '0') return Number(m[1]);
@@ -61,16 +61,45 @@ export default function ReviewDetailClient() {
     const m = window.location.pathname.match(/\/reviews\/(\d+)/);
     if (m && m[1] !== '0') {
       const n = Number(m[1]);
-      if (n !== id) setId(n);
+      if (n !== urlId) setUrlId(n);
       return;
     }
     const fromParams = Number(params.id);
-    if (Number.isFinite(fromParams) && fromParams > 0 && fromParams !== id) {
-      setId(fromParams);
+    if (Number.isFinite(fromParams) && fromParams > 0 && fromParams !== urlId) {
+      setUrlId(fromParams);
     }
-  }, [params.id, id]);
+  }, [params.id, urlId]);
 
-  const { data: appData, isLoading: appLoading, mutate: mutateApp } = useApplication(id);
+  // The /reviews/<id> URL accepts BOTH review IDs and application IDs.
+  // Try as a review first (canonical interpretation since we're under
+  // /reviews/) — that covers links shared from notifications, queue rows
+  // that pass review.id, and direct URL entry. Fall back to treating <id>
+  // as an application_id (legacy queue rows + cross-portal links).
+  const [appId, setAppId] = useState<number | null>(null);
+  const [resolvingId, setResolvingId] = useState(false);
+  useEffect(() => {
+    if (urlId == null) {
+      setAppId(null);
+      return;
+    }
+    let cancelled = false;
+    setResolvingId(true);
+    api.get<{ review: { application_id: number } }>(`/reviews/${urlId}`)
+      .then((res) => {
+        if (cancelled) return;
+        const applicationId = res?.review?.application_id;
+        setAppId(typeof applicationId === 'number' ? applicationId : urlId);
+      })
+      .catch(() => {
+        // 404/403 from the review lookup — assume the URL id is itself an
+        // application_id and let useApplication handle access control.
+        if (!cancelled) setAppId(urlId);
+      })
+      .finally(() => { if (!cancelled) setResolvingId(false); });
+    return () => { cancelled = true; };
+  }, [urlId]);
+
+  const { data: appData, isLoading: appLoading, mutate: mutateApp } = useApplication(appId);
   const application = appData?.application ?? null;
 
   const grantId = application?.grant_id ?? null;
@@ -107,25 +136,25 @@ export default function ReviewDetailClient() {
   }, [criteria, scores]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!appId) return;
     setDocsLoading(true);
-    api.get<{ documents: DocType[] }>(`/applications/${id}/documents`)
+    api.get<{ documents: DocType[] }>(`/applications/${appId}/documents`)
       .then((res) => setDocuments(res.documents ?? []))
       .catch(() => setDocuments([]))
       .finally(() => setDocsLoading(false));
-  }, [id]);
+  }, [appId]);
 
   const updateScore = useCallback((key: string, field: 'score' | 'comment', value: number | string) => {
     setScores((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
   }, []);
 
   const handleSuggestRationale = useCallback(async (criterionKey: string) => {
-    if (!id) return;
+    if (!appId) return;
     setCriterionAiLoading((p) => ({ ...p, [criterionKey]: true }));
     try {
       const res = await api.post<{ success: boolean; score: number; rationale: string }>(
         '/ai/score-criterion',
-        { application_id: id, criterion_key: criterionKey },
+        { application_id: appId, criterion_key: criterionKey },
       );
       if (res.success && res.rationale) {
         setScores((prev) => ({
@@ -143,17 +172,17 @@ export default function ReviewDetailClient() {
     } finally {
       setCriterionAiLoading((p) => ({ ...p, [criterionKey]: false }));
     }
-  }, [id, t]);
+  }, [appId, t]);
 
   const handleAiScore = useCallback(async () => {
-    if (!id) return;
+    if (!appId) return;
     setAiScoring(true);
     setError('');
     try {
       const res = await api.post<{
         success: boolean;
         scores: { criterion_scores?: Record<string, { score: number; feedback: string }> };
-      }>(`/ai/score-application`, { application_id: id });
+      }>(`/ai/score-application`, { application_id: appId });
       if (res.success && res.scores?.criterion_scores) {
         const ai = res.scores.criterion_scores;
         setScores((prev) => {
@@ -170,15 +199,15 @@ export default function ReviewDetailClient() {
     } finally {
       setAiScoring(false);
     }
-  }, [id, mutateApp]);
+  }, [appId, mutateApp]);
 
   const handleExtractEvidence = useCallback(async () => {
-    if (!id) return;
+    if (!appId) return;
     setLoadingEvidence(true);
     setEvidenceError(null);
     try {
       const res = await api.post<EvidenceResult>('/ai/extract-evidence', {
-        application_id: id,
+        application_id: appId,
       });
       setEvidenceResult(res);
     } catch (err) {
@@ -188,10 +217,10 @@ export default function ReviewDetailClient() {
     } finally {
       setLoadingEvidence(false);
     }
-  }, [id, t]);
+  }, [appId, t]);
 
   const handleSubmit = useCallback(async () => {
-    if (!id) return;
+    if (!appId) return;
     setSubmitting(true);
     setError('');
     try {
@@ -201,7 +230,7 @@ export default function ReviewDetailClient() {
         scoreMap[key] = val.score;
         commentMap[key] = val.comment;
       }
-      await api.post('/reviews/', { application_id: id, scores: scoreMap, comments: commentMap });
+      await api.post('/reviews/', { application_id: appId, scores: scoreMap, comments: commentMap });
       setSuccess(true);
       await mutateApp();
     } catch (err) {
@@ -209,12 +238,13 @@ export default function ReviewDetailClient() {
     } finally {
       setSubmitting(false);
     }
-  }, [id, scores, mutateApp]);
+  }, [appId, scores, mutateApp]);
 
-  // Show skeleton while we resolve id from URL OR while SWR is fetching.
-  // Without the `id == null` guard, the static-export placeholder briefly
-  // fires the not-found UI before window.location is read.
-  if (id == null || appLoading || grantLoading) {
+  // Show skeleton while we resolve id from URL, while we figure out
+  // whether the URL id was a review or application id, OR while SWR is
+  // fetching. Without the guards, the static-export placeholder or the
+  // pre-resolution gap briefly fires the not-found UI.
+  if (urlId == null || resolvingId || appId == null || appLoading || grantLoading) {
     return (
       <div className="max-w-5xl mx-auto space-y-3">
         <div className="kuja-shimmer h-8 w-64 rounded" />
@@ -282,7 +312,7 @@ export default function ReviewDetailClient() {
         </button>
         <div>
           <h1 className="kuja-display text-2xl">{t('review.detail.score_app')}</h1>
-          <p className="text-sm text-muted-foreground">Application #{id}</p>
+          <p className="text-sm text-muted-foreground">Application #{appId}</p>
         </div>
       </div>
 
