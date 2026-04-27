@@ -5,8 +5,9 @@ import { useGrants, useReports } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { InfoTip } from '@/components/shared/info-tip';
 import {
-  ShieldCheck, AlertTriangle, Clock, BarChart3, FileText, TrendingUp, ChevronDown, ChevronUp,
+  ShieldCheck, AlertTriangle, Clock, BarChart3, FileText, TrendingUp, ChevronDown, ChevronUp, Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Grant, Report } from '@/lib/types';
@@ -27,13 +28,8 @@ function RiskDot({ level }: { level: 'green' | 'amber' | 'red' }) {
   return <span className={cn('inline-block w-2.5 h-2.5 rounded-full flex-shrink-0', cls)} />;
 }
 
-function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
 function GrantAccordion({ grant, reports }: { grant: Grant; reports: Report[] }) {
-  const { t } = useTranslation();
+  const { t, formatDate } = useTranslation();
   const [open, setOpen] = useState(false);
 
   const orgMap = useMemo(() => {
@@ -73,7 +69,7 @@ function GrantAccordion({ grant, reports }: { grant: Grant; reports: Report[] })
         </div>
         <div className="flex items-center gap-3">
           <ScoreRing score={avg} size={48} strokeWidth={4} label="Compl." />
-          <StatusBadge status={grant.status} />
+          <StatusBadge status={grant.status} kind="grant" />
           {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
         </div>
       </button>
@@ -86,7 +82,7 @@ function GrantAccordion({ grant, reports }: { grant: Grant; reports: Report[] })
           ) : (
             Array.from(orgMap.entries()).map(([orgName, orgReports]) => (
               <div key={orgName} className="mt-4 first:mt-4">
-                <div className="flex items-center gap-2 mb-1.5">
+                <div className="flex items-center gap-2 mb-1.5 bg-muted/20 px-3 py-2 rounded-md">
                   <FileText className="h-3.5 w-3.5 text-[hsl(var(--kuja-clay))]" />
                   <span className="text-sm font-medium">{orgName}</span>
                 </div>
@@ -132,7 +128,7 @@ function GrantAccordion({ grant, reports }: { grant: Grant; reports: Report[] })
                           <span className={cn(isOverdue ? 'text-[hsl(var(--kuja-flag))]' : 'text-muted-foreground')}>
                             Due: {formatDate(r.due_date)}
                           </span>
-                          <StatusBadge status={r.status} />
+                          <StatusBadge status={r.status} kind="report" />
                         </div>
                       </div>
                     );
@@ -153,7 +149,10 @@ export default function CompliancePage() {
   const { data: reportsData, isLoading: reportsLoading } = useReports();
 
   const isLoading = grantsLoading || reportsLoading;
-  const grants = grantsData?.grants ?? [];
+  // Compliance is a posture-tracking surface for ACTIVE grants. Drafts have no
+  // applications, no awards, and no compliance signal — they were polluting
+  // the donor compliance view with empty test rows. Exclude them here.
+  const grants = (grantsData?.grants ?? []).filter((g) => g.status !== 'draft');
   const reports = reportsData?.reports ?? [];
 
   const reportsByGrant = useMemo(() => {
@@ -197,7 +196,10 @@ export default function CompliancePage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="kuja-display text-3xl">{t('compliance.dashboard_title') || 'Compliance'}</h1>
+        <h1 className="kuja-display text-3xl inline-flex items-center gap-2">
+          {t('compliance.dashboard_title') || 'Compliance'}
+          <InfoTip>{t('glossary.compliance')}</InfoTip>
+        </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
           {t('compliance.dashboard_subtitle') || 'Track grant compliance, deliverables, and risk.'}
         </p>
@@ -227,11 +229,21 @@ export default function CompliancePage() {
         </div>
       )}
 
+      {(summary.overdueItems > 0 || summary.atRisk > 0) && (
+        <div className="rounded-xl border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]/40 p-3 flex items-start gap-3">
+          <Sparkles className="h-4 w-4 text-[hsl(var(--kuja-spark))] flex-shrink-0 mt-0.5" />
+          <div className="flex-1 text-xs leading-relaxed">
+            <span className="font-semibold text-[hsl(var(--kuja-spark))]">{t('compliance.recommended_action_title')}</span>{' '}
+            {t('compliance.recommended_action_body', { overdue: summary.overdueItems, atRisk: summary.atRisk })}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <SummaryStat icon={AlertTriangle} label={t('compliance.at_risk') || 'At risk'} value={summary.atRisk} tone="danger" />
+        <SummaryStat icon={Clock} label={t('compliance.overdue_items') || 'Overdue items'} value={summary.overdueItems} tone="warn" />
         <SummaryStat icon={ShieldCheck} label={t('compliance.total_grants') || 'Total grants'} value={summary.totalGrants} />
         <SummaryStat icon={TrendingUp} label={t('compliance.avg_compliance') || 'Avg compliance'} value={`${summary.avgCompliance}%`} tone="success" />
-        <SummaryStat icon={Clock} label={t('compliance.overdue_items') || 'Overdue items'} value={summary.overdueItems} tone="warn" />
-        <SummaryStat icon={AlertTriangle} label={t('compliance.at_risk') || 'At risk'} value={summary.atRisk} tone="danger" />
       </div>
 
       <div className="space-y-2">

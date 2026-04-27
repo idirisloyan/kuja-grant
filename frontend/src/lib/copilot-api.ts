@@ -32,10 +32,24 @@ async function safeCall<T>(fn: () => Promise<CopilotResult<T>>): Promise<Copilot
 // 1. Donor portfolio insights
 // ---------------------------------------------------------------------------
 
+export type DonorActionType =
+  | 'review_applications'
+  | 'review_compliance'
+  | 'review_reports'
+  | 'create_grant'
+  | 'manage_grants'
+  | 'assign_reviewers'
+  | 'other';
+
 export interface DonorPortfolioInsights {
   headline: string;
   sections?: Array<{ title: string; body: string; severity?: string }>;
-  next_decisions?: Array<{ title: string; detail: string; severity?: string }>;
+  next_decisions?: Array<{
+    title: string;
+    detail: string;
+    severity?: string;
+    action_type?: DonorActionType;
+  }>;
 }
 
 export function fetchDonorPortfolioInsights() {
@@ -54,6 +68,11 @@ export interface GrantScaffold {
   reporting_requirements?: Array<{ title: string; frequency: string; detail: string }>;
   exclusions?: string[];
   guidance?: string;
+  burden?: {
+    score?: 'low' | 'medium' | 'high';
+    drivers?: string[];
+    simplifications?: string[];
+  };
 }
 
 export function fetchGrantScaffold(input: {
@@ -72,12 +91,29 @@ export function fetchGrantScaffold(input: {
 // 3. NGO readiness
 // ---------------------------------------------------------------------------
 
+// action_type lets the readiness console route each next_action to the
+// page that completes it, instead of just opening the co-pilot rail.
+export type NgoActionType =
+  | 'apply_grant'
+  | 'submit_report'
+  | 'complete_assessment'
+  | 'upload_document'
+  | 'update_profile'
+  | 'improve_application'
+  | 'other';
+
 export interface NgoReadiness {
   readiness_score: number;
   headline?: string;
   subscores?: Record<string, number>;
   top_blockers?: Array<{ title: string; impact_pts?: number; severity?: string }>;
-  next_actions?: Array<{ title: string; detail?: string; estimated_uplift_pts?: number; severity?: string }>;
+  next_actions?: Array<{
+    title: string;
+    detail?: string;
+    estimated_uplift_pts?: number;
+    severity?: string;
+    action_type?: NgoActionType;
+  }>;
 }
 
 export function fetchNgoReadiness() {

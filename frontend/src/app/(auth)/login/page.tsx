@@ -76,17 +76,17 @@ export default function LoginPage() {
     try {
       const success = await login(submittedEmail, submittedPassword);
       if (success) {
-        toast.success('Welcome back!');
+        toast.success(t('toast.welcome_back'));
         // Hard navigate — next/router.replace inside a static export
         // sometimes stalls when the target layout runs its own session
         // check on mount. window.location guarantees the full shell
         // reload with the authenticated cookie set.
         window.location.href = '/dashboard/';
       } else {
-        toast.error('Invalid email or password');
+        toast.error(t('toast.invalid_credentials'));
       }
     } catch {
-      toast.error('Something went wrong. Please try again.');
+      toast.error(t('toast.error'));
     } finally {
       setIsLoading(false);
     }

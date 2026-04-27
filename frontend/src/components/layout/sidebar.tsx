@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, ClipboardCheck, Search, FileText, BarChart3, Building2,
   PlusCircle, Briefcase, Star, Shield, CheckCircle2, ClipboardList,
-  ChevronLeft, ChevronRight, X,
+  ChevronLeft, ChevronRight, X, Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
@@ -84,6 +84,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
       { icon: Search, label: t('nav.org_search'), href: '/organizations/search' },
       { icon: CheckCircle2, label: t('nav.registration_checks'), href: '/verification' },
       { icon: Shield, label: t('nav.compliance'), href: '/compliance' },
+      { icon: Activity, label: t('nav.observability'), href: '/observability' },
     ],
   };
 
@@ -146,14 +147,22 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
           'hidden lg:flex items-center gap-2 border-t border-white/5 px-3 py-3 text-xs text-[#B5816C] hover:bg-white/5 hover:text-white transition-colors',
           sidebarCollapsed && 'justify-center px-0',
         )}
-        aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-label={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
       >
-        {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : (
-          <>
-            <ChevronLeft className="h-4 w-4" />
-            <span>Collapse</span>
-          </>
-        )}
+        {(() => {
+          // In RTL the sidebar sits on the right edge, so the chevron
+          // direction inverts — collapse points right (toward edge),
+          // expand points left (toward content).
+          const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+          const CollapseIcon = isRtl ? ChevronRight : ChevronLeft;
+          const ExpandIcon = isRtl ? ChevronLeft : ChevronRight;
+          return sidebarCollapsed ? <ExpandIcon className="h-4 w-4" /> : (
+            <>
+              <CollapseIcon className="h-4 w-4" />
+              <span>{t('sidebar.collapse')}</span>
+            </>
+          );
+        })()}
       </button>
     </div>
   );

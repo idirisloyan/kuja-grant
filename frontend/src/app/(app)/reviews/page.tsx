@@ -2,7 +2,7 @@
 
 /**
  * Reviews — shadcn + Tailwind.
- * Reviewer view: pending / completed tabs with assignments.
+ * Reviewer view: pending / completed tabs with assignments + AI compare.
  * Donor view: all applications filtered by grant.
  */
 
@@ -10,15 +10,13 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useReviews, useApplications, useGrants } from '@/lib/hooks/use-api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { cn } from '@/lib/utils';
-import { ClipboardCheck, FileText, Star, Filter, ChevronDown } from 'lucide-react';
+import { ClipboardCheck, FileText, Star, Filter, ChevronDown, GitCompare, Sparkles, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { Review } from '@/lib/types';
-
-function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+import { fetchReviewerRecommendation, type ReviewerRecommendation } from '@/lib/copilot-api';
+import { toast } from 'sonner';
 
 export default function ReviewsPage() {
   const user = useAuthStore((s) => s.user);
@@ -32,11 +30,43 @@ export default function ReviewsPage() {
 
 function ReviewerView() {
   const router = useRouter();
+  const { t, formatDate } = useTranslation();
   const { data, isLoading } = useReviews();
   const [tab, setTab] = useState<'pending' | 'completed'>('pending');
+  const [selectedAppIds, setSelectedAppIds] = useState<Set<number>>(new Set());
+  const [comparing, setComparing] = useState(false);
+  const [compareResult, setCompareResult] = useState<ReviewerRecommendation | null>(null);
+  const [compareError, setCompareError] = useState<string | null>(null);
 
   const pending = (data?.pending ?? []) as Review[];
   const completed = (data?.completed ?? []) as Review[];
+
+  const toggleSelect = (appId: number) => {
+    setSelectedAppIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(appId)) next.delete(appId);
+      else if (next.size < 5) next.add(appId);
+      else { toast.error(t('review.compare_select_max')); return prev; }
+      return next;
+    });
+  };
+
+  const runCompare = async () => {
+    if (selectedAppIds.size < 2) {
+      toast.error(t('review.compare_select_min'));
+      return;
+    }
+    setComparing(true); setCompareError(null); setCompareResult(null);
+    try {
+      const res = await fetchReviewerRecommendation({
+        application_ids: Array.from(selectedAppIds),
+      });
+      if (res.ok) setCompareResult(res.data);
+      else setCompareError(res.message);
+    } finally {
+      setComparing(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -49,10 +79,36 @@ function ReviewerView() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="kuja-display text-3xl">Review assignments</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">AI-prioritized queue with comparison support</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="kuja-display text-3xl">Review assignments</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">AI-prioritized queue with comparison support</p>
+        </div>
+        {tab === 'pending' && pending.length >= 2 && (
+          <button
+            onClick={runCompare}
+            disabled={selectedAppIds.size < 2 || comparing}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-spark))] hover:opacity-90 text-white text-sm font-medium px-3 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {comparing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitCompare className="h-3.5 w-3.5" />}
+            {comparing
+              ? t('review.compare_button_running')
+              : selectedAppIds.size < 2
+                ? t('review.compare_button_select')
+                : t('review.compare_button_ready', { n: selectedAppIds.size })}
+          </button>
+        )}
       </div>
+
+      {(compareResult || compareError) && (
+        <ReviewerCompareCard
+          result={compareResult}
+          error={compareError}
+          loading={comparing}
+          onClose={() => { setCompareResult(null); setCompareError(null); setSelectedAppIds(new Set()); }}
+          onOpenApp={(appId) => router.push(`/reviews/${appId}`)}
+        />
+      )}
 
       <div className="flex gap-1 border-b border-border">
         {(['pending', 'completed'] as const).map((k) => (
@@ -78,30 +134,46 @@ function ReviewerView() {
         ) : (
           <TableWrap>
             <tr className="bg-muted/30 border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-2.5 w-8" />
               <th className="px-4 py-2.5">Applicant</th>
               <th className="px-4 py-2.5">Grant</th>
               <th className="px-4 py-2.5">Status</th>
               <th className="px-4 py-2.5 text-right">Actions</th>
             </tr>
-            {pending.map((r) => (
-              <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                <td className="px-4 py-3 font-medium text-foreground">
-                  {r.ngo_org_name || `Application #${r.application_id}`}
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">{r.grant_title || '—'}</td>
-                <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/reviews/${r.application_id}`)}
-                    className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-xs font-medium px-3 py-1.5"
-                  >
-                    <Star className="h-3.5 w-3.5" />
-                    Start review
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {pending.map((r) => {
+              const checked = selectedAppIds.has(r.application_id);
+              return (
+                <tr key={r.id} className={cn(
+                  'border-b border-border last:border-0 hover:bg-muted/30 transition-colors',
+                  checked && 'bg-[hsl(var(--kuja-spark-soft))]/30',
+                )}>
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleSelect(r.application_id)}
+                      className="h-4 w-4 rounded border-input text-[hsl(var(--kuja-spark))] focus:ring-[hsl(var(--kuja-spark))]"
+                      aria-label={t('review.checkbox_aria')}
+                    />
+                  </td>
+                  <td className="px-4 py-3 font-medium text-foreground">
+                    {r.ngo_org_name || `Application #${r.application_id}`}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{r.grant_title || '—'}</td>
+                  <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/reviews/${r.application_id}`)}
+                      className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-xs font-medium px-3 py-1.5"
+                    >
+                      <Star className="h-3.5 w-3.5" />
+                      Start review
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </TableWrap>
         )
       )}
@@ -141,11 +213,128 @@ function ReviewerView() {
 }
 
 // --------------------------------------------------------------------------
+// Reviewer compare card — surfaces fund/clarify/decline rationale per
+// application, similarity alerts, and an overall portfolio summary. Calls
+// /api/ai/reviewer-recommendation. Replaces the prior "open compare mode"
+// behavior that just popped the co-pilot rail.
+// --------------------------------------------------------------------------
+
+function ReviewerCompareCard({
+  result, error, loading, onClose, onOpenApp,
+}: {
+  result: ReviewerRecommendation | null;
+  error: string | null;
+  loading: boolean;
+  onClose: () => void;
+  onOpenApp: (id: number) => void;
+}) {
+  const { t } = useTranslation();
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]/30 p-4">
+        <div className="flex items-center gap-2 text-sm text-[hsl(var(--kuja-spark))]">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {t('review.compare_running')}
+        </div>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+        <div className="flex items-center gap-2 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4" /> {error}
+        </div>
+        <button onClick={onClose} className="mt-2 text-xs text-muted-foreground hover:text-foreground underline">{t('review.compare_dismiss')}</button>
+      </div>
+    );
+  }
+  if (!result) return null;
+
+  const tones: Record<string, string> = {
+    fund: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    clarify: 'border-amber-200 bg-amber-50 text-amber-800',
+    decline: 'border-red-200 bg-red-50 text-red-800',
+  };
+
+  return (
+    <div className="rounded-xl border border-[hsl(var(--kuja-spark-soft))] bg-background p-4 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-[hsl(var(--kuja-spark))]" />
+          <div className="text-sm font-semibold text-foreground">{t('review.compare_title')}</div>
+        </div>
+        <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground underline">{t('review.compare_close')}</button>
+      </div>
+
+      {result.review_summary && (
+        <p className="text-sm text-muted-foreground leading-relaxed">{result.review_summary}</p>
+      )}
+
+      <div className="space-y-2">
+        {result.ranked.map((r) => (
+          <div key={r.application_id} className={cn('rounded-lg border p-3', tones[r.recommendation] ?? 'border-border bg-muted/30')}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="kuja-numeric text-xs font-bold rounded-full bg-background border border-border px-1.5 py-0.5">#{r.rank}</span>
+                <span className="text-xs uppercase tracking-wide font-bold">{r.recommendation}</span>
+                <span className="text-sm font-medium">Application #{r.application_id}</span>
+              </div>
+              <button
+                onClick={() => onOpenApp(r.application_id)}
+                className="text-xs font-medium text-[hsl(var(--kuja-clay))] hover:underline"
+              >
+                {t('review.compare_open')}
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed">{r.rationale}</p>
+            {r.key_strengths && r.key_strengths.length > 0 && (
+              <div className="mt-2">
+                <div className="text-[10px] uppercase tracking-wide font-semibold mb-0.5 opacity-70">{t('review.compare_strengths')}</div>
+                <ul className="space-y-0.5">
+                  {r.key_strengths.map((s, i) => (
+                    <li key={i} className="flex items-start gap-1 text-[11px]"><CheckCircle2 className="mt-0.5 h-3 w-3 flex-shrink-0" /><span>{s}</span></li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {r.key_weaknesses && r.key_weaknesses.length > 0 && (
+              <div className="mt-2">
+                <div className="text-[10px] uppercase tracking-wide font-semibold mb-0.5 opacity-70">{t('review.compare_weaknesses')}</div>
+                <ul className="ml-4 list-disc space-y-0.5 text-[11px]">
+                  {r.key_weaknesses.map((s, i) => <li key={i}>{s}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {result.similarity_alerts && result.similarity_alerts.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <div className="text-xs font-semibold text-amber-800 mb-1.5 inline-flex items-center gap-1">
+            <AlertTriangle className="h-3.5 w-3.5" /> {t('review.compare_similarity_alerts')}
+          </div>
+          <ul className="space-y-1 text-xs text-amber-900">
+            {result.similarity_alerts.map((a, i) => (
+              <li key={i}>
+                <span className="font-medium">#{a.application_ids.join(' & #')}:</span> {a.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
 // Donor view
 // --------------------------------------------------------------------------
 
 function DonorView() {
   const router = useRouter();
+  const { formatDate } = useTranslation();
   const { data: appsData, isLoading: appsLoading } = useApplications();
   const { data: grantsData, isLoading: grantsLoading } = useGrants();
   const [grantFilter, setGrantFilter] = useState<string>('all');
@@ -211,7 +400,7 @@ function DonorView() {
             >
               <td className="px-4 py-3 font-medium text-foreground">{a.org_name || '—'}</td>
               <td className="px-4 py-3 text-muted-foreground">{a.grant_title || '—'}</td>
-              <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
+              <td className="px-4 py-3"><StatusBadge status={a.status} kind="app" /></td>
               <td className="px-4 py-3 text-right text-muted-foreground">{formatDate(a.submitted_at)}</td>
             </tr>
           ))}

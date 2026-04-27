@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAssessmentFrameworks } from '@/lib/hooks/use-api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { ScoreRing } from '@/components/shared/score-ring';
@@ -26,14 +27,22 @@ interface AssessmentResult {
   gaps: string[];
 }
 
-const STEPS = ['Org Profile', 'Compliance', 'Documents', 'Results'];
+const STEP_KEYS = [
+  'assessment.step.org_profile',
+  'assessment.step.compliance',
+  'assessment.step.documents',
+  'assessment.step.results',
+] as const;
 
-const FRAMEWORK_OPTIONS: { key: AssessmentFramework; label: string }[] = [
-  { key: 'kuja', label: 'Kuja Framework' },
-  { key: 'step', label: 'STEP Framework' },
-  { key: 'un_hact', label: 'UN-HACT' },
-  { key: 'chs', label: 'CHS (Core Humanitarian Standard)' },
-  { key: 'nupas', label: 'NUPAS' },
+// Framework labels and descriptions are now i18n-keyed (framework.<key>.label
+// and framework.<key>.description). The backend still ships English defaults
+// for compatibility with API clients; the UI overrides with translations.
+const FRAMEWORK_OPTIONS: { key: AssessmentFramework }[] = [
+  { key: 'kuja' },
+  { key: 'step' },
+  { key: 'un_hact' },
+  { key: 'chs' },
+  { key: 'nupas' },
 ];
 
 const DOC_TYPES = [
@@ -49,6 +58,7 @@ const inputCls =
 
 export default function AssessmentWizardPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const searchParams = useSearchParams();
   const user = useAuthStore((s) => s.user);
   const { data: fwData, isLoading: fwLoading } = useAssessmentFrameworks();
@@ -173,12 +183,12 @@ export default function AssessmentWizardPage() {
           onClick={() => router.push('/assessments')}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to assessments
+          <ArrowLeft className="h-4 w-4" /> {t('assessment.back_to_assessments')}
         </button>
         <div>
-          <h1 className="kuja-display text-3xl">Select framework</h1>
+          <h1 className="kuja-display text-3xl">{t('assessment.select_framework_title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Choose a capacity assessment framework to begin
+            {t('assessment.select_framework_subtitle')}
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -191,18 +201,18 @@ export default function AssessmentWizardPage() {
                 onClick={() => setSelectedFramework(opt.key)}
                 className="text-left rounded-xl border border-border bg-background p-5 hover:border-[hsl(var(--kuja-clay))] hover:shadow-md transition-all"
               >
-                <div className="text-sm font-semibold">{opt.label}</div>
+                <div className="text-sm font-semibold">{t(`framework.${opt.key}.label`)}</div>
                 {info && (
                   <>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{info.description}</p>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{t(`framework.${opt.key}.description`)}</p>
                     <div className="flex gap-3 mt-3 text-xs text-muted-foreground">
                       <span>{info.estimated_time}</span>
-                      <span>{info.total_items} items</span>
+                      <span>{t('framework.items_count', { n: info.total_items })}</span>
                     </div>
                   </>
                 )}
                 <div className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[hsl(var(--kuja-clay))]">
-                  <Play className="h-3.5 w-3.5" /> Select
+                  <Play className="h-3.5 w-3.5" /> {t('framework.select_cta')}
                 </div>
               </button>
             );
@@ -224,9 +234,9 @@ export default function AssessmentWizardPage() {
 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="kuja-display text-3xl">Capacity assessment</h1>
+          <h1 className="kuja-display text-3xl">{t('assessment.wizard_title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Framework: {FRAMEWORK_OPTIONS.find((f) => f.key === selectedFramework)?.label}
+            {selectedFramework ? t(`framework.${selectedFramework}.label`) : ''}
           </p>
         </div>
         {currentStep < 4 && (
@@ -235,19 +245,19 @@ export default function AssessmentWizardPage() {
             onClick={() => setSelectedFramework('')}
             className="inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-3 py-1.5"
           >
-            Change framework
+            {t('assessment.change_framework')}
           </button>
         )}
       </div>
 
       {/* Stepper */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {STEPS.map((label, i) => {
+        {STEP_KEYS.map((stepKey, i) => {
           const n = i + 1;
           const done = currentStep > n;
           const active = currentStep === n;
           return (
-            <div key={label} className="flex items-center gap-2 whitespace-nowrap">
+            <div key={stepKey} className="flex items-center gap-2 whitespace-nowrap">
               <div className={cn(
                 'w-7 h-7 rounded-full grid place-items-center text-xs font-semibold',
                 done ? 'bg-[hsl(var(--kuja-grow))] text-white'
@@ -257,24 +267,25 @@ export default function AssessmentWizardPage() {
                 {done ? <CheckCircle className="h-4 w-4" /> : n}
               </div>
               <span className={cn('text-sm', active ? 'font-semibold' : 'text-muted-foreground')}>
-                {label}
+                {t(stepKey)}
               </span>
-              {n < STEPS.length && <div className="w-6 h-px bg-border" />}
+              {n < STEP_KEYS.length && <div className="w-6 h-px bg-border" />}
             </div>
           );
         })}
       </div>
 
-      {currentStep === 1 && <OrgProfileStep profile={orgProfile} onChange={handleProfileChange} />}
+      {currentStep === 1 && <OrgProfileStep profile={orgProfile} onChange={handleProfileChange} t={t} />}
       {currentStep === 2 && (
         <ComplianceStep
           categories={checklistCategories}
           responses={checklistResponses}
           onChange={handleChecklistChange}
+          t={t}
         />
       )}
-      {currentStep === 3 && <DocumentUploadStep uploads={docUploads} onChange={handleDocChange} />}
-      {currentStep === 4 && results && <ResultsStep results={results} framework={selectedFramework} />}
+      {currentStep === 3 && <DocumentUploadStep uploads={docUploads} onChange={handleDocChange} t={t} />}
+      {currentStep === 4 && results && <ResultsStep results={results} framework={selectedFramework} t={t} />}
 
       {/* Navigation */}
       {currentStep < 4 && (
@@ -285,7 +296,7 @@ export default function AssessmentWizardPage() {
             onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
             className="inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <ArrowLeft className="h-4 w-4" /> Previous
+            <ArrowLeft className="h-4 w-4" /> {t('common.previous')}
           </button>
           {currentStep < 3 ? (
             <button
@@ -293,7 +304,7 @@ export default function AssessmentWizardPage() {
               onClick={() => setCurrentStep((s) => s + 1)}
               className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
             >
-              Next <ArrowRight className="h-4 w-4" />
+              {t('common.next')} <ArrowRight className="h-4 w-4" />
             </button>
           ) : (
             <button
@@ -303,7 +314,7 @@ export default function AssessmentWizardPage() {
               className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
-              {submitting ? 'Analyzing…' : 'Submit & get results'}
+              {submitting ? 'Analyzing…' : t('assessment.submit_get_results')}
             </button>
           )}
         </div>
@@ -332,15 +343,15 @@ export default function AssessmentWizardPage() {
 }
 
 function OrgProfileStep({
-  profile, onChange,
-}: { profile: OrgProfile; onChange: (field: keyof OrgProfile, value: string) => void }) {
+  profile, onChange, t,
+}: { profile: OrgProfile; onChange: (field: keyof OrgProfile, value: string) => void; t: (key: string, vars?: Record<string, string | number>) => string }) {
   return (
     <div className="rounded-xl border border-border bg-background p-5">
       <div className="flex items-center gap-2 mb-1">
         <Building2 className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-semibold">Organization profile</span>
+        <span className="text-sm font-semibold">{t('assessment.org_profile')}</span>
       </div>
-      <p className="text-xs text-muted-foreground mb-4">Provide basic information about your organization</p>
+      <p className="text-xs text-muted-foreground mb-4">{t('assessment.org_profile_subtitle')}</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Organization name">
           <input type="text" value={profile.name} onChange={(e) => onChange('name', e.target.value)}
@@ -388,17 +399,18 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function ComplianceStep({
-  categories, responses, onChange,
+  categories, responses, onChange, t,
 }: {
   categories: { category: string; items: { key: string; label: string }[] }[];
   responses: Record<string, boolean>;
   onChange: (key: string, checked: boolean) => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   if (categories.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-background px-6 py-12 text-center">
         <ClipboardList className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
-        <p className="text-sm text-muted-foreground">No checklist items for this framework</p>
+        <p className="text-sm text-muted-foreground">{t('assessment.no_checklist_items')}</p>
       </div>
     );
   }
@@ -445,16 +457,16 @@ function ComplianceStep({
 }
 
 function DocumentUploadStep({
-  uploads, onChange,
-}: { uploads: Record<string, DocFile>; onChange: (key: string, file: File | null) => void }) {
+  uploads, onChange, t,
+}: { uploads: Record<string, DocFile>; onChange: (key: string, file: File | null) => void; t: (key: string, vars?: Record<string, string | number>) => string }) {
   return (
     <div className="rounded-xl border border-border bg-background p-5">
       <div className="flex items-center gap-2 mb-1">
         <Upload className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-semibold">Supporting documents</span>
+        <span className="text-sm font-semibold">{t('assessment.supporting_documents')}</span>
       </div>
       <p className="text-xs text-muted-foreground mb-4">
-        Upload documents to support your assessment (optional but recommended)
+        {t('assessment.supporting_subtitle')}
       </p>
       <div className="space-y-3">
         {DOC_TYPES.map((doc) => {
@@ -462,8 +474,8 @@ function DocumentUploadStep({
           return (
             <div key={doc.key} className="border border-border rounded-lg p-4">
               <div className="mb-2">
-                <div className="text-sm font-medium">{doc.label}</div>
-                <div className="text-xs text-muted-foreground">{doc.description}</div>
+                <div className="text-sm font-medium">{t(`doc_type.${doc.key}.label`)}</div>
+                <div className="text-xs text-muted-foreground">{t(`doc_type.${doc.key}.description`)}</div>
               </div>
               {upload?.file ? (
                 <div className="flex items-center gap-3 p-3 bg-[hsl(142_68%_96%)] border border-[hsl(142_55%_85%)] rounded-md">
@@ -474,13 +486,13 @@ function DocumentUploadStep({
                     onClick={() => onChange(doc.key, null)}
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
-                    Remove
+                    {t('apply.remove')}
                   </button>
                 </div>
               ) : (
                 <label className="flex flex-col items-center gap-1 p-5 border-2 border-dashed border-border rounded-md cursor-pointer hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand-50))] transition-all">
                   <Upload className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Click to upload</span>
+                  <span className="text-sm text-muted-foreground">{t('apply.click_to_upload')}</span>
                   <input
                     type="file"
                     className="hidden"
@@ -497,27 +509,48 @@ function DocumentUploadStep({
   );
 }
 
-function ResultsStep({ results, framework }: { results: AssessmentResult; framework: string }) {
+function ResultsStep({ results, framework, t }: { results: AssessmentResult; framework: string; t: (key: string, vars?: Record<string, string | number>) => string }) {
   const categoryEntries = Object.entries(results.category_scores);
-  const levelLabel =
-    results.overall_score >= 80 ? 'Excellent capacity'
-    : results.overall_score >= 60 ? 'Good capacity'
-    : results.overall_score >= 40 ? 'Developing capacity'
-    : 'Needs improvement';
+  // Tier the score into a coaching headline + subhead + "what this unlocks"
+  // string so the result feels like a guided conversation, not a verdict.
+  const tier = results.overall_score >= 80 ? 'excellent'
+    : results.overall_score >= 60 ? 'good'
+    : results.overall_score >= 40 ? 'developing'
+    : 'starting';
+  const headline = t(`assessment.results.headline_${tier}`);
+  const subhead = t(`assessment.results.subhead_${tier}`);
+  const unlocks = t(`assessment.results.unlocks_${tier}`);
+  const tierTone = tier === 'excellent' ? 'success' : tier === 'good' ? 'success' : tier === 'developing' ? 'warn' : 'warn';
+  const tierBadgeCls = tierTone === 'success'
+    ? 'bg-[hsl(var(--kuja-grow)/0.1)] text-[hsl(var(--kuja-grow))] border-[hsl(var(--kuja-grow)/0.2)]'
+    : 'bg-[hsl(var(--kuja-sun)/0.1)] text-[hsl(var(--kuja-sun))] border-[hsl(var(--kuja-sun)/0.3)]';
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-background p-10 flex flex-col items-center text-center">
-        <ScoreRing score={Math.round(results.overall_score)} size={140} strokeWidth={10} label="Overall" />
-        <h2 className="kuja-display text-2xl mt-5">{levelLabel}</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          {framework.toUpperCase().replace('_', '-')} framework assessment
-        </p>
+      {/* Hero verdict with coaching headline + framework tag */}
+      <div className="rounded-xl border border-border bg-gradient-to-br from-background to-[hsl(var(--kuja-sand-50))] p-8 sm:p-10">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+          <ScoreRing score={Math.round(results.overall_score)} size={140} strokeWidth={10} label={t('assessment.overall')} />
+          <div className="flex-1 text-center sm:text-left">
+            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${tierBadgeCls}`}>
+              {framework.toUpperCase().replace('_', '-')}
+            </span>
+            <h2 className="kuja-display text-2xl sm:text-3xl mt-2 leading-tight text-balance">{headline}</h2>
+            <p className="mt-2 text-sm text-[hsl(var(--kuja-ink-soft))] leading-relaxed">{subhead}</p>
+          </div>
+        </div>
+        {/* What your current capacity unlocks */}
+        <div className="mt-6 rounded-md border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]/50 p-3">
+          <div className="text-[10px] uppercase tracking-wide font-semibold text-[hsl(var(--kuja-spark))] mb-1">
+            {t('assessment.results.what_unlocks')}
+          </div>
+          <div className="text-sm text-foreground">{unlocks}</div>
+        </div>
       </div>
 
       {categoryEntries.length > 0 && (
         <div className="rounded-xl border border-border bg-background p-5">
-          <div className="text-sm font-semibold mb-3">Category breakdown</div>
+          <div className="text-sm font-semibold mb-3">{t('assessment.category_breakdown')}</div>
           <div className="space-y-3">
             {categoryEntries.map(([category, score]) => {
               const color = score >= 80 ? 'hsl(var(--kuja-grow))' : score >= 60 ? 'hsl(var(--kuja-sun))' : 'hsl(var(--kuja-flag))';
@@ -541,7 +574,7 @@ function ResultsStep({ results, framework }: { results: AssessmentResult; framew
         <div className="rounded-xl border border-border bg-background p-5">
           <div className="flex items-center gap-2 mb-3">
             <AlertCircle className="h-4 w-4 text-[hsl(var(--kuja-sun))]" />
-            <span className="text-sm font-semibold">Areas for improvement</span>
+            <span className="text-sm font-semibold">{t('assessment.areas_for_improvement')}</span>
           </div>
           <ul className="space-y-2">
             {results.gaps.map((gap, i) => (
@@ -555,6 +588,35 @@ function ResultsStep({ results, framework }: { results: AssessmentResult; framew
           </ul>
         </div>
       )}
+
+      {/* Concrete next-step actions — wired so the user can leave the
+          results screen with a clear thing to do, not just a number. */}
+      <div className="rounded-xl border border-border bg-background p-5">
+        <div className="text-sm font-semibold mb-3">{t('assessment.results.next_steps')}</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <a
+            href="/grants"
+            className="inline-flex items-center justify-between gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-xs font-medium px-3 py-2"
+          >
+            <span>{t('assessment.results.action_browse_grants')}</span>
+            <span aria-hidden>→</span>
+          </a>
+          <a
+            href="/organizations/profile"
+            className="inline-flex items-center justify-between gap-1.5 rounded-md border border-border hover:bg-muted text-xs font-medium px-3 py-2"
+          >
+            <span>{t('assessment.results.action_strengthen_profile')}</span>
+            <span aria-hidden>→</span>
+          </a>
+          <a
+            href="/assessments/wizard"
+            className="inline-flex items-center justify-between gap-1.5 rounded-md border border-border hover:bg-muted text-xs font-medium px-3 py-2"
+          >
+            <span>{t('assessment.results.action_retake')}</span>
+            <span aria-hidden>→</span>
+          </a>
+        </div>
+      </div>
     </div>
   );
 }

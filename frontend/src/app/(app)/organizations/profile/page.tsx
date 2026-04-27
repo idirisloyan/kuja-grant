@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
 import {
   Building2, Save, Loader2, CheckCircle, MapPin, Calendar,
@@ -36,6 +37,7 @@ function Field({
 }
 
 export default function OrgProfilePage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const [org, setOrg] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,9 +114,9 @@ export default function OrgProfilePage() {
     return (
       <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
         <Building2 className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-        <p className="kuja-display text-xl">No organization linked</p>
+        <p className="kuja-display text-xl">{t('org.no_org_linked')}</p>
         <p className="text-sm text-muted-foreground mt-1">
-          Contact an administrator to link your account to an organization.
+          {t('org.no_org_hint')}
         </p>
       </div>
     );
@@ -124,15 +126,15 @@ export default function OrgProfilePage() {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="kuja-display text-3xl">Organization profile</h1>
+          <h1 className="kuja-display text-3xl">{t('org.profile_title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Manage your organization&apos;s information
+            {t('org.profile_subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-3">
           {saved && (
             <span className="inline-flex items-center gap-1 text-sm text-[hsl(var(--kuja-grow))]">
-              <CheckCircle className="h-4 w-4" /> Saved
+              <CheckCircle className="h-4 w-4" /> {t('common.saved')}
             </span>
           )}
           <button
@@ -142,10 +144,44 @@ export default function OrgProfilePage() {
             className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? 'Saving…' : 'Save changes'}
+            {saving ? 'Saving…' : t('common.save_changes')}
           </button>
         </div>
       </div>
+
+      {/* Profile completion progress — shows the user how complete their
+          profile is and motivates them to fill the gaps. AI suggestions
+          and applications get sharper as more fields fill in. */}
+      {(() => {
+        const fields = [
+          { key: 'name', filled: !!name.trim() },
+          { key: 'country', filled: !!country.trim() },
+          { key: 'year', filled: !!yearEstablished.trim() },
+          { key: 'budget', filled: !!annualBudget.trim() },
+          { key: 'staff', filled: !!staffCount.trim() },
+          { key: 'website', filled: !!website.trim() },
+          { key: 'mission', filled: !!mission.trim() },
+          { key: 'sectors', filled: selectedSectors.length > 0 },
+        ];
+        const filled = fields.filter((f) => f.filled).length;
+        const pct = Math.round((filled / fields.length) * 100);
+        const tone = pct >= 80 ? 'bg-[hsl(var(--kuja-grow))]' : pct >= 50 ? 'bg-[hsl(var(--kuja-sun))]' : 'bg-[hsl(var(--kuja-flag))]';
+        return (
+          <div className="rounded-xl border border-border bg-background p-4">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-sm font-semibold">{t('org.profile_completion')}</div>
+              <span className="kuja-numeric text-sm font-bold">{pct}%</span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-2">{t('org.profile_completion_subtitle')}</p>
+            <div className="h-2 bg-muted rounded overflow-hidden">
+              <div className={cn('h-full transition-all', tone)} style={{ width: `${pct}%` }} />
+            </div>
+            {pct < 100 && (
+              <p className="mt-2 text-xs text-muted-foreground">{t('org.complete_profile_cta')}</p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Status badges */}
       {org && (
@@ -178,45 +214,45 @@ export default function OrgProfilePage() {
       <div className="rounded-xl border border-border bg-background p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Building2 className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">Basic information</span>
+          <span className="text-sm font-semibold">{t('org.basic_info')}</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Organization name" icon={Building2}>
+          <Field label={t('org.field.name')} icon={Building2}>
             <div className="relative">
               <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <input type="text" value={name} onChange={(e) => { setName(e.target.value); setSaved(false); }}
                 placeholder="Enter organization name" className={inputCls} />
             </div>
           </Field>
-          <Field label="Country" icon={MapPin}>
+          <Field label={t('org.field.country')} icon={MapPin}>
             <div className="relative">
               <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <input type="text" value={country} onChange={(e) => { setCountry(e.target.value); setSaved(false); }}
                 placeholder="e.g., Kenya" className={inputCls} />
             </div>
           </Field>
-          <Field label="Year established" icon={Calendar}>
+          <Field label={t('org.field.year')} icon={Calendar}>
             <div className="relative">
               <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <input type="number" value={yearEstablished} onChange={(e) => { setYearEstablished(e.target.value); setSaved(false); }}
                 placeholder="e.g., 2010" className={inputCls} />
             </div>
           </Field>
-          <Field label="Annual budget" icon={DollarSign}>
+          <Field label={t('org.field.budget')} icon={DollarSign}>
             <div className="relative">
               <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <input type="text" value={annualBudget} onChange={(e) => { setAnnualBudget(e.target.value); setSaved(false); }}
                 placeholder="e.g., $500,000" className={inputCls} />
             </div>
           </Field>
-          <Field label="Staff count" icon={Users}>
+          <Field label={t('org.field.staff')} icon={Users}>
             <div className="relative">
               <Users className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <input type="text" value={staffCount} onChange={(e) => { setStaffCount(e.target.value); setSaved(false); }}
                 placeholder="e.g., 50" className={inputCls} />
             </div>
           </Field>
-          <Field label="Website" icon={Globe}>
+          <Field label={t('org.field.website')} icon={Globe}>
             <div className="relative">
               <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <input type="text" value={website} onChange={(e) => { setWebsite(e.target.value); setSaved(false); }}
@@ -224,7 +260,7 @@ export default function OrgProfilePage() {
             </div>
           </Field>
         </div>
-        <Field label="Mission statement">
+        <Field label={t('org.field.mission')}>
           <textarea
             value={mission}
             onChange={(e) => { setMission(e.target.value); setSaved(false); }}
@@ -239,9 +275,9 @@ export default function OrgProfilePage() {
       <div className="rounded-xl border border-border bg-background p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Target className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">Sectors</span>
+          <span className="text-sm font-semibold">{t('org.sectors')}</span>
         </div>
-        <p className="text-xs text-muted-foreground">Select the sectors your organization works in</p>
+        <p className="text-xs text-muted-foreground">{t('org.sectors_subtitle')}</p>
         <div className="flex flex-wrap gap-2">
           {SECTOR_OPTIONS.map((sector) => {
             const active = selectedSectors.includes(sector);

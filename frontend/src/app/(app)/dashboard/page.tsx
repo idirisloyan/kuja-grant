@@ -14,6 +14,7 @@
  */
 
 import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { DonorCommandCenter } from '@/components/dashboards/donor-command-center';
 import { NgoReadinessConsole } from '@/components/dashboards/ngo-readiness-console';
 import { ReviewerQueue } from '@/components/dashboards/reviewer-queue';
@@ -21,6 +22,7 @@ import { AdminOpsPanel } from '@/components/dashboards/admin-ops-panel';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
+  const { t } = useTranslation();
 
   if (!user) {
     return (
@@ -35,15 +37,28 @@ export default function DashboardPage() {
     );
   }
 
+  const h = new Date().getHours();
+  const greetingKey =
+    h < 5 ? 'dashboard.greeting.up_early'
+    : h < 12 ? 'dashboard.greeting.morning'
+    : h < 17 ? 'dashboard.greeting.afternoon'
+    : 'dashboard.greeting.evening';
+  const subtitleKey =
+    user.role === 'donor' ? 'dashboard.donor.subtitle'
+    : user.role === 'ngo' ? 'dashboard.ngo.subtitle'
+    : user.role === 'reviewer' ? 'dashboard.reviewer.subtitle'
+    : user.role === 'admin' ? 'dashboard.admin.subtitle'
+    : 'dashboard.subtitle.default';
+
   return (
     <div className="space-y-6">
       {/* Welcome line */}
       <div>
         <h1 className="kuja-display text-3xl">
-          {_greeting()}, <span className="text-[hsl(var(--kuja-clay-dark))]">{user.name?.split(' ')[0] ?? 'there'}</span>
+          {t(greetingKey)}, <span className="text-[hsl(var(--kuja-clay-dark))]">{user.name?.split(' ')[0] ?? 'there'}</span>
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {_subtitle(user.role)}
+          {t(subtitleKey)}
         </p>
       </div>
 
@@ -53,22 +68,4 @@ export default function DashboardPage() {
       {user.role === 'admin' && <AdminOpsPanel />}
     </div>
   );
-}
-
-function _greeting() {
-  const h = new Date().getHours();
-  if (h < 5) return 'Up early';
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
-}
-
-function _subtitle(role: string) {
-  switch (role) {
-    case 'donor':    return 'Your portfolio command center — AI surfaces what needs attention today.';
-    case 'ngo':      return 'Your readiness console — coached toward your next winning application.';
-    case 'reviewer': return 'Your review queue — AI-prioritized and ready to compare.';
-    case 'admin':    return 'Operations overview with live AI health and anomaly detection.';
-    default:         return 'Your Kuja workspace.';
-  }
 }

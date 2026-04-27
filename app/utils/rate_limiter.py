@@ -176,6 +176,15 @@ class DbRateLimiter:
 # login_limiter is unused — login route uses its own DB-backed logic in auth.py
 login_limiter = RateLimiter(max_attempts=5, window_seconds=300, lockout_seconds=900)
 
-# ai_limiter: DB-backed, shared across all Gunicorn workers
-ai_limiter = DbRateLimiter(name='__ai_limit__', max_attempts=20,
-                           window_seconds=60, lockout_seconds=60)
+# ai_limiter: DB-backed, shared across all Gunicorn workers.
+# Tuned for active tester behavior — a single page load can fire 3-5 AI calls
+# (suggestions + insight captions + readiness + draft) so the prior 20/min
+# ceiling locked testers out within a single dashboard visit.
+# Env-configurable so prod can dial up/down without a redeploy.
+import os as _os
+ai_limiter = DbRateLimiter(
+    name='__ai_limit__',
+    max_attempts=int(_os.environ.get('RATE_LIMIT_AI_PER_USER', '60')),
+    window_seconds=int(_os.environ.get('RATE_LIMIT_AI_WINDOW_S', '60')),
+    lockout_seconds=int(_os.environ.get('RATE_LIMIT_AI_LOCKOUT_S', '30')),
+)

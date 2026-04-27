@@ -3,7 +3,10 @@
 import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { fetchGrantScaffold } from '@/lib/copilot-api';
 import { toast } from 'sonner';
+import { useTranslation } from '@/lib/hooks/use-translation';
+import { AiBadge } from '@/components/shared/ai-badge';
 import {
   ArrowLeft,
   ArrowRight,
@@ -241,6 +244,7 @@ function MultiSelectToggle({
 
 export default function CreateGrantPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState(0);
@@ -337,7 +341,7 @@ export default function CreateGrantPage() {
         const reqCount = extractedData?.requirements?.length || 0;
         const indCount = extractedData?.indicators?.length || 0;
         toast.success(
-          `AI extracted ${reqCount} reporting requirement${reqCount !== 1 ? 's' : ''} and ${indCount} indicator${indCount !== 1 ? 's' : ''}`,
+          t('toast.ai_extracted_reqs_indicators', { req_count: reqCount, ind_count: indCount }),
         );
       }
     } catch (err) {
@@ -412,7 +416,7 @@ export default function CreateGrantPage() {
           if (!basic.title) setBasic((prev) => ({ ...prev, title: draftTitle }));
         }
       } catch {
-        toast.error('Failed to create draft grant');
+        toast.error(t('toast.grant_draft_create_failed'));
         return;
       }
     }
@@ -461,49 +465,92 @@ export default function CreateGrantPage() {
 
   const criteriaWeightTotal = criteria.reduce((sum, c) => sum + c.weight, 0);
 
+  // Replaces the prior chat-API + JSON-regex hack with the proper
+  // structured /api/ai/donor-grant-copilot endpoint via fetchGrantScaffold.
+  // Populates evaluation criteria AND eligibility in one call so the donor
+  // gets a coherent grant scaffold rather than just five rubric rows.
+  const [aiGuidance, setAiGuidance] = useState<string | null>(null);
+  const [aiExclusions, setAiExclusions] = useState<string[]>([]);
+  const [aiBurden, setAiBurden] = useState<{ score?: 'low' | 'medium' | 'high'; drivers?: string[]; simplifications?: string[] } | null>(null);
+
   const handleSuggestCriteria = async () => {
     setSuggestingCriteria(true);
     try {
-      const sectorsText = basic.sectors.length > 0 ? basic.sectors.join(', ') : 'humanitarian';
-      const titleText = basic.title || 'a humanitarian grant';
-      const message = `Suggest 5 evaluation criteria for a grant titled "${titleText}" in the sectors: ${sectorsText}. For each criterion, provide: label, weight (percentages totaling 100), description, instructions for applicants, and recommended max words. Format as JSON array with keys: label, weight, description, instructions, max_words.`;
-      const res = await api.post<AIChatResponse>('/ai/chat', {
-        message,
-        context: { page: 'grant_wizard' },
+      const sectors = basic.sectors.length > 0 ? basic.sectors.join(', ') : '';
+      const countries = basic.countries.length > 0 ? basic.countries.join(', ') : '';
+      const goal = basic.title || 'humanitarian grant call';
+      const budget = basic.total_funding ? Number(basic.total_funding) : null;
+
+      const res = await fetchGrantScaffold({
+        goal,
+        thematic: sectors || undefined,
+        geography: countries || undefined,
+        budget_usd: budget,
+        draft: {
+          description: basic.description || undefined,
+          deadline: basic.deadline || undefined,
+        },
       });
-      if (res.response) {
-        const jsonMatch = res.response.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          try {
-            const parsed = JSON.parse(jsonMatch[0]) as Array<{
-              label?: string;
-              weight?: number;
-              description?: string;
-              instructions?: string;
-              max_words?: number;
-            }>;
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setCriteria(
-                parsed.map((item, i) => ({
-                  key: `criterion_${i + 1}`,
-                  label: item.label || '',
-                  weight: item.weight || 20,
-                  description: item.description || '',
-                  instructions: item.instructions || '',
-                  max_words: item.max_words || 500,
-                })),
-              );
-              toast.success(`AI suggested ${parsed.length} evaluation criteria`);
-            }
-          } catch {
-            toast.error('Could not parse AI suggestions. Please add criteria manually.');
-          }
-        } else {
-          toast.error('AI response did not contain structured criteria.');
-        }
+
+      if (!res.ok) {
+        toast.error(res.message || t('toast.ai_scaffold_unavailable'));
+        return;
       }
+
+      const { scoring_rubric, eligibility: aiEligibility, exclusions, guidance, burden } = res.data;
+
+      let populated = 0;
+      if (scoring_rubric && scoring_rubric.length > 0) {
+        setCriteria(
+          scoring_rubric.map((item, i) => ({
+            key: `criterion_${i + 1}`,
+            label: item.criterion || '',
+            weight: typeof item.weight === 'number' ? item.weight : 20,
+            description: item.rationale || '',
+            instructions: '',
+            max_words: 500,
+          })),
+        );
+        populated += scoring_rubric.length;
+      }
+
+      // Eligibility: AI returns plain strings; map them onto our structured
+      // eligibility categories where labels match, otherwise enable the
+      // first available unfilled slot. Prefer matching by keyword over
+      // dropping items.
+      if (aiEligibility && aiEligibility.length > 0) {
+        setEligibility((prev) => {
+          const used = new Set<number>();
+          const next = [...prev];
+          for (const text of aiEligibility) {
+            const lower = text.toLowerCase();
+            // Try keyword match first
+            let idx = next.findIndex((e, i) => !used.has(i) && (
+              lower.includes(e.key) || lower.includes(e.label.toLowerCase())
+            ));
+            if (idx === -1) {
+              idx = next.findIndex((e, i) => !used.has(i) && !e.enabled);
+            }
+            if (idx === -1) continue;
+            next[idx] = { ...next[idx], enabled: true, details: text };
+            used.add(idx);
+            populated += 1;
+          }
+          return next;
+        });
+      }
+
+      setAiExclusions(exclusions || []);
+      setAiGuidance(guidance || null);
+      setAiBurden(burden || null);
+
+      toast.success(
+        populated > 0
+          ? t('toast.ai_scaffold_designed', { count: populated })
+          : t('toast.ai_scaffold_no_match'),
+      );
     } catch {
-      toast.error('AI suggestion failed. Please add criteria manually.');
+      toast.error(t('toast.ai_scaffold_failed'));
     } finally {
       setSuggestingCriteria(false);
     }
@@ -519,9 +566,9 @@ export default function CreateGrantPage() {
         if (res.success) setGrantId(res.grant.id);
       }
       await autoSave();
-      toast.success('Grant saved as draft');
+      toast.success(t('toast.grant_draft_saved'));
     } catch {
-      toast.error('Failed to save draft');
+      toast.error(t('toast.grant_draft_save_failed'));
     } finally {
       setSaving(false);
     }
@@ -529,14 +576,14 @@ export default function CreateGrantPage() {
 
   const handlePublish = async () => {
     if (!grantId) {
-      toast.error('No grant to publish. Please complete the wizard first.');
+      toast.error(t('toast.grant_publish_no_grant'));
       return;
     }
     setPublishing(true);
     try {
       await autoSave();
       await api.post(`/grants/${grantId}/publish`);
-      toast.success('Grant published successfully!');
+      toast.success(t('toast.grant_published'));
       router.push('/grants');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to publish grant';
@@ -893,6 +940,73 @@ export default function CreateGrantPage() {
 
   const renderStep3Evaluation = () => (
     <div className="space-y-3">
+      {(aiGuidance || aiExclusions.length > 0) && (
+        <div className="rounded-[10px] border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]/40 p-3">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-[hsl(var(--kuja-spark))] mb-1.5">
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>AI design guidance</span>
+            <AiBadge className="ml-1" />
+          </div>
+          {aiGuidance && (
+            <p className="text-xs text-foreground leading-relaxed mb-2">{aiGuidance}</p>
+          )}
+          {aiExclusions.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">
+                Suggested exclusions
+              </div>
+              <ul className="ml-4 list-disc space-y-0.5 text-xs text-muted-foreground">
+                {aiExclusions.slice(0, 5).map((x, i) => <li key={i}>{x}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+      {aiBurden && aiBurden.score && (
+        <div className="rounded-[10px] border border-border bg-card p-3">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-foreground">
+              <Sparkles className="h-3.5 w-3.5 text-[hsl(var(--kuja-spark))]" />
+              <span>{t('donor.scaffold.burden_score')}</span>
+              <AiBadge className="ml-1" />
+            </div>
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                aiBurden.score === 'low'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : aiBurden.score === 'medium'
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+              }`}
+            >
+              {t(`donor.scaffold.burden_${aiBurden.score}`)}
+            </span>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
+            {t('donor.scaffold.burden_explainer')}
+          </p>
+          {aiBurden.drivers && aiBurden.drivers.length > 0 && (
+            <div className="mb-2">
+              <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">
+                {t('donor.scaffold.burden_drivers')}
+              </div>
+              <ul className="ml-4 list-disc space-y-0.5 text-xs text-foreground">
+                {aiBurden.drivers.slice(0, 5).map((d, i) => <li key={i}>{d}</li>)}
+              </ul>
+            </div>
+          )}
+          {aiBurden.simplifications && aiBurden.simplifications.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">
+                {t('donor.scaffold.burden_simplifications')}
+              </div>
+              <ul className="ml-4 list-disc space-y-0.5 text-xs text-foreground">
+                {aiBurden.simplifications.slice(0, 5).map((s, i) => <li key={i}>{s}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           Define the criteria reviewers will use to evaluate applications.
@@ -916,7 +1030,7 @@ export default function CreateGrantPage() {
             ) : (
               <Sparkles className="h-3.5 w-3.5" />
             )}
-            {suggestingCriteria ? 'Suggesting...' : 'AI Suggest Criteria'}
+            {suggestingCriteria ? 'Designing…' : 'Design with AI'}
           </button>
           <button
             onClick={addCriterion}

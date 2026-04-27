@@ -5,8 +5,21 @@
  *
  * Renders a small outlined pill with tone-coded color. The `sx` prop from
  * the old MUI version is intentionally dropped — callers should use
- * `className` instead. No external consumers pass `sx` today.
+ * `className` instead.
+ *
+ * Role-aware labels (added 2026-04-26):
+ *   Pass `kind` ("app" | "report" | "grant") and the badge will render a
+ *   coaching tone for NGOs (warmer, second-person) and an enterprise tone for
+ *   donor/admin/reviewer (crisp, neutral). When `kind` is omitted, falls back
+ *   to the legacy hardcoded label table so callers that haven't been updated
+ *   keep working — including non-{app,report,grant} statuses (review,
+ *   compliance, verification).
  */
+
+import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
+
+export type StatusBadgeKind = 'app' | 'report' | 'grant';
 
 type Tone = 'success' | 'error' | 'warning' | 'info' | 'primary' | 'default';
 
@@ -50,6 +63,12 @@ const STATUS_TONE: Record<string, Tone> = {
   expired: 'error',
 };
 
+/**
+ * Legacy fallback labels — used when no `kind` is supplied or when the
+ * status doesn't belong to one of the role-aware kinds (e.g. review,
+ * compliance, verification). Also acts as a safety net if an i18n key is
+ * missing.
+ */
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft',
   open: 'Open',
@@ -77,12 +96,33 @@ const STATUS_LABEL: Record<string, string> = {
 
 interface StatusBadgeProps {
   status: string;
+  /**
+   * Domain of the status. When supplied, the label is resolved via i18n key
+   * `status.{kind}.{status}.{enterprise|coaching}` based on the current
+   * user's role. Omit for non-domain statuses (review, compliance, etc.).
+   */
+  kind?: StatusBadgeKind;
   className?: string;
 }
 
-export function StatusBadge({ status, className = '' }: StatusBadgeProps) {
+export function StatusBadge({ status, kind, className = '' }: StatusBadgeProps) {
+  const { t } = useTranslation();
+  const role = useAuthStore((s) => s.user?.role);
+
   const tone = STATUS_TONE[status] ?? 'default';
-  const label = STATUS_LABEL[status] ?? status;
+
+  let label: string;
+  if (kind) {
+    const variant = role === 'ngo' ? 'coaching' : 'enterprise';
+    const key = `status.${kind}.${status}.${variant}`;
+    const translated = t(key);
+    // translate() falls back to the raw key when no translation exists.
+    // If that happened, drop down to the legacy label table for safety.
+    label = translated === key ? (STATUS_LABEL[status] ?? status) : translated;
+  } else {
+    label = STATUS_LABEL[status] ?? status;
+  }
+
   return (
     <span
       className={`inline-flex h-6 items-center rounded-full border px-2 text-[11px] font-medium ${TONE_CLS[tone]} ${className}`}

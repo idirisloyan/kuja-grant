@@ -65,10 +65,13 @@ export function ReviewerQueue() {
     return raw.map((b) => ({ ...b, fill: colorFor[b.age] ?? SAVANNA }));
   }, [stats]);
 
+  // Reviewer next-actions all live on the /reviews queue page where the
+  // actual scoring work happens. Send them there directly instead of just
+  // opening the co-pilot rail.
   const actions: VerdictAction[] = (suggestions ?? []).slice(0, 3).map((s) => ({
     label: s.title,
     severity: s.severity ?? 'info',
-    onClick: () => window.dispatchEvent(new CustomEvent('kuja:open-copilot')),
+    href: '/reviews',
   }));
 
   const tone = actions.some((a) => a.severity === 'critical') ? 'danger' : 'spark';

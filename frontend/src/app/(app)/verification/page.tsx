@@ -1,20 +1,18 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
+import { Sparkles } from 'lucide-react';
 import { useVerifications, useRegistries } from '@/lib/hooks/use-api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { AiBadge } from '@/components/shared/ai-badge';
 import {
   ShieldCheck, AlertTriangle, Clock, Eye, Search, RefreshCw,
   ChevronDown, ChevronRight, Loader2, CheckCircle, XCircle, Cpu,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { RegistrationVerification } from '@/lib/types';
-
-function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 function confidenceCls(c: number | null | undefined): string {
   if (c == null) return 'text-muted-foreground';
@@ -30,19 +28,143 @@ function confidenceBar(c: number | null | undefined): string {
   return 'bg-[hsl(var(--kuja-flag))]';
 }
 
+interface ComplianceExplanation {
+  headline: string;
+  confidence_band: 'high' | 'medium' | 'low';
+  what_we_know: string[];
+  gaps: string[];
+  recommended_actions: { title: string; why: string; urgency: 'now' | 'soon' | 'fyi' }[];
+  source: string;
+}
+
 function VerificationDetail({ verification }: { verification: RegistrationVerification }) {
+  const { t, formatDate } = useTranslation();
   const a = verification.ai_analysis as Record<string, unknown> | null;
   const findings = a?.findings as string[] | undefined;
   const recommendations = a?.recommendations as string[] | undefined;
   const registryResult = verification.registry_check_result as Record<string, unknown> | null;
+  const orgId = (verification as unknown as { org_id?: number }).org_id;
+
+  // Compliance co-pilot — on-demand plain-language explanation of the
+  // verification + sanctions findings with concrete follow-up actions.
+  const [explanation, setExplanation] = useState<ComplianceExplanation | null>(null);
+  const [loadingExpl, setLoadingExpl] = useState(false);
+  const [explError, setExplError] = useState<string | null>(null);
+
+  const fetchExplanation = useCallback(async () => {
+    if (!orgId) return;
+    setLoadingExpl(true); setExplError(null);
+    try {
+      const res = await api.post<{ success: boolean } & ComplianceExplanation>(
+        '/ai/compliance-explain', { org_id: orgId },
+      );
+      if (res.success) setExplanation(res);
+      else setExplError('AI explanation unavailable');
+    } catch (e) {
+      setExplError(e instanceof Error ? e.message : 'AI explanation failed');
+    } finally {
+      setLoadingExpl(false);
+    }
+  }, [orgId]);
 
   return (
-    <div className="px-5 py-4 bg-muted/30 border-t border-border">
+    <div className="px-5 py-4 bg-muted/30 border-t border-border space-y-4">
+      {/* Compliance co-pilot panel — prominent because this is the highest
+          decision-relevance signal a donor needs from this row. */}
+      <div className="rounded-xl border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]/40 p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Sparkles className="h-4 w-4 text-[hsl(var(--kuja-spark))]" />
+            <span className="text-sm font-semibold">{t('compliance_copilot.title')}</span>
+            {explanation && <AiBadge className="ml-1" />}
+          </div>
+          {!explanation && (
+            <button
+              type="button"
+              onClick={fetchExplanation}
+              disabled={loadingExpl || !orgId}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-spark))] hover:opacity-90 text-white text-xs font-medium px-3 py-1.5 disabled:opacity-50"
+            >
+              {loadingExpl ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              {loadingExpl ? t('compliance_copilot.thinking') : t('compliance_copilot.run')}
+            </button>
+          )}
+        </div>
+        {!explanation && !loadingExpl && !explError && (
+          <p className="text-xs text-muted-foreground leading-relaxed">{t('compliance_copilot.intro')}</p>
+        )}
+        {explError && (
+          <p className="text-xs text-red-700">{explError}</p>
+        )}
+        {explanation && (
+          <div className="space-y-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <p className="text-sm text-foreground font-medium leading-relaxed flex-1">{explanation.headline}</p>
+              <span className={cn(
+                'rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap',
+                explanation.confidence_band === 'high' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : explanation.confidence_band === 'medium' ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : 'bg-red-50 text-red-700 border-red-200',
+              )}>
+                {t(`compliance_copilot.confidence_${explanation.confidence_band}`)}
+              </span>
+            </div>
+            {explanation.what_we_know && explanation.what_we_know.length > 0 && (
+              <div>
+                <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">{t('compliance_copilot.known')}</div>
+                <ul className="space-y-0.5">
+                  {explanation.what_we_know.map((s, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-xs"><CheckCircle className="mt-0.5 h-3 w-3 flex-shrink-0 text-[hsl(var(--kuja-grow))]" /><span>{s}</span></li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {explanation.gaps && explanation.gaps.length > 0 && (
+              <div>
+                <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">{t('compliance_copilot.gaps')}</div>
+                <ul className="ml-4 list-disc space-y-0.5 text-xs text-muted-foreground">
+                  {explanation.gaps.map((s, i) => <li key={i}>{s}</li>)}
+                </ul>
+              </div>
+            )}
+            {explanation.recommended_actions && explanation.recommended_actions.length > 0 && (
+              <div>
+                <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">{t('compliance_copilot.actions')}</div>
+                <ul className="space-y-1.5">
+                  {explanation.recommended_actions.map((a, i) => {
+                    const urgencyCls = a.urgency === 'now' ? 'bg-red-50 text-red-700 border-red-200'
+                      : a.urgency === 'soon' ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-muted text-muted-foreground border-border';
+                    return (
+                      <li key={i} className="rounded-md border border-border bg-background p-2.5">
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          <span className="text-xs font-medium">{a.title}</span>
+                          <span className={cn('rounded-full border px-1.5 py-0.5 text-[10px] uppercase font-bold', urgencyCls)}>
+                            {t(`compliance_copilot.urgency_${a.urgency}`)}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">{a.why}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            <button
+              onClick={fetchExplanation}
+              className="text-[10px] text-muted-foreground hover:text-foreground underline"
+            >
+              {t('compliance_copilot.rerun')}
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Cpu className="h-3.5 w-3.5 text-[hsl(var(--kuja-clay))]" />
-            <span className="text-sm font-semibold">AI analysis</span>
+            <span className="text-sm font-semibold">{t('verification.ai_analysis')}</span>
           </div>
           {findings && findings.length > 0 ? (
             <ul className="space-y-1 text-sm text-muted-foreground">
@@ -51,13 +173,13 @@ function VerificationDetail({ verification }: { verification: RegistrationVerifi
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground italic">No AI findings available.</p>
+            <p className="text-sm text-muted-foreground italic">{t('verification.no_findings')}</p>
           )}
         </div>
         <div>
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle className="h-3.5 w-3.5 text-[hsl(var(--kuja-grow))]" />
-            <span className="text-sm font-semibold">Recommendations</span>
+            <span className="text-sm font-semibold">{t('verification.recommendations')}</span>
           </div>
           {recommendations && recommendations.length > 0 ? (
             <ul className="space-y-1 text-sm text-muted-foreground">
@@ -66,14 +188,14 @@ function VerificationDetail({ verification }: { verification: RegistrationVerifi
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground italic">No recommendations available.</p>
+            <p className="text-sm text-muted-foreground italic">{t('verification.no_recommendations')}</p>
           )}
         </div>
       </div>
 
       {registryResult && (
         <div className="mt-4">
-          <div className="text-sm font-semibold mb-2">Registry check result</div>
+          <div className="text-sm font-semibold mb-2">{t('verification.registry_check')}</div>
           <pre className="bg-background border border-border rounded p-3 text-xs font-mono overflow-auto max-h-64">
             {JSON.stringify(registryResult, null, 2)}
           </pre>
@@ -96,6 +218,7 @@ function VerificationDetail({ verification }: { verification: RegistrationVerifi
 }
 
 export default function VerificationPage() {
+  const { t } = useTranslation();
   const { data, isLoading, mutate } = useVerifications();
   const { data: registriesData } = useRegistries();
   const [searchQuery, setSearchQuery] = useState('');
@@ -159,18 +282,28 @@ export default function VerificationPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="kuja-display text-3xl">Registration verification</h1>
+        <h1 className="kuja-display text-3xl">{t('verification.title')}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
           Verify organization registrations across {Object.keys(registriesData?.registries ?? {}).length} supported countries
         </p>
       </div>
 
+      {/* Intro callout — explains what each status means so first-time
+          users (especially donors new to the verification surface) don't
+          have to infer the difference between Verified vs AI reviewed. */}
+      <div className="rounded-xl border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]/40 p-3">
+        <div className="text-[10px] uppercase tracking-wide font-semibold text-[hsl(var(--kuja-spark))] mb-1">
+          {t('verification.intro_title')}
+        </div>
+        <p className="text-xs text-foreground leading-relaxed">{t('verification.intro_body')}</p>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatBox icon={ShieldCheck} label="Verified" value={statCounts.verified} tone="success" />
-        <StatBox icon={Cpu} label="AI reviewed" value={statCounts.ai_reviewed} tone="spark" />
-        <StatBox icon={Clock} label="Pending" value={statCounts.pending} tone="warn" />
-        <StatBox icon={AlertTriangle} label="Flagged" value={statCounts.flagged} tone="danger" />
-        <StatBox icon={XCircle} label="Unverified" value={statCounts.unverified} />
+        <StatBox icon={ShieldCheck} label={t('verification.status.verified')} value={statCounts.verified} tone="success" />
+        <StatBox icon={Cpu} label={t('verification.status.ai_reviewed')} value={statCounts.ai_reviewed} tone="spark" />
+        <StatBox icon={Clock} label={t('verification.status.pending')} value={statCounts.pending} tone="warn" />
+        <StatBox icon={AlertTriangle} label={t('verification.status.flagged')} value={statCounts.flagged} tone="danger" />
+        <StatBox icon={XCircle} label={t('verification.status.unverified')} value={statCounts.unverified} />
       </div>
 
       <div className="relative max-w-md">
@@ -179,7 +312,7 @@ export default function VerificationPage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by org, country, reg number…"
+          placeholder={t('verification.search_placeholder')}
           className="w-full h-10 pl-9 pr-3 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]"
         />
       </div>
@@ -187,7 +320,7 @@ export default function VerificationPage() {
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
           <Eye className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="kuja-display text-xl">No verifications found</p>
+          <p className="kuja-display text-xl">{t('verification.no_verifications')}</p>
           <p className="text-sm text-muted-foreground mt-1">
             {searchQuery ? 'Try a different search term.' : 'No organization verifications available.'}
           </p>
@@ -199,13 +332,13 @@ export default function VerificationPage() {
               <thead>
                 <tr className="bg-muted/30 border-b border-border text-left">
                   <th className="w-10" />
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Organization</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Country</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Reg #</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Authority</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Status</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">AI confidence</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Actions</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">{t('verification.col.org')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">{t('verification.col.country')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">{t('verification.col.reg')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">{t('verification.col.authority')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">{t('verification.col.status')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">{t('verification.col.confidence')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">{t('verification.col.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -256,10 +389,15 @@ export default function VerificationPage() {
                             type="button"
                             onClick={(e) => { e.stopPropagation(); runVerification(v.org_id); }}
                             disabled={running}
-                            className="inline-flex items-center gap-1 rounded border border-border hover:border-[hsl(var(--kuja-clay))] text-xs font-medium px-2.5 py-1 disabled:opacity-50"
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded text-xs font-medium px-2.5 py-1 disabled:opacity-50',
+                              v.status === 'unverified' || v.status === 'pending'
+                                ? 'bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white'
+                                : 'border border-border hover:border-[hsl(var(--kuja-clay))]',
+                            )}
                           >
                             {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                            {running ? 'Running…' : 'Verify'}
+                            {running ? t('verification.running') : t('verification.verify')}
                           </button>
                         </td>
                       </tr>

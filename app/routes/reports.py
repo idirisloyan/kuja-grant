@@ -195,6 +195,51 @@ def api_update_report(report_id):
     return jsonify({'success': True, 'report': report.to_dict()})
 
 
+@reports_bp.route('/<int:report_id>/precheck', methods=['POST'])
+@login_required
+@role_required('ngo')
+def api_precheck_report(report_id):
+    """Run AI compliance analysis WITHOUT submitting.
+
+    Lets NGOs see per-requirement scores, gaps, and risk flags before they
+    hit submit — the team flagged that the platform was running this only
+    AFTER submission, which is "diagnosis" rather than "coaching." This
+    endpoint flips it to coaching.
+    """
+    report = db.session.get(Report, report_id)
+    if not report:
+        return jsonify({'error': 'Report not found', 'success': False}), 404
+    if report.submitted_by_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied', 'success': False}), 403
+    if report.status not in ('draft', 'revision_requested'):
+        return jsonify({
+            'error': 'Pre-check is only available for drafts or revision-requested reports.',
+            'success': False,
+        }), 400
+
+    grant = db.session.get(Grant, report.grant_id)
+    requirements = grant.get_reporting_requirements() if grant else []
+    content = report.get_content()
+
+    try:
+        analysis = AIService.analyze_report(content, requirements, report.report_type)
+    except Exception as e:
+        logger.error(f"Report precheck AI failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'AI analysis is temporarily unavailable. You can still submit, '
+                     'but a post-submit review will run instead.',
+        }), 502
+
+    # Persist on the report so the donor can also see what the AI saw at
+    # precheck time, and so re-opening the panel doesn't burn another AI
+    # call. Status stays unchanged.
+    report.set_ai_analysis(analysis)
+    db.session.commit()
+
+    return jsonify({'success': True, 'analysis': analysis, 'report_id': report.id})
+
+
 @reports_bp.route('/<int:report_id>/submit', methods=['POST'])
 @login_required
 @role_required('ngo')

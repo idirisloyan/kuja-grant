@@ -106,7 +106,7 @@ export function Header() {
             >
               <div className="px-3 py-2 border-b border-border">
                 <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  <Globe className="h-3 w-3" /> Language
+                  <Globe className="h-3 w-3" /> {t('header.language')}
                 </div>
               </div>
               {supportedLanguages.map((l) => {
@@ -138,7 +138,7 @@ export function Header() {
                 );
               })}
               <div className="px-3 py-2 border-t border-border text-[11px] text-muted-foreground leading-snug">
-                AI responses use your selected language.
+                {t('header.lang_footer')}
               </div>
             </div>
           )}

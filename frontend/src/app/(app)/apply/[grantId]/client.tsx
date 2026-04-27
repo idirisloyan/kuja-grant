@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { useParams, useRouter } from 'next/navigation';
 import { useGrant } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { ScoreRing } from '@/components/shared/score-ring';
+import { InfoTip } from '@/components/shared/info-tip';
+import { AiBadge } from '@/components/shared/ai-badge';
 import {
   ArrowLeft,
   ArrowRight,
@@ -63,6 +66,15 @@ interface GuidanceResult {
   visible: boolean;
 }
 
+interface StrengthenResult {
+  strengths: string[];
+  gaps: string[];
+  sharpened: string;
+  tweaks: string[];
+  source: string;
+  visible: boolean;
+}
+
 interface UploadedDoc {
   fileName: string;
   uploading: boolean;
@@ -71,7 +83,12 @@ interface UploadedDoc {
   docId?: number;
 }
 
-const STEPS = ['Eligibility', 'Proposal', 'Documents', 'Review & Submit'];
+const STEP_KEYS = [
+  'apply.step.eligibility',
+  'apply.step.proposal',
+  'apply.step.documents',
+  'apply.step.review',
+] as const;
 
 const TA_CLS =
   'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))] placeholder:text-muted-foreground';
@@ -131,8 +148,19 @@ function Chip({
 // ---------------------------------------------------------------------------
 
 export default function ApplyWizardClient() {
+  const { t } = useTranslation();
   const params = useParams();
-  const grantId = Number(params.grantId);
+  // The Next.js static export only generates /apply/0/ as the placeholder
+  // page — Flask serves that HTML for any /apply/<id>. So `params.grantId`
+  // hydrates as "0" even when the URL is /apply/266. Trust the URL pathname
+  // first; fall back to params for the placeholder build itself.
+  const grantId = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const m = window.location.pathname.match(/\/apply\/(\d+)/);
+      if (m && m[1] !== '0') return Number(m[1]);
+    }
+    return Number(params.grantId);
+  }, [params.grantId]);
   const router = useRouter();
   const { data, isLoading } = useGrant(grantId || null);
   const grant = data?.grant;
@@ -162,7 +190,7 @@ export default function ApplyWizardClient() {
       setOrgProfile(res.organization);
       return res.organization;
     } catch {
-      toast.error('Failed to load organization profile');
+      toast.error(t('toast.org_profile_load_failed'));
       return null;
     }
   }, [orgProfile]);
@@ -176,8 +204,24 @@ export default function ApplyWizardClient() {
       const id = res.application_id ?? res.id;
       setApplicationId(id as number);
       return id as number;
-    } catch {
-      toast.error('Failed to create application draft');
+    } catch (e) {
+      // POST returns 409 if a draft already exists for this NGO+grant pair.
+      // Look it up so the user can continue the existing draft instead of
+      // being stuck at step 0 with a silent error.
+      const status = (e as { status?: number })?.status;
+      if (status === 409) {
+        try {
+          const list = await api.get<{ applications: Array<{ id: number; grant_id: number; status: string }> }>(
+            `/applications/?grant_id=${grantId}`,
+          );
+          const existing = (list.applications || []).find((a) => a.grant_id === grantId && a.status === 'draft');
+          if (existing) {
+            setApplicationId(existing.id);
+            return existing.id;
+          }
+        } catch { /* fall through to error toast */ }
+      }
+      toast.error(t('toast.app_draft_create_failed'));
       return null;
     }
   }, [applicationId, grantId]);
@@ -208,7 +252,7 @@ export default function ApplyWizardClient() {
 
   const handleNext = useCallback(async () => {
     if (step === 0 && !canProceedFromEligibility()) {
-      toast.error('Please confirm all required eligibility items before proceeding');
+      toast.error(t('toast.confirm_eligibility_required'));
       return;
     }
     const appId = await ensureApplication();
@@ -276,7 +320,7 @@ export default function ApplyWizardClient() {
     setEligibility(updated);
     setProfileImported(true);
     setImportingProfile(false);
-    toast.success('Profile data imported successfully');
+    toast.success(t('toast.profile_imported'));
   }, [eligibility, grant, fetchOrgProfile]);
 
   const handleResponseChange = useCallback((key: string, text: string) => {
@@ -307,7 +351,7 @@ export default function ApplyWizardClient() {
           },
         }));
       } catch {
-        toast.error('AI guidance unavailable right now. Please try again.');
+        toast.error(t('toast.ai_guidance_unavailable'));
       } finally {
         setGuidanceLoading((prev) => ({ ...prev, [criterion.key]: false }));
       }
@@ -319,6 +363,103 @@ export default function ApplyWizardClient() {
     setGuidanceResults((prev) => ({ ...prev, [key]: { ...prev[key], visible: false } }));
   }, []);
 
+  // AI drafts the section (or rewrites/strengthens existing text). Hits
+  // /api/ai/draft-section. Replaces the current response text directly so
+  // the NGO sees AI doing the work, not just commenting on it.
+  const [draftLoading, setDraftLoading] = useState<Record<string, boolean>>({});
+
+  // "Strengthen against this criterion" — analyses the current text and
+  // returns strengths/gaps + a sharpened rewrite + tweaks. Hits
+  // /api/ai/strengthen-section.
+  const [strengthenLoading, setStrengthenLoading] = useState<Record<string, boolean>>({});
+  const [strengthenResults, setStrengthenResults] = useState<Record<string, StrengthenResult>>({});
+
+  const handleStrengthenSection = useCallback(
+    async (criterion: Criterion) => {
+      const currentText = responses[criterion.key] ?? '';
+      if (!currentText.trim()) {
+        toast.error(t('apply.strengthen_failed'));
+        return;
+      }
+      setStrengthenLoading((p) => ({ ...p, [criterion.key]: true }));
+      try {
+        const res = await api.post<{
+          strengths: string[];
+          gaps: string[];
+          sharpened: string;
+          tweaks: string[];
+          source: string;
+        }>('/ai/strengthen-section', {
+          criterion: {
+            label: criterion.label,
+            description: criterion.description ?? '',
+            instructions: criterion.instructions ?? '',
+          },
+          current_text: currentText,
+          grant_id: grant?.id,
+        });
+        if (res.sharpened) {
+          setResponses((prev) => ({ ...prev, [criterion.key]: res.sharpened }));
+        }
+        setStrengthenResults((prev) => ({
+          ...prev,
+          [criterion.key]: {
+            strengths: res.strengths || [],
+            gaps: res.gaps || [],
+            sharpened: res.sharpened || '',
+            tweaks: res.tweaks || [],
+            source: res.source || '',
+            visible: true,
+          },
+        }));
+        toast.success(t('apply.improve_toast'));
+      } catch {
+        toast.error(t('apply.strengthen_failed'));
+      } finally {
+        setStrengthenLoading((p) => ({ ...p, [criterion.key]: false }));
+      }
+    },
+    [responses, grant?.id, t],
+  );
+
+  const handleDismissStrengthen = useCallback((key: string) => {
+    setStrengthenResults((prev) => ({ ...prev, [key]: { ...prev[key], visible: false } }));
+  }, []);
+
+  const handleDraftSection = useCallback(
+    async (criterion: Criterion) => {
+      const currentText = responses[criterion.key] ?? '';
+      setDraftLoading((p) => ({ ...p, [criterion.key]: true }));
+      try {
+        const res = await api.post<{ success: boolean; draft: string; mode: string; source: string }>(
+          '/ai/draft-section',
+          {
+            criterion: {
+              label: criterion.label,
+              description: criterion.description ?? '',
+              instructions: criterion.instructions ?? '',
+            },
+            current_text: currentText,
+            grant_id: grant?.id,
+          },
+        );
+        if (res.success && res.draft) {
+          setResponses((prev) => ({ ...prev, [criterion.key]: res.draft }));
+          toast.success(res.mode === 'improve'
+            ? t('toast.ai_draft_improved')
+            : t('toast.ai_draft_started'));
+        } else {
+          toast.error(t('toast.ai_draft_failed'));
+        }
+      } catch {
+        toast.error(t('toast.ai_draft_unavailable'));
+      } finally {
+        setDraftLoading((p) => ({ ...p, [criterion.key]: false }));
+      }
+    },
+    [responses, grant?.id],
+  );
+
   const handleApplySuggestions = useCallback(
     (key: string) => {
       const guidance = guidanceResults[key];
@@ -329,7 +470,7 @@ export default function ApplyWizardClient() {
         : guidance.guidance;
       setResponses((prev) => ({ ...prev, [key]: updated }));
       setGuidanceResults((prev) => ({ ...prev, [key]: { ...prev[key], visible: false } }));
-      toast.success('AI suggestions applied to your response');
+      toast.success(t('toast.ai_suggestions_applied'));
     },
     [guidanceResults, responses],
   );
@@ -368,7 +509,7 @@ export default function ApplyWizardClient() {
     }
     setResponses(updated);
     setProfileImportedProposal(true);
-    toast.success('Organization profile imported into relevant responses');
+    toast.success(t('toast.profile_imported_proposal'));
   }, [responses, grant, fetchOrgProfile]);
 
   const handleFileUpload = useCallback(
@@ -398,13 +539,13 @@ export default function ApplyWizardClient() {
             docId: res.document_id,
           },
         }));
-        toast.success(`${file.name} uploaded successfully`);
+        toast.success(t('toast.file_uploaded_named', { name: file.name }));
       } catch {
         setUploadedDocs((prev) => ({
           ...prev,
           [docKey]: { fileName: file.name, uploading: false, uploaded: false },
         }));
-        toast.error(`Failed to upload ${file.name}`);
+        toast.error(t('toast.file_upload_failed_named', { name: file.name }));
       }
     },
     [applicationId, ensureApplication],
@@ -424,13 +565,13 @@ export default function ApplyWizardClient() {
     const requiredEligibility = requirements.filter((r) => r.required);
     const unmetEligibility = requiredEligibility.filter((r) => !eligibility[r.key]?.checked);
     if (unmetEligibility.length > 0) {
-      toast.error('Some required eligibility items are not confirmed');
+      toast.error(t('toast.eligibility_unconfirmed'));
       return;
     }
     const requiredDocs = (grant.doc_requirements ?? []).filter((d) => d.required);
     const missingDocs = requiredDocs.filter((d) => !uploadedDocs[d.key]?.uploaded);
     if (missingDocs.length > 0) {
-      toast.error('Please upload all required documents before submitting');
+      toast.error(t('toast.upload_required_docs'));
       return;
     }
     setSubmitting(true);
@@ -456,9 +597,9 @@ export default function ApplyWizardClient() {
       const score = result.ai_score ?? result.scores?.overall_score ?? null;
       setSubmissionScore(score);
       setSubmitted(true);
-      toast.success('Application submitted successfully!');
+      toast.success(t('toast.application_submitted'));
     } catch {
-      toast.error('Failed to submit application. Please try again.');
+      toast.error(t('toast.application_submit_failed'));
     } finally {
       setSubmitting(false);
     }
@@ -488,7 +629,7 @@ export default function ApplyWizardClient() {
           onClick={() => router.push('/grants')}
           className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to Grants
+          <ArrowLeft className="h-4 w-4" /> {t('apply.back_to_grants')}
         </button>
       </div>
     );
@@ -500,7 +641,7 @@ export default function ApplyWizardClient() {
         <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
           <CheckCircle className="h-10 w-10 text-emerald-600" />
         </div>
-        <h2 className="kuja-display text-2xl font-bold">Application Submitted!</h2>
+        <h2 className="kuja-display text-2xl font-bold">{t('apply.submitted_title')}</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
           Your application for &quot;{grant.title}&quot; has been submitted and is now being reviewed.
           You will be notified when scoring is complete.
@@ -520,13 +661,13 @@ export default function ApplyWizardClient() {
             onClick={() => router.push('/applications')}
             className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
           >
-            View My Applications
+            {t('apply.view_my_apps')}
           </button>
           <button
             onClick={() => router.push('/grants')}
             className="rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))]"
           >
-            Browse More Grants
+            {t('apply.browse_more')}
           </button>
         </div>
       </div>
@@ -557,7 +698,7 @@ export default function ApplyWizardClient() {
         onClick={() => router.push(`/grants/${grantId}`)}
         className="inline-flex items-center gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to Grant
+        <ArrowLeft className="h-4 w-4" /> {t('apply.back_to_grant')}
       </button>
 
       <div>
@@ -569,11 +710,11 @@ export default function ApplyWizardClient() {
 
       {/* Custom stepper */}
       <div className="flex items-center gap-0 overflow-x-auto py-2">
-        {STEPS.map((label, i) => {
+        {STEP_KEYS.map((stepKey, i) => {
           const active = i === step;
           const complete = i < step;
           return (
-            <div key={label} className="flex flex-1 items-center">
+            <div key={stepKey} className="flex flex-1 items-center">
               <div className="flex items-center gap-2">
                 <div
                   className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold transition ${
@@ -591,10 +732,10 @@ export default function ApplyWizardClient() {
                     active || complete ? 'text-foreground' : 'text-muted-foreground'
                   }`}
                 >
-                  {label}
+                  {t(stepKey)}
                 </span>
               </div>
-              {i < STEPS.length - 1 && (
+              {i < STEP_KEYS.length - 1 && (
                 <div
                   className={`mx-2 h-px flex-1 ${
                     complete ? 'bg-[hsl(var(--kuja-savanna))]' : 'bg-border'
@@ -614,6 +755,7 @@ export default function ApplyWizardClient() {
           onImportProfile={handleImportProfileEligibility}
           profileImported={profileImported}
           importingProfile={importingProfile}
+          t={t}
         />
       )}
       {step === 1 && (
@@ -628,6 +770,12 @@ export default function ApplyWizardClient() {
           onApplySuggestions={handleApplySuggestions}
           onImportProfile={handleImportProfileProposal}
           profileImported={profileImportedProposal}
+          draftLoading={draftLoading}
+          onDraftSection={handleDraftSection}
+          strengthenLoading={strengthenLoading}
+          strengthenResults={strengthenResults}
+          onStrengthenSection={handleStrengthenSection}
+          onDismissStrengthen={handleDismissStrengthen}
         />
       )}
       {step === 2 && (
@@ -636,6 +784,7 @@ export default function ApplyWizardClient() {
           uploadedDocs={uploadedDocs}
           onUpload={handleFileUpload}
           onRemove={handleRemoveDoc}
+          t={t}
         />
       )}
       {step === 3 && (
@@ -646,6 +795,7 @@ export default function ApplyWizardClient() {
           criteria={criteria}
           uploadedDocs={uploadedDocs}
           hasMissingItems={hasMissingItems}
+          t={t}
         />
       )}
 
@@ -655,14 +805,14 @@ export default function ApplyWizardClient() {
           disabled={step === 0}
           className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40"
         >
-          <ArrowLeft className="h-4 w-4" /> Previous
+          <ArrowLeft className="h-4 w-4" /> {t('common.previous')}
         </button>
         {step < 3 ? (
           <button
             onClick={handleNext}
             className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))]"
           >
-            Next <ArrowRight className="h-4 w-4" />
+            {t('common.next')} <ArrowRight className="h-4 w-4" />
           </button>
         ) : (
           <button
@@ -690,6 +840,7 @@ function EligibilityStep({
   onImportProfile,
   profileImported,
   importingProfile,
+  t,
 }: {
   requirements: EligibilityRequirement[];
   responses: Record<string, EligibilityResponse>;
@@ -697,13 +848,14 @@ function EligibilityStep({
   onImportProfile: () => void;
   profileImported: boolean;
   importingProfile: boolean;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   if (requirements.length === 0) {
     return (
       <Card className="py-10 text-center">
         <CheckCircle className="mx-auto mb-2 h-10 w-10 text-emerald-400" />
         <p className="text-sm text-muted-foreground">
-          No specific eligibility requirements. Proceed to the next step.
+          {t('apply.no_eligibility')}
         </p>
       </Card>
     );
@@ -713,9 +865,12 @@ function EligibilityStep({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm font-semibold text-foreground">Eligibility Requirements</div>
+          <div className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
+            {t('apply.eligibility_title')}
+            <InfoTip>{t('glossary.eligibility')}</InfoTip>
+          </div>
           <div className="text-xs text-muted-foreground">
-            Confirm your organization meets each requirement
+            {t('apply.eligibility_subtitle')}
           </div>
         </div>
         <button
@@ -724,12 +879,12 @@ function EligibilityStep({
           className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark-soft))]/80 disabled:opacity-50"
         >
           {importingProfile ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-          Import from Profile
+          {t('apply.import_profile')}
         </button>
       </div>
 
       {profileImported && (
-        <Alert tone="success">Profile data imported. Review and confirm each item below.</Alert>
+        <Alert tone="success">{t('apply.profile_imported')}</Alert>
       )}
 
       <Card className="p-5">
@@ -748,7 +903,7 @@ function EligibilityStep({
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium">{req.label}</span>
-                      {req.required && <Chip tone="red">Required</Chip>}
+                      {req.required && <Chip tone="red">{t('common.required')}</Chip>}
                     </div>
                     {req.details && (
                       <div className="mt-0.5 text-xs text-muted-foreground">{req.details}</div>
@@ -758,7 +913,7 @@ function EligibilityStep({
                 <div className="ml-7 mt-2">
                   <textarea
                     rows={2}
-                    placeholder="Provide evidence or explanation..."
+                    placeholder={t('apply.evidence_placeholder')}
                     value={resp.evidence}
                     onChange={(e) => onChange(req.key, 'evidence', e.target.value)}
                     className={TA_CLS}
@@ -788,6 +943,12 @@ function ProposalStep({
   onApplySuggestions,
   onImportProfile,
   profileImported,
+  draftLoading,
+  onDraftSection,
+  strengthenLoading,
+  strengthenResults,
+  onStrengthenSection,
+  onDismissStrengthen,
 }: {
   criteria: Criterion[];
   responses: Record<string, string>;
@@ -799,13 +960,20 @@ function ProposalStep({
   onApplySuggestions: (key: string) => void;
   onImportProfile: () => void;
   profileImported: boolean;
+  draftLoading: Record<string, boolean>;
+  onDraftSection: (criterion: Criterion) => void;
+  strengthenLoading: Record<string, boolean>;
+  strengthenResults: Record<string, StrengthenResult>;
+  onStrengthenSection: (criterion: Criterion) => void;
+  onDismissStrengthen: (key: string) => void;
 }) {
+  const { t } = useTranslation();
   if (criteria.length === 0) {
     return (
       <Card className="py-10 text-center">
         <FileText className="mx-auto mb-2 h-10 w-10 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
-          No proposal criteria defined. Proceed to the next step.
+          {t('apply.no_proposal_criteria')}
         </p>
       </Card>
     );
@@ -815,9 +983,9 @@ function ProposalStep({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm font-semibold text-foreground">Proposal Responses</div>
+          <div className="text-sm font-semibold text-foreground">{t('apply.proposal_heading')}</div>
           <div className="text-xs text-muted-foreground">
-            Address each criterion. Use AI Help for real-time scoring and suggestions.
+            {t('apply.proposal_subtitle')}
           </div>
         </div>
         <button
@@ -825,7 +993,7 @@ function ProposalStep({
           className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark-soft))]/80"
         >
           <Download className="h-3.5 w-3.5" />
-          Import from Profile
+          {t('apply.import_profile')}
         </button>
       </div>
 
@@ -840,6 +1008,8 @@ function ProposalStep({
         const wc = wordCount(text);
         const isLoadingGuidance = guidanceLoading[c.key] || false;
         const guidance = guidanceResults[c.key];
+        const strengthen = strengthenResults[c.key];
+        const isLoadingStrengthen = strengthenLoading[c.key] || false;
         const wcCls = wordCountColor(wc, c.max_words);
 
         return (
@@ -888,19 +1058,113 @@ function ProposalStep({
                   <ScoreRing score={guidance.quality_score} size={36} strokeWidth={3} />
                 )}
               </div>
-              <button
-                onClick={() => onGetGuidance(c)}
-                disabled={!text.trim() || isLoadingGuidance}
-                className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark-soft))]/80 disabled:opacity-50"
-              >
-                {isLoadingGuidance ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
-                )}
-                {isLoadingGuidance ? 'Analyzing...' : 'AI Help'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onDraftSection(c)}
+                  disabled={draftLoading[c.key]}
+                  title={text.trim() ? t('apply.draft_for_me_tooltip_filled') : t('apply.draft_for_me_tooltip_empty')}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  {draftLoading[c.key] ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  {draftLoading[c.key]
+                    ? (text.trim() ? t('apply.rewriting') : t('apply.drafting'))
+                    : (text.trim() ? t('apply.improve_with_ai') : t('apply.draft_for_me'))}
+                </button>
+                <button
+                  onClick={() => onStrengthenSection(c)}
+                  disabled={!text.trim() || isLoadingStrengthen}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-3 py-1.5 text-xs font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50"
+                >
+                  {isLoadingStrengthen ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  {isLoadingStrengthen ? t('apply.strengthening') : t('apply.strengthen_against_criterion')}
+                </button>
+                <button
+                  onClick={() => onGetGuidance(c)}
+                  disabled={!text.trim() || isLoadingGuidance}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark-soft))]/80 disabled:opacity-50"
+                >
+                  {isLoadingGuidance ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  {isLoadingGuidance ? t('apply.analyzing') : t('apply.ai_help')}
+                </button>
+              </div>
             </div>
+
+            {strengthen?.visible && (
+              <div className="relative mt-3 rounded-[10px] border border-[hsl(var(--kuja-clay)/0.25)] bg-[hsl(var(--kuja-sand-50))] p-4">
+                <button
+                  onClick={() => onDismissStrengthen(c.key)}
+                  className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                  aria-label="Dismiss"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-[hsl(var(--kuja-clay))]">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>{t('apply.strengthen_against_criterion')}</span>
+                  <AiBadge className="ml-1" />
+                </div>
+                <div className="space-y-3">
+                  {strengthen.strengths.length > 0 && (
+                    <div>
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                        {t('review.compare_strengths')}
+                      </div>
+                      <ul className="space-y-1">
+                        {strengthen.strengths.map((s, i) => (
+                          <li key={i} className="flex items-start gap-1.5 text-xs text-foreground">
+                            <CheckCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-emerald-600" />
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {strengthen.gaps.length > 0 && (
+                    <div>
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                        {t('review.compare_weaknesses')}
+                      </div>
+                      <ul className="space-y-1">
+                        {strengthen.gaps.map((g, i) => (
+                          <li key={i} className="flex items-start gap-1.5 text-xs text-foreground">
+                            <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-600" />
+                            <span>{g}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {strengthen.tweaks.length > 0 && (
+                    <div>
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--kuja-clay))]">
+                        {/* TODO: add i18n key apply.strengthen_tweaks_label */}
+                        {t('apply.strengthen_tweaks_label') || 'Tweaks for next iteration'}
+                      </div>
+                      <ul className="space-y-1">
+                        {strengthen.tweaks.map((tw, i) => (
+                          <li key={i} className="flex items-start gap-1.5 text-xs text-foreground">
+                            <Sparkles className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[hsl(var(--kuja-clay))]" />
+                            <span>{tw}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {guidance?.visible && (
               <div className="mt-3 rounded-[10px] border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] p-3">
@@ -947,11 +1211,13 @@ function DocumentsStep({
   uploadedDocs,
   onUpload,
   onRemove,
+  t,
 }: {
   requirements: DocRequirement[];
   uploadedDocs: Record<string, UploadedDoc>;
   onUpload: (docKey: string, docType: string, file: File) => void;
   onRemove: (docKey: string) => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -960,7 +1226,7 @@ function DocumentsStep({
       <Card className="py-10 text-center">
         <Upload className="mx-auto mb-2 h-10 w-10 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
-          No documents required. Proceed to review.
+          {t('apply.no_doc_required')}
         </p>
       </Card>
     );
@@ -969,9 +1235,9 @@ function DocumentsStep({
   return (
     <div className="space-y-3">
       <div>
-        <div className="text-sm font-semibold text-foreground">Document Upload</div>
+        <div className="text-sm font-semibold text-foreground">{t('apply.documents_title')}</div>
         <div className="text-xs text-muted-foreground">
-          Upload the required documents for your application
+          {t('apply.documents_subtitle')}
         </div>
       </div>
 
@@ -992,7 +1258,7 @@ function DocumentsStep({
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium">{doc.label}</span>
-                      {doc.required && <Chip tone="red">Required</Chip>}
+                      {doc.required && <Chip tone="red">{t('common.required')}</Chip>}
                       {doc.ai_review && <Chip tone="spark">AI Review</Chip>}
                     </div>
                     {doc.specific_requirements && (
@@ -1012,7 +1278,7 @@ function DocumentsStep({
                   <div className="flex items-center justify-center gap-2 p-6">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">
-                      Uploading {upload.fileName}...
+                      {t('apply.uploading', { name: upload.fileName })}
                     </span>
                   </div>
                 ) : upload?.uploaded ? (
@@ -1023,7 +1289,7 @@ function DocumentsStep({
                       onClick={() => onRemove(doc.key)}
                       className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-background"
                     >
-                      Remove
+                      {t('apply.remove')}
                     </button>
                   </div>
                 ) : (
@@ -1046,9 +1312,9 @@ function DocumentsStep({
                       className="flex w-full flex-col items-center gap-2 rounded-[10px] border-2 border-dashed border-border p-8 transition hover:border-[hsl(var(--kuja-clay))] hover:bg-muted/30"
                     >
                       <Upload className="h-6 w-6 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Click to upload</span>
+                      <span className="text-sm text-muted-foreground">{t('apply.click_to_upload')}</span>
                       <span className="text-xs text-muted-foreground/70">
-                        PDF, DOC, DOCX, XLS, XLSX up to 10MB
+                        {t('apply.upload_constraints')}
                       </span>
                     </button>
                   </div>
@@ -1073,6 +1339,7 @@ function ReviewStep({
   criteria,
   uploadedDocs,
   hasMissingItems,
+  t,
 }: {
   grant: {
     title: string;
@@ -1085,6 +1352,7 @@ function ReviewStep({
   criteria: Criterion[];
   uploadedDocs: Record<string, UploadedDoc>;
   hasMissingItems: boolean;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   const eligibilityReqs = grant.eligibility ?? [];
   const docs = grant.doc_requirements ?? [];
@@ -1126,10 +1394,10 @@ function ReviewStep({
       <Card className="p-5">
         <div className="mb-1 flex items-center gap-1.5">
           <Eye className="h-4 w-4" />
-          <span className="text-sm font-semibold">Review Your Application</span>
+          <span className="text-sm font-semibold">{t('apply.review_title')}</span>
         </div>
         <p className="mb-4 text-xs text-muted-foreground">
-          Verify everything looks correct before submitting
+          {t('apply.review_subtitle')}
         </p>
 
         <div className="space-y-3">

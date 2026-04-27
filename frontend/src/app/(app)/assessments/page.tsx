@@ -2,18 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import { useAssessments, useAssessmentFrameworks } from '@/lib/hooks/use-api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { InfoTip } from '@/components/shared/info-tip';
 import {
   ClipboardCheck, Clock, ListChecks, ArrowRight, Play, TrendingUp, Award,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FrameworkInfo } from '@/lib/types';
-
-function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 function getLevelLabel(score: number): string {
   if (score >= 90) return 'Excellent';
@@ -36,6 +33,7 @@ const FW_ICON: Record<string, string> = { kuja: 'K', step: 'S', un_hact: 'U', ch
 
 export default function AssessmentsPage() {
   const router = useRouter();
+  const { t, formatDate } = useTranslation();
   const { data: assessData, isLoading: assessLoading } = useAssessments();
   const { data: fwData, isLoading: fwLoading } = useAssessmentFrameworks();
 
@@ -71,9 +69,12 @@ export default function AssessmentsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="kuja-display text-3xl">Assessment hub</h1>
+          <h1 className="kuja-display text-3xl inline-flex items-center gap-2">
+            {t('assessment.hub_title')}
+            <InfoTip>{t('glossary.capacity_assessment')}</InfoTip>
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Measure and strengthen your organization&apos;s capacity
+            {t('assessment.hub_subtitle')}
           </p>
         </div>
         <button
@@ -82,7 +83,7 @@ export default function AssessmentsPage() {
           className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
         >
           <Play className="h-4 w-4" />
-          Start assessment
+          {t('assessment.start')}
         </button>
       </div>
 
@@ -101,22 +102,22 @@ export default function AssessmentsPage() {
         <div className="rounded-xl border border-border bg-background p-5 lg:col-span-3">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">Assessment summary</span>
+            <span className="text-sm font-semibold">{t('assessment.summary_title')}</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Stat label="Total" value={assessments.length} />
-            <Stat label="Completed" value={completedAssessments.length} tone="success" />
-            <Stat label="In progress" value={assessments.filter((a) => a.status !== 'completed').length} tone="warn" />
-            <Stat label="Frameworks" value={Object.keys(frameworks).length} tone="primary" />
+            <Stat label={t('assessment.summary_total')} value={assessments.length} />
+            <Stat label={t('assessment.summary_completed')} value={completedAssessments.length} tone="success" />
+            <Stat label={t('assessment.summary_in_progress')} value={assessments.filter((a) => a.status !== 'completed').length} tone="warn" />
+            <Stat label={t('assessment.summary_frameworks')} value={Object.keys(frameworks).length} tone="primary" />
           </div>
         </div>
       </div>
 
       {/* Frameworks */}
       <div>
-        <h2 className="kuja-display text-xl mb-3">Assessment frameworks</h2>
+        <h2 className="kuja-display text-xl mb-3">{t('assessment.frameworks_title')}</h2>
         {Object.keys(frameworks).length === 0 ? (
-          <EmptyBox icon={ClipboardCheck} label="No frameworks available" />
+          <EmptyBox icon={ClipboardCheck} label={t('assessment.no_frameworks')} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
             {Object.entries(frameworks).map(([key, fw]) => {
@@ -149,18 +150,18 @@ export default function AssessmentsPage() {
 
       {/* Previous assessments */}
       <div>
-        <h2 className="kuja-display text-xl mb-3">Previous assessments</h2>
+        <h2 className="kuja-display text-xl mb-3">{t('assessment.previous_title')}</h2>
         {assessments.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border bg-background px-6 py-12 text-center">
             <Award className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
-            <p className="text-sm font-medium">No assessments completed yet</p>
-            <p className="text-xs text-muted-foreground mt-1">Start your first assessment to measure your capacity.</p>
+            <p className="text-sm font-medium">{t('assessment.no_assessments')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('assessment.no_assessments_hint')}</p>
             <button
               type="button"
               onClick={() => router.push('/assessments/wizard')}
               className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-4 py-2"
             >
-              Start assessment <ArrowRight className="h-4 w-4" />
+              {t('assessment.start')} <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         ) : (

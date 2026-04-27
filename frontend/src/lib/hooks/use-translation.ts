@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { translate, isRTL } from '@/i18n';
+import { langToLocale } from '@/lib/locale';
 
 /**
  * Hook that provides translation function bound to the current user's language.
@@ -26,5 +27,24 @@ export function useTranslation() {
     [lang],
   );
 
-  return { t, lang, isRTL: isRTL(lang) };
+  const formatDate = useCallback(
+    (
+      date: string | null | undefined | Date,
+      opts?: Intl.DateTimeFormatOptions,
+    ): string => {
+      if (date === null || date === undefined || date === '') return '—';
+      const d = date instanceof Date ? date : new Date(date);
+      if (Number.isNaN(d.getTime())) return '—';
+      const options: Intl.DateTimeFormatOptions =
+        opts ?? { month: 'short', day: 'numeric', year: 'numeric' };
+      try {
+        return new Intl.DateTimeFormat(langToLocale(lang), options).format(d);
+      } catch {
+        return d.toLocaleDateString('en-US', options);
+      }
+    },
+    [lang],
+  );
+
+  return { t, lang, isRTL: isRTL(lang), formatDate };
 }

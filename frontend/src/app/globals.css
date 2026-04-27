@@ -299,3 +299,31 @@
 [dir="rtl"] .kuja-verdict-danger  { border-right-color: hsl(var(--kuja-flag)); }
 [dir="rtl"] .kuja-verdict-spark   { border-right-color: hsl(var(--kuja-spark)); }
 [dir="rtl"] .kuja-chart-caption   { border-left: none; border-right: 3px solid hsl(var(--kuja-spark)); }
+
+/* Directional icon flipping for RTL — opt-in via .kuja-flip-rtl so the
+   rule only affects icons that semantically carry a direction (back/next
+   arrows, "open" chevrons). Decorative icons keep their orientation. */
+[dir="rtl"] .kuja-flip-rtl { transform: scaleX(-1); }
+
+/* Numbers stay left-to-right even inside RTL containers — score rings,
+   percentages, currency, and tabular numerics read more naturally in
+   Western numerals + LTR direction even when the surrounding language is
+   right-to-left. */
+[dir="rtl"] .kuja-numeric { direction: ltr; unicode-bidi: embed; display: inline-block; }
+[dir="rtl"] .tabular-nums { direction: ltr; unicode-bidi: embed; display: inline-block; }
+
+/* Multilingual button wrapping — Swahili and Somali action labels can be
+   30-40% longer than English equivalents and were breaking single-line
+   button heights. Allow wrapping while keeping minimum line height. */
+button { word-break: keep-all; overflow-wrap: anywhere; }
+
+/* Card content padding gets tighter in RTL where Arabic glyph tails
+   visually consume horizontal space. Bump card padding by 4px on the
+   start side specifically in RTL. */
+[dir="rtl"] .kuja-verdict { padding-inline-start: calc(1rem + 4px); }
+[dir="rtl"] .kuja-chart-card { padding-inline-start: calc(1.25rem + 2px); }
+
+/* Status badges are wider in coaching-tone NGO labels (e.g., "A reviewer is
+   reading your application now" can hit 35+ chars in some langs). Allow
+   wrapping inside badges while keeping pill shape. */
+.kuja-severity { white-space: normal; max-width: 100%; }

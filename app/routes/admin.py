@@ -138,24 +138,68 @@ def api_admin_canary():
 
     checks = {}
 
-    # OpenSanctions API (connectivity probe — no auth needed for base URL)
-    # The /health endpoint may 404; use base URL which returns API info on 200.
+    # OpenSanctions API — authenticated probe of the actual /match/sanctions
+    # endpoint we use in compliance screening. A 200 here means the live key
+    # works AND the request shape is correct; anything else means we'd be
+    # falling back to direct list downloads in production.
+    os_key = os.getenv('OPENSANCTIONS_API_KEY', '')
     try:
-        r = ext_requests.get('https://api.opensanctions.org/', timeout=10)
-        if r.status_code == 200:
-            os_status = 'ok'
-        elif r.status_code < 500:
-            os_status = 'reachable'  # 3xx/4xx = server alive
+        if not os_key:
+            checks['opensanctions'] = {
+                'status': 'not_configured',
+                'key_configured': False,
+                'using_fallback': True,
+            }
         else:
-            os_status = 'degraded'
-        checks['opensanctions'] = {
-            'status': os_status,
-            'http_code': r.status_code,
-            'latency_ms': int(r.elapsed.total_seconds() * 1000),
-            'key_configured': bool(os.getenv('OPENSANCTIONS_API_KEY', '')),
-        }
+            probe_payload = {
+                'queries': {
+                    'probe': {
+                        'schema': 'LegalEntity',
+                        'properties': {'name': ['Kuja Health Probe']},
+                    }
+                }
+            }
+            r = ext_requests.post(
+                'https://api.opensanctions.org/match/sanctions',
+                json=probe_payload,
+                headers={
+                    'Authorization': f'ApiKey {os_key}',
+                    'Content-Type': 'application/json',
+                },
+                timeout=10,
+            )
+            if r.status_code == 200:
+                # Verify the response actually has the expected shape — a 200
+                # with malformed body would still cause silent fallback in prod.
+                try:
+                    body = r.json()
+                    inner = (body.get('responses') or {}).get('probe') or {}
+                    inner_ok = inner.get('status', 200) == 200 and 'results' in inner
+                    os_status = 'ok' if inner_ok else 'degraded'
+                except Exception:
+                    os_status = 'degraded'
+            elif r.status_code in (401, 403):
+                os_status = 'auth_failed'  # key invalid or expired
+            elif r.status_code == 422:
+                os_status = 'request_invalid'  # API contract drift
+            elif r.status_code < 500:
+                os_status = 'degraded'
+            else:
+                os_status = 'down'
+            checks['opensanctions'] = {
+                'status': os_status,
+                'http_code': r.status_code,
+                'latency_ms': int(r.elapsed.total_seconds() * 1000),
+                'key_configured': True,
+                'using_fallback': os_status != 'ok',
+            }
     except Exception as e:
-        checks['opensanctions'] = {'status': 'down', 'error': str(e)[:100]}
+        checks['opensanctions'] = {
+            'status': 'down',
+            'error': str(e)[:100],
+            'key_configured': bool(os_key),
+            'using_fallback': True,
+        }
 
     # Government registries (quick connectivity test)
     # Note: 403/redirect is normal for some portals — only 5xx or timeout = degraded
@@ -214,10 +258,15 @@ def api_admin_canary():
     # Overall status — check core services (opensanctions, anthropic, db)
     # Registries are advisory only (many return 403 normally)
     core_checks = [checks.get('opensanctions', {}), checks.get('anthropic', {})]
-    core_ok = all(c.get('status') in ('ok', 'reachable') for c in core_checks if c.get('status'))
+    healthy_statuses = ('ok', 'reachable')
+    degraded_statuses = ('degraded', 'auth_failed', 'request_invalid', 'not_configured')
+    core_ok = all(c.get('status') in healthy_statuses for c in core_checks if c.get('status'))
     any_down = any(c.get('status') == 'down' for c in core_checks)
+    any_degraded = any(c.get('status') in degraded_statuses for c in core_checks)
 
     if any_down:
+        overall = 'degraded'
+    elif any_degraded:
         overall = 'degraded'
     elif core_ok:
         overall = 'healthy'

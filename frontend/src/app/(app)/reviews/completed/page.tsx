@@ -2,17 +2,14 @@
 
 import { useRouter } from 'next/navigation';
 import { useReviews } from '@/lib/hooks/use-api';
-import { Eye, CheckCircle } from 'lucide-react';
+import { useTranslation } from '@/lib/hooks/use-translation';
+import { Eye, CheckCircle, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Review } from '@/lib/types';
 
-function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
 export default function CompletedReviewsPage() {
   const router = useRouter();
+  const { t, formatDate } = useTranslation();
   const { data, isLoading } = useReviews();
   const completed = (data?.completed ?? []) as Review[];
 
@@ -30,6 +27,9 @@ export default function CompletedReviewsPage() {
       <div>
         <h1 className="kuja-display text-3xl">Completed reviews</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
+          {t('review.completed.subtitle')}
+        </p>
+        <p className="text-xs text-muted-foreground mt-0.5">
           {completed.length} review{completed.length !== 1 ? 's' : ''} completed
         </p>
       </div>
@@ -58,7 +58,6 @@ export default function CompletedReviewsPage() {
                   <th className="px-4 py-3 font-medium text-muted-foreground">Application</th>
                   <th className="px-4 py-3 font-medium text-muted-foreground">Grant</th>
                   <th className="px-4 py-3 font-medium text-muted-foreground text-right">Score</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Completed</th>
                   <th className="px-4 py-3 font-medium text-muted-foreground text-right">Actions</th>
                 </tr>
               </thead>
@@ -69,13 +68,15 @@ export default function CompletedReviewsPage() {
                   return (
                     <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground">
-                        {r.ngo_org_name || `Application #${r.application_id}`}
+                        <div>{r.ngo_org_name || `Application #${r.application_id}`}</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          Completed: {formatDate(r.completed_at)}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{r.grant_title || '—'}</td>
                       <td className={cn('px-4 py-3 text-right kuja-numeric font-semibold', color)}>
                         {r.overall_score != null ? `${r.overall_score}%` : '—'}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatDate(r.completed_at)}</td>
                       <td className="px-4 py-3 text-right">
                         <button
                           type="button"
@@ -92,6 +93,19 @@ export default function CompletedReviewsPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {completed.length > 0 && (
+        <div className="rounded-xl border border-border bg-background p-4 flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm text-muted-foreground">{t('review.completed.next_cta')}</div>
+          <button
+            type="button"
+            onClick={() => router.push('/reviews')}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-xs font-medium px-3 py-1.5"
+          >
+            <Star className="h-3.5 w-3.5" /> {t('review.completed.next_btn')}
+          </button>
         </div>
       )}
     </div>

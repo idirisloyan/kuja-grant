@@ -7,12 +7,13 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { fetchInsightCaption } from '@/lib/copilot-api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { Sparkles, RefreshCcw } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 interface Props {
-  title: string;
+  title: ReactNode;
   subtitle?: string;
   icon?: LucideIcon;
   children: ReactNode;
@@ -28,6 +29,7 @@ interface Props {
 export function ChartCard({
   title, subtitle, icon: Icon, children, caption, className,
 }: Props) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(!!caption);
   const [text, setText] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -67,7 +69,7 @@ export function ChartCard({
             type="button"
             onClick={() => setRefreshTick((t) => t + 1)}
             className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-            aria-label="Refresh AI caption"
+            aria-label={t('chart.refresh_caption_aria')}
           >
             <RefreshCcw className="h-3 w-3" />
           </button>
@@ -84,16 +86,16 @@ export function ChartCard({
           {loading && (
             <span className="inline-flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5 animate-pulse" />
-              AI is reading the data…
+              {t('chart.ai_reading')}
             </span>
           )}
           {!loading && error && (
-            <span className="text-xs">AI caption unavailable — chart data still above.</span>
+            <span className="text-xs">{t('chart.ai_caption_unavailable')}</span>
           )}
           {!loading && !error && text && (
             <>
               <div className="kuja-ai-mark mb-1">
-                <Sparkles className="h-3 w-3" /> AI insight
+                <Sparkles className="h-3 w-3" /> {t('chart.ai_insight')}
               </div>
               <div>{text}</div>
             </>

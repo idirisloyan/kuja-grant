@@ -20,8 +20,22 @@ import { GitMerge, Clock4, ShieldAlert } from 'lucide-react';
 import { VerdictCard, type VerdictAction } from './verdict-card';
 import { ChartCard } from './chart-card';
 import { SizedChart } from './sized-chart';
-import { fetchDonorPortfolioInsights, type DonorPortfolioInsights } from '@/lib/copilot-api';
+import { fetchDonorPortfolioInsights, type DonorPortfolioInsights, type DonorActionType } from '@/lib/copilot-api';
 import { api } from '@/lib/api';
+
+// Map AI-tagged action_type to the page that completes that decision.
+// Returning undefined means "fall back to opening the co-pilot rail".
+function _donorActionHref(t: DonorActionType | undefined): string | undefined {
+  switch (t) {
+    case 'review_applications':  return '/applications';
+    case 'review_compliance':    return '/compliance';
+    case 'review_reports':       return '/reports';
+    case 'create_grant':         return '/grants/new';
+    case 'manage_grants':        return '/grants';
+    case 'assign_reviewers':     return '/applications';
+    default:                     return undefined;
+  }
+}
 
 const CLAY = 'hsl(19, 82%, 41%)';
 const CLAY_LIGHT = 'hsl(24, 88%, 64%)';
@@ -34,11 +48,21 @@ interface ApplicationsResp {
   applications?: Array<{ status?: string; ai_score?: number | null }>;
 }
 
+interface ReportsResp {
+  reports?: Array<{
+    status?: string;
+    due_date?: string | null;
+    submitted_at?: string | null;
+    ai_analysis?: { compliance_score?: number } | null;
+  }>;
+}
+
 export function DonorCommandCenter() {
   const [verdict, setVerdict] = useState<DonorPortfolioInsights | null>(null);
   const [verdictLoading, setVerdictLoading] = useState(true);
   const [verdictError, setVerdictError] = useState<string | null>(null);
   const [apps, setApps] = useState<ApplicationsResp['applications']>([]);
+  const [reports, setReports] = useState<ReportsResp['reports']>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,6 +74,9 @@ export function DonorCommandCenter() {
     });
     api.get<ApplicationsResp>('/applications').then((d) => {
       if (!cancelled) setApps(d.applications ?? []);
+    }).catch(() => {});
+    api.get<ReportsResp>('/reports').then((d) => {
+      if (!cancelled) setReports(d.reports ?? []);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
@@ -77,24 +104,65 @@ export function DonorCommandCenter() {
     { stage: 'Decision', median: 4, p75: 8 },
   ], []);
 
-  // ---- risk heatmap ------------------------------------------------
-  const riskData = useMemo(() => [
-    { dim: 'Compliance',  score: 72, fill: riskColor(72) },
-    { dim: 'Delivery',    score: 65, fill: riskColor(65) },
-    { dim: 'Financial',   score: 80, fill: riskColor(80) },
-    { dim: 'Capacity',    score: 58, fill: riskColor(58) },
-  ], []);
+  // ---- risk heatmap (derived from real data; was hardcoded) -------
+  // Health scores 0-100 across four dimensions, computed from the donor's
+  // own portfolio so the chart actually reflects current state instead of
+  // showing fixed numbers that the team flagged as untrustworthy.
+  const riskData = useMemo(() => {
+    const reportList = reports ?? [];
+    const appList = apps ?? [];
+
+    // Compliance: average of submitted-report compliance_score
+    const compScores = reportList
+      .map((r) => r.ai_analysis?.compliance_score)
+      .filter((s): s is number => typeof s === 'number');
+    const compliance = compScores.length > 0
+      ? Math.round(compScores.reduce((a, b) => a + b, 0) / compScores.length)
+      : 70; // neutral default with no data
+
+    // Delivery: % of reports not overdue or accepted
+    const now = Date.now();
+    const overdue = reportList.filter((r) =>
+      r.due_date && new Date(r.due_date).getTime() < now && r.status !== 'accepted'
+    ).length;
+    const delivery = reportList.length > 0
+      ? Math.round(((reportList.length - overdue) / reportList.length) * 100)
+      : 75;
+
+    // Pipeline: penalize stuck "under_review" share — healthy if applications move
+    const stuck = appList.filter((a) => a.status === 'under_review').length;
+    const total = appList.length;
+    const pipeline = total > 0
+      ? Math.round((1 - Math.min(stuck / total, 1)) * 90 + 10)
+      : 75;
+
+    // Capacity: average ai_score across applications (proxy for grantee capacity quality)
+    const aiScores = appList
+      .map((a) => a.ai_score)
+      .filter((s): s is number => typeof s === 'number' && s > 0);
+    const capacity = aiScores.length > 0
+      ? Math.round(aiScores.reduce((a, b) => a + b, 0) / aiScores.length)
+      : 70;
+
+    return [
+      { dim: 'Compliance', score: compliance, fill: riskColor(compliance) },
+      { dim: 'Delivery',   score: delivery,   fill: riskColor(delivery) },
+      { dim: 'Pipeline',   score: pipeline,   fill: riskColor(pipeline) },
+      { dim: 'Capacity',   score: capacity,   fill: riskColor(capacity) },
+    ];
+  }, [reports, apps]);
 
   // ---- verdict actions --------------------------------------------
-  const verdictActions: VerdictAction[] = (verdict?.next_decisions ?? []).slice(0, 3).map((d) => ({
-    label: d.title,
-    severity: (d.severity as VerdictAction['severity']) ?? 'info',
-    onClick: () => {
-      // Open co-pilot for deeper context
-      const evt = new CustomEvent('kuja:open-copilot');
-      window.dispatchEvent(evt);
-    },
-  }));
+  const verdictActions: VerdictAction[] = (verdict?.next_decisions ?? []).slice(0, 3).map((d) => {
+    const href = _donorActionHref(d.action_type);
+    return {
+      label: d.title,
+      severity: (d.severity as VerdictAction['severity']) ?? 'info',
+      ...(href
+        ? { href }
+        : { onClick: () => window.dispatchEvent(new CustomEvent('kuja:open-copilot')) }),
+    };
+  });
 
   const verdictTone = verdictActions.some((a) => a.severity === 'critical') ? 'danger'
     : verdictActions.some((a) => a.severity === 'major') ? 'warn'

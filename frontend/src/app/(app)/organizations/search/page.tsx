@@ -2,12 +2,14 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
 import { Search, Building2, Eye, ShieldCheck, MapPin, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Organization } from '@/lib/types';
 
 export default function OrgSearchPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Organization[]>([]);
@@ -33,9 +35,9 @@ export default function OrgSearchPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="kuja-display text-3xl">Organization search</h1>
+        <h1 className="kuja-display text-3xl">{t('org.search_title')}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Find organizations in the Kuja Grant system
+          {t('org.search_subtitle')}
         </p>
       </div>
 
@@ -48,7 +50,7 @@ export default function OrgSearchPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Search by name, country, or type…"
+            placeholder={t('org.search_placeholder')}
             className="w-full h-10 pl-9 pr-3 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]"
           />
         </div>
@@ -59,7 +61,7 @@ export default function OrgSearchPage() {
           className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-          Search
+          {t('common.search')}
         </button>
       </div>
 
@@ -73,8 +75,8 @@ export default function OrgSearchPage() {
       {!searching && hasSearched && results.length === 0 && (
         <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
           <Building2 className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="kuja-display text-xl">No organizations found</p>
-          <p className="text-sm text-muted-foreground mt-1">Try a different search term.</p>
+          <p className="kuja-display text-xl">{t('org.search_no_results')}</p>
+          <p className="text-sm text-muted-foreground mt-1">{t('common.try_different_search')}</p>
         </div>
       )}
 
@@ -120,7 +122,7 @@ export default function OrgSearchPage() {
                     <td className="px-4 py-3">
                       {org.verified ? (
                         <span className="inline-flex items-center gap-1 text-[hsl(var(--kuja-grow))] text-xs font-medium">
-                          <ShieldCheck className="h-4 w-4" /> Verified
+                          <ShieldCheck className="h-4 w-4" /> {t('verification.status.verified')}
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">Not verified</span>
@@ -141,10 +143,10 @@ export default function OrgSearchPage() {
                       <button
                         type="button"
                         onClick={() => router.push(`/organizations/profile?id=${org.id}`)}
-                        className="inline-flex items-center gap-1.5 rounded border border-border hover:border-[hsl(var(--kuja-clay))] text-xs font-medium px-2.5 py-1"
+                        className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-xs font-medium px-3 py-1.5"
                       >
                         <Eye className="h-3.5 w-3.5" />
-                        View
+                        {t('common.view')}
                       </button>
                     </td>
                   </tr>
@@ -158,9 +160,9 @@ export default function OrgSearchPage() {
       {!hasSearched && (
         <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
           <Search className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="kuja-display text-xl">Search for organizations</p>
+          <p className="kuja-display text-xl">{t('org.search_empty')}</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Enter a name, country, or type to get started.
+            {t('org.search_empty_hint')}
           </p>
         </div>
       )}

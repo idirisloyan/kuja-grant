@@ -222,10 +222,30 @@ def api_ngo_readiness():
         'uploaded_at': d.uploaded_at.isoformat() if d.uploaded_at else None,
     } for d in docs]
 
+    # Pending/overdue reports — feed them to the AI so "submit your overdue
+    # X report" becomes a concrete action_type=submit_report next_action.
+    pending_reports = []
+    try:
+        rep_q = (Report.query
+                 .filter(Report.submitted_by_org_id == org.id)
+                 .filter(Report.status.in_(('draft', 'submitted', 'revision_requested')))
+                 .order_by(Report.due_date.asc().nullslast())
+                 .limit(10).all())
+        for r in rep_q:
+            pending_reports.append({
+                'id': r.id,
+                'title': r.title,
+                'status': r.status,
+                'due_date': r.due_date.isoformat() if r.due_date else None,
+            })
+    except Exception as e:
+        logger.warning(f"Failed to load pending reports for ngo_readiness: {e}")
+
     t0 = time.time()
     res = CopilotService.ngo_readiness(
         org_summary=org_summary, recent_apps=recent_apps,
-        documents_present=documents_present, lang=get_lang(),
+        documents_present=documents_present,
+        pending_reports=pending_reports, lang=get_lang(),
     )
     log_call(endpoint='ngo-readiness', user_id=current_user.id, result=res,
              duration_ms=int((time.time() - t0) * 1000))
@@ -435,6 +455,7 @@ def api_chat_stream():
              for m in thread.messages.order_by(AIMessage.created_at.asc()).all()]
     thread_pk = thread.id  # captured for closure
     user_id = current_user.id
+    user_role = getattr(current_user, 'role', None)
 
     @stream_with_context
     def gen():
@@ -443,7 +464,7 @@ def api_chat_stream():
         try:
             for frame in CopilotService.chat_stream(
                 question=question, scope=scope, prior_messages=prior,
-                sources=sources, lang=lang,
+                sources=sources, lang=lang, role=user_role,
             ):
                 if frame.get('type') == 'delta':
                     full_answer += frame.get('text') or ''
@@ -549,6 +570,7 @@ def api_thread_get(thread_id):
 @copilot_bp.route('/health', methods=['GET'])
 @login_required
 def api_ai_health():
+    """Lightweight 24h rollup. Kept for the existing admin AI health card."""
     if current_user.role != 'admin':
         return jsonify({'ok': False, 'code': 'FORBIDDEN', 'message': 'Admin only.'}), 403
     from app.models import AICallLog
@@ -569,4 +591,179 @@ def api_ai_health():
         'total_calls': total,
         'success_rate_pct': round((success / total) * 100, 1) if total else None,
         'by_endpoint': by_endpoint,
+    }})
+
+
+@copilot_bp.route('/observability', methods=['GET'])
+@login_required
+def api_ai_observability():
+    """Deep AI observability: time-series, latency percentiles, error
+    breakdown, recent failures, top users. Powers the admin observability
+    page so problems can be diagnosed without dropping into the database.
+    Admin only.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'ok': False, 'code': 'FORBIDDEN', 'message': 'Admin only.'}), 403
+
+    from app.models import AICallLog, User
+    now = datetime.now(timezone.utc)
+    h24 = now - timedelta(hours=24)
+    d7  = now - timedelta(days=7)
+
+    # 24h dataset for percentiles + by_endpoint
+    rows_24h = AICallLog.query.filter(AICallLog.created_at >= h24).all()
+    total_24h = len(rows_24h)
+    success_24h = sum(1 for r in rows_24h if r.success)
+    tokens_in_24h = sum((r.tokens_in or 0) for r in rows_24h)
+    tokens_out_24h = sum((r.tokens_out or 0) for r in rows_24h)
+
+    # Per-endpoint latency percentiles + success rate (last 24h)
+    by_endpoint = {}
+    for r in rows_24h:
+        ep = by_endpoint.setdefault(r.endpoint, {
+            'total': 0, 'success': 0, 'failures': 0,
+            'tokens_in': 0, 'tokens_out': 0, '_latencies': [],
+        })
+        ep['total'] += 1
+        if r.success:
+            ep['success'] += 1
+        else:
+            ep['failures'] += 1
+        ep['tokens_in'] += (r.tokens_in or 0)
+        ep['tokens_out'] += (r.tokens_out or 0)
+        if r.duration_ms is not None:
+            ep['_latencies'].append(r.duration_ms)
+
+    def _pct(values, q):
+        if not values:
+            return None
+        s = sorted(values)
+        idx = max(0, min(len(s) - 1, int(round((q / 100.0) * (len(s) - 1)))))
+        return s[idx]
+
+    for ep_name, ep in by_endpoint.items():
+        lats = ep.pop('_latencies')
+        ep['latency_p50_ms'] = _pct(lats, 50)
+        ep['latency_p95_ms'] = _pct(lats, 95)
+        ep['latency_p99_ms'] = _pct(lats, 99)
+        ep['success_rate_pct'] = round((ep['success'] / ep['total']) * 100, 1) if ep['total'] else None
+
+    # 7-day daily time-series (for trend chart)
+    rows_7d = AICallLog.query.filter(AICallLog.created_at >= d7).all()
+    daily = {}
+    for r in rows_7d:
+        # Bucket by UTC day
+        day_key = r.created_at.date().isoformat() if r.created_at else None
+        if not day_key:
+            continue
+        b = daily.setdefault(day_key, {'date': day_key, 'total': 0, 'success': 0, 'tokens_out': 0})
+        b['total'] += 1
+        if r.success:
+            b['success'] += 1
+        b['tokens_out'] += (r.tokens_out or 0)
+    daily_series = sorted(daily.values(), key=lambda x: x['date'])
+
+    # Top error_codes (last 24h)
+    error_buckets = {}
+    for r in rows_24h:
+        if r.success or not r.error_code:
+            continue
+        eb = error_buckets.setdefault(r.error_code, {
+            'error_code': r.error_code, 'count': 0, 'sample_message': None,
+        })
+        eb['count'] += 1
+        if not eb['sample_message'] and r.error_message:
+            eb['sample_message'] = r.error_message[:200]
+    top_errors = sorted(error_buckets.values(), key=lambda x: x['count'], reverse=True)[:10]
+
+    # Last 20 failures with full context
+    recent_failures_q = (AICallLog.query
+                         .filter(AICallLog.success == False)  # noqa: E712
+                         .order_by(AICallLog.created_at.desc())
+                         .limit(20).all())
+    recent_failures = [{
+        'endpoint': r.endpoint,
+        'user_id': r.user_id,
+        'duration_ms': r.duration_ms,
+        'error_code': r.error_code,
+        'error_message': (r.error_message or '')[:240] if r.error_message else None,
+        'created_at': r.created_at.isoformat() if r.created_at else None,
+    } for r in recent_failures_q]
+
+    # Top users (24h) — surface heavy AI users
+    user_buckets = {}
+    for r in rows_24h:
+        if not r.user_id:
+            continue
+        ub = user_buckets.setdefault(r.user_id, {
+            'user_id': r.user_id, 'calls': 0, 'tokens_out': 0, 'failures': 0,
+        })
+        ub['calls'] += 1
+        ub['tokens_out'] += (r.tokens_out or 0)
+        if not r.success:
+            ub['failures'] += 1
+    top_user_ids = sorted(user_buckets.values(), key=lambda x: x['calls'], reverse=True)[:10]
+    user_emails = {}
+    if top_user_ids:
+        ids = [u['user_id'] for u in top_user_ids]
+        for u in User.query.filter(User.id.in_(ids)).all():
+            user_emails[u.id] = {'email': u.email, 'role': u.role}
+    for ub in top_user_ids:
+        info = user_emails.get(ub['user_id']) or {}
+        ub['email'] = info.get('email')
+        ub['role'] = info.get('role')
+
+    # Anomaly detection: endpoints whose 24h call count has dropped
+    # 80%+ vs. their 6-day prior average (catches regressions silently
+    # disabling a feature). Also flags p95 latency that doubled.
+    rows_prior = AICallLog.query.filter(
+        AICallLog.created_at >= d7, AICallLog.created_at < h24,
+    ).all()
+    prior_per_ep_count = {}
+    prior_per_ep_lat = {}
+    for r in rows_prior:
+        prior_per_ep_count[r.endpoint] = prior_per_ep_count.get(r.endpoint, 0) + 1
+        if r.duration_ms is not None:
+            prior_per_ep_lat.setdefault(r.endpoint, []).append(r.duration_ms)
+    anomalies = []
+    for ep_name, ep in by_endpoint.items():
+        prior_count = prior_per_ep_count.get(ep_name, 0)
+        prior_avg_per_day = prior_count / 6.0 if prior_count else 0
+        if prior_avg_per_day >= 5 and ep['total'] < prior_avg_per_day * 0.2:
+            anomalies.append({
+                'endpoint': ep_name,
+                'kind': 'volume_drop',
+                'detail': f'24h calls={ep["total"]} vs prior 6-day avg={round(prior_avg_per_day,1)}/day — possible silent failure',
+            })
+        prior_lats = prior_per_ep_lat.get(ep_name) or []
+        prior_p95 = _pct(prior_lats, 95)
+        if prior_p95 and ep.get('latency_p95_ms') and ep['latency_p95_ms'] > prior_p95 * 2:
+            anomalies.append({
+                'endpoint': ep_name,
+                'kind': 'latency_spike',
+                'detail': f'p95 {ep["latency_p95_ms"]}ms vs prior {prior_p95}ms (>2x)',
+            })
+        if ep.get('success_rate_pct') is not None and ep['success_rate_pct'] < 80 and ep['total'] >= 5:
+            anomalies.append({
+                'endpoint': ep_name,
+                'kind': 'low_success_rate',
+                'detail': f'24h success rate {ep["success_rate_pct"]}% on {ep["total"]} calls',
+            })
+
+    return jsonify({'ok': True, 'data': {
+        'generated_at': now.isoformat(),
+        'window_hours': 24,
+        'summary_24h': {
+            'total_calls': total_24h,
+            'success_rate_pct': round((success_24h / total_24h) * 100, 1) if total_24h else None,
+            'failures': total_24h - success_24h,
+            'tokens_in': tokens_in_24h,
+            'tokens_out': tokens_out_24h,
+        },
+        'by_endpoint': by_endpoint,
+        'daily_series_7d': daily_series,
+        'top_errors_24h': top_errors,
+        'recent_failures': recent_failures,
+        'top_users_24h': top_user_ids,
+        'anomalies': anomalies,
     }})

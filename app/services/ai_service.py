@@ -319,6 +319,398 @@ class AIService:
         return {'response': template, 'source': 'template'}
 
     @classmethod
+    def strengthen_against_criterion(cls, *, criterion, response_text, grant_context=None, org_summary=None):
+        """NGO co-writer: analyze the applicant's current response against
+        the donor's criterion + grant context, then return:
+          - quick assessment: what's strong, what's weak
+          - a sharpened rewrite that emphasizes what THIS donor cares about
+          - 2-3 specific tweaks the NGO can make beyond the rewrite
+
+        Differs from draft_application_section (improve mode) by adding
+        explicit donor-context tailoring: the rewrite weaves in donor
+        keywords / rubric language without losing the applicant's facts.
+
+        Returns: {strengths[], gaps[], sharpened: str, tweaks[], source}
+        """
+        criterion = criterion or {}
+        grant_context = grant_context or {}
+        org_summary = org_summary or {}
+        response_text = (response_text or '').strip()
+
+        system = (
+            "You are Kuja's grant writing co-pilot. Read the applicant's "
+            "current response, the donor's criterion, and the broader grant "
+            "context. Produce: (1) what's already strong, (2) what's weak "
+            "against this donor's specific lens, (3) a sharpened rewrite "
+            "that keeps every fact present in the applicant's draft and "
+            "weaves in donor priorities WITHOUT inventing numbers, "
+            "partners, or programs that aren't in the source, (4) 2-3 "
+            "specific tweaks beyond the rewrite. "
+            "Be honest about weaknesses. Don't pad. Don't soften the "
+            "rewrite to be vague — be specific.\n\n"
+            "Return ONLY a JSON object matching the schema."
+        )
+
+        schema = """{
+  "strengths": ["..."],
+  "gaps": ["..."],
+  "sharpened": "<rewritten answer text, 120-220 words>",
+  "tweaks": ["...", "...", "..."]
+}"""
+
+        user_msg = (
+            "CRITERION:\n" + json.dumps(criterion, indent=2)[:1500] + "\n\n"
+            "GRANT CONTEXT:\n" + json.dumps(grant_context, indent=2, default=str)[:2000] + "\n\n"
+            "APPLICANT'S ORG:\n" + json.dumps(org_summary, indent=2, default=str)[:1500] + "\n\n"
+            "APPLICANT'S CURRENT RESPONSE:\n"
+            + (response_text if response_text else '(empty — no draft yet)')
+            + "\n\nReturn the JSON now."
+        )
+
+        text = cls._call_claude(system + "\n\n" + schema, user_msg, max_tokens=1800)
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    parsed['source'] = 'claude'
+                    return parsed
+            except Exception as e:
+                logger.warning(f"strengthen_against_criterion JSON parse failed: {e}")
+
+        return {
+            'strengths': ['Existing draft preserved.'] if response_text else [],
+            'gaps': ['AI strengthening unavailable — draft a starting answer first.'],
+            'sharpened': response_text or '',
+            'tweaks': ['Add specific quantified outcomes.', 'Cite past project results.', 'Match donor terminology.'],
+            'source': 'template',
+        }
+
+    @classmethod
+    def extract_evidence(cls, *, criteria, application_responses, application_summary=None):
+        """Reviewer evidence synthesis: pull short verbatim quotes from
+        the applicant's responses that SUPPORT or CONTRADICT each criterion,
+        plus neutral references. Helps reviewers cite specific evidence
+        instead of writing rationale from cold memory.
+
+        Args:
+            criteria: list of {key, label, description, weight}
+            application_responses: dict {criterion_key_or_label: response_text}
+            application_summary: optional summary text
+
+        Returns: {
+            'per_criterion': [
+                {'criterion_key': str, 'criterion_label': str,
+                 'supports': [{'quote': str, 'why': str}],
+                 'contradicts': [{'quote': str, 'why': str}],
+                 'neutral': [{'quote': str, 'why': str}]}
+            ],
+            'overall_observation': str,
+            'source': 'claude'|'template'
+        }
+        """
+        criteria = criteria or []
+        application_responses = application_responses or {}
+        if not criteria:
+            return {'per_criterion': [], 'overall_observation': '', 'source': 'template'}
+
+        system = (
+            "You are Kuja's reviewer evidence synthesizer. Read the "
+            "rubric criteria and the applicant's responses. For EACH "
+            "criterion, return short verbatim quotes from the responses "
+            "that:\n"
+            "  - SUPPORT the criterion (positive evidence)\n"
+            "  - CONTRADICT or undermine it (red flags)\n"
+            "  - NEUTRAL but relevant (worth noting)\n\n"
+            "Quote 5-25 words each. Don't paraphrase. If a section is empty, "
+            "say so explicitly in the 'why' field. Add 'why' (1 sentence) "
+            "explaining how each quote relates. Then a single 'overall_observation' "
+            "summarizing the application's pattern (1-2 sentences).\n\n"
+            "Return ONLY a JSON object matching the schema."
+        )
+
+        schema = """{
+  "per_criterion": [
+    {"criterion_key": "...", "criterion_label": "...",
+     "supports":     [{"quote": "...", "why": "..."}],
+     "contradicts":  [{"quote": "...", "why": "..."}],
+     "neutral":      [{"quote": "...", "why": "..."}]}
+  ],
+  "overall_observation": "1-2 sentence pattern summary"
+}"""
+
+        user_msg = (
+            "RUBRIC CRITERIA:\n" + json.dumps(criteria, indent=2)[:3000] + "\n\n"
+            "APPLICATION SUMMARY:\n" + (application_summary or '(not provided)')[:1500] + "\n\n"
+            "APPLICATION RESPONSES:\n"
+            + json.dumps(application_responses, indent=2, default=str)[:12000]
+            + "\n\nReturn the JSON now."
+        )
+
+        text = cls._call_claude(system + "\n\n" + schema, user_msg, max_tokens=2500)
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    parsed['source'] = 'claude'
+                    return parsed
+            except Exception as e:
+                logger.warning(f"extract_evidence JSON parse failed: {e}")
+
+        return {
+            'per_criterion': [{'criterion_key': c.get('key') or c.get('label'),
+                               'criterion_label': c.get('label', ''),
+                               'supports': [], 'contradicts': [], 'neutral': []}
+                              for c in criteria],
+            'overall_observation': 'Evidence extraction unavailable. Review the responses manually.',
+            'source': 'template',
+        }
+
+    @classmethod
+    def explain_compliance(cls, *, org_summary, verification=None, compliance_checks=None,
+                            registry_check=None, lang='en'):
+        """Compliance co-pilot: interpret verification + sanctions findings
+        in plain language, surface confidence, and recommend the specific
+        manual follow-up a human should do.
+
+        Replaces the team's gap: "Help users interpret verification/sanctions
+        findings, understand confidence, and decide what manual follow-up
+        is needed."
+
+        Args:
+            org_summary: dict with name/country/registration_number
+            verification: dict with status/ai_confidence/registration_authority
+                          (the latest RegistrationVerification.to_dict())
+            compliance_checks: list of dicts (latest ComplianceCheck records)
+            registry_check: dict from RegistryService.verify_online (if any)
+
+        Returns: {
+            'headline': str,         # 1-line plain-language verdict
+            'confidence_band': 'high'|'medium'|'low',
+            'what_we_know': [str],   # bullet list of established facts
+            'gaps': [str],           # what's still uncertain
+            'recommended_actions': [{'title': str, 'why': str, 'urgency': 'now'|'soon'|'fyi'}],
+            'source': 'claude'|'template',
+        }
+        """
+        org_summary = org_summary or {}
+        verification = verification or {}
+        compliance_checks = compliance_checks or []
+        registry_check = registry_check or {}
+
+        system = (
+            "You are Kuja's compliance co-pilot. Donors and admins see "
+            "verification + sanctions findings about NGOs and need to decide "
+            "what manual follow-up is required. Read the structured findings "
+            "and produce a SHORT, plain-language brief. Be honest: don't "
+            "manufacture certainty. If the AI confidence is medium, say so. "
+            "If a registry confirmed registration, say so explicitly. If "
+            "sanctions screening was clear via OpenSanctions, say so. If a "
+            "fallback was used, flag that as a confidence-reducer.\n\n"
+            "Recommended actions must be CONCRETE and tied to specific "
+            "available channels (e.g., 'Phone the NGO Coordination Board "
+            "registrar in {country} to confirm registration #{reg_no}', "
+            "'Re-run sanctions screening via /api/compliance/screen', "
+            "'Request a copy of the certificate from the NGO directly')."
+        )
+
+        user_msg = (
+            "ORG:\n" + json.dumps(org_summary, indent=2, default=str)[:1500] + "\n\n"
+            "VERIFICATION RECORD:\n" + json.dumps(verification, indent=2, default=str)[:2500] + "\n\n"
+            "REGISTRY CHECK RESULT:\n" + json.dumps(registry_check, indent=2, default=str)[:1500] + "\n\n"
+            "COMPLIANCE CHECKS (sanctions etc):\n"
+            + json.dumps(compliance_checks, indent=2, default=str)[:6000]
+        )
+
+        schema = """{
+  "headline": "1-sentence verdict in plain language",
+  "confidence_band": "high|medium|low",
+  "what_we_know": ["...", "..."],
+  "gaps": ["...", "..."],
+  "recommended_actions": [
+    {"title": "...", "why": "...", "urgency": "now|soon|fyi"}
+  ]
+}"""
+
+        # CopilotService has structured-JSON helpers; reuse the call+parse path
+        # via _call_claude + manual JSON extraction so we don't introduce a
+        # cross-import.
+        text = cls._call_claude(system + "\n\nReturn ONLY a JSON object matching:\n" + schema,
+                                user_msg, max_tokens=1500)
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    parsed['source'] = 'claude'
+                    return parsed
+            except Exception as e:
+                logger.warning(f"explain_compliance JSON parse failed: {e}")
+
+        # Template fallback so the UI renders something even when AI is down.
+        org_name = org_summary.get('name') or 'this organization'
+        country = org_summary.get('country') or 'the registry country'
+        reg_no = org_summary.get('registration_number') or '<no number on file>'
+        verified = verification.get('status') == 'verified'
+        return {
+            'headline': (f"Verification record for {org_name} present" if verification
+                         else f"No verification record on file for {org_name}"),
+            'confidence_band': 'high' if verified else 'medium' if verification else 'low',
+            'what_we_know': [
+                f"Registration number on file: {reg_no}",
+                f"Country: {country}",
+            ],
+            'gaps': ['AI explanation unavailable — manual review recommended.'],
+            'recommended_actions': [{
+                'title': f'Confirm registration with {country} registrar',
+                'why': 'Direct registry confirmation is the strongest signal.',
+                'urgency': 'soon',
+            }],
+            'source': 'template',
+        }
+
+    @classmethod
+    def score_one_criterion(cls, *, criterion, response_text, org_name=None, grant_title=None):
+        """Reviewer-side AI: score a single criterion against the NGO's
+        response and produce a 2-3 sentence rationale the reviewer can
+        edit and confirm. Lighter than bulk scoring — focused on one row.
+
+        Returns: {'score': int 0-100, 'rationale': str, 'source': 'claude'|'template'}
+        """
+        criterion = criterion or {}
+        response_text = (response_text or '').strip()
+
+        system_prompt = (
+            "You are an experienced grant reviewer. Score one criterion of "
+            "an NGO's application response (0-100) and write a SHORT, honest "
+            "rationale a reviewer can edit and confirm. Be specific: cite what "
+            "the applicant did or didn't include. Be fair: don't over-penalize "
+            "early-stage NGOs. Return ONLY a JSON object: "
+            '{"score": <0-100>, "rationale": "<2-3 sentences>"}'
+        )
+
+        weight = criterion.get('weight', 0)
+        user_msg = (
+            f"GRANT: {grant_title or '(unspecified)'}\n"
+            f"APPLICANT: {org_name or '(unspecified)'}\n\n"
+            f"CRITERION:\n"
+            f"  label:        {criterion.get('label','')}\n"
+            f"  weight:       {weight}%\n"
+            f"  description:  {criterion.get('description','')}\n"
+            f"  instructions: {criterion.get('instructions','')}\n\n"
+            f"APPLICANT'S RESPONSE:\n"
+            f"{response_text or '(empty — no answer provided)'}\n\n"
+            f"Score and write your rationale."
+        )
+
+        text = cls._call_claude(system_prompt, user_msg, max_tokens=600)
+        if text:
+            # Extract JSON from response (Claude sometimes wraps in prose)
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*?"score"[\s\S]*?"rationale"[\s\S]*?\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    return {
+                        'score': int(parsed.get('score', 0)),
+                        'rationale': str(parsed.get('rationale', '')).strip(),
+                        'source': 'claude',
+                    }
+            except Exception as e:
+                logger.warning(f"score_one_criterion JSON parse failed: {e}")
+                # Fall through to text fallback
+            return {
+                'score': cls._extract_score_from_text(text) or 0,
+                'rationale': text.strip()[:600],
+                'source': 'claude',
+            }
+
+        # Fallback when AI is unavailable
+        if not response_text:
+            return {
+                'score': 0,
+                'rationale': 'No response provided — applicant did not address this criterion.',
+                'source': 'template',
+            }
+        return {
+            'score': cls._quick_text_score(response_text, criterion),
+            'rationale': 'AI rationale unavailable. Quick heuristic suggests reviewing the response for specificity, evidence, and alignment to the criterion above.',
+            'source': 'template',
+        }
+
+    @classmethod
+    def draft_application_section(cls, *, criterion, org_summary=None,
+                                    grant_context=None, current_text='',
+                                    mode='draft'):
+        """Generate (or strengthen) an application response for one criterion.
+
+        mode='draft'    → write a fresh starting answer using org context.
+        mode='improve'  → rewrite/strengthen current_text without losing facts.
+
+        Returns {'draft': str, 'source': 'claude'|'template'}.
+        """
+        org_summary = org_summary or {}
+        grant_context = grant_context or {}
+
+        if mode == 'improve':
+            system_prompt = (
+                "You are a grant writing coach. Rewrite the user's draft answer "
+                "for one application criterion so it is sharper, more specific, "
+                "and more competitive. Keep every fact present in their draft — "
+                "do NOT invent new numbers, partners, or programs. Add stronger "
+                "verbs, quantification where the draft is vague, and explicit "
+                "links to the donor's criterion language. Return ONLY the rewritten "
+                "answer text — no preamble, no explanation, no markdown headings."
+            )
+        else:
+            system_prompt = (
+                "You are a grant writing coach. Draft a starting answer for one "
+                "application criterion using the NGO's actual profile context. "
+                "Be specific, concrete, and competitive — but conservative: do NOT "
+                "fabricate concrete numbers, named partners, geographic specifics, "
+                "or program titles that aren't in the provided org context. Where "
+                "specifics are needed, use placeholders the user can fill in, like "
+                "[insert specific number] or [name of partner]. Keep the draft "
+                "to 120-200 words. Return ONLY the draft text — no preamble, "
+                "no explanation, no markdown headings."
+            )
+
+        user_msg_parts = [
+            f"CRITERION:\nlabel: {criterion.get('label','')}\n"
+            f"description: {criterion.get('description','')}\n"
+            f"instructions: {criterion.get('instructions','')}",
+        ]
+        if org_summary:
+            user_msg_parts.append("ORG PROFILE:\n" + json.dumps(org_summary, indent=2, default=str))
+        if grant_context:
+            user_msg_parts.append("GRANT CONTEXT:\n" + json.dumps(grant_context, indent=2, default=str))
+        if current_text:
+            user_msg_parts.append(f"USER'S CURRENT DRAFT:\n{current_text}")
+
+        user_msg = "\n\n".join(user_msg_parts)
+        text = cls._call_claude(system_prompt, user_msg, max_tokens=900)
+        if text:
+            return {'draft': text.strip(), 'source': 'claude'}
+
+        # Fallback template — generic but better than nothing.
+        org_name = org_summary.get('name') or 'Our organization'
+        sector = org_summary.get('sector') or 'humanitarian programming'
+        country = org_summary.get('country') or 'our operating country'
+        fallback = (
+            f"{org_name} is positioned to address this requirement through our "
+            f"{sector} work in {country}. [Describe specific approach, partners, "
+            f"and target population here.] Our team brings "
+            f"[insert relevant experience and credentials], and we will deliver "
+            f"[insert specific outputs] within the proposed timeframe. Outcomes "
+            f"will be measured through [insert M&E approach]."
+        )
+        return {'draft': fallback, 'source': 'template'}
+
+    @classmethod
     def guidance(cls, field_name, grant_criteria=None, current_text=''):
         """
         Provide writing guidance for a specific application field.

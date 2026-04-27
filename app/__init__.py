@@ -385,7 +385,16 @@ def _register_spa_routes(app):
     nextjs_dir = os.path.join(app.static_folder, 'nextjs')
 
     def _serve_nextjs(path=''):
-        """Serve a Next.js static export file."""
+        """Serve a Next.js static export file.
+
+        Next.js static export only generates the [param] placeholder folder
+        (e.g. /apply/0/index.html) for dynamic routes. Without a fallback
+        for /apply/<real_id>, /grants/<id>, etc., Flask was serving the
+        root index.html, which then redirects authenticated users to
+        /dashboard — breaking direct deep-link navigation. We rewrite any
+        unmatched path to its parent's [param] placeholder so the client
+        can read the real id from window.location and render correctly.
+        """
         if not os.path.isdir(nextjs_dir):
             return None
 
@@ -394,11 +403,40 @@ def _register_spa_routes(app):
         if os.path.isfile(file_path):
             return send_from_directory(nextjs_dir, path)
 
+        # IMPORTANT: For hashed Next.js asset paths that don't exist, return
+        # 404 instead of falling through to the SPA index. Otherwise a stale
+        # browser referencing an old chunk hash receives index.html as the
+        # script body, and silently loads nothing — invisible to the user
+        # except that the page renders English fallbacks. Make it loud so
+        # the browser refetches the parent HTML (which is no-store) and gets
+        # current chunk references.
+        if path.startswith('_next/') or path.endswith('.js') or path.endswith('.css'):
+            from flask import abort
+            abort(404)
+
         # Try path/index.html (Next.js trailingSlash output)
-        for candidate in [f'{path}/index.html', f'{path}.html', 'index.html']:
+        for candidate in [f'{path}/index.html', f'{path}.html']:
             cand_path = os.path.join(nextjs_dir, candidate)
             if os.path.isfile(cand_path):
                 return send_from_directory(nextjs_dir, candidate)
+
+        # Fallback: dynamic-route segments. For path like "apply/266",
+        # try parent + "0" placeholder (apply/0/index.html). Walk up the
+        # path so /grants/123/details would also try /grants/0/details
+        # and then /grants/0.
+        parts = path.strip('/').split('/') if path else []
+        for i in range(len(parts) - 1, -1, -1):
+            candidate_parts = parts[:i] + ['0'] + parts[i + 1:]
+            candidate_path = '/'.join(candidate_parts) + '/index.html'
+            cand = os.path.join(nextjs_dir, candidate_path)
+            if os.path.isfile(cand):
+                return send_from_directory(nextjs_dir, candidate_path)
+
+        # Last resort: root index.html so the client can render at least
+        # the shell and redirect itself.
+        root_index = os.path.join(nextjs_dir, 'index.html')
+        if os.path.isfile(root_index):
+            return send_from_directory(nextjs_dir, 'index.html')
         return None
 
     @app.route('/')

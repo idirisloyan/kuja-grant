@@ -20,7 +20,10 @@ LOCKOUT_DURATION_MINUTES = 15    # How long the lockout lasts
 
 # ---------- IP-based rate limiting (database-backed, works across all workers) ----------
 IP_RATE_LIMIT_WINDOW = 300       # 5-minute sliding window (seconds)
-IP_RATE_LIMIT_MAX = int(os.environ.get('RATE_LIMIT_LOGIN_PER_IP', '20'))  # Default 20/IP per 5min window; tune via env var for shared-NAT deployments
+# Default raised from 20 → 100 because shared-NAT testing teams (and the
+# Adeso retest cohort specifically) were locked out during normal multi-role
+# verification passes. Still env-configurable for stricter prod hardening.
+IP_RATE_LIMIT_MAX = int(os.environ.get('RATE_LIMIT_LOGIN_PER_IP', '100'))
 _ip_table_ready = None
 
 

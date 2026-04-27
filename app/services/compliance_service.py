@@ -114,7 +114,16 @@ class ComplianceService:
 
     @classmethod
     def _check_opensanctions(cls, name, country=None, schema='LegalEntity'):
-        """Call OpenSanctions Match API. Returns raw response dict or None."""
+        """Call OpenSanctions Match API. Returns a normalized result dict
+        ({'results': [...], 'total': {...}}) or None on failure.
+
+        OpenSanctions /match/sanctions requires the batched-queries envelope:
+            {"queries": {"q1": {"schema": ..., "properties": {...}}}}
+        and returns {"responses": {"q1": {"status": 200, "results": [...]}}}.
+        We normalize back to the legacy single-query shape so the rest of the
+        pipeline (_decompose_opensanctions) doesn't need to know about
+        batching.
+        """
         if not OPENSANCTIONS_API_KEY:
             return None
 
@@ -128,12 +137,13 @@ class ComplianceService:
                 'Authorization': f'ApiKey {OPENSANCTIONS_API_KEY}',
                 'Content-Type': 'application/json',
             }
-            payload = {
+            query = {
                 'schema': schema,
                 'properties': {'name': [name]},
             }
             if country:
-                payload['properties']['country'] = [country]
+                query['properties']['country'] = [country]
+            payload = {'queries': {'q1': query}}
 
             resp = requests.post(
                 'https://api.opensanctions.org/match/sanctions',
@@ -142,14 +152,31 @@ class ComplianceService:
                 timeout=15,
             )
             if resp.status_code == 200:
-                data = resp.json()
+                envelope = resp.json()
+                inner = (envelope.get('responses') or {}).get('q1') or {}
+                # Sanity check: the API may return per-query errors as 4xx/5xx
+                inner_status = inner.get('status', 200)
+                if inner_status >= 400:
+                    logger.warning(
+                        f"OpenSanctions per-query error {inner_status} for '{name}': "
+                        f"{str(inner)[:200]}"
+                    )
+                    return None
+                data = {
+                    'results': inner.get('results', []),
+                    'total': inner.get('total', {}),
+                    'query': inner.get('query', {}),
+                }
                 _sanctions_cache.set(cache_key, data)
                 return data
             else:
-                logger.warning(f"OpenSanctions API returned {resp.status_code}: {resp.text[:200]}")
+                logger.warning(
+                    f"OpenSanctions API returned HTTP {resp.status_code} for '{name}': "
+                    f"{resp.text[:200]}"
+                )
                 return None
         except Exception as e:
-            logger.error(f"OpenSanctions API call failed: {e}")
+            logger.error(f"OpenSanctions API call failed for '{name}': {e}")
             return None
 
     @classmethod

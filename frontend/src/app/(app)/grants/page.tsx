@@ -9,6 +9,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useGrants } from '@/lib/hooks/use-api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { Search, X, Plus, ArrowRight, Inbox, Calendar, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Grant } from '@/lib/types';
@@ -21,16 +22,19 @@ function formatFunding(amount: number | null | undefined, currency: string = 'US
   return `${symbol}${amount.toLocaleString()}`;
 }
 
-function getDaysLeft(dateStr: string | null | undefined): { label: string; tone: 'danger' | 'warn' | 'ok' | 'mute' } {
-  if (!dateStr) return { label: 'No deadline', tone: 'mute' };
+function getDaysLeft(
+  dateStr: string | null | undefined,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): { label: string; tone: 'danger' | 'warn' | 'ok' | 'mute' } {
+  if (!dateStr) return { label: t('grant.deadline.none'), tone: 'mute' };
   const d = new Date(dateStr);
   const now = new Date();
   const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return { label: 'Expired', tone: 'danger' };
-  if (diffDays === 0) return { label: 'Due today', tone: 'danger' };
-  if (diffDays <= 7) return { label: `${diffDays}d left`, tone: 'danger' };
-  if (diffDays <= 30) return { label: `${diffDays}d left`, tone: 'warn' };
-  return { label: `${diffDays}d left`, tone: 'ok' };
+  if (diffDays < 0) return { label: t('grant.deadline.expired'), tone: 'danger' };
+  if (diffDays === 0) return { label: t('grant.deadline.today'), tone: 'danger' };
+  if (diffDays <= 7) return { label: t('grant.deadline.days_left', { n: diffDays }), tone: 'danger' };
+  if (diffDays <= 30) return { label: t('grant.deadline.days_left', { n: diffDays }), tone: 'warn' };
+  return { label: t('grant.deadline.days_left', { n: diffDays }), tone: 'ok' };
 }
 
 const SECTOR_OPTIONS = [
@@ -40,8 +44,12 @@ const SECTOR_OPTIONS = [
 
 type SortOption = 'deadline' | 'funding' | 'recent';
 
-const STATUS_LABEL: Record<string, string> = {
-  open: 'Open', draft: 'Draft', review: 'In review', closed: 'Closed', awarded: 'Awarded',
+const STATUS_KEYS: Record<string, string> = {
+  open: 'grant.status.open',
+  draft: 'grant.status.draft',
+  review: 'grant.status.in_review',
+  closed: 'grant.status.closed',
+  awarded: 'grant.status.awarded',
 };
 const STATUS_TONE: Record<string, string> = {
   open: 'bg-[hsl(142_68%_95%)] text-[hsl(var(--kuja-grow))] border-[hsl(142_55%_85%)]',
@@ -52,6 +60,7 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export default function GrantsPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -114,7 +123,7 @@ export default function GrantsPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="kuja-display text-3xl">{isNgo ? 'Browse Grants' : 'My Grants'}</h1>
+          <h1 className="kuja-display text-3xl">{isNgo ? t('grant.browse_title') : t('grant.my_grants')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {filteredGrants.length} grant{filteredGrants.length !== 1 ? 's' : ''} found
           </p>
@@ -125,7 +134,7 @@ export default function GrantsPage() {
             onClick={() => router.push('/grants/new')}
             className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-3 py-2"
           >
-            <Plus className="h-4 w-4" /> Create grant
+            <Plus className="h-4 w-4" /> {t('grant.create')}
           </button>
         )}
       </div>
@@ -137,7 +146,7 @@ export default function GrantsPage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by title, donor, or keyword…"
+          placeholder={t('grant.search_placeholder')}
           className="w-full h-10 pl-9 pr-9 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]"
         />
         {searchQuery && (
@@ -178,12 +187,12 @@ export default function GrantsPage() {
             onClick={() => setActiveSectors(new Set())}
             className="text-xs text-[hsl(var(--kuja-flag))] hover:underline px-2"
           >
-            Clear filters
+            {t('common.clear_filters')}
           </button>
         )}
 
         <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-          Sort:
+          {t('common.sort_by')}
           {(['deadline', 'funding', 'recent'] as const).map((s) => (
             <button
               key={s}
@@ -206,13 +215,13 @@ export default function GrantsPage() {
       {filteredGrants.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
           <Inbox className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="kuja-display text-xl">No grants match</p>
-          <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or clearing filters.</p>
+          <p className="kuja-display text-xl">{t('grant.no_match')}</p>
+          <p className="text-sm text-muted-foreground mt-1">{t('grant.no_match_hint')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredGrants.map((grant) => {
-            const deadline = getDaysLeft(grant.deadline);
+            const deadline = getDaysLeft(grant.deadline, t);
             const deadlineCls =
               deadline.tone === 'danger' ? 'text-[hsl(var(--kuja-flag))]' :
               deadline.tone === 'warn' ? 'text-[hsl(var(--kuja-sun))]' :
@@ -232,7 +241,7 @@ export default function GrantsPage() {
                     )}
                   </div>
                   <span className={cn('kuja-severity border', STATUS_TONE[grant.status] ?? STATUS_TONE.draft)}>
-                    {STATUS_LABEL[grant.status] ?? grant.status}
+                    {STATUS_KEYS[grant.status] ? t(STATUS_KEYS[grant.status]) : grant.status}
                   </span>
                 </div>
                 {grant.description && (

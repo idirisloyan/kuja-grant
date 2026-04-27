@@ -1,7 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApplication } from '@/lib/hooks/use-api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { ScoreRing } from '@/components/shared/score-ring';
 import {
@@ -10,28 +11,42 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Application } from '@/lib/types';
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-}
+import { InfoTip } from '@/components/shared/info-tip';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews';
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'responses', label: 'Responses' },
-  { id: 'documents', label: 'Documents' },
-  { id: 'scores', label: 'Scores' },
-  { id: 'reviews', label: 'Reviews' },
+const TAB_KEYS: { id: TabId; key: string }[] = [
+  { id: 'responses', key: 'application.tab.responses' },
+  { id: 'documents', key: 'application.tab.documents' },
+  { id: 'scores', key: 'application.tab.scores' },
+  { id: 'reviews', key: 'application.tab.reviews' },
 ];
 
 export default function ApplicationDetailClient() {
+  const { t, formatDate } = useTranslation();
   const params = useParams();
-  const id = Number(params.id);
+  // Same static-export fix as /apply/[grantId]: Next.js prerenders only
+  // /applications/0/, so params.id hydrates as "0" for any real id. Read
+  // the real id from window.location.pathname.
+  const id = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const m = window.location.pathname.match(/\/applications\/(\d+)/);
+      if (m && m[1] !== '0') return Number(m[1]);
+    }
+    return Number(params.id);
+  }, [params.id]);
   const router = useRouter();
   const { data, isLoading } = useApplication(id || null);
   const [tab, setTab] = useState<TabId>('responses');
   const application = data?.application;
+
+  useEffect(() => {
+    // If donor/admin/reviewer is viewing and the application has been
+    // reviewed (final_score or human_score present), auto-open Reviews tab
+    // so the most relevant info is front and center.
+    if (application && (application.final_score != null || application.human_score != null)) {
+      setTab('reviews');
+    }
+  }, [application]);
 
   if (isLoading) {
     return (
@@ -48,13 +63,13 @@ export default function ApplicationDetailClient() {
     return (
       <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
         <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-        <p className="kuja-display text-xl">Application not found</p>
+        <p className="kuja-display text-xl">{t('application.not_found')}</p>
         <button
           type="button"
           onClick={() => router.push('/applications')}
           className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-4 py-2"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to applications
+          <ArrowLeft className="h-4 w-4" /> {t('application.back')}
         </button>
       </div>
     );
@@ -67,7 +82,7 @@ export default function ApplicationDetailClient() {
         onClick={() => router.push('/applications')}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to applications
+        <ArrowLeft className="h-4 w-4" /> {t('application.back')}
       </button>
 
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
@@ -76,15 +91,11 @@ export default function ApplicationDetailClient() {
             <h1 className="kuja-display text-3xl">
               {application.grant_title || `Application #${application.id}`}
             </h1>
-            <StatusBadge status={application.status} />
+            <StatusBadge status={application.status} kind="app" />
           </div>
           {application.ngo_org_name && (
             <p className="text-sm text-muted-foreground">{application.ngo_org_name}</p>
           )}
-          <div className="mt-2 flex flex-wrap gap-4 text-sm text-muted-foreground">
-            <span>Submitted: {formatDate(application.submitted_at)}</span>
-            {application.final_score != null && <span>Final score: {application.final_score}%</span>}
-          </div>
         </div>
         {application.ai_score != null && (
           <div className="flex items-center gap-3">
@@ -96,21 +107,56 @@ export default function ApplicationDetailClient() {
         )}
       </div>
 
+      {/* "Where this stands" summary — replaces the loose meta line so the
+          applicant immediately sees what stage they're at and what's
+          happening next, instead of having to interpret the status badge. */}
+      <div className="rounded-xl border border-border bg-gradient-to-br from-background to-[hsl(var(--kuja-sand-50))] p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">
+              {t('applications.detail.where_stands')}
+            </div>
+            <InfoTip>{t('glossary.application_status')}</InfoTip>
+          </div>
+        </div>
+        <p className="mt-1 text-sm text-foreground leading-relaxed">
+          {t(`applications.detail.summary_subtitle_${application.status}`)}
+        </p>
+        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('applications.detail.summary_grant')}</div>
+            <div className="font-medium truncate" title={application.grant_title ?? ''}>{application.grant_title || '—'}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('applications.detail.summary_status')}</div>
+            <div className="font-medium"><StatusBadge status={application.status} kind="app" /></div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('applications.detail.summary_submitted')}</div>
+            <div className="font-medium">{formatDate(application.submitted_at, { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('applications.detail.summary_score')}</div>
+            <div className="font-medium kuja-numeric">{application.final_score != null ? `${application.final_score}%` : '—'}</div>
+          </div>
+        </div>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
-        {TABS.map((t) => (
+        {TAB_KEYS.map((tk) => (
           <button
-            key={t.id}
+            key={tk.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => setTab(tk.id)}
             className={cn(
               'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
-              tab === t.id
+              tab === tk.id
                 ? 'text-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]'
                 : 'text-muted-foreground border-transparent hover:text-foreground',
             )}
           >
-            {t.label}
+            {t(tk.key)}
           </button>
         ))}
       </div>
@@ -133,11 +179,16 @@ function ResponsesTab({ application }: { application: Application }) {
     <div className="space-y-3">
       {entries.map(([key, value]) => {
         const wordCount = value?.trim() ? value.trim().split(/\s+/).length : 0;
+        const wcCls = wordCount < 50
+          ? 'text-amber-600 border-amber-200 bg-amber-50'
+          : wordCount < 200
+            ? 'text-muted-foreground border-border'
+            : 'text-emerald-700 border-emerald-200 bg-emerald-50';
         return (
           <div key={key} className="rounded-xl border border-border bg-background p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold capitalize">{key.replace(/_/g, ' ')}</span>
-              <span className="text-[10px] rounded-full border border-border text-muted-foreground px-2 py-0.5 uppercase tracking-wider">
+              <span className={`text-[10px] rounded-full border px-2 py-0.5 uppercase tracking-wider ${wcCls}`}>
                 {wordCount} words
               </span>
             </div>

@@ -175,6 +175,16 @@ class CopilotService:
             "the donor team should make this week. Be concrete, name specific "
             "grants/NGOs, and avoid generic advice. Never fabricate names — "
             "only reference items in the snapshot."
+            "\n\n"
+            "EVERY next_decision MUST include an `action_type` field set to one of:\n"
+            "  - review_applications: donor should triage pending applications in their queue\n"
+            "  - review_compliance: donor should look at flagged grantee compliance\n"
+            "  - review_reports: donor should review submitted/overdue grantee reports\n"
+            "  - create_grant: donor should design and publish a new grant call\n"
+            "  - manage_grants: donor should adjust an existing grant (criteria, deadline, etc.)\n"
+            "  - assign_reviewers: donor should assign reviewers to scored applications\n"
+            "  - other: catch-all when none of the above fits\n"
+            "Pick the most direct action_type; do not default to 'other' unless nothing fits."
         )
         user = (
             "PORTFOLIO SNAPSHOT:\n"
@@ -187,7 +197,8 @@ class CopilotService:
     {"title": "...", "body": "...", "severity": "critical|warn|info|good"}
   ],
   "next_decisions": [
-    {"title": "...", "detail": "...", "severity": "critical|warn|info"}
+    {"title": "...", "detail": "...", "severity": "critical|warn|info",
+     "action_type": "review_applications|review_compliance|review_reports|create_grant|manage_grants|assign_reviewers|other"}
   ]
 }"""
         return cls._call_json(system, user, schema, lang=lang)
@@ -210,7 +221,18 @@ class CopilotService:
             "scoring rubric (4-6 criteria with weights summing to 100), "
             "reporting requirements (3-5), and red-flag exclusions (2-4). "
             "Be specific to African NGO realities (capacity, registration, "
-            "safeguarding, M&E maturity). Avoid generic templates."
+            "safeguarding, M&E maturity). Avoid generic templates.\n\n"
+            "ALSO assess the APPLICATION BURDEN this design imposes on "
+            "applicants. Burden = estimated time + complexity for a small/"
+            "mid-sized NGO to apply. Lower burden attracts more diverse "
+            "applicants and reduces incomplete submissions. Score:\n"
+            "  - low: <8 hours typical, simple criteria, modest reporting\n"
+            "  - medium: 8-16 hours, moderate complexity\n"
+            "  - high: >16 hours, dense reporting, niche eligibility\n"
+            "Explain WHICH design choices push burden up, so the donor can "
+            "decide which trade-offs are worth keeping. If burden is high, "
+            "suggest 1-2 specific simplifications that wouldn't compromise "
+            "the grant's intent."
         )
         user = (
             f"GOAL: {goal}\n"
@@ -224,9 +246,14 @@ class CopilotService:
   "scoring_rubric": [{"criterion": "...", "weight": 25, "rationale": "..."}],
   "reporting_requirements": [{"title": "...", "frequency": "quarterly|annual|...", "detail": "..."}],
   "exclusions": ["...", "..."],
-  "guidance": "1-2 sentence design note"
+  "guidance": "1-2 sentence design note",
+  "burden": {
+    "score": "low|medium|high",
+    "drivers": ["...", "..."],
+    "simplifications": ["...", "..."]
+  }
 }"""
-        return cls._call_json(system, user, schema, max_tokens=2500, lang=lang)
+        return cls._call_json(system, user, schema, max_tokens=2800, lang=lang)
 
     # ------------------------------------------------------------------
     # 3. NGO holistic readiness
@@ -234,20 +261,41 @@ class CopilotService:
 
     @classmethod
     def ngo_readiness(cls, *, org_summary: dict, recent_apps: list,
-                       documents_present: list, lang: str = 'en') -> dict:
-        """Holistic NGO readiness coaching. Score + top blockers + actions."""
+                       documents_present: list, pending_reports: list = None,
+                       lang: str = 'en') -> dict:
+        """Holistic NGO readiness coaching. Score + top blockers + actions.
+
+        Each next_action carries an `action_type` so the UI can route to the
+        right destination instead of just opening the co-pilot. This is the
+        "AI as workflow, not commentary" shift.
+        """
+        pending_reports = pending_reports or []
         system = (
             "You are Kuja's NGO readiness coach. Given an organization's "
-            "snapshot — capacity, recent applications, documents on file — "
-            "produce a 0-100 readiness score and the 3 highest-leverage "
-            "actions the NGO can take NEXT WEEK to improve their chances "
-            "of winning future grants. Be specific. Reference the documents "
-            "or applications by name. Don't repeat generic 'be more transparent' advice."
+            "snapshot — capacity, recent applications, documents on file, "
+            "pending reports — produce a 0-100 readiness score and the 3 "
+            "highest-leverage actions the NGO can take NEXT WEEK to improve "
+            "their chances of winning future grants. Be specific. Reference "
+            "documents, applications, or reports by name. Don't repeat "
+            "generic 'be more transparent' advice. "
+            "\n\n"
+            "EVERY next_action MUST include an `action_type` field set to one of:\n"
+            "  - apply_grant: NGO should browse and apply to an open grant\n"
+            "  - submit_report: NGO has a pending/overdue report to submit\n"
+            "  - complete_assessment: NGO should run a capacity assessment\n"
+            "  - upload_document: NGO should add a missing key document "
+            "(audited financials, registration certificate, board minutes, etc.)\n"
+            "  - update_profile: NGO should fill in missing org-profile fields\n"
+            "  - improve_application: NGO has a draft application that needs "
+            "stronger content before submission\n"
+            "  - other: catch-all when none of the above fits\n"
+            "Pick the most direct action_type; do not default to 'other' unless nothing fits."
         )
         user = (
             f"ORG SNAPSHOT:\n{json.dumps(org_summary, indent=2)[:8000]}\n\n"
             f"RECENT APPLICATIONS:\n{json.dumps(recent_apps, indent=2, default=str)[:8000]}\n\n"
-            f"DOCUMENTS ON FILE:\n{json.dumps(documents_present, indent=2)[:4000]}"
+            f"DOCUMENTS ON FILE:\n{json.dumps(documents_present, indent=2)[:4000]}\n\n"
+            f"PENDING REPORTS:\n{json.dumps(pending_reports, indent=2, default=str)[:4000]}"
         )
         schema = """{
   "readiness_score": 72,
@@ -259,7 +307,8 @@ class CopilotService:
     {"title": "...", "impact_pts": 12, "severity": "critical|warn|info"}
   ],
   "next_actions": [
-    {"title": "...", "detail": "...", "estimated_uplift_pts": 8}
+    {"title": "...", "detail": "...", "estimated_uplift_pts": 8,
+     "action_type": "apply_grant|submit_report|complete_assessment|upload_document|update_profile|improve_application|other"}
   ]
 }"""
         return cls._call_json(system, user, schema, max_tokens=2000, lang=lang)
@@ -368,6 +417,17 @@ class CopilotService:
             "name a concrete thing (a grant title, a missing document, a "
             "deadline) — avoid generic prompts like 'review your dashboard'."
         )
+        # Role-aware voice — same data, different lens. NGO gets coached,
+        # donor gets briefed, reviewer gets evidence pointers, admin gets
+        # operational signals.
+        role_voice = {
+            'ngo': " VOICE: warm coach. 'You / your team'. Each suggestion unblocks a submission, sharpens a narrative, or closes a gap.",
+            'donor': " VOICE: strategic advisor. 'Your portfolio'. Each suggestion is a decision: approve, escalate, reallocate, or follow up.",
+            'reviewer': " VOICE: analytical peer. Each suggestion points at evidence to verify, contradictions to reconcile, or scoring inconsistencies to revisit.",
+            'admin': " VOICE: operations brief. Each suggestion is a system-level action — a stuck workflow, a compliance backlog, an AI quality signal.",
+        }
+        if role in role_voice:
+            system += role_voice[role]
         user = (
             f"USER ROLE: {role}\n"
             f"SCOPE: {json.dumps(scope)}\n"
@@ -387,7 +447,8 @@ class CopilotService:
 
     @classmethod
     def chat_stream(cls, *, question: str, scope: dict, prior_messages: Optional[list] = None,
-                     sources: Optional[list] = None, lang: str = 'en') -> Generator[dict, None, None]:
+                     sources: Optional[list] = None, lang: str = 'en',
+                     role: Optional[str] = None) -> Generator[dict, None, None]:
         """Stream a chat response. Yields NDJSON-shaped dicts:
               {'type': 'sources', 'items': [...]}
               {'type': 'delta', 'text': '...'}
@@ -407,6 +468,8 @@ class CopilotService:
         # immediately while the model is still warming up.
         yield {'type': 'sources', 'items': sources or []}
 
+        # Base system prompt — shared across roles. Citation discipline,
+        # "WHY/SO WHAT/NEXT" structure, and grounding are universal.
         system = (
             "You are Kuja's read-only co-pilot. Answer the user's question "
             "STRICTLY from the provided source documents. Cite sources inline "
@@ -415,6 +478,43 @@ class CopilotService:
             "this structure when appropriate:\n"
             "WHY THIS MATTERS / SO WHAT / WHAT NEXT — explicit short labels."
         )
+
+        # Role-aware tone. The same evidence base — but we coach an NGO,
+        # advise a donor, support a reviewer, and brief an admin. This
+        # differentiation is what makes Kuja's co-pilot feel role-native
+        # rather than a generic chatbot bolted on top of the data model.
+        role_addendum = {
+            'ngo': (
+                "\n\nAUDIENCE: NGO program lead. Voice: warm, encouraging, "
+                "practical. Use 'you' and 'your team'. Frame everything as "
+                "what they can do next — clarify positioning, sharpen the "
+                "narrative, unblock the next submission. Never lecture. "
+                "Translate compliance language into plain field-team terms."
+            ),
+            'donor': (
+                "\n\nAUDIENCE: Donor portfolio owner. Voice: strategic, "
+                "direct, decisional. Use 'your portfolio' and 'your grants'. "
+                "Surface risk, allocation patterns, oversight signals, and "
+                "trade-offs. Default to a recommendation with a one-line "
+                "rationale — not a menu of options. Quantify where you can."
+            ),
+            'reviewer': (
+                "\n\nAUDIENCE: Independent reviewer. Voice: analytical, "
+                "neutral, evidence-first. Never advocate for fund/decline — "
+                "just surface what the documents support, contradict, or "
+                "leave silent. Quote the source when a claim is contested. "
+                "Flag inconsistencies between applications without ranking."
+            ),
+            'admin': (
+                "\n\nAUDIENCE: Platform admin / operations. Voice: precise, "
+                "operational, throughput-aware. Surface system-level signals "
+                "— stuck workflows, compliance backlogs, AI quality drift, "
+                "cohort-level patterns. Skip narrative; lead with metrics."
+            ),
+        }
+        if role and role in role_addendum:
+            system += role_addendum[role]
+
         if lang and lang != 'en':
             from app.utils.i18n import LANG_NAMES
             if lang in LANG_NAMES:

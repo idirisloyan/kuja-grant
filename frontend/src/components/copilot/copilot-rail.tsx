@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import {
   streamChat, fetchSuggestions, fetchDonorPortfolioInsights, fetchNgoReadiness,
   type Suggestion, type StreamSource,
@@ -48,6 +49,7 @@ interface CopilotScope {
 
 export function CopilotRail({ scope }: { scope?: CopilotScope }) {
   const user = useAuthStore((s) => s.user);
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('now');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -116,7 +118,7 @@ export function CopilotRail({ scope }: { scope?: CopilotScope }) {
           <div>
             <div className="kuja-eyebrow text-[10px]">Kuja Co-pilot</div>
             <div className="text-sm font-semibold text-foreground">
-              {_humanScope(effectiveScope)}
+              {_humanScope(effectiveScope, t)}
             </div>
           </div>
           <Button
@@ -132,9 +134,9 @@ export function CopilotRail({ scope }: { scope?: CopilotScope }) {
 
         {/* Tabs */}
         <div className="flex border-b border-border">
-          <TabButton active={tab === 'now'}      onClick={() => setTab('now')}     label="Now"      icon={<Lightbulb className="h-3.5 w-3.5" />} />
-          <TabButton active={tab === 'ask'}      onClick={() => setTab('ask')}     label="Ask"      icon={<MessageSquare className="h-3.5 w-3.5" />} />
-          <TabButton active={tab === 'insights'} onClick={() => setTab('insights')} label="Insights" icon={<Sparkles className="h-3.5 w-3.5" />} />
+          <TabButton active={tab === 'now'}      onClick={() => setTab('now')}     label={t('copilot.tab.now')}      icon={<Lightbulb className="h-3.5 w-3.5" />} />
+          <TabButton active={tab === 'ask'}      onClick={() => setTab('ask')}     label={t('copilot.tab.ask')}      icon={<MessageSquare className="h-3.5 w-3.5" />} />
+          <TabButton active={tab === 'insights'} onClick={() => setTab('insights')} label={t('copilot.tab.insights')} icon={<Sparkles className="h-3.5 w-3.5" />} />
         </div>
 
         {/* Body — overflow-hidden lets each tab own its own scrolling.
@@ -181,12 +183,12 @@ function TabButton({
   );
 }
 
-function _humanScope(s: CopilotScope) {
-  if (s.kind === 'global') return 'Global view';
-  if (s.kind === 'grant') return s.title ? `Grant: ${s.title}` : 'This grant';
-  if (s.kind === 'application') return 'This application';
-  if (s.kind === 'report') return 'This report';
-  if (s.kind === 'compliance') return 'Compliance posture';
+function _humanScope(s: CopilotScope, t: (key: string, params?: Record<string, string | number>) => string) {
+  if (s.kind === 'global') return t('copilot.scope.global');
+  if (s.kind === 'grant') return s.title ? t('copilot.scope.grant_named', { title: s.title }) : t('copilot.scope.this_grant');
+  if (s.kind === 'application') return t('copilot.scope.application');
+  if (s.kind === 'report') return t('copilot.scope.report');
+  if (s.kind === 'compliance') return t('copilot.scope.compliance');
   return s.kind;
 }
 
@@ -195,6 +197,7 @@ function _humanScope(s: CopilotScope) {
 // ============================================================
 
 function NowTab({ scope, role }: { scope: CopilotScope; role: string }) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<Suggestion[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -219,7 +222,7 @@ function NowTab({ scope, role }: { scope: CopilotScope; role: string }) {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="kuja-eyebrow">Suggested actions</span>
+        <span className="kuja-eyebrow">{t('copilot.suggested_actions')}</span>
         <Button
           variant="ghost"
           size="sm"
@@ -228,7 +231,7 @@ function NowTab({ scope, role }: { scope: CopilotScope; role: string }) {
           className="h-7 text-xs"
         >
           <RotateCcw className={cn('mr-1 h-3 w-3', loading && 'animate-spin')} />
-          Refresh
+          {t('copilot.refresh')}
         </Button>
       </div>
       {loading && (
@@ -240,13 +243,13 @@ function NowTab({ scope, role }: { scope: CopilotScope; role: string }) {
       )}
       {!loading && error && (
         <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-          Couldn&apos;t load suggestions — <span className="font-medium">{error}</span>
+          {t('copilot.cant_load_suggestions')} — <span className="font-medium">{error}</span>
         </div>
       )}
       {!loading && !error && items.length === 0 && (
         <div className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
           <CheckCircle2 className="mx-auto mb-2 h-6 w-6 text-[hsl(var(--kuja-grow))]" />
-          All clear — no actions suggested right now.
+          {t('copilot.all_clear_no_actions')}
         </div>
       )}
       {!loading && items.map((s, i) => (
@@ -277,6 +280,7 @@ function NowTab({ scope, role }: { scope: CopilotScope; role: string }) {
 // ============================================================
 
 function AskTab({ scope }: { scope: CopilotScope }) {
+  const { t } = useTranslation();
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
@@ -363,9 +367,9 @@ function AskTab({ scope }: { scope: CopilotScope }) {
             <svg className="mx-auto h-24 w-24">
               <use href="/svg/empty-states.svg#illo-copilot" />
             </svg>
-            <div className="kuja-display text-xl mt-2">Ask anything about your work</div>
+            <div className="kuja-display text-xl mt-2">{t('copilot.ask_anything')}</div>
             <p className="mx-auto mt-2 max-w-[260px] text-xs text-muted-foreground">
-              Co-pilot grounds every answer in your actual grants, applications, and policies — with citations.
+              {t('copilot.ask_intro')}
             </p>
           </div>
         )}
@@ -383,7 +387,7 @@ function AskTab({ scope }: { scope: CopilotScope }) {
             type="text"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Ask Co-pilot…"
+            placeholder={t('copilot.ask_placeholder')}
             disabled={streaming}
             autoComplete="off"
             className="flex-1 h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-spark))] focus-visible:border-[hsl(var(--kuja-spark))] disabled:opacity-50"
@@ -409,6 +413,7 @@ function AskTab({ scope }: { scope: CopilotScope }) {
 }
 
 function MessageBubble({ msg }: { msg: Message }) {
+  const { t } = useTranslation();
   const isUser = msg.role === 'user';
   if (isUser) {
     return (
@@ -424,7 +429,7 @@ function MessageBubble({ msg }: { msg: Message }) {
       {(msg.sources && msg.sources.length > 0) && (
         <div className="kuja-grounded">
           <CheckCircle2 className="h-3 w-3" />
-          Grounded in {msg.sources.length} source{msg.sources.length === 1 ? '' : 's'}
+          {t(msg.sources.length === 1 ? 'copilot.grounded_in_one' : 'copilot.grounded_in_other', { count: msg.sources.length })}
         </div>
       )}
       <div className="whitespace-pre-wrap rounded-2xl rounded-tl-sm border border-border bg-muted/40 px-3 py-2 text-sm leading-relaxed text-foreground">

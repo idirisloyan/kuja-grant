@@ -279,6 +279,38 @@ def register_middleware(app):
         return response
 
     @app.after_request
+    def add_cache_headers(response):
+        """Cache policy for the Next.js static export.
+
+        Hashed chunks under `/_next/static/` are immutable by definition
+        (filename includes content hash) — cache them aggressively so
+        browsers don't refetch on every navigation.
+
+        HTML pages are NOT hashed (`/dashboard/`, `/login`, etc.) and
+        reference specific chunk hashes inline. They MUST be no-store
+        so browsers always get the latest HTML pointing to current
+        chunks. Without this, a user holding stale HTML referenced
+        chunks from an older build (e.g. a `926-*.js` that pre-dated
+        i18n wiring), which surfaces as "phrases still in English
+        after the language switch" — exactly what the team flagged.
+
+        Skip API and upload responses; they have their own semantics.
+        """
+        path = request.path or ''
+        if path.startswith('/api/') or path.startswith('/uploads/'):
+            return response
+        if '/_next/static/' in path:
+            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        elif path.endswith('.js') or path.endswith('.css') or path.endswith('.woff2') or path.endswith('.woff'):
+            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        else:
+            # HTML and any unhashed asset: never cache, always revalidate.
+            response.headers['Cache-Control'] = 'no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        return response
+
+    @app.after_request
     def add_security_headers(response):
         """Add enterprise security headers to every response."""
         response.headers['X-Content-Type-Options'] = 'nosniff'

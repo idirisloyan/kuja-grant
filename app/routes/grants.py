@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app.extensions import db
-from app.models import Grant, Application
+from app.models import Grant, Application, Report, Review
 from app.utils.helpers import get_request_json, paginate_query
 from app.utils.decorators import role_required
 from app.services.ai_service import AIService, HAS_PYPDF2, HAS_PYTHON_DOCX
@@ -253,6 +253,112 @@ def api_update_grant(grant_id):
     db.session.commit()
     logger.info(f"Grant updated: {grant.title} (id={grant.id})")
     return jsonify({'success': True, 'grant': grant.to_dict()})
+
+
+@grants_bp.route('/<int:grant_id>', methods=['DELETE'])
+@role_required('donor', 'admin')
+def api_delete_grant(grant_id):
+    """Delete a grant. Restricted to draft status to protect grants that
+    have already been published or awarded. Donors can only delete grants
+    owned by their organization; admins can delete any draft.
+
+    Query params:
+      cascade=true — also delete any draft applications referencing this
+                     grant. Submitted/awarded applications still block
+                     the delete (409). Useful for cleaning up after e2e
+                     test runs where an NGO created a draft application
+                     before the test was abandoned.
+
+    Previously DELETE /api/grants/<id> didn't exist, so the e2e test
+    suite's cleanup calls silently failed and orphan drafts accumulated
+    in production.
+    """
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found', 'success': False}), 404
+
+    if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'You can only delete your own grants', 'success': False}), 403
+
+    if grant.status != 'draft':
+        return jsonify({
+            'error': f'Cannot delete a grant with status "{grant.status}". '
+                     f'Only drafts may be deleted.',
+            'success': False,
+        }), 400
+
+    cascade = request.args.get('cascade', '').lower() in ('true', '1', 'yes')
+    apps = Application.query.filter_by(grant_id=grant.id).all()
+
+    cascaded_app_ids = []
+    cascaded_report_ids = []
+    cascaded_review_ids = []
+    if apps:
+        if not cascade:
+            return jsonify({
+                'error': f'Cannot delete: {len(apps)} application(s) reference this grant. '
+                         f'Pass ?cascade=true to also delete draft applications.',
+                'success': False,
+            }), 409
+
+        # With cascade=true, only draft applications are removed. Any
+        # submitted/awarded application still blocks (data integrity).
+        non_draft = [a for a in apps if a.status != 'draft']
+        if non_draft:
+            return jsonify({
+                'error': f'Cannot cascade-delete: {len(non_draft)} application(s) are not '
+                         f'in draft status (statuses: '
+                         f'{sorted(set(a.status for a in non_draft))}).',
+                'success': False,
+            }), 409
+
+        # Reports and Reviews FK to Application/Grant with NOT NULL — if we
+        # delete an Application without first removing its dependent Reports
+        # and Reviews, SQLAlchemy tries to null those FKs and the DB rejects
+        # it. Sweep them first. Same posture as the grant itself: this only
+        # runs when we've already verified the apps are drafts, so the
+        # downstream rows belong to abandoned test state.
+        app_ids = [a.id for a in apps]
+        if app_ids:
+            for r in Review.query.filter(Review.application_id.in_(app_ids)).all():
+                cascaded_review_ids.append(r.id)
+                db.session.delete(r)
+            for rep in Report.query.filter(Report.application_id.in_(app_ids)).all():
+                cascaded_report_ids.append(rep.id)
+                db.session.delete(rep)
+        # Also any Reports attached directly to the grant (without an app)
+        for rep in Report.query.filter(Report.grant_id == grant.id).all():
+            if rep.id not in cascaded_report_ids:
+                cascaded_report_ids.append(rep.id)
+                db.session.delete(rep)
+
+        for a in apps:
+            cascaded_app_ids.append(a.id)
+            db.session.delete(a)
+
+    title = grant.title
+    db.session.delete(grant)
+    db.session.commit()
+
+    log_action('grant.deleted', current_user.email, 'grant', grant_id,
+               {'title': title, 'donor_org_id': grant.donor_org_id,
+                'cascaded_application_ids': cascaded_app_ids,
+                'cascaded_report_ids': cascaded_report_ids,
+                'cascaded_review_ids': cascaded_review_ids})
+    logger.info(
+        f"Grant deleted: {title} (id={grant_id}) by user {current_user.email}; "
+        f"cascaded {len(cascaded_app_ids)} app(s), "
+        f"{len(cascaded_report_ids)} report(s), "
+        f"{len(cascaded_review_ids)} review(s)"
+    )
+
+    return jsonify({
+        'success': True,
+        'deleted_id': grant_id,
+        'cascaded_application_ids': cascaded_app_ids,
+        'cascaded_report_ids': cascaded_report_ids,
+        'cascaded_review_ids': cascaded_review_ids,
+    })
 
 
 @grants_bp.route('/<int:grant_id>/publish', methods=['POST'])

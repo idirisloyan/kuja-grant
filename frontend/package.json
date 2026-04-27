@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && node -e \"const fs=require('fs');const path=require('path');function cp(s,d){fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).forEach(f=>{const sp=path.join(s,f),dp=path.join(d,f);fs.statSync(sp).isDirectory()?cp(sp,dp):fs.copyFileSync(sp,dp)})};cp('out',path.join('..','static','nextjs'));console.log('Copied Next.js output to static/nextjs/')\"",
+    "build": "next build && node scripts/copy-build.js",
     "start": "next start",
     "lint": "next lint"
   },

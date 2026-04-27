@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useGrant } from '@/lib/hooks/use-api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { StatusBadge } from '@/components/shared/status-badge';
 import {
   DollarSign, Calendar, MapPin, FileText, Target, ClipboardList,
@@ -16,24 +17,30 @@ function formatFunding(amount: number | null, currency: string): string {
   return `${currency === 'USD' ? '$' : currency + ' '}${amount.toLocaleString()}`;
 }
 
-function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return 'No deadline';
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-}
-
 type TabId = 'overview' | 'eligibility' | 'criteria' | 'documents' | 'applications';
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'eligibility', label: 'Eligibility' },
-  { id: 'criteria', label: 'Criteria' },
-  { id: 'documents', label: 'Documents' },
-  { id: 'applications', label: 'Applications' },
+const TAB_KEYS: { id: TabId; key: string }[] = [
+  { id: 'overview', key: 'grant.tab.overview' },
+  { id: 'eligibility', key: 'grant.tab.eligibility' },
+  { id: 'criteria', key: 'grant.tab.criteria' },
+  { id: 'documents', key: 'grant.tab.documents' },
+  { id: 'applications', key: 'grant.tab.applications' },
 ];
 
 export default function GrantDetailClient() {
+  const { t, formatDate } = useTranslation();
+  const formatDeadline = (d?: string | null) =>
+    d ? formatDate(d, { month: 'long', day: 'numeric', year: 'numeric' }) : 'No deadline';
   const params = useParams();
-  const id = Number(params.id);
+  // Static-export workaround: only /grants/0/ is prerendered, so params.id
+  // hydrates as "0" for any real id. Trust the URL pathname.
+  const id = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const m = window.location.pathname.match(/\/grants\/(\d+)/);
+      if (m && m[1] !== '0') return Number(m[1]);
+    }
+    return Number(params.id);
+  }, [params.id]);
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const { data, isLoading } = useGrant(id || null);
@@ -58,19 +65,19 @@ export default function GrantDetailClient() {
     return (
       <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
         <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-        <p className="kuja-display text-xl">Grant not found</p>
+        <p className="kuja-display text-xl">{t('grant.detail.not_found')}</p>
         <button
           type="button"
           onClick={() => router.push('/grants')}
           className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-4 py-2"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to grants
+          <ArrowLeft className="h-4 w-4" /> {t('grant.detail.back')}
         </button>
       </div>
     );
   }
 
-  const visibleTabs = TABS.filter((t) => t.id !== 'applications' || isDonor);
+  const visibleTabs = TAB_KEYS.filter((tk) => tk.id !== 'applications' || isDonor);
 
   return (
     <div className="space-y-5">
@@ -79,7 +86,7 @@ export default function GrantDetailClient() {
         onClick={() => router.push('/grants')}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to grants
+        <ArrowLeft className="h-4 w-4" /> {t('grant.detail.back')}
       </button>
 
       {/* Header */}
@@ -87,7 +94,7 @@ export default function GrantDetailClient() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <h1 className="kuja-display text-3xl">{grant.title}</h1>
-            <StatusBadge status={grant.status} />
+            <StatusBadge status={grant.status} kind="grant" />
           </div>
           {grant.donor_org_name && <p className="text-sm text-muted-foreground">{grant.donor_org_name}</p>}
           <div className="mt-2 flex flex-wrap gap-4 text-sm">
@@ -95,7 +102,7 @@ export default function GrantDetailClient() {
               <DollarSign className="h-4 w-4" /> {formatFunding(grant.total_funding, grant.currency)}
             </span>
             <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-              <Calendar className="h-4 w-4" /> {formatDate(grant.deadline)}
+              <Calendar className="h-4 w-4" /> {formatDeadline(grant.deadline)}
             </span>
             {grant.countries && grant.countries.length > 0 && (
               <span className="inline-flex items-center gap-1.5 text-muted-foreground">
@@ -110,59 +117,59 @@ export default function GrantDetailClient() {
             onClick={() => router.push(`/apply/${grant.id}`)}
             className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
           >
-            <FileText className="h-4 w-4" /> Apply now
+            <FileText className="h-4 w-4" /> {t('grant.detail.apply')}
           </button>
         )}
         {isNgo && grant.user_application_status && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Your application:</span>
-            <StatusBadge status={grant.user_application_status} />
+            <span className="text-sm text-muted-foreground">{t('grant.detail.your_app')}:</span>
+            <StatusBadge status={grant.user_application_status} kind="app" />
           </div>
         )}
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border overflow-x-auto">
-        {visibleTabs.map((t) => (
+        {visibleTabs.map((tk) => (
           <button
-            key={t.id}
+            key={tk.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => setTab(tk.id)}
             className={cn(
               'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
-              tab === t.id
+              tab === tk.id
                 ? 'text-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]'
                 : 'text-muted-foreground border-transparent hover:text-foreground',
             )}
           >
-            {t.label}
+            {t(tk.key)}
           </button>
         ))}
       </div>
 
-      {tab === 'overview' && <OverviewTab grant={grant} />}
-      {tab === 'eligibility' && <EligibilityTab requirements={grant.eligibility ?? []} />}
-      {tab === 'criteria' && <CriteriaTab criteria={grant.criteria ?? []} />}
-      {tab === 'documents' && <DocumentsTab requirements={grant.doc_requirements ?? []} />}
-      {tab === 'applications' && <ApplicationsTab grantId={grant.id} />}
+      {tab === 'overview' && <OverviewTab grant={grant} t={t} formatDeadline={formatDeadline} />}
+      {tab === 'eligibility' && <EligibilityTab requirements={grant.eligibility ?? []} t={t} />}
+      {tab === 'criteria' && <CriteriaTab criteria={grant.criteria ?? []} t={t} />}
+      {tab === 'documents' && <DocumentsTab requirements={grant.doc_requirements ?? []} t={t} />}
+      {tab === 'applications' && <ApplicationsTab grantId={grant.id} t={t} />}
     </div>
   );
 }
 
-function OverviewTab({ grant }: { grant: NonNullable<ReturnType<typeof useGrant>['data']>['grant'] }) {
+function OverviewTab({ grant, t, formatDeadline }: { grant: NonNullable<ReturnType<typeof useGrant>['data']>['grant']; t: (key: string, vars?: Record<string, string | number>) => string; formatDeadline: (d?: string | null) => string }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="lg:col-span-2 space-y-4">
         <div className="rounded-xl border border-border bg-background p-5">
-          <div className="text-sm font-semibold mb-2">Description</div>
+          <div className="text-sm font-semibold mb-2">{t('grant.detail.description')}</div>
           <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-            {grant.description || 'No description provided.'}
+            {grant.description || t('grant.detail.no_description')}
           </p>
         </div>
 
         {grant.reporting_requirements && grant.reporting_requirements.length > 0 && (
           <div className="rounded-xl border border-border bg-background p-5">
-            <div className="text-sm font-semibold mb-3">Reporting requirements</div>
+            <div className="text-sm font-semibold mb-3">{t('grant.detail.reporting')}</div>
             <div className="space-y-2">
               {grant.reporting_requirements.map((r, i) => (
                 <div key={i} className="flex items-start gap-3 p-3 bg-muted/30 rounded-md">
@@ -185,13 +192,13 @@ function OverviewTab({ grant }: { grant: NonNullable<ReturnType<typeof useGrant>
 
       <div className="space-y-3">
         <div className="rounded-xl border border-border bg-background p-5">
-          <div className="text-sm font-semibold mb-3">Quick facts</div>
+          <div className="text-sm font-semibold mb-3">{t('grant.detail.quick_facts')}</div>
           <div className="space-y-3">
             <Fact label="Funding" value={formatFunding(grant.total_funding, grant.currency)} strong />
-            <Fact label="Deadline" value={formatDate(grant.deadline)} />
+            <Fact label="Deadline" value={formatDeadline(grant.deadline)} />
             <div>
               <div className="kuja-label text-[10px]">Status</div>
-              <div className="mt-1"><StatusBadge status={grant.status} /></div>
+              <div className="mt-1"><StatusBadge status={grant.status} kind="grant" /></div>
             </div>
             {grant.application_count !== undefined && (
               <Fact label="Applications" value={String(grant.application_count)} />
@@ -238,8 +245,8 @@ function Fact({ label, value, strong }: { label: string; value: string; strong?:
   );
 }
 
-function EligibilityTab({ requirements }: { requirements: EligibilityRequirement[] }) {
-  if (requirements.length === 0) return <EmptyBlock icon={ClipboardList} label="No eligibility requirements specified" />;
+function EligibilityTab({ requirements, t }: { requirements: EligibilityRequirement[]; t: (key: string, vars?: Record<string, string | number>) => string }) {
+  if (requirements.length === 0) return <EmptyBlock icon={ClipboardList} label={t('grant.detail.no_eligibility')} />;
   return (
     <div className="space-y-2">
       {requirements.map((req, i) => (
@@ -251,7 +258,7 @@ function EligibilityTab({ requirements }: { requirements: EligibilityRequirement
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium">{req.label}</span>
-                {req.required && <span className="kuja-severity kuja-severity-critical">Required</span>}
+                {req.required && <span className="kuja-severity kuja-severity-critical">{t('grant.detail.required')}</span>}
                 {req.weight && <span className="kuja-severity kuja-severity-info">Weight: {req.weight}</span>}
               </div>
               {req.details && <p className="text-sm text-muted-foreground mt-1">{req.details}</p>}
@@ -263,13 +270,13 @@ function EligibilityTab({ requirements }: { requirements: EligibilityRequirement
   );
 }
 
-function CriteriaTab({ criteria }: { criteria: Criterion[] }) {
-  if (criteria.length === 0) return <EmptyBlock icon={Target} label="No scoring criteria specified" />;
+function CriteriaTab({ criteria, t }: { criteria: Criterion[]; t: (key: string, vars?: Record<string, string | number>) => string }) {
+  if (criteria.length === 0) return <EmptyBlock icon={Target} label={t('grant.detail.no_criteria')} />;
   const total = criteria.reduce((sum, c) => sum + c.weight, 0);
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-        <Target className="h-4 w-4" /> Total weight: {total}
+        <Target className="h-4 w-4" /> {t('grant.detail.total_weight')}: {total}
       </div>
       {criteria.map((c, i) => (
         <div key={c.key || i} className="rounded-xl border border-border bg-background p-4">
@@ -291,8 +298,8 @@ function CriteriaTab({ criteria }: { criteria: Criterion[] }) {
   );
 }
 
-function DocumentsTab({ requirements }: { requirements: DocRequirement[] }) {
-  if (requirements.length === 0) return <EmptyBlock icon={Upload} label="No document requirements specified" />;
+function DocumentsTab({ requirements, t }: { requirements: DocRequirement[]; t: (key: string, vars?: Record<string, string | number>) => string }) {
+  if (requirements.length === 0) return <EmptyBlock icon={Upload} label={t('grant.detail.no_doc_reqs')} />;
   return (
     <div className="space-y-2">
       {requirements.map((doc, i) => (
@@ -307,7 +314,7 @@ function DocumentsTab({ requirements }: { requirements: DocRequirement[] }) {
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium">{doc.label}</span>
-                {doc.required && <span className="kuja-severity kuja-severity-critical">Required</span>}
+                {doc.required && <span className="kuja-severity kuja-severity-critical">{t('grant.detail.required')}</span>}
                 {doc.ai_review && <span className="kuja-ai-pill">AI reviewed</span>}
               </div>
               {doc.specific_requirements && (
@@ -324,18 +331,18 @@ function DocumentsTab({ requirements }: { requirements: DocRequirement[] }) {
   );
 }
 
-function ApplicationsTab({ grantId }: { grantId: number }) {
+function ApplicationsTab({ grantId, t }: { grantId: number; t: (key: string, vars?: Record<string, string | number>) => string }) {
   const router = useRouter();
   return (
     <div className="rounded-xl border border-border bg-background px-6 py-12 text-center">
       <Users className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
-      <p className="text-sm text-muted-foreground mb-3">View and manage applications for this grant</p>
+      <p className="text-sm text-muted-foreground mb-3">{t('grant.detail.view_apps_subtitle')}</p>
       <button
         type="button"
         onClick={() => router.push(`/applications?grant_id=${grantId}`)}
         className="inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-4 py-2"
       >
-        <Users className="h-4 w-4" /> View applications
+        <Users className="h-4 w-4" /> {t('grant.detail.view_apps')}
       </button>
     </div>
   );

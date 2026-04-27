@@ -14,8 +14,10 @@ import { Send, Gauge } from 'lucide-react';
 import { VerdictCard, type VerdictAction } from './verdict-card';
 import { ChartCard } from './chart-card';
 import { SizedChart } from './sized-chart';
-import { fetchNgoReadiness, type NgoReadiness } from '@/lib/copilot-api';
+import { fetchNgoReadiness, type NgoReadiness, type NgoActionType } from '@/lib/copilot-api';
 import { api } from '@/lib/api';
+import { useTranslation } from '@/lib/hooks/use-translation';
+import { InfoTip } from '@/components/shared/info-tip';
 
 const CLAY = 'hsl(19, 82%, 41%)';
 const CLAY_LIGHT = 'hsl(24, 88%, 64%)';
@@ -28,7 +30,22 @@ interface ApplicationsResp {
   applications?: Array<{ status?: string }>;
 }
 
+// Map AI-tagged action_type to the page that completes that action.
+// Returning undefined means "we don't have a destination, fall back to copilot".
+function _actionHref(t: NgoActionType | undefined): string | undefined {
+  switch (t) {
+    case 'apply_grant':          return '/grants';
+    case 'submit_report':        return '/reports';
+    case 'complete_assessment':  return '/assessments/wizard';
+    case 'upload_document':      return '/organizations/profile';
+    case 'update_profile':       return '/organizations/profile';
+    case 'improve_application':  return '/applications';
+    default:                     return undefined;
+  }
+}
+
 export function NgoReadinessConsole() {
+  const { t } = useTranslation();
   const [readiness, setReadiness] = useState<NgoReadiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,42 +72,54 @@ export function NgoReadinessConsole() {
       if (b[s] !== undefined) b[s]++;
     });
     return [
-      { stage: 'Draft',        count: b.draft,         fill: 'hsl(var(--muted-foreground))' },
-      { stage: 'Submitted',    count: b.submitted,     fill: CLAY_LIGHT },
-      { stage: 'Under review', count: b.under_review,  fill: CLAY },
-      { stage: 'Scored',       count: b.scored,        fill: SAVANNA },
-      { stage: 'Awarded',      count: b.awarded,       fill: GROW },
-      { stage: 'Rejected',     count: b.rejected,      fill: FLAG },
+      { stage: t('ngo.pipeline.stage.draft'),        count: b.draft,         fill: 'hsl(var(--muted-foreground))' },
+      { stage: t('ngo.pipeline.stage.submitted'),    count: b.submitted,     fill: CLAY_LIGHT },
+      { stage: t('ngo.pipeline.stage.under_review'), count: b.under_review,  fill: CLAY },
+      { stage: t('ngo.pipeline.stage.scored'),       count: b.scored,        fill: SAVANNA },
+      { stage: t('ngo.pipeline.stage.awarded'),      count: b.awarded,       fill: GROW },
+      { stage: t('ngo.pipeline.stage.rejected'),     count: b.rejected,      fill: FLAG },
     ];
-  }, [apps]);
+  }, [apps, t]);
 
   const score = readiness?.readiness_score ?? 0;
   const gaugeData = [{ name: 'readiness', value: score }];
   const gaugeColor = score >= 70 ? GROW : score >= 50 ? SUN : FLAG;
   const verdictTone = score >= 70 ? 'success' : score >= 50 ? 'warn' : 'danger';
 
-  const actions: VerdictAction[] = (readiness?.next_actions ?? []).slice(0, 3).map((a) => ({
-    label: a.title,
-    severity: (a.severity as VerdictAction['severity']) ?? 'info',
-    onClick: () => window.dispatchEvent(new CustomEvent('kuja:open-copilot')),
-  }));
+  const actions: VerdictAction[] = (readiness?.next_actions ?? []).slice(0, 3).map((a) => {
+    const href = _actionHref(a.action_type);
+    return {
+      label: a.title,
+      severity: (a.severity as VerdictAction['severity']) ?? 'info',
+      // If we can route to a real page that completes this action, do so.
+      // Otherwise fall back to opening the co-pilot rail for guidance.
+      ...(href
+        ? { href }
+        : { onClick: () => window.dispatchEvent(new CustomEvent('kuja:open-copilot')) }),
+    };
+  });
 
   return (
     <div className="space-y-4">
       <VerdictCard
         tone={verdictTone}
-        eyebrow="YOUR READINESS — NEXT ACTIONS"
-        headline={readiness?.headline ?? (error ? 'Readiness coaching unavailable' : undefined)}
-        body={readiness ? `${readiness.readiness_score}/100 holistic readiness` : (error ?? undefined)}
-        aiBadge={readiness ? 'AI coach' : undefined}
+        eyebrow={t('ngo.readiness.next_actions_eyebrow')}
+        headline={readiness?.headline ?? (error ? t('ngo.readiness.unavailable') : undefined)}
+        body={readiness ? t('ngo.readiness.score_summary', { score: readiness.readiness_score }) : (error ?? undefined)}
+        aiBadge={readiness ? t('ngo.readiness.ai_coach_badge') : undefined}
         actions={actions}
         loading={loading}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ChartCard
-          title="Readiness score"
-          subtitle="Your competitive strength"
+          title={
+            <span className="inline-flex items-center gap-1">
+              {t('ngo.readiness.score_card_title')}
+              <InfoTip>{t('glossary.readiness_score')}</InfoTip>
+            </span>
+          }
+          subtitle={t('ngo.readiness.score_card_subtitle')}
           icon={Gauge}
           caption={readiness ? {
             chartType: 'readiness-ring',
@@ -116,15 +145,15 @@ export function NgoReadinessConsole() {
               <text
                 x="50%" y="62%" textAnchor="middle"
                 style={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', letterSpacing: '0.1em' }}
-              >of 100</text>
+              >{t('ngo.readiness.of_100')}</text>
             </RadialBarChart>
           </SizedChart>
         </ChartCard>
 
         <div className="lg:col-span-2">
           <ChartCard
-            title="Your application pipeline"
-            subtitle="Submissions across stages"
+            title={t('ngo.readiness.pipeline_title')}
+            subtitle={t('ngo.readiness.pipeline_subtitle')}
             icon={Send}
             caption={{
               chartType: 'bar',

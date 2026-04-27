@@ -10,90 +10,50 @@
  * Persistence: localStorage key `kuja_onboarded_${role}_${userId}`.
  */
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { Sparkles, X, ArrowRight } from 'lucide-react';
 
 // --------------------------------------------------------------------------
-// Tour configuration
+// Tour configuration — content is i18n-keyed so it translates with the user's
+// language preference. Anchors stay here since they target DOM selectors.
 // --------------------------------------------------------------------------
 
 interface TourStep {
-  title: string;
-  body: string;
+  titleKey: string;
+  bodyKey: string;
   /** Optional DOM selector; tooltip points at this element if found. */
   anchor?: string;
 }
 
 const TOURS: Record<string, TourStep[]> = {
   donor: [
-    {
-      title: 'Your portfolio command center',
-      body: "Today's verdict synthesizes the 3-5 things that need your attention this week — AI-derived from your actual grants, applications, and risk signals.",
-    },
-    {
-      title: 'Charts with AI insight captions',
-      body: 'Every chart has a "so what" caption written by AI. Scan a dashboard in 10 seconds, not 10 minutes.',
-    },
-    {
-      title: 'Co-pilot is always a click away',
-      body: 'Tap the sparkle on the right edge anytime. Ask Co-pilot about portfolio health, write a new RFP, or scan for patterns across declined applications.',
-      anchor: '[aria-label="Open co-pilot"]',
-    },
-    {
-      title: 'Design grants with AI',
-      body: 'Under "Create grant," Kuja suggests eligibility criteria, rubric weights, and reporting requirements tuned to your goal + thematic + geography.',
-    },
+    { titleKey: 'tour.donor.s1.title', bodyKey: 'tour.donor.s1.body' },
+    { titleKey: 'tour.donor.s2.title', bodyKey: 'tour.donor.s2.body' },
+    { titleKey: 'tour.donor.s3.title', bodyKey: 'tour.donor.s3.body',
+      anchor: '[aria-label="Open co-pilot"]' },
+    { titleKey: 'tour.donor.s4.title', bodyKey: 'tour.donor.s4.body' },
   ],
   ngo: [
-    {
-      title: 'Your readiness score',
-      body: 'A 0–100 signal of how competitive your next application is likely to be. AI updates this as your documents, applications, and capacity change.',
-    },
-    {
-      title: 'AI-coached next actions',
-      body: 'The three actions here are ranked by impact on your readiness score — with estimated uplift per action.',
-    },
-    {
-      title: 'Browse grants smart',
-      body: "Every grant shows your AI-estimated fit + win probability + what's missing from your profile. Focus where you'll win.",
-    },
-    {
-      title: 'Co-pilot writes with you',
-      body: 'Stuck on a section? Tap the sparkle. Co-pilot grounds every suggestion in your own past applications — never generic.',
-      anchor: '[aria-label="Open co-pilot"]',
-    },
+    { titleKey: 'tour.ngo.s1.title', bodyKey: 'tour.ngo.s1.body' },
+    { titleKey: 'tour.ngo.s2.title', bodyKey: 'tour.ngo.s2.body' },
+    { titleKey: 'tour.ngo.s3.title', bodyKey: 'tour.ngo.s3.body' },
+    { titleKey: 'tour.ngo.s4.title', bodyKey: 'tour.ngo.s4.body',
+      anchor: '[aria-label="Open co-pilot"]' },
   ],
   reviewer: [
-    {
-      title: 'AI-prioritized queue',
-      body: 'Your assignments are ranked by review priority — deadline, complexity, and similarity to prior high-scoring apps.',
-    },
-    {
-      title: 'Compare mode',
-      body: 'Select 2–5 applications to compare side-by-side. AI aligns strengths, weaknesses, and flags potentially coordinated submissions.',
-    },
-    {
-      title: 'Justify every score',
-      body: 'AI pre-fills rationale per rubric criterion using application content. You edit and confirm — much faster than writing cold.',
-    },
+    { titleKey: 'tour.reviewer.s1.title', bodyKey: 'tour.reviewer.s1.body' },
+    { titleKey: 'tour.reviewer.s2.title', bodyKey: 'tour.reviewer.s2.body' },
+    { titleKey: 'tour.reviewer.s3.title', bodyKey: 'tour.reviewer.s3.body' },
   ],
   admin: [
-    {
-      title: 'Operations at a glance',
-      body: 'Anomaly stream flags unusual patterns — spikes in declined apps, slow review queues, suspicious verification results.',
-    },
-    {
-      title: 'Live AI health panel',
-      body: 'Every AI call across the platform is logged — success rate, tokens, per-endpoint breakdowns. Catch regressions before users notice.',
-      anchor: '[data-onboard="ai-health"]',
-    },
-    {
-      title: 'Configure and trust',
-      body: 'Compliance trust panel, audit timelines, typed-confirmation on destructive actions — this is the platform a board can trust to run a fund.',
-    },
+    { titleKey: 'tour.admin.s1.title', bodyKey: 'tour.admin.s1.body' },
+    { titleKey: 'tour.admin.s2.title', bodyKey: 'tour.admin.s2.body',
+      anchor: '[data-onboard="ai-health"]' },
+    { titleKey: 'tour.admin.s3.title', bodyKey: 'tour.admin.s3.body' },
   ],
 };
 
@@ -122,11 +82,17 @@ export function useOnboarding() {
 export function OnboardingTourProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
+  const { t } = useTranslation();
   const [active, setActive] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const storageKeyRef = useRef<string | null>(null);
 
-  const steps = user ? (TOURS[user.role] ?? TOURS.ngo) : [];
+  const stepDefs = user ? (TOURS[user.role] ?? TOURS.ngo) : [];
+  // Resolve the keyed steps to translated strings via the user's language.
+  const steps = useMemo(
+    () => stepDefs.map((s) => ({ title: t(s.titleKey), body: t(s.bodyKey), anchor: s.anchor })),
+    [stepDefs, t],
+  );
 
   useEffect(() => {
     if (!user) return;
@@ -180,6 +146,7 @@ export function OnboardingTourProvider({ children }: { children: ReactNode }) {
           total={steps.length}
           onSkip={skipForever}
           onNext={next}
+          t={t}
         />
       )}
     </TourContext.Provider>
@@ -190,11 +157,14 @@ export function OnboardingTourProvider({ children }: { children: ReactNode }) {
 // Step overlay
 // --------------------------------------------------------------------------
 
+interface ResolvedStep { title: string; body: string; anchor?: string }
+
 function TourStepOverlay({
-  step, stepIdx, total, onSkip, onNext,
+  step, stepIdx, total, onSkip, onNext, t,
 }: {
-  step: TourStep; stepIdx: number; total: number;
+  step: ResolvedStep; stepIdx: number; total: number;
   onSkip: () => void; onNext: () => void;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
@@ -232,7 +202,7 @@ function TourStepOverlay({
             type="button"
             onClick={onSkip}
             className="p-1 text-muted-foreground hover:text-foreground"
-            aria-label="Skip tour"
+            aria-label={t('tour.skip_aria')}
           >
             <X className="h-4 w-4" />
           </button>
@@ -252,14 +222,14 @@ function TourStepOverlay({
               onClick={onSkip}
               className="text-xs text-muted-foreground hover:text-foreground px-2 py-1"
             >
-              Skip
+              {t('tour.skip')}
             </button>
             <button
               type="button"
               onClick={onNext}
               className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-3 py-1.5"
             >
-              {stepIdx === total - 1 ? 'Got it' : 'Next'}
+              {stepIdx === total - 1 ? t('tour.got_it') : t('tour.next')}
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
