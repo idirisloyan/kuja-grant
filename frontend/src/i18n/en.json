@@ -1472,5 +1472,22 @@
   "coauthor.confidence.high": "High",
   "coauthor.confidence.medium": "Medium",
   "coauthor.confidence.low": "Low",
-  "coauthor.toast.draft_ready": "Draft ready: {n} answers, {provenance} citations"
+  "coauthor.toast.draft_ready": "Draft ready: {n} answers, {provenance} citations",
+  "grant_brief.cta.open": "Or design with AI from a prompt",
+  "grant_brief.cta.design": "Design grant",
+  "grant_brief.cta.designing": "Designing…",
+  "grant_brief.heading": "Design from a prompt",
+  "grant_brief.subtitle": "Type 1-2 lines about who you want to fund and what outcome you care about. AI will design a complete first-draft grant — title, description, criteria with weights, eligibility, documents, reporting cadence, deadline. Edit before publishing.",
+  "grant_brief.placeholder": "e.g. $500k for women-led climate adaptation in coastal Kenya, focus on smallholder agroforestry, 18-month duration",
+  "grant_brief.toast.applied": "Grant designed: {criteria} criteria · review and edit",
+  "ai.confidence.high.tooltip": "High — claim is directly supported by a named source we can show you.",
+  "ai.confidence.medium.tooltip": "Medium — claim is reasonable based on your sources but check the specifics.",
+  "ai.confidence.low.tooltip": "Low — generic claim or extrapolation; verify before submitting.",
+  "provenance.loading": "Loading sources…",
+  "provenance.empty": "No source citations recorded for this section.",
+  "matches.heading": "Best matches for you",
+  "matches.subtitle": "Open grants ranked by your win probability",
+  "matches.recompute": "Refresh",
+  "matches.empty.title": "No matches yet",
+  "matches.empty.body": "We'll surface ranked grants once we've scored you against the open call list."
 }

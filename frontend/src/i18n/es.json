@@ -1472,5 +1472,22 @@
   "coauthor.confidence.high": "Alta",
   "coauthor.confidence.medium": "Media",
   "coauthor.confidence.low": "Baja",
-  "coauthor.toast.draft_ready": "Borrador listo: {n} respuestas, {provenance} citas"
+  "coauthor.toast.draft_ready": "Borrador listo: {n} respuestas, {provenance} citas",
+  "grant_brief.cta.open": "O diseñar con IA desde un resumen",
+  "grant_brief.cta.design": "Diseñar subvención",
+  "grant_brief.cta.designing": "Diseñando…",
+  "grant_brief.heading": "Diseñar desde un resumen",
+  "grant_brief.subtitle": "Escribe 1-2 líneas sobre a quién quieres financiar y qué resultado te importa. La IA diseñará un borrador completo: título, descripción, criterios con pesos, elegibilidad, documentos, calendario de reportes, fecha límite. Edita antes de publicar.",
+  "grant_brief.placeholder": "Ej.: $500k para adaptación climática liderada por mujeres en la costa de Kenia, enfoque en agroforestería de pequeños productores, duración 18 meses",
+  "grant_brief.toast.applied": "Subvención diseñada: {criteria} criterios · revisa y edita",
+  "ai.confidence.high.tooltip": "Alta — la afirmación está directamente respaldada por una fuente que podemos mostrarte.",
+  "ai.confidence.medium.tooltip": "Media — afirmación razonable según tus fuentes; verifica los detalles.",
+  "ai.confidence.low.tooltip": "Baja — afirmación genérica o extrapolación; verifica antes de enviar.",
+  "provenance.loading": "Cargando fuentes…",
+  "provenance.empty": "No hay citas de fuentes registradas para esta sección.",
+  "matches.heading": "Tus mejores coincidencias",
+  "matches.subtitle": "Subvenciones abiertas ordenadas por probabilidad de éxito",
+  "matches.recompute": "Actualizar",
+  "matches.empty.title": "Aún no hay coincidencias",
+  "matches.empty.body": "Mostraremos subvenciones priorizadas en cuanto tengamos tu evaluación frente a las convocatorias abiertas."
 }

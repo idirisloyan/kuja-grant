@@ -1492,5 +1492,22 @@
   "coauthor.confidence.high": "Juu",
   "coauthor.confidence.medium": "Wastani",
   "coauthor.confidence.low": "Chini",
-  "coauthor.toast.draft_ready": "Rasimu tayari: majibu {n}, marejeleo {provenance}"
+  "coauthor.toast.draft_ready": "Rasimu tayari: majibu {n}, marejeleo {provenance}",
+  "grant_brief.cta.open": "Au tengeneza na AI kutoka muhtasari",
+  "grant_brief.cta.design": "Buni ruzuku",
+  "grant_brief.cta.designing": "Inabuni…",
+  "grant_brief.heading": "Buni kutoka muhtasari",
+  "grant_brief.subtitle": "Andika mistari 1-2 kuhusu unaowataka kufadhili na matokeo unayotaka. AI itabuni rasimu kamili — kichwa, maelezo, vigezo na uzani, ustahiki, hati, ratiba ya ripoti, tarehe ya mwisho. Hariri kabla ya kuchapisha.",
+  "grant_brief.placeholder": "Mfano: $500k kwa wakulima wadogo wa kike kuhusu hali ya hewa katika ufuo wa Kenya, miezi 18",
+  "grant_brief.toast.applied": "Ruzuku imebuniwa: vigezo {criteria} · kagua na hariri",
+  "ai.confidence.high.tooltip": "Juu — madai yanaungwa moja kwa moja na chanzo tunachoweza kukuonyesha.",
+  "ai.confidence.medium.tooltip": "Wastani — madai ni ya busara kulingana na vyanzo vyako, lakini hakiki maelezo.",
+  "ai.confidence.low.tooltip": "Chini — madai ya jumla au makisio; hakiki kabla ya kuwasilisha.",
+  "provenance.loading": "Inapakia vyanzo…",
+  "provenance.empty": "Hakuna marejeleo ya vyanzo yaliyorekodiwa kwa sehemu hii.",
+  "matches.heading": "Ulingano bora zaidi kwako",
+  "matches.subtitle": "Ruzuku zilizo wazi zikiwa zimepangwa kulingana na uwezekano wa kufaulu",
+  "matches.recompute": "Onyesha upya",
+  "matches.empty.title": "Bado hakuna ulingano",
+  "matches.empty.body": "Tutaonyesha ruzuku zilizopangwa mara baada ya kukutathmini dhidi ya ruzuku zilizo wazi."
 }

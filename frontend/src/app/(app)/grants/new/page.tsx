@@ -7,6 +7,8 @@ import { fetchGrantScaffold } from '@/lib/copilot-api';
 import { toast } from 'sonner';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { AiBadge } from '@/components/shared/ai-badge';
+import { GrantBriefPrompt } from '@/components/grants/GrantBriefPrompt';
+import type { GeneratedGrantBrief } from '@/lib/copilot-api';
 import {
   ArrowLeft,
   ArrowRight,
@@ -544,6 +546,121 @@ export default function CreateGrantPage() {
   const [aiExclusions, setAiExclusions] = useState<string[]>([]);
   const [aiBurden, setAiBurden] = useState<{ score?: 'low' | 'medium' | 'high'; drivers?: string[]; simplifications?: string[] } | null>(null);
 
+  /**
+   * Phase 2.2 — apply an AI-generated grant brief into the wizard state.
+   * Donor types a 1-2 line prompt; AI returns a complete scaffold; we fill
+   * every wizard field at once and jump to Step 1 so the donor can review.
+   * Existing eligibility categories with matching keys are preserved (we
+   * just enable them and copy the AI's details); custom eligibility from
+   * the AI is appended. Same for doc requirements.
+   */
+  const applyGrantBrief = useCallback((brief: GeneratedGrantBrief) => {
+    // Title + description.
+    setBasic((prev) => {
+      const next = { ...prev };
+      if (brief.title) next.title = brief.title;
+      if (brief.description) next.description = brief.description;
+      // Recommended deadline → today + N days, formatted YYYY-MM-DD.
+      if (brief.recommended_deadline_days && brief.recommended_deadline_days > 0) {
+        const d = new Date();
+        d.setDate(d.getDate() + brief.recommended_deadline_days);
+        next.deadline = d.toISOString().slice(0, 10);
+      }
+      return next;
+    });
+
+    // Criteria — replace entirely. The AI gives keys; preserve them.
+    if (brief.criteria && brief.criteria.length > 0) {
+      setCriteria(
+        brief.criteria.map((c, i) => ({
+          key: c.key || `criterion_${i + 1}`,
+          label: c.label || '',
+          weight: typeof c.weight === 'number' ? c.weight : 20,
+          description: c.description || '',
+          instructions: c.instructions || '',
+          max_words: c.max_words || 500,
+        })),
+      );
+    }
+
+    // Eligibility — merge by key onto existing categories where possible,
+    // append custom ones. Matching by key (geographic, org_type, etc.)
+    // preserves the wizard's structured taxonomy.
+    if (brief.eligibility && brief.eligibility.length > 0) {
+      setEligibility((prev) => {
+        const next = [...prev];
+        const existingKeys = new Set(next.map((e) => e.key));
+        for (const e of brief.eligibility) {
+          if (existingKeys.has(e.key)) {
+            const idx = next.findIndex((x) => x.key === e.key);
+            next[idx] = {
+              ...next[idx],
+              enabled: true,
+              details: e.details || next[idx].details,
+              weight: typeof e.weight === 'number' ? e.weight : next[idx].weight,
+            };
+          } else {
+            next.push({
+              key: e.key || `custom_${Date.now()}`,
+              label: e.label || 'Custom requirement',
+              enabled: true,
+              details: e.details || '',
+              weight: typeof e.weight === 'number' ? e.weight : 10,
+            });
+          }
+        }
+        return next;
+      });
+    }
+
+    // Doc requirements — same merge pattern.
+    if (brief.doc_requirements && brief.doc_requirements.length > 0) {
+      setDocReqs((prev) => {
+        const next = [...prev];
+        const byKey = new Map(next.map((d, i) => [d.key, i]));
+        for (const d of brief.doc_requirements) {
+          const idx = byKey.get(d.key);
+          if (idx != null) {
+            next[idx] = {
+              ...next[idx],
+              enabled: true,
+              required: d.required ?? next[idx].required,
+              specific_requirements: d.specific_requirements || next[idx].specific_requirements,
+            };
+          } else {
+            next.push({
+              key: d.key || `custom_${Date.now()}`,
+              label: d.label || 'Custom document',
+              labelKey: undefined,
+              icon: d.icon || '📄',
+              enabled: true,
+              required: d.required ?? true,
+              specific_requirements: d.specific_requirements || '',
+            });
+          }
+        }
+        return next;
+      });
+    }
+
+    // Burden card — surfaces in Step 3 (evaluation).
+    if (brief.burden) {
+      setAiBurden({
+        score: brief.burden.score,
+        drivers: brief.burden.drivers || [],
+        simplifications: brief.burden.simplifications || [],
+      });
+    }
+
+    // Rationale → guidance banner so the donor sees AI's reasoning.
+    if (brief.rationale) {
+      setAiGuidance(brief.rationale);
+    }
+
+    // Jump to Step 1 (Basic Info) so the donor sees what AI filled in.
+    setStep(1);
+  }, []);
+
   const handleSuggestCriteria = async () => {
     setSuggestingCriteria(true);
     try {
@@ -837,6 +954,8 @@ export default function CreateGrantPage() {
           </div>
         </Card>
       )}
+
+      <GrantBriefPrompt onApplied={applyGrantBrief} className="mt-1" />
 
       <button
         onClick={goNext}

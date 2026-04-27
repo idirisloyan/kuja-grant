@@ -31,6 +31,8 @@ import {
   fetchDraftApplication,
   type ApplicationDraft,
 } from '@/lib/copilot-api';
+import { AIConfidenceBadge } from '@/components/shared/ai-confidence-badge';
+import { ProvenanceChips } from '@/components/shared/provenance-chips';
 import { toast } from 'sonner';
 
 interface Props {
@@ -40,12 +42,6 @@ interface Props {
   onApplied?: (draft: ApplicationDraft) => void;
   className?: string;
 }
-
-const CONFIDENCE_TONE: Record<string, string> = {
-  high: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-  medium: 'border-amber-200 bg-amber-50 text-amber-800',
-  low: 'border-rose-200 bg-rose-50 text-rose-800',
-};
 
 export function DraftCoAuthor({ grantId, applicationId, onApplied, className = '' }: Props) {
   const { t } = useTranslation();
@@ -205,8 +201,12 @@ export function DraftCoAuthor({ grantId, applicationId, onApplied, className = '
             <ul className="space-y-1.5">
               {Object.entries(draft.responses || {}).map(([key, text]) => {
                 const conf = draft.confidence_per_criterion?.[key] || 'medium';
-                const tone = CONFIDENCE_TONE[conf] || CONFIDENCE_TONE.medium;
                 const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+                // Filter draft.claim_provenance down to this criterion so we
+                // can show the chip count + lazy-load the rest on demand.
+                const criterionProvenance = draft.claim_provenance.filter(
+                  (p) => p.criterion_key === key,
+                );
                 return (
                   <li
                     key={key}
@@ -214,17 +214,36 @@ export function DraftCoAuthor({ grantId, applicationId, onApplied, className = '
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-xs font-semibold">{key}</span>
-                      <span
-                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${tone}`}
-                      >
-                        {t(`coauthor.confidence.${conf}`)}
-                      </span>
+                      <AIConfidenceBadge confidence={conf} variant="badge" />
                     </div>
                     <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">
                       {text}
                     </p>
-                    <div className="mt-1 text-[10px] text-muted-foreground">
-                      {t('applications.word_count', { n: wordCount })}
+                    <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <span>{t('applications.word_count', { n: wordCount })}</span>
+                      {criterionProvenance.length > 0 && applicationId != null && (
+                        <ProvenanceChips
+                          subjectKind="application"
+                          subjectId={applicationId}
+                          subjectField={key}
+                          // Pre-populate from the draft response to avoid an
+                          // immediate refetch — same shape as the backend row.
+                          rows={criterionProvenance.map((p, i) => ({
+                            id: -i - 1,
+                            ai_call_id: null,
+                            subject: { kind: 'application', id: applicationId, field: key },
+                            claim: p.claim,
+                            source: {
+                              kind: p.source_kind,
+                              id: p.source_id ?? null,
+                              locator: p.source_locator ?? null,
+                              excerpt: p.source_excerpt ?? null,
+                            },
+                            confidence: p.confidence,
+                            created_at: new Date().toISOString(),
+                          }))}
+                        />
+                      )}
                     </div>
                   </li>
                 );

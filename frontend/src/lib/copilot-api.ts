@@ -492,6 +492,82 @@ export function postAiHelpfulness(
 }
 
 // ---------------------------------------------------------------------------
+// 13b. Match engine (Phase 3.1+3.2+3.3)
+// ---------------------------------------------------------------------------
+
+export interface MatchComponents {
+  eligibility?: number;
+  sector?: number;
+  geography?: number;
+  capacity?: number;
+  track_record?: number;
+}
+
+export interface MatchForOrg {
+  grant_id: number;
+  score: number;
+  components: MatchComponents;
+  top_strength: string | null;
+  top_blocker: string | null;
+  computed_at: string | null;
+  grant: {
+    id: number;
+    title: string;
+    description: string | null;
+    deadline: string | null;
+    total_funding: number | null;
+    currency: string | null;
+    donor_org_id: number;
+  };
+}
+
+export interface MatchForGrant {
+  org_id: number;
+  score: number;
+  components: MatchComponents;
+  top_strength: string | null;
+  top_blocker: string | null;
+  org: {
+    id: number;
+    name: string;
+    sectors: string[] | null;
+    countries: string[] | null;
+  };
+}
+
+export function fetchMatchesForMe(opts: { limit?: number; recompute?: boolean } = {}) {
+  const qs = new URLSearchParams();
+  if (opts.limit) qs.set('limit', String(opts.limit));
+  if (opts.recompute) qs.set('recompute', '1');
+  return safeCall<{ matches: MatchForOrg[]; flag: 'on' | 'off' }>(() =>
+    api.get<CopilotResult<{ matches: MatchForOrg[]; flag: 'on' | 'off' }>>(
+      `/match/for-me${qs.toString() ? `?${qs.toString()}` : ''}`,
+    ),
+  );
+}
+
+export function fetchMatchesForGrant(grantId: number, limit = 10) {
+  return safeCall<{ matches: MatchForGrant[]; flag: 'on' | 'off' }>(() =>
+    api.get<CopilotResult<{ matches: MatchForGrant[]; flag: 'on' | 'off' }>>(
+      `/match/for-grant/${grantId}?limit=${limit}`,
+    ),
+  );
+}
+
+export function postRecomputeMatches(input: {
+  grant_id?: number;
+  org_id?: number;
+  all?: boolean;
+}) {
+  return safeCall<{ recomputed: number; scope: string }>(() =>
+    api.post<CopilotResult<{ recomputed: number; scope: string }>>(
+      '/match/recompute',
+      input,
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 14. AI health (admin only)
 // ---------------------------------------------------------------------------
 

@@ -1472,5 +1472,22 @@
   "coauthor.confidence.high": "Élevée",
   "coauthor.confidence.medium": "Moyenne",
   "coauthor.confidence.low": "Faible",
-  "coauthor.toast.draft_ready": "Brouillon prêt : {n} réponses, {provenance} citations"
+  "coauthor.toast.draft_ready": "Brouillon prêt : {n} réponses, {provenance} citations",
+  "grant_brief.cta.open": "Ou concevoir avec l'IA depuis un résumé",
+  "grant_brief.cta.design": "Concevoir la subvention",
+  "grant_brief.cta.designing": "Conception en cours…",
+  "grant_brief.heading": "Concevoir depuis un résumé",
+  "grant_brief.subtitle": "Saisissez 1-2 lignes sur qui vous souhaitez financer et le résultat visé. L'IA produira un premier brouillon complet — titre, description, critères pondérés, éligibilité, documents, calendrier de rapport, date limite. Modifiez avant publication.",
+  "grant_brief.placeholder": "Ex. : 500k$ pour l'adaptation climatique des femmes sur la côte du Kenya, focus agroforesterie pour petits exploitants, durée 18 mois",
+  "grant_brief.toast.applied": "Subvention conçue : {criteria} critères · relisez et éditez",
+  "ai.confidence.high.tooltip": "Élevée — l'affirmation est directement soutenue par une source nommée que nous pouvons vous montrer.",
+  "ai.confidence.medium.tooltip": "Moyenne — affirmation raisonnable d'après vos sources, mais vérifiez les détails.",
+  "ai.confidence.low.tooltip": "Faible — affirmation générique ou extrapolation ; vérifiez avant de soumettre.",
+  "provenance.loading": "Chargement des sources…",
+  "provenance.empty": "Aucune citation de source enregistrée pour cette section.",
+  "matches.heading": "Meilleures correspondances pour vous",
+  "matches.subtitle": "Subventions ouvertes classées par probabilité de succès",
+  "matches.recompute": "Actualiser",
+  "matches.empty.title": "Aucune correspondance pour l'instant",
+  "matches.empty.body": "Nous afficherons des subventions classées dès que nous vous aurons évalué par rapport aux appels ouverts."
 }

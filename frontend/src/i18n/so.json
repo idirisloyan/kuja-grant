@@ -1492,5 +1492,22 @@
   "coauthor.confidence.high": "Sare",
   "coauthor.confidence.medium": "Dhexdhexaad",
   "coauthor.confidence.low": "Hoose",
-  "coauthor.toast.draft_ready": "Qabyada diyaar: {n} jawaab, {provenance} tixraac"
+  "coauthor.toast.draft_ready": "Qabyada diyaar: {n} jawaab, {provenance} tixraac",
+  "grant_brief.cta.open": "Ama naqshadee adigoo isticmaalaya AI iyo warbixin",
+  "grant_brief.cta.design": "Naqshadee deeqda",
+  "grant_brief.cta.designing": "Waxaa la naqshadeynayaa…",
+  "grant_brief.heading": "Naqshadee adoo isticmaalaya warbixin",
+  "grant_brief.subtitle": "Qor 1-2 jumlado oo ku saabsan cidda aad rabto inaad maalgeliso iyo natiijada aad rabto. AI-gu wuxuu naqshadeyn doonaa qabyo dhammeystiran — cinwaan, sharraxaad, cabbirrada miisaaman, xaq u yeelashada, dukumeentiyada, jadwalka warbixinta, wakhtiga ugu dambeeya. Wax ka beddel ka hor daabacaadda.",
+  "grant_brief.placeholder": "Tusaale: $500k oo loogu talagalay isbeddelka cimilada ee dumarka ee xeebta Kenya, diiradda saaray dhirta beeralayda yaryar, 18 bilood",
+  "grant_brief.toast.applied": "Deeqda waa la naqshadeeyay: cabbirro {criteria} · eeg oo wax ka beddel",
+  "ai.confidence.high.tooltip": "Sare — sheegashada waxaa toos u taageeraysa il magacaaban oo aan ku tusi karno.",
+  "ai.confidence.medium.tooltip": "Dhexdhexaad — sheegashada waa macquul ku saleysan ilahaaga, laakiin hubi faahfaahinta.",
+  "ai.confidence.low.tooltip": "Hoose — sheegasho guud ama qiyaaso; hubi ka hor inta aadan gudbin.",
+  "provenance.loading": "Waxaa la soo dejinayaa ilaha…",
+  "provenance.empty": "Ma jiraan tixraac ilo ah oo qaybtan loo diiwaangeliyay.",
+  "matches.heading": "Deeqaha ugu wanaagsan adiga",
+  "matches.subtitle": "Deeqaha furan oo loo kala saaray itimaalka aad ku guulaysan karto",
+  "matches.recompute": "Cusboonaysii",
+  "matches.empty.title": "Wali ma jiraan deeqo ku habboon",
+  "matches.empty.body": "Waxaan halkan ku tusi doonaa deeqaha la kala saaray markii aan kuu qiimeyno liiska deeqaha furan."
 }

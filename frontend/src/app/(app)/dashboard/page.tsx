@@ -19,6 +19,7 @@ import { DonorCommandCenter } from '@/components/dashboards/donor-command-center
 import { NgoReadinessConsole } from '@/components/dashboards/ngo-readiness-console';
 import { ReviewerQueue } from '@/components/dashboards/reviewer-queue';
 import { AdminOpsPanel } from '@/components/dashboards/admin-ops-panel';
+import { MatchesCard } from '@/components/dashboards/matches-card';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -63,7 +64,15 @@ export default function DashboardPage() {
       </div>
 
       {user.role === 'donor' && <DonorCommandCenter />}
-      {user.role === 'ngo' && <NgoReadinessConsole />}
+      {user.role === 'ngo' && (
+        <>
+          {/* Phase 3.2 — opportunity feed first when matches are enabled,
+              so the NGO immediately sees ranked grants. Falls through to
+              the readiness console below. */}
+          <MatchesCard limit={5} />
+          <NgoReadinessConsole />
+        </>
+      )}
       {user.role === 'reviewer' && <ReviewerQueue />}
       {user.role === 'admin' && <AdminOpsPanel />}
     </div>

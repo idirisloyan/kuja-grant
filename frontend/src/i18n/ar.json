@@ -1472,5 +1472,22 @@
   "coauthor.confidence.high": "مرتفعة",
   "coauthor.confidence.medium": "متوسطة",
   "coauthor.confidence.low": "منخفضة",
-  "coauthor.toast.draft_ready": "المسودة جاهزة: {n} إجابة، {provenance} مرجع"
+  "coauthor.toast.draft_ready": "المسودة جاهزة: {n} إجابة، {provenance} مرجع",
+  "grant_brief.cta.open": "أو صمّم بالذكاء الاصطناعي من وصف قصير",
+  "grant_brief.cta.design": "صمّم المنحة",
+  "grant_brief.cta.designing": "جارٍ التصميم…",
+  "grant_brief.heading": "صمّم من وصف قصير",
+  "grant_brief.subtitle": "اكتب سطراً أو سطرين عن من تريد تمويله وما النتيجة التي تهتم بها. سيصمّم الذكاء الاصطناعي مسودة منحة كاملة — العنوان والوصف ومعايير التقييم بأوزانها والأهلية والمستندات وجدول التقارير والموعد النهائي. يمكنك تعديلها قبل النشر.",
+  "grant_brief.placeholder": "مثال: 500 ألف دولار لتكيّف المرأة مع المناخ في ساحل كينيا، التركيز على الحراجة الزراعية لصغار المزارعين، مدة 18 شهراً",
+  "grant_brief.toast.applied": "تم تصميم المنحة: {criteria} معايير · راجع وعدّل",
+  "ai.confidence.high.tooltip": "مرتفعة — مدعومة بمصدر محدد يمكننا عرضه لك.",
+  "ai.confidence.medium.tooltip": "متوسطة — معقولة استناداً إلى مصادرك، لكن تحقق من التفاصيل.",
+  "ai.confidence.low.tooltip": "منخفضة — ادعاء عام أو استنتاج موسّع؛ تحقق قبل التقديم.",
+  "provenance.loading": "جارٍ تحميل المصادر…",
+  "provenance.empty": "لا توجد مصادر مسجّلة لهذا القسم.",
+  "matches.heading": "أفضل المنح المناسبة لك",
+  "matches.subtitle": "المنح المفتوحة مرتّبة حسب احتمال الفوز بها",
+  "matches.recompute": "تحديث",
+  "matches.empty.title": "لا توجد توافقات بعد",
+  "matches.empty.body": "سنعرض هنا المنح المرتّبة بمجرد تقييم منظمتك مقابل قائمة المنح المفتوحة."
 }
