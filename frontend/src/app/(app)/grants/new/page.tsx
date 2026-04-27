@@ -42,36 +42,54 @@ const STEPS = [
   { labelKey: 'grant.wizard.step.review_publish', icon: Send },
 ];
 
-const SECTOR_OPTIONS = [
-  'Health', 'Education', 'WASH', 'Climate', 'Protection',
-  'Nutrition', 'Livelihoods', 'Governance', 'Agriculture', 'Gender Equality',
+// Sectors and countries: the underlying VALUE stays in English so the DB
+// remains the canonical source for filtering, search, and cross-portal joins;
+// the LABEL is resolved to the user's language at render time. labelKey maps
+// to i18n keys defined in src/i18n/*.json.
+const SECTOR_OPTIONS: Array<{ value: string; labelKey: string }> = [
+  { value: 'Health', labelKey: 'sector.health' },
+  { value: 'Education', labelKey: 'sector.education' },
+  { value: 'WASH', labelKey: 'sector.wash' },
+  { value: 'Climate', labelKey: 'sector.climate' },
+  { value: 'Protection', labelKey: 'sector.protection' },
+  { value: 'Nutrition', labelKey: 'sector.nutrition' },
+  { value: 'Livelihoods', labelKey: 'sector.livelihoods' },
+  { value: 'Governance', labelKey: 'sector.governance' },
+  { value: 'Agriculture', labelKey: 'sector.agriculture' },
+  { value: 'Gender Equality', labelKey: 'sector.gender_equality' },
 ];
 
-const COUNTRY_OPTIONS = [
-  'Kenya', 'Somalia', 'Ethiopia', 'Uganda', 'Tanzania',
-  'South Sudan', 'Nigeria', 'South Africa',
+const COUNTRY_OPTIONS: Array<{ value: string; labelKey: string }> = [
+  { value: 'Kenya', labelKey: 'country.kenya' },
+  { value: 'Somalia', labelKey: 'country.somalia' },
+  { value: 'Ethiopia', labelKey: 'country.ethiopia' },
+  { value: 'Uganda', labelKey: 'country.uganda' },
+  { value: 'Tanzania', labelKey: 'country.tanzania' },
+  { value: 'South Sudan', labelKey: 'country.south_sudan' },
+  { value: 'Nigeria', labelKey: 'country.nigeria' },
+  { value: 'South Africa', labelKey: 'country.south_africa' },
 ];
 
 const CURRENCY_OPTIONS = ['USD', 'EUR', 'GBP', 'KES', 'CHF'];
 
-const ELIGIBILITY_CATEGORIES = [
-  { key: 'geographic', label: 'Geographic Requirements' },
-  { key: 'org_type', label: 'Organization Type' },
-  { key: 'experience', label: 'Experience & Track Record' },
-  { key: 'budget', label: 'Budget / Financial Capacity' },
-  { key: 'sector', label: 'Sector Expertise' },
-  { key: 'registration', label: 'Registration & Compliance' },
+const ELIGIBILITY_CATEGORIES: Array<{ key: string; labelKey: string }> = [
+  { key: 'geographic', labelKey: 'eligibility.geographic' },
+  { key: 'org_type', labelKey: 'eligibility.org_type' },
+  { key: 'experience', labelKey: 'eligibility.experience' },
+  { key: 'budget', labelKey: 'eligibility.budget' },
+  { key: 'sector', labelKey: 'eligibility.sector' },
+  { key: 'registration', labelKey: 'eligibility.registration' },
 ];
 
-const DOC_TYPES = [
-  { key: 'financial_report', label: 'Financial Report', icon: '📊' },
-  { key: 'registration', label: 'Registration Certificate', icon: '📋' },
-  { key: 'audit', label: 'Audit Report', icon: '🔍' },
-  { key: 'PSEA', label: 'PSEA Policy', icon: '🛡' },
-  { key: 'project_report', label: 'Project Reports', icon: '📄' },
-  { key: 'budget', label: 'Detailed Budget', icon: '💰' },
-  { key: 'CV', label: 'Staff CVs', icon: '👤' },
-  { key: 'strategic_plan', label: 'Strategic Plan', icon: '🗺' },
+const DOC_TYPES: Array<{ key: string; labelKey: string; icon: string }> = [
+  { key: 'financial_report', labelKey: 'doctype.financial_report', icon: '📊' },
+  { key: 'registration', labelKey: 'doctype.registration', icon: '📋' },
+  { key: 'audit', labelKey: 'doctype.audit', icon: '🔍' },
+  { key: 'PSEA', labelKey: 'doctype.PSEA', icon: '🛡' },
+  { key: 'project_report', labelKey: 'doctype.project_report', icon: '📄' },
+  { key: 'budget', labelKey: 'doctype.budget', icon: '💰' },
+  { key: 'CV', labelKey: 'doctype.CV', icon: '👤' },
+  { key: 'strategic_plan', labelKey: 'doctype.strategic_plan', icon: '🗺' },
 ];
 
 const ACCEPTED_FILE_TYPES = '.pdf,.doc,.docx,.txt';
@@ -92,7 +110,11 @@ interface BasicInfo {
 
 interface EligibilityItem {
   key: string;
+  // label is the rendered string (used when AI returns a custom requirement
+  // or when the user adds one). For built-in categories we prefer labelKey
+  // so the label re-localizes when the user switches language.
   label: string;
+  labelKey?: string;
   enabled: boolean;
   details: string;
   weight: number;
@@ -109,7 +131,10 @@ interface CriterionItem {
 
 interface DocReqItem {
   key: string;
+  // Same pattern as EligibilityItem: keep both. labelKey is preferred for
+  // built-in doc types; label is used as a custom override / fallback.
   label: string;
+  labelKey?: string;
   icon: string;
   enabled: boolean;
   specific_requirements: string;
@@ -206,34 +231,41 @@ function Alert({
 // Multi-Select Toggle
 // ---------------------------------------------------------------------------
 
+// Toggle accepts options as either plain strings (legacy) or {value, labelKey}
+// pairs, so the same component renders both currency-style English-only lists
+// and localized taxonomy lists (sectors, countries). The selected state always
+// stores the canonical English value so DB writes remain language-agnostic.
 function MultiSelectToggle({
   options,
   selected,
   onChange,
 }: {
-  options: string[];
+  options: Array<string | { value: string; labelKey: string }>;
   selected: string[];
   onChange: (val: string[]) => void;
 }) {
+  const { t } = useTranslation();
   const toggle = (opt: string) => {
     onChange(selected.includes(opt) ? selected.filter((s) => s !== opt) : [...selected, opt]);
   };
   return (
     <div className="flex flex-wrap gap-1.5">
-      {options.map((opt) => {
-        const isActive = selected.includes(opt);
+      {options.map((raw) => {
+        const value = typeof raw === 'string' ? raw : raw.value;
+        const label = typeof raw === 'string' ? raw : t(raw.labelKey);
+        const isActive = selected.includes(value);
         return (
           <button
-            key={opt}
+            key={value}
             type="button"
-            onClick={() => toggle(opt)}
+            onClick={() => toggle(value)}
             className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition ${
               isActive
                 ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-clay))] text-white'
                 : 'border-border bg-background text-foreground hover:bg-muted'
             }`}
           >
-            {opt}
+            {label}
           </button>
         );
       })}
@@ -249,6 +281,18 @@ export default function CreateGrantPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Localize a stored sector/country value (English DB value) → user's lang.
+  // Falls back to the value itself if there's no key (covers AI-suggested
+  // taxonomies that aren't in the canonical list).
+  const localizeSector = (s: string) => {
+    const opt = SECTOR_OPTIONS.find((o) => o.value === s);
+    return opt ? t(opt.labelKey) : s;
+  };
+  const localizeCountry = (c: string) => {
+    const opt = COUNTRY_OPTIONS.find((o) => o.value === c);
+    return opt ? t(opt.labelKey) : c;
+  };
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -272,10 +316,33 @@ export default function CreateGrantPage() {
     countries: [],
   });
 
+  // English fallback labels — used when sending to the API (so the DB stays
+  // language-agnostic) and as the empty-state hint. Display is driven by
+  // labelKey when present.
+  const ELIGIBILITY_FALLBACKS: Record<string, string> = {
+    geographic: 'Geographic Requirements',
+    org_type: 'Organization Type',
+    experience: 'Experience & Track Record',
+    budget: 'Budget / Financial Capacity',
+    sector: 'Sector Expertise',
+    registration: 'Registration & Compliance',
+  };
+  const DOC_FALLBACKS: Record<string, string> = {
+    financial_report: 'Financial Report',
+    registration: 'Registration Certificate',
+    audit: 'Audit Report',
+    PSEA: 'PSEA Policy',
+    project_report: 'Project Reports',
+    budget: 'Detailed Budget',
+    CV: 'Staff CVs',
+    strategic_plan: 'Strategic Plan',
+  };
+
   const [eligibility, setEligibility] = useState<EligibilityItem[]>(
     ELIGIBILITY_CATEGORIES.map((c) => ({
       key: c.key,
-      label: c.label,
+      label: ELIGIBILITY_FALLBACKS[c.key] || '',
+      labelKey: c.labelKey,
       enabled: false,
       details: '',
       weight: 10,
@@ -289,7 +356,8 @@ export default function CreateGrantPage() {
   const [docReqs, setDocReqs] = useState<DocReqItem[]>(
     DOC_TYPES.map((d) => ({
       key: d.key,
-      label: d.label,
+      label: DOC_FALLBACKS[d.key] || '',
+      labelKey: d.labelKey,
       icon: d.icon,
       enabled: false,
       specific_requirements: '',
@@ -637,10 +705,10 @@ export default function CreateGrantPage() {
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-[hsl(var(--kuja-clay))]" />
               <div className="text-sm font-medium text-[hsl(var(--kuja-clay))]">
-                AI is analyzing your document...
+                {t('grant.wizard.ai_analyzing')}
               </div>
               <div className="text-xs text-muted-foreground">
-                Extracting requirements, KPIs, and reporting schedules
+                {t('grant.wizard.ai_extracting')}
               </div>
               <div className="kuja-shimmer h-1 w-[80%] rounded-full bg-muted" />
             </div>
@@ -677,7 +745,7 @@ export default function CreateGrantPage() {
               <CheckCircle2 className="h-6 w-6 flex-shrink-0 text-emerald-600" />
               <div className="flex-1">
                 <div className="text-sm font-semibold text-emerald-800">
-                  Document analyzed successfully
+                  {t('grant.wizard.doc_analyzed')}
                 </div>
                 <div className="truncate text-xs text-muted-foreground">{uploadedFileName}</div>
               </div>
@@ -701,7 +769,7 @@ export default function CreateGrantPage() {
                       {extracted.requirements?.length || 0}
                     </div>
                     <div className="text-[10px] font-semibold uppercase text-muted-foreground">
-                      Requirements
+                      {t('grant.wizard.stat_requirements')}
                     </div>
                   </div>
                   <div className="rounded-md bg-sky-50 p-3 text-center">
@@ -709,7 +777,7 @@ export default function CreateGrantPage() {
                       {extracted.template_sections?.length || 0}
                     </div>
                     <div className="text-[10px] font-semibold uppercase text-muted-foreground">
-                      Sections
+                      {t('grant.wizard.stat_sections')}
                     </div>
                   </div>
                   <div className="rounded-md bg-amber-50 p-3 text-center">
@@ -717,7 +785,7 @@ export default function CreateGrantPage() {
                       {extracted.indicators?.length || 0}
                     </div>
                     <div className="text-[10px] font-semibold uppercase text-muted-foreground">
-                      Indicators
+                      {t('grant.wizard.stat_indicators')}
                     </div>
                   </div>
                 </div>
@@ -725,12 +793,12 @@ export default function CreateGrantPage() {
                 {extracted.requirements && extracted.requirements.length > 0 && (
                   <div className="border-t border-border pt-3">
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                      Reporting Requirements
+                      {t('grant.wizard.reporting_requirements')}
                     </div>
                     {extracted.requirements.slice(0, 4).map((req, i) => (
                       <div key={i} className="flex items-center gap-2 py-0.5">
                         <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[hsl(var(--kuja-clay))]" />
-                        <span className="text-xs">{req.title || req.type || 'Requirement'}</span>
+                        <span className="text-xs">{req.title || req.type || t('grant.wizard.requirement_fallback')}</span>
                         {req.frequency && (
                           <span className="inline-flex items-center rounded-full border border-border bg-background px-1.5 py-0 text-[10px] text-muted-foreground">
                             {req.frequency}
@@ -740,7 +808,7 @@ export default function CreateGrantPage() {
                     ))}
                     {extracted.requirements.length > 4 && (
                       <div className="mt-0.5 text-[11px] text-muted-foreground">
-                        +{extracted.requirements.length - 4} more
+                        {t('grant.wizard.more_count', { n: extracted.requirements.length - 4 })}
                       </div>
                     )}
                   </div>
@@ -749,7 +817,7 @@ export default function CreateGrantPage() {
                 {extracted.indicators && extracted.indicators.length > 0 && (
                   <div className="border-t border-border pt-3">
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                      Key Performance Indicators
+                      {t('grant.wizard.kpis')}
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {extracted.indicators.slice(0, 6).map((ind, i) => (
@@ -757,7 +825,7 @@ export default function CreateGrantPage() {
                           key={i}
                           className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700"
                         >
-                          {ind.name || 'KPI'}
+                          {ind.name || t('grant.wizard.kpi_fallback')}
                           {ind.target ? ` — ${ind.target}` : ''}
                         </span>
                       ))}
@@ -783,7 +851,7 @@ export default function CreateGrantPage() {
     <div className="space-y-4">
       {extracted && (
         <Alert tone="info" icon={<Sparkles className="h-4 w-4" />}>
-          Fields below have been pre-filled from your uploaded document. Review and adjust as needed.
+          {t('grant.wizard.basics_prefilled')}
         </Alert>
       )}
 
@@ -863,12 +931,12 @@ export default function CreateGrantPage() {
   const renderStep2Eligibility = () => (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Toggle the eligibility categories you want applicants to meet. Add details and set relative weights.
+        {t('grant.wizard.eligibility_intro')}
       </p>
 
       {extracted && eligibility.some((e) => e.enabled) && (
         <Alert tone="info" icon={<Sparkles className="h-4 w-4" />}>
-          Some requirements have been pre-filled from your uploaded document.
+          {t('grant.wizard.eligibility_prefilled')}
         </Alert>
       )}
 
@@ -891,12 +959,12 @@ export default function CreateGrantPage() {
                     item.enabled ? 'text-foreground' : 'text-muted-foreground'
                   }`}
                 >
-                  {item.label}
+                  {item.labelKey ? t(item.labelKey) : item.label}
                 </span>
               </label>
               {item.enabled && (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Weight:</span>
+                  <span className="text-xs text-muted-foreground">{t('grant.wizard.weight_label')}</span>
                   <input
                     type="range"
                     min={0}
@@ -916,7 +984,7 @@ export default function CreateGrantPage() {
                 <input
                   value={item.details}
                   onChange={(e) => updateEligibility(i, 'details', e.target.value)}
-                  placeholder="Describe specific requirements..."
+                  placeholder={t('grant.wizard.eligibility_details_placeholder')}
                   className={INPUT_CLS}
                 />
               </div>
@@ -935,7 +1003,7 @@ export default function CreateGrantPage() {
         }}
         className="inline-flex items-center gap-1.5 self-start rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
       >
-        <Plus className="h-3.5 w-3.5" /> Add Custom Requirement
+        <Plus className="h-3.5 w-3.5" /> {t('grant.wizard.add_custom_requirement')}
       </button>
     </div>
   );
@@ -946,7 +1014,7 @@ export default function CreateGrantPage() {
         <div className="rounded-[10px] border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]/40 p-3">
           <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-[hsl(var(--kuja-spark))] mb-1.5">
             <Sparkles className="h-3.5 w-3.5" />
-            <span>AI design guidance</span>
+            <span>{t('grant.wizard.ai_design_guidance')}</span>
             <AiBadge className="ml-1" />
           </div>
           {aiGuidance && (
@@ -955,7 +1023,7 @@ export default function CreateGrantPage() {
           {aiExclusions.length > 0 && (
             <div>
               <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">
-                Suggested exclusions
+                {t('grant.wizard.suggested_exclusions')}
               </div>
               <ul className="ml-4 list-disc space-y-0.5 text-xs text-muted-foreground">
                 {aiExclusions.slice(0, 5).map((x, i) => <li key={i}>{x}</li>)}
@@ -1011,7 +1079,7 @@ export default function CreateGrantPage() {
       )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
-          Define the criteria reviewers will use to evaluate applications.
+          {t('grant.wizard.evaluation_intro')}
         </p>
         <div className="flex items-center gap-2">
           <span
@@ -1019,8 +1087,8 @@ export default function CreateGrantPage() {
               criteriaWeightTotal === 100 ? 'text-emerald-600' : 'text-red-600'
             }`}
           >
-            Total: {criteriaWeightTotal}%
-            {criteriaWeightTotal !== 100 && ' (must = 100%)'}
+            {t('grant.wizard.weight_total', { n: criteriaWeightTotal })}
+            {criteriaWeightTotal !== 100 && t('grant.wizard.weight_must_total')}
           </span>
           <button
             onClick={handleSuggestCriteria}
@@ -1032,13 +1100,13 @@ export default function CreateGrantPage() {
             ) : (
               <Sparkles className="h-3.5 w-3.5" />
             )}
-            {suggestingCriteria ? 'Designing…' : 'Design with AI'}
+            {suggestingCriteria ? t('grant.wizard.designing') : t('grant.wizard.design_with_ai')}
           </button>
           <button
             onClick={addCriterion}
             className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
           >
-            <Plus className="h-3.5 w-3.5" /> Add
+            <Plus className="h-3.5 w-3.5" /> {t('grant.wizard.add')}
           </button>
         </div>
       </div>
@@ -1047,12 +1115,12 @@ export default function CreateGrantPage() {
         <Card key={i}>
           <div className="space-y-3 p-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">Criterion {i + 1}</span>
+              <span className="text-xs font-medium text-muted-foreground">{t('grant.wizard.criterion_n', { n: i + 1 })}</span>
               {criteria.length > 1 && (
                 <button
                   onClick={() => removeCriterion(i)}
                   className="rounded-md p-1 text-red-600 hover:bg-red-50"
-                  aria-label="Remove criterion"
+                  aria-label={t('grant.wizard.remove_criterion')}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -1060,15 +1128,15 @@ export default function CreateGrantPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[3fr_1fr]">
-              <Field label="Label *">
+              <Field label={t('grant.wizard.label_required')}>
                 <input
                   value={criterion.label}
                   onChange={(e) => updateCriterion(i, 'label', e.target.value)}
-                  placeholder="e.g., Technical Approach"
+                  placeholder={t('grant.wizard.label_placeholder')}
                   className={INPUT_CLS}
                 />
               </Field>
-              <Field label="Weight %">
+              <Field label={t('grant.wizard.weight_pct')}>
                 <input
                   type="number"
                   min={0}
@@ -1080,28 +1148,28 @@ export default function CreateGrantPage() {
               </Field>
             </div>
 
-            <Field label="Description">
+            <Field label={t('grant.create.description')}>
               <textarea
                 rows={2}
                 value={criterion.description}
                 onChange={(e) => updateCriterion(i, 'description', e.target.value)}
-                placeholder="What should applicants address..."
+                placeholder={t('grant.wizard.description_placeholder')}
                 className={TA_CLS}
               />
             </Field>
 
-            <Field label="Instructions for Applicants">
+            <Field label={t('grant.wizard.instructions')}>
               <textarea
                 rows={2}
                 value={criterion.instructions}
                 onChange={(e) => updateCriterion(i, 'instructions', e.target.value)}
-                placeholder="Guidance on how to respond..."
+                placeholder={t('grant.wizard.instructions_placeholder')}
                 className={TA_CLS}
               />
             </Field>
 
             <div className="max-w-[140px]">
-              <Field label="Max Words">
+              <Field label={t('grant.wizard.max_words')}>
                 <input
                   type="number"
                   min={50}
@@ -1121,7 +1189,7 @@ export default function CreateGrantPage() {
   const renderStep4Documents = () => (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Select which documents applicants must upload. Click a card to toggle it on, then add specific requirements.
+        {t('grant.wizard.docs_intro')}
       </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1145,14 +1213,14 @@ export default function CreateGrantPage() {
                   className="h-4 w-4 rounded border-input accent-[hsl(var(--kuja-clay))]"
                 />
                 <span className="text-lg">{doc.icon}</span>
-                <span className="text-sm font-medium">{doc.label}</span>
+                <span className="text-sm font-medium">{doc.labelKey ? t(doc.labelKey) : doc.label}</span>
               </div>
               {doc.enabled && (
                 <div className="ml-7 mt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
                   <input
                     value={doc.specific_requirements}
                     onChange={(e) => updateDocReq(i, 'specific_requirements', e.target.value)}
-                    placeholder="Specific requirements for this document..."
+                    placeholder={t('grant.wizard.doc_specific_placeholder')}
                     className={INPUT_CLS}
                   />
                   <label className="flex items-center gap-2">
@@ -1163,7 +1231,7 @@ export default function CreateGrantPage() {
                       className="h-4 w-4 rounded border-input accent-[hsl(var(--kuja-clay))]"
                     />
                     <span className="text-xs text-muted-foreground">
-                      Required (applicants must upload)
+                      {t('grant.wizard.doc_required_label')}
                     </span>
                   </label>
                 </div>
@@ -1179,20 +1247,20 @@ export default function CreateGrantPage() {
     <div className="space-y-4">
       <div className="flex items-center gap-1.5 text-sm font-medium text-[hsl(var(--kuja-clay))]">
         <Info className="h-4 w-4" />
-        Review your grant before publishing
+        {t('grant.wizard.review_intro')}
       </div>
 
       {(!basic.title.trim() || !basic.total_funding || !basic.deadline) && (
         <Alert tone="warning">
-          <strong>Required fields missing:</strong>{' '}
+          <strong>{t('grant.wizard.required_fields_missing')}</strong>{' '}
           {[
-            !basic.title.trim() && 'Title',
-            !basic.total_funding && 'Funding Amount',
-            !basic.deadline && 'Deadline',
+            !basic.title.trim() && t('grant.wizard.missing.title'),
+            !basic.total_funding && t('grant.wizard.missing.funding'),
+            !basic.deadline && t('grant.wizard.missing.deadline'),
           ]
             .filter(Boolean)
             .join(', ')}
-          . Go back to <strong>Basic Info</strong> (Step 2) to complete them before publishing.
+          . <span dangerouslySetInnerHTML={{ __html: t('grant.wizard.go_back_to_basics') }} />
         </Alert>
       )}
 
@@ -1219,7 +1287,7 @@ export default function CreateGrantPage() {
                       key={s}
                       className="inline-flex items-center rounded-full border border-border bg-background px-2 py-0.5 text-[11px]"
                     >
-                      {s}
+                      {localizeSector(s)}
                     </span>
                   ))}
                 </div>
@@ -1234,7 +1302,7 @@ export default function CreateGrantPage() {
                       key={c}
                       className="inline-flex items-center rounded-full border border-border bg-background px-2 py-0.5 text-[11px]"
                     >
-                      {c}
+                      {localizeCountry(c)}
                     </span>
                   ))}
                 </div>
@@ -1254,7 +1322,7 @@ export default function CreateGrantPage() {
                 .map((e) => (
                   <div key={e.key} className="flex items-start justify-between gap-3 text-sm">
                     <div>
-                      <div>{e.label}</div>
+                      <div>{e.labelKey ? t(e.labelKey) : e.label}</div>
                       {e.details && <div className="text-xs text-muted-foreground">{e.details}</div>}
                     </div>
                     <span className="whitespace-nowrap text-muted-foreground">{e.weight}%</span>
@@ -1308,7 +1376,7 @@ export default function CreateGrantPage() {
                         : 'border-border bg-background text-foreground'
                     }`}
                   >
-                    {d.label}
+                    {d.labelKey ? t(d.labelKey) : d.label}
                   </span>
                 ))}
             </div>
@@ -1321,17 +1389,17 @@ export default function CreateGrantPage() {
           <div className="p-5">
             <div className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-[hsl(var(--kuja-spark))]">
               <Sparkles className="h-4 w-4" />
-              AI Extracted Data
+              {t('grant.wizard.ai_extracted_data')}
             </div>
             {extracted.requirements && extracted.requirements.length > 0 && (
               <div className="mb-3">
                 <div className="mb-1 text-xs font-medium">
-                  Reporting Requirements ({extracted.requirements.length})
+                  {t('grant.wizard.reporting_requirements_count', { n: extracted.requirements.length })}
                 </div>
                 <div className="space-y-0.5">
                   {extracted.requirements.map((req, i) => (
                     <div key={i} className="text-xs text-muted-foreground">
-                      {i + 1}. {req.title || req.description || 'Requirement'}
+                      {i + 1}. {req.title || req.description || t('grant.wizard.requirement_fallback')}
                       {req.frequency ? ` (${req.frequency})` : ''}
                     </div>
                   ))}
@@ -1341,13 +1409,13 @@ export default function CreateGrantPage() {
             {extracted.indicators && extracted.indicators.length > 0 && (
               <div>
                 <div className="mb-1 text-xs font-medium">
-                  KPIs / Indicators ({extracted.indicators.length})
+                  {t('grant.wizard.kpis_count', { n: extracted.indicators.length })}
                 </div>
                 <div className="space-y-0.5">
                   {extracted.indicators.map((ind, i) => (
                     <div key={i} className="text-xs text-muted-foreground">
-                      {i + 1}. {ind.name || ind.description || 'Indicator'}
-                      {ind.target ? ` — Target: ${ind.target}` : ''}
+                      {i + 1}. {ind.name || ind.description || t('grant.wizard.indicator_fallback')}
+                      {ind.target ? t('grant.wizard.kpi_target', { target: ind.target }) : ''}
                     </div>
                   ))}
                 </div>
@@ -1360,9 +1428,9 @@ export default function CreateGrantPage() {
       <Card className="border-2 border-emerald-200 bg-emerald-50/40">
         <div className="flex flex-wrap items-center justify-between gap-3 p-5">
           <div>
-            <div className="text-sm font-semibold text-emerald-800">Ready to publish?</div>
+            <div className="text-sm font-semibold text-emerald-800">{t('grant.wizard.ready_to_publish')}</div>
             <div className="text-xs text-muted-foreground">
-              Your grant will be visible to matched NGOs immediately
+              {t('grant.wizard.publish_subtitle')}
             </div>
           </div>
           <div className="flex gap-2">
@@ -1372,7 +1440,7 @@ export default function CreateGrantPage() {
               className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-              {saving ? 'Saving...' : 'Save Draft'}
+              {saving ? t('grant.wizard.saving_dots') : t('grant.wizard.save_draft')}
             </button>
             <button
               onClick={handlePublish}
@@ -1380,7 +1448,7 @@ export default function CreateGrantPage() {
               className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-5 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
               {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {publishing ? 'Publishing...' : 'Publish Grant'}
+              {publishing ? t('grant.wizard.publishing') : t('grant.wizard.publish_grant')}
             </button>
           </div>
         </div>
