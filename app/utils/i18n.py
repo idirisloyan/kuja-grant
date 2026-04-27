@@ -1,8 +1,12 @@
 """
 Kuja Grant Management System - Internationalization (i18n)
 ============================================================
-Backend translation utility. Loads JSON translation files and provides
-a t() function for translating strings in route handlers and services.
+Backend translation utility. Loads the canonical translation catalog (the
+same JSON files the Next.js frontend ships) so backend strings — API error
+messages, lockout copy, AI prompt fragments — render in the user's language
+without us maintaining two parallel dictionaries.
+
+Single source of truth: frontend/src/i18n/<lang>.json.
 """
 
 import json
@@ -19,21 +23,49 @@ _backend_translations = {}
 SUPPORTED_LANGUAGES = ('en', 'ar', 'fr', 'es', 'sw', 'so')
 LANG_NAMES = {'en': 'English', 'ar': 'Arabic', 'fr': 'French', 'es': 'Spanish', 'sw': 'Kiswahili', 'so': 'Soomaali'}
 
+# Native language self-name (used in prompts so AI thinks in the right register
+# rather than in English-language descriptions of the language).
+LANG_NATIVE = {
+    'en': 'English',
+    'ar': 'العربية',
+    'fr': 'français',
+    'es': 'español',
+    'sw': 'Kiswahili',
+    'so': 'Af-Soomaali',
+}
+
 
 def _load_translations():
-    """Load all translation JSON files from static/js/translations/."""
-    base = os.path.join(os.path.dirname(__file__), '..', '..', 'static', 'js', 'translations')
+    """Load translation JSONs from the frontend's canonical i18n directory.
+
+    Falls back to the legacy static/js/translations/ dir if the frontend
+    folder isn't shipped (e.g. backend-only deployments). The frontend dir
+    is preferred because it's the working source — the legacy dir was a
+    build artifact that drifted ~700 keys behind.
+    """
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    candidate_dirs = (
+        os.path.join(repo_root, 'frontend', 'src', 'i18n'),
+        os.path.join(repo_root, 'static', 'js', 'translations'),
+    )
     for lang in SUPPORTED_LANGUAGES:
-        path = os.path.join(base, f'{lang}.json')
-        if os.path.exists(path):
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    _backend_translations[lang] = json.load(f)
-                logger.info(f"Loaded {len(_backend_translations[lang])} translation keys for '{lang}'")
-            except (json.JSONDecodeError, IOError) as e:
-                logger.error(f"Failed to load translations for '{lang}': {e}")
-        else:
-            logger.warning(f"Translation file not found: {path}")
+        loaded = False
+        for base in candidate_dirs:
+            path = os.path.join(base, f'{lang}.json')
+            if os.path.exists(path):
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        _backend_translations[lang] = json.load(f)
+                    logger.info(
+                        f"Loaded {len(_backend_translations[lang])} translation keys for '{lang}' "
+                        f"from {os.path.relpath(path, repo_root)}"
+                    )
+                    loaded = True
+                    break
+                except (json.JSONDecodeError, IOError) as e:
+                    logger.error(f"Failed to load translations for '{lang}' from {path}: {e}")
+        if not loaded:
+            logger.warning(f"No translation file found for '{lang}' in any candidate dir")
 
 
 def get_lang():

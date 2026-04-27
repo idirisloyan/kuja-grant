@@ -5,14 +5,29 @@
 
 /**
  * Custom error class for API responses with non-2xx status codes.
+ *
+ * The new error response shape (Phase 0.3) returns:
+ *   { success: false, error: '<machine-code>', message: '<localized human>' }
+ *
+ * Legacy shape: { error: '<message>' } — message and code conflated.
+ *
+ * ApiError carries both so consumers can:
+ *   - branch on `error.code` (machine, stable, English)
+ *   - render `error.message` (already localized by the server)
+ *   - or fall back to `error.message` === human message in either shape
  */
 export class ApiError extends Error {
+  /** Stable, machine-readable error code (English). May equal message in legacy responses. */
+  public code: string;
+
   constructor(
     public status: number,
     message: string,
+    code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
+    this.code = code || message;
   }
 }
 
@@ -60,10 +75,12 @@ async function apiFetch<T>(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new ApiError(
-      res.status,
-      (err as { error?: string }).error || `HTTP ${res.status}`,
-    );
+    const body = err as { error?: string; message?: string };
+    // New shape: { error: 'code', message: 'localized human text' }
+    // Legacy shape: { error: 'human text' } — message field absent.
+    const message = body.message || body.error || `HTTP ${res.status}`;
+    const code = body.message ? body.error : message;
+    throw new ApiError(res.status, message, code);
   }
 
   return res.json() as Promise<T>;

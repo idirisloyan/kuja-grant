@@ -243,42 +243,381 @@ class AIService:
             )
         return cls._anthropic_client
 
+    # Tonal register per role. NGOs get warm, second-person, supportive copy
+    # ("you've got this"); donors/admins/reviewers get crisp, neutral, expert
+    # copy. Same model, same prompt body — different register clause.
+    _ROLE_TONE = {
+        'ngo': (
+            "Tone: warm, supportive, second-person ('you/your'). Coach the user. "
+            "Use plain language. Acknowledge effort. Make complex grant-process "
+            "concepts approachable without dumbing them down."
+        ),
+        'donor': (
+            "Tone: crisp, neutral, third-person professional. Treat the user as a "
+            "domain expert. Use precise grant-management terminology. Be concise "
+            "and decision-oriented."
+        ),
+        'admin': (
+            "Tone: precise, operational, third-person. The user is a platform "
+            "administrator. Surface concrete signals, anomalies, and recommended "
+            "actions without padding."
+        ),
+        'reviewer': (
+            "Tone: analytical, neutral, evidence-first. The user is an expert "
+            "reviewer making funding decisions. Quote evidence; avoid speculation."
+        ),
+    }
+
     @classmethod
-    def _call_claude(cls, system_prompt, user_message, max_tokens=1024):
-        """Call the Anthropic Claude API. Returns the response text or None on failure."""
+    def _call_claude(
+        cls,
+        system_prompt,
+        user_message,
+        max_tokens=1024,
+        *,
+        language=None,
+        role=None,
+        endpoint=None,
+    ):
+        """Call the Anthropic Claude API. Returns the response text or None on failure.
+
+        Language + role can be passed explicitly (preferred for background tasks
+        and cross-user generation, e.g. drafting in the recipient's language).
+        When omitted, both fall back to the current Flask-Login user — same
+        behavior as before.
+
+        endpoint: short identifier ('strengthen_section', 'draft_application',
+        etc.) used in telemetry so we can later see helpfulness per surface.
+        """
         client = cls._get_client()
         if not client:
             return None
         try:
-            # Inject language instruction for non-English users
-            from app.utils.i18n import get_lang, LANG_NAMES
-            lang = get_lang()
-            if lang != 'en' and lang in LANG_NAMES:
+            from app.utils.i18n import get_lang, LANG_NATIVE, LANG_NAMES
+            from flask_login import current_user
+
+            # Resolve language: explicit override → current user → 'en'.
+            if language is None:
+                try:
+                    language = get_lang()
+                except Exception:
+                    language = 'en'
+
+            # Resolve role: explicit override → current user → None.
+            if role is None:
+                try:
+                    if current_user and current_user.is_authenticated:
+                        role = getattr(current_user, 'role', None)
+                except Exception:
+                    role = None
+
+            # Layer the language directive — uses native language name so the
+            # model thinks in that language rather than translating from English.
+            if language and language != 'en' and language in LANG_NATIVE:
+                native = LANG_NATIVE[language]
+                english = LANG_NAMES.get(language, language)
                 system_prompt += (
-                    f"\n\nIMPORTANT: Respond entirely in {LANG_NAMES[lang]}. "
-                    f"All text, headings, bullet points, and recommendations must be in {LANG_NAMES[lang]}."
+                    f"\n\nIMPORTANT — LANGUAGE: Respond entirely in {native} ({english}). "
+                    f"All text, headings, bullets, and recommendations must be in {native}. "
+                    f"If the user's brief is in another language, still answer in {native}."
                 )
 
+            # Layer the role/tone directive.
+            tone = cls._ROLE_TONE.get(role) if role else None
+            if tone:
+                system_prompt += f"\n\nIMPORTANT — TONE: {tone}"
+
+            import time
+            t0 = time.monotonic()
             message = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=max_tokens,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_message}],
             )
-            # Track token usage
+            latency_ms = int((time.monotonic() - t0) * 1000)
+
+            # Track token usage + structured telemetry.
             usage = getattr(message, 'usage', None)
-            if usage:
-                logger.info(
-                    f"AI_TOKENS model=claude-sonnet-4-20250514 "
-                    f"input={getattr(usage, 'input_tokens', 0)} "
-                    f"output={getattr(usage, 'output_tokens', 0)} "
-                    f"max={max_tokens}"
+            input_tokens = getattr(usage, 'input_tokens', 0) if usage else 0
+            output_tokens = getattr(usage, 'output_tokens', 0) if usage else 0
+            logger.info(
+                f"AI_CALL endpoint={endpoint or '-'} model=claude-sonnet-4-20250514 "
+                f"role={role or '-'} lang={language or 'en'} "
+                f"input_tokens={input_tokens} output_tokens={output_tokens} "
+                f"latency_ms={latency_ms} max_tokens={max_tokens}"
+            )
+
+            # Persist to ai_calls telemetry table (best-effort, never blocks).
+            try:
+                cls._record_call(
+                    endpoint=endpoint,
+                    role=role,
+                    language=language,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    latency_ms=latency_ms,
+                    success=True,
                 )
+            except Exception as telem_err:
+                logger.debug(f"AI telemetry persist failed: {telem_err}")
+
             if message.content and len(message.content) > 0:
                 return message.content[0].text
             return None
         except Exception as e:
-            logger.warning(f"Claude API call failed: {e}")
+            logger.warning(f"Claude API call failed (endpoint={endpoint}): {e}")
+            try:
+                cls._record_call(
+                    endpoint=endpoint,
+                    role=role,
+                    language=language,
+                    input_tokens=0,
+                    output_tokens=0,
+                    latency_ms=0,
+                    success=False,
+                    error=str(e)[:200],
+                )
+            except Exception:
+                pass
+            return None
+
+    # ---- AI telemetry (Phase 0.5) -----------------------------------------
+    # Persists every Claude call to the existing `ai_call_logs` table (modeled
+    # by AICallLog). On first use we ALTER the table to add the new columns
+    # (role/language/org_id/helpfulness/last_call_id) — idempotent: if the
+    # column already exists, we silently skip. This keeps the schema migration
+    # zero-config for prod without touching the formal Alembic migrations.
+    #
+    # Helpfulness arrives later via PATCH /api/ai/calls/<id>/feedback after
+    # the user signals whether they used the AI's output. We need a row id we
+    # can patch back, so _record_call returns the inserted id.
+
+    _ai_logs_columns_ready = None
+
+    @classmethod
+    def _ensure_ai_logs_columns(cls):
+        """Idempotently add Phase 0.5 columns to ai_call_logs."""
+        if cls._ai_logs_columns_ready:
+            return True
+        try:
+            from app.extensions import db
+            from sqlalchemy import text
+            for stmt in (
+                "ALTER TABLE ai_call_logs ADD COLUMN role VARCHAR(32)",
+                "ALTER TABLE ai_call_logs ADD COLUMN language VARCHAR(8)",
+                "ALTER TABLE ai_call_logs ADD COLUMN org_id INT",
+                "ALTER TABLE ai_call_logs ADD COLUMN helpfulness VARCHAR(16)",
+            ):
+                try:
+                    db.session.execute(text(stmt))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()  # column already exists — fine
+            cls._ai_logs_columns_ready = True
+            return True
+        except Exception as e:
+            logger.error(f"ai_call_logs ALTER failed: {e}")
+            try:
+                from app.extensions import db
+                db.session.rollback()
+            except Exception:
+                pass
+            cls._ai_logs_columns_ready = False
+            return False
+
+    # ---- AI provenance (Phase 0.4) ---------------------------------------
+    # Persists per-claim citations so the UI can render source chips and the
+    # audit trail can show "where did this come from". Auto-creates the
+    # ai_provenance table on first use (idempotent).
+
+    _ai_provenance_table_ready = None
+
+    @classmethod
+    def _ensure_ai_provenance_table(cls):
+        if cls._ai_provenance_table_ready:
+            return True
+        try:
+            from app.extensions import db
+            from sqlalchemy import text
+            db.session.execute(text("""
+                CREATE TABLE IF NOT EXISTS ai_provenance (
+                    id SERIAL PRIMARY KEY,
+                    ai_call_id INT,
+                    subject_kind VARCHAR(40) NOT NULL,
+                    subject_id INT,
+                    subject_field VARCHAR(120),
+                    claim VARCHAR(500) NOT NULL,
+                    source_kind VARCHAR(40) NOT NULL,
+                    source_id INT,
+                    source_locator VARCHAR(200),
+                    source_excerpt VARCHAR(800),
+                    confidence VARCHAR(16) DEFAULT 'medium',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            db.session.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_ai_provenance_call "
+                "ON ai_provenance (ai_call_id)"
+            ))
+            db.session.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_ai_provenance_subject "
+                "ON ai_provenance (subject_kind, subject_id)"
+            ))
+            db.session.commit()
+            cls._ai_provenance_table_ready = True
+            return True
+        except Exception as e:
+            try:
+                from app.extensions import db
+                db.session.rollback()
+            except Exception:
+                pass
+            logger.error(f"ai_provenance table create failed: {e}")
+            cls._ai_provenance_table_ready = False
+            return False
+
+    @classmethod
+    def record_provenance(
+        cls,
+        *,
+        ai_call_id=None,
+        subject_kind,
+        subject_id=None,
+        subject_field=None,
+        claim,
+        source_kind,
+        source_id=None,
+        source_locator=None,
+        source_excerpt=None,
+        confidence='medium',
+    ):
+        """Record one provenance row. Best-effort; never raises.
+
+        Callers (e.g. the application co-author) should call this once per
+        cited claim. The UI later joins on (subject_kind, subject_id) to
+        render source chips next to AI-generated content.
+        """
+        if not cls._ensure_ai_provenance_table():
+            return None
+        try:
+            from app.extensions import db
+            from sqlalchemy import text
+            r = db.session.execute(
+                text("""
+                    INSERT INTO ai_provenance
+                      (ai_call_id, subject_kind, subject_id, subject_field, claim,
+                       source_kind, source_id, source_locator, source_excerpt, confidence)
+                    VALUES
+                      (:cid, :sk, :sid, :sf, :claim,
+                       :srck, :srcid, :srcloc, :srcexc, :conf)
+                    RETURNING id
+                """),
+                {
+                    "cid": ai_call_id,
+                    "sk": subject_kind, "sid": subject_id, "sf": subject_field,
+                    "claim": (claim or '')[:500],
+                    "srck": source_kind, "srcid": source_id,
+                    "srcloc": (source_locator or '')[:200] or None,
+                    "srcexc": (source_excerpt or '')[:800] or None,
+                    "conf": confidence or 'medium',
+                },
+            )
+            row = r.fetchone()
+            db.session.commit()
+            return row[0] if row else None
+        except Exception as e:
+            try:
+                from app.extensions import db
+                db.session.rollback()
+            except Exception:
+                pass
+            logger.debug(f"ai_provenance insert failed: {e}")
+            return None
+
+    @classmethod
+    def get_provenance(cls, *, subject_kind, subject_id=None, subject_field=None, limit=50):
+        """Fetch provenance rows for a given subject. Returns list of dicts."""
+        if not cls._ensure_ai_provenance_table():
+            return []
+        try:
+            from app.extensions import db
+            from sqlalchemy import text
+            sql = (
+                "SELECT id, ai_call_id, subject_kind, subject_id, subject_field, "
+                "claim, source_kind, source_id, source_locator, source_excerpt, "
+                "confidence, created_at FROM ai_provenance "
+                "WHERE subject_kind = :sk"
+            )
+            params = {"sk": subject_kind, "limit": limit}
+            if subject_id is not None:
+                sql += " AND subject_id = :sid"
+                params["sid"] = subject_id
+            if subject_field is not None:
+                sql += " AND subject_field = :sf"
+                params["sf"] = subject_field
+            sql += " ORDER BY created_at DESC LIMIT :limit"
+            rows = db.session.execute(text(sql), params).fetchall()
+            return [{
+                'id': r[0],
+                'ai_call_id': r[1],
+                'subject': {'kind': r[2], 'id': r[3], 'field': r[4]},
+                'claim': r[5],
+                'source': {'kind': r[6], 'id': r[7], 'locator': r[8], 'excerpt': r[9]},
+                'confidence': r[10],
+                'created_at': r[11].isoformat() if r[11] else None,
+            } for r in rows]
+        except Exception as e:
+            logger.debug(f"ai_provenance fetch failed: {e}")
+            return []
+
+    @classmethod
+    def _record_call(cls, *, endpoint, role, language, input_tokens, output_tokens,
+                     latency_ms, success, error=None):
+        """Record one AI call. Returns the inserted row id for later helpfulness patching."""
+        if not cls._ensure_ai_logs_columns():
+            return None
+        try:
+            from app.extensions import db
+            from sqlalchemy import text
+            from flask_login import current_user
+            user_id = None
+            org_id = None
+            try:
+                if current_user and current_user.is_authenticated:
+                    user_id = current_user.id
+                    org_id = getattr(current_user, 'org_id', None)
+            except Exception:
+                pass
+            r = db.session.execute(
+                text("""
+                    INSERT INTO ai_call_logs
+                      (endpoint, user_id, success, duration_ms, tokens_in, tokens_out,
+                       model, error_code, error_message,
+                       role, language, org_id)
+                    VALUES
+                      (:endpoint, :uid, :ok, :dur, :ti, :to,
+                       :model, NULL, :err,
+                       :role, :lang, :oid)
+                    RETURNING id
+                """),
+                {
+                    "endpoint": endpoint, "uid": user_id, "ok": success,
+                    "dur": latency_ms, "ti": input_tokens, "to": output_tokens,
+                    "model": "claude-sonnet-4-20250514", "err": error,
+                    "role": role, "lang": language, "oid": org_id,
+                },
+            )
+            row = r.fetchone()
+            db.session.commit()
+            return row[0] if row else None
+        except Exception as e:
+            try:
+                from app.extensions import db
+                db.session.rollback()
+            except Exception:
+                pass
+            logger.debug(f"ai_call_logs insert failed: {e}")
             return None
 
     @classmethod
