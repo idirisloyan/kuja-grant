@@ -10,6 +10,7 @@ import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
+import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
 import { useFlag } from '@/lib/hooks/use-feature-flags';
 import {
   ArrowLeft,
@@ -1041,6 +1042,8 @@ function ProposalStep({
           onApplied={(d) => onDraftApplied(d.responses || {})}
         />
       )}
+
+      {grantId != null && <GrantQAPanel grantId={grantId} variant="compact" />}
 
       {criteria.map((c) => {
         const text = responses[c.key] ?? '';

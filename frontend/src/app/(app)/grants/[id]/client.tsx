@@ -11,19 +11,21 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { EligibilityRequirement, Criterion, DocRequirement } from '@/lib/types';
+import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
 
 function formatFunding(amount: number | null, currency: string): string {
   if (!amount) return 'TBD';
   return `${currency === 'USD' ? '$' : currency + ' '}${amount.toLocaleString()}`;
 }
 
-type TabId = 'overview' | 'eligibility' | 'criteria' | 'documents' | 'applications';
+type TabId = 'overview' | 'eligibility' | 'criteria' | 'documents' | 'qa' | 'applications';
 
 const TAB_KEYS: { id: TabId; key: string }[] = [
   { id: 'overview', key: 'grant.tab.overview' },
   { id: 'eligibility', key: 'grant.tab.eligibility' },
   { id: 'criteria', key: 'grant.tab.criteria' },
   { id: 'documents', key: 'grant.tab.documents' },
+  { id: 'qa', key: 'grant.tab.qa' },
   { id: 'applications', key: 'grant.tab.applications' },
 ];
 
@@ -166,6 +168,7 @@ export default function GrantDetailClient() {
       {tab === 'eligibility' && <EligibilityTab requirements={grant.eligibility ?? []} t={t} />}
       {tab === 'criteria' && <CriteriaTab criteria={grant.criteria ?? []} t={t} />}
       {tab === 'documents' && <DocumentsTab requirements={grant.doc_requirements ?? []} t={t} />}
+      {tab === 'qa' && <GrantQAPanel grantId={grant.id} />}
       {tab === 'applications' && <ApplicationsTab grantId={grant.id} t={t} />}
     </div>
   );
