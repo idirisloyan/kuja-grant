@@ -103,11 +103,11 @@ export function DecisionAuditDrawer({ applicationId, className }: Props) {
         onClick={() => setOpen(true)}
         disabled={!applicationId}
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50',
+          'inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-clay))]/30 bg-[hsl(var(--kuja-clay))]/5 px-3 py-2 text-xs font-medium text-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay))]/10 disabled:opacity-50',
           className,
         )}
       >
-        <Activity className="h-3.5 w-3.5" />
+        <Activity className="h-4 w-4" />
         {t('decision_audit.open')}
       </button>
 

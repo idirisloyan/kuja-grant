@@ -1753,5 +1753,7 @@
   "org_memory.filter.archived": "Archived",
   "org_memory.usage_count": "used {n} times",
   "org_memory.source": "Source",
-  "org_memory.confidence": "Confidence"
+  "org_memory.confidence": "Confidence",
+  "reviewer_summary.intro": "One-screen executive read of this application — extracted evidence per criterion plus a draft rationale you can edit instead of writing from scratch.",
+  "report_readiness.intro": "A donor-perspective scan of your report before you submit — concerns flagged, vague claims sharpened, missing evidence surfaced. Saves a bounceback."
 }

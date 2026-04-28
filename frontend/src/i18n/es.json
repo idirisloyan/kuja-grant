@@ -1753,5 +1753,7 @@
   "org_memory.filter.archived": "Archivados",
   "org_memory.usage_count": "usado {n} veces",
   "org_memory.source": "Fuente",
-  "org_memory.confidence": "Confianza"
+  "org_memory.confidence": "Confianza",
+  "reviewer_summary.intro": "Lectura ejecutiva en una pantalla — evidencia extraída por criterio más un borrador de justificación que puede editar en vez de escribir desde cero.",
+  "report_readiness.intro": "Análisis de su informe desde la perspectiva del donante antes de enviar — preocupaciones, afirmaciones vagas afinadas, evidencia faltante. Evita un rebote."
 }

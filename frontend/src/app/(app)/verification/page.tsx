@@ -66,6 +66,60 @@ function mapToComplianceState(
   return { state: 'followup', detail: 'Auto-check passed; manual eyes recommended.' };
 }
 
+/**
+ * ComplianceListPill — Phase 10.7
+ *
+ * Renders the 4-state taxonomy pill in a verification list row when the
+ * ui.compliance_4state flag is on. Falls back to the legacy StatusBadge
+ * so the list never shows blank. The team's Apr 28 retest correctly
+ * pointed out that the taxonomy was buried in the expanded detail —
+ * this surfaces it where reviewers actually scan.
+ */
+function ComplianceListPill({
+  verification,
+}: { verification: RegistrationVerification }) {
+  const { enabled } = useFlag('ui.compliance_4state');
+  if (!enabled) {
+    return <StatusBadge status={verification.status} />;
+  }
+  const { state } = mapToComplianceState(verification);
+  return <ComplianceState state={state} variant="pill" />;
+}
+
+/**
+ * FourStateStatRow — Phase 10.7
+ *
+ * Top-of-page stat row in the 4-state vocabulary so donors triaging
+ * compliance posture see "12 confirmed / 5 likely / 7 missing /
+ * 3 follow-up" in one glance. Renders only when the flag is on.
+ */
+function FourStateStatRow({
+  counts,
+}: { counts: Record<ComplianceStateKind, number> }) {
+  const { enabled } = useFlag('ui.compliance_4state');
+  if (!enabled) return null;
+  const cells: Array<{ kind: ComplianceStateKind; total: number }> = [
+    { kind: 'clear',     total: counts.clear },
+    { kind: 'confirmed', total: counts.confirmed },
+    { kind: 'likely',    total: counts.likely },
+    { kind: 'missing',   total: counts.missing },
+    { kind: 'followup',  total: counts.followup },
+  ];
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {cells.map(({ kind, total }) => (
+        <div
+          key={kind}
+          className="rounded-xl border border-border bg-background p-4 flex flex-col gap-2"
+        >
+          <ComplianceState state={kind} variant="pill" />
+          <div className="kuja-numeric text-3xl font-bold tabular-nums">{total}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function VerificationDetail({ verification }: { verification: RegistrationVerification }) {
   const { t, formatDate } = useTranslation();
   const { enabled: fourStateEnabled } = useFlag('ui.compliance_4state');
@@ -285,6 +339,21 @@ export default function VerificationPage() {
     return counts;
   }, [verifications]);
 
+  // Phase 10.7 — 4-state taxonomy counts. Maps every org onto one of
+  // clear / confirmed / likely / missing / followup so the donor sees
+  // the same vocabulary across the verification list, the per-row pill,
+  // and the expanded detail panel.
+  const fourStateCounts = useMemo(() => {
+    const counts: Record<ComplianceStateKind, number> = {
+      clear: 0, confirmed: 0, likely: 0, missing: 0, followup: 0,
+    };
+    for (const v of verifications) {
+      const { state } = mapToComplianceState(v);
+      counts[state]++;
+    }
+    return counts;
+  }, [verifications]);
+
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return verifications;
     const q = searchQuery.toLowerCase();
@@ -336,6 +405,14 @@ export default function VerificationPage() {
         <p className="text-xs text-foreground leading-relaxed">{t('verification.intro_body')}</p>
       </div>
 
+      {/* Phase 10.7 — 4-state taxonomy stat row. Shows when the flag is
+          on; this is the primary scan surface for donors triaging
+          compliance posture across their applicant pool. */}
+      <FourStateStatRow counts={fourStateCounts} />
+
+      {/* Legacy stat tiles. Kept rendered for parity with the existing
+          status counts (verified / pending / flagged etc.) — no UI
+          regression for donors who use those numbers in their workflow. */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <StatBox icon={ShieldCheck} label={t('verification.status.verified')} value={statCounts.verified} tone="success" />
         <StatBox icon={Cpu} label={t('verification.status.ai_reviewed')} value={statCounts.ai_reviewed} tone="spark" />
@@ -406,7 +483,12 @@ export default function VerificationPage() {
                         <td className="px-4 py-3 text-xs text-muted-foreground">
                           {v.registration_authority || '—'}
                         </td>
-                        <td className="px-4 py-3"><StatusBadge status={v.status} /></td>
+                        <td className="px-4 py-3">
+                          {/* Phase 10.7 — show 4-state taxonomy pill in
+                              the LIST row, not just the expanded detail.
+                              Falls back to StatusBadge when flag is off. */}
+                          <ComplianceListPill verification={v} />
+                        </td>
                         <td className="px-4 py-3 text-right">
                           {v.ai_confidence != null ? (
                             <div className="flex items-center gap-2 justify-end">

@@ -1753,5 +1753,7 @@
   "org_memory.filter.archived": "مؤرشف",
   "org_memory.usage_count": "استُخدم {n} مرة",
   "org_memory.source": "المصدر",
-  "org_memory.confidence": "الثقة"
+  "org_memory.confidence": "الثقة",
+  "reviewer_summary.intro": "قراءة تنفيذية للطلب على شاشة واحدة — أدلة مستخرجة لكل معيار بالإضافة إلى مسودة تبرير يمكنك تعديلها.",
+  "report_readiness.intro": "فحص لتقريرك من منظور المانح قبل التقديم — مخاوف محددة وادعاءات غامضة موضحة وأدلة مفقودة مكشوفة. يوفر إعادة إرسال."
 }

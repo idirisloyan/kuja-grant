@@ -86,28 +86,44 @@ export function ReviewerSummary({ applicationId, onUseRationale, className }: Pr
   if (!enabled) return null;
 
   return (
-    <div className={cn('rounded-xl border border-[hsl(var(--kuja-spark))]/30 bg-[hsl(var(--kuja-spark-soft))]/30', className)}>
-      <div className="flex items-center justify-between p-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-[hsl(var(--kuja-spark))]" />
-          <span className="text-sm font-semibold text-[hsl(var(--kuja-spark))]">
-            {t('reviewer_summary.title')}
-          </span>
-          {summary?.source === 'fallback' && (
-            <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
-              {t('reviewer_summary.fallback_label')}
-            </span>
-          )}
+    <div
+      className={cn(
+        'rounded-xl border-2 border-[hsl(var(--kuja-spark))]/40 bg-gradient-to-br from-[hsl(var(--kuja-spark-soft))]/60 to-[hsl(var(--kuja-spark-soft))]/30 shadow-sm',
+        className,
+      )}
+    >
+      <div className="flex items-start justify-between gap-3 p-4">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <div className="rounded-lg bg-[hsl(var(--kuja-spark))]/10 p-2 flex-shrink-0">
+            <Sparkles className="h-5 w-5 text-[hsl(var(--kuja-spark))]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="kuja-display text-base text-[hsl(var(--kuja-spark))]">
+                {t('reviewer_summary.title')}
+              </h3>
+              {summary?.source === 'fallback' && (
+                <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+                  {t('reviewer_summary.fallback_label')}
+                </span>
+              )}
+            </div>
+            {!summary && !loading && (
+              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                {t('reviewer_summary.intro')}
+              </p>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {!summary && (
             <button
               type="button"
               onClick={run}
               disabled={!applicationId || loading}
-              className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--kuja-spark))] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-spark))] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 shadow-sm"
             >
-              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               {loading ? t('reviewer_summary.generating') : t('reviewer_summary.generate')}
             </button>
           )}

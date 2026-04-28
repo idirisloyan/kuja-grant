@@ -1773,5 +1773,7 @@
   "org_memory.filter.archived": "Yamehifadhiwa",
   "org_memory.usage_count": "kimetumika mara {n}",
   "org_memory.source": "Chanzo",
-  "org_memory.confidence": "Imani"
+  "org_memory.confidence": "Imani",
+  "reviewer_summary.intro": "Usomaji wa utendaji kwenye skrini moja — ushahidi uliotolewa kwa kila kigezo pamoja na rasimu ya sababu unayoweza kuhariri badala ya kuandika upya.",
+  "report_readiness.intro": "Ukaguzi wa ripoti yako kutoka mtazamo wa mfadhili kabla ya kuwasilisha — wasiwasi, madai yasiyo wazi yaliyoboreshwa, ushahidi unaokosekana. Huokoa kurudishwa."
 }

@@ -32,6 +32,13 @@ import { cn } from '@/lib/utils';
 interface Props {
   reportId: number | null;
   className?: string;
+  /**
+   * 'button' (default) — small inline button that opens the modal.
+   * 'banner' — prominent always-visible banner with title + body + CTA.
+   * Use 'banner' on the report draft row so NGOs see the pre-flight
+   * promise immediately rather than discovering a small button.
+   */
+  variant?: 'button' | 'banner';
 }
 
 const verdictTone = {
@@ -55,7 +62,7 @@ const verdictTone = {
   },
 } as const;
 
-export function ReportReadiness({ reportId, className }: Props) {
+export function ReportReadiness({ reportId, className, variant = 'button' }: Props) {
   const { t } = useTranslation();
   const { enabled } = useFlag('ui.report_readiness');
   const [open, setOpen] = useState(false);
@@ -84,18 +91,50 @@ export function ReportReadiness({ reportId, className }: Props) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={run}
-        disabled={!reportId || loading}
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark))]/30 bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark))]/15 disabled:opacity-50',
-          className,
-        )}
-      >
-        {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
-        {loading ? t('report_readiness.checking') : t('report_readiness.check')}
-      </button>
+      {variant === 'banner' ? (
+        <div
+          className={cn(
+            'rounded-xl border-2 border-[hsl(var(--kuja-spark))]/40 bg-gradient-to-br from-[hsl(var(--kuja-spark-soft))]/60 to-[hsl(var(--kuja-spark-soft))]/30 p-4 flex items-start justify-between gap-3 flex-wrap shadow-sm',
+            className,
+          )}
+        >
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <div className="rounded-lg bg-[hsl(var(--kuja-spark))]/10 p-2 flex-shrink-0">
+              <ShieldCheck className="h-5 w-5 text-[hsl(var(--kuja-spark))]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="kuja-display text-base text-[hsl(var(--kuja-spark))]">
+                {t('report_readiness.title')}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                {t('report_readiness.intro')}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={run}
+            disabled={!reportId || loading}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-spark))] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 shadow-sm flex-shrink-0"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {loading ? t('report_readiness.checking') : t('report_readiness.check')}
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={run}
+          disabled={!reportId || loading}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark))]/30 bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark))]/15 disabled:opacity-50',
+            className,
+          )}
+        >
+          {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+          {loading ? t('report_readiness.checking') : t('report_readiness.check')}
+        </button>
+      )}
 
       {open && (
         <div

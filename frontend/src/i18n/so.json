@@ -1773,5 +1773,7 @@
   "org_memory.filter.archived": "La keydiyay",
   "org_memory.usage_count": "la isticmaalay {n} jeer",
   "org_memory.source": "Isha",
-  "org_memory.confidence": "Kalsoonida"
+  "org_memory.confidence": "Kalsoonida",
+  "reviewer_summary.intro": "Akhrin tabaha hal shaashad — caddaymo laga soo saaray shuruud kasta iyo qabyada sababaynta oo aad wax ka beddeli karto halkii aad si gaar ah u qori lahayd.",
+  "report_readiness.intro": "Baaritaan warbixintaada laga eegayo dhinaca deeq-bixiyaha ka hor gudbinta — walaacyada, sheegashooyin aan caddayn oo la cadeeyay, caddayn maqan. Waxay kaa badbaadinaysaa dib u celin."
 }

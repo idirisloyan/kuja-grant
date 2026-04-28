@@ -1753,5 +1753,7 @@
   "org_memory.filter.archived": "Archivés",
   "org_memory.usage_count": "utilisé {n} fois",
   "org_memory.source": "Source",
-  "org_memory.confidence": "Confiance"
+  "org_memory.confidence": "Confiance",
+  "reviewer_summary.intro": "Lecture exécutive sur un écran — preuves extraites par critère et brouillon de justification éditable plutôt qu'à écrire de zéro.",
+  "report_readiness.intro": "Une analyse de votre rapport du point de vue du bailleur avant l'envoi — préoccupations signalées, affirmations vagues affinées, preuves manquantes mises en évidence. Évite un retour."
 }

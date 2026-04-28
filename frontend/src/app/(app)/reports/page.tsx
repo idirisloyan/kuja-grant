@@ -1132,7 +1132,14 @@ function ReportRow({ report, mutateReports }: { report: Report; mutateReports: (
       </tr>
       {report.status === 'draft' && (
         <tr>
-          <td colSpan={6} className="border-t-0 px-4 py-0 space-y-1">
+          <td colSpan={6} className="border-t-0 px-4 py-2 space-y-2">
+            {/* Phase 10.2 — banner-prominent pre-flight check, FIRST.
+                Earlier the team retest noted they didn't see the new
+                report pre-flight in action; the small button was easy
+                to miss next to the existing precheck panel. The banner
+                variant makes the donor-perspective AI scan unmistakably
+                visible the moment a draft row opens. */}
+            <ReportReadiness reportId={report.id} variant="banner" />
             <ReportDraftCoAuthor reportId={report.id} onApplied={() => mutateReports()} />
             <PreSubmitReviewPanel report={report} mutateReports={mutateReports} />
             <AIReportGuidancePanel report={report} />
