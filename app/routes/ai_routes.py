@@ -1194,6 +1194,167 @@ def api_ai_submission_readiness():
     })
 
 
+@ai_bp.route('/burden-estimate', methods=['POST'])
+@login_required
+@role_required('donor', 'admin')
+def api_ai_burden_estimate():
+    """Phase 10.4 — pre-publish applicant burden + design quality analysis.
+
+    Body: { grant_id?: int, draft?: dict }
+
+    If grant_id is provided we read the existing grant (must be donor's own).
+    If draft is provided we critique it directly without persistence.
+
+    Returns: { success, burden: {...} }
+    """
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return error_response('ai.rate_limited', 429)
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json() or {}
+    grant_draft = None
+    if data.get('grant_id'):
+        grant = db.session.get(Grant, int(data['grant_id']))
+        if not grant:
+            return error_response('grant.not_found', 404)
+        if (current_user.role == 'donor'
+                and getattr(grant, 'donor_org_id', None) != current_user.org_id):
+            return error_response('auth.access_denied', 403)
+        grant_draft = {
+            'title': grant.title,
+            'description': grant.description,
+            'budget_usd': getattr(grant, 'amount', None) or getattr(grant, 'budget_usd', None),
+            'deadline': getattr(grant, 'deadline', None),
+            'criteria': grant.get_criteria() if hasattr(grant, 'get_criteria') else [],
+            'eligibility': grant.get_eligibility() if hasattr(grant, 'get_eligibility') else [],
+            'document_requirements': (grant.get_document_requirements()
+                                      if hasattr(grant, 'get_document_requirements') else []),
+            'reporting_requirements': (grant.get_reporting_requirements()
+                                       if hasattr(grant, 'get_reporting_requirements') else []),
+        }
+    elif data.get('draft'):
+        grant_draft = data['draft']
+    else:
+        return error_response('validation.missing_field', 400, field='grant_id_or_draft')
+
+    burden = AIService.estimate_applicant_burden(
+        grant_draft=grant_draft,
+        language=current_user.language or 'en',
+    )
+    return jsonify({
+        'success': True,
+        'burden': burden,
+        'ai_transparency': {
+            'engine': 'Claude AI' if burden.get('source') == 'claude' else 'Deterministic baseline',
+            'disclaimer': 'Pre-publish design check. Apply suggestions selectively.',
+        },
+    })
+
+
+@ai_bp.route('/reviewer-summary', methods=['POST'])
+@login_required
+@role_required('reviewer', 'admin')
+def api_ai_reviewer_summary():
+    """Phase 10.3 — generate a one-screen reviewer summary + draft rationale.
+
+    Body: { application_id: int }
+    Returns: { success, summary: { one_screen_summary, who_is_the_ngo,
+              what_they_propose, why_strong, why_weak,
+              evidence_per_criterion, draft_rationale, comparable_signal,
+              red_flags, source } }
+    """
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return error_response('ai.rate_limited', 429)
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json() or {}
+    application_id = data.get('application_id')
+    if not application_id:
+        return error_response('validation.missing_field', 400, field='application_id')
+
+    application = db.session.get(Application, int(application_id))
+    if not application:
+        return error_response('application.not_found', 404)
+
+    grant = db.session.get(Grant, application.grant_id) if application.grant_id else None
+    if not grant:
+        return error_response('grant.not_found', 404)
+
+    org_obj = db.session.get(Organization, application.ngo_org_id) if application.ngo_org_id else None
+    org_payload = {
+        'name': org_obj.name if org_obj else None,
+        'mission': getattr(org_obj, 'mission', '') if org_obj else '',
+        'sectors': getattr(org_obj, 'sectors', None) if org_obj else None,
+        'countries': getattr(org_obj, 'countries', None) if org_obj else None,
+        'capacity': getattr(org_obj, 'capacity', None) if org_obj else {},
+    }
+
+    grant_payload = {
+        'id': grant.id,
+        'title': grant.title,
+        'description': grant.description,
+        'criteria': grant.get_criteria() if hasattr(grant, 'get_criteria') else [],
+    }
+
+    application_payload = {
+        'id': application.id,
+        'responses': application.get_responses() if hasattr(application, 'get_responses') else {},
+        'eligibility_responses': (application.get_eligibility_responses()
+                                  if hasattr(application, 'get_eligibility_responses') else {}),
+    }
+
+    documents = []
+    try:
+        from app.models.document import Document
+        docs_q = Document.query.filter_by(application_id=application.id).limit(10).all()
+        documents = [
+            {'id': d.id, 'original_filename': d.original_filename,
+             'doc_type': d.doc_type, 'score': getattr(d, 'score', None)}
+            for d in docs_q
+        ]
+    except Exception:
+        pass
+
+    # Comparable applications: same grant, status pending or scored, exclude this one.
+    comparable_applications = []
+    try:
+        comp_q = (Application.query
+                  .filter(Application.grant_id == grant.id,
+                          Application.id != application.id)
+                  .order_by(Application.ai_score.desc().nullslast())
+                  .limit(5).all())
+        for a in comp_q:
+            other_org = db.session.get(Organization, a.ngo_org_id) if a.ngo_org_id else None
+            comparable_applications.append({
+                'id': a.id,
+                'ngo_name': other_org.name if other_org else None,
+                'ai_score': getattr(a, 'ai_score', None),
+                'status': a.status,
+            })
+    except Exception:
+        pass
+
+    summary = AIService.generate_reviewer_summary(
+        grant=grant_payload,
+        org=org_payload,
+        application=application_payload,
+        documents=documents,
+        comparable_applications=comparable_applications,
+        language=current_user.language or 'en',
+    )
+    return jsonify({
+        'success': True,
+        'summary': summary,
+        'application_id': application.id,
+        'ai_transparency': {
+            'engine': 'Claude AI' if summary.get('source') == 'claude' else 'Deterministic baseline',
+            'disclaimer': 'AI summary — verify quotes against the application text. Rationale is editable.',
+        },
+    })
+
+
 @ai_bp.route('/report-readiness', methods=['POST'])
 @login_required
 @role_required('ngo')

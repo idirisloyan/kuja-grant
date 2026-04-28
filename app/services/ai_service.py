@@ -1111,6 +1111,231 @@ class AIService:
         }
 
     @classmethod
+    def estimate_applicant_burden(
+        cls,
+        *,
+        grant_draft,
+        language=None,
+    ):
+        """Phase 10.4 — pre-publish burden analysis on a donor's grant draft.
+
+        Donors often unintentionally make grants harder to apply for than
+        they need to be. This method runs a critique pass over the grant
+        draft and returns:
+          - burden_score 0-100 (lower = lower applicant burden)
+          - vague_criteria — criteria so generic any answer fits
+          - too_burdensome — criteria that ask for evidence small NGOs
+            can't realistically produce
+          - simplifications — concrete edits that lower burden without
+            losing the donor's intent
+          - predicted_quality_issues — what kinds of weak applications
+            this draft will attract if shipped as-is
+          - eligibility_too_narrow / too_loose flags
+          - recommended_deadline_extension when burden warrants it
+
+        The donor uses this BEFORE clicking publish — it's the design
+        intelligence move from the team's spec ("help donors create
+        better, fairer, lower-burden opportunities").
+
+        Output:
+          {
+            'burden_score': 0-100,
+            'verdict': 'low' | 'moderate' | 'high',
+            'summary': 'one-line read of how applying will feel',
+            'vague_criteria': [{key, label, issue, sharper}],
+            'too_burdensome': [{key, label, ask, why_burdensome, alternative}],
+            'simplifications': [{area, current, proposed, why}],
+            'predicted_quality_issues': [str],
+            'eligibility_concerns': [{kind, detail, suggestion}],
+            'recommended_deadline_extension_days': 0|7|14|21,
+            'source': 'claude'|'fallback'
+          }
+        """
+        grant_draft = grant_draft or {}
+        criteria = grant_draft.get('criteria') or []
+        eligibility = grant_draft.get('eligibility') or []
+        doc_requirements = grant_draft.get('document_requirements') or []
+        reporting_requirements = grant_draft.get('reporting_requirements') or []
+        budget_usd = grant_draft.get('budget_usd') or grant_draft.get('amount')
+        deadline = grant_draft.get('deadline')
+
+        # Deterministic baseline signals.
+        baseline_signals = []
+        # Heuristic 1: lots of doc requirements relative to budget.
+        try:
+            if isinstance(budget_usd, (int, float)) and budget_usd > 0:
+                if len(doc_requirements) >= 8 and budget_usd < 100_000:
+                    baseline_signals.append(
+                        f"{len(doc_requirements)} document requirements for a "
+                        f"${budget_usd:,.0f} grant — heavy lift for small NGOs."
+                    )
+        except Exception:
+            pass
+        # Heuristic 2: criteria with very long word ceilings.
+        for c in criteria:
+            try:
+                mw = c.get('max_words') or 0
+                if mw and mw > 800:
+                    baseline_signals.append(
+                        f"Criterion '{c.get('label') or c.get('key')}' has "
+                        f"{mw} word ceiling — discourages NGOs without dedicated grant writers."
+                    )
+            except Exception:
+                pass
+
+        system = (
+            "You are Kuja's grant-design co-pilot. A donor is about to "
+            "publish a grant. Before they do, your job is to assess "
+            "applicant burden and design quality. Donors often "
+            "unintentionally create grants that lock out smaller NGOs or "
+            "attract weak applications because the criteria are vague or "
+            "the eligibility is misaligned. Be honest and specific.\n\n"
+            "Burden_score 0-100 (LOWER = lower burden, friendlier):\n"
+            "  0-30   — light, friendly to small NGOs\n"
+            "  31-60  — moderate, accessible to mid-sized NGOs\n"
+            "  61-100 — heavy, only large/established NGOs will apply\n\n"
+            "Verdict matches band: low / moderate / high.\n\n"
+            "VAGUE CRITERIA: criteria so generic any boilerplate fits. "
+            "Donors should expect to score most applications similarly "
+            "if criteria are vague — defeating the point. Suggest sharper "
+            "wording.\n\n"
+            "TOO BURDENSOME: criteria asking for evidence small NGOs "
+            "can't realistically produce ('5-year audited financials', "
+            "'M&E plan with control group'). Propose alternatives that "
+            "still capture the signal the donor cares about.\n\n"
+            "SIMPLIFICATIONS: concrete edits — fewer doc requirements, "
+            "shorter narrative, simpler reporting cadence — that lower "
+            "burden without losing rigor.\n\n"
+            "PREDICTED QUALITY ISSUES: name the kinds of weak applications "
+            "this draft will attract if shipped as-is (e.g. 'donors will "
+            "see lots of generic theory-of-change because criterion 2 "
+            "doesn't ask for context-specific assumptions').\n\n"
+            "RECOMMENDED DEADLINE EXTENSION: if burden is high, suggest "
+            "0/7/14/21 days extension. Default 0.\n\n"
+            "Cap totals: max 4 vague_criteria, max 4 too_burdensome, max 5 "
+            "simplifications, max 4 predicted_quality_issues, max 3 "
+            "eligibility_concerns.\n\n"
+            "Return ONLY a JSON object matching the schema."
+        )
+
+        schema = """{
+  "burden_score": 0-100,
+  "verdict": "low" | "moderate" | "high",
+  "summary": "<one-line honest read, ≤140 chars>",
+  "vague_criteria": [
+    {
+      "key": "<criterion key>",
+      "label": "<criterion label>",
+      "issue": "<why it's vague, ≤140 chars>",
+      "sharper": "<concrete sharper wording, ≤220 chars>"
+    }
+  ],
+  "too_burdensome": [
+    {
+      "key": "<criterion or doc-requirement key>",
+      "label": "<label>",
+      "ask": "<what's being asked, ≤140 chars>",
+      "why_burdensome": "<why it locks out smaller NGOs, ≤140 chars>",
+      "alternative": "<alternative ask that captures the same signal, ≤220 chars>"
+    }
+  ],
+  "simplifications": [
+    {
+      "area": "criteria" | "documents" | "reporting" | "eligibility",
+      "current": "<what's there now, ≤140 chars>",
+      "proposed": "<the simpler version, ≤180 chars>",
+      "why": "<why this is still rigorous, ≤140 chars>"
+    }
+  ],
+  "predicted_quality_issues": [
+    "<plain-English description, ≤180 chars>"
+  ],
+  "eligibility_concerns": [
+    {
+      "kind": "too_narrow" | "too_loose" | "ambiguous",
+      "detail": "<what's wrong, ≤140 chars>",
+      "suggestion": "<specific fix, ≤180 chars>"
+    }
+  ],
+  "recommended_deadline_extension_days": 0
+}"""
+
+        criteria_str = json.dumps(criteria, default=str)[:3000]
+        eligibility_str = json.dumps(eligibility, default=str)[:1500]
+        docs_str = json.dumps(doc_requirements, default=str)[:1500]
+        reporting_str = json.dumps(reporting_requirements, default=str)[:1500]
+
+        user_msg = (
+            "GRANT DRAFT (about to be published):\n"
+            f"  title: {grant_draft.get('title')}\n"
+            f"  description: {(grant_draft.get('description') or '')[:1500]}\n"
+            f"  budget_usd: {budget_usd}\n"
+            f"  deadline: {deadline}\n"
+            f"  criteria: {criteria_str}\n"
+            f"  eligibility: {eligibility_str}\n"
+            f"  document_requirements: {docs_str}\n"
+            f"  reporting_requirements: {reporting_str}\n\n"
+            f"DETERMINISTIC BASELINE SIGNALS (incorporate or override):\n"
+            f"  {baseline_signals}\n\n"
+            "Return the JSON burden + design analysis now."
+        )
+
+        text = cls._call_claude(
+            system + "\n\n" + schema,
+            user_msg,
+            max_tokens=2800,
+            language=language,
+            role='donor',
+            endpoint='estimate_applicant_burden',
+        )
+
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    parsed['source'] = 'claude'
+                    parsed.setdefault('burden_score', 50)
+                    parsed.setdefault('verdict', 'moderate')
+                    parsed.setdefault('summary', '')
+                    parsed.setdefault('vague_criteria', [])
+                    parsed.setdefault('too_burdensome', [])
+                    parsed.setdefault('simplifications', [])
+                    parsed.setdefault('predicted_quality_issues', [])
+                    parsed.setdefault('eligibility_concerns', [])
+                    parsed.setdefault('recommended_deadline_extension_days', 0)
+                    try:
+                        parsed['burden_score'] = max(0, min(100, int(parsed['burden_score'])))
+                    except (ValueError, TypeError):
+                        parsed['burden_score'] = 50
+                    return parsed
+            except Exception as e:
+                logger.warning(f"estimate_applicant_burden JSON parse failed: {e}")
+
+        # Deterministic fallback: score based on baseline signal count.
+        score = min(100, 30 + 12 * len(baseline_signals) + 4 * len(doc_requirements))
+        verdict = 'low' if score <= 30 else 'moderate' if score <= 60 else 'high'
+        return {
+            'burden_score': score,
+            'verdict': verdict,
+            'summary': (
+                f'AI burden analysis offline — basic check sees '
+                f'{len(baseline_signals)} signal(s).'
+            ),
+            'vague_criteria': [],
+            'too_burdensome': [],
+            'simplifications': [
+                {'area': 'documents', 'current': f'{len(doc_requirements)} doc requirements',
+                 'proposed': 'Reduce to the 3-4 most essential', 'why': 'Lowers barrier for smaller NGOs.'}
+            ] if len(doc_requirements) >= 6 else [],
+            'predicted_quality_issues': baseline_signals,
+            'eligibility_concerns': [],
+            'recommended_deadline_extension_days': 7 if verdict == 'high' else 0,
+            'source': 'fallback',
+        }
+
+    @classmethod
     def generate_grant_brief(
         cls,
         *,
@@ -2198,6 +2423,206 @@ class AIService:
                               for c in criteria],
             'overall_observation': 'Evidence extraction unavailable. Review the responses manually.',
             'source': 'template',
+        }
+
+    @classmethod
+    def generate_reviewer_summary(
+        cls,
+        *,
+        grant,
+        org,
+        application,
+        documents=None,
+        comparable_applications=None,
+        language=None,
+    ):
+        """Phase 10.3 — one-screen reviewer summary + draft rationale.
+
+        The reviewer time-saving move. A reviewer scoring 50 applications
+        wants ONE screen per application: who is this NGO, what's their
+        argument, what's the evidence for and against each criterion,
+        and a draft rationale they can edit instead of writing from
+        scratch.
+
+        Inputs match the reviewer detail page context:
+          grant: dict with criteria, title, description
+          org:   dict with name, mission, sectors, countries
+          application: dict with responses, eligibility_responses
+          documents: list of attached docs
+          comparable_applications: optional list of {id, ngo_name,
+            ai_score, status} for side-by-side reference
+          language: target output language
+
+        Output:
+          {
+            'one_screen_summary': '120-180 word executive read of the application',
+            'who_is_the_ngo': 'one line org positioning',
+            'what_they_propose': 'one line program in 18 words',
+            'why_strong': [str],
+            'why_weak': [str],
+            'evidence_per_criterion': [
+              { 'criterion_key': str,
+                'criterion_label': str,
+                'evidence_for': [{quote, why}],
+                'evidence_against': [{quote, why}],
+                'judgment': 'strong'|'adequate'|'thin' }
+            ],
+            'draft_rationale': '180-260 word rationale the reviewer can edit',
+            'comparable_signal': 'optional sentence on how this stacks vs comparable apps',
+            'red_flags': [str],
+            'source': 'claude'|'fallback'
+          }
+        """
+        grant = grant or {}
+        org = org or {}
+        application = application or {}
+        documents = documents or []
+        comparable_applications = comparable_applications or []
+
+        criteria = grant.get('criteria') or []
+        responses = (application.get('responses') or {})
+        eligibility_responses = (application.get('eligibility_responses') or {})
+
+        system = (
+            "You are Kuja's reviewer co-pilot. A reviewer is about to score "
+            "this application — your job is to compress the entire submission "
+            "into a one-screen read so they don't have to wade through 4,000 "
+            "words to score it. Your output should let them score this in "
+            "5 minutes instead of 25.\n\n"
+            "Be direct. Reviewers are program officers, not editors — they "
+            "want signal, not deference. If a claim is weak, say so. If "
+            "evidence is thin for a criterion, mark it thin.\n\n"
+            "For each criterion, extract:\n"
+            "  evidence_for     — direct quotes from the response that support a strong score\n"
+            "  evidence_against — direct quotes that suggest a weak score (or note 'none provided')\n"
+            "  judgment         — strong / adequate / thin\n\n"
+            "DRAFT RATIONALE: write a 180-260 word reviewer rationale the "
+            "reviewer can EDIT, not paste verbatim. It should reflect what "
+            "the application actually says — strengths, weaknesses, "
+            "evidence quality. Anchor every claim in the application text.\n\n"
+            "RED FLAGS: only list things a reviewer should investigate further "
+            "(numerical inconsistency, capacity-claim mismatch, eligibility "
+            "doubt). Don't fabricate flags to seem thorough.\n\n"
+            "Cap totals: 4 why_strong, 4 why_weak, 3 red_flags, 2 evidence_for "
+            "and 2 evidence_against per criterion.\n\n"
+            "Return ONLY a JSON object matching the schema."
+        )
+
+        schema = """{
+  "one_screen_summary": "<120-180 words executive read>",
+  "who_is_the_ngo": "<one line org positioning, ≤140 chars>",
+  "what_they_propose": "<one line program ≤18 words, ≤120 chars>",
+  "why_strong": ["<≤140 chars each>"],
+  "why_weak": ["<≤140 chars each>"],
+  "evidence_per_criterion": [
+    {
+      "criterion_key": "<key>",
+      "criterion_label": "<human label>",
+      "evidence_for": [
+        {"quote": "<direct quote ≤180 chars>", "why": "<why it supports ≤120 chars>"}
+      ],
+      "evidence_against": [
+        {"quote": "<direct quote ≤180 chars>", "why": "<why it weakens ≤120 chars>"}
+      ],
+      "judgment": "strong" | "adequate" | "thin"
+    }
+  ],
+  "draft_rationale": "<180-260 words, anchored in the application text, edit-ready>",
+  "comparable_signal": "<one sentence on how this stacks vs comparable apps, or empty>",
+  "red_flags": ["<≤140 chars each>"]
+}"""
+
+        responses_str = json.dumps(responses, default=str)[:6500]
+        eligibility_str = json.dumps(eligibility_responses, default=str)[:1500]
+        criteria_str = json.dumps(criteria, default=str)[:2500]
+        docs_str = json.dumps([
+            {'id': d.get('id'), 'filename': d.get('original_filename') or d.get('filename'),
+             'doc_type': d.get('doc_type'), 'score': d.get('score')}
+            for d in (documents or [])
+        ], default=str)[:1500]
+        comparable_str = json.dumps([
+            {'id': a.get('id'), 'ngo_name': a.get('ngo_name'),
+             'ai_score': a.get('ai_score'), 'status': a.get('status')}
+            for a in (comparable_applications or [])[:5]
+        ], default=str)[:1000]
+
+        user_msg = (
+            "GRANT:\n"
+            f"  title: {grant.get('title')}\n"
+            f"  description: {(grant.get('description') or '')[:1200]}\n"
+            f"  criteria: {criteria_str}\n\n"
+            "APPLICANT NGO:\n"
+            f"  name: {org.get('name')}\n"
+            f"  mission: {(org.get('mission') or '')[:600]}\n"
+            f"  sectors: {org.get('sectors')}\n"
+            f"  countries: {org.get('countries')}\n\n"
+            "RESPONSES (full text):\n"
+            f"{responses_str}\n\n"
+            "ELIGIBILITY RESPONSES:\n"
+            f"{eligibility_str}\n\n"
+            "ATTACHED DOCUMENTS:\n"
+            f"{docs_str}\n\n"
+            "COMPARABLE APPLICATIONS (for relative read):\n"
+            f"{comparable_str}\n\n"
+            "Return the JSON reviewer summary now."
+        )
+
+        text = cls._call_claude(
+            system + "\n\n" + schema,
+            user_msg,
+            max_tokens=3500,
+            language=language,
+            role='reviewer',
+            endpoint='generate_reviewer_summary',
+        )
+
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    parsed['source'] = 'claude'
+                    parsed.setdefault('one_screen_summary', '')
+                    parsed.setdefault('who_is_the_ngo', '')
+                    parsed.setdefault('what_they_propose', '')
+                    parsed.setdefault('why_strong', [])
+                    parsed.setdefault('why_weak', [])
+                    parsed.setdefault('evidence_per_criterion', [])
+                    parsed.setdefault('draft_rationale', '')
+                    parsed.setdefault('comparable_signal', '')
+                    parsed.setdefault('red_flags', [])
+                    return parsed
+            except Exception as e:
+                logger.warning(f"generate_reviewer_summary JSON parse failed: {e}")
+
+        # Deterministic fallback: assemble a minimal one-screen view from
+        # the application text alone.
+        return {
+            'one_screen_summary': (
+                f"{org.get('name') or 'Applicant NGO'} from "
+                f"{(org.get('countries') or [None])[0] if isinstance(org.get('countries'), list) else org.get('countries') or 'unspecified location'}, "
+                f"working in {(org.get('sectors') or [None])[0] if isinstance(org.get('sectors'), list) else org.get('sectors') or 'unspecified sectors'}. "
+                "AI summary unavailable — open each criterion below to read the responses."
+            ),
+            'who_is_the_ngo': org.get('mission') or '',
+            'what_they_propose': '',
+            'why_strong': [],
+            'why_weak': [],
+            'evidence_per_criterion': [
+                {
+                    'criterion_key': c.get('key', ''),
+                    'criterion_label': c.get('label', ''),
+                    'evidence_for': [],
+                    'evidence_against': [],
+                    'judgment': 'adequate',
+                }
+                for c in criteria
+            ],
+            'draft_rationale': '',
+            'comparable_signal': '',
+            'red_flags': [],
+            'source': 'fallback',
         }
 
     @classmethod

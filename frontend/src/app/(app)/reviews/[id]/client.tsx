@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/shared/status-badge';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
+import { ReviewerSummary } from '@/components/reviews/ReviewerSummary';
 import {
   ArrowLeft, Send, Cpu, Loader2, FileText, Star, MessageSquare, CheckCircle,
 } from 'lucide-react';
@@ -354,6 +355,25 @@ export default function ReviewDetailClient() {
           )}
         </div>
       </div>
+
+      {/* Phase 10.3 — One-screen reviewer summary + draft rationale.
+          Reviewers click "Generate" to get an executive read of the
+          application + per-criterion evidence + a draft rationale they
+          can edit. The "Use this rationale" button pastes into the
+          highest-weighted criterion's comment field. */}
+      <ReviewerSummary
+        applicationId={appId}
+        onUseRationale={(rationale) => {
+          // Paste into the comment of the highest-weighted criterion the
+          // reviewer hasn't yet commented on.
+          if (criteria.length === 0) return;
+          const target = [...criteria].sort((a, b) => b.weight - a.weight)
+            .find((c) => !scores[c.key]?.comment);
+          const key = target?.key ?? criteria[0].key;
+          updateScore(key, 'comment', rationale);
+          setTab('scores');
+        }}
+      />
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">

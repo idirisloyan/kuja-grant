@@ -9,6 +9,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { GrantBriefPrompt } from '@/components/grants/GrantBriefPrompt';
 import { MedianNGOPreview } from '@/components/grants/MedianNGOPreview';
+import { BurdenEstimate } from '@/components/grants/BurdenEstimate';
 import type { GeneratedGrantBrief } from '@/lib/copilot-api';
 import {
   ArrowLeft,
@@ -1559,6 +1560,28 @@ export default function CreateGrantPage() {
           eligibility: eligibility.filter((e) => e.enabled).map((e) => ({
             key: e.key, label: e.labelKey || e.label, details: e.details,
           })),
+        } : undefined}
+      />
+
+      {/* Phase 10.4 — applicant burden + design quality check before publish.
+          Donor sees a 0-100 burden score, vague criteria, asks that lock out
+          smaller NGOs, and concrete simplifications. Helps donors create
+          better, fairer, lower-burden opportunities. */}
+      <BurdenEstimate
+        grantId={grantId ?? undefined}
+        draft={!grantId ? {
+          title: basic.title,
+          description: basic.description,
+          budget_usd: basic.total_funding ? Number(basic.total_funding) : undefined,
+          deadline: basic.deadline,
+          criteria: criteria.filter((c) => c.label.trim()).map((c) => ({
+            key: c.key, label: c.label, weight: c.weight,
+            description: c.description, max_words: c.max_words,
+          })),
+          eligibility: eligibility.filter((e) => e.enabled).map((e) => ({
+            key: e.key, label: e.labelKey || e.label, details: e.details,
+          })),
+          document_requirements: docReqs.filter((d) => d.enabled),
         } : undefined}
       />
 

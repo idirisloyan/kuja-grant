@@ -741,6 +741,106 @@ export function fetchReportReadiness(reportId: number) {
 }
 
 // ---------------------------------------------------------------------------
+// 13c. Reviewer One-Screen Summary — Phase 10.3
+// ---------------------------------------------------------------------------
+
+export type ReviewerJudgment = 'strong' | 'adequate' | 'thin';
+
+export interface ReviewerEvidenceQuote {
+  quote: string;
+  why: string;
+}
+
+export interface ReviewerCriterionEvidence {
+  criterion_key: string;
+  criterion_label: string;
+  evidence_for: ReviewerEvidenceQuote[];
+  evidence_against: ReviewerEvidenceQuote[];
+  judgment: ReviewerJudgment;
+}
+
+export interface ReviewerSummary {
+  one_screen_summary: string;
+  who_is_the_ngo: string;
+  what_they_propose: string;
+  why_strong: string[];
+  why_weak: string[];
+  evidence_per_criterion: ReviewerCriterionEvidence[];
+  draft_rationale: string;
+  comparable_signal: string;
+  red_flags: string[];
+  source: 'claude' | 'fallback';
+}
+
+export function fetchReviewerSummary(applicationId: number) {
+  return safeCall<{ summary: ReviewerSummary }>(() =>
+    api.post<CopilotResult<{ summary: ReviewerSummary }>>(
+      '/ai/reviewer-summary',
+      { application_id: applicationId },
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 13d. Donor Burden Estimator — Phase 10.4
+// ---------------------------------------------------------------------------
+
+export type BurdenVerdict = 'low' | 'moderate' | 'high';
+
+export interface BurdenVagueCriterion {
+  key: string;
+  label: string;
+  issue: string;
+  sharper: string;
+}
+
+export interface BurdenTooBurdensome {
+  key: string;
+  label: string;
+  ask: string;
+  why_burdensome: string;
+  alternative: string;
+}
+
+export interface BurdenSimplification {
+  area: 'criteria' | 'documents' | 'reporting' | 'eligibility';
+  current: string;
+  proposed: string;
+  why: string;
+}
+
+export interface BurdenEligibilityConcern {
+  kind: 'too_narrow' | 'too_loose' | 'ambiguous';
+  detail: string;
+  suggestion: string;
+}
+
+export interface BurdenEstimate {
+  burden_score: number;
+  verdict: BurdenVerdict;
+  summary: string;
+  vague_criteria: BurdenVagueCriterion[];
+  too_burdensome: BurdenTooBurdensome[];
+  simplifications: BurdenSimplification[];
+  predicted_quality_issues: string[];
+  eligibility_concerns: BurdenEligibilityConcern[];
+  recommended_deadline_extension_days: number;
+  source: 'claude' | 'fallback';
+}
+
+export function fetchBurdenEstimate(input: {
+  grantId?: number;
+  draft?: Record<string, unknown>;
+}) {
+  return safeCall<{ burden: BurdenEstimate }>(() =>
+    api.post<CopilotResult<{ burden: BurdenEstimate }>>(
+      '/ai/burden-estimate',
+      input.grantId ? { grant_id: input.grantId } : { draft: input.draft },
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 13c. Grant Q&A — Phase 4.3 (NGO ↔ donor inline questions)
 // ---------------------------------------------------------------------------
 
