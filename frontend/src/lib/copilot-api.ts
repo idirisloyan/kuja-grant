@@ -113,6 +113,8 @@ export interface NgoReadiness {
     estimated_uplift_pts?: number;
     severity?: string;
     action_type?: NgoActionType;
+    /** Phase 11.6 — specific entity ID for deep-linking. */
+    target_id?: number | null;
   }>;
 }
 
@@ -342,13 +344,29 @@ export interface ApplicationDraft {
   confidence_per_criterion: Record<string, 'high' | 'medium' | 'low'>;
   claim_provenance: DraftClaimProvenance[];
   voice_note?: string;
+  /** Phase 11.2 — IDs of memory items the AI drew from. */
+  memory_used?: number[];
   source: 'claude' | 'template';
+}
+
+/** Phase 11.2 — full memory item info for the "used in this draft" signal. */
+export interface MemoryUsedItem {
+  id: number;
+  kind: string;
+  label: string | null;
+  content: string;
+  source: string | null;
+  tags: string[];
+  confidence: string | null;
+  usage_count: number;
 }
 
 export interface DraftApplicationResult {
   draft: ApplicationDraft;
   application_id: number | null;
   provenance_saved: number;
+  /** Phase 11.2 — full memory items the AI drew from. */
+  memory_used?: MemoryUsedItem[];
 }
 
 export function fetchDraftApplication(input: {
@@ -705,18 +723,24 @@ export interface ReportMissingEvidence {
   evidence_type: 'data' | 'document' | 'narrative';
   what: string;
   where_to_find: string;
+  /** Phase 11.4 — which donor concern this fix resolves. */
+  addresses?: string;
 }
 
 export interface ReportVagueClaim {
   section: string;
   claim: string;
   sharper: string;
+  /** Phase 11.4 — which donor concern this fix resolves. */
+  addresses?: string;
 }
 
 export interface ReportBudgetVarianceUnexplained {
   line: string;
   variance: string;
   suggestion: string;
+  /** Phase 11.4 — which donor concern this fix resolves. */
+  addresses?: string;
 }
 
 export interface ReportReadiness {
@@ -767,6 +791,10 @@ export interface ReviewerSummary {
   why_weak: string[];
   evidence_per_criterion: ReviewerCriterionEvidence[];
   draft_rationale: string;
+  /** Phase 11.3 — per-criterion rationale paste targets. */
+  per_criterion_rationale: Record<string, string>;
+  /** Phase 11.3 — what would meaningfully shift the score. */
+  decision_changers: string[];
   comparable_signal: string;
   red_flags: string[];
   source: 'claude' | 'fallback';

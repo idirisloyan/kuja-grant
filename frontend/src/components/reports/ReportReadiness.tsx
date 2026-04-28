@@ -263,6 +263,7 @@ export function ReportReadiness({ reportId, className, variant = 'button' }: Pro
                             <p className="mt-1 text-xs text-muted-foreground">
                               <span className="font-medium">{t('readiness.where_to_find')}:</span> {m.where_to_find}
                             </p>
+                            {m.addresses && <AddressesNote text={m.addresses} t={t} />}
                           </div>
                         ))}
                       </div>
@@ -289,6 +290,7 @@ export function ReportReadiness({ reportId, className, variant = 'button' }: Pro
                               </span>
                               {v.sharper}
                             </p>
+                            {v.addresses && <AddressesNote text={v.addresses} t={t} />}
                           </div>
                         ))}
                       </div>
@@ -309,6 +311,7 @@ export function ReportReadiness({ reportId, className, variant = 'button' }: Pro
                               <span className="font-medium">{t('readiness.fix_label')}:</span>{' '}
                               {b.suggestion}
                             </p>
+                            {b.addresses && <AddressesNote text={b.addresses} t={t} />}
                           </div>
                         ))}
                       </div>
@@ -344,6 +347,27 @@ function Section({
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       </div>
       {children}
+    </div>
+  );
+}
+
+/**
+ * AddressesNote — Phase 11.4
+ *
+ * Renders the "this fix resolves: <concern>" line below each fix item
+ * so NGOs can see WHAT donor concern they're closing, not just a
+ * generic to-do. The team's polish ask: "explanation of what concern
+ * each fix resolves."
+ */
+function AddressesNote({
+  text, t,
+}: { text: string; t: (key: string) => string }) {
+  return (
+    <div className="mt-2 flex items-start gap-1.5 rounded border-l-2 border-[hsl(var(--kuja-clay))]/50 bg-[hsl(var(--kuja-clay))]/5 px-2 py-1">
+      <span className="text-[10px] uppercase tracking-wider font-bold text-[hsl(var(--kuja-clay))] flex-shrink-0">
+        {t('report_readiness.addresses')}:
+      </span>
+      <span className="text-xs text-foreground">{text}</span>
     </div>
   );
 }

@@ -24,12 +24,13 @@
  */
 
 import { useState } from 'react';
-import { Sparkles, Loader2, X, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Sparkles, Loader2, X, CheckCircle2, AlertTriangle, Brain } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useApiError } from '@/lib/hooks/use-api-error';
 import {
   fetchDraftApplication,
   type ApplicationDraft,
+  type MemoryUsedItem,
 } from '@/lib/copilot-api';
 import { AIConfidenceBadge } from '@/components/shared/ai-confidence-badge';
 import { ProvenanceChips } from '@/components/shared/provenance-chips';
@@ -51,6 +52,7 @@ export function DraftCoAuthor({ grantId, applicationId, onApplied, className = '
   const [replaceExisting, setReplaceExisting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState<ApplicationDraft | null>(null);
+  const [memoryUsed, setMemoryUsed] = useState<MemoryUsedItem[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const briefMaxLen = 500;
@@ -72,6 +74,7 @@ export function DraftCoAuthor({ grantId, applicationId, onApplied, className = '
         return;
       }
       setDraft(res.data.draft);
+      setMemoryUsed(res.data.memory_used ?? []);
       if (res.data.application_id && onApplied) {
         onApplied(res.data.draft);
       }
@@ -181,6 +184,43 @@ export function DraftCoAuthor({ grantId, applicationId, onApplied, className = '
 
       {draft && (
         <div className="space-y-3">
+          {/* Phase 11.2 — "Drew on N facts from your memory" transparency.
+              The team's spec: "visible proof that memory is being used" +
+              "reused in this draft signals." Each item shows kind+label so
+              the NGO sees exactly what the AI pulled. */}
+          {memoryUsed.length > 0 && (
+            <div className="rounded-md border border-[hsl(var(--kuja-clay))]/30 bg-[hsl(var(--kuja-clay))]/5 p-3">
+              <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-[hsl(var(--kuja-clay))]">
+                <Brain className="h-3.5 w-3.5" />
+                {t('coauthor.memory_used_title', { n: memoryUsed.length })}
+              </div>
+              <ul className="space-y-1">
+                {memoryUsed.map((m) => (
+                  <li
+                    key={m.id}
+                    className="flex items-start gap-2 text-[11px] text-foreground"
+                  >
+                    <span className="mt-0.5 inline-flex items-center rounded border border-border bg-background px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground flex-shrink-0">
+                      {m.kind}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="font-semibold">{m.label || '—'}</span>
+                      {m.label && ' — '}
+                      <span className="text-muted-foreground">
+                        {m.content.length > 120
+                          ? `${m.content.slice(0, 117)}…`
+                          : m.content}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[10px] italic text-muted-foreground">
+                {t('coauthor.memory_used_note')}
+              </p>
+            </div>
+          )}
+
           {draft.voice_note && (
             <div className="rounded-md border border-border bg-background p-2.5 text-[11px] text-muted-foreground">
               <span className="font-semibold text-foreground">

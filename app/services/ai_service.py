@@ -1551,22 +1551,30 @@ class AIService:
         prior_docs_str = json.dumps(prior_documents, default=str)[:4000]
         existing_str = json.dumps(existing_responses, default=str)[:3000]
 
-        # Phase 10.5 — reusable organizational memory. The route handler
-        # populates org['memory_items'] (or omits it). When present, we
-        # render those items as a compact prompt block so the AI cites
-        # them via source_kind='profile'.
+        # Phase 10.5 + 11.2 — reusable organizational memory.
+        # The route handler populates org['memory_items'] (or omits it).
+        # Each item is rendered with a stable ID tag `[mem:<id>]` so the
+        # AI can return a `memory_used` array of IDs it actually drew
+        # from. This powers the Phase 11.2 "drew on N facts from your
+        # memory" transparency signal — the team's ask for "visible
+        # proof that memory is being used" + "reused in this draft."
         memory_items = org.get('memory_items') or []
         memory_block = ''
         if memory_items:
             lines = [
                 "ORG MEMORY — reusable facts/narratives/evidence the org has accumulated. "
-                "Cite via source_kind='profile' when used:"
+                "Cite via source_kind='profile' when used. ALSO: list every memory ID "
+                "you drew from in the `memory_used` array of the JSON output."
             ]
             for m in memory_items[:12]:
                 snippet = (m.get('content') or '').strip().replace('\n', ' ')
                 if len(snippet) > 200:
                     snippet = snippet[:197] + '…'
-                lines.append(f"  • [{m.get('kind')}] {m.get('label') or ''} — {snippet}")
+                mem_id = m.get('id')
+                lines.append(
+                    f"  • [mem:{mem_id}] [{m.get('kind')}] "
+                    f"{m.get('label') or ''} — {snippet}"
+                )
             memory_block = '\n'.join(lines)
 
         # Phase 1.2 — extract a deterministic voice profile from the NGO's
@@ -1700,7 +1708,8 @@ class AIService:
     },
     ...
   ],
-  "voice_note": "<one sentence on tonal choices, ≤120 chars>"
+  "voice_note": "<one sentence on tonal choices, ≤120 chars>",
+  "memory_used": [<list of integer memory IDs you drew from, e.g. [42, 17, 88]; empty array if none>]
 }"""
 
         user_msg = (
@@ -1745,6 +1754,22 @@ class AIService:
                     parsed.setdefault('confidence_per_criterion', {})
                     parsed.setdefault('claim_provenance', [])
                     parsed.setdefault('voice_note', '')
+                    parsed.setdefault('memory_used', [])
+                    # Coerce + dedupe memory IDs to ints — Claude sometimes
+                    # returns them as strings or includes IDs that weren't
+                    # in the prompt.
+                    valid_ids = {m.get('id') for m in (memory_items or []) if m.get('id') is not None}
+                    seen = set()
+                    coerced = []
+                    for raw in (parsed.get('memory_used') or []):
+                        try:
+                            n = int(raw)
+                        except (TypeError, ValueError):
+                            continue
+                        if n in valid_ids and n not in seen:
+                            seen.add(n)
+                            coerced.append(n)
+                    parsed['memory_used'] = coerced
                     return parsed
             except Exception as e:
                 logger.warning(f"draft_application JSON parse failed: {e}")
@@ -1756,6 +1781,7 @@ class AIService:
             'confidence_per_criterion': {c.get('key', f'criterion_{i+1}'): 'low' for i, c in enumerate(criteria)},
             'claim_provenance': [],
             'voice_note': 'AI draft unavailable — start from your strongest prior application.',
+            'memory_used': [],
             'source': 'template',
         }
 
@@ -2099,6 +2125,13 @@ class AIService:
             "  0-49   — material issues; not ready\n\n"
             "Verdict matches band: ready / needs_work / not_ready.\n\n"
             "Cap totals: max 5 donor_concerns, max 4 missing_evidence, max 4 vague_claims, max 3 budget_variance_unexplained, max 4 strengths.\n\n"
+            "PHASE 11.4 — concern linkage: every fix item (missing_evidence, "
+            "vague_claims, budget_variance_unexplained) MUST include an "
+            "`addresses` field naming the specific donor concern it resolves. "
+            "Phrase as a plain sentence the NGO can read: "
+            "'Resolves the donor's question about whether the 1,200 figure is "
+            "verified.' This is the team's polish ask: NGOs should see what "
+            "concern each fix is closing, not just a generic to-do list.\n\n"
             "Return ONLY a JSON object matching the schema."
         )
 
@@ -2119,21 +2152,24 @@ class AIService:
       "section": "<section name>",
       "evidence_type": "data" | "document" | "narrative",
       "what": "<what's missing, ≤140 chars>",
-      "where_to_find": "<where in the org's records to look, ≤140 chars>"
+      "where_to_find": "<where in the org's records to look, ≤140 chars>",
+      "addresses": "<which donor concern this fix resolves, ≤180 chars>"
     }
   ],
   "vague_claims": [
     {
       "section": "<section name>",
       "claim": "<vague claim from the report, ≤160 chars>",
-      "sharper": "<concrete reframing using available data, ≤220 chars>"
+      "sharper": "<concrete reframing using available data, ≤220 chars>",
+      "addresses": "<which donor concern this fix resolves, ≤180 chars>"
     }
   ],
   "budget_variance_unexplained": [
     {
       "line": "<budget line or category>",
       "variance": "<short description, ≤120 chars>",
-      "suggestion": "<what to add to explain it, ≤180 chars>"
+      "suggestion": "<what to add to explain it, ≤180 chars>",
+      "addresses": "<which donor concern this fix resolves, ≤180 chars>"
     }
   ],
   "strengths": [
@@ -2519,11 +2555,20 @@ class AIService:
             "reviewer can EDIT, not paste verbatim. It should reflect what "
             "the application actually says — strengths, weaknesses, "
             "evidence quality. Anchor every claim in the application text.\n\n"
+            "PER-CRITERION RATIONALE: separately, for each criterion provide "
+            "a 60-100 word rationale tightly anchored in that criterion's "
+            "evidence_for/evidence_against. The reviewer pastes these directly "
+            "into the per-criterion comment fields with one click — saves "
+            "rewriting the same observation 6 times.\n\n"
+            "DECISION CHANGERS: list 2-4 specific pieces of new information "
+            "that would meaningfully shift the score. Be concrete: 'verified "
+            "beneficiary count from baseline study' beats 'more evidence.' "
+            "These help the reviewer decide whether to follow up before scoring.\n\n"
             "RED FLAGS: only list things a reviewer should investigate further "
             "(numerical inconsistency, capacity-claim mismatch, eligibility "
             "doubt). Don't fabricate flags to seem thorough.\n\n"
             "Cap totals: 4 why_strong, 4 why_weak, 3 red_flags, 2 evidence_for "
-            "and 2 evidence_against per criterion.\n\n"
+            "and 2 evidence_against per criterion, 4 decision_changers.\n\n"
             "Return ONLY a JSON object matching the schema."
         )
 
@@ -2547,6 +2592,12 @@ class AIService:
     }
   ],
   "draft_rationale": "<180-260 words, anchored in the application text, edit-ready>",
+  "per_criterion_rationale": {
+    "<criterion_key>": "<60-100 word rationale specific to this criterion, anchored in evidence_for/against above>"
+  },
+  "decision_changers": [
+    "<≤180 chars each — what specific NEW information would meaningfully shift the score? e.g. 'Verified beneficiary count from independent baseline study would move impact from adequate→strong'>"
+  ],
   "comparable_signal": "<one sentence on how this stacks vs comparable apps, or empty>",
   "red_flags": ["<≤140 chars each>"]
 }"""
@@ -2609,6 +2660,8 @@ class AIService:
                     parsed.setdefault('why_weak', [])
                     parsed.setdefault('evidence_per_criterion', [])
                     parsed.setdefault('draft_rationale', '')
+                    parsed.setdefault('per_criterion_rationale', {})
+                    parsed.setdefault('decision_changers', [])
                     parsed.setdefault('comparable_signal', '')
                     parsed.setdefault('red_flags', [])
                     return parsed
@@ -2639,6 +2692,8 @@ class AIService:
                 for c in criteria
             ],
             'draft_rationale': '',
+            'per_criterion_rationale': {},
+            'decision_changers': [],
             'comparable_signal': '',
             'red_flags': [],
             'source': 'fallback',

@@ -67,14 +67,24 @@ function mapActionType(t: string | undefined): ActionKind {
   }
 }
 
-function actionHref(kind: ActionKind): string | undefined {
+function actionHref(kind: ActionKind, targetId?: number | null): string | undefined {
+  // Phase 11.6 — deep-link to a specific entity when the AI tagged one.
+  // The team's spec: "make every AI card/action recommendation clickable
+  // into the exact follow-up step." When target_id is present, route to
+  // the detail page for that entity; otherwise fall back to the list.
   switch (kind) {
-    case 'apply': return '/grants/';
-    case 'report': return '/reports/';
-    case 'profile': return '/organizations/profile/';
-    case 'assessment': return '/assessments/';
-    case 'fix': return '/applications/';
-    default: return undefined;
+    case 'apply':
+      return targetId ? `/apply/${targetId}/` : '/grants/';
+    case 'report':
+      return '/reports/';
+    case 'profile':
+      return '/organizations/profile/';
+    case 'assessment':
+      return targetId ? `/assessments/wizard/?id=${targetId}` : '/assessments/';
+    case 'fix':
+      return targetId ? `/applications/${targetId}/` : '/applications/';
+    default:
+      return undefined;
   }
 }
 
@@ -107,7 +117,7 @@ export function ThisWeekHome() {
         kind,
         title: a.title,
         detail: a.detail,
-        href: actionHref(kind),
+        href: actionHref(kind, a.target_id),
         severity: (a.severity as 'high' | 'medium' | 'low') ?? 'medium',
         uplift: a.estimated_uplift_pts,
       };

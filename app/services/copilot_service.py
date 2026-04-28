@@ -289,7 +289,17 @@ class CopilotService:
             "  - improve_application: NGO has a draft application that needs "
             "stronger content before submission\n"
             "  - other: catch-all when none of the above fits\n"
-            "Pick the most direct action_type; do not default to 'other' unless nothing fits."
+            "Pick the most direct action_type; do not default to 'other' unless nothing fits.\n\n"
+            "PHASE 11.6 — when the action targets a SPECIFIC application, "
+            "report, or grant present in the snapshot, include `target_id` "
+            "(integer) so the UI deep-links to that exact entity instead of "
+            "the list page. Use the application/report/grant id from RECENT "
+            "APPLICATIONS or PENDING REPORTS as appropriate. Omit `target_id` "
+            "if the action is generic (e.g. 'browse open grants').\n\n"
+            "PHASE 11.5 — TONE: NGO copy must coach, not judge. Replace "
+            "'you are missing X' with 'here's how to strengthen this.' Replace "
+            "'this is wrong' with 'sharper version.' Highlight progress and "
+            "momentum, not gaps. Use confidence-building phrasing."
         )
         user = (
             f"ORG SNAPSHOT:\n{json.dumps(org_summary, indent=2)[:8000]}\n\n"
@@ -308,7 +318,8 @@ class CopilotService:
   ],
   "next_actions": [
     {"title": "...", "detail": "...", "estimated_uplift_pts": 8,
-     "action_type": "apply_grant|submit_report|complete_assessment|upload_document|update_profile|improve_application|other"}
+     "action_type": "apply_grant|submit_report|complete_assessment|upload_document|update_profile|improve_application|other",
+     "target_id": null}
   ]
 }"""
         return cls._call_json(system, user, schema, max_tokens=2000, lang=lang)

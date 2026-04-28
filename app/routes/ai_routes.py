@@ -882,11 +882,32 @@ def api_ai_draft_application():
             db.session.rollback()
             logger.error(f"Failed to save AI draft to application {application.id}: {e}")
 
+    # Phase 11.2 — record which memory items the draft actually drew from
+    # so the NGO sees a "used in this draft" signal AND the items rise in
+    # the usage_count ranking for next time.
+    memory_used_ids = parsed.get('memory_used') or []
+    memory_used_summary = []
+    if memory_used_ids:
+        try:
+            from app.services import org_memory_service as oms
+            from app.models.org_memory import OrgMemory
+            oms.mark_used(memory_used_ids)
+            # Look up the full item rows for the front-end so the NGO sees
+            # exactly what the AI drew on (kind + label + content excerpt).
+            rows = OrgMemory.query.filter(
+                OrgMemory.id.in_(memory_used_ids),
+                OrgMemory.org_id == current_user.org_id,
+            ).all()
+            memory_used_summary = [r.to_dict() for r in rows]
+        except Exception as e:
+            logger.debug(f"memory_used summary failed: {e}")
+
     return jsonify({
         'success': True,
         'draft': parsed,
         'application_id': application.id if application else None,
         'provenance_saved': provenance_saved,
+        'memory_used': memory_used_summary,
         'ai_transparency': {
             'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
             'disclaimer': 'AI-drafted application — review every claim before submitting.',

@@ -369,9 +369,17 @@ export default function ReviewDetailClient() {
           highest-weighted criterion's comment field. */}
       <ReviewerSummary
         applicationId={appId}
-        onUseRationale={(rationale) => {
-          // Paste into the comment of the highest-weighted criterion the
-          // reviewer hasn't yet commented on.
+        onUseRationale={(rationale, criterionKey) => {
+          // Phase 11.3 — when the AI provides a per-criterion rationale,
+          // the panel passes the criterion key so we paste into THAT row.
+          // Without a key (legacy "Use this rationale" for the overall
+          // draft), target the highest-weighted criterion the reviewer
+          // hasn't yet commented on.
+          if (criterionKey) {
+            updateScore(criterionKey, 'comment', rationale);
+            setTab('scores');
+            return;
+          }
           if (criteria.length === 0) return;
           const target = [...criteria].sort((a, b) => b.weight - a.weight)
             .find((c) => !scores[c.key]?.comment);

@@ -29,8 +29,14 @@ import { toast } from 'sonner';
 
 interface Props {
   applicationId: number | null;
-  /** When the reviewer clicks "Use this rationale", paste it into a comment field. */
-  onUseRationale?: (rationale: string) => void;
+  /**
+   * Paste a rationale into the score grid. When `criterionKey` is omitted,
+   * the parent should target the highest-weighted criterion (legacy
+   * behavior). When provided (Phase 11.3), paste into THAT criterion's
+   * comment field — used by the per-criterion "Paste here" buttons so
+   * reviewers can drop AI rationale into each row in one click.
+   */
+  onUseRationale?: (rationale: string, criterionKey?: string) => void;
   className?: string;
 }
 
@@ -230,9 +236,12 @@ export function ReviewerSummary({ applicationId, onUseRationale, className }: Pr
               </div>
               {summary.evidence_per_criterion.map((c, i) => {
                 const tone = judgmentTone[c.judgment];
+                // Phase 11.3 — per-criterion rationale paste target.
+                const perCritRationale =
+                  summary.per_criterion_rationale?.[c.criterion_key];
                 return (
                   <div key={i} className="rounded-md border border-border bg-background/80 p-2.5">
-                    <div className="flex items-center gap-2 mb-1.5">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                       <span className="text-xs font-semibold text-foreground">{c.criterion_label || c.criterion_key}</span>
                       <span
                         className={cn(
@@ -243,6 +252,16 @@ export function ReviewerSummary({ applicationId, onUseRationale, className }: Pr
                       >
                         {tone.label}
                       </span>
+                      {perCritRationale && onUseRationale && (
+                        <button
+                          type="button"
+                          onClick={() => onUseRationale(perCritRationale, c.criterion_key)}
+                          className="ml-auto inline-flex items-center gap-1 rounded bg-[hsl(var(--kuja-spark))] px-2 py-0.5 text-[10px] font-medium text-white hover:opacity-90"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          {t('reviewer_summary.paste_into_this')}
+                        </button>
+                      )}
                     </div>
                     {c.evidence_for.length > 0 && (
                       <div className="space-y-1 mb-1.5">
@@ -264,9 +283,42 @@ export function ReviewerSummary({ applicationId, onUseRationale, className }: Pr
                         ))}
                       </div>
                     )}
+                    {/* Phase 11.3 — show the per-criterion rationale below
+                        evidence so the reviewer can preview before pasting. */}
+                    {perCritRationale && (
+                      <div className="mt-2 rounded border border-dashed border-[hsl(var(--kuja-spark))]/30 bg-[hsl(var(--kuja-spark-soft))]/40 p-2">
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-[hsl(var(--kuja-spark))] mb-0.5">
+                          {t('reviewer_summary.per_crit_rationale')}
+                        </div>
+                        <p className="text-xs text-foreground italic leading-relaxed">{perCritRationale}</p>
+                      </div>
+                    )}
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Phase 11.3 — Decision changers: what new info would shift score. */}
+          {summary.decision_changers && summary.decision_changers.length > 0 && (
+            <div className="rounded-md border border-[hsl(var(--kuja-clay))]/30 bg-[hsl(var(--kuja-clay))]/5 p-2.5">
+              <div className="flex items-center gap-1 mb-1.5">
+                <Sparkles className="h-3 w-3 text-[hsl(var(--kuja-clay))]" />
+                <span className="text-[10px] uppercase tracking-wider font-bold text-[hsl(var(--kuja-clay))]">
+                  {t('reviewer_summary.decision_changers')}
+                </span>
+              </div>
+              <ul className="space-y-1 text-xs text-foreground">
+                {summary.decision_changers.map((s, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-[hsl(var(--kuja-clay))]" />
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1.5 text-[10px] italic text-muted-foreground">
+                {t('reviewer_summary.decision_changers_hint')}
+              </p>
             </div>
           )}
 
