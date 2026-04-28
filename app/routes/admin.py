@@ -731,6 +731,220 @@ def api_admin_trigger_rescreening():
 
 
 # ===========================================================================
+# Phase 9.4 — performance budgets + alerts
+# ===========================================================================
+
+# Per-endpoint latency budgets (ms). Anything above the p95 budget for the
+# trailing window triggers a regression flag in the dashboard. Tunable.
+PERF_BUDGETS_P95_MS: dict[str, int] = {
+    'draft_application':     12000,
+    'draft_report':          12000,
+    'generate_grant_brief':   8000,
+    'median_ngo_preview':    10000,
+    'compliance_preempt':     8000,
+    'strengthen_section':     6000,
+    'extract_evidence':       6000,
+    'score_one_criterion':    5000,
+    'chat':                   4000,
+    'guidance':               4000,
+}
+
+
+@admin_bp.route('/admin/perf-budgets', methods=['GET'])
+@login_required
+def api_admin_perf_budgets():
+    """Per-endpoint latency vs budget. Used by the observability page.
+
+    Query: ?hours=24 (default) | max 168.
+    """
+    if current_user.role != 'admin':
+        from app.utils.api_errors import error_response
+        return error_response('auth.admin_only', 403)
+
+    try:
+        hours = int(request.args.get('hours', 24))
+    except (TypeError, ValueError):
+        hours = 24
+    hours = max(1, min(168, hours))
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+
+    out = []
+    try:
+        rows = db.session.execute(
+            text("""
+                SELECT
+                    endpoint,
+                    COUNT(*) AS total,
+                    PERCENTILE_DISC(0.50) WITHIN GROUP (ORDER BY duration_ms)::INT AS p50,
+                    PERCENTILE_DISC(0.95) WITHIN GROUP (ORDER BY duration_ms)::INT AS p95,
+                    PERCENTILE_DISC(0.99) WITHIN GROUP (ORDER BY duration_ms)::INT AS p99
+                FROM ai_call_logs
+                WHERE created_at >= :cutoff
+                GROUP BY endpoint
+                HAVING COUNT(*) >= 3
+                ORDER BY total DESC
+            """),
+            {"cutoff": cutoff},
+        ).fetchall()
+
+        for r in rows:
+            endpoint = r[0]
+            budget = PERF_BUDGETS_P95_MS.get(endpoint, 12000)
+            p95 = r[3]
+            over = (p95 is not None) and (p95 > budget)
+            out.append({
+                'endpoint': endpoint,
+                'total': r[1],
+                'p50_ms': r[2],
+                'p95_ms': p95,
+                'p99_ms': r[4],
+                'budget_p95_ms': budget,
+                'over_budget': over,
+                'over_pct': round(100 * (p95 - budget) / budget, 1) if (over and p95) else 0.0,
+            })
+    except Exception as e:
+        logger.error(f"perf budgets query failed: {e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+    return jsonify({
+        'success': True,
+        'window_hours': hours,
+        'budgets': out,
+        'alerts': [r for r in out if r.get('over_budget')],
+    })
+
+
+# ===========================================================================
+# Phase 9.3 — A/B testing rail (experiments + outcomes)
+# ===========================================================================
+
+@admin_bp.route('/admin/experiments', methods=['GET'])
+@login_required
+def api_admin_experiments():
+    """List defined experiments + last-30d winrates per variant."""
+    if current_user.role != 'admin':
+        from app.utils.api_errors import error_response
+        return error_response('auth.admin_only', 403)
+    from app.utils.ab_testing import list_experiments, get_winrates
+    out = []
+    for spec in list_experiments():
+        out.append({**spec, 'winrates': get_winrates(spec['key'], days=30)})
+    return jsonify({'success': True, 'experiments': out})
+
+
+# ===========================================================================
+# Phase 8.1 — anonymized cross-grant pattern library
+# ===========================================================================
+
+@admin_bp.route('/admin/patterns', methods=['GET'])
+@login_required
+def api_admin_patterns():
+    """Anonymized cross-grant aggregates: which patterns recur in winning
+    applications, which sectors have highest award rates, what response
+    word counts correlate with awards.
+
+    All counts are aggregated; no per-NGO data is returned. Available to
+    admins; donors see their own portfolio via /admin/portfolio-diagnostics.
+    """
+    if current_user.role != 'admin':
+        from app.utils.api_errors import error_response
+        return error_response('auth.admin_only', 403)
+
+    try:
+        from sqlalchemy import text
+        # Awards by sector (across ALL donors, anonymized).
+        sector_rows = db.session.execute(
+            text("""
+                SELECT
+                    UNNEST(string_to_array(LOWER(COALESCE(g.sectors::text, '')), ',')) AS sector,
+                    COUNT(*) AS submissions,
+                    SUM(CASE WHEN a.status = 'awarded' THEN 1 ELSE 0 END) AS awarded
+                FROM applications a
+                JOIN grants g ON g.id = a.grant_id
+                WHERE a.status IN ('submitted', 'awarded', 'rejected', 'scored')
+                  AND a.created_at >= NOW() - INTERVAL '180 days'
+                GROUP BY sector
+                HAVING COUNT(*) >= 3
+                ORDER BY awarded DESC NULLS LAST
+                LIMIT 20
+            """)
+        ).fetchall()
+    except Exception as e:
+        logger.debug(f"sector pattern query failed: {e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        sector_rows = []
+
+    sector_patterns = []
+    for r in sector_rows:
+        s = (r[0] or '').strip().strip('[]"\\') if r[0] else ''
+        if not s or s in ('null', '{}'):
+            continue
+        subs = int(r[1] or 0)
+        awarded = int(r[2] or 0)
+        sector_patterns.append({
+            'sector': s,
+            'submissions': subs,
+            'awarded': awarded,
+            'award_rate_pct': round(100 * awarded / subs, 1) if subs > 0 else 0.0,
+        })
+
+    # Award rate by application word-count bucket. Establishes the rough
+    # 'sweet spot' so applicant guidance can lean evidence-backed.
+    try:
+        from sqlalchemy import text
+        wc_rows = db.session.execute(
+            text("""
+                SELECT
+                    CASE
+                        WHEN length(coalesce(responses::text, '')) < 2000  THEN '<2k chars'
+                        WHEN length(coalesce(responses::text, '')) < 5000  THEN '2-5k chars'
+                        WHEN length(coalesce(responses::text, '')) < 10000 THEN '5-10k chars'
+                        WHEN length(coalesce(responses::text, '')) < 20000 THEN '10-20k chars'
+                        ELSE '20k+ chars'
+                    END AS bucket,
+                    COUNT(*) AS submissions,
+                    SUM(CASE WHEN status = 'awarded' THEN 1 ELSE 0 END) AS awarded
+                FROM applications
+                WHERE status IN ('submitted', 'awarded', 'rejected', 'scored')
+                GROUP BY bucket
+                ORDER BY bucket
+            """)
+        ).fetchall()
+    except Exception as e:
+        logger.debug(f"length pattern query failed: {e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        wc_rows = []
+
+    length_patterns = []
+    for r in wc_rows:
+        subs = int(r[1] or 0)
+        awarded = int(r[2] or 0)
+        length_patterns.append({
+            'bucket': r[0],
+            'submissions': subs,
+            'awarded': awarded,
+            'award_rate_pct': round(100 * awarded / subs, 1) if subs > 0 else 0.0,
+        })
+
+    return jsonify({
+        'success': True,
+        'window_days': 180,
+        'sector_patterns': sector_patterns,
+        'length_patterns': length_patterns,
+    })
+
+
+# ===========================================================================
 # Reviewer drift detection (Phase 8.3) — admin only
 # ===========================================================================
 
