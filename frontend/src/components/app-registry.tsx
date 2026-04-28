@@ -41,9 +41,71 @@ function installRSCConsoleSilencer() {
   };
 }
 
+// Phase 12 — stale-build auto-reload.
+// The team's Apr 28 retest hit a stale browser cache: their HTML was
+// pinned to build yA8uSRLL while the live deploy was already on
+// w3iyZdrPc. The HTML headers correctly say `cache-control: no-store`,
+// but Playwright/persistent browser sessions can still hold the parsed
+// document. To guarantee that fresh deploys land instantly without the
+// user clicking "hard refresh," we poll the index HTML on visibility
+// change + focus and force a reload when the server's buildId differs
+// from the buildId baked into our currently-loaded page.
+//
+// The check uses HEAD-equivalent fetch with `cache: 'no-store'`. Tiny
+// payload, fires only when the user returns to the tab — never during
+// active interaction.
+function installStaleBuildDetector() {
+  if (typeof window === 'undefined') return;
+  const w = window as unknown as {
+    __staleBuildDetectorInstalled?: boolean;
+    __NEXT_DATA__?: { buildId?: string };
+  };
+  if (w.__staleBuildDetectorInstalled) return;
+  w.__staleBuildDetectorInstalled = true;
+
+  const ourBuildId = w.__NEXT_DATA__?.buildId;
+  if (!ourBuildId) return;
+
+  let checking = false;
+  const check = async () => {
+    if (checking || document.visibilityState !== 'visible') return;
+    checking = true;
+    try {
+      const res = await fetch('/?_buildcheck=1', {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
+      if (!res.ok) return;
+      const text = await res.text();
+      // The buildId appears in __NEXT_DATA__ as `"buildId":"<id>"`
+      const match = /"buildId":"([^"]+)"/.exec(text);
+      if (match && match[1] && match[1] !== ourBuildId) {
+        // Reload bypassing the cache. Use a query string to defeat any
+        // intermediate caching layer and force a clean fetch.
+        const url = new URL(window.location.href);
+        url.searchParams.set('_v', match[1].slice(0, 8));
+        window.location.replace(url.toString());
+      }
+    } catch {
+      // Network blip; try again next visibility change.
+    } finally {
+      checking = false;
+    }
+  };
+
+  document.addEventListener('visibilitychange', check);
+  window.addEventListener('focus', check);
+  // Also check 90 seconds after first paint to catch users who never
+  // tab away — captures the case where the user is mid-session when
+  // a deploy lands.
+  window.setTimeout(check, 90_000);
+}
+
 export function AppRegistry({ children }: { children: ReactNode }) {
   useEffect(() => {
     installRSCConsoleSilencer();
+    installStaleBuildDetector();
   }, []);
 
   return (
