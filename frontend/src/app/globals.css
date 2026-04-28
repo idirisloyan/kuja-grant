@@ -327,3 +327,54 @@ button { word-break: keep-all; overflow-wrap: anywhere; }
    reading your application now" can hit 35+ chars in some langs). Allow
    wrapping inside badges while keeping pill shape. */
 .kuja-severity { white-space: normal; max-width: 100%; }
+
+/* ================================================================
+   Phase 6.2 — additional RTL polish
+   --------------------------------------------------------------
+   Components added during the category-defining build that need
+   directional fixes when rendered in Arabic.
+   ================================================================ */
+
+/* Activity timeline (Phase 5.3): the vertical line + dot anchor were
+   built with explicit `border-l` and `-left-[33px]` Tailwind classes.
+   In RTL the line should sit on the right and the dot offset flips. */
+[dir="rtl"] ol.relative.border-l { border-left: 0; border-right: 1px solid hsl(var(--border)); padding-left: 0; padding-right: 1.25rem; }
+[dir="rtl"] ol.relative.border-l > li > span.absolute { left: auto; right: -33px; }
+
+/* Provenance chips (Phase 5.1) and confidence badges already use
+   inline-flex with logical gap utilities, so they flip cleanly. The
+   citation chips with leading icon + text need their margin-end logic
+   adjusted in RTL because lucide icons aren't symmetrical. */
+[dir="rtl"] .lucide { /* lucide icons are direction-agnostic line drawings */ }
+
+/* Score breakdown progress bars (Phase 5.2) fill from the start side.
+   Tailwind's h-full bg-* div uses `width: %` which fills LTR; in RTL
+   we want the fill to start from the right. */
+[dir="rtl"] .h-1.rounded-full.bg-muted > div { margin-left: auto; }
+
+/* Match card top-strength / top-blocker rows use `text-left`-style
+   icon placement that should flip. Those rows already use lucide icons
+   inside flex containers, so the flex-direction-aware utilities handle
+   most of it; this catches stragglers where margin-right was used. */
+[dir="rtl"] [data-rtl-mirror] { transform: scaleX(-1); }
+
+/* ================================================================
+   Phase 7.4 — visual density consistency
+   --------------------------------------------------------------
+   Ship a small set of utility classes the new components can opt into
+   so density stays consistent across surfaces. Tailwind's spacing
+   tokens are still the source of truth; these just label common
+   patterns we use across cards.
+   ================================================================ */
+
+/* Compact density: card padding + reduced gap for dense surfaces like
+   the reviewer scoring grid and the matches feed. Existing components
+   use this informally; adding a single class makes the choice explicit. */
+.kuja-density-compact { padding: 0.75rem; gap: 0.5rem; }
+
+/* Comfortable density: default for narrative surfaces. */
+.kuja-density-comfortable { padding: 1.25rem; gap: 1rem; }
+
+/* Roomy density: for hero cards, verdict surfaces, and the donor wizard
+   review step where breathing room matters. */
+.kuja-density-roomy { padding: 1.75rem; gap: 1.25rem; }
