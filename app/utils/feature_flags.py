@@ -47,21 +47,27 @@ DEFAULT_FLAGS: dict[str, dict[str, Any]] = {
     'ai.grant_brief_generator': {'kind': 'bool', 'default': False, 'description': 'Auto-generated grant brief (Phase 2.2)'},
     'ai.cross_grant_patterns': {'kind': 'bool', 'default': False, 'description': 'Anonymized cross-grant pattern library (Phase 8.1)'},
     'ai.compliance_preempt':   {'kind': 'bool', 'default': False, 'description': 'Pre-submit compliance pre-emption (Phase 8.2)'},
-    'ai.submission_readiness': {'kind': 'bool', 'default': False, 'description': 'Pre-submit AI readiness check on applications (Phase 10.1)'},
-    'ai.report_readiness':     {'kind': 'bool', 'default': False, 'description': 'Pre-submit AI readiness check on reports (Phase 10.2)'},
-    'ai.reviewer_summary':     {'kind': 'bool', 'default': False, 'description': 'One-screen reviewer summary + draft rationale (Phase 10.3)'},
-    'ai.burden_estimator':     {'kind': 'bool', 'default': False, 'description': 'Donor pre-publish burden estimate + simplifications (Phase 10.4)'},
-    'ai.org_memory':           {'kind': 'bool', 'default': False, 'description': 'Reusable NGO organizational memory pulled into AI (Phase 10.5)'},
+    # Phase 10 AI services — all have deterministic fallbacks and are
+    # rate-limited; safe to default ON so users actually experience the
+    # category-defining features rather than the gated empty-state.
+    'ai.submission_readiness': {'kind': 'bool', 'default': True,  'description': 'Pre-submit AI readiness check on applications (Phase 10.1)'},
+    'ai.report_readiness':     {'kind': 'bool', 'default': True,  'description': 'Pre-submit AI readiness check on reports (Phase 10.2)'},
+    'ai.reviewer_summary':     {'kind': 'bool', 'default': True,  'description': 'One-screen reviewer summary + draft rationale (Phase 10.3)'},
+    'ai.burden_estimator':     {'kind': 'bool', 'default': True,  'description': 'Donor pre-publish burden estimate + simplifications (Phase 10.4)'},
+    'ai.org_memory':           {'kind': 'bool', 'default': True,  'description': 'Reusable NGO organizational memory pulled into AI (Phase 10.5)'},
     'ui.preview_as_reviewer':  {'kind': 'bool', 'default': False, 'description': 'NGO can preview their submission as the reviewer sees it (Phase 4.1)'},
     'ui.live_drafters_pill':   {'kind': 'bool', 'default': False, 'description': 'Donor sees "N orgs are drafting now" (Phase 4.2)'},
     'ui.audit_trail_tab':      {'kind': 'bool', 'default': False, 'description': 'NGO-visible audit trail (Phase 5.3)'},
-    'ui.submission_readiness': {'kind': 'bool', 'default': False, 'description': 'Apply form shows "Pre-flight check" button (Phase 10.1)'},
-    'ui.report_readiness':     {'kind': 'bool', 'default': False, 'description': 'Report submit shows "Pre-flight check" button (Phase 10.2)'},
-    'ui.reviewer_summary':     {'kind': 'bool', 'default': False, 'description': 'Reviewer detail shows AI summary panel (Phase 10.3)'},
-    'ui.burden_estimator':     {'kind': 'bool', 'default': False, 'description': 'Donor wizard shows burden estimate (Phase 10.4)'},
-    'ui.this_week_home':       {'kind': 'bool', 'default': False, 'description': 'NGO dashboard "This Week" action center (Phase 10.6)'},
-    'ui.compliance_4state':    {'kind': 'bool', 'default': False, 'description': 'Compliance surfaces use 4-state taxonomy (Phase 10.7)'},
-    'ui.decision_audit':       {'kind': 'bool', 'default': False, 'description': 'Decision audit timeline drawer (Phase 10.8)'},
+    # Phase 10 UI surfaces — defaulting ON so the matched ai.* default-ON
+    # has a visible surface. Each carries a feature flag so we can pull
+    # them back individually if a tenant reports an issue.
+    'ui.submission_readiness': {'kind': 'bool', 'default': True,  'description': 'Apply form shows "Pre-flight check" button (Phase 10.1)'},
+    'ui.report_readiness':     {'kind': 'bool', 'default': True,  'description': 'Report submit shows "Pre-flight check" button (Phase 10.2)'},
+    'ui.reviewer_summary':     {'kind': 'bool', 'default': True,  'description': 'Reviewer detail shows AI summary panel (Phase 10.3)'},
+    'ui.burden_estimator':     {'kind': 'bool', 'default': True,  'description': 'Donor wizard shows burden estimate (Phase 10.4)'},
+    'ui.this_week_home':       {'kind': 'bool', 'default': True,  'description': 'NGO dashboard "This Week" action center (Phase 10.6)'},
+    'ui.compliance_4state':    {'kind': 'bool', 'default': True,  'description': 'Compliance surfaces use 4-state taxonomy (Phase 10.7)'},
+    'ui.decision_audit':       {'kind': 'bool', 'default': True,  'description': 'Decision audit timeline drawer (Phase 10.8)'},
 }
 
 
@@ -99,6 +105,43 @@ def _ensure_table():
             "ON feature_flag_overrides (scope_kind, scope_id)"
         ))
         db.session.commit()
+
+        # Phase 10 flag-flip migration (rev 2026-04-28).
+        # When we shipped the Phase 10 sprint, every new flag was defaulted
+        # to False so we could roll out per-tenant. The team's retest
+        # correctly noted that the category-defining surfaces aren't reaching
+        # production users — so we're flipping defaults to True.
+        #
+        # Risk: if a DB row somehow ended up with explicit False for these
+        # keys (defensive seeding, manual admin toggle), the new default
+        # would be ignored. This migration deletes those stale-False rows
+        # for the Phase 10 flag set ONLY, letting the new default apply.
+        # Admin-set explicit False values for OTHER flags are preserved.
+        #
+        # Idempotent: running twice is harmless because deletes are
+        # value-conditional and the row count converges to zero.
+        PHASE_10_FLAGS = (
+            'ai.submission_readiness', 'ai.report_readiness',
+            'ai.reviewer_summary', 'ai.burden_estimator', 'ai.org_memory',
+            'ui.submission_readiness', 'ui.report_readiness',
+            'ui.reviewer_summary', 'ui.burden_estimator', 'ui.this_week_home',
+            'ui.compliance_4state', 'ui.decision_audit',
+        )
+        try:
+            keys_csv = ','.join(f"'{k}'" for k in PHASE_10_FLAGS)
+            # Postgres + SQLite both treat 'false' as a literal string here.
+            db.session.execute(text(
+                f"DELETE FROM feature_flags WHERE key IN ({keys_csv}) "
+                f"AND LOWER(COALESCE(value, '')) IN ('false', '0', 'f', '')"
+            ))
+            db.session.commit()
+        except Exception as e:
+            logger.debug(f"phase 10 flag migration noop: {e}")
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+
         _table_ready = True
         return True
     except Exception as e:

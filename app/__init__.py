@@ -398,26 +398,33 @@ def _register_spa_routes(app):
         if not os.path.isdir(nextjs_dir):
             return None
 
-        # Phase 10.11 — RSC fallback noise fix.
+        # Phase 10.11 — RSC fallback noise fix (rev 2).
         # In static-export mode, Next router issues prefetch/navigation
         # requests with the `RSC: 1` header expecting an RSC stream
         # (`text/x-component`). We have no RSC stream — only static HTML.
-        # Returning HTML to an RSC request triggers Next's
-        # "Failed to fetch RSC payload ... Falling back to browser
-        # navigation" console error, and only THEN it does the hard nav.
         #
-        # The fix: return 200 with `text/x-component` content-type and an
-        # empty body. Next's fetch succeeds (no console.error), the empty
-        # payload parses to nothing, and the router falls back to hard
-        # navigation silently. We also set Vary: RSC so any caching layer
-        # treats RSC and HTML responses as distinct entries.
+        # The first attempt returned an empty body, but the React Flight
+        # parser hangs on an empty stream and ultimately rejects, which
+        # makes Next.js log "Failed to fetch RSC payload ... Falling back
+        # to browser navigation" before doing the hard nav.
+        #
+        # The actual fix: return a MINIMAL VALID Flight payload — the
+        # single literal `0:null\n` which the Flight parser interprets
+        # as "model 0 = null". It resolves cleanly with no payload, Next
+        # router treats it as "no RSC content, do hard nav," and no
+        # console.error fires.
+        #
+        # Belt-and-suspenders: set `Cache-Control: no-store` so browsers
+        # never cache the empty payload, and `Vary: RSC` so any CDN or
+        # proxy understands the RSC/HTML responses are distinct.
         from flask import request, make_response
         is_rsc_request = (
             request.headers.get('RSC') == '1'
             or request.args.get('_rsc') is not None
         )
         if is_rsc_request:
-            resp = make_response('', 200)
+            # Minimal valid Flight payload: model 0 resolves to null.
+            resp = make_response('0:null\n', 200)
             resp.headers['Content-Type'] = 'text/x-component'
             resp.headers['Vary'] = 'RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Url'
             resp.headers['Cache-Control'] = 'no-store'

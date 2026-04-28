@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { ReportDraftCoAuthor } from '@/components/reports/ReportDraftCoAuthor';
+import { ReportReadiness } from '@/components/reports/ReportReadiness';
 import { useApiError } from '@/lib/hooks/use-api-error';
 import { useReports, useUpcomingReports } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -530,7 +531,9 @@ function PreSubmitReviewPanel({ report, mutateReports }: { report: Report; mutat
               )}
 
               {/* Ready-gate: tells the NGO whether the report is good to send,
-                  and lets them submit (or submit anyway, with eyes open). */}
+                  and lets them submit (or submit anyway, with eyes open).
+                  Phase 10.2 — ReportReadiness is the donor-perspective
+                  pre-flight; renders when ui.report_readiness is ON. */}
               {overall !== null && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[hsl(var(--kuja-spark-soft))] pt-3">
                   {overall >= 80 ? (
@@ -539,6 +542,7 @@ function PreSubmitReviewPanel({ report, mutateReports }: { report: Report; mutat
                         <CheckCircle2 className="h-3 w-3" />
                         {t('report.ready_to_submit')}
                       </span>
+                      <ReportReadiness reportId={report.id} />
                       <button
                         onClick={handleSubmit}
                         disabled={submitting}
@@ -553,6 +557,7 @@ function PreSubmitReviewPanel({ report, mutateReports }: { report: Report; mutat
                       <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
                         {t('report.address_gaps_first')}
                       </span>
+                      <ReportReadiness reportId={report.id} />
                       <button
                         onClick={handleSubmit}
                         disabled={submitting}

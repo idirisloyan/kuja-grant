@@ -7,6 +7,8 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { AiBadge } from '@/components/shared/ai-badge';
+import { ComplianceState, type ComplianceStateKind } from '@/components/shared/compliance-state';
+import { useFlag } from '@/lib/hooks/use-feature-flags';
 import {
   ShieldCheck, AlertTriangle, Clock, Eye, Search, RefreshCw,
   ChevronDown, ChevronRight, Loader2, CheckCircle, XCircle, Cpu,
@@ -37,13 +39,42 @@ interface ComplianceExplanation {
   source: string;
 }
 
+// Phase 10.7 — map a verification record onto the 4-state compliance taxonomy.
+// Returns one of clear / confirmed / likely / missing / followup so the
+// shared ComplianceState primitive can render a consistent pill across
+// every compliance surface.
+function mapToComplianceState(
+  v: RegistrationVerification & { verification_status?: string },
+): { state: ComplianceStateKind; detail?: string } {
+  const status = (v.verification_status ?? v.status ?? 'unverified') as string;
+  const conf = (v as unknown as { ai_confidence?: number | null }).ai_confidence;
+  const a = v.ai_analysis as Record<string, unknown> | null;
+  const findingsCount = (a?.findings as unknown[] | undefined)?.length ?? 0;
+
+  if (status === 'verified' && (conf == null || conf >= 80)) {
+    return { state: 'clear', detail: 'Registry confirmed; no findings.' };
+  }
+  if (status === 'flagged' || (conf != null && conf < 50 && findingsCount > 0)) {
+    return { state: 'confirmed', detail: 'Findings indicate ineligibility — escalate.' };
+  }
+  if (findingsCount > 0 && (conf == null || conf < 70)) {
+    return { state: 'likely', detail: `${findingsCount} finding(s); high confidence pattern.` };
+  }
+  if (status === 'pending' || status === 'unverified' || !conf) {
+    return { state: 'missing', detail: 'Registry check not yet run or returned no data.' };
+  }
+  return { state: 'followup', detail: 'Auto-check passed; manual eyes recommended.' };
+}
+
 function VerificationDetail({ verification }: { verification: RegistrationVerification }) {
   const { t, formatDate } = useTranslation();
+  const { enabled: fourStateEnabled } = useFlag('ui.compliance_4state');
   const a = verification.ai_analysis as Record<string, unknown> | null;
   const findings = a?.findings as string[] | undefined;
   const recommendations = a?.recommendations as string[] | undefined;
   const registryResult = verification.registry_check_result as Record<string, unknown> | null;
   const orgId = (verification as unknown as { org_id?: number }).org_id;
+  const fourState = fourStateEnabled ? mapToComplianceState(verification) : null;
 
   // Compliance co-pilot — on-demand plain-language explanation of the
   // verification + sanctions findings with concrete follow-up actions.
@@ -69,6 +100,13 @@ function VerificationDetail({ verification }: { verification: RegistrationVerifi
 
   return (
     <div className="px-5 py-4 bg-muted/30 border-t border-border space-y-4">
+      {/* Phase 10.7 — 4-state compliance taxonomy pill at the top of
+          each verification detail. Renders only when ui.compliance_4state
+          is on; gives donor/admin a consistent vocabulary across surfaces:
+          clear / confirmed / likely / missing / followup. */}
+      {fourState && (
+        <ComplianceState state={fourState.state} detail={fourState.detail} variant="row" />
+      )}
       {/* Compliance co-pilot panel — prominent because this is the highest
           decision-relevance signal a donor needs from this row. */}
       <div className="rounded-xl border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]/40 p-4">

@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, ClipboardCheck, Search, FileText, BarChart3, Building2,
   PlusCircle, Briefcase, Star, Shield, CheckCircle2, ClipboardList,
-  ChevronLeft, ChevronRight, X, Activity,
+  ChevronLeft, ChevronRight, X, Activity, Brain,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
@@ -61,6 +61,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
       { icon: FileText, label: t('nav.my_applications'), href: '/applications' },
       { icon: BarChart3, label: t('nav.reports'), href: '/reports' },
       { icon: Building2, label: t('nav.org_profile'), href: '/organizations/profile' },
+      { icon: Brain, label: t('nav.org_memory'), href: '/organizations/memory' },
     ],
     donor: [
       { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },

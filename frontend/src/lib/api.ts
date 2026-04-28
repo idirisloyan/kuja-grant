@@ -100,6 +100,9 @@ export const api = {
   /** HTTP PUT (JSON body) */
   put: <T>(path: string, body?: unknown) => apiFetch<T>('PUT', path, body),
 
+  /** HTTP PATCH (JSON body) */
+  patch: <T>(path: string, body?: unknown) => apiFetch<T>('PATCH', path, body),
+
   /** HTTP DELETE */
   delete: <T>(path: string) => apiFetch<T>('DELETE', path),
 
