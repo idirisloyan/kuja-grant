@@ -398,6 +398,31 @@ def _register_spa_routes(app):
         if not os.path.isdir(nextjs_dir):
             return None
 
+        # Phase 10.11 — RSC fallback noise fix.
+        # In static-export mode, Next router issues prefetch/navigation
+        # requests with the `RSC: 1` header expecting an RSC stream
+        # (`text/x-component`). We have no RSC stream — only static HTML.
+        # Returning HTML to an RSC request triggers Next's
+        # "Failed to fetch RSC payload ... Falling back to browser
+        # navigation" console error, and only THEN it does the hard nav.
+        #
+        # The fix: return 200 with `text/x-component` content-type and an
+        # empty body. Next's fetch succeeds (no console.error), the empty
+        # payload parses to nothing, and the router falls back to hard
+        # navigation silently. We also set Vary: RSC so any caching layer
+        # treats RSC and HTML responses as distinct entries.
+        from flask import request, make_response
+        is_rsc_request = (
+            request.headers.get('RSC') == '1'
+            or request.args.get('_rsc') is not None
+        )
+        if is_rsc_request:
+            resp = make_response('', 200)
+            resp.headers['Content-Type'] = 'text/x-component'
+            resp.headers['Vary'] = 'RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Url'
+            resp.headers['Cache-Control'] = 'no-store'
+            return resp
+
         # Try exact file first (JS, CSS, images, etc.)
         file_path = os.path.join(nextjs_dir, path)
         if os.path.isfile(file_path):

@@ -12,6 +12,7 @@ import { AiBadge } from '@/components/shared/ai-badge';
 import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
 import { PreviewAsReviewer } from '@/components/apply/PreviewAsReviewer';
+import { SubmissionReadiness } from '@/components/apply/SubmissionReadiness';
 import { useFlag } from '@/lib/hooks/use-feature-flags';
 import {
   ArrowLeft,
@@ -841,7 +842,14 @@ export default function ApplyWizardClient() {
             {t('common.next')} <ArrowRight className="h-4 w-4" />
           </button>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <SubmissionReadiness
+              applicationId={applicationId}
+              onApplyRewrite={(criterionKey, rewrite) => {
+                setResponses((prev) => ({ ...prev, [criterionKey]: rewrite }));
+                toast.success(t('readiness.applied_toast'));
+              }}
+            />
             <PreviewAsReviewer
               criteria={criteria}
               responses={responses}

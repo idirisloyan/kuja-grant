@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
 from app.extensions import db
@@ -1105,6 +1106,189 @@ def api_ai_draft_report():
         'ai_transparency': {
             'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
             'disclaimer': 'AI-drafted report — verify every metric and date before submitting.',
+        },
+    })
+
+
+# ---------------------------------------------------------------------------
+# Phase 10.1 — submission readiness pre-submit check
+# ---------------------------------------------------------------------------
+
+@ai_bp.route('/submission-readiness', methods=['POST'])
+@login_required
+@role_required('ngo')
+def api_ai_submission_readiness():
+    """Phase 10.1 — pre-submit AI gap analysis for an application.
+
+    Body: { application_id: int }
+    Returns: { success, readiness: { readiness_score, verdict, summary,
+              gaps[], missing_evidence[], overclaims[], generic_answers[],
+              strengths[], source } }
+    """
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return error_response('ai.rate_limited', 429)
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json() or {}
+    application_id = data.get('application_id')
+    if not application_id:
+        return error_response('validation.missing_field', 400, field='application_id')
+
+    application = db.session.get(Application, int(application_id))
+    if not application:
+        return error_response('application.not_found', 404)
+    if application.ngo_org_id != current_user.org_id:
+        return error_response('auth.access_denied', 403)
+
+    grant = db.session.get(Grant, application.grant_id) if application.grant_id else None
+    if not grant:
+        return error_response('grant.not_found', 404)
+
+    org_payload = _gather_org_context(current_user.org_id)
+    if not org_payload:
+        return error_response('auth.access_denied', 403)
+
+    grant_payload = {
+        'id': grant.id,
+        'title': grant.title,
+        'description': grant.description,
+        'criteria': grant.get_criteria() if hasattr(grant, 'get_criteria') else [],
+        'eligibility': grant.get_eligibility() if hasattr(grant, 'get_eligibility') else [],
+    }
+
+    application_payload = {
+        'id': application.id,
+        'responses': application.get_responses() if hasattr(application, 'get_responses') else {},
+        'eligibility_responses': (application.get_eligibility_responses()
+                                  if hasattr(application, 'get_eligibility_responses') else {}),
+    }
+
+    # Documents attached to this application
+    documents = []
+    try:
+        from app.models.document import Document
+        docs_q = Document.query.filter_by(application_id=application.id).limit(10).all()
+        documents = [
+            {'id': d.id, 'original_filename': d.original_filename, 'doc_type': d.doc_type}
+            for d in docs_q
+        ]
+    except Exception:
+        pass
+
+    readiness = AIService.check_submission_readiness(
+        grant=grant_payload,
+        org=org_payload,
+        application=application_payload,
+        documents=documents,
+        language=current_user.language or 'en',
+    )
+    return jsonify({
+        'success': True,
+        'readiness': readiness,
+        'application_id': application.id,
+        'ai_transparency': {
+            'engine': 'Claude AI' if readiness.get('source') == 'claude' else 'Deterministic baseline',
+            'disclaimer': 'Pre-flight check — your judgment is final. Apply suggestions selectively.',
+        },
+    })
+
+
+@ai_bp.route('/report-readiness', methods=['POST'])
+@login_required
+@role_required('ngo')
+def api_ai_report_readiness():
+    """Phase 10.2 — pre-submit AI gap analysis for a report.
+
+    Body: { report_id: int }
+    Returns: { success, readiness: {...} }
+    """
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return error_response('ai.rate_limited', 429)
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json() or {}
+    report_id = data.get('report_id')
+    if not report_id:
+        return error_response('validation.missing_field', 400, field='report_id')
+
+    report = db.session.get(Report, int(report_id))
+    if not report:
+        return error_response('report.not_found', 404)
+    if report.submitted_by_org_id != current_user.org_id:
+        return error_response('auth.access_denied', 403)
+
+    grant = db.session.get(Grant, report.grant_id) if report.grant_id else None
+    if not grant:
+        return error_response('grant.not_found', 404)
+
+    org_payload = _gather_org_context(current_user.org_id)
+    if not org_payload:
+        return error_response('auth.access_denied', 403)
+
+    requirements = []
+    try:
+        requirements = grant.get_reporting_requirements() or []
+    except Exception:
+        pass
+    grant_payload = {
+        'id': grant.id,
+        'title': grant.title,
+        'reporting_requirements': requirements,
+    }
+
+    content = {}
+    try:
+        content = report.get_content() or {}
+    except Exception:
+        pass
+
+    report_payload = {
+        'id': report.id,
+        'reporting_period': getattr(report, 'reporting_period', None),
+        'report_type': report.report_type,
+        'sections': content,
+        'budget_actuals': getattr(report, 'budget_actuals', None) or {},
+        'milestones': getattr(report, 'milestones', None) or [],
+    }
+
+    # Prior reports for consistency check.
+    prior_reports = []
+    try:
+        prior_q = (Report.query
+                   .filter_by(grant_id=report.grant_id,
+                              submitted_by_org_id=current_user.org_id)
+                   .filter(Report.id != report.id)
+                   .order_by(Report.created_at.desc())
+                   .limit(2).all())
+        for p in prior_q:
+            try:
+                pc = p.get_content() if hasattr(p, 'get_content') else {}
+            except Exception:
+                pc = {}
+            prior_reports.append({
+                'id': p.id,
+                'reporting_period': getattr(p, 'reporting_period', None),
+                'narrative': json.dumps(pc, default=str)[:600] if pc else '',
+            })
+    except Exception:
+        pass
+
+    readiness = AIService.check_report_readiness(
+        grant=grant_payload,
+        org=org_payload,
+        report=report_payload,
+        prior_reports=prior_reports,
+        language=current_user.language or 'en',
+    )
+    return jsonify({
+        'success': True,
+        'readiness': readiness,
+        'report_id': report.id,
+        'ai_transparency': {
+            'engine': 'Claude AI' if readiness.get('source') == 'claude' else 'Deterministic baseline',
+            'disclaimer': 'Pre-flight check from a donor perspective. Verify each suggestion.',
         },
     })
 

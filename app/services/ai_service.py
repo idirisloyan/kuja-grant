@@ -1516,6 +1516,461 @@ class AIService:
         }
 
     @classmethod
+    def check_submission_readiness(
+        cls,
+        *,
+        grant,
+        org,
+        application,
+        documents=None,
+        language=None,
+    ):
+        """Phase 10.1 — pre-submit readiness gap analysis for an application.
+
+        This is the move that turns AI from "useful" to "indispensable":
+        before an NGO clicks Submit, we run a structured pass over their
+        responses and tell them exactly what's missing, weak, generic, or
+        overclaimed — with one-click rewrites. NGOs should never wonder
+        "is this good enough?" — the product should tell them honestly.
+
+        Inputs:
+          grant: dict with criteria, eligibility, title, description
+          org:   dict with mission, sectors, countries, capacity
+          application: dict with responses, eligibility_responses
+          documents: list of attached docs (id, original_filename, doc_type)
+          language: target output language
+
+        Output:
+          {
+            'readiness_score': 0-100,
+            'verdict': 'ready' | 'needs_work' | 'not_ready',
+            'summary': 'one-line honest verdict for the NGO',
+            'gaps': [{criterion_key, severity, issue, suggestion, rewrite?}],
+            'missing_evidence': [{criterion_key, evidence_type, what, where_to_find}],
+            'overclaims': [{criterion_key, claim, why, softer}],
+            'generic_answers': [{criterion_key, issue, concrete_alternative}],
+            'strengths': [str],
+            'source': 'claude' | 'fallback'
+          }
+
+        Severity bands:
+          blocker — fix before submit (eligibility unmet, missing required answer)
+          weak    — submission would pass but lose points
+          polish  — minor improvement
+        """
+        grant = grant or {}
+        org = org or {}
+        application = application or {}
+        documents = documents or []
+
+        criteria = grant.get('criteria') or []
+        eligibility = grant.get('eligibility') or []
+        responses = (application.get('responses') or {})
+        eligibility_responses = (application.get('eligibility_responses') or {})
+
+        # Deterministic baseline: count empty / very short / repeated answers.
+        # This becomes the fallback if Claude is unavailable, AND seeds the
+        # AI prompt so the model focuses on judgment calls rather than
+        # measuring word counts.
+        baseline_gaps = []
+        for c in criteria:
+            key = c.get('key') or ''
+            if not key:
+                continue
+            text = (responses.get(key) or '').strip()
+            if not text:
+                baseline_gaps.append({
+                    'criterion_key': key,
+                    'severity': 'blocker',
+                    'issue': 'No response yet for this criterion.',
+                    'suggestion': f"Draft 150-250 words addressing: {c.get('label') or key}",
+                })
+            elif len(text.split()) < 30:
+                baseline_gaps.append({
+                    'criterion_key': key,
+                    'severity': 'weak',
+                    'issue': 'Response is very short — reviewers will read this as low effort.',
+                    'suggestion': 'Expand to 150-250 words with specific evidence.',
+                })
+
+        unmet_eligibility = []
+        for e in eligibility:
+            key = e.get('key') or ''
+            if not key:
+                continue
+            er = eligibility_responses.get(key) or {}
+            if not er.get('met') and not er.get('evidence'):
+                unmet_eligibility.append(key)
+
+        system = (
+            "You are Kuja's submission-readiness reviewer. An NGO is about "
+            "to click Submit on a grant application. Your job is to give "
+            "them an HONEST pre-flight check — what's missing, what's weak, "
+            "what's overclaimed, what reads generic. Be specific and "
+            "actionable. NGOs trust you because you tell them the truth, "
+            "not because you flatter their work.\n\n"
+            "For each gap, give a concrete suggestion they can act on in "
+            "minutes — not 'improve this' but 'add the 2024 baseline figure "
+            "from your last MEL report'.\n\n"
+            "Severity bands:\n"
+            "  blocker — must fix before submit (empty answer, unmet eligibility, claim that contradicts profile)\n"
+            "  weak    — submission would pass but lose points (vague, short, no evidence)\n"
+            "  polish  — minor improvement (could be sharper, could cite a doc)\n\n"
+            "Score the readiness 0-100:\n"
+            "  90-100 — ready to submit, only polish gaps\n"
+            "  70-89  — submit-able but loses material points; fix top 2 weak items\n"
+            "  50-69  — needs serious work before submit\n"
+            "  0-49   — not ready; blockers present\n\n"
+            "Verdict matches the score band: ready / needs_work / not_ready.\n\n"
+            "When you spot a generic answer ('we will use a results-based "
+            "framework'), give a concrete alternative anchored in the NGO's "
+            "actual profile. When you spot an overclaim ('we will reach "
+            "1M beneficiaries'), give a softer reframing they can defend.\n\n"
+            "Cap totals to keep this actionable: max 6 gaps, max 4 missing "
+            "evidence items, max 3 overclaims, max 4 generic answers, max 4 strengths.\n\n"
+            "Return ONLY a JSON object matching the schema."
+        )
+
+        schema = """{
+  "readiness_score": 0-100,
+  "verdict": "ready" | "needs_work" | "not_ready",
+  "summary": "<one-line honest verdict, ≤140 chars>",
+  "gaps": [
+    {
+      "criterion_key": "<key>",
+      "severity": "blocker" | "weak" | "polish",
+      "issue": "<what's wrong, ≤200 chars>",
+      "suggestion": "<specific fix the NGO can do in minutes, ≤200 chars>",
+      "rewrite": "<optional 60-150 word stronger rewrite of the response>"
+    }
+  ],
+  "missing_evidence": [
+    {
+      "criterion_key": "<key>",
+      "evidence_type": "data" | "document" | "narrative",
+      "what": "<what's missing, ≤140 chars>",
+      "where_to_find": "<suggestion for where in their org to find it, ≤140 chars>"
+    }
+  ],
+  "overclaims": [
+    {
+      "criterion_key": "<key>",
+      "claim": "<the overclaim, ≤140 chars>",
+      "why": "<why it might not hold up, ≤140 chars>",
+      "softer": "<more defensible reframing, ≤200 chars>"
+    }
+  ],
+  "generic_answers": [
+    {
+      "criterion_key": "<key>",
+      "issue": "<too generic — anyone could write this, ≤140 chars>",
+      "concrete_alternative": "<specific reframing using their org details, ≤220 chars>"
+    }
+  ],
+  "strengths": [
+    "<what's already strong, ≤140 chars>"
+  ]
+}"""
+
+        # Cap context to keep cost reasonable — full responses can be 5k+ words.
+        responses_str = json.dumps(responses, default=str)[:6000]
+        eligibility_str = json.dumps(eligibility_responses, default=str)[:1500]
+        criteria_str = json.dumps(criteria, default=str)[:2500]
+        eligibility_def_str = json.dumps(eligibility, default=str)[:1200]
+        docs_str = json.dumps([
+            {'id': d.get('id'), 'filename': d.get('original_filename') or d.get('filename'),
+             'doc_type': d.get('doc_type')}
+            for d in (documents or [])
+        ], default=str)[:1500]
+
+        user_msg = (
+            "GRANT:\n"
+            f"  title: {grant.get('title')}\n"
+            f"  description: {(grant.get('description') or '')[:1200]}\n"
+            f"  criteria: {criteria_str}\n"
+            f"  eligibility: {eligibility_def_str}\n\n"
+            "APPLICANT NGO:\n"
+            f"  name: {org.get('name')}\n"
+            f"  mission: {(org.get('mission') or '')[:600]}\n"
+            f"  sectors: {org.get('sectors')}\n"
+            f"  countries: {org.get('countries')}\n"
+            f"  capacity: {json.dumps(org.get('capacity') or {}, default=str)[:1200]}\n\n"
+            "DRAFTED RESPONSES (this is what the NGO is about to submit):\n"
+            f"{responses_str}\n\n"
+            "ELIGIBILITY RESPONSES:\n"
+            f"{eligibility_str}\n\n"
+            "ATTACHED DOCUMENTS:\n"
+            f"{docs_str}\n\n"
+            "DETERMINISTIC BASELINE GAPS (incorporate, refine, or override):\n"
+            f"{json.dumps(baseline_gaps, default=str)[:1500]}\n"
+            f"  unmet_eligibility_keys: {unmet_eligibility}\n\n"
+            "Return the JSON readiness check now."
+        )
+
+        text = cls._call_claude(
+            system + "\n\n" + schema,
+            user_msg,
+            max_tokens=3072,
+            language=language,
+            role='ngo',
+            endpoint='check_submission_readiness',
+        )
+
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    parsed['source'] = 'claude'
+                    # Defensive normalization
+                    parsed.setdefault('readiness_score', 50)
+                    parsed.setdefault('verdict', 'needs_work')
+                    parsed.setdefault('summary', '')
+                    parsed.setdefault('gaps', [])
+                    parsed.setdefault('missing_evidence', [])
+                    parsed.setdefault('overclaims', [])
+                    parsed.setdefault('generic_answers', [])
+                    parsed.setdefault('strengths', [])
+                    # Clamp score to 0-100
+                    try:
+                        parsed['readiness_score'] = max(0, min(100, int(parsed['readiness_score'])))
+                    except (ValueError, TypeError):
+                        parsed['readiness_score'] = 50
+                    return parsed
+            except Exception as e:
+                logger.warning(f"check_submission_readiness JSON parse failed: {e}")
+
+        # Deterministic fallback: assemble a minimal but useful readiness
+        # report from the baseline checks. Score = 100 - 15*blockers - 7*weak.
+        blockers = sum(1 for g in baseline_gaps if g['severity'] == 'blocker')
+        weaks = sum(1 for g in baseline_gaps if g['severity'] == 'weak')
+        score = max(0, 100 - 15 * blockers - 7 * weaks - 10 * len(unmet_eligibility))
+        verdict = 'ready' if score >= 90 else 'needs_work' if score >= 50 else 'not_ready'
+        return {
+            'readiness_score': score,
+            'verdict': verdict,
+            'summary': (
+                'AI pre-flight unavailable. '
+                f'{blockers} blocker(s), {weaks} weak answer(s) detected by basic checks.'
+            ),
+            'gaps': baseline_gaps[:6],
+            'missing_evidence': [
+                {
+                    'criterion_key': k,
+                    'evidence_type': 'narrative',
+                    'what': 'Eligibility not yet evidenced.',
+                    'where_to_find': 'Add a 1-2 sentence justification with a citation.',
+                }
+                for k in unmet_eligibility[:4]
+            ],
+            'overclaims': [],
+            'generic_answers': [],
+            'strengths': [],
+            'source': 'fallback',
+        }
+
+    @classmethod
+    def check_report_readiness(
+        cls,
+        *,
+        grant,
+        org,
+        report,
+        prior_reports=None,
+        documents=None,
+        language=None,
+    ):
+        """Phase 10.2 — pre-submit readiness check for a report.
+
+        Same shape as check_submission_readiness, but tuned for reports:
+        we look for likely donor concerns (impact claims with no data,
+        budget variance with no explanation, missing milestone evidence)
+        rather than application-style criteria gaps.
+
+        Output:
+          {
+            'readiness_score': 0-100,
+            'verdict': 'ready' | 'needs_work' | 'not_ready',
+            'summary': 'one-line donor-perspective verdict',
+            'donor_concerns': [{section, concern, why, suggestion}],
+            'missing_evidence': [{section, evidence_type, what, where_to_find}],
+            'vague_claims': [{section, claim, sharper}],
+            'budget_variance_unexplained': [{line, variance, suggestion}] (optional),
+            'strengths': [str],
+            'source': 'claude' | 'fallback'
+          }
+        """
+        grant = grant or {}
+        org = org or {}
+        report = report or {}
+        prior_reports = prior_reports or []
+        documents = documents or []
+
+        sections = report.get('sections') or report.get('content') or {}
+        if isinstance(sections, str):
+            sections = {'narrative': sections}
+        budget_actuals = report.get('budget_actuals') or report.get('budget') or {}
+        milestones = report.get('milestones') or []
+        report_period = report.get('reporting_period') or report.get('period') or 'current'
+        report_type = report.get('report_type') or 'progress'
+
+        # Deterministic baseline: short narrative, no budget data, no milestones evidence.
+        baseline_concerns = []
+        if isinstance(sections, dict):
+            for sec_name, sec_text in sections.items():
+                text = (sec_text or '').strip() if isinstance(sec_text, str) else ''
+                if not text:
+                    baseline_concerns.append({
+                        'section': sec_name,
+                        'concern': 'Section is empty.',
+                        'why': 'Donors expect every required section to be addressed.',
+                        'suggestion': f"Add 100-200 words addressing the '{sec_name}' section.",
+                    })
+                elif len(text.split()) < 40:
+                    baseline_concerns.append({
+                        'section': sec_name,
+                        'concern': 'Section is very short.',
+                        'why': 'Donors read short sections as incomplete.',
+                        'suggestion': 'Expand with specific activities, numbers, and evidence.',
+                    })
+
+        system = (
+            "You are Kuja's report pre-flight reviewer. An NGO is about to "
+            "submit a grant report and you're checking it from the DONOR's "
+            "perspective: what concerns will a busy program officer flag, "
+            "what's missing, what reads vague? Your goal is to help the NGO "
+            "fix issues before the donor sees them — saving a bounceback.\n\n"
+            "Common donor concerns to scan for:\n"
+            "  • impact claims with no underlying data (no baseline, no count, no source)\n"
+            "  • budget actuals with material variance and no explanation\n"
+            "  • missing or weak milestone evidence (claimed but no attached proof)\n"
+            "  • narrative drift (talks about activity but not outcome)\n"
+            "  • unexplained delays or scope changes\n"
+            "  • inconsistencies vs prior reports\n\n"
+            "Score readiness 0-100:\n"
+            "  90-100 — ready, only polish issues\n"
+            "  70-89  — submit-able, fix top 2 vague claims first\n"
+            "  50-69  — donor will likely send back\n"
+            "  0-49   — material issues; not ready\n\n"
+            "Verdict matches band: ready / needs_work / not_ready.\n\n"
+            "Cap totals: max 5 donor_concerns, max 4 missing_evidence, max 4 vague_claims, max 3 budget_variance_unexplained, max 4 strengths.\n\n"
+            "Return ONLY a JSON object matching the schema."
+        )
+
+        schema = """{
+  "readiness_score": 0-100,
+  "verdict": "ready" | "needs_work" | "not_ready",
+  "summary": "<one-line donor-perspective verdict, ≤140 chars>",
+  "donor_concerns": [
+    {
+      "section": "<section name or 'overall'>",
+      "concern": "<what a donor will flag, ≤180 chars>",
+      "why": "<why it matters to the donor, ≤140 chars>",
+      "suggestion": "<specific fix, ≤180 chars>"
+    }
+  ],
+  "missing_evidence": [
+    {
+      "section": "<section name>",
+      "evidence_type": "data" | "document" | "narrative",
+      "what": "<what's missing, ≤140 chars>",
+      "where_to_find": "<where in the org's records to look, ≤140 chars>"
+    }
+  ],
+  "vague_claims": [
+    {
+      "section": "<section name>",
+      "claim": "<vague claim from the report, ≤160 chars>",
+      "sharper": "<concrete reframing using available data, ≤220 chars>"
+    }
+  ],
+  "budget_variance_unexplained": [
+    {
+      "line": "<budget line or category>",
+      "variance": "<short description, ≤120 chars>",
+      "suggestion": "<what to add to explain it, ≤180 chars>"
+    }
+  ],
+  "strengths": [
+    "<what's already strong, ≤140 chars>"
+  ]
+}"""
+
+        sections_str = json.dumps(sections, default=str)[:6000]
+        budget_str = json.dumps(budget_actuals, default=str)[:2000]
+        milestones_str = json.dumps(milestones, default=str)[:1500]
+        prior_str = json.dumps([
+            {'id': r.get('id'), 'period': r.get('reporting_period'),
+             'narrative': (r.get('narrative') or '')[:400]}
+            for r in (prior_reports or [])[:3]
+        ], default=str)[:2000]
+
+        user_msg = (
+            "GRANT:\n"
+            f"  title: {grant.get('title')}\n"
+            f"  reporting_requirements: {json.dumps(grant.get('reporting_requirements') or [], default=str)[:1500]}\n\n"
+            f"NGO: {org.get('name')} (sectors: {org.get('sectors')}, countries: {org.get('countries')})\n\n"
+            f"REPORT (about to submit) — period: {report_period}, type: {report_type}\n"
+            f"  sections:\n{sections_str}\n\n"
+            f"  budget_actuals:\n{budget_str}\n\n"
+            f"  milestones:\n{milestones_str}\n\n"
+            f"PRIOR REPORTS (consistency check):\n{prior_str}\n\n"
+            "DETERMINISTIC BASELINE CONCERNS (incorporate or override):\n"
+            f"{json.dumps(baseline_concerns, default=str)[:1200]}\n\n"
+            "Return the JSON readiness check now."
+        )
+
+        text = cls._call_claude(
+            system + "\n\n" + schema,
+            user_msg,
+            max_tokens=2800,
+            language=language,
+            role='ngo',
+            endpoint='check_report_readiness',
+        )
+
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    parsed['source'] = 'claude'
+                    parsed.setdefault('readiness_score', 50)
+                    parsed.setdefault('verdict', 'needs_work')
+                    parsed.setdefault('summary', '')
+                    parsed.setdefault('donor_concerns', [])
+                    parsed.setdefault('missing_evidence', [])
+                    parsed.setdefault('vague_claims', [])
+                    parsed.setdefault('budget_variance_unexplained', [])
+                    parsed.setdefault('strengths', [])
+                    try:
+                        parsed['readiness_score'] = max(0, min(100, int(parsed['readiness_score'])))
+                    except (ValueError, TypeError):
+                        parsed['readiness_score'] = 50
+                    return parsed
+            except Exception as e:
+                logger.warning(f"check_report_readiness JSON parse failed: {e}")
+
+        score = max(0, 100 - 15 * len(baseline_concerns))
+        verdict = 'ready' if score >= 90 else 'needs_work' if score >= 50 else 'not_ready'
+        return {
+            'readiness_score': score,
+            'verdict': verdict,
+            'summary': (
+                'AI pre-flight unavailable. '
+                f'{len(baseline_concerns)} concern(s) detected by basic checks.'
+            ),
+            'donor_concerns': baseline_concerns[:5],
+            'missing_evidence': [],
+            'vague_claims': [],
+            'budget_variance_unexplained': [],
+            'strengths': [],
+            'source': 'fallback',
+        }
+
+    @classmethod
     def draft_report(
         cls,
         *,

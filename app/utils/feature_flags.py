@@ -47,9 +47,21 @@ DEFAULT_FLAGS: dict[str, dict[str, Any]] = {
     'ai.grant_brief_generator': {'kind': 'bool', 'default': False, 'description': 'Auto-generated grant brief (Phase 2.2)'},
     'ai.cross_grant_patterns': {'kind': 'bool', 'default': False, 'description': 'Anonymized cross-grant pattern library (Phase 8.1)'},
     'ai.compliance_preempt':   {'kind': 'bool', 'default': False, 'description': 'Pre-submit compliance pre-emption (Phase 8.2)'},
+    'ai.submission_readiness': {'kind': 'bool', 'default': False, 'description': 'Pre-submit AI readiness check on applications (Phase 10.1)'},
+    'ai.report_readiness':     {'kind': 'bool', 'default': False, 'description': 'Pre-submit AI readiness check on reports (Phase 10.2)'},
+    'ai.reviewer_summary':     {'kind': 'bool', 'default': False, 'description': 'One-screen reviewer summary + draft rationale (Phase 10.3)'},
+    'ai.burden_estimator':     {'kind': 'bool', 'default': False, 'description': 'Donor pre-publish burden estimate + simplifications (Phase 10.4)'},
+    'ai.org_memory':           {'kind': 'bool', 'default': False, 'description': 'Reusable NGO organizational memory pulled into AI (Phase 10.5)'},
     'ui.preview_as_reviewer':  {'kind': 'bool', 'default': False, 'description': 'NGO can preview their submission as the reviewer sees it (Phase 4.1)'},
     'ui.live_drafters_pill':   {'kind': 'bool', 'default': False, 'description': 'Donor sees "N orgs are drafting now" (Phase 4.2)'},
     'ui.audit_trail_tab':      {'kind': 'bool', 'default': False, 'description': 'NGO-visible audit trail (Phase 5.3)'},
+    'ui.submission_readiness': {'kind': 'bool', 'default': False, 'description': 'Apply form shows "Pre-flight check" button (Phase 10.1)'},
+    'ui.report_readiness':     {'kind': 'bool', 'default': False, 'description': 'Report submit shows "Pre-flight check" button (Phase 10.2)'},
+    'ui.reviewer_summary':     {'kind': 'bool', 'default': False, 'description': 'Reviewer detail shows AI summary panel (Phase 10.3)'},
+    'ui.burden_estimator':     {'kind': 'bool', 'default': False, 'description': 'Donor wizard shows burden estimate (Phase 10.4)'},
+    'ui.this_week_home':       {'kind': 'bool', 'default': False, 'description': 'NGO dashboard "This Week" action center (Phase 10.6)'},
+    'ui.compliance_4state':    {'kind': 'bool', 'default': False, 'description': 'Compliance surfaces use 4-state taxonomy (Phase 10.7)'},
+    'ui.decision_audit':       {'kind': 'bool', 'default': False, 'description': 'Decision audit timeline drawer (Phase 10.8)'},
 }
 
 

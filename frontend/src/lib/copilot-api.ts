@@ -634,6 +634,113 @@ export function fetchCompliancePreempt(applicationId: number) {
 }
 
 // ---------------------------------------------------------------------------
+// 13b. Submission Readiness — Phase 10.1 (NGO pre-submit AI gap analysis)
+// ---------------------------------------------------------------------------
+
+export type ReadinessVerdict = 'ready' | 'needs_work' | 'not_ready';
+export type GapSeverity = 'blocker' | 'weak' | 'polish';
+
+export interface ReadinessGap {
+  criterion_key: string;
+  severity: GapSeverity;
+  issue: string;
+  suggestion: string;
+  rewrite?: string;
+}
+
+export interface ReadinessMissingEvidence {
+  criterion_key: string;
+  evidence_type: 'data' | 'document' | 'narrative';
+  what: string;
+  where_to_find: string;
+}
+
+export interface ReadinessOverclaim {
+  criterion_key: string;
+  claim: string;
+  why: string;
+  softer: string;
+}
+
+export interface ReadinessGenericAnswer {
+  criterion_key: string;
+  issue: string;
+  concrete_alternative: string;
+}
+
+export interface SubmissionReadiness {
+  readiness_score: number;
+  verdict: ReadinessVerdict;
+  summary: string;
+  gaps: ReadinessGap[];
+  missing_evidence: ReadinessMissingEvidence[];
+  overclaims: ReadinessOverclaim[];
+  generic_answers: ReadinessGenericAnswer[];
+  strengths: string[];
+  source: 'claude' | 'fallback';
+}
+
+export function fetchSubmissionReadiness(applicationId: number) {
+  return safeCall<{ readiness: SubmissionReadiness }>(() =>
+    api.post<CopilotResult<{ readiness: SubmissionReadiness }>>(
+      '/ai/submission-readiness',
+      { application_id: applicationId },
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 13b'. Report Pre-Flight — Phase 10.2 (donor-perspective check)
+// ---------------------------------------------------------------------------
+
+export interface ReportDonorConcern {
+  section: string;
+  concern: string;
+  why: string;
+  suggestion: string;
+}
+
+export interface ReportMissingEvidence {
+  section: string;
+  evidence_type: 'data' | 'document' | 'narrative';
+  what: string;
+  where_to_find: string;
+}
+
+export interface ReportVagueClaim {
+  section: string;
+  claim: string;
+  sharper: string;
+}
+
+export interface ReportBudgetVarianceUnexplained {
+  line: string;
+  variance: string;
+  suggestion: string;
+}
+
+export interface ReportReadiness {
+  readiness_score: number;
+  verdict: ReadinessVerdict;
+  summary: string;
+  donor_concerns: ReportDonorConcern[];
+  missing_evidence: ReportMissingEvidence[];
+  vague_claims: ReportVagueClaim[];
+  budget_variance_unexplained: ReportBudgetVarianceUnexplained[];
+  strengths: string[];
+  source: 'claude' | 'fallback';
+}
+
+export function fetchReportReadiness(reportId: number) {
+  return safeCall<{ readiness: ReportReadiness }>(() =>
+    api.post<CopilotResult<{ readiness: ReportReadiness }>>(
+      '/ai/report-readiness',
+      { report_id: reportId },
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 13c. Grant Q&A — Phase 4.3 (NGO ↔ donor inline questions)
 // ---------------------------------------------------------------------------
 
