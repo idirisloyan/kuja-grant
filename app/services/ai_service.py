@@ -268,6 +268,46 @@ class AIService:
         ),
     }
 
+    # Phase 6.3 — per-language register adjustments. The base role tone is
+    # English-centric; in each language we layer culturally-legible register
+    # cues so the AI writes naturally for that audience rather than producing
+    # a translated-from-English feel.
+    _LANG_TONE_ADJUST = {
+        'ar': (
+            "Arabic register: prefer Modern Standard Arabic (الفصحى) for written "
+            "submissions. Use formal but warm phrasing for NGO-facing copy "
+            "(لا تتردّد في…) and crisp neutral phrasing for donor copy. Avoid "
+            "literal English idioms; pick the natural Arabic equivalent. Use "
+            "Eastern Arabic numerals only when the surrounding context already "
+            "uses them — otherwise stick with Western Arabic numerals (123)."
+        ),
+        'fr': (
+            "French register: use vouvoiement (vous) for all professional contexts. "
+            "Avoid Anglicisms where a precise French term exists "
+            "('candidature' not 'application' as a noun, 'évaluateur' not "
+            "'reviewer'). Use French quotation guillemets «...» when quoting."
+        ),
+        'es': (
+            "Spanish register: use formal 'usted' for donor-facing and reviewer "
+            "contexts; 'tú' is acceptable for NGO-facing coaching copy when the "
+            "tone is warm. Prefer Latin American neutral Spanish (e.g. 'computadora' "
+            "over 'ordenador') unless the user's geography clearly indicates Spain."
+        ),
+        'sw': (
+            "Kiswahili register: use Standard Kiswahili. Prefer respectful forms "
+            "(ndugu, mwenzangu where appropriate) for NGO-facing coaching. Keep "
+            "donor copy formal but accessible. When borrowing English technical "
+            "terms (e.g. 'KPI'), italicize them in the user's mind by leaving "
+            "them un-translated only when there's no settled Kiswahili term."
+        ),
+        'so': (
+            "Somali register: use formal Somali appropriate for written grant "
+            "submissions. Maintain warm, respectful tone for NGO coaching "
+            "(walaal, fadlan). Use clear, direct phrasing — Somali rewards "
+            "concision. Numbers in Western numerals."
+        ),
+    }
+
     @classmethod
     def _call_claude(
         cls,
@@ -326,6 +366,13 @@ class AIService:
             tone = cls._ROLE_TONE.get(role) if role else None
             if tone:
                 system_prompt += f"\n\nIMPORTANT — TONE: {tone}"
+
+            # Phase 6.3 — language-specific register adjustments layered on top
+            # of role tone, so the AI writes naturally in the target language
+            # rather than producing translated-from-English feel.
+            lang_tone = cls._LANG_TONE_ADJUST.get(language) if language else None
+            if lang_tone:
+                system_prompt += f"\n\nIMPORTANT — LANGUAGE REGISTER: {lang_tone}"
 
             import time
             t0 = time.monotonic()
