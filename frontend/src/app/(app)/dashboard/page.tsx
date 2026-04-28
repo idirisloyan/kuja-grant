@@ -20,6 +20,7 @@ import { NgoReadinessConsole } from '@/components/dashboards/ngo-readiness-conso
 import { ReviewerQueue } from '@/components/dashboards/reviewer-queue';
 import { AdminOpsPanel } from '@/components/dashboards/admin-ops-panel';
 import { MatchesCard } from '@/components/dashboards/matches-card';
+import { ThisWeekHome } from '@/components/dashboards/this-week-home';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -66,6 +67,11 @@ export default function DashboardPage() {
       {user.role === 'donor' && <DonorCommandCenter />}
       {user.role === 'ngo' && (
         <>
+          {/* Phase 10.6 — "This Week" action center: opinionated next
+              actions backed by /api/ai/ngo-readiness. Renders only when
+              ui.this_week_home flag is on; otherwise falls through to
+              the existing surfaces. */}
+          <ThisWeekHome />
           {/* Phase 3.2 — opportunity feed first when matches are enabled,
               so the NGO immediately sees ranked grants. Falls through to
               the readiness console below. */}

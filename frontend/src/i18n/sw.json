@@ -1689,5 +1689,9 @@
   "burden.alternative": "Mbadala",
   "burden.current": "Sasa",
   "burden.proposed": "Iliyopendekezwa",
-  "burden.suggestion": "Pendekezo"
+  "burden.suggestion": "Pendekezo",
+  "this_week.title": "Wiki hii",
+  "this_week.readiness": "utayari",
+  "this_week.uplift_unit": "alama",
+  "this_week.empty": "Umemaliza yote — hakuna kilichowekwa alama wiki hii."
 }

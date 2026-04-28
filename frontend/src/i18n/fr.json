@@ -1669,5 +1669,9 @@
   "burden.alternative": "Alternative",
   "burden.current": "Actuel",
   "burden.proposed": "Proposé",
-  "burden.suggestion": "Suggestion"
+  "burden.suggestion": "Suggestion",
+  "this_week.title": "Cette semaine",
+  "this_week.readiness": "préparation",
+  "this_week.uplift_unit": "pts",
+  "this_week.empty": "Vous êtes à jour — rien à signaler cette semaine."
 }

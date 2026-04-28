@@ -1669,5 +1669,9 @@
   "burden.alternative": "بديل",
   "burden.current": "الحالي",
   "burden.proposed": "المقترح",
-  "burden.suggestion": "اقتراح"
+  "burden.suggestion": "اقتراح",
+  "this_week.title": "هذا الأسبوع",
+  "this_week.readiness": "الجاهزية",
+  "this_week.uplift_unit": "نقطة",
+  "this_week.empty": "أنت محدّث — لا توجد بنود لهذا الأسبوع."
 }

@@ -1551,6 +1551,24 @@ class AIService:
         prior_docs_str = json.dumps(prior_documents, default=str)[:4000]
         existing_str = json.dumps(existing_responses, default=str)[:3000]
 
+        # Phase 10.5 — reusable organizational memory. The route handler
+        # populates org['memory_items'] (or omits it). When present, we
+        # render those items as a compact prompt block so the AI cites
+        # them via source_kind='profile'.
+        memory_items = org.get('memory_items') or []
+        memory_block = ''
+        if memory_items:
+            lines = [
+                "ORG MEMORY — reusable facts/narratives/evidence the org has accumulated. "
+                "Cite via source_kind='profile' when used:"
+            ]
+            for m in memory_items[:12]:
+                snippet = (m.get('content') or '').strip().replace('\n', ' ')
+                if len(snippet) > 200:
+                    snippet = snippet[:197] + '…'
+                lines.append(f"  • [{m.get('kind')}] {m.get('label') or ''} — {snippet}")
+            memory_block = '\n'.join(lines)
+
         # Phase 1.2 — extract a deterministic voice profile from the NGO's
         # prior applications so the AI matches their actual writing style.
         # When the NGO has no prior apps, voice_profile is None and we drop
@@ -1699,7 +1717,8 @@ class AIService:
             f"  capacity: {json.dumps(org.get('capacity') or {}, default=str)[:1500]}\n\n"
             f"PRIOR APPLICATIONS (voice anchor + facts):\n{prior_apps_str}\n\n"
             f"UPLOADED DOCUMENTS (cite when relevant):\n{prior_docs_str}\n\n"
-            f"EXISTING DRAFT TO IMPROVE (preserve verified facts):\n{existing_str}\n\n"
+            + (f"{memory_block}\n\n" if memory_block else "")
+            + f"EXISTING DRAFT TO IMPROVE (preserve verified facts):\n{existing_str}\n\n"
             f"USER BRIEF:\n{brief or '(none — generate a strong default first cut)'}\n\n"
             "Return the JSON now."
         )

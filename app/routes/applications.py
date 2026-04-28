@@ -254,6 +254,20 @@ def api_submit_application(app_id):
     log_action('application.submitted', current_user.email, 'application', application.id,
                {'grant_id': application.grant_id, 'ai_score': application.ai_score})
 
+    # Phase 10.5 — auto-extract reusable memory items from the submitted
+    # application so the next time this org applies, the AI co-author can
+    # cite their actual figures/partners/narratives. Best-effort; errors
+    # don't surface to the user.
+    try:
+        from app.utils.feature_flags import is_enabled
+        if is_enabled('ai.org_memory', org_id=application.ngo_org_id):
+            from app.services import org_memory_service as oms
+            extracted = oms.auto_extract_from_application(application)
+            if extracted > 0:
+                logger.info(f"org_memory: extracted {extracted} item(s) from application {application.id}")
+    except Exception as _exc:  # pylint: disable=broad-except
+        logger.debug(f"org_memory auto-extraction skipped: {_exc}")
+
     logger.info(f"Application submitted: id={app_id} by org {current_user.org_id} (score: {application.ai_score})")
     return jsonify({'success': True, 'application': application.to_dict()})
 

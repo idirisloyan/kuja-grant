@@ -614,6 +614,34 @@ def _gather_org_context(org_id):
             }
     except Exception:
         pass
+    # Phase 10.5 — pull reusable organizational memory (facts, narratives,
+    # evidence) so the AI co-author has structured access to what the org
+    # has built up across applications/reports without the user having to
+    # re-paste it. Gated by ai.org_memory feature flag — when off, returns
+    # an empty list and no memory is added to the prompt.
+    memory_items = []
+    try:
+        from app.utils.feature_flags import is_enabled
+        if is_enabled('ai.org_memory', org_id=org_id):
+            from app.services import org_memory_service as oms
+            sectors_list = getattr(org, 'sectors', None) or []
+            countries_list = getattr(org, 'countries', None) or []
+            if isinstance(sectors_list, str):
+                sectors_list = [s.strip() for s in sectors_list.split(',') if s.strip()]
+            if isinstance(countries_list, str):
+                countries_list = [c.strip() for c in countries_list.split(',') if c.strip()]
+            memory_items = [
+                m.to_dict() for m in oms.retrieve_relevant(
+                    org_id,
+                    sectors=sectors_list,
+                    countries=countries_list,
+                    limit=12,
+                )
+            ]
+    except Exception as _exc:  # pylint: disable=broad-except
+        # Memory is best-effort; never block draft generation.
+        logger.debug(f"org_memory retrieval skipped: {_exc}")
+
     return {
         'id': org.id,
         'name': org.name,
@@ -621,6 +649,7 @@ def _gather_org_context(org_id):
         'sectors': getattr(org, 'sectors', None),
         'countries': getattr(org, 'countries', None),
         'capacity': capacity,
+        'memory_items': memory_items,
     }
 
 

@@ -1669,5 +1669,9 @@
   "burden.alternative": "Alternative",
   "burden.current": "Current",
   "burden.proposed": "Proposed",
-  "burden.suggestion": "Suggestion"
+  "burden.suggestion": "Suggestion",
+  "this_week.title": "This week",
+  "this_week.readiness": "readiness",
+  "this_week.uplift_unit": "pts",
+  "this_week.empty": "You're all caught up — nothing flagged for this week."
 }

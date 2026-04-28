@@ -1689,5 +1689,9 @@
   "burden.alternative": "Beddel",
   "burden.current": "Hadda",
   "burden.proposed": "La soo jeediyay",
-  "burden.suggestion": "Talo"
+  "burden.suggestion": "Talo",
+  "this_week.title": "Toddobaadkan",
+  "this_week.readiness": "diyaarinta",
+  "this_week.uplift_unit": "dhibco",
+  "this_week.empty": "Wax kasta waad gaartay — wax dhab ah lama calaamadeyn toddobaadkan."
 }

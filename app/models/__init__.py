@@ -21,6 +21,7 @@ from app.models.ai_thread import AIThread, AIMessage, AICallLog
 from app.models.ai_provenance import AIProvenance
 from app.models.grant_question import GrantQuestion
 from app.models.diligence import DiligenceItem
+from app.models.org_memory import OrgMemory
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -28,4 +29,5 @@ __all__ = [
     'Notification',
     'AIThread', 'AIMessage', 'AICallLog', 'AIProvenance',
     'GrantQuestion', 'DiligenceItem',
+    'OrgMemory',
 ]
