@@ -727,6 +727,129 @@ class AIService:
         }
 
     @classmethod
+    def compliance_preempt(
+        cls,
+        *,
+        application,
+        org,
+        grant,
+        documents=None,
+        language=None,
+    ):
+        """Phase 8.2 — pre-submission compliance scan.
+
+        BEFORE the NGO submits, we run an AI check against historical
+        compliance flags to surface issues that would later cause a delay
+        or a rejection. The output is purely informational; no compliance
+        flag is recorded yet — this is the NGO's chance to fix things.
+
+        Output:
+          {
+            'risk_level': 'low' | 'medium' | 'high',
+            'flags': [
+              { 'kind': str,           # 'eligibility'|'documents'|'finance'|'narrative'|'data'
+                'severity': 'info'|'warning'|'critical',
+                'issue': str,           # what's wrong
+                'fix': str,             # one-sentence concrete action
+                'related_field': str|null,
+              }, ...
+            ],
+            'pre_clear': [str],         # things that look good
+            'rationale': str,           # short summary
+          }
+        """
+        application = application or {}
+        org = org or {}
+        grant = grant or {}
+        documents = documents or []
+
+        system = (
+            "You are Kuja's compliance pre-emption assistant. The NGO is "
+            "about to submit an application. Your job is to spot ANYTHING "
+            "that would later trigger a compliance flag, audit query, or "
+            "rejection — so the NGO can fix it BEFORE submitting.\n\n"
+            "Look for: missing required documents, dates that don't match, "
+            "geographic eligibility mismatch, currency/budget inconsistencies, "
+            "narrative contradictions with the org profile, missing PSEA / "
+            "registration details, sanctions-screening risk indicators, "
+            "and stock compliance pitfalls (e.g. claiming activity in a "
+            "country the org isn't registered in).\n\n"
+            "Be SPECIFIC. Don't say 'consider reviewing eligibility' — "
+            "say 'eligibility says ≥3 years operating in Uganda but org "
+            "profile shows registration date 2024-03 (under 2 years)'.\n\n"
+            "Only flag REAL issues you can identify from the data. If the "
+            "application looks clean, return an empty flags list and "
+            "risk_level='low'. Don't invent problems.\n\n"
+            "Return ONLY a JSON object matching the schema."
+        )
+
+        schema = """{
+  "risk_level": "low|medium|high",
+  "flags": [
+    {
+      "kind": "eligibility|documents|finance|narrative|data",
+      "severity": "info|warning|critical",
+      "issue": "<concrete what's wrong>",
+      "fix": "<one-sentence concrete action>",
+      "related_field": "<field name or null>"
+    }
+  ],
+  "pre_clear": ["<short positive note>", "..."],
+  "rationale": "<≤200 chars summary>"
+}"""
+
+        user_msg = (
+            "GRANT REQUIREMENTS:\n"
+            f"  title: {grant.get('title')}\n"
+            f"  eligibility: {json.dumps(grant.get('eligibility') or [], default=str)[:1500]}\n"
+            f"  required_docs: {json.dumps(grant.get('doc_requirements') or [], default=str)[:1000]}\n\n"
+            "APPLICANT NGO:\n"
+            f"  name: {org.get('name')}\n"
+            f"  countries: {org.get('countries')}\n"
+            f"  sectors: {org.get('sectors')}\n"
+            f"  registration: {org.get('registration_date') or '-'}\n"
+            f"  capacity: {json.dumps(org.get('capacity') or {}, default=str)[:800]}\n\n"
+            "APPLICATION:\n"
+            f"  responses: {json.dumps(application.get('responses') or {}, default=str)[:3000]}\n"
+            f"  eligibility_responses: {json.dumps(application.get('eligibility_responses') or {}, default=str)[:1500]}\n"
+            f"  total_funding_requested: {application.get('total_funding_requested')}\n\n"
+            f"UPLOADED DOCUMENTS:\n{json.dumps(documents, default=str)[:1500]}\n\n"
+            "Return the JSON now."
+        )
+
+        text = cls._call_claude(
+            system + "\n\n" + schema,
+            user_msg,
+            max_tokens=2500,
+            language=language,
+            role='ngo',
+            endpoint='compliance_preempt',
+        )
+
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    parsed['source'] = 'claude'
+                    parsed.setdefault('flags', [])
+                    parsed.setdefault('pre_clear', [])
+                    parsed.setdefault('risk_level', 'low')
+                    parsed.setdefault('rationale', '')
+                    return parsed
+            except Exception as e:
+                logger.warning(f"compliance_preempt JSON parse failed: {e}")
+
+        return {
+            'risk_level': 'low',
+            'flags': [],
+            'pre_clear': [],
+            'rationale': '',
+            'source': 'template',
+        }
+
+    @classmethod
     def _extract_voice_profile(cls, prior_applications):
         """Phase 1.2 — derive a deterministic voice signature from prior apps.
 

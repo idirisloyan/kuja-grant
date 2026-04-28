@@ -865,6 +865,87 @@ def api_ai_draft_application():
 
 
 # ---------------------------------------------------------------------------
+# Phase 8.2 — pre-submission compliance scan
+# ---------------------------------------------------------------------------
+
+@ai_bp.route('/compliance-preempt', methods=['POST'])
+@login_required
+@role_required('ngo')
+def api_ai_compliance_preempt():
+    """Pre-submission compliance scan.
+
+    Body: {"application_id": int}
+
+    Surfaces issues BEFORE the NGO submits — last chance to fix things
+    that would later trigger a compliance flag or rejection. Gated by
+    ai.compliance_preempt feature flag (default OFF until verified).
+    """
+    from app.utils.feature_flags import is_enabled
+    if not is_enabled('ai.compliance_preempt',
+                      user_id=current_user.id,
+                      org_id=getattr(current_user, 'org_id', None)):
+        return error_response('auth.access_denied', 403,
+                              default='This feature is not enabled for your account.')
+
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return error_response('ai.rate_limited', 429)
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json() or {}
+    application_id = data.get('application_id')
+    if not application_id:
+        return error_response('validation.missing_field', 400, field='application_id')
+
+    application = db.session.get(Application, int(application_id))
+    if not application:
+        return error_response('application.not_found', 404)
+    if application.ngo_org_id != current_user.org_id:
+        return error_response('auth.access_denied', 403)
+
+    grant = db.session.get(Grant, application.grant_id) if application.grant_id else None
+    if not grant:
+        return error_response('grant.not_found', 404)
+
+    org_payload = _gather_org_context(current_user.org_id)
+    if not org_payload:
+        return error_response('auth.access_denied', 403)
+
+    grant_payload = {
+        'id': grant.id,
+        'title': grant.title,
+        'eligibility': grant.get_eligibility() if hasattr(grant, 'get_eligibility') else [],
+        'doc_requirements': grant.get_doc_requirements() if hasattr(grant, 'get_doc_requirements') else [],
+    }
+
+    application_payload = {
+        'responses': (application.get_responses() or {}) if hasattr(application, 'get_responses') else {},
+        'eligibility_responses': (application.get_eligibility_responses() or {})
+        if hasattr(application, 'get_eligibility_responses') else {},
+        'total_funding_requested': getattr(application, 'total_funding_requested', None),
+    }
+
+    documents = _gather_org_documents(current_user.org_id, limit=10)
+
+    parsed = AIService.compliance_preempt(
+        application=application_payload,
+        org=org_payload,
+        grant=grant_payload,
+        documents=documents,
+        language=current_user.language or 'en',
+    )
+
+    return jsonify({
+        'success': True,
+        'preempt': parsed,
+        'ai_transparency': {
+            'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
+            'disclaimer': 'AI compliance scan — not a guarantee. Verify against the donor agreement.',
+        },
+    })
+
+
+# ---------------------------------------------------------------------------
 # Phase 1.3 — NGO report co-author (first-draft generation)
 # ---------------------------------------------------------------------------
 

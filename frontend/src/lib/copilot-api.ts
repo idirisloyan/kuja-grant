@@ -607,6 +607,33 @@ export function postRecomputeMatches(input: {
 }
 
 // ---------------------------------------------------------------------------
+// 13b. Compliance pre-emption — Phase 8.2
+// ---------------------------------------------------------------------------
+
+export interface CompliancePreempt {
+  risk_level: 'low' | 'medium' | 'high';
+  flags: Array<{
+    kind: 'eligibility' | 'documents' | 'finance' | 'narrative' | 'data' | string;
+    severity: 'info' | 'warning' | 'critical';
+    issue: string;
+    fix: string;
+    related_field?: string | null;
+  }>;
+  pre_clear: string[];
+  rationale: string;
+  source: 'claude' | 'template';
+}
+
+export function fetchCompliancePreempt(applicationId: number) {
+  return safeCall<{ preempt: CompliancePreempt }>(() =>
+    api.post<CopilotResult<{ preempt: CompliancePreempt }>>(
+      '/ai/compliance-preempt',
+      { application_id: applicationId },
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 13c. Grant Q&A — Phase 4.3 (NGO ↔ donor inline questions)
 // ---------------------------------------------------------------------------
 

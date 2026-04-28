@@ -20,11 +20,12 @@ from app.models.notification import Notification
 from app.models.ai_thread import AIThread, AIMessage, AICallLog
 from app.models.ai_provenance import AIProvenance
 from app.models.grant_question import GrantQuestion
+from app.models.diligence import DiligenceItem
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
     'Document', 'Review', 'Report', 'ComplianceCheck', 'RegistrationVerification',
     'Notification',
     'AIThread', 'AIMessage', 'AICallLog', 'AIProvenance',
-    'GrantQuestion',
+    'GrantQuestion', 'DiligenceItem',
 ]
