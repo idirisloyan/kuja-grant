@@ -83,18 +83,18 @@ export default function OrgSearchPage() {
       {!searching && results.length > 0 && (
         <div className="rounded-xl border border-border bg-background overflow-hidden">
           <div className="px-4 py-2 border-b border-border bg-muted/20 text-sm text-muted-foreground">
-            {results.length} result{results.length !== 1 ? 's' : ''} found
+            {t('org_search.results_count', { n: results.length })}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/30 border-b border-border text-left">
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Organization</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Type</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Country</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Verified</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Assessment</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Actions</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">{t('org_search.col.organization')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">{t('org_search.col.type')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">{t('verification.col.country')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">{t('org_search.col.verified')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">{t('org_search.col.assessment')}</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">{t('verification.col.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -125,7 +125,7 @@ export default function OrgSearchPage() {
                           <ShieldCheck className="h-4 w-4" /> {t('verification.status.verified')}
                         </span>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Not verified</span>
+                        <span className="text-xs text-muted-foreground">{t('org_search.not_verified')}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">

@@ -117,10 +117,25 @@ export function StatusBadge({ status, kind, className = '' }: StatusBadgeProps) 
     const key = `status.${kind}.${status}.${variant}`;
     const translated = t(key);
     // translate() falls back to the raw key when no translation exists.
-    // If that happened, drop down to the legacy label table for safety.
-    label = translated === key ? (STATUS_LABEL[status] ?? status) : translated;
+    // If that happened, drop down to legacy or Phase 10.10 tone keys.
+    if (translated !== key) {
+      label = translated;
+    } else {
+      // Phase 10.10 — donor- and NGO-toned status keys.
+      // status.donor.<status>  (precise + decision-oriented)
+      // status.ngo.<status>    (warm + supportive)
+      // When neither exists fall back to the legacy label table.
+      const tone = role === 'ngo' ? 'ngo' : 'donor';
+      const toneKey = `status.${tone}.${status}`;
+      const toneLabel = t(toneKey);
+      label = toneLabel === toneKey ? (STATUS_LABEL[status] ?? status) : toneLabel;
+    }
   } else {
-    label = STATUS_LABEL[status] ?? status;
+    // Phase 10.10 — same fallback for kindless callers.
+    const tone = role === 'ngo' ? 'ngo' : 'donor';
+    const toneKey = `status.${tone}.${status}`;
+    const toneLabel = t(toneKey);
+    label = toneLabel === toneKey ? (STATUS_LABEL[status] ?? status) : toneLabel;
   }
 
   return (

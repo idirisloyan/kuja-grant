@@ -11,6 +11,7 @@ import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { ReviewerSummary } from '@/components/reviews/ReviewerSummary';
+import { DecisionAuditDrawer } from '@/components/applications/DecisionAuditDrawer';
 import {
   ArrowLeft, Send, Cpu, Loader2, FileText, Star, MessageSquare, CheckCircle,
 } from 'lucide-react';
@@ -305,10 +306,15 @@ export default function ReviewDetailClient() {
         >
           <ArrowLeft className="h-4 w-4" /> {t('common.back')}
         </button>
-        <div>
+        <div className="flex-1">
           <h1 className="kuja-display text-2xl">{t('review.detail.score_app')}</h1>
           <p className="text-sm text-muted-foreground">Application #{appId}</p>
         </div>
+        {/* Phase 10.8 — decision audit drawer for reviewers/donors/admins.
+            Renders the timeline of AI calls + lifecycle events that led
+            to the current state of this application. Hidden behind the
+            ui.decision_audit flag. */}
+        <DecisionAuditDrawer applicationId={appId} />
       </div>
 
       {/* Summary card */}

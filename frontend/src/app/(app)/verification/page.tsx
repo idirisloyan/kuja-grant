@@ -205,13 +205,13 @@ function VerificationDetail({ verification }: { verification: RegistrationVerifi
       <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
         {verification.registry_url && (
           <span>
-            Registry: <a href={verification.registry_url} target="_blank" rel="noreferrer"
+            {t('verification.detail.registry_label')}: <a href={verification.registry_url} target="_blank" rel="noreferrer"
               className="text-[hsl(var(--kuja-clay))] underline">{verification.registry_url}</a>
           </span>
         )}
-        {verification.verified_by_name && <span>Verified by: {verification.verified_by_name}</span>}
-        {verification.verified_at && <span>Verified: {formatDate(verification.verified_at)}</span>}
-        {verification.notes && <span>Notes: {verification.notes}</span>}
+        {verification.verified_by_name && <span>{t('verification.detail.verified_by_label')}: {verification.verified_by_name}</span>}
+        {verification.verified_at && <span>{t('verification.status.verified')}: {formatDate(verification.verified_at)}</span>}
+        {verification.notes && <span>{t('verification.detail.notes_label')}: {verification.notes}</span>}
       </div>
     </div>
   );
@@ -284,7 +284,7 @@ export default function VerificationPage() {
       <div>
         <h1 className="kuja-display text-3xl">{t('verification.title')}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Verify organization registrations across {Object.keys(registriesData?.registries ?? {}).length} supported countries
+          {t('verification.subtitle', { n: Object.keys(registriesData?.registries ?? {}).length })}
         </p>
       </div>
 
@@ -322,7 +322,7 @@ export default function VerificationPage() {
           <Eye className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
           <p className="kuja-display text-xl">{t('verification.no_verifications')}</p>
           <p className="text-sm text-muted-foreground mt-1">
-            {searchQuery ? 'Try a different search term.' : 'No organization verifications available.'}
+            {searchQuery ? t('common.try_different_search') : t('verification.no_orgs_hint')}
           </p>
         </div>
       ) : (

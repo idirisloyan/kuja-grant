@@ -318,7 +318,7 @@ export default function AssessmentWizardPage() {
               className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
-              {submitting ? 'Analyzing…' : t('assessment.submit_get_results')}
+              {submitting ? t('assessments_wizard.analyzing') : t('assessment.submit_get_results')}
             </button>
           )}
         </div>
@@ -331,14 +331,14 @@ export default function AssessmentWizardPage() {
             onClick={() => router.push('/assessments')}
             className="rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] text-sm font-medium px-4 py-2"
           >
-            Back to assessments
+            {t('assessments_wizard.back_to_assessments_btn')}
           </button>
           <button
             type="button"
             onClick={() => router.push('/grants')}
             className="rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
           >
-            Browse grants
+            {t('assessments_wizard.browse_grants_btn')}
           </button>
         </div>
       )}
@@ -357,11 +357,11 @@ function OrgProfileStep({
       </div>
       <p className="text-xs text-muted-foreground mb-4">{t('assessment.org_profile_subtitle')}</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Organization name">
+        <Field label={t('assessments_wizard.field.org_name')}>
           <input type="text" value={profile.name} onChange={(e) => onChange('name', e.target.value)}
             placeholder="Enter organization name" className={inputCls} />
         </Field>
-        <Field label="Country">
+        <Field label={t('assessments_wizard.field.country')}>
           <input type="text" value={profile.country} onChange={(e) => onChange('country', e.target.value)}
             placeholder="e.g., Kenya" className={inputCls} />
         </Field>
@@ -383,7 +383,7 @@ function OrgProfileStep({
         </Field>
       </div>
       <div className="mt-3">
-        <Field label="Mission statement">
+        <Field label={t('assessments_wizard.field.mission')}>
           <textarea value={profile.mission} onChange={(e) => onChange('mission', e.target.value)}
             rows={3} placeholder="Describe your organization's mission…"
             className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--kuja-clay))]" />

@@ -144,7 +144,7 @@ export default function OrgProfilePage() {
             className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? 'Saving…' : t('common.save_changes')}
+            {saving ? t('org.saving') : t('common.save_changes')}
           </button>
         </div>
       </div>
@@ -192,19 +192,19 @@ export default function OrgProfilePage() {
               ? 'bg-[hsl(142_68%_95%)] text-[hsl(var(--kuja-grow))] border-[hsl(142_55%_85%)]'
               : 'bg-[hsl(32_100%_95%)] text-[hsl(32_80%_35%)] border-[hsl(32_80%_85%)]',
           )}>
-            {org.verified ? 'Verified' : 'Unverified'}
+            {org.verified ? t('org_profile.verified_yes') : t('org_profile.verified_no')}
           </span>
           <span className="kuja-severity bg-muted text-muted-foreground border-border uppercase">
-            {org.org_type || 'NGO'}
+            {org.org_type || t('org_profile.org_type_default')}
           </span>
           {org.registration_number && (
             <span className="kuja-severity bg-muted text-muted-foreground border-border">
-              Reg: {org.registration_number}
+              {t('org_profile.reg_label')}: {org.registration_number}
             </span>
           )}
           {org.assess_score != null && (
             <span className="kuja-severity bg-[hsl(var(--kuja-sand-50))] text-[hsl(var(--kuja-clay-dark))] border-[hsl(var(--kuja-sand))]">
-              Capacity {org.assess_score}%
+              {t('org_profile.capacity_label')} {org.assess_score}%
             </span>
           )}
         </div>

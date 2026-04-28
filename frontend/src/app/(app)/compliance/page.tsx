@@ -68,7 +68,7 @@ function GrantAccordion({ grant, reports }: { grant: Grant; reports: Report[] })
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <ScoreRing score={avg} size={48} strokeWidth={4} label="Compl." />
+          <ScoreRing score={avg} size={48} strokeWidth={4} label={t('compliance.score_label_short')} />
           <StatusBadge status={grant.status} kind="grant" />
           {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
         </div>
@@ -126,7 +126,7 @@ function GrantAccordion({ grant, reports }: { grant: Grant; reports: Report[] })
                             </span>
                           )}
                           <span className={cn(isOverdue ? 'text-[hsl(var(--kuja-flag))]' : 'text-muted-foreground')}>
-                            Due: {formatDate(r.due_date)}
+                            {t('compliance.due_prefix')}: {formatDate(r.due_date)}
                           </span>
                           <StatusBadge status={r.status} kind="report" />
                         </div>
@@ -218,7 +218,7 @@ export default function CompliancePage() {
             {summary.atRisk > 0 && (
               <div className="flex items-baseline gap-1">
                 <span className="kuja-numeric text-xl font-semibold text-[hsl(var(--kuja-sun))]">{summary.atRisk}</span>
-                <span className="text-[hsl(var(--kuja-sun))]">at risk</span>
+                <span className="text-[hsl(var(--kuja-sun))]">{t('compliance.at_risk_text')}</span>
               </div>
             )}
             <div className="flex items-baseline gap-1">

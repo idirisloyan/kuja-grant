@@ -12,13 +12,13 @@ import {
 import { cn } from '@/lib/utils';
 import type { FrameworkInfo } from '@/lib/types';
 
-function getLevelLabel(score: number): string {
-  if (score >= 90) return 'Excellent';
-  if (score >= 80) return 'Very good';
-  if (score >= 70) return 'Good';
-  if (score >= 60) return 'Satisfactory';
-  if (score >= 40) return 'Developing';
-  return 'Needs improvement';
+function getLevelKey(score: number): string {
+  if (score >= 90) return 'assessments.level.excellent';
+  if (score >= 80) return 'assessments.level.very_good';
+  if (score >= 70) return 'assessments.level.good';
+  if (score >= 60) return 'assessments.level.satisfactory';
+  if (score >= 40) return 'assessments.level.developing';
+  return 'assessments.level.needs_improvement';
 }
 
 const FW_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -90,9 +90,9 @@ export default function AssessmentsPage() {
       {/* Score + summary */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="rounded-xl border border-border bg-background p-5 flex flex-col items-center text-center">
-          <ScoreRing score={currentScore} size={120} strokeWidth={8} label="Score" />
-          <p className="mt-3 text-sm font-semibold">{getLevelLabel(currentScore)}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Current capacity level</p>
+          <ScoreRing score={currentScore} size={120} strokeWidth={8} label={t('assessments.score_label')} />
+          <p className="mt-3 text-sm font-semibold">{t(getLevelKey(currentScore))}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('assessments.current_capacity_level')}</p>
           {latestAssessment && (
             <span className="mt-3 rounded-full border border-border text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-0.5">
               {latestAssessment.framework.toUpperCase()} framework
@@ -175,10 +175,10 @@ export default function AssessmentsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted/30 border-b border-border text-left">
-                    <th className="px-4 py-3 font-medium text-muted-foreground">Framework</th>
-                    <th className="px-4 py-3 font-medium text-muted-foreground text-center">Score</th>
-                    <th className="px-4 py-3 font-medium text-muted-foreground">Date</th>
-                    <th className="px-4 py-3 font-medium text-muted-foreground">Status</th>
+                    <th className="px-4 py-3 font-medium text-muted-foreground">{t('assessments.col.framework')}</th>
+                    <th className="px-4 py-3 font-medium text-muted-foreground text-center">{t('assessments.col.score')}</th>
+                    <th className="px-4 py-3 font-medium text-muted-foreground">{t('assessments.col.date')}</th>
+                    <th className="px-4 py-3 font-medium text-muted-foreground">{t('assessments.col.status')}</th>
                   </tr>
                 </thead>
                 <tbody>
