@@ -48,10 +48,30 @@ kuja-grant/
 │   └── js/translations/    # i18n JSON files (en, fr, ar, es, sw, so)
 ├── smoke_test.py           # Pre-deploy gate (runs before every deploy)
 ├── test_e2e_final.py       # Full E2E regression suite
+├── scripts/test_invariants.py  # Logic invariants (35 fast checks; gated in smoke)
 ├── requirements.txt        # Python dependencies
 ├── railway.json            # Railway deployment config
-└── Procfile                # Gunicorn process definition
+├── Procfile                # Gunicorn process definition
+├── BACKLOG.md              # Living backlog — update on every commit that defers/picks up/completes work
+├── OPERATIONS.md           # Day-2 ops playbook
+└── docs/i18n_review_targets.md  # Native-speaker review priority namespaces
 ```
+
+### Working with the backlog
+
+`BACKLOG.md` is the single source of truth for deferred work. The
+convention (enforced by team norm, not by hook):
+
+- Every commit that **defers** new work → add an entry with priority +
+  `last_touched` date.
+- Every commit that **picks up** work → reference the entry in the commit
+  message.
+- Every commit that **completes** work → move to the rolling log at the
+  bottom with the commit SHA + date.
+
+Always check the backlog before proposing new work — most "should we
+do X?" conversations have already happened. See the **Explicitly
+declined** section for items consciously not pursued.
 
 ## Development Setup
 
