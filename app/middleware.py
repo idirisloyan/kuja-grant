@@ -324,6 +324,14 @@ def register_middleware(app):
         # 'unsafe-inline' on style-src for MUI runtime style injection.
         # blob: in img-src covers chart libraries that render to blob URLs.
         # data: in font-src covers libraries that inline small icon fonts.
+        # Phase 13.13 — CSP refinement (PMO transfer).
+        # Tightened directives without breaking the static-export hydration:
+        #   - worker-src 'self' blob: — for any Web Worker chunks
+        #   - manifest-src 'self'     — for the PWA manifest
+        #   - media-src 'self'        — explicit deny of remote media
+        #   - block-all-mixed-content — defends against TLS downgrade
+        # The 'unsafe-inline' on script-src remains until a build-time
+        # nonce-based CSP is wired (1-2 sessions of work — kept on backlog).
         response.headers['Content-Security-Policy'] = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline'; "
@@ -331,10 +339,14 @@ def register_middleware(app):
             "img-src 'self' data: blob:; "
             "font-src 'self' https://fonts.gstatic.com data:; "
             "connect-src 'self'; "
+            "worker-src 'self' blob:; "
+            "manifest-src 'self'; "
+            "media-src 'self'; "
             "frame-ancestors 'none'; "
             "base-uri 'self'; "
             "form-action 'self'; "
             "object-src 'none'; "
+            "block-all-mixed-content; "
             "upgrade-insecure-requests"
         )
         # HSTS: always set in production (Railway terminates TLS at proxy)

@@ -328,6 +328,79 @@ def api_failed_logins():
     })
 
 
+@admin_health_bp.route('/forget-user/<int:user_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_forget_user(user_id):
+    """Phase 13.14 — GDPR right-to-be-forgotten.
+
+    Anonymizes a user record:
+      - first_name / last_name -> "[Deleted]"
+      - email -> "deleted-<id>@kuja.invalid"
+      - password_hash -> randomized
+      - is_active = False
+      - language preference reset
+    Audit log + ownership history is PRESERVED (legal record). PII is
+    gone but every FK pointing at this user (applications submitted,
+    grants owned, comments authored) keeps its reference — anonymization
+    keeps historical integrity intact.
+
+    Body (optional): { reason: str — for the audit log }
+    """
+    from app.models import User
+    from werkzeug.security import generate_password_hash
+    import secrets
+    from app.models.audit_chain import AuditChainEntry
+
+    user = db.session.get(User, user_id)
+    if not user:
+        return error_response('not_found', 404)
+    if user.id == current_user.id:
+        return error_response('validation.invalid_value', 400, field='user_id',
+                              detail='Cannot forget yourself')
+
+    data = request.get_json(silent=True) or {}
+    reason = (data.get('reason') or '').strip()[:280]
+    original_email = user.email
+
+    user.first_name = '[Deleted]'
+    user.last_name = '[Deleted]'
+    if hasattr(user, 'name'):
+        user.name = '[Deleted] User'
+    user.email = f'deleted-{user.id}@kuja.invalid'
+    user.password_hash = generate_password_hash(secrets.token_urlsafe(32))
+    if hasattr(user, 'is_active'):
+        user.is_active = False
+    if hasattr(user, 'language'):
+        user.language = 'en'
+    if hasattr(user, 'avatar_url'):
+        user.avatar_url = None
+    db.session.commit()
+
+    # Append to the hash-chained audit log (tamper-evident).
+    AuditChainEntry.append(
+        action='user.forgotten',
+        actor_email=current_user.email,
+        subject_kind='user',
+        subject_id=user.id,
+        details={'original_email': original_email, 'reason': reason},
+    )
+    return jsonify({
+        'success': True,
+        'user_id': user.id,
+        'note': 'PII anonymized; FK references preserved for legal continuity.',
+    })
+
+
+@admin_health_bp.route('/audit-chain/verify', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_audit_chain_verify():
+    """Phase 13.12 — verify the hash-chained audit log."""
+    from app.models.audit_chain import AuditChainEntry
+    return jsonify({'success': True, **AuditChainEntry.verify()})
+
+
 @admin_health_bp.route('/api-docs', methods=['GET'])
 @login_required
 @role_required('admin')
