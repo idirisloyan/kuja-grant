@@ -1800,5 +1800,12 @@
   "risk.status.mitigating": "En atténuation",
   "risk.status.mitigated": "Atténué",
   "risk.status.accepted": "Accepté",
-  "risk.status.dismissed": "Rejeté"
+  "risk.status.dismissed": "Rejeté",
+  "ask_ai.title": "Demander à Kuja",
+  "ask_ai.placeholder": "Posez une question sur vos subventions, rapports, risques…",
+  "ask_ai.thinking": "Recherche en cours…",
+  "ask_ai.try_examples": "Essayez de demander :",
+  "ask_ai.example_1": "Quels rapports sont en retard ?",
+  "ask_ai.example_2": "Montrez-moi le score de conformité pour la subvention 12.",
+  "ask_ai.example_3": "Listez mes risques ouverts."
 }

@@ -1800,5 +1800,12 @@
   "risk.status.mitigating": "Mitigating",
   "risk.status.mitigated": "Mitigated",
   "risk.status.accepted": "Accepted",
-  "risk.status.dismissed": "Dismissed"
+  "risk.status.dismissed": "Dismissed",
+  "ask_ai.title": "Ask Kuja",
+  "ask_ai.placeholder": "Ask about your grants, reports, risks…",
+  "ask_ai.thinking": "Looking it up…",
+  "ask_ai.try_examples": "Try asking:",
+  "ask_ai.example_1": "Which reports are overdue?",
+  "ask_ai.example_2": "Show me the compliance health for grant 12.",
+  "ask_ai.example_3": "List my open risks."
 }

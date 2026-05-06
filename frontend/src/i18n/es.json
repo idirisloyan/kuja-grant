@@ -1800,5 +1800,12 @@
   "risk.status.mitigating": "Mitigando",
   "risk.status.mitigated": "Mitigado",
   "risk.status.accepted": "Aceptado",
-  "risk.status.dismissed": "Descartado"
+  "risk.status.dismissed": "Descartado",
+  "ask_ai.title": "Preguntar a Kuja",
+  "ask_ai.placeholder": "Pregunte sobre sus subvenciones, informes, riesgos…",
+  "ask_ai.thinking": "Buscando…",
+  "ask_ai.try_examples": "Pruebe a preguntar:",
+  "ask_ai.example_1": "¿Qué informes están vencidos?",
+  "ask_ai.example_2": "Muéstreme el puntaje de cumplimiento para la subvención 12.",
+  "ask_ai.example_3": "Liste mis riesgos abiertos."
 }

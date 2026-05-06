@@ -1800,5 +1800,12 @@
   "risk.status.mitigating": "قيد التخفيف",
   "risk.status.mitigated": "تم تخفيفه",
   "risk.status.accepted": "مقبول",
-  "risk.status.dismissed": "مرفوض"
+  "risk.status.dismissed": "مرفوض",
+  "ask_ai.title": "اسأل كوجا",
+  "ask_ai.placeholder": "اسأل عن منحك أو تقاريرك أو مخاطرك…",
+  "ask_ai.thinking": "جارٍ البحث…",
+  "ask_ai.try_examples": "جرّب أن تسأل:",
+  "ask_ai.example_1": "ما التقارير المتأخرة؟",
+  "ask_ai.example_2": "أرني درجة الامتثال للمنحة 12.",
+  "ask_ai.example_3": "اعرض المخاطر المفتوحة لديّ."
 }

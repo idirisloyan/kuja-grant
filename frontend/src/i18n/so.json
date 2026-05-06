@@ -1820,5 +1820,12 @@
   "risk.status.mitigating": "La yareynayo",
   "risk.status.mitigated": "La yareeyay",
   "risk.status.accepted": "La aqbalay",
-  "risk.status.dismissed": "La diiday"
+  "risk.status.dismissed": "La diiday",
+  "ask_ai.title": "Weydii Kuja",
+  "ask_ai.placeholder": "Weydii ku saabsan deeqahaaga, warbixinta, halista…",
+  "ask_ai.thinking": "Waa la raadinayaa…",
+  "ask_ai.try_examples": "Isku day inaad weydiiso:",
+  "ask_ai.example_1": "Warbixino ay waqtigoodu dhaafay?",
+  "ask_ai.example_2": "I tus dhibcaha qaanuun-raacida ee deeqda 12.",
+  "ask_ai.example_3": "Liiska halista furan ee aan haysto."
 }

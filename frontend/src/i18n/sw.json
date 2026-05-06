@@ -1820,5 +1820,12 @@
   "risk.status.mitigating": "Inapunguzwa",
   "risk.status.mitigated": "Imepunguzwa",
   "risk.status.accepted": "Imekubaliwa",
-  "risk.status.dismissed": "Imekataliwa"
+  "risk.status.dismissed": "Imekataliwa",
+  "ask_ai.title": "Uliza Kuja",
+  "ask_ai.placeholder": "Uliza kuhusu ruzuku, ripoti, hatari zako…",
+  "ask_ai.thinking": "Inatafuta…",
+  "ask_ai.try_examples": "Jaribu kuuliza:",
+  "ask_ai.example_1": "Ripoti zipi zimepitwa na muda?",
+  "ask_ai.example_2": "Nionyeshe alama ya kufuata sheria kwa ruzuku 12.",
+  "ask_ai.example_3": "Orodhesha hatari zangu zilizo wazi."
 }

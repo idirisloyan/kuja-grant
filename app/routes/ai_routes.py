@@ -1505,6 +1505,39 @@ def api_ai_report_readiness():
 
 
 # ---------------------------------------------------------------------------
+# Phase 13.9 — AI conversational agent ("Ask AI")
+# ---------------------------------------------------------------------------
+
+@ai_bp.route('/ask', methods=['POST'])
+@login_required
+def api_ai_ask():
+    """Run the AI conversational agent against a user query.
+
+    Body: { query: str (max 500 chars) }
+    Returns: { success, answer, tools_used: [str], data: { tool_name: result } }
+
+    The agent uses Claude's tool-use to query a registry of read-only
+    DB tools (RBAC-checked + org-scoped). 3-step max iteration, hard
+    timeout via the SDK ceiling.
+    """
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return error_response('ai.rate_limited', 429)
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json() or {}
+    from app.utils.validation import require_string, ValidationError, to_error_response
+    try:
+        query = require_string(data, 'query', max_len=500)
+    except ValidationError as e:
+        return to_error_response(e)
+
+    from app.services.ai_agent import run_agent
+    result = run_agent(query, current_user)
+    return jsonify({'success': True, **result})
+
+
+# ---------------------------------------------------------------------------
 # Provenance read endpoint (Phase 5.1 prep)
 # ---------------------------------------------------------------------------
 
