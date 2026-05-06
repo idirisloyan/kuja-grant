@@ -13,6 +13,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { Search, X, Plus, ArrowRight, Inbox, Calendar, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Grant } from '@/lib/types';
+import { SavedSearchesBar } from '@/components/shared/saved-searches-bar';
 
 function formatFunding(amount: number | null | undefined, currency: string = 'USD'): string {
   if (!amount) return 'TBD';
@@ -160,6 +161,24 @@ export default function GrantsPage() {
           </button>
         )}
       </div>
+
+      {/* Phase 13.39 — saved searches drop-in. Captures the active filter
+          shape (search, sectors, sort) so users can restore it with one click. */}
+      <SavedSearchesBar
+        scope="grants"
+        currentFilter={{
+          q: searchQuery,
+          sectors: Array.from(activeSectors),
+          sort: sortBy,
+        }}
+        onApply={(f) => {
+          if (typeof f.q === 'string') setSearchQuery(f.q);
+          if (Array.isArray(f.sectors)) setActiveSectors(new Set(f.sectors as string[]));
+          if (typeof f.sort === 'string' && ['deadline', 'funding', 'recent'].includes(f.sort)) {
+            setSortBy(f.sort as SortOption);
+          }
+        }}
+      />
 
       {/* Sector filters + sort */}
       <div className="flex flex-wrap items-center gap-2">

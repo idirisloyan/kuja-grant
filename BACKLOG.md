@@ -148,6 +148,16 @@ re-pitch unless the underlying premise changes.
 
 Newest first. Drop entries older than 90 days.
 
+### 2026-05-06 — Phase 13 batch 47: orphans wired + admin diligence surfaces
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.39-saved-searches-mount | `<SavedSearchesBar>` mounted on `/grants` list page. Captures `{ q, sectors, sort }` shape — restores all three on apply. The component now drives a real surface; previously was dead code. | (this batch) |
+| 13.39-slips-mount | `<SlipsForecastBadge>` mounted next to each grant's `<ScoreRing>` on `/compliance`. Renders only when the trajectory cron projects a slip ≤30d away. | (this batch) |
+| 13.39-budget-card | `<AIBudgetCard>` mounted on `/observability` (admin AI surface). Consumes `/admin/ai-spend/forecast` and renders ok/watch/over_budget tone-coded panel with daily-avg + headroom. | (this batch) |
+| 13.39-demo-readiness | `GET /api/admin/demo-readiness` — scans prod for sparse-data risks across 7 categories (grants without criteria, open grants without applications, submitted apps without docs/responses, reports missing submitted_at, orgs missing profile, admins without 2FA). Each finding includes count + sample IDs + a fix hint so admins can curate before showing the product. | (this batch) |
+| 13.39-ai-surface-health | New `app/services/ai_surface_health.py` runner exercises every flagship AI surface against synthetic fixtures (submission/report readiness, burden estimator, draft_application, reviewer summary, extract_evidence, suggest_criteria). `GET /api/admin/ai-surface-health` for admin readout; `scripts/ai_surface_health.py` for cron (exits 1 on overall=fail). 3 new logic invariants pin the runner's contract. | (this batch) |
+
 ### 2026-05-06 — Phase 13 batch 46: enterprise hardening + category-defining moments
 
 Sequenced from the user's direct prioritized feedback after the live

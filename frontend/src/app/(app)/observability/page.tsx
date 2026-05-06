@@ -23,6 +23,7 @@ import {
   Activity, AlertTriangle, AlertCircle, TrendingDown, Clock4, RotateCcw, Loader2,
 } from 'lucide-react';
 import { AIHelpfulnessPanel } from '@/components/observability/AIHelpfulnessPanel';
+import { AIBudgetCard } from '@/components/observability/AIBudgetCard';
 
 interface EndpointStats {
   total: number;
@@ -193,6 +194,11 @@ export default function ObservabilityPage() {
             <SummaryTile label={t('observability.summary.failures')} value={formatNum(data.summary_24h.failures)} tone={data.summary_24h.failures > 0 ? 'warn' : undefined} />
             <SummaryTile label={t('observability.summary.tokens_out')} value={formatNum(data.summary_24h.tokens_out)} />
           </div>
+
+          {/* Phase 13.39 — 30-day spend projection vs. KUJA_AI_BUDGET_USD_30D.
+              Renders status (ok / watch / over_budget) so admins see budget
+              risk before the bill arrives, not after. */}
+          <AIBudgetCard />
 
           {/* Anomalies callout */}
           <Section title={t('observability.anomalies')}>

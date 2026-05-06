@@ -255,6 +255,28 @@ def main():
     check('ai_mock.gate returns False when env is unset',
           lambda: (os.environ.pop('AI_MOCK_MODE', None) is not None or True) and not ai_mock.gate())
 
+    # Phase 13.39 — flagship AI surface health runner contract.
+    # Dry-run must never raise + must report on every known surface.
+    from app.services.ai_surface_health import run_health_check
+    EXPECTED_SURFACES = {
+        'check_submission_readiness', 'check_report_readiness',
+        'estimate_applicant_burden', 'draft_application',
+        'generate_reviewer_summary', 'extract_evidence',
+        'suggest_criteria',
+    }
+    _saved_key = os.environ.pop('ANTHROPIC_API_KEY', None)
+    try:
+        _hc = run_health_check(exercise_ai=False)
+    finally:
+        if _saved_key:
+            os.environ['ANTHROPIC_API_KEY'] = _saved_key
+    check('ai_surface_health dry-run returns expected shape',
+          lambda: 'overall' in _hc and isinstance(_hc.get('surfaces'), list))
+    check('ai_surface_health enumerates every flagship surface',
+          lambda: EXPECTED_SURFACES.issubset({s['name'] for s in _hc['surfaces']}))
+    check('ai_surface_health dry-run reports overall=skipped',
+          lambda: _hc['overall'] in ('skipped', 'ok'))
+
     # Phase 13.38 — pin the second-wave flag flip. These were defaulted
     # ON in batch 24; prevent silent regression to default OFF.
     from app.utils.feature_flags import DEFAULT_FLAGS

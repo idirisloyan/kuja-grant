@@ -6,6 +6,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { InfoTip } from '@/components/shared/info-tip';
+import { SlipsForecastBadge } from '@/components/shared/slips-forecast-badge';
 import {
   ShieldCheck, AlertTriangle, Clock, BarChart3, FileText, TrendingUp, ChevronDown, ChevronUp, Sparkles,
 } from 'lucide-react';
@@ -68,6 +69,10 @@ function GrantAccordion({ grant, reports }: { grant: Grant; reports: Report[] })
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* Phase 13.39 — surfaces upcoming compliance slip from the
+              trajectory cron's linear-regression forecast. Renders only
+              when the projected slip is within 30 days. */}
+          <SlipsForecastBadge grantId={grant.id} />
           <ScoreRing score={avg} size={48} strokeWidth={4} label={t('compliance.score_label_short')} />
           <StatusBadge status={grant.status} kind="grant" />
           {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
