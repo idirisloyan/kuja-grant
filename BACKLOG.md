@@ -1,6 +1,7 @@
 # Kuja Grant — Living Backlog
 
 **Created:** 2026-05-06
+**Last cleanup:** 2026-05-06 (batch 45 — duplicate-entry sweep)
 **Owner:** Idiris (single product owner today; if/when donor-side and NGO-side
 audiences need separate planning, fork into parallel backlogs).
 
@@ -27,163 +28,13 @@ re-discussing.
 
 ## High priority
 
-### ~~Wire the Phase 13 polish components into the app shell~~ ✓
-**Done batch 36:** TwoFactorNagBanner + ChangelogButton + KeyboardShortcutOverlay + AskAI all mounted.
-
-### ~~Risk register UI~~ ✓
-**Done batch 36:** `<RiskRegister>` component lives at `components/shared/risk-register.tsx`.
-
-### ~~Comments + @mentions UI~~ ✓
-**Done batch 37:** `<EntityCommentsThread>` polymorphic, drops into any
-entity detail page. @mention via toolbar + inline pill rendering.
-
-### ~~Daily compliance health snapshots cron~~ ✓
-**Done batch 37:** ComplianceSnapshot model + write_daily_snapshots() in
-scheduler + trajectory(grant_id) helper + GET /api/grants/&lt;id&gt;/compliance-health/trajectory.
-
-### ~~AI narrative layer on compliance health~~ ✓
-**Done batch 37:** `add_ai_narrative()` overlay, 6h cache, gated by
-`ai.compliance_health_narrative` flag (default OFF).
-
-### ~~/admin/security/ TOTP enrollment UI~~ ✓
-**Done batch 38:** Full enrollment flow + recovery code download +
-disable. Hooked from the 2FA nag banner CTA.
-
-### ~~Tool-use migration on top extractors (3 of 5)~~ ✓
-**Done batch 38:** check_submission_readiness · check_report_readiness ·
-estimate_applicant_burden — all use `_call_claude_tool` with strict
-JSONSchema. Logic invariants enforce the migration. Two more
-extractors (draft_application, generate_reviewer_summary) deferred —
-composite schemas warrant their own batch.
-
-### ~~Donor + reviewer "What Needs You" panels~~ ✓
-**Done batch 39:** `<DonorActionQueue>` + `<ReviewerActionQueue>`,
-mounted on the dashboard above the existing command-center surfaces.
-
-### ~~Audit retention pruning~~ ✓
-**Done batch 39:** `app/services/audit_prune.py` runs nightly via
-notification scheduler. Reads `KUJA_AUDIT_RETENTION_DAYS` (default
-365). Deletes ai_call_logs + read+old notifications. Hash-chained
-audit_chain rows are NEVER pruned.
-
-### Tool-use migration on remaining extractors (draft_application, generate_reviewer_summary)
-**Why:** PMO's lesson that schema-validated forced tool-use eliminates
-JSON-parsing failure paths. Helper exists at
-`AIService._call_claude_tool` (Phase 13.4); each extractor needs a
-focused mechanical migration with side-by-side regression coverage.
-Targets, in priority order:
-1. `draft_application` — most-traffic, complex schema
-2. `check_submission_readiness` — pre-submit pre-flight, high visibility
-3. `check_report_readiness` — same, for reports
-4. `generate_reviewer_summary` — reviewer-time-saving signature surface
-5. `estimate_applicant_burden` — donor pre-publish critique
-- **Pair with:** logic invariant test that flags any new extractor
-  using prompt-and-parse.
-- `last_touched: 2026-05-08`
-
-### Wire the Phase 13 polish components into the app shell
-Components exist but aren't mounted yet:
-- `<TwoFactorNagBanner>` → into `(app)/layout.tsx` above the header
-- `<ChangelogButton>` → into the header next to the language switcher
-- `<KeyboardShortcutOverlay>` → mounted at the app root (renders globally)
-- `<AskAIPanel>` → wired as a slide-over via the existing co-pilot
-  rail toggle, OR as a dedicated header button
-- **Estimated:** half a session.
-- `last_touched: 2026-05-08`
-
-### Risk register UI
-Backend at `/api/risks/*` is complete (Phase 13.7). UI needed:
-- `<RiskRegister>` component for application/grant detail pages —
-  list with severity-colored left borders + status dropdown +
-  `<RiskResponseDrawer>` for response_md / owner / due_date editing
-- "Awaiting your response" badge on the donor dashboard sourced
-  from `/api/risks/awaiting-response`
-- `last_touched: 2026-05-08`
-
-### Comments + @mentions UI
-Backend at `/api/comments/*` is complete (Phase 13.18). UI needed:
-- `<EntityCommentsThread>` component that drops into application,
-  grant, report, and risk detail pages
-- @mention auto-completion in the textarea (resolves against
-  visible org members)
-- Notifications panel surfaces mention-kind notifications
-- `last_touched: 2026-05-08`
-
-### Daily compliance health snapshots cron
-Phase 13.8 ships on-demand calculation. The trajectory chart +
-30-day forecast (PMO's "slips in N days" badge) needs:
-- New `compliance_health_snapshots` table: `grant_id, date, score, band,
-  pillars_json`
-- Cron job (extend the existing notification scheduler) writes one row
-  per active grant per day
-- `<ComplianceTrajectoryChart>` component — sparkline of last 60 days
-- Linear-regression forecast → "slips below at-risk in N days" badge
-- `last_touched: 2026-05-08`
-
-### Web push via VAPID
-Currently @mention notifications fire to the in-app `Notification`
-table only. Web push for the marketplace's collaboration moment
-(donor reviewer @mentions NGO program officer) requires:
-- `pywebpush` dependency
-- VAPID key generation + Railway env config (3 keys: public, private, subject)
-- Service worker registration in the frontend
-- `push_subscriptions` table for endpoint storage
-- Subscribe / unsubscribe routes
-- `last_touched: 2026-05-08`
+_None open. Last sweep on 2026-05-06 closed all open high-priority
+items. New high-priority work should land here with a clear "Why"
+section before any code is written._
 
 ---
 
 ## Medium priority
-
-### `/admin/security/` enrollment UI for TOTP 2FA
-Backend complete (Phase 13.15). UI needed:
-- QR code rendering from `provisioning_uri` (use `qrcode.react` or inline SVG)
-- 6-digit code input with auto-submit
-- Recovery codes display with one-time download
-- Disable flow with current-code verification
-- `last_touched: 2026-05-08`
-
-### ~~Hard 2FA enforcement gate~~ ✓
-**Done batch 40 (`2026-05-06`):** middleware `enforce_admin_2fa`
-gates admin write actions when `KUJA_ENFORCE_ADMIN_2FA=true`. Default
-OFF; flip the env var on `2026-05-29` per the deferred plan.
-Allowlist exempts reads, enrollment routes, and `/admin/system-health`.
-
-### Donor + reviewer "What Needs You" panels
-Phase 10.6 shipped `<ThisWeekHome>` for NGOs. Same pattern needed for:
-- **Donor**: applications awaiting decision + grants with overdue
-  reports + risks awaiting response (sourced from existing
-  `/api/risks/awaiting-response` + `donor_portfolio_insights`)
-- **Reviewer**: assigned applications + recently-edited applications
-  in their queue
-- Reuse the action-card visual vocabulary from ThisWeekHome.
-- `last_touched: 2026-05-08`
-
-### AI narrative layer on compliance health
-Phase 13.8 ships rule-based 4-pillar score. PMO's enhancement:
-1-2 sentence Haiku-generated narrative cached 6h per grant per
-score. Falls back to rule-based if AI offline. Adds a `summary`
-field on the response.
-- Use Haiku 4.5 (cheap), not Sonnet
-- Cache key: `(grant_id, score, date_bucket)`
-- `last_touched: 2026-05-08`
-
-### ~~Real Redoc HTML page at `/admin/api-docs`~~ ✓
-**Done batch 40:** `/api/admin/api-docs/openapi.json` synthesizes a
-minimal OpenAPI 3.0 doc by walking the url_map + pulling docstring
-first lines as summaries. `/api/admin/api-docs/html` renders it via
-Redoc CDN bundle (no npm install). Full request/response schema
-introspection deferred — would need typed schemas on every handler.
-
-### Audit retention pruning in the notification scheduler
-Phase 13.10 exposes the config endpoint. Actual prune logic
-needs to:
-- Read `KUJA_AUDIT_RETENTION_DAYS` from env (default 365)
-- Run nightly via the existing notification scheduler
-- Delete `ai_call_logs`, `audit_chain` (only after confirming
-  hash-chain re-anchor strategy), `notifications` (read + older)
-- Write a marker row showing rows pruned per table
-- `last_touched: 2026-05-08`
 
 ### Native-speaker translation review pass
 Phase 6.1 shipped `docs/i18n_review_targets.md` listing priority
@@ -192,51 +43,20 @@ Awaiting the human reviewers. When the first batch comes back:
 - Build the `frontend/scripts/update_translations.py` 30-line merge
   script (planned but not written — see audit doc for invocation)
 - Apply annotations and ship
+- **Blocked on:** human reviewer availability (operational TODO).
 - `last_touched: 2026-05-06`
-
-### ~~Redis-backed rate limiter~~ ✓
-**Done batch 43:** `app/utils/rate_policies.py` now lazy-loads a Redis
-client when `REDIS_URL` (or `RATE_LIMIT_REDIS_URL`) is set in env, and
-runs the sliding-window enforcement via an atomic `ZREMRANGEBYSCORE
-+ ZADD + ZCARD + EXPIRE` pipeline (one round-trip per call). Falls
-back to the in-memory bucket if Redis is unconfigured or unreachable
-— logs the fallback once, never blocks requests. Multi-worker
-Gunicorn on Railway now sees consistent rate limits across workers
-when Redis is wired; without Redis, behavior is unchanged from
-Phase 13.11.
 
 ---
 
 ## Low priority
 
-### ~~Saved searches with drag-reorder~~ ✓
-**Done batch 40 (backend) + batch 44 (UI):** `SavedSearch` model +
-`/api/saved-searches` CRUD + `/api/saved-searches/reorder`. Scope
-enum: grants / applications / reports / organizations / reviews /
-risks. UI: `<SavedSearchesBar>` at
-`frontend/src/components/shared/saved-searches-bar.tsx` — drop into
-any list page with `scope`, `currentFilter`, and an `onApply`
-callback. Reorder via accessible ↑/↓ buttons (no DnD library — zero
-new deps, keyboard-navigable, screen-reader-friendly). Inline
-"+ Save current" with name input. Optimistic updates with
-fail-revert.
-
-### ~~Onboarding tour per role~~ ✓
-**Done batch 44 (audit conclusion):** Phase 8's `OnboardingTourProvider`
-already meets PMO's pattern — per-role scripts (donor/ngo/reviewer/admin),
-i18n-keyed copy, anchored tooltips with auto-scroll, localStorage
-completion (`kuja_onboarded_${role}_${userId}`), and a
-`kuja:replay-tour` event hook. Only gap was a discoverable replay
-entry point. Added a "Replay onboarding tour" link inside the Cmd/?
-shortcut overlay (i18n: `shortcuts.replay_tour` across en/fr/es/ar/sw/so).
-
 ### UAT fixture self-healing cron
 PMO ran a daily `/api/cron/uat-fixtures` to ensure demo states
 exist (≥ 1 grant in every band, 1 report needing pre-flight, etc.).
 Kuja's single-tenant prod hasn't seen the marker-row drift PMO hit
-in their multi-tenant prod. Revisit if/when QA starts complaining
+in their multi-tenant prod. **Revisit trigger:** QA team complains
 that demo data has drifted.
-- `last_touched: 2026-05-08`
+- `last_touched: 2026-05-06`
 
 ### Polymorphic FK lint
 PMO had a Prisma-query lint that flagged any query against
@@ -244,33 +64,19 @@ polymorphic tables filtering on `contract_id` XOR `sop_id` without
 a `// polymorphic-fk: <reason>` justification comment. No
 polymorphic splits currently in flight at Kuja (`Risk`,
 `EntityComment`, `OrgMemory` are polymorphic but use `subject_kind` +
-`subject_id` patterns rather than dual-FK columns). Revisit if a
-similar split lands.
-- `last_touched: 2026-05-08`
+`subject_id` patterns rather than dual-FK columns). **Revisit
+trigger:** a similar dual-FK split lands.
+- `last_touched: 2026-05-06`
 
-### Workflow configurator
+### Workflow configurator (parallel reviewer groups + COI gates)
 PMO had a generic configurable workflow engine (parallel review
 groups, COI gates, sign-off ledger, flowchart preview). Kuja's
-review flow is currently single-reviewer per application.
-Multi-reviewer + COI gates would matter for high-stakes donors.
-- `last_touched: 2026-05-08`
-
-### ~~"Slips in N days" forecast badge~~ ✓
-**Done batch 44:** `<SlipsForecastBadge>` at
-`frontend/src/components/shared/slips-forecast-badge.tsx`. Hits
-`/api/grants/<id>/compliance-health/trajectory`, renders nothing when
-`slips_below_at_risk_in_days` is null or beyond `thresholdDays`
-(default 30). Tone-coded: red ≤7d, amber ≤14d, sky ≤30d. Hover
-title explains the linear-regression source so the badge isn't a
-bare prediction.
-
-### ~~AI cost forecasting~~ ✓
-**Done batch 44:** `GET /api/admin/ai-spend/forecast` projects
-next-30-day spend from a trailing window (default 14 days, configurable
-via `?trailing_days=`). Compares against `KUJA_AI_BUDGET_USD_30D` env
-(default $250). Returns `status` of `ok | watch | over_budget` (watch
-fires at 80% of budget) so the admin UI can light up without doing
-its own math. Pairs with the existing `/ai-spend` historical endpoint.
+review flow is currently single-reviewer per application. **Revisit
+trigger:** a high-stakes donor explicitly requests multi-reviewer
+parallel approval with COI gates, OR a procurement-grade reviewer
+audit trail becomes a contractual ask. Estimated 2-3 weeks of work;
+not worth the build cost without a customer pull.
+- `last_touched: 2026-05-06`
 
 ---
 
@@ -284,9 +90,18 @@ when done.
   per-process fallback at boot if missing, so /admin/system-health
   no longer warns — but multi-worker prod needs an env-set value
   so all workers share the same secret.*
+- [ ] Set `REDIS_URL` (or `RATE_LIMIT_REDIS_URL`) in Railway env so
+  the Phase 13.35 Redis-backed rate limiter activates. Without it,
+  rate limits are per-Gunicorn-worker (effectively N× looser) on
+  multi-worker prod. Falls back to in-memory automatically — no
+  outage if the env is unset.
+- [ ] Set `KUJA_AI_BUDGET_USD_30D` in Railway env (default $250) if
+  the team wants the AI-spend forecast banner to fire `over_budget`
+  at a different threshold.
 - [ ] Confirm `OPENSANCTIONS_API_KEY` is current. Live sanctions
   primary feed; falls back to direct UN/OFAC/EU CSVs if missing.
-- [ ] Decide hard-2FA enforcement date (proposed 2026-05-29).
+- [ ] Decide hard-2FA enforcement date (proposed 2026-05-29). Flip
+  `KUJA_ENFORCE_ADMIN_2FA=true` in Railway env on the chosen date.
 - [ ] First native-speaker review batch — assign reviewers per locale.
 - [ ] Decide whether to enable per-tenant audit retention windows
   (current implementation is global). If yes, swap to a row in
@@ -303,7 +118,9 @@ of post-deploy traffic:
 - `/admin/perf-budgets` — cold-start regressions
 - `/admin/experiments` — A/B rail bucket assignment + outcome data
 - `/admin/system-health` — AI failure rate trends, native_pdf usage spikes
-- `/admin/ai-spend` — day-bucket cost; alert if any single day > $50
+- `/admin/ai-spend` — day-bucket cost; `/admin/ai-spend/forecast` for
+  30-day projection vs. `KUJA_AI_BUDGET_USD_30D`. Alert if any single
+  day > $50 or if forecast hits `over_budget`.
 - `/admin/failed-logins` — brute-force ramps
 
 ---
@@ -331,16 +148,64 @@ re-pitch unless the underlying premise changes.
 
 Newest first. Drop entries older than 90 days.
 
-### 2026-05-06 — Phase 13 batch 36: AI-extract editability + UI mounts
+### 2026-05-06 — Phase 13 batch 45: BACKLOG cleanup
+
+Duplicate-entry sweep. The `High priority` section had completed
+items both ✓-marked at the top AND repeated as un-done entries
+further down (artifact of incremental edits over batches 36-44).
+Removed the dupes; consolidated everything into the Completed
+rolling log + Explicitly declined sections. Active backlog now
+shows: 0 high-priority, 1 medium-priority (native-speaker review,
+blocked on human reviewers), 3 low-priority (UAT cron, FK lint,
+workflow configurator — all have explicit revisit triggers).
+
+### 2026-05-06 — Phase 13 batch 44: low-priority polish
 
 | Sub-phase | What | Commit |
 |---|---|---|
-| 13.25 | EditableExtractionList primitive — donor edits AI-extracted reporting requirements + indicators in grant wizard (provenance badges: AI / AI-edited / You) | (this batch) |
-| 13.26 | NGO clarification notes on AI document analysis (3 new doc columns + PATCH endpoint + DocumentClarificationPanel UI) | (this batch) |
-| 13.15-wire | TwoFactorNagBanner mounted in app shell layout | (this batch) |
-| 13.16-wire | ChangelogButton mounted in header next to language picker | (this batch) |
-| 13.17-wire | KeyboardShortcutOverlay mounted globally (Cmd/? to open) | (this batch) |
-| 13.7-ui | RiskRegister component — inline status, response drawer, severity-tinted left borders | (this batch) |
+| 13.36-saved-searches-ui | `<SavedSearchesBar>` drop-in component with ↑/↓ reorder (no DnD lib), inline create/delete, optimistic updates | `61f768b` |
+| 13.36-slips-badge | `<SlipsForecastBadge>` consumes trajectory endpoint, renders only when projected slip ≤ threshold; tone-coded by urgency | `61f768b` |
+| 13.36-ai-forecast | `GET /api/admin/ai-spend/forecast` — trailing-window daily-average → 30-day projection vs. `KUJA_AI_BUDGET_USD_30D` | `61f768b` |
+| 13.36-tour-replay | Onboarding tour audit conclusion + "Replay onboarding tour" link in shortcut overlay (i18n across 6 locales) | `61f768b` |
+
+### 2026-05-06 — Phase 13 batch 43: Redis rate limiter
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.35 | Redis-backed sliding-window rate limiter via atomic `ZREMRANGEBYSCORE + ZADD + ZCARD + EXPIRE` pipeline; opt-in via `REDIS_URL` env; in-memory fallback when unconfigured | `f8a6653` |
+
+### 2026-05-06 — Phase 13 batches 41 + 42: tool-use final + web push
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.4-final | `draft_application` + `generate_reviewer_summary` migrated to `_call_claude_tool` (forced tool-use). All 5 top extractors now schema-validated. Logic invariants gate further drift. | `9ce2798` |
+| 13.34 | Web push infra end-to-end: VAPID config + service worker + `<PushSubscription>` model + 4 routes + `frontend/src/lib/web-push.ts` client + integration with @mention notifications. Best-effort, no-op when VAPID env unset. | `9ce2798` |
+
+### 2026-05-06 — Phase 13 batches 39 + 40: action queues + admin self-service
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.29 | `<DonorActionQueue>` + `<ReviewerActionQueue>` mounted on the dashboard above existing surfaces | `6d1113f` |
+| 13.30 | Audit retention prune in nightly notification scheduler (deletes ai_call_logs + read+old notifications; never touches hash-chained audit_chain rows) | `6d1113f` |
+| 13.31 | Hard 2FA enforcement gate via `enforce_admin_2fa` middleware (`KUJA_ENFORCE_ADMIN_2FA=true`) | `df0fbca` |
+| 13.32 | Real Redoc HTML at `/api/admin/api-docs/html` — synthesizes OpenAPI 3.0 from url_map + serves via Redoc CDN | `df0fbca` |
+| 13.33 | Saved-searches model + CRUD + `/reorder` endpoint | `df0fbca` |
+
+### 2026-05-06 — Phase 13 batches 36-38: UI polish + AI overlay + 2FA
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.25 | EditableExtractionList primitive — donor edits AI-extracted reporting requirements + indicators in grant wizard (provenance badges: AI / AI-edited / You) | (batch 36) |
+| 13.26 | NGO clarification notes on AI document analysis (3 new doc columns + PATCH endpoint + DocumentClarificationPanel UI) | (batch 36) |
+| 13.7-ui | RiskRegister component — inline status, response drawer, severity-tinted left borders | (batch 36) |
+| 13.15-wire | TwoFactorNagBanner mounted in app shell layout | (batch 36) |
+| 13.16-wire | ChangelogButton mounted in header next to language picker | (batch 36) |
+| 13.17-wire | KeyboardShortcutOverlay mounted globally (Cmd/? to open) | (batch 36) |
+| 13.18-ui | `<EntityCommentsThread>` polymorphic, drops into any entity detail page | (batch 37) |
+| 13.27 | ComplianceSnapshot model + write_daily_snapshots() in scheduler + `<ComplianceTrajectoryChart>` + `slips_below_at_risk_in_days` field | (batch 37) |
+| 13.28 | `add_ai_narrative()` overlay on compliance health, 6h cache, gated by `ai.compliance_health_narrative` flag | (batch 37) |
+| 13.15-ui | Full TOTP enrollment UI at `/admin/security/` — QR + 6-digit input + recovery code download + disable | (batch 38) |
+| 13.4-tool-use-3 | check_submission_readiness · check_report_readiness · estimate_applicant_burden migrated to `_call_claude_tool` | (batch 38) |
 
 ### 2026-05-06 — Phase 13 hotfix batch (post-team-retest)
 
