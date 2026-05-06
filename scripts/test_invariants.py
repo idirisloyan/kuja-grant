@@ -181,6 +181,21 @@ def main():
                         ai_src.find('def estimate_applicant_burden') + 20000) > 0
         ),
     )
+    # Phase 13.4 batch 41 — composite-schema migrations
+    check(
+        'draft_application uses _call_claude_tool',
+        lambda: (
+            ai_src.find('_call_claude_tool', ai_src.find('def draft_application'),
+                        ai_src.find('def draft_application') + 30000) > 0
+        ),
+    )
+    check(
+        'generate_reviewer_summary uses _call_claude_tool',
+        lambda: (
+            ai_src.find('_call_claude_tool', ai_src.find('def generate_reviewer_summary'),
+                        ai_src.find('def generate_reviewer_summary') + 30000) > 0
+        ),
+    )
 
     # --- 4. Schema invariants -------------------------------------
     from app.models import (

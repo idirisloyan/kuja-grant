@@ -2027,47 +2027,93 @@ class AIService:
             "Return the JSON now."
         )
 
-        text = cls._call_claude(
-            system + "\n\n" + schema,
+        # Phase 13.4 — migrated to forced tool-use (composite schema).
+        # `responses` and `eligibility_responses` are dynamic-keyed dicts
+        # (criterion key → text). JSONSchema can't validate dynamic
+        # keys against a closed set, so we use additionalProperties to
+        # allow any string keys → string values for responses, and a
+        # plain object shape for eligibility responses.
+        tool_schema = {
+            "type": "object",
+            "properties": {
+                "responses": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                    "description": "Dict of criterion_key → drafted response text.",
+                },
+                "eligibility_responses": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "met": {"type": "boolean"},
+                            "evidence": {"type": "string"},
+                        },
+                    },
+                },
+                "confidence_per_criterion": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string", "enum": ["high", "medium", "low"]},
+                },
+                "claim_provenance": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "criterion_key": {"type": "string"},
+                            "claim": {"type": "string"},
+                            "source_kind": {"type": "string", "enum": ["profile", "document", "application", "ai_general"]},
+                            "source_id": {"type": ["integer", "null"]},
+                            "source_locator": {"type": ["string", "null"]},
+                            "source_excerpt": {"type": ["string", "null"]},
+                            "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+                        },
+                    },
+                },
+                "voice_note": {"type": "string", "maxLength": 200},
+                "memory_used": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "IDs of org_memory items the AI drew from.",
+                },
+            },
+            "required": ["responses"],
+        }
+
+        parsed = cls._call_claude_tool(
+            system,
             user_msg,
+            tool_name='draft_application',
+            tool_description='Draft a complete first-cut grant application from the org profile + grant criteria.',
+            tool_schema=tool_schema,
             max_tokens=4096,
             language=language,
             role='ngo',
             endpoint='draft_application',
         )
 
-        if text:
-            try:
-                import re
-                m = re.search(r'\{[\s\S]*\}', text)
-                if m:
-                    parsed = json.loads(m.group(0))
-                    parsed['source'] = 'claude'
-                    # Defensive normalization
-                    parsed.setdefault('responses', {})
-                    parsed.setdefault('eligibility_responses', {})
-                    parsed.setdefault('confidence_per_criterion', {})
-                    parsed.setdefault('claim_provenance', [])
-                    parsed.setdefault('voice_note', '')
-                    parsed.setdefault('memory_used', [])
-                    # Coerce + dedupe memory IDs to ints — Claude sometimes
-                    # returns them as strings or includes IDs that weren't
-                    # in the prompt.
-                    valid_ids = {m.get('id') for m in (memory_items or []) if m.get('id') is not None}
-                    seen = set()
-                    coerced = []
-                    for raw in (parsed.get('memory_used') or []):
-                        try:
-                            n = int(raw)
-                        except (TypeError, ValueError):
-                            continue
-                        if n in valid_ids and n not in seen:
-                            seen.add(n)
-                            coerced.append(n)
-                    parsed['memory_used'] = coerced
-                    return parsed
-            except Exception as e:
-                logger.warning(f"draft_application JSON parse failed: {e}")
+        if parsed:
+            parsed['source'] = 'claude'
+            parsed.setdefault('responses', {})
+            parsed.setdefault('eligibility_responses', {})
+            parsed.setdefault('confidence_per_criterion', {})
+            parsed.setdefault('claim_provenance', [])
+            parsed.setdefault('voice_note', '')
+            parsed.setdefault('memory_used', [])
+            # Coerce + dedupe memory IDs against the prompt's set.
+            valid_ids = {m.get('id') for m in (memory_items or []) if m.get('id') is not None}
+            seen = set()
+            coerced = []
+            for raw in (parsed.get('memory_used') or []):
+                try:
+                    n = int(raw)
+                except (TypeError, ValueError):
+                    continue
+                if n in valid_ids and n not in seen:
+                    seen.add(n)
+                    coerced.append(n)
+            parsed['memory_used'] = coerced
+            return parsed
 
         # Template fallback: empty draft + per-criterion stub.
         return {
@@ -3048,36 +3094,86 @@ class AIService:
             "Return the JSON reviewer summary now."
         )
 
-        text = cls._call_claude(
-            system + "\n\n" + schema,
+        # Phase 13.4 — migrated to forced tool-use (composite schema).
+        tool_schema = {
+            "type": "object",
+            "properties": {
+                "one_screen_summary": {"type": "string"},
+                "who_is_the_ngo": {"type": "string"},
+                "what_they_propose": {"type": "string"},
+                "why_strong": {"type": "array", "items": {"type": "string"}},
+                "why_weak": {"type": "array", "items": {"type": "string"}},
+                "evidence_per_criterion": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "criterion_key": {"type": "string"},
+                            "criterion_label": {"type": "string"},
+                            "evidence_for": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "quote": {"type": "string"},
+                                        "why": {"type": "string"},
+                                    },
+                                    "required": ["quote"],
+                                },
+                            },
+                            "evidence_against": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "quote": {"type": "string"},
+                                        "why": {"type": "string"},
+                                    },
+                                    "required": ["quote"],
+                                },
+                            },
+                            "judgment": {"type": "string", "enum": ["strong", "adequate", "thin"]},
+                        },
+                    },
+                },
+                "draft_rationale": {"type": "string"},
+                "per_criterion_rationale": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                },
+                "decision_changers": {"type": "array", "items": {"type": "string"}},
+                "comparable_signal": {"type": "string"},
+                "red_flags": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["one_screen_summary"],
+        }
+
+        parsed = cls._call_claude_tool(
+            system,
             user_msg,
+            tool_name='reviewer_summary',
+            tool_description='One-screen reviewer summary + per-criterion rationale + decision changers.',
+            tool_schema=tool_schema,
             max_tokens=3500,
             language=language,
             role='reviewer',
             endpoint='generate_reviewer_summary',
         )
 
-        if text:
-            try:
-                import re
-                m = re.search(r'\{[\s\S]*\}', text)
-                if m:
-                    parsed = json.loads(m.group(0))
-                    parsed['source'] = 'claude'
-                    parsed.setdefault('one_screen_summary', '')
-                    parsed.setdefault('who_is_the_ngo', '')
-                    parsed.setdefault('what_they_propose', '')
-                    parsed.setdefault('why_strong', [])
-                    parsed.setdefault('why_weak', [])
-                    parsed.setdefault('evidence_per_criterion', [])
-                    parsed.setdefault('draft_rationale', '')
-                    parsed.setdefault('per_criterion_rationale', {})
-                    parsed.setdefault('decision_changers', [])
-                    parsed.setdefault('comparable_signal', '')
-                    parsed.setdefault('red_flags', [])
-                    return parsed
-            except Exception as e:
-                logger.warning(f"generate_reviewer_summary JSON parse failed: {e}")
+        if parsed:
+            parsed['source'] = 'claude'
+            parsed.setdefault('one_screen_summary', '')
+            parsed.setdefault('who_is_the_ngo', '')
+            parsed.setdefault('what_they_propose', '')
+            parsed.setdefault('why_strong', [])
+            parsed.setdefault('why_weak', [])
+            parsed.setdefault('evidence_per_criterion', [])
+            parsed.setdefault('draft_rationale', '')
+            parsed.setdefault('per_criterion_rationale', {})
+            parsed.setdefault('decision_changers', [])
+            parsed.setdefault('comparable_signal', '')
+            parsed.setdefault('red_flags', [])
+            return parsed
 
         # Deterministic fallback: assemble a minimal one-screen view from
         # the application text alone.

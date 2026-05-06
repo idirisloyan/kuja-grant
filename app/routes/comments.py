@@ -152,24 +152,39 @@ def create_comment():
     db.session.commit()
 
     # Fire in-app notifications for each mentioned user (skip self).
+    notif_payloads = []
     for uid in mentioned:
         if uid == current_user.id:
             continue
         try:
+            title = f'You were mentioned by {current_user.name or current_user.email}'
+            body = (body_md[:200] + ('…' if len(body_md) > 200 else ''))
             n = Notification(
                 user_id=uid,
                 kind='mention',
-                title=f'You were mentioned by {current_user.name or current_user.email}',
-                body=(body_md[:200] + ('…' if len(body_md) > 200 else '')),
-                # Adopting an extra metadata blob via meta_json if Notification supports it.
+                title=title,
+                body=body,
             )
             db.session.add(n)
+            notif_payloads.append((uid, title, body))
         except Exception:
             pass
     try:
         db.session.commit()
     except Exception:
         db.session.rollback()
+        notif_payloads = []
+
+    # Phase 13.34 — also fire web push to subscribed devices. Best-effort;
+    # never blocks comment creation. No-op when VAPID isn't configured.
+    if notif_payloads:
+        try:
+            from app.services.web_push import send_to_user
+            for uid, title, body in notif_payloads:
+                send_to_user(uid, title=title, body=body,
+                             url=f'/{entity_kind}s/{entity_id}/')
+        except Exception:
+            pass
 
     return jsonify({'success': True, 'comment': c.to_dict()})
 
