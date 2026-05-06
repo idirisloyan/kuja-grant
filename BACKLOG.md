@@ -28,16 +28,45 @@ re-discussing.
 ## High priority
 
 ### ~~Wire the Phase 13 polish components into the app shell~~ ✓
-**Done batch 36 (`2026-05-06`):** TwoFactorNagBanner mounted above app
-shell · ChangelogButton in header · KeyboardShortcutOverlay global ·
-AskAI shipped via the existing copilot rail (header sparkle button).
+**Done batch 36:** TwoFactorNagBanner + ChangelogButton + KeyboardShortcutOverlay + AskAI all mounted.
 
 ### ~~Risk register UI~~ ✓
-**Done batch 36 (`2026-05-06`):** `<RiskRegister>` component with
-inline status dropdown + response_md drawer + owner/due display.
-Drops into any application/grant detail page.
+**Done batch 36:** `<RiskRegister>` component lives at `components/shared/risk-register.tsx`.
 
-### Tool-use migration on the top 5 extractors
+### ~~Comments + @mentions UI~~ ✓
+**Done batch 37:** `<EntityCommentsThread>` polymorphic, drops into any
+entity detail page. @mention via toolbar + inline pill rendering.
+
+### ~~Daily compliance health snapshots cron~~ ✓
+**Done batch 37:** ComplianceSnapshot model + write_daily_snapshots() in
+scheduler + trajectory(grant_id) helper + GET /api/grants/&lt;id&gt;/compliance-health/trajectory.
+
+### ~~AI narrative layer on compliance health~~ ✓
+**Done batch 37:** `add_ai_narrative()` overlay, 6h cache, gated by
+`ai.compliance_health_narrative` flag (default OFF).
+
+### ~~/admin/security/ TOTP enrollment UI~~ ✓
+**Done batch 38:** Full enrollment flow + recovery code download +
+disable. Hooked from the 2FA nag banner CTA.
+
+### ~~Tool-use migration on top extractors (3 of 5)~~ ✓
+**Done batch 38:** check_submission_readiness · check_report_readiness ·
+estimate_applicant_burden — all use `_call_claude_tool` with strict
+JSONSchema. Logic invariants enforce the migration. Two more
+extractors (draft_application, generate_reviewer_summary) deferred —
+composite schemas warrant their own batch.
+
+### ~~Donor + reviewer "What Needs You" panels~~ ✓
+**Done batch 39:** `<DonorActionQueue>` + `<ReviewerActionQueue>`,
+mounted on the dashboard above the existing command-center surfaces.
+
+### ~~Audit retention pruning~~ ✓
+**Done batch 39:** `app/services/audit_prune.py` runs nightly via
+notification scheduler. Reads `KUJA_AUDIT_RETENTION_DAYS` (default
+365). Deletes ai_call_logs + read+old notifications. Hash-chained
+audit_chain rows are NEVER pruned.
+
+### Tool-use migration on remaining extractors (draft_application, generate_reviewer_summary)
 **Why:** PMO's lesson that schema-validated forced tool-use eliminates
 JSON-parsing failure paths. Helper exists at
 `AIService._call_claude_tool` (Phase 13.4); each extractor needs a

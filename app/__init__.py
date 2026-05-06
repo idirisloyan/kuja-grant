@@ -404,6 +404,23 @@ def _register_notification_scheduler(app):
                     )
             except Exception as e:
                 app.logger.error(f"Compliance snapshots failed: {e}")
+            # Phase 13.30 — audit retention prune. Reads the
+            # KUJA_AUDIT_RETENTION_DAYS env var (default 365). Deletes
+            # ai_call_logs + read+old notifications older than the
+            # window. Hash-chained audit_chain rows are NEVER pruned —
+            # they're the cryptographic record. Logs the marker counts
+            # so /admin/audit-retention can show the last run.
+            try:
+                with app.app_context():
+                    from app.services.audit_prune import run_audit_prune
+                    result = run_audit_prune()
+                    app.logger.info(
+                        f"Audit prune: ai_call_logs_deleted={result['ai_call_logs_deleted']} "
+                        f"notifications_deleted={result['notifications_deleted']} "
+                        f"window_days={result['window_days']}"
+                    )
+            except Exception as e:
+                app.logger.error(f"Audit prune failed: {e}")
             # Run once per day (24 hours)
             time.sleep(86400)
 

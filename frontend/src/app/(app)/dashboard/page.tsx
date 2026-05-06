@@ -21,6 +21,8 @@ import { ReviewerQueue } from '@/components/dashboards/reviewer-queue';
 import { AdminOpsPanel } from '@/components/dashboards/admin-ops-panel';
 import { MatchesCard } from '@/components/dashboards/matches-card';
 import { ThisWeekHome } from '@/components/dashboards/this-week-home';
+import { DonorActionQueue } from '@/components/dashboards/donor-action-queue';
+import { ReviewerActionQueue } from '@/components/dashboards/reviewer-action-queue';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -64,7 +66,15 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {user.role === 'donor' && <DonorCommandCenter />}
+      {user.role === 'donor' && (
+        <>
+          {/* Phase 13.29 — donor action queue (analog of ThisWeekHome).
+              Renders above the existing command center so the donor sees
+              "what do I do next?" before "what's the state?" */}
+          <DonorActionQueue />
+          <DonorCommandCenter />
+        </>
+      )}
       {user.role === 'ngo' && (
         <>
           {/* Phase 10.6 — "This Week" action center: opinionated next
@@ -79,7 +89,14 @@ export default function DashboardPage() {
           <NgoReadinessConsole />
         </>
       )}
-      {user.role === 'reviewer' && <ReviewerQueue />}
+      {user.role === 'reviewer' && (
+        <>
+          {/* Phase 13.29 — reviewer action queue. Pending assignments
+              top-of-page, then the existing detailed queue below. */}
+          <ReviewerActionQueue />
+          <ReviewerQueue />
+        </>
+      )}
       {user.role === 'admin' && <AdminOpsPanel />}
     </div>
   );
