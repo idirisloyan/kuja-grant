@@ -818,6 +818,19 @@ def main():
         print("  All smoke tests passed. Deploy is clear.")
     print("=" * 60 + "\n")
 
+    # Phase 13.20 — also gate on the logic invariant suite. Millisecond-
+    # level regression detection for timeouts / validation / prompt /
+    # schema / security invariants. Fast enough that the smoke runner
+    # is still under 30s.
+    if not failed:
+        print("  Running logic invariants...")
+        import subprocess as _sp
+        rc = _sp.call(['py', '-3', 'scripts/test_invariants.py'])
+        if rc != 0:
+            print("  Logic invariants failed — DEPLOY BLOCKED.")
+            sys.exit(1)
+        print("  Logic invariants passed.\n")
+
     sys.exit(1 if failed else 0)
 
 

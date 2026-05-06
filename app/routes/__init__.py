@@ -29,6 +29,7 @@ def register_blueprints(app):
     from app.routes.admin_health import admin_health_bp  # Phase 13.10
     from app.routes.totp_routes import totp_bp  # Phase 13.15
     from app.routes.comments import comments_bp  # Phase 13.18
+    from app.routes.test_routes import test_bp  # Phase 13.19 (env-gated)
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -36,5 +37,5 @@ def register_blueprints(app):
                compliance_bp, reviews_bp, reports_bp, admin_bp,
                notifications_bp,
                match_bp, questions_bp, diligence_bp, org_memory_bp,
-               risks_bp, admin_health_bp, totp_bp, comments_bp]:
+               risks_bp, admin_health_bp, totp_bp, comments_bp, test_bp]:
         app.register_blueprint(bp)

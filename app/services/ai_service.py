@@ -440,6 +440,19 @@ class AIService:
                 system_prompt += f"\n\nIMPORTANT — LANGUAGE REGISTER: {lang_tone}"
 
             import time
+            # Phase 13.19 — AI mock harness intercept. When AI_MOCK_MODE=1
+            # AND a scenario is queued for this endpoint, return the
+            # scripted result without hitting Anthropic. Production has
+            # AI_MOCK_MODE unset, so this is a no-op there.
+            try:
+                from app.services import ai_mock
+                if ai_mock.is_mock_mode():
+                    scenario = ai_mock.consume(endpoint or '')
+                    if scenario is not None:
+                        return ai_mock.render_scenario(scenario)
+            except Exception:
+                pass
+
             t0 = time.monotonic()
             # Phase 13.1 — per-call timeout layered over SDK ceiling. The
             # SDK was created with timeout=AI_SDK_TIMEOUT; .with_options()
