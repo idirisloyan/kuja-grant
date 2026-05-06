@@ -255,6 +255,20 @@ def main():
     check('ai_mock.gate returns False when env is unset',
           lambda: (os.environ.pop('AI_MOCK_MODE', None) is not None or True) and not ai_mock.gate())
 
+    # Phase 13.38 — pin the second-wave flag flip. These were defaulted
+    # ON in batch 24; prevent silent regression to default OFF.
+    from app.utils.feature_flags import DEFAULT_FLAGS
+    for k in (
+        'ai.grant_brief_generator', 'ai.compliance_preempt',
+        'ai.cross_grant_patterns', 'ui.preview_as_reviewer',
+        'ui.live_drafters_pill', 'ui.audit_trail_tab',
+    ):
+        check(
+            f'flag {k} defaults ON',
+            lambda k=k: bool(DEFAULT_FLAGS.get(k, {}).get('default')) is True,
+            f'default for {k} is not True'
+        )
+
     # CSP middleware must include block-all-mixed-content.
     mw_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

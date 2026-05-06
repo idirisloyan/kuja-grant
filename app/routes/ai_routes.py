@@ -211,6 +211,58 @@ def api_ai_extract_evidence():
     return jsonify({'success': True, **result})
 
 
+@ai_bp.route('/suggest-criteria', methods=['POST'])
+@login_required
+@role_required('reviewer', 'donor', 'admin')
+def api_ai_suggest_criteria():
+    """Phase 13.38 — propose evaluation criteria for a grant that has none.
+
+    Turns the reviewer empty-state ("No evaluation criteria defined") from
+    a dead end into a category-defining moment: AI proposes 5-7 criteria
+    based on grant title + description + objectives, weights normalized
+    to 100. Reviewers can copy these and share with the donor; donors
+    (and admins) can save them directly to the grant.
+
+    Body: { grant_id: int }
+    Returns: { suggestions: [...], note: str, source: 'claude'|'template' }
+    """
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return jsonify({'error': 'Too many AI requests. Please wait a moment.', 'success': False}), 429
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json() or {}
+    grant_id = data.get('grant_id')
+    if not grant_id:
+        return error_response('validation.missing_field', 400, field='grant_id')
+
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return error_response('not_found', 404)
+
+    # Reviewer sees the call; donor on their own grant; admin everywhere.
+    role = current_user.role
+    org_id = getattr(current_user, 'org_id', None)
+    if role == 'donor' and getattr(grant, 'donor_org_id', None) != org_id:
+        return error_response('auth.access_denied', 403)
+
+    objectives = []
+    if hasattr(grant, 'objectives') and grant.objectives:
+        objectives = grant.objectives if isinstance(grant.objectives, list) else [str(grant.objectives)]
+
+    result = AIService.suggest_criteria(
+        grant_title=getattr(grant, 'title', '') or '',
+        grant_description=getattr(grant, 'description', '') or getattr(grant, 'summary', ''),
+        grant_objectives=objectives,
+        sector=getattr(grant, 'sector', '') or getattr(grant, 'category', ''),
+        count=int(data.get('count') or 6),
+    )
+
+    return jsonify({'success': True, 'grant_id': grant_id,
+                    'can_save': role in ('donor', 'admin'),
+                    **result})
+
+
 @ai_bp.route('/compliance-explain', methods=['POST'])
 @login_required
 @role_required('donor', 'admin')

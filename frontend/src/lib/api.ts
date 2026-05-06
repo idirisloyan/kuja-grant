@@ -63,16 +63,22 @@ async function apiFetch<T>(
     opts.body = JSON.stringify(body);
   }
 
-  // Phase 13.23 — one-shot retry on transient 5xx for idempotent GETs.
+  // Phase 13.23 + 13.38 — retry transient 5xx on idempotent GETs.
   // Railway's edge / Gunicorn worker recycle occasionally produces a
-  // single 502 that resolves on the next attempt. Retrying ONLY GET
-  // requests ONCE removes the console noise from the team's May 6
-  // retest without masking real errors (a non-transient 502 will
-  // surface on the second attempt).
+  // single 502/503/504 that resolves on the next attempt. Retry up to
+  // TWICE with exponential backoff (250ms, then 750ms). Two retries
+  // covers two transient hops without significantly delaying real
+  // failures — a stuck backend will still surface within ~1s.
+  // Mutating verbs (POST/PUT/PATCH/DELETE) are NEVER retried —
+  // potential double-write risk.
   let res = await fetch(`/api${path}`, opts);
-  if (method === 'GET' && (res.status === 502 || res.status === 503 || res.status === 504)) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    res = await fetch(`/api${path}`, opts);
+  if (method === 'GET') {
+    const backoffs = [250, 750];
+    for (const delay of backoffs) {
+      if (res.status !== 502 && res.status !== 503 && res.status !== 504) break;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      res = await fetch(`/api${path}`, opts);
+    }
   }
 
   // Redirect to login on 401 (except for the session-check endpoint)

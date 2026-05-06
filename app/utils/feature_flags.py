@@ -145,6 +145,15 @@ def _ensure_table():
                 f"DELETE FROM feature_flags WHERE key IN ({keys_csv}) "
                 f"AND LOWER(COALESCE(value, '')) IN ('false', '0', 'f', '')"
             ))
+            # Phase 13.38 — ALSO sweep stale per-user / per-org overrides
+            # that say 'false' for these flags. The original migration
+            # only cleaned global rows; a leftover org-scope override
+            # from earlier testing would silently keep the flag OFF for
+            # that tenant even after the default flipped to True.
+            db.session.execute(text(
+                f"DELETE FROM feature_flag_overrides WHERE key IN ({keys_csv}) "
+                f"AND LOWER(COALESCE(value, '')) IN ('false', '0', 'f', '')"
+            ))
             db.session.commit()
         except Exception as e:
             logger.debug(f"phase 10 flag migration noop: {e}")

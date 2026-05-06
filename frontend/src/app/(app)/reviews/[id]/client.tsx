@@ -126,6 +126,14 @@ export default function ReviewDetailClient() {
   const [loadingEvidence, setLoadingEvidence] = useState(false);
   const [evidenceResult, setEvidenceResult] = useState<EvidenceResult | null>(null);
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
+  // Phase 13.38 — when the grant has no criteria, offer AI to draft them.
+  const [suggestingCriteria, setSuggestingCriteria] = useState(false);
+  const [suggestedCriteria, setSuggestedCriteria] = useState<{
+    suggestions: { key: string; label: string; description: string; weight: number; rationale: string }[];
+    note: string;
+    source: string;
+    can_save?: boolean;
+  } | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   // Documents come back as part of /api/applications/<id>; no separate fetch
@@ -530,7 +538,7 @@ export default function ReviewDetailClient() {
               the empty result reads as 'feature broken' rather than
               'feature not applicable here.' */}
           {evidenceResult?.reason === 'no_criteria' && (
-            <div className="rounded-xl border border-[hsl(var(--kuja-sun))]/30 bg-[hsl(38_92%_97%)] p-4 text-sm">
+            <div className="rounded-xl border border-[hsl(var(--kuja-sun))]/30 bg-[hsl(38_92%_97%)] p-4 text-sm space-y-3">
               <div className="flex items-center gap-1.5 mb-1 text-[10px] uppercase tracking-wider font-bold text-[hsl(var(--kuja-sun))]">
                 <MessageSquare className="h-3 w-3" />
                 {t('review.detail.evidence_no_criteria_label')}
@@ -538,6 +546,74 @@ export default function ReviewDetailClient() {
               <p className="text-sm text-foreground">
                 {evidenceResult.message || t('review.detail.evidence_no_criteria_body')}
               </p>
+
+              {/* Phase 13.38 — turn the dead-end into a category-defining
+                  moment: AI proposes 5-7 criteria the donor can adopt. */}
+              {!suggestedCriteria ? (
+                <button
+                  type="button"
+                  disabled={suggestingCriteria || !grant?.id}
+                  onClick={async () => {
+                    if (!grant?.id) return;
+                    setSuggestingCriteria(true);
+                    try {
+                      const res = await api.post<typeof suggestedCriteria & { success: boolean }>(
+                        '/ai/suggest-criteria',
+                        { grant_id: grant.id, count: 6 },
+                      );
+                      setSuggestedCriteria(res);
+                    } catch {
+                      toast.error('Could not draft criteria — try again in a moment.');
+                    } finally {
+                      setSuggestingCriteria(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50 text-white text-sm font-medium px-3 py-1.5"
+                >
+                  {suggestingCriteria ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cpu className="h-4 w-4" />}
+                  {suggestingCriteria ? 'Drafting…' : 'Suggest evaluation criteria'}
+                </button>
+              ) : (
+                <div className="space-y-3 mt-2">
+                  {suggestedCriteria.note && (
+                    <p className="text-xs text-muted-foreground italic">{suggestedCriteria.note}</p>
+                  )}
+                  <ol className="space-y-2 list-none pl-0">
+                    {suggestedCriteria.suggestions.map((s, i) => (
+                      <li key={s.key || i} className="rounded-lg border border-border bg-background p-3 text-sm">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="font-semibold">{s.label}</span>
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                            weight {s.weight}
+                          </span>
+                        </div>
+                        <p className="text-xs text-foreground">{s.description}</p>
+                        <p className="text-[11px] text-muted-foreground mt-1 italic">
+                          Why: {s.rationale}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const text = suggestedCriteria.suggestions
+                          .map((s) => `• ${s.label} (weight ${s.weight}) — ${s.description}`)
+                          .join('\n');
+                        navigator.clipboard?.writeText(text);
+                        toast.success('Copied — share with the donor.');
+                      }}
+                      className="text-xs rounded-md border border-border bg-background hover:bg-muted px-2 py-1"
+                    >
+                      Copy as plain text
+                    </button>
+                    <span className="text-[11px] text-muted-foreground">
+                      {suggestedCriteria.source === 'claude' ? 'AI-drafted' : 'Baseline (AI offline)'}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

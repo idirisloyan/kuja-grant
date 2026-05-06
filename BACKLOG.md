@@ -148,6 +148,19 @@ re-pitch unless the underlying premise changes.
 
 Newest first. Drop entries older than 90 days.
 
+### 2026-05-06 — Phase 13 batch 46: enterprise hardening + category-defining moments
+
+Sequenced from the user's direct prioritized feedback after the live
+admin/API + browser pass.
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.38-ai-spend-harden | `_parse_int_arg` helper + try/except wraps around both `/ai-spend` and `/ai-spend/forecast` SQL paths. Bad query args (e.g. `?days=` empty / `?days=foo`) and any DB hiccup now return a logged `error_response` instead of a bare 500. | (this batch) |
+| 13.38-system-health | Added `redis_backend` and `ai_budget_threshold` checks to `/admin/system-health`. Both surface as soft `ok` when env is unset (in-memory fallback / $250 default) with concrete `fix:` notes — never light up red, but make the missing env discoverable. | (this batch) |
+| 13.38-retry | Bumped frontend `apiFetch` GET retry from 1× @ 250ms to 2× exponential (250ms, 750ms). Two retries cover two transient hops (Railway edge + Gunicorn worker recycle) while still surfacing real failures within ~1s. | (this batch) |
+| 13.38-suggest-criteria | NEW backend extractor `AIService.suggest_criteria` + `POST /api/ai/suggest-criteria`. When a grant has no rubric, AI proposes 5-7 criteria (label / description / weight normalized to 100 / rationale). Reviewer empty-state now shows a "Suggest evaluation criteria" button → drafted criteria render inline + "Copy as plain text" action so the reviewer can share with the donor. Template fallback always non-empty so the surface is useful even if AI is offline. | (this batch) |
+| 13.38-flag-flip | Strengthened the Phase 13.24 second-wave flag flip to ALSO sweep stale `feature_flag_overrides` rows (per-user / per-org `value='false'`) for the 6 second-wave keys. Previously only the global row was cleaned, so a leftover org-scope override silently kept a flag OFF for that tenant after the default flipped. Added 6 logic invariants pinning the defaults so this can't regress. | (this batch) |
+
 ### 2026-05-06 — Phase 13 batch 45: BACKLOG cleanup
 
 Duplicate-entry sweep. The `High priority` section had completed

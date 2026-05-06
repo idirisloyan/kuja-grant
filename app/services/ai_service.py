@@ -2938,6 +2938,124 @@ class AIService:
         }
 
     @classmethod
+    def suggest_criteria(cls, *, grant_title, grant_description=None,
+                         grant_objectives=None, sector=None, count=6):
+        """Phase 13.38 — propose evaluation criteria for a grant that has
+        none defined. Turns the reviewer's "feature broken" empty-state
+        into "let me help you draft criteria."
+
+        Args:
+            grant_title:        required, short string
+            grant_description:  optional longer text
+            grant_objectives:   optional list/string of objectives
+            sector:             optional sector tag (health/education/etc)
+            count:              target number of criteria (5-8 reasonable)
+
+        Returns: {
+            'suggestions': [
+                {'key': 'capacity', 'label': '...', 'description': '...',
+                 'weight': 0..100, 'rationale': 'why this criterion fits'},
+            ],
+            'note': str,         # 1-sentence framing for the donor
+            'source': 'claude' | 'template',
+        }
+
+        Source 'template' fires when AI is unavailable — returns a 6-row
+        sector-agnostic baseline so the UI is never empty.
+        """
+        title = (grant_title or '').strip()[:200]
+        desc = (grant_description or '').strip()[:1500]
+        objectives = grant_objectives if isinstance(grant_objectives, str) else \
+            (', '.join(grant_objectives) if grant_objectives else '')
+        objectives = objectives[:1000]
+        sector = (sector or '').strip()[:60] or 'general'
+        count = max(4, min(int(count or 6), 8))
+
+        system = (
+            "You are Kuja's evaluation-criteria drafter. A donor has "
+            "published a grant with no scoring rubric. Propose criteria a "
+            "reviewer would use to evaluate applications fairly.\n\n"
+            "Constraints:\n"
+            f"  - Target {count} criteria. No fewer than 4, no more than 8.\n"
+            "  - Each criterion: short label (3-5 words), 1-sentence "
+            "description, suggested weight (sum to 100), and a 1-sentence "
+            "rationale explaining why it fits THIS grant.\n"
+            "  - Mix programmatic (capacity, MEL, sustainability) with "
+            "context-specific criteria the donor's focus implies.\n"
+            "  - Keys are snake_case, English, stable identifiers.\n"
+            "  - Do NOT propose criteria the donor obviously wouldn't "
+            "score (e.g. 'org age' for a startup-focused grant).\n\n"
+            "Return ONLY a JSON object matching the schema."
+        )
+
+        schema = """{
+  "suggestions": [
+    {"key": "snake_case", "label": "...", "description": "...",
+     "weight": 25, "rationale": "..."}
+  ],
+  "note": "1-sentence framing for the donor"
+}"""
+
+        user_msg = (
+            f"GRANT TITLE: {title}\n"
+            f"SECTOR: {sector}\n"
+            f"DESCRIPTION:\n{desc or '(not provided)'}\n\n"
+            f"OBJECTIVES:\n{objectives or '(not provided)'}\n\n"
+            "Propose the criteria now."
+        )
+
+        text = cls._call_claude(system + "\n\n" + schema, user_msg, max_tokens=1500)
+        if text:
+            try:
+                import re
+                m = re.search(r'\{[\s\S]*\}', text)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    sugg = parsed.get('suggestions') or []
+                    if isinstance(sugg, list) and sugg:
+                        # Normalize weights so they sum to 100.
+                        total = sum(int(s.get('weight', 0) or 0) for s in sugg)
+                        if total > 0 and total != 100:
+                            for s in sugg:
+                                s['weight'] = round(int(s.get('weight', 0) or 0) / total * 100)
+                        parsed['source'] = 'claude'
+                        return parsed
+            except Exception as e:
+                logger.warning(f"suggest_criteria JSON parse failed: {e}")
+
+        # Template fallback — always non-empty so the UI is useful.
+        return {
+            'suggestions': [
+                {'key': 'organizational_capacity', 'label': 'Organizational capacity',
+                 'description': 'Track record, team experience, and operational maturity.',
+                 'weight': 20,
+                 'rationale': 'Baseline check that the applicant can deliver.'},
+                {'key': 'program_design', 'label': 'Program design',
+                 'description': 'Clarity of theory of change, activities, and outcomes.',
+                 'weight': 20,
+                 'rationale': 'Tests the rigor of the proposed intervention.'},
+                {'key': 'budget_realism', 'label': 'Budget realism',
+                 'description': 'Cost reasonableness and value-for-money signal.',
+                 'weight': 15,
+                 'rationale': 'Filters proposals where budget and scope are misaligned.'},
+                {'key': 'mel_plan', 'label': 'Monitoring & learning plan',
+                 'description': 'Quality of indicators, baselines, and learning loops.',
+                 'weight': 15,
+                 'rationale': 'Surfaces whether the applicant can measure what they promise.'},
+                {'key': 'sustainability', 'label': 'Sustainability',
+                 'description': 'Likelihood the work continues beyond the grant.',
+                 'weight': 15,
+                 'rationale': 'Donors care about impact that outlasts the funding window.'},
+                {'key': 'community_fit', 'label': 'Community fit',
+                 'description': 'Alignment with community priorities and local leadership.',
+                 'weight': 15,
+                 'rationale': 'Surfaces locally-rooted proposals over imported templates.'},
+            ],
+            'note': 'AI unavailable — these are baseline criteria you can refine.',
+            'source': 'template',
+        }
+
+    @classmethod
     def generate_reviewer_summary(
         cls,
         *,

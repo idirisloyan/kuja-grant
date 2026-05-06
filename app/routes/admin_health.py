@@ -157,6 +157,52 @@ def api_system_health():
     except Exception:
         pass
 
+    # 6b. Phase 13.38 — Redis backend for cross-worker rate limiting.
+    # Without REDIS_URL set, rate limits are per-Gunicorn-worker
+    # (effectively N× looser than the policy says). Surface as a soft
+    # 'ok' with a callout so admins can see what they're missing
+    # without the page lighting up red.
+    try:
+        from app.utils.rate_policies import _get_redis
+        redis_active = _get_redis() is not None
+    except Exception:
+        redis_active = False
+    if redis_active:
+        checks.append({'key': 'redis_backend', 'status': 'ok',
+                       'why': 'Cross-worker rate limits + lockouts active',
+                       'current': 'Redis connected', 'fix': ''})
+    elif os.environ.get('REDIS_URL') or os.environ.get('RATE_LIMIT_REDIS_URL'):
+        checks.append({'key': 'redis_backend', 'status': 'warn',
+                       'why': 'REDIS_URL set but unreachable — falling back to in-memory.',
+                       'current': 'Configured but offline',
+                       'fix': 'Verify Railway Redis service is up; check connection from app pod.'})
+    else:
+        checks.append({'key': 'redis_backend', 'status': 'ok',
+                       'why': 'Rate limits run per-worker without Redis.',
+                       'current': 'In-memory fallback',
+                       'fix': 'For multi-worker prod, provision a Redis service and set REDIS_URL in Railway.'})
+
+    # 6c. Phase 13.38 — AI budget threshold for /ai-spend/forecast.
+    # Defaults to $250/30d when unset. Soft 'ok' either way.
+    budget_env = os.environ.get('KUJA_AI_BUDGET_USD_30D')
+    if budget_env:
+        try:
+            budget_v = float(budget_env)
+            checks.append({'key': 'ai_budget_threshold', 'status': 'ok',
+                           'why': '30-day AI budget alert threshold',
+                           'current': f'${budget_v:.0f}',
+                           'fix': ''})
+        except ValueError:
+            checks.append({'key': 'ai_budget_threshold', 'status': 'warn',
+                           'why': 'KUJA_AI_BUDGET_USD_30D set but not numeric',
+                           'current': budget_env[:40],
+                           'fix': 'Set KUJA_AI_BUDGET_USD_30D to a number (e.g. 250).'})
+    else:
+        checks.append({'key': 'ai_budget_threshold', 'status': 'ok',
+                       'why': '30-day AI budget alert threshold',
+                       'current': '$250 (default)',
+                       'fix': 'Set KUJA_AI_BUDGET_USD_30D in Railway env to override.'})
+
     # 7. Risks owned by users with no due_date (PMO observation: orphaned risks)
     try:
         result = db.session.execute(text("""
@@ -191,57 +237,92 @@ def api_system_health():
     })
 
 
+def _parse_int_arg(name: str, default: int, min_v: int, max_v: int) -> int:
+    """Phase 13.38 — bulletproof int query-arg parsing.
+
+    The earlier `int(request.args.get('days', 7))` blew up on `?days=`
+    or `?days=foo` with a bare ValueError → 500. This helper:
+      - returns default when arg is missing or empty
+      - returns default when arg is non-numeric (don't 500 on bad input)
+      - clamps to [min_v, max_v]
+    """
+    raw = (request.args.get(name) or '').strip()
+    if not raw:
+        return default
+    try:
+        v = int(raw)
+    except (TypeError, ValueError):
+        return default
+    if v < min_v:
+        return min_v
+    if v > max_v:
+        return max_v
+    return v
+
+
 @admin_health_bp.route('/ai-spend', methods=['GET'])
 @login_required
 @role_required('admin')
 def api_ai_spend():
     """Token cost telemetry, day-bucketed.
 
-    Query: days=7|14|30 (default 7)
+    Query: days=7|14|30 (default 7, clamped to [1, 90])
     Output: { days, total_usd, per_day: [{date, calls, input_tokens, output_tokens, usd}], per_endpoint: [...] }
-    """
-    from sqlalchemy import text
-    days = min(int(request.args.get('days', 7)), 90)
 
-    # Phase 13.10 — column names on the ai_call_logs table are
-    # tokens_in / tokens_out (NOT input_tokens / output_tokens). Mismatched
-    # column names threw 500 in batch 30; fixed in batch 35.
-    rows = db.session.execute(text(f"""
-        SELECT DATE(created_at) AS day,
-               endpoint,
-               COUNT(*) AS calls,
-               COALESCE(SUM(tokens_in), 0) AS in_tokens,
-               COALESCE(SUM(tokens_out), 0) AS out_tokens
-        FROM ai_call_logs
-        WHERE created_at >= NOW() - INTERVAL '{days} days'
-        GROUP BY 1, 2
-        ORDER BY 1 DESC, 2
-    """)).fetchall()
+    Phase 13.38 — fully wrapped in try/except. Bad query args + any SQL
+    hiccup return a structured error_response instead of a bare 500.
+    """
+    import logging
+    from sqlalchemy import text
+    days = _parse_int_arg('days', 7, 1, 90)
+
+    try:
+        # Column names on ai_call_logs are tokens_in / tokens_out (NOT
+        # input_tokens / output_tokens). Phase 13.10/35 fixed the
+        # mismatch + COALESCE for null tokens.
+        rows = db.session.execute(text(f"""
+            SELECT DATE(created_at) AS day,
+                   endpoint,
+                   COUNT(*) AS calls,
+                   COALESCE(SUM(tokens_in), 0) AS in_tokens,
+                   COALESCE(SUM(tokens_out), 0) AS out_tokens
+            FROM ai_call_logs
+            WHERE created_at >= NOW() - INTERVAL '{days} days'
+            GROUP BY 1, 2
+            ORDER BY 1 DESC, 2
+        """)).fetchall()
+    except Exception as e:
+        logging.getLogger('kuja').exception('ai-spend SQL failed')
+        return error_response('admin.ai_spend_query_failed', 500, detail=str(e)[:200])
 
     sonnet = _PRICING['claude-sonnet-4-20250514']
     per_day_map: dict[str, dict] = {}
     per_endpoint_map: dict[str, dict] = {}
     total_usd = 0.0
-    for r in rows:
-        day = r[0].isoformat() if hasattr(r[0], 'isoformat') else str(r[0])
-        endpoint = r[1] or 'unknown'
-        calls = int(r[2] or 0)
-        in_t = int(r[3] or 0)
-        out_t = int(r[4] or 0)
-        cost = (in_t / 1_000_000 * sonnet['input']) + (out_t / 1_000_000 * sonnet['output'])
-        total_usd += cost
+    try:
+        for r in rows:
+            day = r[0].isoformat() if hasattr(r[0], 'isoformat') else str(r[0])
+            endpoint = r[1] or 'unknown'
+            calls = int(r[2] or 0)
+            in_t = int(r[3] or 0)
+            out_t = int(r[4] or 0)
+            cost = (in_t / 1_000_000 * sonnet['input']) + (out_t / 1_000_000 * sonnet['output'])
+            total_usd += cost
 
-        d = per_day_map.setdefault(day, {'date': day, 'calls': 0, 'input_tokens': 0, 'output_tokens': 0, 'usd': 0.0})
-        d['calls'] += calls
-        d['input_tokens'] += in_t
-        d['output_tokens'] += out_t
-        d['usd'] += cost
+            d = per_day_map.setdefault(day, {'date': day, 'calls': 0, 'input_tokens': 0, 'output_tokens': 0, 'usd': 0.0})
+            d['calls'] += calls
+            d['input_tokens'] += in_t
+            d['output_tokens'] += out_t
+            d['usd'] += cost
 
-        e = per_endpoint_map.setdefault(endpoint, {'endpoint': endpoint, 'calls': 0, 'input_tokens': 0, 'output_tokens': 0, 'usd': 0.0})
-        e['calls'] += calls
-        e['input_tokens'] += in_t
-        e['output_tokens'] += out_t
-        e['usd'] += cost
+            e = per_endpoint_map.setdefault(endpoint, {'endpoint': endpoint, 'calls': 0, 'input_tokens': 0, 'output_tokens': 0, 'usd': 0.0})
+            e['calls'] += calls
+            e['input_tokens'] += in_t
+            e['output_tokens'] += out_t
+            e['usd'] += cost
+    except Exception as e:
+        logging.getLogger('kuja').exception('ai-spend aggregation failed')
+        return error_response('admin.ai_spend_aggregation_failed', 500, detail=str(e)[:200])
 
     per_day = sorted(per_day_map.values(), key=lambda x: x['date'])
     per_endpoint = sorted(per_endpoint_map.values(), key=lambda x: -x['usd'])
@@ -282,13 +363,18 @@ def api_ai_spend_forecast():
     """
     from sqlalchemy import text
     import os
-    trailing = min(max(int(request.args.get('trailing_days', 14)), 7), 60)
-    rows = db.session.execute(text(f"""
-        SELECT COALESCE(SUM(tokens_in), 0) AS in_tokens,
-               COALESCE(SUM(tokens_out), 0) AS out_tokens
-        FROM ai_call_logs
-        WHERE created_at >= NOW() - INTERVAL '{trailing} days'
-    """)).fetchone()
+    import logging
+    trailing = _parse_int_arg('trailing_days', 14, 7, 60)
+    try:
+        rows = db.session.execute(text(f"""
+            SELECT COALESCE(SUM(tokens_in), 0) AS in_tokens,
+                   COALESCE(SUM(tokens_out), 0) AS out_tokens
+            FROM ai_call_logs
+            WHERE created_at >= NOW() - INTERVAL '{trailing} days'
+        """)).fetchone()
+    except Exception as e:
+        logging.getLogger('kuja').exception('ai-spend forecast SQL failed')
+        return error_response('admin.ai_spend_forecast_failed', 500, detail=str(e)[:200])
     in_t = int((rows[0] if rows else 0) or 0)
     out_t = int((rows[1] if rows else 0) or 0)
     sonnet = _PRICING['claude-sonnet-4-20250514']
