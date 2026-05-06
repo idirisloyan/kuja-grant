@@ -1822,6 +1822,7 @@
   "shortcuts.go_grants": "Aller aux subventions",
   "shortcuts.group.global": "Global",
   "shortcuts.group.navigation": "Navigation",
+  "shortcuts.replay_tour": "Rejouer la visite guidée",
   "review.detail.evidence_no_criteria_label": "Extraction d'éléments non applicable",
   "review.detail.evidence_no_criteria_body": "Cette subvention n'a pas de critères d'évaluation définis, donc l'extraction par critère ne s'applique pas. Ajoutez des critères à la subvention pour activer cette fonctionnalité.",
   "extraction.add_item": "Ajouter un élément",

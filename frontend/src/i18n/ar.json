@@ -1822,6 +1822,7 @@
   "shortcuts.go_grants": "الذهاب إلى المنح",
   "shortcuts.group.global": "عام",
   "shortcuts.group.navigation": "التنقل",
+  "shortcuts.replay_tour": "إعادة تشغيل جولة التعريف",
   "review.detail.evidence_no_criteria_label": "استخراج الأدلة غير قابل للتطبيق",
   "review.detail.evidence_no_criteria_body": "لا توجد معايير تقييم محددة لهذه المنحة، لذا فإن استخراج الأدلة لكل معيار لا ينطبق هنا. أضف معايير إلى المنحة لتفعيل هذه الميزة.",
   "extraction.add_item": "إضافة بند",

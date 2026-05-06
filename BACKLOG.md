@@ -210,18 +210,25 @@ Phase 13.11.
 ## Low priority
 
 ### ~~Saved searches with drag-reorder~~ ✓
-**Done batch 40:** `SavedSearch` model + `/api/saved-searches` CRUD
-+ `/api/saved-searches/reorder` for drag-reorder integration. Scope
+**Done batch 40 (backend) + batch 44 (UI):** `SavedSearch` model +
+`/api/saved-searches` CRUD + `/api/saved-searches/reorder`. Scope
 enum: grants / applications / reports / organizations / reviews /
-risks. UI integration (drag handle on each scope's filter bar)
-follows in a focused frontend batch.
+risks. UI: `<SavedSearchesBar>` at
+`frontend/src/components/shared/saved-searches-bar.tsx` — drop into
+any list page with `scope`, `currentFilter`, and an `onApply`
+callback. Reorder via accessible ↑/↓ buttons (no DnD library — zero
+new deps, keyboard-navigable, screen-reader-friendly). Inline
+"+ Save current" with name input. Optimistic updates with
+fail-revert.
 
-### Onboarding tour per role
-Phase 8 already shipped a basic tour-provider. PMO's pattern: 4
-per-role scripts (NGO / donor / reviewer / admin), localStorage-
-tracked completion, library-free overlay + tooltip. Audit existing
-tour and extend if shallow.
-- `last_touched: 2026-05-08`
+### ~~Onboarding tour per role~~ ✓
+**Done batch 44 (audit conclusion):** Phase 8's `OnboardingTourProvider`
+already meets PMO's pattern — per-role scripts (donor/ngo/reviewer/admin),
+i18n-keyed copy, anchored tooltips with auto-scroll, localStorage
+completion (`kuja_onboarded_${role}_${userId}`), and a
+`kuja:replay-tour` event hook. Only gap was a discoverable replay
+entry point. Added a "Replay onboarding tour" link inside the Cmd/?
+shortcut overlay (i18n: `shortcuts.replay_tour` across en/fr/es/ar/sw/so).
 
 ### UAT fixture self-healing cron
 PMO ran a daily `/api/cron/uat-fixtures` to ensure demo states
@@ -248,17 +255,22 @@ review flow is currently single-reviewer per application.
 Multi-reviewer + COI gates would matter for high-stakes donors.
 - `last_touched: 2026-05-08`
 
-### "Slips in N days" forecast badge
-Pairs with the daily compliance health snapshots cron (above).
-Linear regression against last 30 days projected forward 30 days;
-when forecast crosses below the at-risk threshold, render badge.
-- `last_touched: 2026-05-08`
+### ~~"Slips in N days" forecast badge~~ ✓
+**Done batch 44:** `<SlipsForecastBadge>` at
+`frontend/src/components/shared/slips-forecast-badge.tsx`. Hits
+`/api/grants/<id>/compliance-health/trajectory`, renders nothing when
+`slips_below_at_risk_in_days` is null or beyond `thresholdDays`
+(default 30). Tone-coded: red ≤7d, amber ≤14d, sky ≤30d. Hover
+title explains the linear-regression source so the badge isn't a
+bare prediction.
 
-### AI cost forecasting
-Phase 13.10's `/admin/ai-spend` shows historical day-buckets.
-Forecast next-30-day spend based on trailing average + alert
-admins when projected spend crosses a budget threshold.
-- `last_touched: 2026-05-08`
+### ~~AI cost forecasting~~ ✓
+**Done batch 44:** `GET /api/admin/ai-spend/forecast` projects
+next-30-day spend from a trailing window (default 14 days, configurable
+via `?trailing_days=`). Compares against `KUJA_AI_BUDGET_USD_30D` env
+(default $250). Returns `status` of `ok | watch | over_budget` (watch
+fires at 80% of budget) so the admin UI can light up without doing
+its own math. Pairs with the existing `/ai-spend` historical endpoint.
 
 ---
 

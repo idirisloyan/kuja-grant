@@ -260,6 +260,64 @@ def api_ai_spend():
     })
 
 
+@admin_health_bp.route('/ai-spend/forecast', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_ai_spend_forecast():
+    """Project next-30-day AI spend from the trailing window.
+
+    Phase 13.36 — pairs with /ai-spend (which is historical day-buckets).
+    Forecast logic: take the trailing 14 days of usage, compute the
+    daily-average USD, project that across the next 30 days. Compare
+    against a budget threshold (env `KUJA_AI_BUDGET_USD_30D`, default
+    250) so admins can see headroom at a glance.
+
+    Output:
+      {
+        trailing_days, trailing_total_usd, daily_avg_usd,
+        forecast_30d_usd, budget_30d_usd, headroom_pct,
+        status: 'ok' | 'watch' | 'over_budget',
+        as_of
+      }
+    """
+    from sqlalchemy import text
+    import os
+    trailing = min(max(int(request.args.get('trailing_days', 14)), 7), 60)
+    rows = db.session.execute(text(f"""
+        SELECT COALESCE(SUM(tokens_in), 0) AS in_tokens,
+               COALESCE(SUM(tokens_out), 0) AS out_tokens
+        FROM ai_call_logs
+        WHERE created_at >= NOW() - INTERVAL '{trailing} days'
+    """)).fetchone()
+    in_t = int((rows[0] if rows else 0) or 0)
+    out_t = int((rows[1] if rows else 0) or 0)
+    sonnet = _PRICING['claude-sonnet-4-20250514']
+    trailing_total = (in_t / 1_000_000 * sonnet['input']) + (out_t / 1_000_000 * sonnet['output'])
+    daily_avg = trailing_total / max(trailing, 1)
+    forecast_30 = daily_avg * 30
+    budget_30 = float(os.environ.get('KUJA_AI_BUDGET_USD_30D', '250'))
+    # headroom_pct: positive = under budget, negative = over.
+    headroom_pct = ((budget_30 - forecast_30) / budget_30 * 100) if budget_30 > 0 else 0.0
+    if forecast_30 > budget_30:
+        status = 'over_budget'
+    elif forecast_30 > budget_30 * 0.8:
+        status = 'watch'
+    else:
+        status = 'ok'
+    return jsonify({
+        'success': True,
+        'trailing_days': trailing,
+        'trailing_total_usd': round(trailing_total, 4),
+        'daily_avg_usd': round(daily_avg, 4),
+        'forecast_30d_usd': round(forecast_30, 2),
+        'budget_30d_usd': round(budget_30, 2),
+        'headroom_pct': round(headroom_pct, 1),
+        'status': status,
+        'as_of': datetime.now(timezone.utc).isoformat(),
+        'note': 'Set KUJA_AI_BUDGET_USD_30D in Railway env to change the budget threshold.',
+    })
+
+
 @admin_health_bp.route('/audit-retention', methods=['GET', 'PUT'])
 @login_required
 @role_required('admin')

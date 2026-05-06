@@ -119,6 +119,18 @@ export function KeyboardShortcutOverlay() {
               </ul>
             </section>
           ))}
+          <div className="pt-2 border-t border-border">
+            <button
+              type="button"
+              className="w-full text-left text-sm text-[hsl(var(--kuja-clay))] hover:text-[hsl(var(--kuja-clay-dark))] hover:underline"
+              onClick={() => {
+                setOpen(false);
+                window.dispatchEvent(new Event('kuja:replay-tour'));
+              }}
+            >
+              {t('shortcuts.replay_tour')}
+            </button>
+          </div>
         </div>
       </div>
     </div>

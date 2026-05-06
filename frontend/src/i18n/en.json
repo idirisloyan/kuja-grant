@@ -1822,6 +1822,7 @@
   "shortcuts.go_grants": "Go to grants",
   "shortcuts.group.global": "Global",
   "shortcuts.group.navigation": "Navigation",
+  "shortcuts.replay_tour": "Replay onboarding tour",
   "review.detail.evidence_no_criteria_label": "Evidence extract not applicable",
   "review.detail.evidence_no_criteria_body": "This grant has no evaluation criteria defined, so criterion-by-criterion evidence extraction does not apply here. Add criteria to the grant to enable this feature.",
   "extraction.add_item": "Add item",
