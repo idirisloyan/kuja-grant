@@ -1792,5 +1792,6 @@
   "reviewer_summary.per_crit_rationale": "Sababaynta shuruudan",
   "reviewer_summary.decision_changers": "Waxa beddeli kara go'aankan",
   "reviewer_summary.decision_changers_hint": "Caddayn gaar ah oo beddeli karta dhibcaha — waxay caawisaa ka hor qiimaynta.",
-  "report_readiness.addresses": "Wuxuu xalliyaa"
+  "report_readiness.addresses": "Wuxuu xalliyaa",
+  "inline_status.changed": "Heerka waa la cusbooneysiiyay"
 }

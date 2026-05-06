@@ -1772,5 +1772,6 @@
   "reviewer_summary.per_crit_rationale": "Justification pour ce critère",
   "reviewer_summary.decision_changers": "Ce qui changerait cette décision",
   "reviewer_summary.decision_changers_hint": "Preuves spécifiques qui modifieraient la note — utile avant de scorer.",
-  "report_readiness.addresses": "Résout"
+  "report_readiness.addresses": "Résout",
+  "inline_status.changed": "Statut mis à jour"
 }

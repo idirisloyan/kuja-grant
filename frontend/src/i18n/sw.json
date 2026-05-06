@@ -1792,5 +1792,6 @@
   "reviewer_summary.per_crit_rationale": "Sababu ya kigezo hiki",
   "reviewer_summary.decision_changers": "Nini kingebadilisha uamuzi huu",
   "reviewer_summary.decision_changers_hint": "Ushahidi maalum ungeobadilisha alama — muhimu kabla ya kupiga alama.",
-  "report_readiness.addresses": "Hutatua"
+  "report_readiness.addresses": "Hutatua",
+  "inline_status.changed": "Hali imesasishwa"
 }

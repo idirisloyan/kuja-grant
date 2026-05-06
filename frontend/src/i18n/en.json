@@ -1772,5 +1772,6 @@
   "reviewer_summary.per_crit_rationale": "Rationale for this criterion",
   "reviewer_summary.decision_changers": "What would change this decision",
   "reviewer_summary.decision_changers_hint": "Specific evidence that would shift the score — useful for follow-up before scoring.",
-  "report_readiness.addresses": "Resolves"
+  "report_readiness.addresses": "Resolves",
+  "inline_status.changed": "Status updated"
 }

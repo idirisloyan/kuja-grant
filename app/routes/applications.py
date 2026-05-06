@@ -185,6 +185,8 @@ def api_update_application(app_id):
 
     db.session.commit()
 
+    # Phase 13.6 — inline-edit endpoint follows below; the existing PUT
+    # path is preserved for full-payload edits (responses, eligibility, etc.)
     # Audit trail for critical state transition: awarded
     if new_status == 'awarded':
         log_action('application.awarded', current_user.email, 'application', application.id,
@@ -275,6 +277,63 @@ def api_submit_application(app_id):
 # ---------------------------------------------------------------------------
 # Phase 5.3 — NGO-visible audit trail
 # ---------------------------------------------------------------------------
+
+@applications_bp.route('/<int:app_id>/status', methods=['PATCH'])
+@login_required
+def api_application_status_inline(app_id):
+    """Phase 13.6 — inline-edit status flip.
+
+    Tight, low-friction endpoint for the dropdown-on-row UX. Returns the
+    minimal payload needed to update the row in place — no full doc body,
+    no recomputed scores. Donor + admin only; NGOs use /submit.
+
+    Body: { status: 'submitted' | 'under_review' | 'awarded' | 'rejected' }
+
+    Allowed transitions are role-checked:
+      donor:  draft -> (no — NGO submits) ;
+              submitted/under_review -> under_review/awarded/rejected
+      admin:  any
+    """
+    from app.utils.validation import require_enum, ValidationError, to_error_response
+    from app.utils.api_errors import error_response
+
+    application = db.session.get(Application, app_id)
+    if not application:
+        return error_response('application.not_found', 404)
+    if current_user.role not in ('donor', 'admin'):
+        return error_response('auth.access_denied', 403)
+    if current_user.role == 'donor':
+        # Donor must own the grant to flip status on its applications.
+        from app.models import Grant
+        grant = db.session.get(Grant, application.grant_id)
+        if not grant or getattr(grant, 'donor_org_id', None) != current_user.org_id:
+            return error_response('auth.access_denied', 403)
+
+    data = get_request_json() or {}
+    try:
+        new_status = require_enum(data, 'status', (
+            'submitted', 'under_review', 'awarded', 'rejected'
+        ))
+    except ValidationError as e:
+        return to_error_response(e)
+
+    old_status = application.status
+    application.status = new_status
+    db.session.commit()
+
+    log_action(
+        f'application.status.{new_status}',
+        current_user.email, 'application', application.id,
+        {'old_status': old_status, 'new_status': new_status, 'inline': True},
+    )
+    logger.info(f"Inline status flip: app={app_id} {old_status}->{new_status} by {current_user.email}")
+    return jsonify({
+        'success': True,
+        'application_id': application.id,
+        'status': new_status,
+        'previous_status': old_status,
+    })
+
 
 @applications_bp.route('/<int:app_id>/activity', methods=['GET'])
 @login_required

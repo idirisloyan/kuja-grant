@@ -1772,5 +1772,6 @@
   "reviewer_summary.per_crit_rationale": "تبرير لهذا المعيار",
   "reviewer_summary.decision_changers": "ما الذي يغيّر هذا القرار",
   "reviewer_summary.decision_changers_hint": "أدلة محددة قد تغيّر الدرجة — مفيدة للمتابعة قبل التقييم.",
-  "report_readiness.addresses": "يعالج"
+  "report_readiness.addresses": "يعالج",
+  "inline_status.changed": "تم تحديث الحالة"
 }

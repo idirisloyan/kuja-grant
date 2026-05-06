@@ -185,6 +185,31 @@ def create_app(config_name=None):
                 if 'revision_history' not in report_cols:
                     conn.execute(text("ALTER TABLE reports ADD COLUMN revision_history TEXT"))
                     added.append('reports.revision_history')
+                # Phase 13.5 — extraction lifecycle columns (two-phase intake).
+                if 'extraction_status' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN extraction_status VARCHAR(20)"))
+                    added.append('documents.extraction_status')
+                if 'extraction_started_at' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN extraction_started_at TIMESTAMP"))
+                    added.append('documents.extraction_started_at')
+                if 'extraction_completed_at' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN extraction_completed_at TIMESTAMP"))
+                    added.append('documents.extraction_completed_at')
+                if 'extraction_failed_reason' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN extraction_failed_reason VARCHAR(500)"))
+                    added.append('documents.extraction_failed_reason')
+                if 'extraction_failed_code' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN extraction_failed_code VARCHAR(40)"))
+                    added.append('documents.extraction_failed_code')
+                if 'extraction_trace_id' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN extraction_trace_id VARCHAR(40)"))
+                    added.append('documents.extraction_trace_id')
+                if 'extraction_attempt_count' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN extraction_attempt_count INTEGER DEFAULT 0"))
+                    added.append('documents.extraction_attempt_count')
+                if 'extraction_used_native_pdf' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN extraction_used_native_pdf BOOLEAN DEFAULT FALSE"))
+                    added.append('documents.extraction_used_native_pdf')
                 if added:
                     conn.commit()
                     app.logger.info(f"Added missing columns: {', '.join(added)}")

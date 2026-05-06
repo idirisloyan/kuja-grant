@@ -217,18 +217,36 @@ def api_upload_document():
                     break
 
     # Save document immediately (AI analysis runs in background to avoid 502 timeouts)
+    # Phase 13.5 — two-phase intake: queue extraction with a stable
+    # trace_id so the client can poll status + show "extracting…" UX
+    # without holding the upload connection open.
+    import uuid as _uuid
+    document.extraction_status = 'queued'
+    document.extraction_trace_id = _uuid.uuid4().hex[:16]
+    document.extraction_attempt_count = 0
     db.session.add(document)
     db.session.commit()
 
     doc_id = document.id
-    logger.info(f"Document uploaded: {original_filename} (id={doc_id}, AI analysis pending)")
+    trace_id = document.extraction_trace_id
+    logger.info(f"Document uploaded: {original_filename} (id={doc_id}, trace_id={trace_id}, AI analysis queued)")
 
     # Submit AI analysis as a background task so the upload response returns fast
     def _run_ai_analysis():
         from flask import current_app
+        from datetime import datetime, timezone
         app = current_app._get_current_object()
         with app.app_context():
+            doc = db.session.get(Document, doc_id)
+            if not doc:
+                return
             try:
+                # Phase 13.5 — running state
+                doc.extraction_status = 'running'
+                doc.extraction_started_at = datetime.now(timezone.utc)
+                doc.extraction_attempt_count = (doc.extraction_attempt_count or 0) + 1
+                db.session.commit()
+
                 analysis = AIService.analyze_document(
                     original_filename, doc_type, file_size,
                     file_path=filepath, requirements=donor_requirements,
@@ -237,10 +255,27 @@ def api_upload_document():
                 if doc:
                     doc.set_ai_analysis(analysis)
                     doc.score = analysis.get('score', 0)
+                    # Phase 13.5 — completed state + native_pdf telemetry
+                    doc.extraction_status = 'completed'
+                    doc.extraction_completed_at = datetime.now(timezone.utc)
+                    if (analysis or {}).get('_extraction_path') == 'native_pdf':
+                        doc.extraction_used_native_pdf = True
                     db.session.commit()
-                    logger.info(f"Document AI analysis complete: id={doc_id}, score={doc.score}")
+                    logger.info(f"Document AI analysis complete: id={doc_id}, score={doc.score}, trace_id={trace_id}")
             except Exception as e:
-                logger.error(f"Background document analysis failed for id={doc_id}: {e}")
+                logger.error(f"Background document analysis failed for id={doc_id} trace_id={trace_id}: {e}")
+                # Phase 13.5 — classify failure into PMO's vocabulary so
+                # the client can surface specific recovery copy.
+                err_code = 'unknown'
+                msg = (str(e) or '').lower()
+                if 'timeout' in msg or 'timed out' in msg:
+                    err_code = 'timeout'
+                elif 'aborted' in msg or 'cancel' in msg:
+                    err_code = 'aborted'
+                elif 'rate' in msg and 'limit' in msg:
+                    err_code = 'ai_error'
+                elif 'pdf' in msg or 'extract' in msg:
+                    err_code = 'text_extract_failed'
                 doc = db.session.get(Document, doc_id)
                 if doc:
                     doc.set_ai_analysis({
@@ -249,6 +284,10 @@ def api_upload_document():
                         'recommendations': ['Manual review recommended'],
                     })
                     doc.score = 50
+                    doc.extraction_status = 'failed'
+                    doc.extraction_completed_at = datetime.now(timezone.utc)
+                    doc.extraction_failed_code = err_code
+                    doc.extraction_failed_reason = str(e)[:500]
                     db.session.commit()
 
     from flask import current_app as _ca
@@ -287,3 +326,48 @@ def api_get_document(doc_id):
                 return jsonify({'error': 'Access denied'}), 403
 
     return jsonify({'document': document.to_dict()})
+
+
+@documents_bp.route('/<int:doc_id>/extraction-status', methods=['GET'])
+@login_required
+def api_document_extraction_status(doc_id):
+    """Phase 13.5 — lightweight polling endpoint for two-phase intake.
+
+    The client polls this every 2-3s while the wizard is in `extracting`
+    state. Returns just the lifecycle subset of the document — no AI
+    analysis body, so this is cheap to call.
+
+    Status values: queued | running | completed | failed | timed_out | aborted
+    Failure codes: no_document | text_extract_failed | text_too_short |
+                   timeout | ai_error | aborted | unknown
+    """
+    document = db.session.get(Document, doc_id)
+    if not document:
+        return jsonify({'error': 'Document not found'}), 404
+
+    # Reuse same access-control as GET /<id>.
+    if document.application_id:
+        application = db.session.get(Application, document.application_id)
+        if application and current_user.role == 'ngo' and application.ngo_org_id != current_user.org_id:
+            return jsonify({'error': 'Access denied'}), 403
+    if document.assessment_id:
+        assessment = db.session.get(Assessment, document.assessment_id)
+        if assessment and current_user.role not in ('admin',) and assessment.org_id != current_user.org_id:
+            return jsonify({'error': 'Access denied'}), 403
+
+    return jsonify({
+        'success': True,
+        'document_id': document.id,
+        'extraction': {
+            'status': document.extraction_status,
+            'started_at': document.extraction_started_at.isoformat() if document.extraction_started_at else None,
+            'completed_at': document.extraction_completed_at.isoformat() if document.extraction_completed_at else None,
+            'failed_reason': document.extraction_failed_reason,
+            'failed_code': document.extraction_failed_code,
+            'trace_id': document.extraction_trace_id,
+            'attempt_count': document.extraction_attempt_count or 0,
+            'used_native_pdf': bool(document.extraction_used_native_pdf),
+        },
+        'has_analysis': bool(document.ai_analysis),
+        'score': document.score,
+    })

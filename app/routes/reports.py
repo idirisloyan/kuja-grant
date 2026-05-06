@@ -328,6 +328,55 @@ def api_review_report(report_id):
     return jsonify({'success': True, 'report': report.to_dict()})
 
 
+@reports_bp.route('/<int:report_id>/status', methods=['PATCH'])
+@login_required
+def api_report_status_inline(report_id):
+    """Phase 13.6 — inline-edit status flip for reports.
+
+    Body: { status: 'accepted' | 'revision_requested' | 'submitted' }
+
+    Donor + admin only. Mirrors the application inline endpoint but
+    routed through the report lifecycle.
+    """
+    from app.utils.validation import require_enum, ValidationError, to_error_response
+    from app.utils.api_errors import error_response
+
+    report = db.session.get(Report, report_id)
+    if not report:
+        return error_response('report.not_found', 404)
+    if current_user.role not in ('donor', 'admin'):
+        return error_response('auth.access_denied', 403)
+    if current_user.role == 'donor':
+        from app.models import Grant
+        grant = db.session.get(Grant, report.grant_id)
+        if not grant or getattr(grant, 'donor_org_id', None) != current_user.org_id:
+            return error_response('auth.access_denied', 403)
+
+    data = get_request_json() or {}
+    try:
+        new_status = require_enum(data, 'status', (
+            'submitted', 'accepted', 'revision_requested',
+        ))
+    except ValidationError as e:
+        return to_error_response(e)
+
+    old_status = report.status
+    report.status = new_status
+    db.session.commit()
+    log_action(
+        f'report.status.{new_status}',
+        current_user.email, 'report', report.id,
+        {'old_status': old_status, 'new_status': new_status, 'inline': True},
+    )
+    logger.info(f"Inline status flip: report={report_id} {old_status}->{new_status} by {current_user.email}")
+    return jsonify({
+        'success': True,
+        'report_id': report.id,
+        'status': new_status,
+        'previous_status': old_status,
+    })
+
+
 @reports_bp.route('/upcoming', methods=['GET'])
 @login_required
 def api_upcoming_reports():
