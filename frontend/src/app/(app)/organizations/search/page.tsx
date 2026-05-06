@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { Search, Building2, Eye, ShieldCheck, MapPin, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Organization } from '@/lib/types';
+import { SavedSearchesBar } from '@/components/shared/saved-searches-bar';
 
 export default function OrgSearchPage() {
   const { t } = useTranslation();
@@ -40,6 +41,23 @@ export default function OrgSearchPage() {
           {t('org.search_subtitle')}
         </p>
       </div>
+
+      {/* Phase 13.40 — saved searches captures the active query so users
+          can stash recurring lookups (e.g. "Kenya health orgs"). */}
+      <SavedSearchesBar
+        scope="organizations"
+        currentFilter={{ q: query }}
+        onApply={(f) => {
+          if (typeof f.q === 'string') {
+            setQuery(f.q);
+            // Auto-fire the search after a saved-filter apply so the user
+            // sees results immediately without needing a second click.
+            if (f.q.trim()) {
+              setTimeout(() => handleSearch(), 0);
+            }
+          }
+        }}
+      />
 
       {/* Search bar */}
       <div className="flex gap-2 max-w-xl">

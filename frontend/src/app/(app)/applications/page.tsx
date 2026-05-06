@@ -4,11 +4,14 @@
  * Applications list — shadcn + Tailwind.
  */
 
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApplications } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { ScoreRing } from '@/components/shared/score-ring';
+import { SavedSearchesBar } from '@/components/shared/saved-searches-bar';
+import { cn } from '@/lib/utils';
 
 import { FileText, Eye, ArrowRight, Inbox } from 'lucide-react';
 
@@ -22,11 +25,22 @@ interface AppRow {
   submitted_at?: string | null;
 }
 
+const STATUS_FILTERS = ['all', 'submitted', 'under_review', 'scored', 'accepted', 'rejected'] as const;
+type StatusFilter = typeof STATUS_FILTERS[number];
+
 export default function ApplicationsPage() {
   const { t, formatDate } = useTranslation();
   const router = useRouter();
   const { data, isLoading } = useApplications();
-  const applications = (data?.applications ?? []) as AppRow[];
+  const all = (data?.applications ?? []) as AppRow[];
+  // Phase 13.40 — minimal status filter so SavedSearchesBar has something
+  // worth capturing. The filter chip strip is keyboard-accessible and
+  // i18n-free (status labels come from StatusBadge's role-aware lookup).
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const applications = useMemo(() => {
+    if (statusFilter === 'all') return all;
+    return all.filter((a) => a.status === statusFilter);
+  }, [all, statusFilter]);
 
   if (isLoading) {
     return (
@@ -56,6 +70,34 @@ export default function ApplicationsPage() {
           <FileText className="h-4 w-4" />
           {t('application.browse_grants')}
         </button>
+      </div>
+
+      {/* Saved searches + status filter chips */}
+      <SavedSearchesBar
+        scope="applications"
+        currentFilter={{ status: statusFilter }}
+        onApply={(f) => {
+          if (typeof f.status === 'string' && (STATUS_FILTERS as readonly string[]).includes(f.status)) {
+            setStatusFilter(f.status as StatusFilter);
+          }
+        }}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        {STATUS_FILTERS.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setStatusFilter(s)}
+            className={cn(
+              'rounded-full border text-xs px-3 py-1.5 transition-colors',
+              statusFilter === s
+                ? 'bg-[hsl(var(--kuja-clay))] text-white border-transparent'
+                : 'border-border text-foreground hover:bg-muted',
+            )}
+          >
+            {s === 'all' ? t('common.all') || 'All' : s.replace('_', ' ')}
+          </button>
+        ))}
       </div>
 
       {applications.length === 0 ? (

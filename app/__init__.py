@@ -421,6 +421,64 @@ def _register_notification_scheduler(app):
                     )
             except Exception as e:
                 app.logger.error(f"Audit prune failed: {e}")
+
+            # Phase 13.40 — daily AI-surface-health probe + demo-readiness
+            # scan. Both run during the existing 24h cycle so we don't
+            # add a second scheduler thread.
+            #
+            # AI surface health: exercises every flagship AI extractor
+            # against synthetic fixtures. ~7 cheap Anthropic calls per
+            # day (well under any reasonable budget). Skips itself when
+            # ANTHROPIC_API_KEY is unset. On any fail, writes one
+            # admin-kind notification per admin user so it shows up in
+            # the notification panel.
+            #
+            # Opt out: set KUJA_DAILY_AI_SURFACE_HEALTH=false in env to
+            # skip the probe (e.g. during initial cost-monitoring).
+            try:
+                if os.getenv('KUJA_DAILY_AI_SURFACE_HEALTH', 'true').lower() != 'false':
+                    with app.app_context():
+                        from app.services.ai_surface_health import run_health_check
+                        hc = run_health_check(exercise_ai=True)
+                        app.logger.info(
+                            f"AI surface health: overall={hc['overall']} "
+                            f"ok={hc['ok']} fail={hc['fail']} skipped={hc['skipped']}"
+                        )
+                        if hc['fail'] > 0:
+                            _notify_admins(
+                                kind='ai_surface_drift',
+                                title=f"AI surface drift: {hc['fail']} flagship surface(s) failing",
+                                body=', '.join(s['name'] for s in hc['surfaces']
+                                               if s['status'] == 'fail')[:480],
+                            )
+            except Exception as e:
+                app.logger.error(f"AI surface health daily run failed: {e}")
+
+            # Demo-readiness: scans for sparse-data risks across 7
+            # categories. Cheap (a few aggregate SQL queries). On any
+            # category with warn status, notify admins ONCE per day so
+            # they can curate the data before the next product showing.
+            try:
+                if os.getenv('KUJA_DAILY_DEMO_READINESS', 'true').lower() != 'false':
+                    with app.app_context():
+                        warn_findings = _run_demo_readiness_scan()
+                        if warn_findings:
+                            top = warn_findings[:3]
+                            preview = ', '.join(
+                                f"{f['key']} ({f['count']})" for f in top
+                            )
+                            _notify_admins(
+                                kind='demo_readiness',
+                                title=f"Demo-readiness: {len(warn_findings)} categor"
+                                      f"{'y' if len(warn_findings) == 1 else 'ies'} need attention",
+                                body=preview[:480],
+                            )
+                            app.logger.info(
+                                f"Demo-readiness: {len(warn_findings)} warn categories"
+                            )
+            except Exception as e:
+                app.logger.error(f"Demo-readiness daily run failed: {e}")
+
             # Run once per day (24 hours)
             time.sleep(86400)
 
@@ -431,6 +489,65 @@ def _register_notification_scheduler(app):
     )
     thread.start()
     app.logger.info("Notification scheduler started (daily checks, first run in 5m)")
+
+
+def _notify_admins(*, kind: str, title: str, body: str) -> int:
+    """Phase 13.40 — fan out a single notification row per admin user.
+
+    Used by the daily scheduler to surface AI surface drift +
+    demo-readiness warnings in the admin notification panel. Idempotent
+    on a per-day basis — checks for an existing notification of the
+    same kind+title within the last 20 hours and skips if found, so
+    a worker restart mid-cycle doesn't duplicate.
+
+    Returns count of newly-created notifications.
+    """
+    from datetime import datetime, timedelta, timezone
+    from app.extensions import db
+    from app.models import Notification, User
+    from sqlalchemy import text
+    try:
+        admins = User.query.filter_by(role='admin').all()
+        if not admins:
+            return 0
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=20)
+        created = 0
+        for u in admins:
+            # Idempotent: skip if a same-kind+title row already exists today.
+            existing = Notification.query.filter(
+                Notification.user_id == u.id,
+                Notification.kind == kind,
+                Notification.title == title,
+                Notification.created_at >= cutoff,
+            ).first()
+            if existing:
+                continue
+            db.session.add(Notification(
+                user_id=u.id, kind=kind, title=title, body=body,
+            ))
+            created += 1
+        if created:
+            db.session.commit()
+        return created
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return 0
+
+
+def _run_demo_readiness_scan() -> list[dict]:
+    """Phase 13.40 — invoke the pure scanner used by the admin endpoint.
+    Returns just the warn-status findings so the caller can decide
+    whether to notify. Same source of truth — no drift possible.
+    """
+    try:
+        from app.services.demo_readiness import scan_demo_readiness
+        result = scan_demo_readiness()
+        return [f for f in result.get('findings', []) if f.get('status') == 'warn']
+    except Exception:
+        return []
 
 
 def _setup_logging(app, config_name):

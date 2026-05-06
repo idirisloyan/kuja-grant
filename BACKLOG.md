@@ -68,6 +68,15 @@ polymorphic splits currently in flight at Kuja (`Risk`,
 trigger:** a similar dual-FK split lands.
 - `last_touched: 2026-05-06`
 
+### Saved searches on `/reports` calendar page
+Phase 13.40 wired `<SavedSearchesBar>` on `/grants`, `/applications`, and
+`/organizations/search`. The reports page is a calendar view, not a
+filterable list, so saved searches has nothing to capture. Adding it
+requires first deciding whether we want a flat list view alongside
+the calendar — product decision, not a quick mount. **Revisit
+trigger:** team or donor explicitly asks for a list-form reports view.
+- `last_touched: 2026-05-06`
+
 ### Workflow configurator (parallel reviewer groups + COI gates)
 PMO had a generic configurable workflow engine (parallel review
 groups, COI gates, sign-off ledger, flowchart preview). Kuja's
@@ -147,6 +156,17 @@ re-pitch unless the underlying premise changes.
 ## Completed (rolling log)
 
 Newest first. Drop entries older than 90 days.
+
+### 2026-05-06 — Phase 13 batch 48: cron-wire diligence + finish saved-searches mounts
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.40-cron-ai-surface | Daily scheduler now runs the flagship AI surface health probe inside the existing 24h loop. ~7 cheap Anthropic calls/day; skips when ANTHROPIC_API_KEY is unset. On any fail, writes one admin-kind notification per admin so it shows up in the panel. Idempotent on a 20h window so worker restarts don't dup. Opt out: `KUJA_DAILY_AI_SURFACE_HEALTH=false`. | (this batch) |
+| 13.40-cron-demo-readiness | Daily scheduler runs the demo-readiness scan and notifies admins when any category goes warn-level. Top-3 finding preview in the notification body. Opt out: `KUJA_DAILY_DEMO_READINESS=false`. | (this batch) |
+| 13.40-pure-scanner | Refactored `api_demo_readiness` to delegate to a new pure function `app/services/demo_readiness.scan_demo_readiness()`. Single source of truth — admin endpoint and daily scheduler can never drift apart. | (this batch) |
+| 13.40-apps-saved | `<SavedSearchesBar>` mounted on `/applications`. Added a 6-state status filter chip strip (`all / submitted / under_review / scored / accepted / rejected`) so saved searches has meaningful filter shape to capture. | (this batch) |
+| 13.40-orgs-saved | `<SavedSearchesBar>` mounted on `/organizations/search` capturing the active query. Auto-fires the search on apply so a saved filter restores the result list with one click. | (this batch) |
+| 13.40-reports-saved | **Skipped** — `/reports` is calendar-only with no list-portion to attach a filter to. Adding saved searches here would mean first designing a flat report list view alongside the calendar, which is a product decision, not a 5-minute mount. Tracked separately. | — |
 
 ### 2026-05-06 — Phase 13 batch 47: orphans wired + admin diligence surfaces
 

@@ -442,143 +442,14 @@ def api_demo_readiness():
     fine. This endpoint catalogs those risks so admins can curate the
     data BEFORE showing the product.
 
-    Categories:
-      - grants_no_criteria        AI evidence/scoring degrades
-      - grants_no_applications    Donor dashboard looks empty
-      - apps_no_documents         AI document analysis no-ops
-      - apps_no_responses         Reviewer evidence panel empty
-      - reports_no_submitted_at   Compliance health unreliable
-      - orgs_no_profile           Org memory + sanctions weaker
-      - users_no_2fa_admins       Security risk + admin-2FA gate noise
-
-    Each category returns a count + sample IDs so the admin can spot-fix.
-    Status: 'ok' when empty, 'warn' otherwise. Overall verdict aggregates.
+    Logic lives in `app.services.demo_readiness.scan_demo_readiness`
+    so the daily scheduler runs the same checks (Phase 13.40).
     """
-    from sqlalchemy import text
-    import logging
-
-    findings = []
-    sample_limit = 5
-
-    def _scan(label, why, query, fix_hint):
-        try:
-            rows = db.session.execute(text(query)).fetchall()
-            count = len(rows)
-            sample_ids = [int(r[0]) for r in rows[:sample_limit]] if rows else []
-            findings.append({
-                'key': label,
-                'status': 'ok' if count == 0 else 'warn',
-                'why': why,
-                'count': count,
-                'sample_ids': sample_ids,
-                'fix': fix_hint if count else '',
-            })
-        except Exception as e:
-            logging.getLogger('kuja').warning(f'demo-readiness scan {label} failed: {e}')
-            findings.append({
-                'key': label, 'status': 'unknown',
-                'why': why, 'count': None, 'sample_ids': [],
-                'fix': 'Could not query — check schema parity.',
-            })
-
-    # 1. Grants with no criteria (extract-evidence dead-ends)
-    _scan(
-        'grants_no_criteria',
-        "Reviewer's evidence-extract surface dead-ends when criteria are empty.",
-        "SELECT id FROM grants WHERE status IN ('open', 'review', 'closed') "
-        "AND (criteria IS NULL OR criteria = '' OR criteria = '[]') "
-        "ORDER BY created_at DESC LIMIT 50",
-        "Edit each grant; add 4-7 evaluation criteria. Or use the new "
-        "POST /api/ai/suggest-criteria endpoint for an AI draft.",
-    )
-
-    # 2. Open grants with zero applications (donor dashboard reads as empty)
-    _scan(
-        'grants_no_applications',
-        "Open grants with zero applications make donor dashboards look empty.",
-        "SELECT g.id FROM grants g LEFT JOIN applications a ON a.grant_id = g.id "
-        "WHERE g.status = 'open' "
-        "GROUP BY g.id HAVING COUNT(a.id) = 0 "
-        "ORDER BY g.created_at DESC LIMIT 50",
-        "Either close stale grants or seed sample applications for demos.",
-    )
-
-    # 3. Submitted applications with no documents (analyze_document no-op)
-    _scan(
-        'apps_no_documents',
-        "Submitted applications with zero documents — AI doc analysis no-ops.",
-        "SELECT a.id FROM applications a "
-        "LEFT JOIN documents d ON d.application_id = a.id "
-        "WHERE a.status IN ('submitted', 'under_review', 'scored') "
-        "GROUP BY a.id HAVING COUNT(d.id) = 0 "
-        "ORDER BY a.submitted_at DESC NULLS LAST LIMIT 50",
-        "Ask applicants to attach supporting documents before review.",
-    )
-
-    # 4. Submitted applications with empty responses (reviewer evidence empty)
-    _scan(
-        'apps_no_responses',
-        "Submitted applications with empty/short responses — evidence panel reads as broken.",
-        "SELECT id FROM applications "
-        "WHERE status IN ('submitted', 'under_review', 'scored') "
-        "AND (responses IS NULL OR responses = '' OR responses = '{}' "
-        "     OR LENGTH(COALESCE(responses, '')) < 200) "
-        "ORDER BY submitted_at DESC NULLS LAST LIMIT 50",
-        "Coach applicants to fill responses; add help text on the form.",
-    )
-
-    # 5. Submitted reports without a submitted_at timestamp (compliance health unreliable)
-    _scan(
-        'reports_no_submitted_at',
-        "Reports marked submitted/accepted with NULL submitted_at — compliance pillars miscompute.",
-        "SELECT id FROM reports "
-        "WHERE status IN ('submitted', 'accepted') AND submitted_at IS NULL "
-        "ORDER BY id DESC LIMIT 50",
-        "Backfill submitted_at from updated_at, or re-trigger the report submission flow.",
-    )
-
-    # 6. Organizations with no profile text (org memory weak)
-    _scan(
-        'orgs_no_profile',
-        "Organizations with empty profile/about — org memory + sanctions checks weaker.",
-        "SELECT id FROM organizations "
-        "WHERE COALESCE(NULLIF(TRIM(COALESCE(description, '')), ''), '') = '' "
-        "ORDER BY created_at DESC LIMIT 50",
-        "Ask the org admins to fill out their profile during onboarding.",
-    )
-
-    # 7. Admin users without TOTP enrolled (security risk + nag-banner noise)
-    try:
-        rows = db.session.execute(text(
-            "SELECT id FROM users WHERE role = 'admin' AND COALESCE(totp_enabled, false) = false"
-        )).fetchall()
-        count = len(rows)
-        findings.append({
-            'key': 'admins_no_2fa',
-            'status': 'ok' if count == 0 else 'warn',
-            'why': 'Admin accounts without TOTP enrolled.',
-            'count': count,
-            'sample_ids': [int(r[0]) for r in rows[:sample_limit]],
-            'fix': ('Direct each admin to /admin/security/ to enroll. Required '
-                    'before flipping KUJA_ENFORCE_ADMIN_2FA=true.') if count else '',
-        })
-    except Exception as e:
-        logging.getLogger('kuja').warning(f'demo-readiness admins_no_2fa failed: {e}')
-        findings.append({
-            'key': 'admins_no_2fa', 'status': 'unknown',
-            'why': 'Admin accounts without TOTP enrolled.',
-            'count': None, 'sample_ids': [],
-            'fix': 'Could not query users.totp_enabled — check schema.',
-        })
-
-    warn_count = sum(1 for f in findings if f['status'] == 'warn')
-    overall = 'warn' if warn_count else 'ok'
-
+    from app.services.demo_readiness import scan_demo_readiness
+    result = scan_demo_readiness()
     return jsonify({
         'success': True,
-        'overall': overall,
-        'warn_count': warn_count,
-        'findings': findings,
+        **result,
         'as_of': datetime.now(timezone.utc).isoformat(),
     })
 
