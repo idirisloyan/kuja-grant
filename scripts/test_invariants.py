@@ -157,6 +157,31 @@ def main():
         lambda: 'evidence_for' in ai_src and 'evidence_against' in ai_src,
     )
 
+    # Phase 13.4 — top extractors MUST use forced tool-use (eliminates
+    # the markdown-fence / truncated-JSON failure class).
+    check(
+        'check_submission_readiness uses _call_claude_tool',
+        lambda: (
+            'check_submission_readiness' in ai_src
+            and ai_src.find('_call_claude_tool', ai_src.find('def check_submission_readiness'),
+                            ai_src.find('def check_submission_readiness') + 20000) > 0
+        ),
+    )
+    check(
+        'check_report_readiness uses _call_claude_tool',
+        lambda: (
+            ai_src.find('_call_claude_tool', ai_src.find('def check_report_readiness'),
+                        ai_src.find('def check_report_readiness') + 20000) > 0
+        ),
+    )
+    check(
+        'estimate_applicant_burden uses _call_claude_tool',
+        lambda: (
+            ai_src.find('_call_claude_tool', ai_src.find('def estimate_applicant_burden'),
+                        ai_src.find('def estimate_applicant_burden') + 20000) > 0
+        ),
+    )
+
     # --- 4. Schema invariants -------------------------------------
     from app.models import (
         Risk, AuditChainEntry, OrgMemory, EntityComment,

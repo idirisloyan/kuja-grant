@@ -1518,38 +1518,95 @@ class AIService:
             "Return the JSON burden + design analysis now."
         )
 
-        text = cls._call_claude(
-            system + "\n\n" + schema,
+        # Phase 13.4 — migrated to forced tool-use.
+        tool_schema = {
+            "type": "object",
+            "properties": {
+                "burden_score": {"type": "integer", "minimum": 0, "maximum": 100},
+                "verdict": {"type": "string", "enum": ["low", "moderate", "high"]},
+                "summary": {"type": "string", "maxLength": 200},
+                "vague_criteria": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "key": {"type": "string"},
+                            "label": {"type": "string"},
+                            "issue": {"type": "string"},
+                            "sharper": {"type": "string"},
+                        },
+                    },
+                },
+                "too_burdensome": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "key": {"type": "string"},
+                            "label": {"type": "string"},
+                            "ask": {"type": "string"},
+                            "why_burdensome": {"type": "string"},
+                            "alternative": {"type": "string"},
+                        },
+                    },
+                },
+                "simplifications": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "area": {"type": "string", "enum": ["criteria", "documents", "reporting", "eligibility"]},
+                            "current": {"type": "string"},
+                            "proposed": {"type": "string"},
+                            "why": {"type": "string"},
+                        },
+                    },
+                },
+                "predicted_quality_issues": {"type": "array", "items": {"type": "string"}},
+                "eligibility_concerns": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "kind": {"type": "string", "enum": ["too_narrow", "too_loose", "ambiguous"]},
+                            "detail": {"type": "string"},
+                            "suggestion": {"type": "string"},
+                        },
+                    },
+                },
+                "recommended_deadline_extension_days": {"type": "integer", "minimum": 0, "maximum": 60},
+            },
+            "required": ["burden_score", "verdict", "summary"],
+        }
+
+        parsed = cls._call_claude_tool(
+            system,
             user_msg,
+            tool_name='applicant_burden',
+            tool_description='Pre-publish applicant-burden + design-quality critique on a donor grant draft.',
+            tool_schema=tool_schema,
             max_tokens=2800,
             language=language,
             role='donor',
             endpoint='estimate_applicant_burden',
         )
 
-        if text:
+        if parsed:
+            parsed['source'] = 'claude'
+            parsed.setdefault('burden_score', 50)
+            parsed.setdefault('verdict', 'moderate')
+            parsed.setdefault('summary', '')
+            parsed.setdefault('vague_criteria', [])
+            parsed.setdefault('too_burdensome', [])
+            parsed.setdefault('simplifications', [])
+            parsed.setdefault('predicted_quality_issues', [])
+            parsed.setdefault('eligibility_concerns', [])
+            parsed.setdefault('recommended_deadline_extension_days', 0)
             try:
-                import re
-                m = re.search(r'\{[\s\S]*\}', text)
-                if m:
-                    parsed = json.loads(m.group(0))
-                    parsed['source'] = 'claude'
-                    parsed.setdefault('burden_score', 50)
-                    parsed.setdefault('verdict', 'moderate')
-                    parsed.setdefault('summary', '')
-                    parsed.setdefault('vague_criteria', [])
-                    parsed.setdefault('too_burdensome', [])
-                    parsed.setdefault('simplifications', [])
-                    parsed.setdefault('predicted_quality_issues', [])
-                    parsed.setdefault('eligibility_concerns', [])
-                    parsed.setdefault('recommended_deadline_extension_days', 0)
-                    try:
-                        parsed['burden_score'] = max(0, min(100, int(parsed['burden_score'])))
-                    except (ValueError, TypeError):
-                        parsed['burden_score'] = 50
-                    return parsed
-            except Exception as e:
-                logger.warning(f"estimate_applicant_burden JSON parse failed: {e}")
+                parsed['burden_score'] = max(0, min(100, int(parsed['burden_score'])))
+            except (ValueError, TypeError):
+                parsed['burden_score'] = 50
+            return parsed
 
         # Deterministic fallback: score based on baseline signal count.
         score = min(100, 30 + 12 * len(baseline_signals) + 4 * len(doc_requirements))
@@ -2215,39 +2272,97 @@ class AIService:
             "Return the JSON readiness check now."
         )
 
-        text = cls._call_claude(
-            system + "\n\n" + schema,
+        # Phase 13.4 — migrated to forced tool-use. Eliminates the
+        # markdown-fence / truncated-JSON failure class.
+        tool_schema = {
+            "type": "object",
+            "properties": {
+                "readiness_score": {"type": "integer", "minimum": 0, "maximum": 100},
+                "verdict": {"type": "string", "enum": ["ready", "needs_work", "not_ready"]},
+                "summary": {"type": "string", "maxLength": 200},
+                "gaps": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "criterion_key": {"type": "string"},
+                            "severity": {"type": "string", "enum": ["blocker", "weak", "polish"]},
+                            "issue": {"type": "string"},
+                            "suggestion": {"type": "string"},
+                            "rewrite": {"type": "string"},
+                        },
+                        "required": ["severity", "issue", "suggestion"],
+                    },
+                },
+                "missing_evidence": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "criterion_key": {"type": "string"},
+                            "evidence_type": {"type": "string", "enum": ["data", "document", "narrative"]},
+                            "what": {"type": "string"},
+                            "where_to_find": {"type": "string"},
+                        },
+                    },
+                },
+                "overclaims": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "criterion_key": {"type": "string"},
+                            "claim": {"type": "string"},
+                            "why": {"type": "string"},
+                            "softer": {"type": "string"},
+                        },
+                    },
+                },
+                "generic_answers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "criterion_key": {"type": "string"},
+                            "issue": {"type": "string"},
+                            "concrete_alternative": {"type": "string"},
+                        },
+                    },
+                },
+                "strengths": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["readiness_score", "verdict", "summary"],
+        }
+
+        parsed = cls._call_claude_tool(
+            system,
             user_msg,
+            tool_name='submission_readiness',
+            tool_description='Pre-submit gap analysis on an NGO grant application.',
+            tool_schema=tool_schema,
             max_tokens=3072,
             language=language,
             role='ngo',
             endpoint='check_submission_readiness',
         )
 
-        if text:
+        if parsed:
+            parsed['source'] = 'claude'
+            # Defensive normalization (tool-use validates types but keys
+            # may still be missing if the model returned partial output).
+            parsed.setdefault('readiness_score', 50)
+            parsed.setdefault('verdict', 'needs_work')
+            parsed.setdefault('summary', '')
+            parsed.setdefault('gaps', [])
+            parsed.setdefault('missing_evidence', [])
+            parsed.setdefault('overclaims', [])
+            parsed.setdefault('generic_answers', [])
+            parsed.setdefault('strengths', [])
             try:
-                import re
-                m = re.search(r'\{[\s\S]*\}', text)
-                if m:
-                    parsed = json.loads(m.group(0))
-                    parsed['source'] = 'claude'
-                    # Defensive normalization
-                    parsed.setdefault('readiness_score', 50)
-                    parsed.setdefault('verdict', 'needs_work')
-                    parsed.setdefault('summary', '')
-                    parsed.setdefault('gaps', [])
-                    parsed.setdefault('missing_evidence', [])
-                    parsed.setdefault('overclaims', [])
-                    parsed.setdefault('generic_answers', [])
-                    parsed.setdefault('strengths', [])
-                    # Clamp score to 0-100
-                    try:
-                        parsed['readiness_score'] = max(0, min(100, int(parsed['readiness_score'])))
-                    except (ValueError, TypeError):
-                        parsed['readiness_score'] = 50
-                    return parsed
-            except Exception as e:
-                logger.warning(f"check_submission_readiness JSON parse failed: {e}")
+                parsed['readiness_score'] = max(0, min(100, int(parsed['readiness_score'])))
+            except (ValueError, TypeError):
+                parsed['readiness_score'] = 50
+            return parsed
 
         # Deterministic fallback: assemble a minimal but useful readiness
         # report from the baseline checks. Score = 100 - 15*blockers - 7*weak.
@@ -2439,37 +2554,95 @@ class AIService:
             "Return the JSON readiness check now."
         )
 
-        text = cls._call_claude(
-            system + "\n\n" + schema,
+        # Phase 13.4 — migrated to forced tool-use.
+        tool_schema = {
+            "type": "object",
+            "properties": {
+                "readiness_score": {"type": "integer", "minimum": 0, "maximum": 100},
+                "verdict": {"type": "string", "enum": ["ready", "needs_work", "not_ready"]},
+                "summary": {"type": "string", "maxLength": 200},
+                "donor_concerns": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "section": {"type": "string"},
+                            "concern": {"type": "string"},
+                            "why": {"type": "string"},
+                            "suggestion": {"type": "string"},
+                        },
+                        "required": ["section", "concern"],
+                    },
+                },
+                "missing_evidence": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "section": {"type": "string"},
+                            "evidence_type": {"type": "string", "enum": ["data", "document", "narrative"]},
+                            "what": {"type": "string"},
+                            "where_to_find": {"type": "string"},
+                            "addresses": {"type": "string"},
+                        },
+                    },
+                },
+                "vague_claims": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "section": {"type": "string"},
+                            "claim": {"type": "string"},
+                            "sharper": {"type": "string"},
+                            "addresses": {"type": "string"},
+                        },
+                    },
+                },
+                "budget_variance_unexplained": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "line": {"type": "string"},
+                            "variance": {"type": "string"},
+                            "suggestion": {"type": "string"},
+                            "addresses": {"type": "string"},
+                        },
+                    },
+                },
+                "strengths": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["readiness_score", "verdict", "summary"],
+        }
+
+        parsed = cls._call_claude_tool(
+            system,
             user_msg,
+            tool_name='report_readiness',
+            tool_description='Pre-submit donor-perspective scan of an NGO grant report.',
+            tool_schema=tool_schema,
             max_tokens=2800,
             language=language,
             role='ngo',
             endpoint='check_report_readiness',
         )
 
-        if text:
+        if parsed:
+            parsed['source'] = 'claude'
+            parsed.setdefault('readiness_score', 50)
+            parsed.setdefault('verdict', 'needs_work')
+            parsed.setdefault('summary', '')
+            parsed.setdefault('donor_concerns', [])
+            parsed.setdefault('missing_evidence', [])
+            parsed.setdefault('vague_claims', [])
+            parsed.setdefault('budget_variance_unexplained', [])
+            parsed.setdefault('strengths', [])
             try:
-                import re
-                m = re.search(r'\{[\s\S]*\}', text)
-                if m:
-                    parsed = json.loads(m.group(0))
-                    parsed['source'] = 'claude'
-                    parsed.setdefault('readiness_score', 50)
-                    parsed.setdefault('verdict', 'needs_work')
-                    parsed.setdefault('summary', '')
-                    parsed.setdefault('donor_concerns', [])
-                    parsed.setdefault('missing_evidence', [])
-                    parsed.setdefault('vague_claims', [])
-                    parsed.setdefault('budget_variance_unexplained', [])
-                    parsed.setdefault('strengths', [])
-                    try:
-                        parsed['readiness_score'] = max(0, min(100, int(parsed['readiness_score'])))
-                    except (ValueError, TypeError):
-                        parsed['readiness_score'] = 50
-                    return parsed
-            except Exception as e:
-                logger.warning(f"check_report_readiness JSON parse failed: {e}")
+                parsed['readiness_score'] = max(0, min(100, int(parsed['readiness_score'])))
+            except (ValueError, TypeError):
+                parsed['readiness_score'] = 50
+            return parsed
 
         score = max(0, 100 - 15 * len(baseline_concerns))
         verdict = 'ready' if score >= 90 else 'needs_work' if score >= 50 else 'not_ready'
