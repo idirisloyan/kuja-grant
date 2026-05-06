@@ -1810,5 +1810,16 @@
   "ask_ai.example_3": "List my open risks.",
   "twofa_nag.title": "Two-factor authentication recommended.",
   "twofa_nag.body": "Admin accounts should enroll in 2FA to protect tenant data.",
-  "twofa_nag.enroll_now": "Enroll now"
+  "twofa_nag.enroll_now": "Enroll now",
+  "changelog.open": "What's new",
+  "changelog.title": "What's new in Kuja",
+  "shortcuts.title": "Keyboard shortcuts",
+  "shortcuts.show_overlay": "Show this overlay",
+  "shortcuts.close_dialog": "Close any dialog",
+  "shortcuts.go_dashboard": "Go to dashboard",
+  "shortcuts.go_applications": "Go to applications",
+  "shortcuts.go_reports": "Go to reports",
+  "shortcuts.go_grants": "Go to grants",
+  "shortcuts.group.global": "Global",
+  "shortcuts.group.navigation": "Navigation"
 }

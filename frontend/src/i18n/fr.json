@@ -1810,5 +1810,16 @@
   "ask_ai.example_3": "Listez mes risques ouverts.",
   "twofa_nag.title": "L'authentification à deux facteurs est recommandée.",
   "twofa_nag.body": "Les comptes admin devraient activer le 2FA pour protéger les données.",
-  "twofa_nag.enroll_now": "Activer"
+  "twofa_nag.enroll_now": "Activer",
+  "changelog.open": "Nouveautés",
+  "changelog.title": "Quoi de neuf dans Kuja",
+  "shortcuts.title": "Raccourcis clavier",
+  "shortcuts.show_overlay": "Afficher cette superposition",
+  "shortcuts.close_dialog": "Fermer la boîte de dialogue",
+  "shortcuts.go_dashboard": "Aller au tableau de bord",
+  "shortcuts.go_applications": "Aller aux candidatures",
+  "shortcuts.go_reports": "Aller aux rapports",
+  "shortcuts.go_grants": "Aller aux subventions",
+  "shortcuts.group.global": "Global",
+  "shortcuts.group.navigation": "Navigation"
 }

@@ -28,6 +28,7 @@ def register_blueprints(app):
     from app.routes.risks import risks_bp  # Phase 13.7
     from app.routes.admin_health import admin_health_bp  # Phase 13.10
     from app.routes.totp_routes import totp_bp  # Phase 13.15
+    from app.routes.comments import comments_bp  # Phase 13.18
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -35,5 +36,5 @@ def register_blueprints(app):
                compliance_bp, reviews_bp, reports_bp, admin_bp,
                notifications_bp,
                match_bp, questions_bp, diligence_bp, org_memory_bp,
-               risks_bp, admin_health_bp, totp_bp]:
+               risks_bp, admin_health_bp, totp_bp, comments_bp]:
         app.register_blueprint(bp)

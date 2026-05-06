@@ -1810,5 +1810,16 @@
   "ask_ai.example_3": "اعرض المخاطر المفتوحة لديّ.",
   "twofa_nag.title": "يُنصح بالمصادقة الثنائية.",
   "twofa_nag.body": "يجب على حسابات المسؤولين تسجيل المصادقة الثنائية لحماية بيانات المستأجر.",
-  "twofa_nag.enroll_now": "سجّل الآن"
+  "twofa_nag.enroll_now": "سجّل الآن",
+  "changelog.open": "الجديد",
+  "changelog.title": "ما الجديد في كوجا",
+  "shortcuts.title": "اختصارات لوحة المفاتيح",
+  "shortcuts.show_overlay": "عرض هذه النافذة",
+  "shortcuts.close_dialog": "إغلاق أي مربع حوار",
+  "shortcuts.go_dashboard": "الذهاب إلى لوحة المعلومات",
+  "shortcuts.go_applications": "الذهاب إلى الطلبات",
+  "shortcuts.go_reports": "الذهاب إلى التقارير",
+  "shortcuts.go_grants": "الذهاب إلى المنح",
+  "shortcuts.group.global": "عام",
+  "shortcuts.group.navigation": "التنقل"
 }

@@ -1830,5 +1830,16 @@
   "ask_ai.example_3": "Orodhesha hatari zangu zilizo wazi.",
   "twofa_nag.title": "Uthibitishaji wa hatua mbili unapendekezwa.",
   "twofa_nag.body": "Akaunti za msimamizi zinapaswa kujiandikisha kwa 2FA kulinda data.",
-  "twofa_nag.enroll_now": "Jiandikishe sasa"
+  "twofa_nag.enroll_now": "Jiandikishe sasa",
+  "changelog.open": "Mpya",
+  "changelog.title": "Mpya katika Kuja",
+  "shortcuts.title": "Njia za mkato za kibodi",
+  "shortcuts.show_overlay": "Onyesha dirisha hili",
+  "shortcuts.close_dialog": "Funga mazungumzo",
+  "shortcuts.go_dashboard": "Nenda kwa dashibodi",
+  "shortcuts.go_applications": "Nenda kwa maombi",
+  "shortcuts.go_reports": "Nenda kwa ripoti",
+  "shortcuts.go_grants": "Nenda kwa ruzuku",
+  "shortcuts.group.global": "Jumla",
+  "shortcuts.group.navigation": "Urambazaji"
 }

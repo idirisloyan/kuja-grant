@@ -1830,5 +1830,16 @@
   "ask_ai.example_3": "Liiska halista furan ee aan haysto.",
   "twofa_nag.title": "Xaqiijinta laba-tallaabo ayaa la talinayaa.",
   "twofa_nag.body": "Akoonnada maamulka waa inay 2FA dhigtaan si ay u ilaaliyaan xogta.",
-  "twofa_nag.enroll_now": "Hadda is diiwaangeli"
+  "twofa_nag.enroll_now": "Hadda is diiwaangeli",
+  "changelog.open": "Wax cusub",
+  "changelog.title": "Waxa cusub ee Kuja",
+  "shortcuts.title": "Furaha kibordhka",
+  "shortcuts.show_overlay": "Tus daaqaddan",
+  "shortcuts.close_dialog": "Xidh wadahadalka",
+  "shortcuts.go_dashboard": "Tag dashboard-ka",
+  "shortcuts.go_applications": "Tag codsiyada",
+  "shortcuts.go_reports": "Tag warbixinta",
+  "shortcuts.go_grants": "Tag deeqaha",
+  "shortcuts.group.global": "Guud",
+  "shortcuts.group.navigation": "Hababka"
 }
