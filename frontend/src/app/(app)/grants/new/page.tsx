@@ -10,6 +10,10 @@ import { AiBadge } from '@/components/shared/ai-badge';
 import { GrantBriefPrompt } from '@/components/grants/GrantBriefPrompt';
 import { MedianNGOPreview } from '@/components/grants/MedianNGOPreview';
 import { BurdenEstimate } from '@/components/grants/BurdenEstimate';
+import {
+  EditableExtractionList,
+  type ExtractionSource,
+} from '@/components/shared/editable-extraction-list';
 import type { GeneratedGrantBrief } from '@/lib/copilot-api';
 import {
   ArrowLeft,
@@ -146,9 +150,18 @@ interface DocReqItem {
 }
 
 interface ExtractedData {
-  requirements?: Array<{ title?: string; type?: string; description?: string; frequency?: string }>;
-  template_sections?: Array<{ name?: string; description?: string }>;
-  indicators?: Array<{ name?: string; description?: string; target?: string }>;
+  // Phase 13.25 — items optionally carry a `source` provenance tag
+  // (ai_extracted | ai_edited | manual) so the editable list can render
+  // the right badge per row.
+  requirements?: Array<{
+    title?: string; type?: string; description?: string; frequency?: string;
+    source?: string; _key?: string;
+  }>;
+  template_sections?: Array<{ name?: string; description?: string; source?: string; _key?: string }>;
+  indicators?: Array<{
+    name?: string; description?: string; target?: string;
+    source?: string; _key?: string;
+  }>;
 }
 
 interface GrantCreateResponse {
@@ -1506,42 +1519,83 @@ export default function CreateGrantPage() {
       )}
 
       {extracted && (
-        <Card className="border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]">
-          <div className="p-5">
-            <div className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-[hsl(var(--kuja-spark))]">
+        <Card className="border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]/40">
+          <div className="p-5 space-y-5">
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-[hsl(var(--kuja-spark))]">
               <Sparkles className="h-4 w-4" />
               {t('grant.wizard.ai_extracted_data')}
+              <span className="ml-2 text-[10px] font-normal text-muted-foreground">
+                {t('grant.wizard.ai_extracted_subtitle')}
+              </span>
             </div>
-            {extracted.requirements && extracted.requirements.length > 0 && (
-              <div className="mb-3">
-                <div className="mb-1 text-xs font-medium">
-                  {t('grant.wizard.reporting_requirements_count', { n: extracted.requirements.length })}
-                </div>
-                <div className="space-y-0.5">
-                  {extracted.requirements.map((req, i) => (
-                    <div key={i} className="text-xs text-muted-foreground">
-                      {i + 1}. {req.title || req.description || t('grant.wizard.requirement_fallback')}
-                      {req.frequency ? ` (${req.frequency})` : ''}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {extracted.indicators && extracted.indicators.length > 0 && (
-              <div>
-                <div className="mb-1 text-xs font-medium">
-                  {t('grant.wizard.kpis_count', { n: extracted.indicators.length })}
-                </div>
-                <div className="space-y-0.5">
-                  {extracted.indicators.map((ind, i) => (
-                    <div key={i} className="text-xs text-muted-foreground">
-                      {i + 1}. {ind.name || ind.description || t('grant.wizard.indicator_fallback')}
-                      {ind.target ? t('grant.wizard.kpi_target', { target: ind.target }) : ''}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+
+            {/* Phase 13.25 — editable AI-extracted reporting requirements.
+                Donor can edit each row, delete unwanted ones, or add new
+                ones manually. Provenance badges (AI / AI · edited / You)
+                make the human-vs-AI authorship visible at a glance. */}
+            <EditableExtractionList<{ title?: string; type?: string; description?: string; frequency?: string; source?: ExtractionSource; _key?: string }>
+              title={t('grant.wizard.reporting_requirements')}
+              subtitle={t('grant.wizard.reporting_requirements_subtitle')}
+              items={(extracted.requirements ?? []).map((r) => ({
+                ...r,
+                source: (r.source as ExtractionSource | undefined) ?? 'ai_extracted',
+              }))}
+              fields={[
+                { name: 'title', label: t('grant.wizard.field.title'), kind: 'text', maxLen: 200 },
+                { name: 'description', label: t('grant.wizard.field.description'), kind: 'textarea', maxLen: 600 },
+                {
+                  name: 'frequency', label: t('grant.wizard.field.frequency'), kind: 'select',
+                  options: [
+                    { value: 'monthly', label: t('grant.wizard.frequency.monthly') },
+                    { value: 'quarterly', label: t('grant.wizard.frequency.quarterly') },
+                    { value: 'biannual', label: t('grant.wizard.frequency.biannual') },
+                    { value: 'annual', label: t('grant.wizard.frequency.annual') },
+                    { value: 'final', label: t('grant.wizard.frequency.final') },
+                    { value: 'ad_hoc', label: t('grant.wizard.frequency.ad_hoc') },
+                  ],
+                },
+              ]}
+              defaultItem={() => ({ title: '', description: '', frequency: 'quarterly', source: 'manual' as ExtractionSource })}
+              onChange={(items) => setExtracted((prev) => prev ? { ...prev, requirements: items } : { requirements: items })}
+              onSave={async (items) => {
+                if (!grantId) return;
+                try {
+                  await api.put(`/grants/${grantId}`, { reporting_requirements: items });
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Failed to save changes');
+                }
+              }}
+            />
+
+            {/* Indicators — same primitive, different schema. */}
+            <EditableExtractionList<{ name?: string; description?: string; target?: string; source?: ExtractionSource; _key?: string }>
+              title={t('grant.wizard.kpis')}
+              subtitle={t('grant.wizard.kpis_subtitle')}
+              items={(extracted.indicators ?? []).map((ind) => ({
+                ...ind,
+                source: (ind.source as ExtractionSource | undefined) ?? 'ai_extracted',
+              }))}
+              fields={[
+                { name: 'name', label: t('grant.wizard.field.indicator_name'), kind: 'text', maxLen: 200 },
+                { name: 'description', label: t('grant.wizard.field.description'), kind: 'textarea', maxLen: 400 },
+                { name: 'target', label: t('grant.wizard.field.target'), kind: 'text', maxLen: 120 },
+              ]}
+              defaultItem={() => ({ name: '', description: '', target: '', source: 'manual' as ExtractionSource })}
+              onChange={(items) => setExtracted((prev) => prev ? { ...prev, indicators: items } : { indicators: items })}
+              onSave={async (items) => {
+                if (!grantId) return;
+                try {
+                  await api.put(`/grants/${grantId}`, {
+                    report_template: {
+                      template_sections: extracted?.template_sections || [],
+                      indicators: items,
+                    },
+                  });
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Failed to save changes');
+                }
+              }}
+            />
           </div>
         </Card>
       )}

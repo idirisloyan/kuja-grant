@@ -10,6 +10,7 @@ from app.utils.helpers import get_request_json, allowed_file, ALLOWED_EXTENSIONS
 from app.utils.decorators import role_required
 from app.services.ai_service import AIService
 from app.services.task_runner import submit_task
+from app.services.audit import log_action
 import logging
 
 logger = logging.getLogger('kuja')
@@ -326,6 +327,56 @@ def api_get_document(doc_id):
                 return jsonify({'error': 'Access denied'}), 403
 
     return jsonify({'document': document.to_dict()})
+
+
+@documents_bp.route('/<int:doc_id>/clarification', methods=['PATCH'])
+@login_required
+def api_document_clarification(doc_id):
+    """Phase 13.26 — NGO clarification on AI findings.
+
+    The team's May 6 ask: NGOs should be able to add context the AI
+    missed on their uploaded compliance documents (e.g. "this finding
+    doesn't apply because we used methodology X"). Donors see these
+    notes alongside the AI analysis on review — humans staying in the
+    loop on AI judgment without erasing the AI signal.
+
+    Body: { clarification: str (max 4000c) | '' to clear }
+    Authority: NGO that owns the document, or admin.
+    """
+    from datetime import datetime, timezone
+    from app.utils.validation import optional_string, ValidationError, to_error_response
+    from app.utils.api_errors import error_response
+
+    document = db.session.get(Document, doc_id)
+    if not document:
+        return error_response('not_found', 404)
+    if document.application_id:
+        application = db.session.get(Application, document.application_id)
+        if application and current_user.role == 'ngo' and application.ngo_org_id != current_user.org_id:
+            return error_response('auth.access_denied', 403)
+    if document.assessment_id:
+        assessment = db.session.get(Assessment, document.assessment_id)
+        if assessment and current_user.role not in ('admin',) and assessment.org_id != current_user.org_id:
+            return error_response('auth.access_denied', 403)
+
+    data = get_request_json() or {}
+    try:
+        clarification = optional_string(data, 'clarification', max_len=4000)
+    except ValidationError as e:
+        return to_error_response(e)
+
+    document.user_clarification = clarification or None
+    document.user_clarification_at = datetime.now(timezone.utc) if clarification else None
+    document.user_clarification_by_user_id = current_user.id if clarification else None
+    db.session.commit()
+
+    log_action(
+        'document.clarification.updated', current_user.email,
+        'document', document.id,
+        {'has_clarification': bool(clarification),
+         'length': len(clarification or '')},
+    )
+    return jsonify({'success': True, 'document': document.to_dict()})
 
 
 @documents_bp.route('/<int:doc_id>/extraction-status', methods=['GET'])

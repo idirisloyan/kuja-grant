@@ -47,6 +47,16 @@ class Document(db.Model):
     # (Phase 13.2). Surfaced in /admin/system-health as a quality signal.
     extraction_used_native_pdf = db.Column(db.Boolean, nullable=True, default=False)
 
+    # Phase 13.26 — user clarification on AI findings.
+    # The team's May 6 ask: NGOs need to update / modify / add to AI-
+    # extracted output on their compliance documents. Free-text notes
+    # the uploader can attach to the document explaining context the AI
+    # missed ("this finding doesn't apply because we used methodology X").
+    # Donors see these notes alongside the AI analysis on review.
+    user_clarification = db.Column(db.Text, nullable=True)
+    user_clarification_at = db.Column(db.DateTime, nullable=True)
+    user_clarification_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
     # Relationship to the document this one supersedes
     supersedes = db.relationship('Document', remote_side=[id], backref='superseded_by')
 
@@ -84,4 +94,8 @@ class Document(db.Model):
                 'attempt_count': self.extraction_attempt_count or 0,
                 'used_native_pdf': bool(self.extraction_used_native_pdf),
             },
+            # Phase 13.26 — user clarification on the AI analysis.
+            'user_clarification': self.user_clarification,
+            'user_clarification_at': self.user_clarification_at.isoformat() if self.user_clarification_at else None,
+            'user_clarification_by_user_id': self.user_clarification_by_user_id,
         }

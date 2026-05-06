@@ -210,6 +210,16 @@ def create_app(config_name=None):
                 if 'extraction_used_native_pdf' not in doc_cols:
                     conn.execute(text("ALTER TABLE documents ADD COLUMN extraction_used_native_pdf BOOLEAN DEFAULT FALSE"))
                     added.append('documents.extraction_used_native_pdf')
+                # Phase 13.26 — user clarification columns.
+                if 'user_clarification' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN user_clarification TEXT"))
+                    added.append('documents.user_clarification')
+                if 'user_clarification_at' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN user_clarification_at TIMESTAMP"))
+                    added.append('documents.user_clarification_at')
+                if 'user_clarification_by_user_id' not in doc_cols:
+                    conn.execute(text("ALTER TABLE documents ADD COLUMN user_clarification_by_user_id INTEGER"))
+                    added.append('documents.user_clarification_by_user_id')
                 # Phase 13.15 — TOTP 2FA columns on users.
                 user_cols = {c['name'] for c in inspector.get_columns('users')}
                 if 'totp_secret' not in user_cols:

@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import {
   Menu, LogOut, Sparkles, ChevronDown, User as UserIcon, Check, Globe,
 } from 'lucide-react';
+import { ChangelogButton } from './ChangelogButton';
 
 export function Header() {
   const router = useRouter();
@@ -84,6 +85,9 @@ export function Header() {
           <Sparkles className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">{t('header.ai_assistant') || 'Ask AI'}</span>
         </button>
+
+        {/* Phase 13.16 — In-app changelog (sparkle + red dot when unread). */}
+        <ChangelogButton />
 
         {/* Language picker */}
         <div className="relative" ref={langMenuRef}>

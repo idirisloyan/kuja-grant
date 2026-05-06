@@ -14,6 +14,8 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { CopilotRail } from '@/components/copilot/copilot-rail';
 import { OnboardingTourProvider } from '@/components/onboarding/tour-provider';
+import { TwoFactorNagBanner } from '@/components/security/TwoFactorNagBanner';
+import { KeyboardShortcutOverlay } from '@/components/shared/KeyboardShortcutOverlay';
 
 const SIDEBAR_WIDTH = 280;
 const COLLAPSED_WIDTH = 72;
@@ -54,6 +56,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <OnboardingTourProvider>
+      {/* Phase 13.15 — 2FA nag banner above the app shell. Self-gated:
+          renders only for admin users without TOTP enrolled. Dismissible
+          per-day via localStorage. */}
+      <TwoFactorNagBanner />
       <div className="relative min-h-screen bg-[hsl(var(--kuja-quartz))]">
         <Sidebar width={SIDEBAR_WIDTH} collapsedWidth={COLLAPSED_WIDTH} />
         <div
@@ -68,6 +74,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
         <CopilotRail />
+        {/* Phase 13.17 — global keyboard shortcut overlay. Cmd/? opens.
+            Self-gated: only listens for keydown events; no UI when closed. */}
+        <KeyboardShortcutOverlay />
       </div>
     </OnboardingTourProvider>
   );

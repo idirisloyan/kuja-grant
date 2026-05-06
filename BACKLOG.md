@@ -27,6 +27,16 @@ re-discussing.
 
 ## High priority
 
+### ~~Wire the Phase 13 polish components into the app shell~~ ✓
+**Done batch 36 (`2026-05-06`):** TwoFactorNagBanner mounted above app
+shell · ChangelogButton in header · KeyboardShortcutOverlay global ·
+AskAI shipped via the existing copilot rail (header sparkle button).
+
+### ~~Risk register UI~~ ✓
+**Done batch 36 (`2026-05-06`):** `<RiskRegister>` component with
+inline status dropdown + response_md drawer + owner/due display.
+Drops into any application/grant detail page.
+
 ### Tool-use migration on the top 5 extractors
 **Why:** PMO's lesson that schema-validated forced tool-use eliminates
 JSON-parsing failure paths. Helper exists at
@@ -288,6 +298,17 @@ re-pitch unless the underlying premise changes.
 ## Completed (rolling log)
 
 Newest first. Drop entries older than 90 days.
+
+### 2026-05-06 — Phase 13 batch 36: AI-extract editability + UI mounts
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.25 | EditableExtractionList primitive — donor edits AI-extracted reporting requirements + indicators in grant wizard (provenance badges: AI / AI-edited / You) | (this batch) |
+| 13.26 | NGO clarification notes on AI document analysis (3 new doc columns + PATCH endpoint + DocumentClarificationPanel UI) | (this batch) |
+| 13.15-wire | TwoFactorNagBanner mounted in app shell layout | (this batch) |
+| 13.16-wire | ChangelogButton mounted in header next to language picker | (this batch) |
+| 13.17-wire | KeyboardShortcutOverlay mounted globally (Cmd/? to open) | (this batch) |
+| 13.7-ui | RiskRegister component — inline status, response drawer, severity-tinted left borders | (this batch) |
 
 ### 2026-05-06 — Phase 13 hotfix batch (post-team-retest)
 
