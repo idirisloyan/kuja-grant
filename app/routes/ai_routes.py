@@ -171,6 +171,28 @@ def api_ai_extract_evidence():
     criteria = grant.get_criteria() if grant else []
     responses = app_obj.get_responses() if hasattr(app_obj, 'get_responses') else {}
 
+    # Phase 13.22 — explicit empty-state when grant has no criteria.
+    # The team's May 6 retest hit this on a legacy review whose grant
+    # had no evaluation criteria defined. The page DID say "No
+    # evaluation criteria defined for this grant," but the API
+    # returned a generic empty result that read as "feature broken."
+    # Now we explicitly return reason=no_criteria so the UI can
+    # render "this grant has no evaluation criteria — extract is
+    # not applicable" instead of an empty evidence panel.
+    if not criteria:
+        return jsonify({
+            'success': True,
+            'reason': 'no_criteria',
+            'message': (
+                'This grant has no evaluation criteria defined, so '
+                'criterion-by-criterion evidence extraction is not applicable. '
+                'Add evaluation criteria to the grant to enable this feature.'
+            ),
+            'per_criterion': [],
+            'overall_observation': '',
+            'source': 'skipped',
+        })
+
     # Application summary text — pull short summary if available, else
     # synthesize one from responses.
     summary_text = ''

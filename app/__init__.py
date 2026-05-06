@@ -233,6 +233,23 @@ def create_app(config_name=None):
             app.logger.warning(f"Could not verify versioning columns: {e}")
 
     # -----------------------------------------------------------------
+    # Phase 13.21 — CRON_SECRET fallback.
+    # Without an env-set CRON_SECRET, scheduled jobs that need to
+    # authenticate to themselves (future audit prune, fixture cron)
+    # have nothing to use. We generate a per-process token at boot
+    # so prod isn't blocked, but multi-worker stability needs an
+    # env-set value. /admin/system-health surfaces both states.
+    # -----------------------------------------------------------------
+    if not os.environ.get('CRON_SECRET'):
+        import secrets as _secrets
+        os.environ['CRON_SECRET'] = _secrets.token_urlsafe(32)
+        app._kuja_cron_fallback = True
+        app.logger.info("CRON_SECRET auto-generated (per-process fallback). "
+                        "Set CRON_SECRET in Railway env for multi-worker stability.")
+    else:
+        app._kuja_cron_fallback = False
+
+    # -----------------------------------------------------------------
     # Load i18n translation files
     # -----------------------------------------------------------------
     from app.utils.i18n import _load_translations

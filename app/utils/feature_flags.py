@@ -44,9 +44,11 @@ DEFAULT_FLAGS: dict[str, dict[str, Any]] = {
     'ai.draft_report':         {'kind': 'bool', 'default': True,  'description': 'NGO report first-draft co-author (Phase 1.3)'},
     'ai.match_engine':         {'kind': 'bool', 'default': False, 'description': 'Win-probability match scoring (Phase 3)'},
     'ai.median_ngo_preview':   {'kind': 'bool', 'default': False, 'description': 'Donor median-NGO preview (Phase 2.1)'},
-    'ai.grant_brief_generator': {'kind': 'bool', 'default': False, 'description': 'Auto-generated grant brief (Phase 2.2)'},
-    'ai.cross_grant_patterns': {'kind': 'bool', 'default': False, 'description': 'Anonymized cross-grant pattern library (Phase 8.1)'},
-    'ai.compliance_preempt':   {'kind': 'bool', 'default': False, 'description': 'Pre-submit compliance pre-emption (Phase 8.2)'},
+    # Phase 13.24 — second-wave flag flip per team's May 6 retest priority
+    # order. All four have deterministic fallbacks; safe to default ON.
+    'ai.grant_brief_generator': {'kind': 'bool', 'default': True,  'description': 'Auto-generated grant brief (Phase 2.2)'},
+    'ai.cross_grant_patterns': {'kind': 'bool', 'default': True,  'description': 'Anonymized cross-grant pattern library (Phase 8.1)'},
+    'ai.compliance_preempt':   {'kind': 'bool', 'default': True,  'description': 'Pre-submit compliance pre-emption (Phase 8.2)'},
     # Phase 10 AI services — all have deterministic fallbacks and are
     # rate-limited; safe to default ON so users actually experience the
     # category-defining features rather than the gated empty-state.
@@ -55,9 +57,10 @@ DEFAULT_FLAGS: dict[str, dict[str, Any]] = {
     'ai.reviewer_summary':     {'kind': 'bool', 'default': True,  'description': 'One-screen reviewer summary + draft rationale (Phase 10.3)'},
     'ai.burden_estimator':     {'kind': 'bool', 'default': True,  'description': 'Donor pre-publish burden estimate + simplifications (Phase 10.4)'},
     'ai.org_memory':           {'kind': 'bool', 'default': True,  'description': 'Reusable NGO organizational memory pulled into AI (Phase 10.5)'},
-    'ui.preview_as_reviewer':  {'kind': 'bool', 'default': False, 'description': 'NGO can preview their submission as the reviewer sees it (Phase 4.1)'},
-    'ui.live_drafters_pill':   {'kind': 'bool', 'default': False, 'description': 'Donor sees "N orgs are drafting now" (Phase 4.2)'},
-    'ui.audit_trail_tab':      {'kind': 'bool', 'default': False, 'description': 'NGO-visible audit trail (Phase 5.3)'},
+    # Phase 13.24 — second-wave UI flag flip per team's May 6 retest order.
+    'ui.preview_as_reviewer':  {'kind': 'bool', 'default': True,  'description': 'NGO can preview their submission as the reviewer sees it (Phase 4.1)'},
+    'ui.live_drafters_pill':   {'kind': 'bool', 'default': True,  'description': 'Donor sees "N orgs are drafting now" (Phase 4.2)'},
+    'ui.audit_trail_tab':      {'kind': 'bool', 'default': True,  'description': 'NGO-visible audit trail (Phase 5.3)'},
     # Phase 10 UI surfaces — defaulting ON so the matched ai.* default-ON
     # has a visible surface. Each carries a feature flag so we can pull
     # them back individually if a tenant reports an issue.
@@ -126,6 +129,10 @@ def _ensure_table():
             'ui.submission_readiness', 'ui.report_readiness',
             'ui.reviewer_summary', 'ui.burden_estimator', 'ui.this_week_home',
             'ui.compliance_4state', 'ui.decision_audit',
+            # Phase 13.24 — second-wave flag flip (May 6 team retest priority)
+            'ai.grant_brief_generator', 'ai.compliance_preempt',
+            'ai.cross_grant_patterns', 'ui.preview_as_reviewer',
+            'ui.live_drafters_pill', 'ui.audit_trail_tab',
         )
         try:
             keys_csv = ','.join(f"'{k}'" for k in PHASE_10_FLAGS)

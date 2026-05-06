@@ -63,7 +63,17 @@ async function apiFetch<T>(
     opts.body = JSON.stringify(body);
   }
 
-  const res = await fetch(`/api${path}`, opts);
+  // Phase 13.23 — one-shot retry on transient 5xx for idempotent GETs.
+  // Railway's edge / Gunicorn worker recycle occasionally produces a
+  // single 502 that resolves on the next attempt. Retrying ONLY GET
+  // requests ONCE removes the console noise from the team's May 6
+  // retest without masking real errors (a non-transient 502 will
+  // surface on the second attempt).
+  let res = await fetch(`/api${path}`, opts);
+  if (method === 'GET' && (res.status === 502 || res.status === 503 || res.status === 504)) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    res = await fetch(`/api${path}`, opts);
+  }
 
   // Redirect to login on 401 (except for the session-check endpoint)
   if (res.status === 401) {

@@ -39,19 +39,19 @@ const CLIENT_DEFAULT_FLAGS: Record<string, boolean> = {
   // Phase 2 — donor side
   'ai.match_engine': false,
   'ai.median_ngo_preview': false,
-  'ai.grant_brief_generator': false,
+  'ai.grant_brief_generator': true,   // Phase 13.24
   // Phase 8 — patterns + compliance
-  'ai.cross_grant_patterns': false,
-  'ai.compliance_preempt': false,
+  'ai.cross_grant_patterns': true,    // Phase 13.24
+  'ai.compliance_preempt': true,      // Phase 13.24
   // Phase 10 — category-defining surfaces (all default ON as of Apr 28)
   'ai.submission_readiness': true,
   'ai.report_readiness': true,
   'ai.reviewer_summary': true,
   'ai.burden_estimator': true,
   'ai.org_memory': true,
-  'ui.preview_as_reviewer': false,
-  'ui.live_drafters_pill': false,
-  'ui.audit_trail_tab': false,
+  'ui.preview_as_reviewer': true,    // Phase 13.24
+  'ui.live_drafters_pill': true,     // Phase 13.24
+  'ui.audit_trail_tab': true,        // Phase 13.24
   'ui.submission_readiness': true,
   'ui.report_readiness': true,
   'ui.reviewer_summary': true,

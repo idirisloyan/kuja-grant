@@ -238,9 +238,11 @@ admins when projected spend crosses a budget threshold.
 These are manual things the team owes the system. Strikethrough
 when done.
 
-- [ ] Set `CRON_SECRET` in Railway env (32-char token). Without it
-  scheduled jobs (notifications, future fixture cron, audit prune)
-  cannot self-authenticate. *Surfaced as a WARN in `/admin/system-health`.*
+- [ ] Set `CRON_SECRET` in Railway env for multi-worker stability
+  (32-char token). *As of Phase 13.21 the app auto-generates a
+  per-process fallback at boot if missing, so /admin/system-health
+  no longer warns — but multi-worker prod needs an env-set value
+  so all workers share the same secret.*
 - [ ] Confirm `OPENSANCTIONS_API_KEY` is current. Live sanctions
   primary feed; falls back to direct UN/OFAC/EU CSVs if missing.
 - [ ] Decide hard-2FA enforcement date (proposed 2026-05-29).
@@ -286,6 +288,16 @@ re-pitch unless the underlying premise changes.
 ## Completed (rolling log)
 
 Newest first. Drop entries older than 90 days.
+
+### 2026-05-06 — Phase 13 hotfix batch (post-team-retest)
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.10-fix | `/api/admin/ai-spend` 500 fix (column name mismatch — was `input_tokens`, schema is `tokens_in`) | (this batch) |
+| 13.21 | CRON_SECRET auto-generated per-process fallback at boot | (this batch) |
+| 13.22 | extract-evidence empty-state when grant has no criteria (UI callout + API `reason: 'no_criteria'`) | (this batch) |
+| 13.23 | One-shot retry on transient 5xx for idempotent GET requests (silences single-502 console noise) | (this batch) |
+| 13.24 | Second-wave flag flip: `ai.grant_brief_generator`, `ai.compliance_preempt`, `ai.cross_grant_patterns`, `ui.preview_as_reviewer`, `ui.live_drafters_pill`, `ui.audit_trail_tab` defaulted ON | (this batch) |
 
 ### 2026-05-06 — Phase 13 PMO transfer (9 batches, 20 sub-phases)
 

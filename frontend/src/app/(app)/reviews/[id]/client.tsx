@@ -37,6 +37,9 @@ interface EvidenceResult {
   per_criterion: PerCriterionEvidence[];
   overall_observation: string;
   source: string;
+  /** Phase 13.22 — set to 'no_criteria' when the grant has no rubric. */
+  reason?: string;
+  message?: string;
 }
 
 export default function ReviewDetailClient() {
@@ -518,6 +521,23 @@ export default function ReviewDetailClient() {
           {evidenceError && (
             <div className="rounded-md border border-[hsl(var(--kuja-flag))]/30 bg-[hsl(0_85%_97%)] text-[hsl(var(--kuja-flag))] px-4 py-2 text-sm">
               {evidenceError}
+            </div>
+          )}
+
+          {/* Phase 13.22 — explicit 'no criteria defined' callout when
+              the API returns reason='no_criteria'. The team's May 6
+              retest hit this on a legacy grant; without the callout,
+              the empty result reads as 'feature broken' rather than
+              'feature not applicable here.' */}
+          {evidenceResult?.reason === 'no_criteria' && (
+            <div className="rounded-xl border border-[hsl(var(--kuja-sun))]/30 bg-[hsl(38_92%_97%)] p-4 text-sm">
+              <div className="flex items-center gap-1.5 mb-1 text-[10px] uppercase tracking-wider font-bold text-[hsl(var(--kuja-sun))]">
+                <MessageSquare className="h-3 w-3" />
+                {t('review.detail.evidence_no_criteria_label')}
+              </div>
+              <p className="text-sm text-foreground">
+                {evidenceResult.message || t('review.detail.evidence_no_criteria_body')}
+              </p>
             </div>
           )}
 

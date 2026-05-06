@@ -1821,5 +1821,7 @@
   "shortcuts.go_reports": "Ir a informes",
   "shortcuts.go_grants": "Ir a subvenciones",
   "shortcuts.group.global": "Global",
-  "shortcuts.group.navigation": "Navegación"
+  "shortcuts.group.navigation": "Navegación",
+  "review.detail.evidence_no_criteria_label": "Extracción de evidencia no aplicable",
+  "review.detail.evidence_no_criteria_body": "Esta subvención no tiene criterios de evaluación definidos, por lo que la extracción de evidencia por criterio no aplica. Agregue criterios para habilitar esta función."
 }

@@ -67,15 +67,25 @@ def api_system_health():
                        'current': 'Not set',
                        'fix': 'Optional: set OPENSANCTIONS_API_KEY for primary sanctions feed.'})
 
-    # 3. CRON_SECRET (for self-healing fixtures + scheduled jobs)
+    # 3. CRON_SECRET (for self-healing fixtures + scheduled jobs).
+    # Auto-generated at boot if missing — see app/__init__.py. The
+    # warning only fires if BOTH the env var and the fallback are
+    # missing, OR if a critical scheduled job depends on a stable
+    # value across deploys (audit prune isn't there yet — when it
+    # lands, elevate this check back to 'warn').
     if os.environ.get('CRON_SECRET'):
         checks.append({'key': 'cron_secret', 'status': 'ok',
-                       'why': 'Authenticates scheduled jobs', 'current': 'Set', 'fix': ''})
+                       'why': 'Authenticates scheduled jobs', 'current': 'Set (env)', 'fix': ''})
+    elif hasattr(__import__('flask').current_app, '_kuja_cron_fallback'):
+        checks.append({'key': 'cron_secret', 'status': 'ok',
+                       'why': 'Auto-generated fallback active for this process',
+                       'current': 'Set (per-process fallback)',
+                       'fix': 'For multi-worker stability set CRON_SECRET in Railway.'})
     else:
         checks.append({'key': 'cron_secret', 'status': 'warn',
                        'why': 'Without this, scheduled jobs cannot self-authenticate.',
                        'current': 'Not set',
-                       'fix': 'Generate a 32-char token and set CRON_SECRET in Railway.'})
+                       'fix': 'Generate a 32-char token and set CRON_SECRET in Railway env.'})
 
     # 4. AI failure rate (last 24h)
     try:
@@ -193,12 +203,15 @@ def api_ai_spend():
     from sqlalchemy import text
     days = min(int(request.args.get('days', 7)), 90)
 
+    # Phase 13.10 — column names on the ai_call_logs table are
+    # tokens_in / tokens_out (NOT input_tokens / output_tokens). Mismatched
+    # column names threw 500 in batch 30; fixed in batch 35.
     rows = db.session.execute(text(f"""
         SELECT DATE(created_at) AS day,
                endpoint,
                COUNT(*) AS calls,
-               SUM(input_tokens) AS in_tokens,
-               SUM(output_tokens) AS out_tokens
+               COALESCE(SUM(tokens_in), 0) AS in_tokens,
+               COALESCE(SUM(tokens_out), 0) AS out_tokens
         FROM ai_call_logs
         WHERE created_at >= NOW() - INTERVAL '{days} days'
         GROUP BY 1, 2

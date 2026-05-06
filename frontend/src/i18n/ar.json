@@ -1821,5 +1821,7 @@
   "shortcuts.go_reports": "الذهاب إلى التقارير",
   "shortcuts.go_grants": "الذهاب إلى المنح",
   "shortcuts.group.global": "عام",
-  "shortcuts.group.navigation": "التنقل"
+  "shortcuts.group.navigation": "التنقل",
+  "review.detail.evidence_no_criteria_label": "استخراج الأدلة غير قابل للتطبيق",
+  "review.detail.evidence_no_criteria_body": "لا توجد معايير تقييم محددة لهذه المنحة، لذا فإن استخراج الأدلة لكل معيار لا ينطبق هنا. أضف معايير إلى المنحة لتفعيل هذه الميزة."
 }
