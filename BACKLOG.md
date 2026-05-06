@@ -194,21 +194,16 @@ Awaiting the human reviewers. When the first batch comes back:
 - Apply annotations and ship
 - `last_touched: 2026-05-06`
 
-### Redis-backed rate limiter
-Phase 13.11 ships in-memory token bucket. Multi-worker production
-on Railway means each Gunicorn worker has its own bucket — limits
-are effectively per-worker, not per-user. Redis swap:
-- Add `redis-py` connection helper (dep already in requirements.txt)
-- Replace `_buckets: dict` with a Redis sorted-set per (policy, scope)
-- One-file change inside `app/utils/rate_policies.py`
-- `last_touched: 2026-05-08`
-
-### CSP nonce-based replacement of `'unsafe-inline'`
-Phase 13.13 tightened CSP but kept `'unsafe-inline'` on
-`script-src` because Next.js static export needs it for hydration
-bootstrap. Build-time SHA-256 hashes of inline scripts → CSP
-`script-src 'self' 'sha256-...'`. Estimated 1-2 sessions.
-- `last_touched: 2026-05-08`
+### ~~Redis-backed rate limiter~~ ✓
+**Done batch 43:** `app/utils/rate_policies.py` now lazy-loads a Redis
+client when `REDIS_URL` (or `RATE_LIMIT_REDIS_URL`) is set in env, and
+runs the sliding-window enforcement via an atomic `ZREMRANGEBYSCORE
++ ZADD + ZCARD + EXPIRE` pipeline (one round-trip per call). Falls
+back to the in-memory bucket if Redis is unconfigured or unreachable
+— logs the fallback once, never blocks requests. Multi-worker
+Gunicorn on Railway now sees consistent rate limits across workers
+when Redis is wired; without Redis, behavior is unchanged from
+Phase 13.11.
 
 ---
 
@@ -316,6 +311,7 @@ re-pitch unless the underlying premise changes.
 | `xlsx` (SheetJS) → `exceljs` migration | 2026-05-06 | N/A for our Python stack. We use `openpyxl` (no active CVEs). |
 | `pdf-parse` v2 → alternative migration | 2026-05-06 | N/A for our Python stack. We use `PyPDF2` (PMO's warning was about a Node.js bug). |
 | Per-org polymorphic comments scope | 2026-05-06 | Comments scope to donor↔NGO pair via the access-control function in `app/routes/comments.py`, not via org-wide visibility. |
+| CSP nonce/hash replacement of `'unsafe-inline'` on `script-src` | 2026-05-06 | Deferred. Next.js static export emits per-page hydration scripts whose contents vary by route, so a nonce-based CSP requires either (a) a build-time per-page hash manifest + Flask middleware that emits per-page CSP headers, or (b) migrating off static export to SSR so a per-request nonce can be threaded through `next/script`. Both are 1–2 session refactors. The remaining `'unsafe-inline'` is meaningfully bounded: `script-src 'self' 'unsafe-inline'` (no third-party origins), `frame-ancestors 'none'`, `object-src 'none'`, `block-all-mixed-content`, `base-uri 'self'`, `form-action 'self'`. Revisit if (i) we drop static export, or (ii) a Wiz/Snyk audit specifically flags this as the top remediation for our threat model. |
 
 ---
 

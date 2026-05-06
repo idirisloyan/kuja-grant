@@ -233,6 +233,24 @@ def main():
     check('rate policy login is IP-scoped',
           lambda: POLICIES['login'].scope == 'ip')
 
+    # Phase 13.35 — Redis-backed rate limiter must be opt-in via env
+    # and must fall back to in-memory when REDIS_URL is unset.
+    import app.utils.rate_policies as _rp
+    # Reset the lazy-init cache so the check is hermetic.
+    _rp._redis_client = None
+    _rp._redis_init_attempted = False
+    os.environ.pop('REDIS_URL', None)
+    os.environ.pop('RATE_LIMIT_REDIS_URL', None)
+    check('rate_policies._get_redis returns None without REDIS_URL',
+          lambda: _rp._get_redis() is None)
+    check('rate_policies has _enforce_redis backend',
+          lambda: callable(getattr(_rp, '_enforce_redis', None)))
+    # Bucket fallback still works after the Redis branch.
+    _rp._redis_init_attempted = False
+    _rp._redis_client = None
+    check('rate_policies.enforce on unknown policy is permissive',
+          lambda: _rp.enforce('does-not-exist', 1) is None)
+
     from app.services import ai_mock
     check('ai_mock.gate returns False when env is unset',
           lambda: (os.environ.pop('AI_MOCK_MODE', None) is not None or True) and not ai_mock.gate())
