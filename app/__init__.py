@@ -210,6 +210,20 @@ def create_app(config_name=None):
                 if 'extraction_used_native_pdf' not in doc_cols:
                     conn.execute(text("ALTER TABLE documents ADD COLUMN extraction_used_native_pdf BOOLEAN DEFAULT FALSE"))
                     added.append('documents.extraction_used_native_pdf')
+                # Phase 13.15 — TOTP 2FA columns on users.
+                user_cols = {c['name'] for c in inspector.get_columns('users')}
+                if 'totp_secret' not in user_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN totp_secret VARCHAR(64)"))
+                    added.append('users.totp_secret')
+                if 'totp_enabled' not in user_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN totp_enabled BOOLEAN DEFAULT FALSE"))
+                    added.append('users.totp_enabled')
+                if 'totp_enrolled_at' not in user_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN totp_enrolled_at TIMESTAMP"))
+                    added.append('users.totp_enrolled_at')
+                if 'totp_recovery_codes' not in user_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN totp_recovery_codes TEXT"))
+                    added.append('users.totp_recovery_codes')
                 if added:
                     conn.commit()
                     app.logger.info(f"Added missing columns: {', '.join(added)}")

@@ -34,6 +34,13 @@ class User(UserMixin, db.Model):
     last_failed_login = db.Column(db.DateTime, nullable=True)
     locked_until = db.Column(db.DateTime, nullable=True)
 
+    # Phase 13.15 — TOTP 2FA. nag-then-enforce model. PMO transfer.
+    totp_secret = db.Column(db.String(64), nullable=True)
+    totp_enabled = db.Column(db.Boolean, default=False)
+    totp_enrolled_at = db.Column(db.DateTime, nullable=True)
+    # JSON list of bcrypt-hashed single-use recovery codes.
+    totp_recovery_codes = db.Column(db.Text, nullable=True)
+
     # Relationships
     organization = db.relationship('Organization', backref=db.backref('users', lazy='dynamic'))
     reviews = db.relationship('Review', backref='reviewer', lazy='dynamic')

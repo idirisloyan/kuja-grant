@@ -1807,5 +1807,8 @@
   "ask_ai.try_examples": "Pruebe a preguntar:",
   "ask_ai.example_1": "¿Qué informes están vencidos?",
   "ask_ai.example_2": "Muéstreme el puntaje de cumplimiento para la subvención 12.",
-  "ask_ai.example_3": "Liste mis riesgos abiertos."
+  "ask_ai.example_3": "Liste mis riesgos abiertos.",
+  "twofa_nag.title": "Se recomienda autenticación de dos factores.",
+  "twofa_nag.body": "Las cuentas admin deben habilitar 2FA para proteger los datos.",
+  "twofa_nag.enroll_now": "Activar ahora"
 }

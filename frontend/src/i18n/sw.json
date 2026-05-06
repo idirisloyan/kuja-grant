@@ -1827,5 +1827,8 @@
   "ask_ai.try_examples": "Jaribu kuuliza:",
   "ask_ai.example_1": "Ripoti zipi zimepitwa na muda?",
   "ask_ai.example_2": "Nionyeshe alama ya kufuata sheria kwa ruzuku 12.",
-  "ask_ai.example_3": "Orodhesha hatari zangu zilizo wazi."
+  "ask_ai.example_3": "Orodhesha hatari zangu zilizo wazi.",
+  "twofa_nag.title": "Uthibitishaji wa hatua mbili unapendekezwa.",
+  "twofa_nag.body": "Akaunti za msimamizi zinapaswa kujiandikisha kwa 2FA kulinda data.",
+  "twofa_nag.enroll_now": "Jiandikishe sasa"
 }

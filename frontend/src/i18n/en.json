@@ -1807,5 +1807,8 @@
   "ask_ai.try_examples": "Try asking:",
   "ask_ai.example_1": "Which reports are overdue?",
   "ask_ai.example_2": "Show me the compliance health for grant 12.",
-  "ask_ai.example_3": "List my open risks."
+  "ask_ai.example_3": "List my open risks.",
+  "twofa_nag.title": "Two-factor authentication recommended.",
+  "twofa_nag.body": "Admin accounts should enroll in 2FA to protect tenant data.",
+  "twofa_nag.enroll_now": "Enroll now"
 }
