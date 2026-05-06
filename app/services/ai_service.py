@@ -234,12 +234,77 @@ class AIService:
     # Reusable Anthropic client (created once, not per-call)
     _anthropic_client = None
 
+    # Phase 13.1 — TIMEOUT ALIGNMENT CONTRACT.
+    #
+    # PMO's hard-won lesson: caller-level timeout MUST be ≤ SDK timeout,
+    # always. If the caller times out first the SDK still hits Anthropic
+    # and racks up tokens we can't surface; if the SDK times out first
+    # we kill a mid-stream response that was about to return.
+    #
+    # Settings derived from PMO's measured workload:
+    #   SDK ceiling    300s — ample headroom for dense legal text at
+    #                          ~80 tokens/sec * 16k output ≈ 200s
+    #   Heavy callers  ≤ 240s — leaves 60s before SDK kills it
+    #   Light callers  ≤ SDK   — anything goes, but bounded
+    #   Stalled UI     180s   — UI flips to "still working…" before timeout
+    #
+    # Caller categories:
+    #   HEAVY — full-document extraction, multi-criterion drafts, briefs
+    #   MEDIUM — single-criterion strengthen, scoring, evidence extract
+    #   LIGHT — chat, guidance snippets, status synthesis
+    AI_SDK_TIMEOUT = 300.0
+    AI_HEAVY_TIMEOUT = 240.0
+    AI_MEDIUM_TIMEOUT = 120.0
+    AI_LIGHT_TIMEOUT = 60.0
+    AI_STALLED_THRESHOLD = 180.0  # surfaced via telemetry / UI hint
+
+    # Endpoint → caller category mapping. Every extractor that asks for
+    # max_tokens >= 3000 is a heavy caller; the rest are medium; chat-style
+    # endpoints are light. Keep this in sync with the _call_claude callsites.
+    _AI_TIMEOUT_BY_ENDPOINT = {
+        # heavy — full-document or multi-section generation
+        'draft_application': AI_HEAVY_TIMEOUT,
+        'draft_report': AI_HEAVY_TIMEOUT,
+        'generate_grant_brief': AI_HEAVY_TIMEOUT,
+        'median_ngo_preview': AI_HEAVY_TIMEOUT,
+        'analyze_document': AI_HEAVY_TIMEOUT,
+        'analyze_report': AI_HEAVY_TIMEOUT,
+        'extract_reporting_requirements': AI_HEAVY_TIMEOUT,
+        'verify_registration': AI_HEAVY_TIMEOUT,
+        # medium — bounded but non-trivial
+        'check_submission_readiness': AI_MEDIUM_TIMEOUT,
+        'check_report_readiness': AI_MEDIUM_TIMEOUT,
+        'generate_reviewer_summary': AI_MEDIUM_TIMEOUT,
+        'estimate_applicant_burden': AI_MEDIUM_TIMEOUT,
+        'extract_evidence': AI_MEDIUM_TIMEOUT,
+        'compliance_preempt': AI_MEDIUM_TIMEOUT,
+        'explain_compliance': AI_MEDIUM_TIMEOUT,
+        'score_application': AI_MEDIUM_TIMEOUT,
+        'score_criterion': AI_MEDIUM_TIMEOUT,
+        'strengthen_section': AI_MEDIUM_TIMEOUT,
+        'draft_section': AI_MEDIUM_TIMEOUT,
+        # light — short-form
+        'chat': AI_LIGHT_TIMEOUT,
+        'guidance': AI_LIGHT_TIMEOUT,
+        'report_guidance': AI_LIGHT_TIMEOUT,
+    }
+
+    @classmethod
+    def _resolve_timeout(cls, endpoint):
+        """Return the caller-level timeout for an endpoint. Always ≤ SDK."""
+        t = cls._AI_TIMEOUT_BY_ENDPOINT.get(endpoint or '', cls.AI_MEDIUM_TIMEOUT)
+        # Belt-and-suspenders contract: caller MUST be ≤ SDK timeout.
+        return min(t, cls.AI_SDK_TIMEOUT)
+
     @classmethod
     def _get_client(cls):
         if cls._anthropic_client is None and HAS_ANTHROPIC and ANTHROPIC_API_KEY:
+            # Phase 13.1 — SDK ceiling 300s. Per-call timeouts are layered
+            # via the with_options() pattern below so the SDK can never
+            # outlive the caller's intended budget.
             cls._anthropic_client = anthropic.Anthropic(
                 api_key=ANTHROPIC_API_KEY,
-                timeout=60.0,  # 60 second timeout for all AI calls
+                timeout=cls.AI_SDK_TIMEOUT,
             )
         return cls._anthropic_client
 
@@ -376,13 +441,29 @@ class AIService:
 
             import time
             t0 = time.monotonic()
-            message = client.messages.create(
+            # Phase 13.1 — per-call timeout layered over SDK ceiling. The
+            # SDK was created with timeout=AI_SDK_TIMEOUT; .with_options()
+            # gives this specific call a tighter ceiling so we never wait
+            # longer than the caller's intended budget.
+            per_call_timeout = cls._resolve_timeout(endpoint)
+            scoped = client.with_options(timeout=per_call_timeout)
+            message = scoped.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=max_tokens,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_message}],
             )
             latency_ms = int((time.monotonic() - t0) * 1000)
+            # Phase 13.1 — emit a "stalled" log signal when a call ran
+            # over the UI's expectation threshold. Used by /admin/system-health
+            # to surface "calls flirting with the timeout" so we tighten
+            # max_tokens or split prompts before users hit failures.
+            if latency_ms > int(cls.AI_STALLED_THRESHOLD * 1000):
+                logger.warning(
+                    f"AI_STALLED endpoint={endpoint or '-'} "
+                    f"latency_ms={latency_ms} threshold_ms={int(cls.AI_STALLED_THRESHOLD * 1000)} "
+                    f"per_call_timeout={per_call_timeout}"
+                )
 
             # Track token usage + structured telemetry.
             usage = getattr(message, 'usage', None)
@@ -414,6 +495,150 @@ class AIService:
             return None
         except Exception as e:
             logger.warning(f"Claude API call failed (endpoint={endpoint}): {e}")
+            try:
+                cls._record_call(
+                    endpoint=endpoint,
+                    role=role,
+                    language=language,
+                    input_tokens=0,
+                    output_tokens=0,
+                    latency_ms=0,
+                    success=False,
+                    error=str(e)[:200],
+                )
+            except Exception:
+                pass
+            return None
+
+    @classmethod
+    def _call_claude_tool(
+        cls,
+        system_prompt,
+        user_message,
+        *,
+        tool_name,
+        tool_description,
+        tool_schema,
+        max_tokens=2048,
+        language=None,
+        role=None,
+        endpoint=None,
+    ):
+        """Phase 13.4 — forced tool-use call. Returns the parsed dict.
+
+        PMO's lesson: prompt-and-parse breaks under truncation, markdown
+        fences, malformed JSON. Forced tool-use produces schema-validated
+        input every time — Claude either returns a tool_use block whose
+        `input` matches the schema, or doesn't return anything at all.
+
+        Migration pattern from prompt-and-parse:
+
+            # OLD
+            text = cls._call_claude(system + schema, user, max_tokens=2000, ...)
+            m = re.search(r'\\{[\\s\\S]*\\}', text)
+            parsed = json.loads(m.group(0))
+
+            # NEW
+            parsed = cls._call_claude_tool(
+                system, user,
+                tool_name='submission_readiness',
+                tool_description='Pre-submit gap analysis',
+                tool_schema={...},
+                max_tokens=2000, ...,
+            )
+
+        On failure the method falls back to None so callers can use their
+        existing fallback paths (template_fallback, deterministic baseline).
+        """
+        client = cls._get_client()
+        if not client:
+            return None
+        try:
+            from app.utils.i18n import get_lang, LANG_NATIVE, LANG_NAMES
+            from flask_login import current_user
+
+            if language is None:
+                try:
+                    language = get_lang()
+                except Exception:
+                    language = 'en'
+
+            if role is None:
+                try:
+                    if current_user and current_user.is_authenticated:
+                        role = getattr(current_user, 'role', None)
+                except Exception:
+                    role = None
+
+            if language and language != 'en' and language in LANG_NATIVE:
+                native = LANG_NATIVE[language]
+                english = LANG_NAMES.get(language, language)
+                system_prompt += (
+                    f"\n\nIMPORTANT — LANGUAGE: Respond entirely in {native} ({english}). "
+                    f"All text in tool input fields must be in {native}."
+                )
+
+            tone = cls._ROLE_TONE.get(role) if role else None
+            if tone:
+                system_prompt += f"\n\nIMPORTANT — TONE: {tone}"
+            lang_tone = cls._LANG_TONE_ADJUST.get(language) if language else None
+            if lang_tone:
+                system_prompt += f"\n\nIMPORTANT — LANGUAGE REGISTER: {lang_tone}"
+
+            import time
+            t0 = time.monotonic()
+            per_call_timeout = cls._resolve_timeout(endpoint)
+            scoped = client.with_options(timeout=per_call_timeout)
+            message = scoped.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=max_tokens,
+                system=system_prompt,
+                tools=[{
+                    "name": tool_name,
+                    "description": tool_description,
+                    "input_schema": tool_schema,
+                }],
+                tool_choice={"type": "tool", "name": tool_name},
+                messages=[{"role": "user", "content": user_message}],
+            )
+            latency_ms = int((time.monotonic() - t0) * 1000)
+            if latency_ms > int(cls.AI_STALLED_THRESHOLD * 1000):
+                logger.warning(
+                    f"AI_STALLED endpoint={endpoint or '-'} (tool) "
+                    f"latency_ms={latency_ms} threshold_ms={int(cls.AI_STALLED_THRESHOLD * 1000)}"
+                )
+
+            usage = getattr(message, 'usage', None)
+            input_tokens = getattr(usage, 'input_tokens', 0) if usage else 0
+            output_tokens = getattr(usage, 'output_tokens', 0) if usage else 0
+            logger.info(
+                f"AI_TOOL_CALL endpoint={endpoint or '-'} tool={tool_name} "
+                f"input_tokens={input_tokens} output_tokens={output_tokens} "
+                f"latency_ms={latency_ms} max_tokens={max_tokens}"
+            )
+
+            try:
+                cls._record_call(
+                    endpoint=endpoint,
+                    role=role,
+                    language=language,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    latency_ms=latency_ms,
+                    success=True,
+                )
+            except Exception:
+                pass
+
+            # Pull the tool_use block. Forced tool_choice means it MUST
+            # be there if the call returned successfully.
+            for block in (message.content or []):
+                if getattr(block, 'type', None) == 'tool_use' and getattr(block, 'name', None) == tool_name:
+                    return getattr(block, 'input', None) or {}
+            logger.warning(f"_call_claude_tool: no tool_use block for {tool_name}")
+            return None
+        except Exception as e:
+            logger.warning(f"Claude tool-use call failed (endpoint={endpoint}, tool={tool_name}): {e}")
             try:
                 cls._record_call(
                     endpoint=endpoint,
@@ -3009,7 +3234,7 @@ class AIService:
                                 pages_text.append(text)
                         file_content = '\n'.join(pages_text)[:8000]
                     except Exception:
-                        file_content = f"[PDF document: {filename}, type: {doc_type}, size: {file_size} bytes]"
+                        file_content = ''  # let native-PDF fallback handle it
                 elif ext in ('docx', 'doc') and HAS_PYTHON_DOCX:
                     try:
                         doc_obj = python_docx.Document(file_path)
@@ -3078,18 +3303,90 @@ Return a JSON object with:
 
 Return ONLY valid JSON."""
 
-                response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
-                    max_tokens=1000,
-                    messages=[{"role": "user", "content": prompt}]
+                # Phase 13.2 — native PDF fallback for scanned / image-only
+                # PDFs. PMO's lesson: ~5% of donor agreements arrive as
+                # signed scans with no text layer. pdfjs/PyPDF2 returns "" on
+                # those; if we feed empty text to Claude we get garbage
+                # analysis. The fallback: pass the raw PDF bytes as an
+                # Anthropic `document` content block — Claude's vision
+                # pipeline OCRs each page natively (no Tesseract install
+                # required). Costs ~10× the input token count of the text
+                # path but only on the 5% that need it.
+                #
+                # Trigger: text path returned < 50 chars AND file is a PDF
+                # AND file size ≤ 25 MB (leaves headroom under Anthropic's
+                # 32 MB limit).
+                NATIVE_PDF_THRESHOLD_CHARS = 50
+                NATIVE_PDF_MAX_BYTES = 25 * 1024 * 1024
+                used_native_pdf = False
+                content_blocks = None
+                if (
+                    ext == 'pdf'
+                    and len((file_content or '').strip()) < NATIVE_PDF_THRESHOLD_CHARS
+                    and file_path
+                ):
+                    try:
+                        import os as _os
+                        size_bytes = _os.path.getsize(file_path)
+                        if size_bytes <= NATIVE_PDF_MAX_BYTES:
+                            import base64 as _b64
+                            with open(file_path, 'rb') as _fh:
+                                pdf_bytes = _fh.read()
+                            b64 = _b64.standard_b64encode(pdf_bytes).decode('utf-8')
+                            content_blocks = [
+                                {
+                                    "type": "document",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": "application/pdf",
+                                        "data": b64,
+                                    },
+                                },
+                                {"type": "text", "text": prompt},
+                            ]
+                            used_native_pdf = True
+                            logger.info(
+                                f"AI_NATIVE_PDF endpoint=analyze_document "
+                                f"filename={filename} size_bytes={size_bytes} "
+                                f"reason=text_too_short text_chars={len((file_content or '').strip())}"
+                            )
+                        else:
+                            logger.warning(
+                                f"AI_NATIVE_PDF skipped — file too large "
+                                f"({size_bytes} > {NATIVE_PDF_MAX_BYTES})"
+                            )
+                    except Exception as native_err:
+                        logger.error(f"native PDF fallback failed: {native_err}")
+
+                # Per-call timeout via with_options (Phase 13.1).
+                scoped = client.with_options(
+                    timeout=AIService._resolve_timeout('analyze_document')
                 )
+                if content_blocks is not None:
+                    response = scoped.messages.create(
+                        model="claude-sonnet-4-20250514",
+                        max_tokens=1500,  # native PDF needs more headroom
+                        messages=[{"role": "user", "content": content_blocks}],
+                    )
+                else:
+                    response = scoped.messages.create(
+                        model="claude-sonnet-4-20250514",
+                        max_tokens=1000,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
 
                 text = response.content[0].text.strip()
+                parsed_obj = None
                 if text.startswith('{'):
-                    return json.loads(text)
-                json_match = re.search(r'\{[\s\S]*\}', text)
-                if json_match:
-                    return json.loads(json_match.group())
+                    parsed_obj = json.loads(text)
+                else:
+                    json_match = re.search(r'\{[\s\S]*\}', text)
+                    if json_match:
+                        parsed_obj = json.loads(json_match.group())
+                if parsed_obj is not None:
+                    if used_native_pdf:
+                        parsed_obj.setdefault('_extraction_path', 'native_pdf')
+                    return parsed_obj
             except Exception as e:
                 logger.error(f"AI document analysis failed, using fallback: {e}")
 
