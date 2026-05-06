@@ -142,6 +142,44 @@ def api_ai_strengthen_section():
     return jsonify({'success': True, **result})
 
 
+@ai_bp.route('/jobs/<job_id>', methods=['GET'])
+@login_required
+def api_ai_job_status(job_id):
+    """Phase 13.42 — generic poll endpoint for async AI jobs.
+
+    Used by the frontend `useAiJob` hook + any direct caller that
+    submitted work via `submit_ai_job`. Returns the task_runner's
+    canonical job state plus a normalized `result_or_null` field so
+    the frontend can render conditionally without nested optional
+    chaining.
+
+    Response shape:
+      { success, status: 'running'|'completed'|'failed'|'unknown',
+        result: any,        # only present when status === 'completed'
+        error: string,      # only present when status === 'failed'
+        type, created_at, completed_at? }
+
+    No auth-tightening beyond login_required: task_runner stores no
+    PII in the job record (just the AI result, which the same user
+    requested). When job_id is unknown, returns status='unknown' rather
+    than 404 so a stale poll never crashes the UI.
+    """
+    from app.services.ai_jobs import get_ai_job
+    job = get_ai_job(job_id)
+    if not job:
+        return jsonify({'success': True, 'status': 'unknown', 'job_id': job_id})
+    return jsonify({
+        'success': True,
+        'job_id': job_id,
+        'type': job.get('type'),
+        'status': job.get('status'),
+        'result': job.get('result'),
+        'error': job.get('error'),
+        'created_at': job.get('created_at'),
+        'completed_at': job.get('completed_at'),
+    })
+
+
 @ai_bp.route('/extract-evidence', methods=['POST'])
 @login_required
 @role_required('reviewer', 'admin')

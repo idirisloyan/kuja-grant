@@ -255,6 +255,22 @@ def main():
     check('ai_mock.gate returns False when env is unset',
           lambda: (os.environ.pop('AI_MOCK_MODE', None) is not None or True) and not ai_mock.gate())
 
+    # Phase 13.42 — async AI job dispatcher must compose the existing
+    # task_runner. Pinning prevents accidental drift to a parallel
+    # background system.
+    from app.services import ai_jobs as _aij
+    check('ai_jobs.submit_ai_job is callable',
+          lambda: callable(getattr(_aij, 'submit_ai_job', None)))
+    check('ai_jobs.get_ai_job is callable',
+          lambda: callable(getattr(_aij, 'get_ai_job', None)))
+    check('ai_jobs.is_async_request is callable',
+          lambda: callable(getattr(_aij, 'is_async_request', None)))
+    # The dispatcher must compose task_runner.submit_task — not a parallel system.
+    import inspect
+    _src = inspect.getsource(_aij.submit_ai_job)
+    check('ai_jobs.submit_ai_job composes task_runner.submit_task',
+          lambda: 'submit_task' in _src)
+
     # Phase 13.41 — per-user concurrent-AI semaphore: must exist + cap > 0.
     # Production outage 2026-05-06 root cause: one client could fire enough
     # concurrent AI calls to saturate the Gunicorn thread pool.

@@ -157,6 +157,30 @@ re-pitch unless the underlying premise changes.
 
 Newest first. Drop entries older than 90 days.
 
+### 2026-05-06 — Phase 13 batch 49: async AI job dispatcher (architectural fix)
+
+The 2026-05-06 outage exposed that synchronous AI calls in HTTP
+handler threads is fundamentally fragile — when many concurrent AI
+calls hit, workers saturate and even `/api/health` queues. Batch 41
+shipped a bandage (thread bump + per-user concurrent cap). This batch
+ships the proper architectural fix.
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.42-dispatcher | New `app/services/ai_jobs.py` — `submit_ai_job(task_type, fn, ...)` composes the existing `task_runner.submit_task` to run AI calls in the background pool with full Flask app context. Captures per-request user_id + language so the bg worker reproduces the calling context. Drop-in: returns a `task_id` matching the existing job conventions. | (this batch) |
+| 13.42-poll-endpoint | New `GET /api/ai/jobs/<id>` — generic poll for any submitted AI job. Returns `{status, result?, error?}` shape. Unknown ids return `status=unknown` rather than 404 so a stale poll never crashes the UI. | (this batch) |
+| 13.42-async-mode | Backend convention: `?async=true` query param OR `body.async_mode=true` opts a route into async mode. Returns 202 + `{ok, job_id, status: 'pending'}`. Default sync mode unchanged for back-compat. Migrated `/api/ai/insight-narrate` and `/api/ai/suggestions` (the two worst offenders identified in the outage logs). | (this batch) |
+| 13.42-frontend-hook | New `frontend/src/lib/hooks/use-ai-job.ts` — React hook with enqueue + exponential-backoff polling (250ms → 2s, capped at 30 attempts ~50s). Cancellation on unmount or new run. Sync fallback when an endpoint returns a body instead of a job_id. | (this batch) |
+| 13.42-frontend-fetchers | `frontend/src/lib/copilot-api.ts` — added `safeCallAsync` helper that does enqueue+poll under the hood while preserving the `CopilotResult<T>` return shape. `fetchInsightCaption` and `fetchSuggestions` now run async-by-default — call sites (dashboards, co-pilot rail) get the same final result without holding worker threads during the wait. | (this batch) |
+| 13.42-invariants | 4 new logic invariants pin the dispatcher contract: helpers are callable, `submit_ai_job` composes `task_runner.submit_task` (not a parallel system). 60/60 pass. | (this batch) |
+
+Why this matters: dashboards mounting (admin AI insight cards, co-pilot
+rail) used to fire 6+ concurrent synchronous AI calls. Each held a
+Gunicorn thread for 2-10s. Even with batch 41's bumped thread count,
+heavy concurrent traffic could still saturate. With batch 42, those
+calls return 202 in <50ms — workers free, polling does the wait
+client-side. The architectural fix the bandage was deferring.
+
 ### 2026-05-06 — Phase 13 batch 48: cron-wire diligence + finish saved-searches mounts
 
 | Sub-phase | What | Commit |

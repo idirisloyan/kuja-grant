@@ -359,6 +359,27 @@ def api_insight_narrate():
         return jsonify({'ok': False, 'code': 'BAD_REQUEST',
                         'message': 'chart_type and data are required.'}), 400
 
+    # Phase 13.42 — async mode opt-in. Frontend passes ?async=true OR
+    # body.async_mode=true to offload the AI call to the background
+    # pool. Returns 202 + job_id; client polls /api/ai/jobs/<id>.
+    # Default sync behavior is unchanged for back-compat.
+    from app.services.ai_jobs import submit_ai_job, is_async_request
+    if is_async_request(request):
+        lang = get_lang()
+        uid = current_user.id
+
+        def _do_work():
+            t0 = time.time()
+            res = CopilotService.insight_narrate(
+                chart_type=chart_type, data=chart_data, context=context, lang=lang,
+            )
+            log_call(endpoint='insight-narrate', user_id=uid, result=res,
+                     duration_ms=int((time.time() - t0) * 1000))
+            return res
+
+        job_id = submit_ai_job('insight_narrate', _do_work)
+        return jsonify({'ok': True, 'job_id': job_id, 'status': 'pending'}), 202
+
     t0 = time.time()
     res = CopilotService.insight_narrate(
         chart_type=chart_type, data=chart_data, context=context, lang=get_lang(),
@@ -401,6 +422,24 @@ def api_suggestions():
                 reviewer_id=current_user.id, status='pending').count() if hasattr(Review, 'status') else 0
     except Exception as e:
         logger.warning(f"page_state build failed (non-fatal): {e}")
+
+    # Phase 13.42 — async mode opt-in (same convention as insight-narrate).
+    from app.services.ai_jobs import submit_ai_job, is_async_request
+    if is_async_request(request):
+        lang = get_lang()
+        uid = current_user.id
+
+        def _do_work():
+            t0 = time.time()
+            res = CopilotService.context_suggestions(
+                role=role, scope=scope, page_state=page_state, lang=lang,
+            )
+            log_call(endpoint='suggestions', user_id=uid, result=res,
+                     duration_ms=int((time.time() - t0) * 1000))
+            return res
+
+        job_id = submit_ai_job('suggestions', _do_work)
+        return jsonify({'ok': True, 'job_id': job_id, 'status': 'pending'}), 202
 
     t0 = time.time()
     res = CopilotService.context_suggestions(

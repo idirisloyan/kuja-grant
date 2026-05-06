@@ -28,6 +28,60 @@ async function safeCall<T>(fn: () => Promise<CopilotResult<T>>): Promise<Copilot
   }
 }
 
+// Phase 13.42 — async-mode wrapper. POSTs to `${path}?async=true`, gets
+// back {job_id}, then polls /api/ai/jobs/<id> until completed/failed.
+// Returns the same CopilotResult<T> shape as safeCall so callers don't
+// need to know the call ran async. Falls back to sync semantics when
+// the endpoint returns a real result body instead of a job_id (so any
+// call site is safe to opt into without breaking older endpoints).
+//
+// Why exists: the worst saturating endpoints (insight-narrate,
+// suggestions) need to be async by default to keep dashboard mounts
+// from blocking the worker pool. This wrapper makes the migration
+// transparent at the call-site.
+const ASYNC_POLL_BACKOFFS_MS = [250, 500, 1000, 1500, 2000];
+async function safeCallAsync<T>(
+  path: string,
+  body: Record<string, unknown>,
+): Promise<CopilotResult<T>> {
+  return safeCall<T>(async () => {
+    const url = path + (path.includes('?') ? '&' : '?') + 'async=true';
+    const enqueue = await api.post<unknown>(url, body);
+    const dict = enqueue as { ok?: boolean; job_id?: string; status?: string };
+
+    // Sync fallback — endpoint hasn't been migrated, response IS the result.
+    if (!dict || typeof dict !== 'object' || !dict.job_id) {
+      return enqueue as CopilotResult<T>;
+    }
+
+    // Poll loop. Cap ~50s total — most AI calls finish in 2-10s.
+    const id = dict.job_id;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const delay = ASYNC_POLL_BACKOFFS_MS[Math.min(attempt, ASYNC_POLL_BACKOFFS_MS.length - 1)];
+      await new Promise((r) => setTimeout(r, delay));
+      const poll = await api.get<{
+        success: boolean;
+        status: 'running' | 'completed' | 'failed' | 'unknown';
+        result?: CopilotResult<T> | T;
+        error?: string;
+      }>(`/ai/jobs/${id}`);
+      if (poll.status === 'completed') {
+        // Backend may return either CopilotResult<T> or raw T —
+        // normalize to CopilotResult.
+        const r = poll.result as CopilotResult<T> | T;
+        if (r && typeof r === 'object' && 'ok' in (r as object)) {
+          return r as CopilotResult<T>;
+        }
+        return { ok: true, data: r as T };
+      }
+      if (poll.status === 'failed') {
+        return { ok: false, code: 'JOB_FAILED', message: poll.error || 'AI job failed' };
+      }
+    }
+    return { ok: false, code: 'JOB_TIMEOUT', message: 'AI job exceeded poll budget' };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // 1. Donor portfolio insights
 // ---------------------------------------------------------------------------
@@ -183,9 +237,9 @@ export function fetchInsightCaption(input: {
   data: unknown;
   context?: string;
 }) {
-  return safeCall<InsightCaption>(() =>
-    api.post<CopilotResult<InsightCaption>>('/ai/insight-narrate', input),
-  );
+  // Phase 13.42 — runs async by default. Dashboards fire one of these
+  // per chart on mount; if they ran sync the worker pool saturated.
+  return safeCallAsync<InsightCaption>('/ai/insight-narrate', input as Record<string, unknown>);
 }
 
 // ---------------------------------------------------------------------------
@@ -208,9 +262,9 @@ export function fetchSuggestions(input: {
   role?: string;
   scope?: { kind: string; id?: number | string };
 }) {
-  return safeCall<Suggestions>(() =>
-    api.post<CopilotResult<Suggestions>>('/ai/suggestions', input),
-  );
+  // Phase 13.42 — async by default. Co-pilot rail fires this on every
+  // route change; sync execution would re-saturate workers.
+  return safeCallAsync<Suggestions>('/ai/suggestions', input as Record<string, unknown>);
 }
 
 // ---------------------------------------------------------------------------
