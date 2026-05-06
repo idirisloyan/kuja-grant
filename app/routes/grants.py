@@ -563,6 +563,29 @@ def api_upload_grant_doc(grant_id):
 # Phase 13.8 — grant compliance health (4-pillar score + Why-this-score)
 # ---------------------------------------------------------------------------
 
+@grants_bp.route('/<int:grant_id>/compliance-health/trajectory', methods=['GET'])
+@login_required
+def api_grant_compliance_trajectory(grant_id):
+    """Phase 13.27 — sparkline + 30-day forecast for a grant's health score.
+
+    Output: { history: [{date, score, band}, ...], forecast_30d_score,
+              slips_below_at_risk_in_days }
+    """
+    from app.utils.api_errors import error_response
+    from app.services.compliance_health import trajectory
+
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return error_response('grant.not_found', 404)
+    if current_user.role not in ('donor', 'admin'):
+        return error_response('auth.access_denied', 403)
+    if current_user.role == 'donor' and getattr(grant, 'donor_org_id', None) != current_user.org_id:
+        return error_response('auth.access_denied', 403)
+
+    days = min(int(request.args.get('days', 60)), 365)
+    return jsonify({'success': True, 'grant_id': grant_id, **trajectory(grant_id, days=days)})
+
+
 @grants_bp.route('/<int:grant_id>/compliance-health', methods=['GET'])
 @login_required
 def api_grant_compliance_health(grant_id):
@@ -590,6 +613,19 @@ def api_grant_compliance_health(grant_id):
         return error_response('auth.access_denied', 403)
 
     breakdown = calculate_grant_compliance_health(grant_id)
+    # Phase 13.28 — overlay AI narrative when the flag is on (default
+    # off; flip per-tenant). Adds `narrative` field; falls back silently
+    # to rule-based when AI is offline.
+    try:
+        from app.utils.feature_flags import is_enabled
+        if is_enabled('ai.compliance_health_narrative'):
+            from app.services.compliance_health import add_ai_narrative
+            breakdown = add_ai_narrative(
+                breakdown,
+                language=getattr(current_user, 'language', None) or 'en',
+            )
+    except Exception:
+        pass
     return jsonify({'success': True, **breakdown})
 
 

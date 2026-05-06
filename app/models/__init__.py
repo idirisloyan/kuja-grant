@@ -25,6 +25,7 @@ from app.models.org_memory import OrgMemory
 from app.models.risk import Risk
 from app.models.audit_chain import AuditChainEntry
 from app.models.entity_comment import EntityComment
+from app.models.compliance_snapshot import ComplianceSnapshot
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -32,5 +33,5 @@ __all__ = [
     'Notification',
     'AIThread', 'AIMessage', 'AICallLog', 'AIProvenance',
     'GrantQuestion', 'DiligenceItem',
-    'OrgMemory', 'Risk', 'AuditChainEntry', 'EntityComment',
+    'OrgMemory', 'Risk', 'AuditChainEntry', 'EntityComment', 'ComplianceSnapshot',
 ]

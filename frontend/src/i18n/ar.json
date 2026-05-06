@@ -1860,5 +1860,14 @@
   "risk_register.due": "تاريخ الاستحقاق",
   "risk_register.status": "الحالة",
   "risk_register.resolved_at": "تم الحل {ts}",
-  "common.add": "إضافة"
+  "common.add": "إضافة",
+  "comments.title": "التعليقات",
+  "comments.empty": "لا توجد تعليقات بعد. اذكر زميلًا بـ @ لبدء محادثة.",
+  "comments.placeholder": "اكتب تعليقًا… استخدم @handle لإخطار شخص ما",
+  "comments.post": "نشر",
+  "comments.mention": "إشارة",
+  "comments.insert_mention": "إدراج إشارة @",
+  "comments.mention_hint": "يحل @email-localpart إلى مستخدم",
+  "comments.delete_confirm": "حذف هذا التعليق؟",
+  "comments.edited": "(تم التحرير)"
 }

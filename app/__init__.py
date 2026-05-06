@@ -390,6 +390,20 @@ def _register_notification_scheduler(app):
                 app.logger.info("Daily notification checks completed")
             except Exception as e:
                 app.logger.error(f"Notification checks failed: {e}")
+            # Phase 13.27 — daily compliance health snapshots. PMO's
+            # trajectory chart + 30-day forecast read from this table.
+            try:
+                with app.app_context():
+                    from app.services.compliance_health import write_daily_snapshots
+                    result = write_daily_snapshots()
+                    app.logger.info(
+                        f"Daily compliance snapshots: "
+                        f"written={result['written']} "
+                        f"updated={result['skipped_existing']} "
+                        f"errors={result['errors']}"
+                    )
+            except Exception as e:
+                app.logger.error(f"Compliance snapshots failed: {e}")
             # Run once per day (24 hours)
             time.sleep(86400)
 

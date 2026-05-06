@@ -1880,5 +1880,14 @@
   "risk_register.due": "Inakomma",
   "risk_register.status": "Hali",
   "risk_register.resolved_at": "Imetatuliwa {ts}",
-  "common.add": "Ongeza"
+  "common.add": "Ongeza",
+  "comments.title": "Maoni",
+  "comments.empty": "Hakuna maoni bado. Mtaja mwenzako kwa @ kuanza mazungumzo.",
+  "comments.placeholder": "Andika maoni… tumia @handle kumtaarifu mtu",
+  "comments.post": "Chapisha",
+  "comments.mention": "Taja",
+  "comments.insert_mention": "Ingiza @ taja",
+  "comments.mention_hint": "@sehemu-ya-barua-pepe inaelekeza kwa mtumiaji",
+  "comments.delete_confirm": "Futa maoni haya?",
+  "comments.edited": "(yamehaririwa)"
 }

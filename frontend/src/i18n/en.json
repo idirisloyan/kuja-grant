@@ -1860,5 +1860,14 @@
   "risk_register.due": "Due",
   "risk_register.status": "Status",
   "risk_register.resolved_at": "Resolved {ts}",
-  "common.add": "Add"
+  "common.add": "Add",
+  "comments.title": "Comments",
+  "comments.empty": "No comments yet. Tag a colleague with @ to start a thread.",
+  "comments.placeholder": "Write a comment… use @handle to notify someone",
+  "comments.post": "Post",
+  "comments.mention": "Mention",
+  "comments.insert_mention": "Insert @ mention",
+  "comments.mention_hint": "@email-localpart resolves to a user",
+  "comments.delete_confirm": "Delete this comment?",
+  "comments.edited": "(edited)"
 }

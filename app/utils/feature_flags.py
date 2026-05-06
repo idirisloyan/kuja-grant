@@ -71,6 +71,10 @@ DEFAULT_FLAGS: dict[str, dict[str, Any]] = {
     'ui.this_week_home':       {'kind': 'bool', 'default': True,  'description': 'NGO dashboard "This Week" action center (Phase 10.6)'},
     'ui.compliance_4state':    {'kind': 'bool', 'default': True,  'description': 'Compliance surfaces use 4-state taxonomy (Phase 10.7)'},
     'ui.decision_audit':       {'kind': 'bool', 'default': True,  'description': 'Decision audit timeline drawer (Phase 10.8)'},
+    # Phase 13.28 — AI narrative on top of the rule-based compliance health
+    # breakdown. Default off — flip per-tenant once Anthropic costs are
+    # validated against expected cron call volume. Cached 6h per (grant, score).
+    'ai.compliance_health_narrative': {'kind': 'bool', 'default': False, 'description': 'AI narrative on compliance health (Phase 13.28)'},
 }
 
 

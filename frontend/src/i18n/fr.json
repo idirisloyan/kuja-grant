@@ -1860,5 +1860,14 @@
   "risk_register.due": "Échéance",
   "risk_register.status": "Statut",
   "risk_register.resolved_at": "Résolu {ts}",
-  "common.add": "Ajouter"
+  "common.add": "Ajouter",
+  "comments.title": "Commentaires",
+  "comments.empty": "Aucun commentaire. Mentionnez un collègue avec @.",
+  "comments.placeholder": "Écrivez un commentaire… utilisez @handle pour mentionner",
+  "comments.post": "Publier",
+  "comments.mention": "Mentionner",
+  "comments.insert_mention": "Insérer une mention @",
+  "comments.mention_hint": "@partie-locale-email résout à un utilisateur",
+  "comments.delete_confirm": "Supprimer ce commentaire ?",
+  "comments.edited": "(modifié)"
 }

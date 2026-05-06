@@ -1860,5 +1860,14 @@
   "risk_register.due": "Vence",
   "risk_register.status": "Estado",
   "risk_register.resolved_at": "Resuelto {ts}",
-  "common.add": "Agregar"
+  "common.add": "Agregar",
+  "comments.title": "Comentarios",
+  "comments.empty": "Sin comentarios aún. Mencione a un colega con @ para iniciar.",
+  "comments.placeholder": "Escriba un comentario… use @handle para notificar",
+  "comments.post": "Publicar",
+  "comments.mention": "Mencionar",
+  "comments.insert_mention": "Insertar mención @",
+  "comments.mention_hint": "@parte-local-email se resuelve a usuario",
+  "comments.delete_confirm": "¿Eliminar este comentario?",
+  "comments.edited": "(editado)"
 }

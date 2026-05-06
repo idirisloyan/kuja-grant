@@ -1880,5 +1880,14 @@
   "risk_register.due": "Wakhti",
   "risk_register.status": "Xaalad",
   "risk_register.resolved_at": "Waa la xalliyay {ts}",
-  "common.add": "Ku dar"
+  "common.add": "Ku dar",
+  "comments.title": "Faallooyin",
+  "comments.empty": "Faallooyin ma jiraan weli. Ku xus saaxiibkaa @ si aad u bilowdo.",
+  "comments.placeholder": "Qor faallo… isticmaal @handle si aad ugu sheegto qof",
+  "comments.post": "Daabac",
+  "comments.mention": "Xuso",
+  "comments.insert_mention": "Geli @ xusid",
+  "comments.mention_hint": "@qaybta-iimaylka waxay u beddelantaa isticmaale",
+  "comments.delete_confirm": "Tirtir faallaadan?",
+  "comments.edited": "(la wax ka beddelay)"
 }
