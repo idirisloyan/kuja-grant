@@ -260,6 +260,55 @@ def register_middleware(app):
         """Record request start time for latency measurement."""
         request._start_time = time.monotonic()
 
+    @app.before_request
+    def enforce_admin_2fa():
+        """Phase 13.31 — hard 2FA gate for admin write actions.
+
+        Soft enforcement (the nag banner) shipped Phase 13.15. After
+        ~3 weeks of nag, this gate flips on for admin write actions:
+        admins without TOTP enrolled get a 401 + a clear error code.
+
+        Allowed without 2FA:
+          - all reads (GET, HEAD)
+          - the /api/auth/totp/* enrollment routes themselves
+          - /api/auth/me, /api/auth/login, /api/auth/logout
+          - /api/admin/system-health (so they can see what's wrong)
+
+        Activation gate: KUJA_ENFORCE_ADMIN_2FA=true env var. Default
+        OFF until the team flips the switch. The deferred date in
+        BACKLOG.md is 2026-05-29.
+        """
+        import os
+        if os.environ.get('KUJA_ENFORCE_ADMIN_2FA', '').lower() != 'true':
+            return  # Soft mode — the nag banner is the only signal
+        if not current_user.is_authenticated:
+            return
+        if getattr(current_user, 'role', None) != 'admin':
+            return
+        if request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return
+        path = request.path or ''
+        if not path.startswith('/api/'):
+            return  # static export shell
+        # Allow the routes the user needs to ENROLL or recover access.
+        allowlist_prefixes = (
+            '/api/auth/totp/',
+            '/api/auth/me',
+            '/api/auth/login',
+            '/api/auth/logout',
+            '/api/admin/system-health',
+        )
+        if any(path.startswith(p) for p in allowlist_prefixes):
+            return
+        if not getattr(current_user, 'totp_enabled', False):
+            from flask import jsonify
+            return jsonify({
+                'success': False,
+                'error': 'totp.required',
+                'message': 'Two-factor authentication is required for admin write actions. Enroll at /admin/security/.',
+                'enrollment_url': '/admin/security/',
+            }), 401
+
     @app.after_request
     def log_request_metrics(response):
         """Log structured request metrics for observability."""

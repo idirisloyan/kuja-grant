@@ -143,14 +143,11 @@ Backend complete (Phase 13.15). UI needed:
 - Disable flow with current-code verification
 - `last_touched: 2026-05-08`
 
-### Hard 2FA enforcement gate
-Soft enforcement (banner) shipped Phase 13.15. After ~3 weeks of
-nag, flip to a middleware gate that:
-- 401s any admin write action when `totp_enabled=False`
-- Allows reads + the `/admin/security/` enrollment flow
-- Surfaces clearly in the UI ("complete 2FA enrollment to continue")
-- **Trigger date:** 2026-05-29 (3 weeks after batch 32 deploy)
-- `last_touched: 2026-05-08`
+### ~~Hard 2FA enforcement gate~~ ✓
+**Done batch 40 (`2026-05-06`):** middleware `enforce_admin_2fa`
+gates admin write actions when `KUJA_ENFORCE_ADMIN_2FA=true`. Default
+OFF; flip the env var on `2026-05-29` per the deferred plan.
+Allowlist exempts reads, enrollment routes, and `/admin/system-health`.
 
 ### Donor + reviewer "What Needs You" panels
 Phase 10.6 shipped `<ThisWeekHome>` for NGOs. Same pattern needed for:
@@ -171,14 +168,12 @@ field on the response.
 - Cache key: `(grant_id, score, date_bucket)`
 - `last_touched: 2026-05-08`
 
-### Real Redoc HTML page at `/admin/api-docs`
-Phase 13.10 ships a route catalog as JSON. PMO's pattern was a
-proper `/api/v1/openapi.json` + Redoc CDN bundle. To do this
-properly we'd need:
-- `@doc()` decorators on every route OR an OpenAPI generator
-  walking Flask's url_map + introspecting handler signatures
-- A small HTML page that loads `redoc-standalone.js` from CDN
-- `last_touched: 2026-05-08`
+### ~~Real Redoc HTML page at `/admin/api-docs`~~ ✓
+**Done batch 40:** `/api/admin/api-docs/openapi.json` synthesizes a
+minimal OpenAPI 3.0 doc by walking the url_map + pulling docstring
+first lines as summaries. `/api/admin/api-docs/html` renders it via
+Redoc CDN bundle (no npm install). Full request/response schema
+introspection deferred — would need typed schemas on every handler.
 
 ### Audit retention pruning in the notification scheduler
 Phase 13.10 exposes the config endpoint. Actual prune logic
@@ -219,12 +214,12 @@ bootstrap. Build-time SHA-256 hashes of inline scripts → CSP
 
 ## Low priority
 
-### Saved searches with drag-reorder
-PMO Section 11.4. Native HTML5 drag-and-drop, no library install.
-`saved_searches` table with `sort_order` column. Reorder action
-updates `sort_order` to the new array index in a single transaction.
-Useful for donors with many filtered grant lists.
-- `last_touched: 2026-05-08`
+### ~~Saved searches with drag-reorder~~ ✓
+**Done batch 40:** `SavedSearch` model + `/api/saved-searches` CRUD
++ `/api/saved-searches/reorder` for drag-reorder integration. Scope
+enum: grants / applications / reports / organizations / reviews /
+risks. UI integration (drag handle on each scope's filter bar)
+follows in a focused frontend batch.
 
 ### Onboarding tour per role
 Phase 8 already shipped a basic tour-provider. PMO's pattern: 4

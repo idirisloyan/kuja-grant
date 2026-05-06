@@ -423,8 +423,8 @@ def api_docs():
     Lists every registered route with method + URL rule. Not a full
     OpenAPI 3.0 doc yet (would need explicit @doc decorators per route);
     this is the catalog admins can scroll to confirm "yes, that endpoint
-    exists." When PMO-style Redoc rendering is needed, swap this for a
-    /api/v1/openapi.json + /admin/api-docs HTML page.
+    exists." Phase 13.32 ships a synthesized OpenAPI 3.0 doc + Redoc
+    HTML at /api/v1/openapi.json and /admin/api-docs/html.
     """
     from flask import current_app
     out = []
@@ -440,3 +440,100 @@ def api_docs():
         'routes': sorted(out, key=lambda x: x['rule']),
         'count': len(out),
     })
+
+
+@admin_health_bp.route('/api-docs/openapi.json', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_docs_openapi():
+    """Phase 13.32 — synthesized OpenAPI 3.0 doc.
+
+    Walks Flask's url_map and emits a minimal OpenAPI document. Path
+    descriptions are pulled from each handler's docstring first line.
+    Each path has a single operationId derived from the endpoint name.
+
+    Not a full doc — request/response schemas aren't introspected from
+    code (would require @doc decorators on every route or a typed
+    schema layer). Sufficient for partner discovery + curl examples.
+    """
+    from flask import current_app
+    paths = {}
+    for rule in current_app.url_map.iter_rules():
+        path = str(rule)
+        if not path.startswith('/api/'):
+            continue
+        # Convert Flask <int:id> → OpenAPI {id} with inferred type.
+        import re as _re
+        oa_path = _re.sub(r'<(int:)?([a-zA-Z_]+)>', r'{\2}', path)
+        params = []
+        for m in _re.finditer(r'<(int:)?([a-zA-Z_]+)>', path):
+            is_int = bool(m.group(1))
+            params.append({
+                'name': m.group(2),
+                'in': 'path',
+                'required': True,
+                'schema': {'type': 'integer' if is_int else 'string'},
+            })
+        handler = current_app.view_functions.get(rule.endpoint)
+        doc_first = (handler.__doc__ or '').strip().split('\n', 1)[0] if handler else ''
+        for method in (rule.methods - {'HEAD', 'OPTIONS'}):
+            paths.setdefault(oa_path, {})[method.lower()] = {
+                'summary': doc_first or rule.endpoint,
+                'operationId': f'{method.lower()}_{rule.endpoint.replace(".", "_")}',
+                'parameters': params if params else None,
+                'responses': {
+                    '200': {'description': 'Success'},
+                    '4XX': {'description': 'Client error'},
+                    '5XX': {'description': 'Server error'},
+                },
+                'security': [{'session_cookie': []}],
+            }
+            # Drop None fields.
+            paths[oa_path][method.lower()] = {
+                k: v for k, v in paths[oa_path][method.lower()].items()
+                if v is not None
+            }
+    spec = {
+        'openapi': '3.0.3',
+        'info': {
+            'title': 'Kuja Grant Management API',
+            'version': '13.32',
+            'description': 'Auto-generated discovery doc. For full schemas request access to the typed SDK.',
+        },
+        'servers': [{'url': '/'}],
+        'components': {
+            'securitySchemes': {
+                'session_cookie': {'type': 'apiKey', 'in': 'cookie', 'name': 'session'},
+            },
+        },
+        'paths': paths,
+    }
+    return jsonify(spec)
+
+
+@admin_health_bp.route('/api-docs/html', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_docs_html():
+    """Phase 13.32 — Redoc-rendered HTML view of the OpenAPI doc.
+
+    Loads Redoc from the CDN (no npm dependency). The bundle is
+    cacheable + the inline script is tiny — no build step needed.
+    """
+    from flask import Response
+    html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Kuja API — Reference</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>body { margin: 0; padding: 0; }</style>
+</head>
+<body>
+  <redoc spec-url="/api/admin/api-docs/openapi.json"></redoc>
+  <script src="https://cdn.jsdelivr.net/npm/redoc@2.5.0/bundles/redoc.standalone.js"
+          integrity="sha384-v5Ge4Y9nB0X9j2CdxF6r1ZvL2j+8dF/qWxRrqV0L3Ek4y2u+FeF4G1V5VKf6kFdT"
+          crossorigin="anonymous"></script>
+</body>
+</html>"""
+    return Response(html, mimetype='text/html')
