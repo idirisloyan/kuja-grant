@@ -41,6 +41,72 @@ except ImportError:
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
 
 
+# Phase 13.41 — per-user concurrent-AI-call semaphore.
+#
+# Production outage 2026-05-06: a single admin user firing 6+ concurrent
+# AI calls (dashboard mounting, multiple tabs, repeat clicks) saturated
+# the Gunicorn thread pool. Even though no single request hung,
+# accumulated occupancy stalled unrelated requests for 60s+. The
+# existing per-minute rate limiter (ai_limiter) doesn't help — it caps
+# RATE, not concurrency.
+#
+# This semaphore caps how many AI calls one user can have IN FLIGHT at
+# the same time. When the cap is hit, new calls return None (same as
+# any other AI failure path) so callers fall through to template
+# fallback or a "try again" UX. No new exception type — drop-in safe.
+import threading as _threading
+_USER_AI_INFLIGHT_LOCK = _threading.Lock()
+_USER_AI_INFLIGHT: dict[str, int] = {}
+# Default: 3 concurrent AI calls per user. Bypassed for unauthenticated
+# / system contexts (None key). Override with KUJA_USER_AI_CONCURRENT.
+_USER_AI_CONCURRENT_MAX = int(os.environ.get('KUJA_USER_AI_CONCURRENT', '3'))
+
+
+def _user_ai_acquire(user_key) -> bool:
+    """Try to acquire one slot in the per-user AI semaphore.
+
+    Returns True if acquired (caller MUST call _user_ai_release on
+    completion), False if the user is at the cap and should fall back
+    to the template path.
+    """
+    if not user_key:
+        return True  # System / anonymous calls bypass the cap.
+    with _USER_AI_INFLIGHT_LOCK:
+        cur = _USER_AI_INFLIGHT.get(user_key, 0)
+        if cur >= _USER_AI_CONCURRENT_MAX:
+            return False
+        _USER_AI_INFLIGHT[user_key] = cur + 1
+        return True
+
+
+def _user_ai_release(user_key):
+    """Release one slot. Always paired with a successful acquire."""
+    if not user_key:
+        return
+    with _USER_AI_INFLIGHT_LOCK:
+        cur = _USER_AI_INFLIGHT.get(user_key, 0)
+        if cur <= 1:
+            _USER_AI_INFLIGHT.pop(user_key, None)
+        else:
+            _USER_AI_INFLIGHT[user_key] = cur - 1
+
+
+def _resolve_user_key():
+    """Pull a stable per-user key from Flask-Login's current_user.
+    Returns None for unauthenticated / outside-request contexts (so
+    background jobs and the AI surface health runner don't get capped).
+    """
+    try:
+        from flask_login import current_user
+        if current_user and getattr(current_user, 'is_authenticated', False):
+            uid = getattr(current_user, 'id', None)
+            if uid is not None:
+                return f'u:{uid}'
+    except Exception:
+        pass
+    return None
+
+
 class AIService:
     """
     AI Service wrapping the Anthropic Claude API.
@@ -397,6 +463,18 @@ class AIService:
         client = cls._get_client()
         if not client:
             return None
+
+        # Phase 13.41 — per-user concurrent-AI cap. Acquire BEFORE any
+        # network work so a flooding client never holds a worker thread
+        # waiting for Anthropic. Released in the finally below.
+        _user_key = _resolve_user_key()
+        if not _user_ai_acquire(_user_key):
+            logger.warning(
+                f"AI_CONCURRENT_CAP user={_user_key} max={_USER_AI_CONCURRENT_MAX} "
+                f"endpoint={endpoint or '-'} — falling back to template path"
+            )
+            return None
+
         try:
             from app.utils.i18n import get_lang, LANG_NATIVE, LANG_NAMES
             from flask_login import current_user
@@ -522,6 +600,9 @@ class AIService:
             except Exception:
                 pass
             return None
+        finally:
+            # Phase 13.41 — release the per-user concurrent slot.
+            _user_ai_release(_user_key)
 
     @classmethod
     def _call_claude_tool(
@@ -566,6 +647,16 @@ class AIService:
         client = cls._get_client()
         if not client:
             return None
+
+        # Phase 13.41 — same per-user concurrent cap that wraps _call_claude.
+        _user_key = _resolve_user_key()
+        if not _user_ai_acquire(_user_key):
+            logger.warning(
+                f"AI_CONCURRENT_CAP user={_user_key} max={_USER_AI_CONCURRENT_MAX} "
+                f"endpoint={endpoint or '-'} tool={tool_name} — falling back"
+            )
+            return None
+
         try:
             from app.utils.i18n import get_lang, LANG_NATIVE, LANG_NAMES
             from flask_login import current_user
@@ -666,6 +757,9 @@ class AIService:
             except Exception:
                 pass
             return None
+        finally:
+            # Phase 13.41 — release the per-user concurrent slot.
+            _user_ai_release(_user_key)
 
     # ---- AI telemetry (Phase 0.5) -----------------------------------------
     # Persists every Claude call to the existing `ai_call_logs` table (modeled

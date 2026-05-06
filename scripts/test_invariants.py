@@ -255,6 +255,33 @@ def main():
     check('ai_mock.gate returns False when env is unset',
           lambda: (os.environ.pop('AI_MOCK_MODE', None) is not None or True) and not ai_mock.gate())
 
+    # Phase 13.41 — per-user concurrent-AI semaphore: must exist + cap > 0.
+    # Production outage 2026-05-06 root cause: one client could fire enough
+    # concurrent AI calls to saturate the Gunicorn thread pool.
+    from app.services.ai_service import (
+        _user_ai_acquire, _user_ai_release, _USER_AI_CONCURRENT_MAX,
+    )
+    check('AI semaphore cap > 0',
+          lambda: _USER_AI_CONCURRENT_MAX >= 1)
+    # Acquire/release symmetry — bursts up to the cap should all acquire,
+    # the (cap+1)-th should reject, and after a release the next acquires.
+    test_key = 'u:test-invariant'
+    acquired = []
+    try:
+        for _ in range(_USER_AI_CONCURRENT_MAX):
+            acquired.append(_user_ai_acquire(test_key))
+        check('AI semaphore allows up to cap concurrent acquires',
+              lambda: all(acquired))
+        check('AI semaphore rejects (cap+1)-th acquire',
+              lambda: not _user_ai_acquire(test_key))
+    finally:
+        for ok in acquired:
+            if ok:
+                _user_ai_release(test_key)
+    # System / unauthenticated path bypasses the cap.
+    check('AI semaphore bypasses None user_key',
+          lambda: _user_ai_acquire(None) is True)
+
     # Phase 13.39 — flagship AI surface health runner contract.
     # Dry-run must never raise + must report on every known surface.
     from app.services.ai_surface_health import run_health_check
