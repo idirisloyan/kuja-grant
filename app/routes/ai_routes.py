@@ -240,13 +240,16 @@ def api_ai_extract_evidence():
         first_keys = list(responses.keys())[:3]
         summary_text = ' '.join((responses.get(k) or '')[:300] for k in first_keys)
 
-    result = AIService.extract_evidence(
-        criteria=criteria,
-        application_responses=responses,
-        application_summary=summary_text,
-    )
-
-    return jsonify({'success': True, **result})
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    def _work():
+        result = AIService.extract_evidence(
+            criteria=criteria,
+            application_responses=responses,
+            application_summary=summary_text,
+        )
+        return {'success': True, **result}
+    return maybe_async_jsonify(request, 'extract_evidence', _work)
 
 
 @ai_bp.route('/suggest-criteria', methods=['POST'])
@@ -287,18 +290,22 @@ def api_ai_suggest_criteria():
     objectives = []
     if hasattr(grant, 'objectives') and grant.objectives:
         objectives = grant.objectives if isinstance(grant.objectives, list) else [str(grant.objectives)]
+    title = getattr(grant, 'title', '') or ''
+    desc = getattr(grant, 'description', '') or getattr(grant, 'summary', '')
+    sector = getattr(grant, 'sector', '') or getattr(grant, 'category', '')
+    count = int(data.get('count') or 6)
 
-    result = AIService.suggest_criteria(
-        grant_title=getattr(grant, 'title', '') or '',
-        grant_description=getattr(grant, 'description', '') or getattr(grant, 'summary', ''),
-        grant_objectives=objectives,
-        sector=getattr(grant, 'sector', '') or getattr(grant, 'category', ''),
-        count=int(data.get('count') or 6),
-    )
-
-    return jsonify({'success': True, 'grant_id': grant_id,
-                    'can_save': role in ('donor', 'admin'),
-                    **result})
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    def _work():
+        result = AIService.suggest_criteria(
+            grant_title=title, grant_description=desc,
+            grant_objectives=objectives, sector=sector, count=count,
+        )
+        return {'success': True, 'grant_id': grant_id,
+                'can_save': role in ('donor', 'admin'),
+                **result}
+    return maybe_async_jsonify(request, 'suggest_criteria', _work)
 
 
 @ai_bp.route('/compliance-explain', methods=['POST'])
@@ -953,78 +960,84 @@ def api_ai_draft_application():
         except Exception:
             existing_responses = {}
 
-    parsed = AIService.draft_application(
-        grant=grant_payload,
-        org=org_payload,
-        brief=brief,
-        prior_applications=prior_apps,
-        prior_documents=prior_docs,
-        language=current_user.language or 'en',
-        existing_responses=existing_responses,
-    )
+    # Phase 13.43 — async-capable. Re-fetch SQLAlchemy objects inside
+    # the closure since the bg thread runs in its own app context.
+    captured_app_id = application.id if application else None
+    captured_org_id = current_user.org_id
+    captured_lang = current_user.language or 'en'
+    captured_save = bool(data.get('save', True))
 
-    # If we have an application to attach to, optionally save the draft.
-    save_to_application = bool(data.get('save', True)) and application is not None
-    provenance_saved = 0
-    if save_to_application and application:
-        try:
-            current = {} if replace_existing else (application.get_responses() or {})
-            new_responses = parsed.get('responses') or {}
-            # Merge: replace mode overrides; non-replace fills empty only.
-            if replace_existing:
-                merged = {**current, **new_responses}
-            else:
-                merged = dict(current)
-                for k, v in new_responses.items():
-                    if not merged.get(k):
-                        merged[k] = v
-            application.set_responses(merged)
+    from app.services.ai_jobs import maybe_async_jsonify
+    def _work():
+        parsed = AIService.draft_application(
+            grant=grant_payload,
+            org=org_payload,
+            brief=brief,
+            prior_applications=prior_apps,
+            prior_documents=prior_docs,
+            language=captured_lang,
+            existing_responses=existing_responses,
+        )
 
-            elig = parsed.get('eligibility_responses') or {}
-            if elig:
-                try:
-                    cur_elig = application.get_eligibility_responses() or {}
-                    application.set_eligibility_responses({**cur_elig, **elig})
-                except Exception:
-                    pass
+        # If we have an application to attach to, optionally save the draft.
+        provenance_saved = 0
+        if captured_save and captured_app_id:
+            try:
+                app_inner = db.session.get(Application, captured_app_id)
+                if app_inner is not None:
+                    current = {} if replace_existing else (app_inner.get_responses() or {})
+                    new_responses = parsed.get('responses') or {}
+                    if replace_existing:
+                        merged = {**current, **new_responses}
+                    else:
+                        merged = dict(current)
+                        for k, v in new_responses.items():
+                            if not merged.get(k):
+                                merged[k] = v
+                    app_inner.set_responses(merged)
 
-            db.session.commit()
-            provenance_saved = _persist_draft_provenance(application.id, parsed)
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to save AI draft to application {application.id}: {e}")
+                    elig = parsed.get('eligibility_responses') or {}
+                    if elig:
+                        try:
+                            cur_elig = app_inner.get_eligibility_responses() or {}
+                            app_inner.set_eligibility_responses({**cur_elig, **elig})
+                        except Exception:
+                            pass
 
-    # Phase 11.2 — record which memory items the draft actually drew from
-    # so the NGO sees a "used in this draft" signal AND the items rise in
-    # the usage_count ranking for next time.
-    memory_used_ids = parsed.get('memory_used') or []
-    memory_used_summary = []
-    if memory_used_ids:
-        try:
-            from app.services import org_memory_service as oms
-            from app.models.org_memory import OrgMemory
-            oms.mark_used(memory_used_ids)
-            # Look up the full item rows for the front-end so the NGO sees
-            # exactly what the AI drew on (kind + label + content excerpt).
-            rows = OrgMemory.query.filter(
-                OrgMemory.id.in_(memory_used_ids),
-                OrgMemory.org_id == current_user.org_id,
-            ).all()
-            memory_used_summary = [r.to_dict() for r in rows]
-        except Exception as e:
-            logger.debug(f"memory_used summary failed: {e}")
+                    db.session.commit()
+                    provenance_saved = _persist_draft_provenance(app_inner.id, parsed)
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Failed to save AI draft to application {captured_app_id}: {e}")
 
-    return jsonify({
-        'success': True,
-        'draft': parsed,
-        'application_id': application.id if application else None,
-        'provenance_saved': provenance_saved,
-        'memory_used': memory_used_summary,
-        'ai_transparency': {
-            'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
-            'disclaimer': 'AI-drafted application — review every claim before submitting.',
-        },
-    })
+        # Phase 11.2 — record memory items the draft drew from.
+        memory_used_ids = parsed.get('memory_used') or []
+        memory_used_summary = []
+        if memory_used_ids:
+            try:
+                from app.services import org_memory_service as oms
+                from app.models.org_memory import OrgMemory
+                oms.mark_used(memory_used_ids)
+                rows = OrgMemory.query.filter(
+                    OrgMemory.id.in_(memory_used_ids),
+                    OrgMemory.org_id == captured_org_id,
+                ).all()
+                memory_used_summary = [r.to_dict() for r in rows]
+            except Exception as e:
+                logger.debug(f"memory_used summary failed: {e}")
+
+        return {
+            'success': True,
+            'draft': parsed,
+            'application_id': captured_app_id,
+            'provenance_saved': provenance_saved,
+            'memory_used': memory_used_summary,
+            'ai_transparency': {
+                'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
+                'disclaimer': 'AI-drafted application — review every claim before submitting.',
+            },
+        }
+    return maybe_async_jsonify(request, 'draft_application', _work)
 
 
 # ---------------------------------------------------------------------------
@@ -1089,23 +1102,27 @@ def api_ai_compliance_preempt():
     }
 
     documents = _gather_org_documents(current_user.org_id, limit=10)
+    captured_lang = current_user.language or 'en'
 
-    parsed = AIService.compliance_preempt(
-        application=application_payload,
-        org=org_payload,
-        grant=grant_payload,
-        documents=documents,
-        language=current_user.language or 'en',
-    )
-
-    return jsonify({
-        'success': True,
-        'preempt': parsed,
-        'ai_transparency': {
-            'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
-            'disclaimer': 'AI compliance scan — not a guarantee. Verify against the donor agreement.',
-        },
-    })
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    def _work():
+        parsed = AIService.compliance_preempt(
+            application=application_payload,
+            org=org_payload,
+            grant=grant_payload,
+            documents=documents,
+            language=captured_lang,
+        )
+        return {
+            'success': True,
+            'preempt': parsed,
+            'ai_transparency': {
+                'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
+                'disclaimer': 'AI compliance scan — not a guarantee. Verify against the donor agreement.',
+            },
+        }
+    return maybe_async_jsonify(request, 'compliance_preempt', _work)
 
 
 # ---------------------------------------------------------------------------
@@ -1207,69 +1224,79 @@ def api_ai_draft_report():
         pass
 
     notes = (data.get('notes') or '').strip()[:3000]
-
-    parsed = AIService.draft_report(
-        grant=grant_payload,
-        org=org_payload,
-        report_period=getattr(report, 'reporting_period', None),
-        report_type=report.report_type,
-        prior_reports=prior_reports,
-        evidence_uploads=evidence_uploads,
-        notes=notes,
-        language=current_user.language or 'en',
-    )
-
-    # Save draft into report content, merging vs replacing.
+    captured_lang = current_user.language or 'en'
+    captured_report_id = report.id
+    captured_report_period = getattr(report, 'reporting_period', None)
+    captured_report_type = report.report_type
     replace_existing = bool(data.get('replace_existing'))
-    provenance_saved = 0
-    try:
-        current_content = {}
+
+    # Phase 13.43 — async-capable. Re-fetch report by id inside _work
+    # since the bg thread runs in its own session.
+    from app.services.ai_jobs import maybe_async_jsonify
+    def _work():
+        parsed = AIService.draft_report(
+            grant=grant_payload,
+            org=org_payload,
+            report_period=captured_report_period,
+            report_type=captured_report_type,
+            prior_reports=prior_reports,
+            evidence_uploads=evidence_uploads,
+            notes=notes,
+            language=captured_lang,
+        )
+
+        provenance_saved = 0
         try:
-            current_content = report.get_content() or {}
-        except Exception:
-            pass
-        new_sections = parsed.get('sections') or {}
-        if replace_existing:
-            merged = {**current_content, **new_sections}
-        else:
-            merged = dict(current_content)
-            for k, v in new_sections.items():
-                if not merged.get(k):
-                    merged[k] = v
-        if hasattr(report, 'set_content'):
-            report.set_content(merged)
-            db.session.commit()
+            report_inner = db.session.get(Report, captured_report_id)
+            if report_inner is not None:
+                current_content = {}
+                try:
+                    current_content = report_inner.get_content() or {}
+                except Exception:
+                    pass
+                new_sections = parsed.get('sections') or {}
+                if replace_existing:
+                    merged = {**current_content, **new_sections}
+                else:
+                    merged = dict(current_content)
+                    for k, v in new_sections.items():
+                        if not merged.get(k):
+                            merged[k] = v
+                if hasattr(report_inner, 'set_content'):
+                    report_inner.set_content(merged)
+                    db.session.commit()
 
-        for c in (parsed.get('claim_provenance') or []):
-            try:
-                AIService.record_provenance(
-                    subject_kind='report',
-                    subject_id=report.id,
-                    subject_field=c.get('section_key'),
-                    claim=c.get('claim') or '',
-                    source_kind=c.get('source_kind') or 'ai_general',
-                    source_id=c.get('source_id'),
-                    source_locator=c.get('source_locator'),
-                    source_excerpt=c.get('source_excerpt'),
-                    confidence=c.get('confidence') or 'medium',
-                )
-                provenance_saved += 1
-            except Exception:
-                pass
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Failed to save AI report draft for {report.id}: {e}")
+                for c in (parsed.get('claim_provenance') or []):
+                    try:
+                        AIService.record_provenance(
+                            subject_kind='report',
+                            subject_id=captured_report_id,
+                            subject_field=c.get('section_key'),
+                            claim=c.get('claim') or '',
+                            source_kind=c.get('source_kind') or 'ai_general',
+                            source_id=c.get('source_id'),
+                            source_locator=c.get('source_locator'),
+                            source_excerpt=c.get('source_excerpt'),
+                            confidence=c.get('confidence') or 'medium',
+                        )
+                        provenance_saved += 1
+                    except Exception:
+                        pass
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to save AI report draft for {captured_report_id}: {e}")
 
-    return jsonify({
-        'success': True,
-        'draft': parsed,
-        'report_id': report.id,
-        'provenance_saved': provenance_saved,
-        'ai_transparency': {
-            'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
-            'disclaimer': 'AI-drafted report — verify every metric and date before submitting.',
-        },
-    })
+        return {
+            'success': True,
+            'draft': parsed,
+            'report_id': captured_report_id,
+            'provenance_saved': provenance_saved,
+            'ai_transparency': {
+                'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
+                'disclaimer': 'AI-drafted report — verify every metric and date before submitting.',
+            },
+        }
+    return maybe_async_jsonify(request, 'draft_report', _work)
 
 
 # ---------------------------------------------------------------------------
@@ -1338,22 +1365,29 @@ def api_ai_submission_readiness():
     except Exception:
         pass
 
-    readiness = AIService.check_submission_readiness(
-        grant=grant_payload,
-        org=org_payload,
-        application=application_payload,
-        documents=documents,
-        language=current_user.language or 'en',
-    )
-    return jsonify({
-        'success': True,
-        'readiness': readiness,
-        'application_id': application.id,
-        'ai_transparency': {
-            'engine': 'Claude AI' if readiness.get('source') == 'claude' else 'Deterministic baseline',
-            'disclaimer': 'Pre-flight check — your judgment is final. Apply suggestions selectively.',
-        },
-    })
+    captured_lang = current_user.language or 'en'
+    captured_app_id = application.id
+
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    def _work():
+        readiness = AIService.check_submission_readiness(
+            grant=grant_payload,
+            org=org_payload,
+            application=application_payload,
+            documents=documents,
+            language=captured_lang,
+        )
+        return {
+            'success': True,
+            'readiness': readiness,
+            'application_id': captured_app_id,
+            'ai_transparency': {
+                'engine': 'Claude AI' if readiness.get('source') == 'claude' else 'Deterministic baseline',
+                'disclaimer': 'Pre-flight check — your judgment is final. Apply suggestions selectively.',
+            },
+        }
+    return maybe_async_jsonify(request, 'submission_readiness', _work)
 
 
 @ai_bp.route('/burden-estimate', methods=['POST'])
@@ -1400,18 +1434,24 @@ def api_ai_burden_estimate():
     else:
         return error_response('validation.missing_field', 400, field='grant_id_or_draft')
 
-    burden = AIService.estimate_applicant_burden(
-        grant_draft=grant_draft,
-        language=current_user.language or 'en',
-    )
-    return jsonify({
-        'success': True,
-        'burden': burden,
-        'ai_transparency': {
-            'engine': 'Claude AI' if burden.get('source') == 'claude' else 'Deterministic baseline',
-            'disclaimer': 'Pre-publish design check. Apply suggestions selectively.',
-        },
-    })
+    captured_lang = current_user.language or 'en'
+
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    def _work():
+        burden = AIService.estimate_applicant_burden(
+            grant_draft=grant_draft,
+            language=captured_lang,
+        )
+        return {
+            'success': True,
+            'burden': burden,
+            'ai_transparency': {
+                'engine': 'Claude AI' if burden.get('source') == 'claude' else 'Deterministic baseline',
+                'disclaimer': 'Pre-publish design check. Apply suggestions selectively.',
+            },
+        }
+    return maybe_async_jsonify(request, 'burden_estimate', _work)
 
 
 @ai_bp.route('/reviewer-summary', methods=['POST'])
@@ -1498,23 +1538,30 @@ def api_ai_reviewer_summary():
     except Exception:
         pass
 
-    summary = AIService.generate_reviewer_summary(
-        grant=grant_payload,
-        org=org_payload,
-        application=application_payload,
-        documents=documents,
-        comparable_applications=comparable_applications,
-        language=current_user.language or 'en',
-    )
-    return jsonify({
-        'success': True,
-        'summary': summary,
-        'application_id': application.id,
-        'ai_transparency': {
-            'engine': 'Claude AI' if summary.get('source') == 'claude' else 'Deterministic baseline',
-            'disclaimer': 'AI summary — verify quotes against the application text. Rationale is editable.',
-        },
-    })
+    captured_lang = current_user.language or 'en'
+    captured_app_id = application.id
+
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    def _work():
+        summary = AIService.generate_reviewer_summary(
+            grant=grant_payload,
+            org=org_payload,
+            application=application_payload,
+            documents=documents,
+            comparable_applications=comparable_applications,
+            language=captured_lang,
+        )
+        return {
+            'success': True,
+            'summary': summary,
+            'application_id': captured_app_id,
+            'ai_transparency': {
+                'engine': 'Claude AI' if summary.get('source') == 'claude' else 'Deterministic baseline',
+                'disclaimer': 'AI summary — verify quotes against the application text. Rationale is editable.',
+            },
+        }
+    return maybe_async_jsonify(request, 'reviewer_summary', _work)
 
 
 @ai_bp.route('/report-readiness', methods=['POST'])
@@ -1598,22 +1645,29 @@ def api_ai_report_readiness():
     except Exception:
         pass
 
-    readiness = AIService.check_report_readiness(
-        grant=grant_payload,
-        org=org_payload,
-        report=report_payload,
-        prior_reports=prior_reports,
-        language=current_user.language or 'en',
-    )
-    return jsonify({
-        'success': True,
-        'readiness': readiness,
-        'report_id': report.id,
-        'ai_transparency': {
-            'engine': 'Claude AI' if readiness.get('source') == 'claude' else 'Deterministic baseline',
-            'disclaimer': 'Pre-flight check from a donor perspective. Verify each suggestion.',
-        },
-    })
+    captured_lang = current_user.language or 'en'
+    captured_report_id = report.id
+
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    def _work():
+        readiness = AIService.check_report_readiness(
+            grant=grant_payload,
+            org=org_payload,
+            report=report_payload,
+            prior_reports=prior_reports,
+            language=captured_lang,
+        )
+        return {
+            'success': True,
+            'readiness': readiness,
+            'report_id': captured_report_id,
+            'ai_transparency': {
+                'engine': 'Claude AI' if readiness.get('source') == 'claude' else 'Deterministic baseline',
+                'disclaimer': 'Pre-flight check from a donor perspective. Verify each suggestion.',
+            },
+        }
+    return maybe_async_jsonify(request, 'report_readiness', _work)
 
 
 # ---------------------------------------------------------------------------
@@ -1738,19 +1792,24 @@ def api_ai_median_ngo_preview():
     else:
         return error_response('validation.missing_field', 400, field='grant_id|grant')
 
-    parsed = AIService.median_ngo_preview(
-        grant=grant_payload,
-        language=current_user.language or 'en',
-    )
+    captured_lang = current_user.language or 'en'
 
-    return jsonify({
-        'success': True,
-        'preview': parsed,
-        'ai_transparency': {
-            'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
-            'disclaimer': 'AI prediction — verify against your actual applicant pool after publishing.',
-        },
-    })
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    def _work():
+        parsed = AIService.median_ngo_preview(
+            grant=grant_payload,
+            language=captured_lang,
+        )
+        return {
+            'success': True,
+            'preview': parsed,
+            'ai_transparency': {
+                'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
+                'disclaimer': 'AI prediction — verify against your actual applicant pool after publishing.',
+            },
+        }
+    return maybe_async_jsonify(request, 'median_ngo_preview', _work)
 
 
 # ---------------------------------------------------------------------------
@@ -1802,23 +1861,31 @@ def api_ai_grant_brief():
     except Exception:
         pass
 
-    parsed = AIService.generate_grant_brief(
-        donor_org=donor_org,
-        prompt=prompt,
-        thematic=data.get('thematic'),
-        geography=data.get('geography'),
-        budget_usd=data.get('budget_usd'),
-        language=current_user.language or 'en',
-    )
+    captured_lang = current_user.language or 'en'
+    captured_thematic = data.get('thematic')
+    captured_geography = data.get('geography')
+    captured_budget = data.get('budget_usd')
 
-    return jsonify({
-        'success': True,
-        'brief': parsed,
-        'ai_transparency': {
-            'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
-            'disclaimer': 'AI-designed grant — review every choice before publishing.',
-        },
-    })
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    def _work():
+        parsed = AIService.generate_grant_brief(
+            donor_org=donor_org,
+            prompt=prompt,
+            thematic=captured_thematic,
+            geography=captured_geography,
+            budget_usd=captured_budget,
+            language=captured_lang,
+        )
+        return {
+            'success': True,
+            'brief': parsed,
+            'ai_transparency': {
+                'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
+                'disclaimer': 'AI-designed grant — review every choice before publishing.',
+            },
+        }
+    return maybe_async_jsonify(request, 'grant_brief', _work)
 
 
 # ---------------------------------------------------------------------------

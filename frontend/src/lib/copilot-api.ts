@@ -107,9 +107,8 @@ export interface DonorPortfolioInsights {
 }
 
 export function fetchDonorPortfolioInsights() {
-  return safeCall<DonorPortfolioInsights>(() =>
-    api.post<CopilotResult<DonorPortfolioInsights>>('/ai/donor-portfolio-insights', {}),
-  );
+  // Phase 13.43 — async by default. Donor dashboard mounts this on load.
+  return safeCallAsync<DonorPortfolioInsights>('/ai/donor-portfolio-insights', {});
 }
 
 // ---------------------------------------------------------------------------
@@ -136,9 +135,8 @@ export function fetchGrantScaffold(input: {
   budget_usd?: number | null;
   draft?: Record<string, unknown>;
 }) {
-  return safeCall<GrantScaffold>(() =>
-    api.post<CopilotResult<GrantScaffold>>('/ai/donor-grant-copilot', input),
-  );
+  // Phase 13.43 — async by default.
+  return safeCallAsync<GrantScaffold>('/ai/donor-grant-copilot', input as Record<string, unknown>);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,9 +171,8 @@ export interface NgoReadiness {
 }
 
 export function fetchNgoReadiness() {
-  return safeCall<NgoReadiness>(() =>
-    api.post<CopilotResult<NgoReadiness>>('/ai/ngo-readiness', {}),
-  );
+  // Phase 13.43 — async by default. NGO dashboard mounts this on load.
+  return safeCallAsync<NgoReadiness>('/ai/ngo-readiness', {});
 }
 
 // ---------------------------------------------------------------------------
@@ -199,9 +196,8 @@ export function fetchReviewerRecommendation(input: {
   application_ids: number[];
   rubric?: Array<{ criterion: string; weight: number }>;
 }) {
-  return safeCall<ReviewerRecommendation>(() =>
-    api.post<CopilotResult<ReviewerRecommendation>>('/ai/reviewer-recommendation', input),
-  );
+  // Phase 13.43 — async by default. Heavy multi-application AI call.
+  return safeCallAsync<ReviewerRecommendation>('/ai/reviewer-recommendation', input as Record<string, unknown>);
 }
 
 // ---------------------------------------------------------------------------
@@ -219,9 +215,8 @@ export interface CrossGrantPatterns {
 }
 
 export function fetchCrossGrantPatterns() {
-  return safeCall<CrossGrantPatterns>(() =>
-    api.post<CopilotResult<CrossGrantPatterns>>('/ai/cross-grant-patterns', {}),
-  );
+  // Phase 13.43 — async by default.
+  return safeCallAsync<CrossGrantPatterns>('/ai/cross-grant-patterns', {});
 }
 
 // ---------------------------------------------------------------------------
@@ -430,9 +425,8 @@ export function fetchDraftApplication(input: {
   replace_existing?: boolean;
   save?: boolean;
 }) {
-  return safeCall<DraftApplicationResult>(() =>
-    api.post<CopilotResult<DraftApplicationResult>>('/ai/draft-application', input),
-  );
+  // Phase 13.43 — async by default. One of the heaviest AI calls.
+  return safeCallAsync<DraftApplicationResult>('/ai/draft-application', input as Record<string, unknown>);
 }
 
 // ---------------------------------------------------------------------------
@@ -459,9 +453,8 @@ export function fetchDraftReport(input: {
   notes?: string;
   replace_existing?: boolean;
 }) {
-  return safeCall<DraftReportResult>(() =>
-    api.post<CopilotResult<DraftReportResult>>('/ai/draft-report', input),
-  );
+  // Phase 13.43 — async by default.
+  return safeCallAsync<DraftReportResult>('/ai/draft-report', input as Record<string, unknown>);
 }
 
 // ---------------------------------------------------------------------------
@@ -530,11 +523,9 @@ export function fetchMedianNGOPreview(input: {
     eligibility?: Array<{ key: string; label: string; details?: string }>;
   };
 }) {
-  return safeCall<{ preview: MedianNGOPreview }>(() =>
-    api.post<CopilotResult<{ preview: MedianNGOPreview }>>(
-      '/ai/median-ngo-preview',
-      input,
-    ),
+  // Phase 13.43 — async by default.
+  return safeCallAsync<{ preview: MedianNGOPreview }>(
+    '/ai/median-ngo-preview', input as Record<string, unknown>,
   );
 }
 
@@ -581,8 +572,9 @@ export function fetchGrantBrief(input: {
   geography?: string;
   budget_usd?: number;
 }) {
-  return safeCall<{ brief: GeneratedGrantBrief }>(() =>
-    api.post<CopilotResult<{ brief: GeneratedGrantBrief }>>('/ai/grant-brief', input),
+  // Phase 13.43 — async by default. Heavy donor wizard call.
+  return safeCallAsync<{ brief: GeneratedGrantBrief }>(
+    '/ai/grant-brief', input as Record<string, unknown>,
   );
 }
 
@@ -697,11 +689,9 @@ export interface CompliancePreempt {
 }
 
 export function fetchCompliancePreempt(applicationId: number) {
-  return safeCall<{ preempt: CompliancePreempt }>(() =>
-    api.post<CopilotResult<{ preempt: CompliancePreempt }>>(
-      '/ai/compliance-preempt',
-      { application_id: applicationId },
-    ),
+  // Phase 13.43 — async by default.
+  return safeCallAsync<{ preempt: CompliancePreempt }>(
+    '/ai/compliance-preempt', { application_id: applicationId },
   );
 }
 
@@ -753,11 +743,9 @@ export interface SubmissionReadiness {
 }
 
 export function fetchSubmissionReadiness(applicationId: number) {
-  return safeCall<{ readiness: SubmissionReadiness }>(() =>
-    api.post<CopilotResult<{ readiness: SubmissionReadiness }>>(
-      '/ai/submission-readiness',
-      { application_id: applicationId },
-    ),
+  // Phase 13.43 — async by default.
+  return safeCallAsync<{ readiness: SubmissionReadiness }>(
+    '/ai/submission-readiness', { application_id: applicationId },
   );
 }
 
@@ -810,11 +798,9 @@ export interface ReportReadiness {
 }
 
 export function fetchReportReadiness(reportId: number) {
-  return safeCall<{ readiness: ReportReadiness }>(() =>
-    api.post<CopilotResult<{ readiness: ReportReadiness }>>(
-      '/ai/report-readiness',
-      { report_id: reportId },
-    ),
+  // Phase 13.43 — async by default.
+  return safeCallAsync<{ readiness: ReportReadiness }>(
+    '/ai/report-readiness', { report_id: reportId },
   );
 }
 
@@ -855,11 +841,9 @@ export interface ReviewerSummary {
 }
 
 export function fetchReviewerSummary(applicationId: number) {
-  return safeCall<{ summary: ReviewerSummary }>(() =>
-    api.post<CopilotResult<{ summary: ReviewerSummary }>>(
-      '/ai/reviewer-summary',
-      { application_id: applicationId },
-    ),
+  // Phase 13.43 — async by default.
+  return safeCallAsync<{ summary: ReviewerSummary }>(
+    '/ai/reviewer-summary', { application_id: applicationId },
   );
 }
 
@@ -914,11 +898,10 @@ export function fetchBurdenEstimate(input: {
   grantId?: number;
   draft?: Record<string, unknown>;
 }) {
-  return safeCall<{ burden: BurdenEstimate }>(() =>
-    api.post<CopilotResult<{ burden: BurdenEstimate }>>(
-      '/ai/burden-estimate',
-      input.grantId ? { grant_id: input.grantId } : { draft: input.draft },
-    ),
+  // Phase 13.43 — async by default.
+  return safeCallAsync<{ burden: BurdenEstimate }>(
+    '/ai/burden-estimate',
+    input.grantId ? { grant_id: input.grantId } : { draft: input.draft || {} },
   );
 }
 

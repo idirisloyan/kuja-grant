@@ -130,13 +130,20 @@ def api_donor_portfolio_insights():
         'recent_apps': recent_apps,
     }
 
-    t0 = time.time()
-    res = CopilotService.donor_portfolio_insights(
-        donor_org_id=org_id or 0, snapshot=snapshot, lang=get_lang(),
-    )
-    log_call(endpoint='donor-portfolio-insights', user_id=current_user.id, result=res,
-             duration_ms=int((time.time() - t0) * 1000))
-    return jsonify(res)
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    lang = get_lang()
+    uid = current_user.id
+    captured_org_id = org_id or 0
+    def _work():
+        t0 = time.time()
+        res = CopilotService.donor_portfolio_insights(
+            donor_org_id=captured_org_id, snapshot=snapshot, lang=lang,
+        )
+        log_call(endpoint='donor-portfolio-insights', user_id=uid, result=res,
+                 duration_ms=int((time.time() - t0) * 1000))
+        return res
+    return maybe_async_jsonify(request, 'donor_portfolio_insights', _work)
 
 
 # ----------------------------------------------------------------------
@@ -158,18 +165,24 @@ def api_donor_grant_copilot():
         return jsonify({'ok': False, 'code': 'BAD_REQUEST',
                         'message': 'A grant goal is required.'}), 400
 
-    t0 = time.time()
-    res = CopilotService.donor_grant_copilot(
-        goal=goal,
-        thematic=(data.get('thematic') or '').strip(),
-        geography=(data.get('geography') or '').strip(),
-        budget_usd=data.get('budget_usd'),
-        draft=data.get('draft'),
-        lang=get_lang(),
-    )
-    log_call(endpoint='donor-grant-copilot', user_id=current_user.id, result=res,
-             duration_ms=int((time.time() - t0) * 1000))
-    return jsonify(res)
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    lang = get_lang()
+    uid = current_user.id
+    thematic = (data.get('thematic') or '').strip()
+    geography = (data.get('geography') or '').strip()
+    budget_usd = data.get('budget_usd')
+    draft = data.get('draft')
+    def _work():
+        t0 = time.time()
+        res = CopilotService.donor_grant_copilot(
+            goal=goal, thematic=thematic, geography=geography,
+            budget_usd=budget_usd, draft=draft, lang=lang,
+        )
+        log_call(endpoint='donor-grant-copilot', user_id=uid, result=res,
+                 duration_ms=int((time.time() - t0) * 1000))
+        return res
+    return maybe_async_jsonify(request, 'donor_grant_copilot', _work)
 
 
 # ----------------------------------------------------------------------
@@ -241,15 +254,21 @@ def api_ngo_readiness():
     except Exception as e:
         logger.warning(f"Failed to load pending reports for ngo_readiness: {e}")
 
-    t0 = time.time()
-    res = CopilotService.ngo_readiness(
-        org_summary=org_summary, recent_apps=recent_apps,
-        documents_present=documents_present,
-        pending_reports=pending_reports, lang=get_lang(),
-    )
-    log_call(endpoint='ngo-readiness', user_id=current_user.id, result=res,
-             duration_ms=int((time.time() - t0) * 1000))
-    return jsonify(res)
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    lang = get_lang()
+    uid = current_user.id
+    def _work():
+        t0 = time.time()
+        res = CopilotService.ngo_readiness(
+            org_summary=org_summary, recent_apps=recent_apps,
+            documents_present=documents_present,
+            pending_reports=pending_reports, lang=lang,
+        )
+        log_call(endpoint='ngo-readiness', user_id=uid, result=res,
+                 duration_ms=int((time.time() - t0) * 1000))
+        return res
+    return maybe_async_jsonify(request, 'ngo_readiness', _work)
 
 
 # ----------------------------------------------------------------------
@@ -292,13 +311,19 @@ def api_reviewer_recommendation():
         {'criterion': 'Risk management',     'weight': 15},
     ]
 
-    t0 = time.time()
-    res = CopilotService.reviewer_recommendation(
-        applications=payload_apps, rubric=rubric, lang=get_lang(),
-    )
-    log_call(endpoint='reviewer-recommendation', user_id=current_user.id, result=res,
-             duration_ms=int((time.time() - t0) * 1000))
-    return jsonify(res)
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    lang = get_lang()
+    uid = current_user.id
+    def _work():
+        t0 = time.time()
+        res = CopilotService.reviewer_recommendation(
+            applications=payload_apps, rubric=rubric, lang=lang,
+        )
+        log_call(endpoint='reviewer-recommendation', user_id=uid, result=res,
+                 duration_ms=int((time.time() - t0) * 1000))
+        return res
+    return maybe_async_jsonify(request, 'reviewer_recommendation', _work)
 
 
 # ----------------------------------------------------------------------
@@ -334,11 +359,17 @@ def api_cross_grant_patterns():
         return jsonify({'ok': True, 'data': {'patterns': [], 'summary': 'No declined applications yet.'},
                         'meta': {}})
 
-    t0 = time.time()
-    res = CopilotService.cross_grant_patterns(declined_apps=payload, lang=get_lang())
-    log_call(endpoint='cross-grant-patterns', user_id=current_user.id, result=res,
-             duration_ms=int((time.time() - t0) * 1000))
-    return jsonify(res)
+    # Phase 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    lang = get_lang()
+    uid = current_user.id
+    def _work():
+        t0 = time.time()
+        res = CopilotService.cross_grant_patterns(declined_apps=payload, lang=lang)
+        log_call(endpoint='cross-grant-patterns', user_id=uid, result=res,
+                 duration_ms=int((time.time() - t0) * 1000))
+        return res
+    return maybe_async_jsonify(request, 'cross_grant_patterns', _work)
 
 
 # ----------------------------------------------------------------------
@@ -359,34 +390,19 @@ def api_insight_narrate():
         return jsonify({'ok': False, 'code': 'BAD_REQUEST',
                         'message': 'chart_type and data are required.'}), 400
 
-    # Phase 13.42 — async mode opt-in. Frontend passes ?async=true OR
-    # body.async_mode=true to offload the AI call to the background
-    # pool. Returns 202 + job_id; client polls /api/ai/jobs/<id>.
-    # Default sync behavior is unchanged for back-compat.
-    from app.services.ai_jobs import submit_ai_job, is_async_request
-    if is_async_request(request):
-        lang = get_lang()
-        uid = current_user.id
-
-        def _do_work():
-            t0 = time.time()
-            res = CopilotService.insight_narrate(
-                chart_type=chart_type, data=chart_data, context=context, lang=lang,
-            )
-            log_call(endpoint='insight-narrate', user_id=uid, result=res,
-                     duration_ms=int((time.time() - t0) * 1000))
-            return res
-
-        job_id = submit_ai_job('insight_narrate', _do_work)
-        return jsonify({'ok': True, 'job_id': job_id, 'status': 'pending'}), 202
-
-    t0 = time.time()
-    res = CopilotService.insight_narrate(
-        chart_type=chart_type, data=chart_data, context=context, lang=get_lang(),
-    )
-    log_call(endpoint='insight-narrate', user_id=current_user.id, result=res,
-             duration_ms=int((time.time() - t0) * 1000))
-    return jsonify(res)
+    # Phase 13.42 / 13.43 — async-capable. Default sync mode unchanged.
+    from app.services.ai_jobs import maybe_async_jsonify
+    lang = get_lang()
+    uid = current_user.id
+    def _work():
+        t0 = time.time()
+        res = CopilotService.insight_narrate(
+            chart_type=chart_type, data=chart_data, context=context, lang=lang,
+        )
+        log_call(endpoint='insight-narrate', user_id=uid, result=res,
+                 duration_ms=int((time.time() - t0) * 1000))
+        return res
+    return maybe_async_jsonify(request, 'insight_narrate', _work)
 
 
 # ----------------------------------------------------------------------
@@ -423,31 +439,19 @@ def api_suggestions():
     except Exception as e:
         logger.warning(f"page_state build failed (non-fatal): {e}")
 
-    # Phase 13.42 — async mode opt-in (same convention as insight-narrate).
-    from app.services.ai_jobs import submit_ai_job, is_async_request
-    if is_async_request(request):
-        lang = get_lang()
-        uid = current_user.id
-
-        def _do_work():
-            t0 = time.time()
-            res = CopilotService.context_suggestions(
-                role=role, scope=scope, page_state=page_state, lang=lang,
-            )
-            log_call(endpoint='suggestions', user_id=uid, result=res,
-                     duration_ms=int((time.time() - t0) * 1000))
-            return res
-
-        job_id = submit_ai_job('suggestions', _do_work)
-        return jsonify({'ok': True, 'job_id': job_id, 'status': 'pending'}), 202
-
-    t0 = time.time()
-    res = CopilotService.context_suggestions(
-        role=role, scope=scope, page_state=page_state, lang=get_lang(),
-    )
-    log_call(endpoint='suggestions', user_id=current_user.id, result=res,
-             duration_ms=int((time.time() - t0) * 1000))
-    return jsonify(res)
+    # Phase 13.42 / 13.43 — async-capable.
+    from app.services.ai_jobs import maybe_async_jsonify
+    lang = get_lang()
+    uid = current_user.id
+    def _work():
+        t0 = time.time()
+        res = CopilotService.context_suggestions(
+            role=role, scope=scope, page_state=page_state, lang=lang,
+        )
+        log_call(endpoint='suggestions', user_id=uid, result=res,
+                 duration_ms=int((time.time() - t0) * 1000))
+        return res
+    return maybe_async_jsonify(request, 'suggestions', _work)
 
 
 # ----------------------------------------------------------------------

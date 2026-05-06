@@ -137,3 +137,31 @@ def is_async_request(req) -> bool:
     except Exception:
         pass
     return False
+
+
+def maybe_async_jsonify(req, task_type: str, work_fn):
+    """Phase 13.43 — one-line route helper for async-capable AI endpoints.
+
+    Wraps any AI route handler's "do the work, return a dict" closure
+    so it transparently supports both sync and async modes:
+
+      - Sync (default): runs `work_fn()`, jsonifies the result, returns 200.
+      - Async (`?async=true` or `body.async_mode=true`): submits `work_fn`
+        to the background pool, returns 202 + `{ok, job_id, status}`.
+
+    `work_fn` is expected to:
+      - Capture per-request data (request.json, current_user.id, etc.)
+        in its closure BEFORE being passed in. Inside the bg thread,
+        Flask's `current_user` and `request` aren't available.
+      - Return a JSON-serializable dict — the result the frontend
+        ultimately receives via `/api/ai/jobs/<id>` poll.
+
+    This dramatically reduces per-route migration cost: 3 lines added
+    vs. the 12-line block we used in the original insight-narrate
+    migration.
+    """
+    from flask import jsonify
+    if is_async_request(req):
+        job_id = submit_ai_job(task_type, work_fn)
+        return jsonify({'ok': True, 'job_id': job_id, 'status': 'pending'}), 202
+    return jsonify(work_fn())

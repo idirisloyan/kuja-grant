@@ -157,6 +157,25 @@ re-pitch unless the underlying premise changes.
 
 Newest first. Drop entries older than 90 days.
 
+### 2026-05-06 — Phase 13 batch 50: complete the async AI migration
+
+Batch 49 shipped the dispatcher + migrated 2 endpoints (insight-narrate,
+suggestions). This batch sweeps the remaining heavy AI endpoints.
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.43-helper | New `maybe_async_jsonify(req, task_type, work_fn)` in `app/services/ai_jobs.py`. Wraps "do the work, return a dict" closures so each route migration is ~5 lines instead of 12. Both sync and async modes from a single helper. | (this batch) |
+| 13.43-routes | All heavy AI endpoints now async-capable. Backend list: `donor-portfolio-insights`, `donor-grant-copilot`, `ngo-readiness`, `reviewer-recommendation`, `cross-grant-patterns`, `extract-evidence`, `suggest-criteria`, `compliance-preempt`, `draft-application`, `draft-report`, `submission-readiness`, `report-readiness`, `reviewer-summary`, `burden-estimate`, `median-ngo-preview`, `grant-brief`. Plus the original `insight-narrate` and `suggestions` from batch 49 (refactored to use the new helper). 18 total. | (this batch) |
+| 13.43-fetchers | Frontend fetchers in `copilot-api.ts` now async-by-default for: `fetchDonorPortfolioInsights`, `fetchGrantScaffold`, `fetchNgoReadiness`, `fetchReviewerRecommendation`, `fetchCrossGrantPatterns`, `fetchDraftApplication`, `fetchDraftReport`, `fetchMedianNGOPreview`, `fetchGrantBrief`, `fetchCompliancePreempt`, `fetchSubmissionReadiness`, `fetchReportReadiness`, `fetchReviewerSummary`, `fetchBurdenEstimate`. (`fetchInsightCaption` + `fetchSuggestions` already async from batch 49.) Caller signatures + return shapes unchanged — `safeCallAsync` does enqueue+poll under the hood. | (this batch) |
+| 13.43-detached-objects | For routes that need DB writes after the AI call (`draft-application`, `draft-report`), the closure re-fetches SQLAlchemy objects by ID inside the bg thread instead of capturing the request-scoped session-attached object. Avoids "DetachedInstanceError" when the bg session is different from the request session. | (this batch) |
+
+Endpoints intentionally left sync: `chat`, `chat-stream` (already streaming),
+`guidance`, `strengthen-section`, `score-criterion`, `score-application`,
+`analyze-report`, `report-guidance`, `compliance-explain`, `draft-section`
+— per-section / per-criterion calls that are typically short and not
+common dashboard saturators. Can migrate later if traffic shows them
+problematic.
+
 ### 2026-05-06 — Phase 13 batch 49: async AI job dispatcher (architectural fix)
 
 The 2026-05-06 outage exposed that synchronous AI calls in HTTP
