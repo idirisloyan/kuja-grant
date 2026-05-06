@@ -22,6 +22,7 @@ from app.models.ai_provenance import AIProvenance
 from app.models.grant_question import GrantQuestion
 from app.models.diligence import DiligenceItem
 from app.models.org_memory import OrgMemory
+from app.models.risk import Risk
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -29,5 +30,5 @@ __all__ = [
     'Notification',
     'AIThread', 'AIMessage', 'AICallLog', 'AIProvenance',
     'GrantQuestion', 'DiligenceItem',
-    'OrgMemory',
+    'OrgMemory', 'Risk',
 ]

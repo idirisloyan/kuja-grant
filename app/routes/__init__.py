@@ -25,11 +25,13 @@ def register_blueprints(app):
     from app.routes.grant_questions import questions_bp  # Phase 4.3: Q&A
     from app.routes.diligence import diligence_bp  # Phase 4.4: diligence room
     from app.routes.org_memory_routes import org_memory_bp  # Phase 10.5
+    from app.routes.risks import risks_bp  # Phase 13.7
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
                copilot_bp,
                compliance_bp, reviews_bp, reports_bp, admin_bp,
                notifications_bp,
-               match_bp, questions_bp, diligence_bp, org_memory_bp]:
+               match_bp, questions_bp, diligence_bp, org_memory_bp,
+               risks_bp]:
         app.register_blueprint(bp)

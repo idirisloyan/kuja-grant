@@ -869,6 +869,135 @@ export function fetchBurdenEstimate(input: {
 }
 
 // ---------------------------------------------------------------------------
+// 14. Grant compliance health — Phase 13.8 (4-pillar Why-this-score)
+// ---------------------------------------------------------------------------
+
+export type ComplianceBand = 'on_track' | 'at_risk' | 'high_risk';
+
+export interface CompliancePillarContribution {
+  label: string;
+  value: number;
+  detail?: string;
+}
+
+export interface CompliancePillar {
+  key: 'completion' | 'timeliness' | 'workflow' | 'importance' | string;
+  weight: number;
+  value: number;
+  note?: string;
+  contributions?: CompliancePillarContribution[];
+}
+
+export interface ComplianceHealth {
+  grant_id: number;
+  score: number;
+  band: ComplianceBand;
+  pillars: CompliancePillar[];
+  as_of: string;
+  computed_via: 'rule_based' | 'ai_narrative';
+}
+
+export function fetchGrantComplianceHealth(grantId: number) {
+  return safeCall<ComplianceHealth>(() =>
+    api.get<CopilotResult<ComplianceHealth>>(`/grants/${grantId}/compliance-health`),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 15. Risk register — Phase 13.7
+// ---------------------------------------------------------------------------
+
+export type RiskKind =
+  | 'compliance' | 'eligibility' | 'documents' | 'finance'
+  | 'narrative' | 'data' | 'governance';
+export type RiskSeverity = 'critical' | 'high' | 'medium' | 'low';
+export type RiskStatus =
+  | 'open' | 'mitigating' | 'mitigated' | 'accepted' | 'dismissed';
+export type RiskSubjectKind = 'org' | 'application' | 'grant';
+
+export interface Risk {
+  id: number;
+  subject: { kind: RiskSubjectKind; id: number };
+  kind: RiskKind;
+  severity: RiskSeverity;
+  title: string;
+  description: string | null;
+  status: RiskStatus;
+  response_md: string | null;
+  owner: { user_id: number; name: string | null; email: string | null } | null;
+  due_date: string | null;
+  resolved_at: string | null;
+  detected_at: string | null;
+  source: string | null;
+  ai_call_id: number | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RiskCounts {
+  open: number;
+  mitigating: number;
+  mitigated: number;
+  accepted: number;
+  dismissed: number;
+  awaiting_response: number;
+}
+
+export function fetchRisksForSubject(input: {
+  subjectKind: RiskSubjectKind;
+  subjectId: number;
+  status?: RiskStatus;
+  excludeTerminal?: boolean;
+}) {
+  const qs = new URLSearchParams({
+    subject_kind: input.subjectKind,
+    subject_id: String(input.subjectId),
+  });
+  if (input.status) qs.set('status', input.status);
+  if (input.excludeTerminal) qs.set('exclude_terminal', 'true');
+  return safeCall<{ risks: Risk[]; counts: RiskCounts }>(() =>
+    api.get<CopilotResult<{ risks: Risk[]; counts: RiskCounts }>>(`/risks/?${qs.toString()}`),
+  );
+}
+
+export function patchRisk(riskId: number, body: Partial<{
+  status: RiskStatus;
+  response_md: string;
+  owner_user_id: number | null;
+  due_date: string | null;
+  severity: RiskSeverity;
+  title: string;
+  description: string;
+}>) {
+  return safeCall<{ risk: Risk }>(() =>
+    api.patch<CopilotResult<{ risk: Risk }>>(`/risks/${riskId}`, body),
+  );
+}
+
+export function createRisk(body: {
+  subject_kind: RiskSubjectKind;
+  subject_id: number;
+  kind: RiskKind;
+  severity: RiskSeverity;
+  title: string;
+  description?: string;
+  owner_user_id?: number;
+  due_date?: string;
+  source?: string;
+}) {
+  return safeCall<{ risk: Risk }>(() =>
+    api.post<CopilotResult<{ risk: Risk }>>('/risks/', body),
+  );
+}
+
+export function fetchMyAwaitingResponse() {
+  return safeCall<{ risks: Risk[]; count: number }>(() =>
+    api.get<CopilotResult<{ risks: Risk[]; count: number }>>('/risks/awaiting-response'),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 13c. Grant Q&A — Phase 4.3 (NGO ↔ donor inline questions)
 // ---------------------------------------------------------------------------
 

@@ -560,6 +560,40 @@ def api_upload_grant_doc(grant_id):
 
 
 # ---------------------------------------------------------------------------
+# Phase 13.8 — grant compliance health (4-pillar score + Why-this-score)
+# ---------------------------------------------------------------------------
+
+@grants_bp.route('/<int:grant_id>/compliance-health', methods=['GET'])
+@login_required
+def api_grant_compliance_health(grant_id):
+    """Return the 4-pillar compliance health score for this grant.
+
+    Donors + admins only. Other roles can call /api/grants/<id> for the
+    public-facing grant info; this endpoint is the donor-side health
+    surface that drives the 'Why this score?' dialog and the trajectory
+    chart.
+
+    Output (rule-based, no AI cost):
+      score (0-100), band (on_track / at_risk / high_risk), pillars[]
+      sorted lowest-first, with per-pillar contributions for the
+      dialog drilldown.
+    """
+    from app.utils.api_errors import error_response
+    from app.services.compliance_health import calculate_grant_compliance_health
+
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return error_response('grant.not_found', 404)
+    if current_user.role not in ('donor', 'admin'):
+        return error_response('auth.access_denied', 403)
+    if current_user.role == 'donor' and getattr(grant, 'donor_org_id', None) != current_user.org_id:
+        return error_response('auth.access_denied', 403)
+
+    breakdown = calculate_grant_compliance_health(grant_id)
+    return jsonify({'success': True, **breakdown})
+
+
+# ---------------------------------------------------------------------------
 # Phase 2.3 — donor portfolio diagnostics
 # ---------------------------------------------------------------------------
 
