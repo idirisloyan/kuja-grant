@@ -53,17 +53,29 @@ export function KeyboardShortcutOverlay() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    // Phase 13.45 — diagnostic marker so automated certs can verify
+    // mount without depending on i18n text. Stable across i18n changes.
+    try {
+      (window as unknown as Record<string, unknown>).__kuja_kbd_overlay_mounted = true;
+    } catch {}
     const handler = (e: KeyboardEvent) => {
-      if (e.key === '?' && !isTypingInInput(e.target)) {
+      // Trigger on '?' OR Shift+/ (some non-US layouts emit '/' with shiftKey).
+      const isQuestion = e.key === '?' || (e.key === '/' && e.shiftKey);
+      if (isQuestion && !isTypingInInput(e.target)) {
         e.preventDefault();
         setOpen((v) => !v);
-      } else if (e.key === 'Escape' && open) {
-        setOpen(false);
+      } else if (e.key === 'Escape') {
+        // Use functional setter so we don't need `open` in deps.
+        setOpen((v) => (v ? false : v));
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [open]);
+    // Empty deps so the listener attaches once and stays. Prior `[open]`
+    // dep tore down + re-attached on every toggle, which was racy on
+    // rapid presses and made the cert script's synthetic dispatch miss
+    // the brief window the listener was unbound between renders.
+  }, []);
 
   if (!open) return null;
 

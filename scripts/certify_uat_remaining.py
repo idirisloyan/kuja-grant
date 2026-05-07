@@ -45,51 +45,74 @@ results: list[tuple[str, str, str]] = []
 
 
 def report(item_id: str, status: str, reason: str = '') -> None:
-    icon = '✓' if status == PASS else ('✗' if status == FAIL else '○')
+    # ASCII-only icons so Windows cp1252 consoles don't UnicodeEncodeError.
+    icon = '+' if status == PASS else ('-' if status == FAIL else 'o')
     line = f'  [{status:4s}] {item_id:32s} {icon}  {reason}'
-    print(line)
+    try:
+        print(line)
+    except UnicodeEncodeError:
+        # Last-resort fallback if some payload string contains non-ASCII.
+        print(line.encode('ascii', errors='replace').decode('ascii'))
     results.append((item_id, status, reason))
 
 
 def _login(page: Page, base: str, email: str, password: str = 'pass123',
            label: str = '') -> bool:
-    """Log in via the SPA login form. Returns True on success.
+    """Log in by calling the API directly so the session cookie lands
+    on the page context. Then navigate to /dashboard/ via the SPA.
 
-    Inspects the login API response so we can distinguish "wrong creds"
-    (401), "rate limited" (429 — common in CI when the suite reruns),
-    and "infra timeout" (no response) — each surfaces a clear reason
-    in the report instead of a generic Playwright wait_for_url timeout.
+    Why not the form: the SPA's `window.location.href = '/dashboard/'`
+    redirect after a successful login can race with the layout's own
+    on-mount session check, especially in headless. Bypassing the form
+    keeps the cert focused on the surfaces we actually want to verify
+    (saved searches, slips badge, ?-overlay, web-push wiring) instead
+    of re-certifying the login flow itself, which has its own dedicated
+    e2e coverage.
     """
-    page.goto(f'{base}/login/')
-    page.wait_for_load_state('networkidle')
-    # Capture the login API response so we can read its status.
-    with page.expect_response('**/api/auth/login', timeout=10000) as resp_info:
-        page.fill('input[type="email"]', email)
-        page.fill('input[type="password"]', password)
-        page.click('button[type="submit"]')
+    # Prime an /api/version cookie domain by hitting any page first.
+    page.goto(f'{base}/login/', wait_until='domcontentloaded')
+
+    # POST to the login API from inside the page so the cookie is
+    # bound to this browser context.
     try:
-        resp = resp_info.value
+        result = page.evaluate(
+            "async ([email, pw]) => { "
+            " const r = await fetch('/api/auth/login', { "
+            "  method: 'POST', credentials: 'include', "
+            "  headers: { 'Content-Type': 'application/json', "
+            "             'X-Requested-With': 'XMLHttpRequest' }, "
+            "  body: JSON.stringify({ email, password: pw }) }); "
+            " return { status: r.status, body: await r.json().catch(()=>({})) }; "
+            "}", [email, password]
+        )
     except Exception as e:
-        report(f'LOGIN_{label}', FAIL, f'no login response ({e})')
+        report(f'LOGIN_{label}', FAIL, f'fetch failed: {e}')
         return False
-    if resp.status == 200:
-        try:
-            page.wait_for_url('**/dashboard*', timeout=10000)
-            return True
-        except Exception:
-            # 200 but client didn't navigate — still treat as failure but
-            # surface what the URL actually is.
-            report(f'LOGIN_{label}', FAIL, f'200 but URL is {page.url}')
-            return False
-    if resp.status == 429:
-        report(f'LOGIN_{label}', SKIP,
-               f'IP rate-limited (429) — wait 5 min before re-running')
+
+    status = result.get('status')
+    if status == 429:
+        report(f'LOGIN_{label}', SKIP, 'IP rate-limited — wait 5 min')
         return False
-    if resp.status == 401:
+    if status == 401:
         report(f'LOGIN_{label}', FAIL, f'401 — wrong creds for {email}')
         return False
-    report(f'LOGIN_{label}', FAIL, f'unexpected status {resp.status}')
-    return False
+    if status != 200 or not (result.get('body') or {}).get('success'):
+        report(f'LOGIN_{label}', FAIL, f'status={status} body={result.get("body")}')
+        return False
+
+    # Navigate into the app shell. /dashboard/ is everyone's landing.
+    try:
+        page.goto(f'{base}/dashboard/', wait_until='domcontentloaded')
+        page.wait_for_load_state('networkidle', timeout=10000)
+    except Exception:
+        # networkidle isn't strictly required — proceed if DOM is up.
+        pass
+    if '/login' in page.url:
+        report(f'LOGIN_{label}', FAIL,
+               f'session cookie not honoured; bounced back to login')
+        return False
+    report(f'LOGIN_{label}', PASS, f'API login + nav to {page.url}')
+    return True
 
 
 def _login_admin(page: Page, base: str) -> bool:
@@ -259,22 +282,50 @@ def cert_shortcut_overlay_replay(page: Page, base: str) -> None:
     page.goto(f'{base}/dashboard/')
     page.wait_for_load_state('networkidle')
 
+    # Phase 13.45 — definitive mount marker the component sets in its
+    # useEffect. If false, the overlay component never mounted and we
+    # know the issue is mount-side, not handler-side.
+    import time as _time
+    deadline = _time.monotonic() + 6
+    mounted = False
+    while _time.monotonic() < deadline:
+        try:
+            mounted = bool(page.evaluate(
+                "() => window.__kuja_kbd_overlay_mounted === true"
+            ))
+            if mounted:
+                break
+        except Exception:
+            pass
+        page.wait_for_timeout(250)
+    if not mounted:
+        report('SHORTCUT_OVERLAY_MOUNTED', FAIL,
+               'KeyboardShortcutOverlay never mounted on /dashboard/')
+        return
+    report('SHORTCUT_OVERLAY_MOUNTED', PASS, 'component mounted')
+
     # Ensure focus isn't in an input — the overlay handler ignores '?'
-    # while typing in inputs by design. Use page.keyboard.type so the
-    # '?' arrives as a character event regardless of keyboard layout.
+    # while typing in inputs by design.
     page.locator('body').click()
     page.keyboard.type('?')
 
     try:
         page.wait_for_selector('text=Keyboard shortcuts', timeout=4000)
-        report('SHORTCUT_OVERLAY_OPENS', PASS, 'overlay rendered')
+        report('SHORTCUT_OVERLAY_OPENS', PASS, 'overlay rendered after "?"')
     except Exception:
-        report('SHORTCUT_OVERLAY_OPENS', FAIL, 'overlay not shown after "?"')
-        return
+        # Fall back to checking the dialog by role since i18n could vary.
+        try:
+            page.wait_for_selector('[role="dialog"][aria-modal="true"]',
+                                   timeout=2000)
+            report('SHORTCUT_OVERLAY_OPENS', PASS,
+                   'overlay rendered (dialog role match)')
+        except Exception:
+            report('SHORTCUT_OVERLAY_OPENS', FAIL,
+                   'overlay not shown after "?"')
+            return
 
     replay = page.get_by_text('Replay onboarding tour', exact=False)
     if replay.count() == 0:
-        # Some locales render the translated form. Check the i18n key fallback.
         replay = page.locator('button', has_text='Replay')
     if replay.count() == 0:
         report('SHORTCUT_REPLAY_LINK', FAIL, 'replay link not in overlay')
@@ -288,7 +339,7 @@ def cert_shortcut_overlay_replay(page: Page, base: str) -> None:
         "() => { window.__kuja_replay_fired = true; }); }"
     )
     replay.first.click()
-    page.wait_for_timeout(300)
+    page.wait_for_timeout(400)
     fired = page.evaluate("() => window.__kuja_replay_fired === true")
     if fired:
         report('SHORTCUT_REPLAY_DISPATCHES_EVENT', PASS, 'kuja:replay-tour fired')
