@@ -115,7 +115,10 @@ export function SavedSearchesBar({
   }, [savingName, scope, currentFilter, refresh]);
 
   return (
-    <div className={`flex flex-wrap items-center gap-2 py-2 ${className}`}>
+    <div
+      data-testid={`saved-searches-bar-${scope}`}
+      className={`flex flex-wrap items-center gap-2 py-2 ${className}`}
+    >
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground mr-1">
         <Bookmark className="h-3 w-3" aria-hidden />
         Saved
@@ -192,6 +195,7 @@ export function SavedSearchesBar({
             type="button"
             onClick={save}
             disabled={loading || !savingName.trim()}
+            data-testid="saved-search-confirm-save"
             className="px-1.5 text-[hsl(var(--kuja-clay))] hover:text-[hsl(var(--kuja-clay-dark))] disabled:opacity-50"
           >
             Save
