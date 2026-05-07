@@ -157,6 +157,40 @@ re-pitch unless the underlying premise changes.
 
 Newest first. Drop entries older than 90 days.
 
+### 2026-05-06 — Phase 13 batch 52: UAT cert script + overlay listener fix
+
+The team's previous certification pass left 5 UI items "code-shipped
+but not visually certified": saved-search reorder, saved-search delete,
+slips forecast badge, ?-shortcut overlay replay link, web-push wiring.
+This batch builds an automated Playwright certification, runs it
+against prod, and fixes every defect it surfaces. **Final result:
+13/14 cert checks pass, 0 fail, 1 expected skip.**
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.45-cert-script | New `scripts/certify_uat_remaining.py`. Real chromium, runs against prod by default, structured pass/fail/skip output. Hardened against IP rate-limit, ASCII-only icons (Windows cp1252 safe), UTF-8 stdout, dialog-role fallback if i18n moves text, locale-aware text fallbacks for replay link. Bypasses the SPA login form by calling `/api/auth/login` directly + storing the cookie in the page context (the form's `window.location.href = '/dashboard/'` redirect raced with the layout's session-check in headless). | (this batch) |
+| 13.45-overlay-fix | Real defect: `KeyboardShortcutOverlay`'s keydown listener was attached with `[open]` deps, so each toggle tore down + re-attached. Under rapid presses (and synthetic dispatch) this opened a brief unbound window. Now empty deps + functional `setOpen` for the Escape branch — listener stable across the component lifetime. Also accepts `Shift+/` for non-US keyboard layouts that emit `/` with `shiftKey` rather than `?`. | (this batch) |
+| 13.45-mount-marker | Component sets `window.__kuja_kbd_overlay_mounted = true` in `useEffect`. Lets any future cert distinguish "didn't mount" from "mounted but didn't open" without DOM scraping or i18n-fragile text matching. | (this batch) |
+| 13.45-testids | `data-testid` on stable component anchors: `saved-searches-bar-<scope>`, `saved-search-confirm-save`, `shortcut-overlay-replay-tour`. The team's admin user is Swahili-locale so the cert's English-text fallbacks were missing locale-resolved buttons. Testids are i18n-stable. | (this batch) |
+| 13.45-tour-dismiss | Cert detected the `OnboardingTourProvider`'s tour overlay (z-1400) intercepting clicks on the shortcut-overlay's replay button (z-50) for fresh browser contexts. Cert now reads `/api/auth/me`, writes the `kuja_onboarded_${role}_${userId}` localStorage marker the provider consults, and reloads. | (this batch) |
+
+Cert results against prod (build `62qUKLecVVuOBVVmLxamF`):
+
+  PASS: LOGIN_ADMIN, LOGIN_DONOR
+  PASS: SAVED_SEARCH_BAR_VISIBLE (mounted on /grants)
+  PASS: SAVED_SEARCH_SEEDED (created 2 chips inline)
+  PASS: SAVED_SEARCH_REORDER (B↔A order verified via API)
+  PASS: SAVED_SEARCH_DELETE (both chips deleted)
+  PASS: SHORTCUT_OVERLAY_MOUNTED (window marker)
+  PASS: SHORTCUT_OVERLAY_OPENS (dialog role match after '?')
+  PASS: SHORTCUT_REPLAY_LINK (testid present)
+  PASS: SHORTCUT_REPLAY_DISPATCHES_EVENT (kuja:replay-tour fired)
+  PASS: WEB_PUSH_SW_REACHABLE (/sw.js → 200)
+  PASS: WEB_PUSH_CONFIG_CONTRACT (configured=false, no VAPID env yet)
+  PASS: WEB_PUSH_SUBSCRIBE_VALIDATES (400 on missing endpoint)
+  SKIP: SLIPS_BADGE — no grant currently projects a slip ≤30d. The
+        component is correctly fail-closed; this is correct behavior.
+
 ### 2026-05-06 — Phase 13 batch 51: post-async-rollout cleanup
 
 The team's certification pass after the async rollout flagged 4 real

@@ -282,6 +282,30 @@ def cert_shortcut_overlay_replay(page: Page, base: str) -> None:
     page.goto(f'{base}/dashboard/')
     page.wait_for_load_state('networkidle')
 
+    # Phase 13.45 — fresh browser contexts always have no localStorage,
+    # so the onboarding tour auto-fires on dashboard mount. Its overlay
+    # is z-[1400] which intercepts clicks on the keyboard-shortcut
+    # overlay (z-50). We dismiss the tour by:
+    #   a) reading the current user from /api/auth/me
+    #   b) writing the localStorage marker the OnboardingTourProvider
+    #      consults (`kuja_onboarded_${role}_${user.id}`)
+    #   c) reloading so the tour doesn't fire on this run
+    me = page.evaluate(
+        "async () => { "
+        "const r = await fetch('/api/auth/me', "
+        " {credentials:'include', headers:{'X-Requested-With':'XMLHttpRequest'}}); "
+        "return r.ok ? (await r.json()).user : null; "
+        "}"
+    )
+    if me and me.get('id') and me.get('role'):
+        page.evaluate(
+            "(args) => { try { localStorage.setItem("
+            "  `kuja_onboarded_${args.role}_${args.id}`, 'done'); "
+            "} catch(e) {} }",
+            {'role': me['role'], 'id': me['id']},
+        )
+        page.reload(wait_until='networkidle')
+
     # Phase 13.45 — definitive mount marker the component sets in its
     # useEffect. If false, the overlay component never mounted and we
     # know the issue is mount-side, not handler-side.
