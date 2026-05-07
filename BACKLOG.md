@@ -92,29 +92,113 @@ not worth the build cost without a customer pull.
 ## Operational TODOs
 
 These are manual things the team owes the system. Strikethrough
-when done.
+when done. Last refreshed 2026-05-06 to reflect every env var the
+codebase actually consults today.
 
-- [ ] Set `CRON_SECRET` in Railway env for multi-worker stability
-  (32-char token). *As of Phase 13.21 the app auto-generates a
-  per-process fallback at boot if missing, so /admin/system-health
-  no longer warns — but multi-worker prod needs an env-set value
-  so all workers share the same secret.*
-- [ ] Set `REDIS_URL` (or `RATE_LIMIT_REDIS_URL`) in Railway env so
-  the Phase 13.35 Redis-backed rate limiter activates. Without it,
-  rate limits are per-Gunicorn-worker (effectively N× looser) on
-  multi-worker prod. Falls back to in-memory automatically — no
-  outage if the env is unset.
-- [ ] Set `KUJA_AI_BUDGET_USD_30D` in Railway env (default $250) if
-  the team wants the AI-spend forecast banner to fire `over_budget`
-  at a different threshold.
-- [ ] Confirm `OPENSANCTIONS_API_KEY` is current. Live sanctions
-  primary feed; falls back to direct UN/OFAC/EU CSVs if missing.
-- [ ] Decide hard-2FA enforcement date (proposed 2026-05-29). Flip
-  `KUJA_ENFORCE_ADMIN_2FA=true` in Railway env on the chosen date.
-- [ ] First native-speaker review batch — assign reviewers per locale.
-- [ ] Decide whether to enable per-tenant audit retention windows
-  (current implementation is global). If yes, swap to a row in
-  `feature_flag_overrides` keyed by `org_id`.
+### Railway env: required-or-recommended for production maturity
+
+- [ ] **`CRON_SECRET`** — multi-worker stability for scheduled jobs.
+  As of Phase 13.21 the app auto-generates a per-process fallback at
+  boot if missing, so `/admin/system-health` no longer warns. **But**
+  multi-worker prod needs an env-set value so all workers share the
+  same secret. Set a 32-char token (`secrets.token_urlsafe(32)`).
+- [ ] **`REDIS_URL`** (or `RATE_LIMIT_REDIS_URL`) — highest-leverage
+  unset env. Activates **two** systems at once:
+    1. Phase 13.35 cross-worker rate limiter (without it, limits are
+       per-Gunicorn-worker — effectively N× looser).
+    2. Phase 13.42 cross-worker async-AI job state (without it, a job
+       submitted on worker A can't be polled from worker B; under
+       multi-worker load, ~3 of every 4 polls would 404 the job).
+  Both fall back gracefully when unset; no outage. Provision a
+  Redis service in Railway and set the URL. The same Redis instance
+  serves both — no need for two separate ones.
+- [ ] **`VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` + `VAPID_SUBJECT`** —
+  activate web push @mention delivery to subscribed devices. Without
+  these the in-app notification path still works, but push gracefully
+  no-ops. Generate via `py -3 -m pywebpush --keys` (or any VAPID
+  generator) and set all three in Railway env. Subject must be a
+  `mailto:` URL or a site URL.
+- [ ] **`OPENSANCTIONS_API_KEY`** — confirm current. Live sanctions
+  primary feed; falls back to direct UN/OFAC/EU CSVs if missing or
+  invalid. Worth re-verifying every quarter.
+
+### Railway env: tunable thresholds (sensible defaults; override only on signal)
+
+- [ ] `KUJA_AI_BUDGET_USD_30D` — `/admin/ai-spend/forecast` budget.
+  Default `250`. Override only if your projected monthly spend
+  shouldn't fire `over_budget` at $250.
+- [ ] `KUJA_USER_AI_CONCURRENT` — max in-flight AI calls per
+  authenticated user. Default `3`. Phase 13.41 added this to prevent
+  one client saturating the worker pool. Lower if you see queue
+  pressure; raise only after Phase 13.42 async dispatcher is wired
+  on every AI route the team relies on.
+- [ ] `KUJA_AUDIT_RETENTION_DAYS` — nightly prune window for
+  `ai_call_logs` + read+old `notifications`. Default `365`.
+  Hash-chained `audit_chain` rows are NEVER pruned. Lower if disk
+  pressure; the value is editable live via PUT
+  `/api/admin/audit-retention`.
+- [ ] `KUJA_DAILY_AI_SURFACE_HEALTH` — daily dry-run of all 7
+  flagship surfaces against synthetic fixtures (~7 cheap Anthropic
+  calls). Default `true`. Set `false` only if you want to suppress
+  the daily probe (e.g. during a cost-monitoring window).
+- [ ] `KUJA_DAILY_DEMO_READINESS` — daily sparse-data scan + admin
+  notification on warn-level findings. Default `true`. Same opt-out
+  pattern as above.
+- [ ] `RATE_LIMIT_LOGIN_PER_IP` — IP-scoped login attempt cap over
+  the 5-minute sliding window. Default `100`. Raise only if shared-
+  NAT testing teams keep getting locked out.
+- [ ] `RATE_LIMIT_ENUM_PER_IP` — distinct-email enumeration cap.
+  Default `15`. Raise only if multi-role QA grows past 15 seed
+  accounts.
+
+### Decisions the team owes the system
+
+- [ ] **Hard-2FA enforcement date** — proposed `2026-05-29`. Flip
+  `KUJA_ENFORCE_ADMIN_2FA=true` on the chosen day. Until then,
+  admins are nagged but not blocked.
+- [ ] **Native-speaker translation review** — assign reviewers per
+  locale (ar/sw/so/fr/es). `docs/i18n_review_targets.md` lists
+  priority namespaces. Once the first batch returns, a 30-line merge
+  script (planned but unwritten) lands the annotations.
+- [ ] **Per-tenant audit retention windows** — current impl is
+  global. If yes, swap to a row in `feature_flag_overrides` keyed
+  by `org_id`.
+- [ ] **Reports list view** — `/reports` is calendar-only today.
+  Saved-search bar isn't there because there's no list to filter.
+  If a list-form view is wanted, that's a real product decision —
+  layout + filters + saved-search wiring follow.
+- [ ] **AI cost forecasting follow-through** — once 30 days of
+  real spend data accumulates, review the `/admin/ai-spend/forecast`
+  output and either confirm the $250 default or set a calibrated
+  `KUJA_AI_BUDGET_USD_30D`.
+
+### Manual verification owed (post-deploy, can't fully automate)
+
+- [ ] **Web push end-to-end** — once VAPID env is set:
+    - Open Chrome on a real machine, log in as an NGO program
+      officer, click "Enable notifications" on the prompt the
+      `<TwoFactorNagBanner>`-area surfaces.
+    - Have a donor reviewer @mention them in a comment.
+    - Verify the push arrives even with the tab backgrounded.
+    - Cert script verifies the wiring contract (`/sw.js` reachable,
+      `/api/push/config` shape, subscribe/unsubscribe 401-vs-400
+      semantics) but can't grant Notification permission programmatically.
+- [ ] **Slips forecast badge** under real conditions — currently
+  no grant projects a slip ≤30d. Either:
+    - Wait for the trajectory cron to accumulate enough snapshots
+      that real grants enter the warning window naturally; OR
+    - Pin a fixture grant whose health is deliberately deteriorating
+      so the badge has a known-visible target.
+  The cert reports SKIP today (correct fail-closed); a real-grant
+  pass closes the loop.
+- [ ] **NGO supportive-tone audit** — pointed feedback session with
+  an NGO user identifying specific strings that read procedural vs.
+  supportive. Without specific examples this can't be acted on
+  blind. Phase 11.5 did a copy refresh; this is the next-mile
+  pass.
+- [ ] **First-week observability sweep** — check the seven Watch
+  dashboards (below) after the first full week of post-deploy
+  traffic. If anything trends red, file as new high-priority.
 
 ## Watch (post-launch monitoring)
 
