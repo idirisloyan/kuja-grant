@@ -237,14 +237,28 @@ def api_system_health():
     })
 
 
-def _parse_int_arg(name: str, default: int, min_v: int, max_v: int) -> int:
-    """Phase 13.38 — bulletproof int query-arg parsing.
+class _BadIntArg(Exception):
+    """Raised by _parse_int_arg when the value is provided but non-numeric."""
+    def __init__(self, name: str, raw: str):
+        super().__init__(f'{name} must be an integer; got {raw!r}')
+        self.name = name
+        self.raw = raw
 
-    The earlier `int(request.args.get('days', 7))` blew up on `?days=`
-    or `?days=foo` with a bare ValueError → 500. This helper:
-      - returns default when arg is missing or empty
-      - returns default when arg is non-numeric (don't 500 on bad input)
-      - clamps to [min_v, max_v]
+
+def _parse_int_arg(name: str, default: int, min_v: int, max_v: int) -> int:
+    """Phase 13.38 / 13.44 — bulletproof int query-arg parsing.
+
+    The earlier behaviour silently coerced bad input to the default,
+    which the team's May 6 retest correctly flagged as inconsistent
+    with the documented contract ("should 4xx with JSON").
+
+    Behaviour now:
+      - Missing or empty arg → `default` (friendly, common case)
+      - Out-of-range numeric → clamped to [min_v, max_v] (still friendly)
+      - Non-numeric string ("foo") → raises _BadIntArg → caller returns 400
+
+    Net: callers stay short and never 500; bad input is surfaced as
+    a real 400 instead of being hidden as a coerced default.
     """
     raw = (request.args.get(name) or '').strip()
     if not raw:
@@ -252,7 +266,7 @@ def _parse_int_arg(name: str, default: int, min_v: int, max_v: int) -> int:
     try:
         v = int(raw)
     except (TypeError, ValueError):
-        return default
+        raise _BadIntArg(name, raw)
     if v < min_v:
         return min_v
     if v > max_v:
@@ -274,7 +288,11 @@ def api_ai_spend():
     """
     import logging
     from sqlalchemy import text
-    days = _parse_int_arg('days', 7, 1, 90)
+    try:
+        days = _parse_int_arg('days', 7, 1, 90)
+    except _BadIntArg as e:
+        return error_response('validation.invalid_value', 400,
+                              field=e.name, default=str(e))
 
     try:
         # Column names on ai_call_logs are tokens_in / tokens_out (NOT
@@ -364,7 +382,11 @@ def api_ai_spend_forecast():
     from sqlalchemy import text
     import os
     import logging
-    trailing = _parse_int_arg('trailing_days', 14, 7, 60)
+    try:
+        trailing = _parse_int_arg('trailing_days', 14, 7, 60)
+    except _BadIntArg as e:
+        return error_response('validation.invalid_value', 400,
+                              field=e.name, default=str(e))
     try:
         rows = db.session.execute(text(f"""
             SELECT COALESCE(SUM(tokens_in), 0) AS in_tokens,

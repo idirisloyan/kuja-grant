@@ -139,6 +139,31 @@ def test_brute_force_real_account():
         log('LOCK-003', 'Locked account returns 429 even with correct password',
             r.status_code == 429, f'status={r.status_code}')
 
+    # Phase 13.44 — clean up so subsequent test_e2e_final.py "log in all
+    # accounts" passes don't fail with a phantom 429 on this email. Uses
+    # the new admin-only POST /api/admin/clear-lockout. Best-effort: if
+    # admin login fails or the endpoint is missing on the deploy under
+    # test, we still report a non-fatal warning so the suite continues.
+    try:
+        cleanup_session = requests.Session()
+        cleanup_session.headers.update({'X-Requested-With': 'XMLHttpRequest'})
+        admin_login = cleanup_session.post(f'{BASE}/api/auth/login', json={
+            'email': 'admin@kuja.org', 'password': 'pass123',
+        })
+        if admin_login.status_code == 200:
+            clear = cleanup_session.post(
+                f'{BASE}/api/admin/clear-lockout',
+                json={'email': lockout_email},
+            )
+            log('LOCK-004', f'Admin clear-lockout cleanup for {lockout_email}',
+                clear.status_code == 200, f'status={clear.status_code}')
+        else:
+            log('LOCK-004', 'Admin clear-lockout cleanup (skipped: admin login failed)',
+                False, f'admin_login_status={admin_login.status_code}')
+    except Exception as e:
+        log('LOCK-004', 'Admin clear-lockout cleanup (skipped: exception)',
+            False, str(e)[:120])
+
 
 # ===========================================================================
 # SECTION 4: Authentication + RBAC

@@ -157,6 +157,19 @@ re-pitch unless the underlying premise changes.
 
 Newest first. Drop entries older than 90 days.
 
+### 2026-05-06 — Phase 13 batch 51: post-async-rollout cleanup
+
+The team's certification pass after the async rollout flagged 4 real
+issues. Fixed in this batch.
+
+| Sub-phase | What | Commit |
+|---|---|---|
+| 13.44-surface-health | `app/services/ai_surface_health.py` was passing flat kwargs (`criteria=`, `grant_title=`) but the real AIService methods take `grant=`/`org=`/`application=` dicts with title/criteria nested. 5/7 probes were failing in prod with TypeError. Fixture rewritten to match real signatures. Assertion shapes also relaxed to be permissive about variant return-keys (verdict / readiness_score / readiness_band; per_criterion / evidence_per_criterion). | (this batch) |
+| 13.44-sig-invariants | 7 new logic invariants (one per flagship surface) use `inspect.signature.bind` to verify the runner's kwargs match the real method signatures **synchronously, without calling Anthropic**. Catches future signature drift in CI before it reaches production. 67/67 invariants pass. | (this batch) |
+| 13.44-no-criteria-rescue | Reviewer page: the "Suggest evaluation criteria" affordance was only rendered inside `evidenceResult?.reason === 'no_criteria'` — i.e. only AFTER the user clicked Extract Evidence. The static empty state (visible the moment the page loads with no criteria) showed only an `<EmptyBox>` "No evaluation criteria defined" — looked like a dead end. Replaced with the productized rescue panel: button visible immediately, full proposal flow + clipboard copy + AI/template source label. | (this batch) |
+| 13.44-ai-spend-contract | `_parse_int_arg` now raises `_BadIntArg` on non-numeric input instead of silently coercing to default. Both `/api/admin/ai-spend?days=foo` and `/api/admin/ai-spend/forecast?trailing_days=foo` return 400 with `{success: false, error: 'validation.invalid_value', message: '...'}`. Missing/empty arg still defaults (friendly common case). Out-of-range numeric still clamps. | (this batch) |
+| 13.44-clear-lockout | New `POST /api/admin/clear-lockout` admin endpoint. Body: `{email}`. Resets `users.failed_login_count`, `users.locked_until`, and deletes `login_attempts` rows for that email. Used by `test_brute_force_real_account` to clean up `maria@reviewer.org` after exercising lockout, so subsequent login-all-accounts tests don't fail with phantom 429. Live probe confirms LOCK-001 itself is correct (was likely flaking during the outage period when worker saturation made DB queries unreliable). | (this batch) |
+
 ### 2026-05-06 — Phase 13 batch 50: complete the async AI migration
 
 Batch 49 shipped the dispatcher + migrated 2 endpoints (insight-narrate,

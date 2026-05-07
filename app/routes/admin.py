@@ -612,6 +612,86 @@ def _check_slo_alerts(security, documents):
     return alerts
 
 
+@admin_bp.route('/admin/clear-lockout', methods=['POST'])
+@login_required
+def api_admin_clear_lockout():
+    """Phase 13.44 — admin tool to reset login lockout state.
+
+    Used by:
+      - QA test runs after exercising the brute-force lockout path against
+        a real account (e.g. maria@reviewer.org). Without this, subsequent
+        login-all-accounts tests fail with a 429 from the locked target.
+      - Operations: rescuing a legitimately-locked-out user when password
+        reset is still in flight.
+
+    Body: { email: str }
+      - Resets users.failed_login_count and users.locked_until on the
+        user with that email (if exists).
+      - Deletes login_attempts rows for that email so the per-email
+        lockout window also resets.
+
+    Returns: { success, email, user_reset: bool, attempts_deleted: int }
+    """
+    from app.utils.helpers import get_request_json
+
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    data = get_request_json() or {}
+    email = (data.get('email') or '').strip().lower()
+    if not email:
+        return jsonify({'success': False, 'error': 'email is required'}), 400
+
+    user_reset = False
+    attempts_deleted = 0
+    try:
+        # Reset the per-user lockout columns if the column + user exist.
+        from app.models import User
+        u = User.query.filter_by(email=email).first()
+        if u is not None:
+            try:
+                db.session.execute(
+                    text("UPDATE users SET failed_login_count = 0, "
+                         "last_failed_login = NULL, locked_until = NULL "
+                         "WHERE id = :id"),
+                    {"id": u.id}
+                )
+                user_reset = True
+            except Exception as e:
+                logger.warning(f"clear-lockout user reset failed: {e}")
+                db.session.rollback()
+
+        # Always sweep login_attempts rows for this email (works for
+        # non-existent emails too).
+        try:
+            res = db.session.execute(
+                text("DELETE FROM login_attempts WHERE email = :email"),
+                {"email": email}
+            )
+            attempts_deleted = res.rowcount or 0
+        except Exception as e:
+            logger.warning(f"clear-lockout attempts delete failed: {e}")
+            db.session.rollback()
+
+        db.session.commit()
+        logger.info(
+            f"clear-lockout: email={email} user_reset={user_reset} "
+            f"attempts_deleted={attempts_deleted} by admin={current_user.email}"
+        )
+    except Exception as e:
+        logger.error(f"clear-lockout failed: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': 'lockout reset failed',
+                        'detail': str(e)[:200]}), 500
+
+    return jsonify({
+        'success': True,
+        'email': email,
+        'user_reset': user_reset,
+        'attempts_deleted': attempts_deleted,
+    })
+
+
 @admin_bp.route('/admin/security-events', methods=['GET'])
 @login_required
 def api_admin_security_events():

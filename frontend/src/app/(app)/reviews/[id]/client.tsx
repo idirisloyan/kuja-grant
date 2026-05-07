@@ -629,7 +629,86 @@ export default function ReviewDetailClient() {
           )}
 
           {criteria.length === 0 ? (
-            <EmptyBox label={t('review.detail.no_criteria')} />
+            // Phase 13.44 — productized no-criteria rescue panel.
+            // The team's May 6 retest noted that the bare EmptyBox felt
+            // like a dead-end. Rendering the AI "Suggest evaluation
+            // criteria" affordance directly in the static empty state
+            // (instead of only after the user clicks Extract Evidence)
+            // makes the recovery moment unmistakably visible.
+            <div className="rounded-xl border border-[hsl(var(--kuja-sun))]/30 bg-[hsl(38_92%_97%)] p-5 text-sm space-y-3">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-[hsl(var(--kuja-sun))]">
+                <MessageSquare className="h-3 w-3" />
+                {t('review.detail.evidence_no_criteria_label')}
+              </div>
+              <p className="text-sm text-foreground">
+                {t('review.detail.no_criteria')} {t('review.detail.evidence_no_criteria_body')}
+              </p>
+              {!suggestedCriteria ? (
+                <button
+                  type="button"
+                  disabled={suggestingCriteria || !grant?.id}
+                  onClick={async () => {
+                    if (!grant?.id) return;
+                    setSuggestingCriteria(true);
+                    try {
+                      const res = await api.post<typeof suggestedCriteria & { success: boolean }>(
+                        '/ai/suggest-criteria',
+                        { grant_id: grant.id, count: 6 },
+                      );
+                      setSuggestedCriteria(res);
+                    } catch {
+                      toast.error('Could not draft criteria — try again in a moment.');
+                    } finally {
+                      setSuggestingCriteria(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50 text-white text-sm font-medium px-3 py-1.5"
+                >
+                  {suggestingCriteria ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cpu className="h-4 w-4" />}
+                  {suggestingCriteria ? 'Drafting…' : 'Suggest evaluation criteria'}
+                </button>
+              ) : (
+                <div className="space-y-3 mt-2">
+                  {suggestedCriteria.note && (
+                    <p className="text-xs text-muted-foreground italic">{suggestedCriteria.note}</p>
+                  )}
+                  <ol className="space-y-2 list-none pl-0">
+                    {suggestedCriteria.suggestions.map((s, i) => (
+                      <li key={s.key || i} className="rounded-lg border border-border bg-background p-3 text-sm">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="font-semibold">{s.label}</span>
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                            weight {s.weight}
+                          </span>
+                        </div>
+                        <p className="text-xs text-foreground">{s.description}</p>
+                        <p className="text-[11px] text-muted-foreground mt-1 italic">
+                          Why: {s.rationale}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const text = suggestedCriteria.suggestions
+                          .map((s) => `• ${s.label} (weight ${s.weight}) — ${s.description}`)
+                          .join('\n');
+                        navigator.clipboard?.writeText(text);
+                        toast.success('Copied — share with the donor.');
+                      }}
+                      className="text-xs rounded-md border border-border bg-background hover:bg-muted px-2 py-1"
+                    >
+                      Copy as plain text
+                    </button>
+                    <span className="text-[11px] text-muted-foreground">
+                      {suggestedCriteria.source === 'claude' ? 'AI-drafted' : 'Baseline (AI offline)'}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             criteria.map((c) => {
               const entry = scores[c.key] ?? { score: 0, comment: '' };

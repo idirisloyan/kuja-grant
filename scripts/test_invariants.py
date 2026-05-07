@@ -320,6 +320,63 @@ def main():
     check('ai_surface_health dry-run reports overall=skipped',
           lambda: _hc['overall'] in ('skipped', 'ok'))
 
+    # Phase 13.44 — signature-binding check. The 2026-05-06 prod admin
+    # probe found 5/7 surfaces failing with TypeError because the runner's
+    # fixture used flat kwargs (criteria=, grant_title=) but the real
+    # methods take grant=/org=/application= dicts. We exercise the
+    # ACTUAL kwargs the runner passes against each method's real
+    # signature, so any future drift fails this invariant before it
+    # reaches production. This catches signature mismatches even without
+    # a real ANTHROPIC_API_KEY by using inspect.signature.bind, which
+    # raises TypeError synchronously without making a network call.
+    import inspect as _inspect
+    from app.services.ai_service import AIService as _AI
+
+    # Re-derive the same fixtures the runner uses internally.
+    _GRANT = {
+        'title': 'X', 'description': 'Y', 'criteria': [], 'eligibility': [],
+    }
+    _ORG = {'name': 'Org', 'mission': '', 'sectors': [], 'countries': [],
+            'capacity': {}}
+    _APP = {'id': -1, 'responses': {}, 'eligibility_responses': {}}
+    _REPORT = {'id': -1, 'reporting_period': '', 'report_type': 'q',
+               'sections': {}, 'budget_actuals': {}, 'milestones': []}
+    _SIG_TESTS = [
+        ('check_submission_readiness',
+         dict(grant=_GRANT, org=_ORG, application=_APP, documents=[], language='en')),
+        ('check_report_readiness',
+         dict(grant=_GRANT, org=_ORG, report=_REPORT, prior_reports=[], documents=[], language='en')),
+        ('estimate_applicant_burden',
+         dict(grant_draft=_GRANT, language='en')),
+        ('draft_application',
+         dict(grant=_GRANT, org=_ORG, brief='', prior_applications=[],
+              prior_documents=[], language='en', existing_responses={})),
+        ('generate_reviewer_summary',
+         dict(grant=_GRANT, org=_ORG, application=_APP, documents=[],
+              comparable_applications=[], language='en')),
+        ('extract_evidence',
+         dict(criteria=[], application_responses={}, application_summary='')),
+        ('suggest_criteria',
+         dict(grant_title='X', grant_description='Y', grant_objectives=[],
+              sector='Health', count=5)),
+    ]
+    for _meth, _kwargs in _SIG_TESTS:
+        fn = getattr(_AI, _meth, None)
+        if not callable(fn):
+            check(f'AIService.{_meth} exists', lambda: False, 'method missing')
+            continue
+        # classmethods bind via the descriptor; inspect.signature returns
+        # the underlying function's signature, which already excludes cls.
+        try:
+            sig = _inspect.signature(fn)
+            sig.bind(**_kwargs)
+            check(f'AIService.{_meth} accepts surface-health kwargs',
+                  lambda: True)
+        except TypeError as e:
+            err = str(e)[:160]
+            check(f'AIService.{_meth} accepts surface-health kwargs',
+                  lambda: False, f'sig bind failed: {err}')
+
     # Phase 13.38 — pin the second-wave flag flip. These were defaulted
     # ON in batch 24; prevent silent regression to default OFF.
     from app.utils.feature_flags import DEFAULT_FLAGS

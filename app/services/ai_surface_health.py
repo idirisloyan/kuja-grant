@@ -152,74 +152,131 @@ def run_health_check(*, exercise_ai: bool = True) -> dict:
                     'latency_ms': 0, 'detail': 'ANTHROPIC_API_KEY not set'}
         return _safe(name, fn)
 
-    # 1. submission readiness
+    # Phase 13.44 — fixture aligned with the real AIService signatures.
+    # The earlier fixture used flat kwargs (criteria=, grant_title=) but
+    # the real methods take grant=/org=/application= dicts that contain
+    # title + criteria nested. Caught by the team's live admin probe.
+
+    # Shared per-call shapes the AIService methods expect.
+    grant_dict = {
+        'title': _GRANT_FIXTURE['title'],
+        'description': _GRANT_FIXTURE['description'],
+        'criteria': _GRANT_FIXTURE['criteria'],
+        'eligibility': [],
+    }
+    org_dict = {
+        'name': 'Amani Health',
+        'mission': 'Maternal-health antenatal-care expansion',
+        'sectors': ['Health'],
+        'countries': ['Kenya'],
+        'capacity': {'staff': 17, 'years_active': 8},
+    }
+    application_dict = {
+        'id': -1,
+        'responses': _APP_FIXTURE_RESPONSES,
+        'eligibility_responses': {},
+    }
+    report_dict = {
+        'id': -1,
+        'reporting_period': '2026 Q1',
+        'report_type': 'quarterly',
+        'sections': {'narrative': _REPORT_FIXTURE['narrative']},
+        'budget_actuals': {},
+        'milestones': [],
+    }
+
+    # 1. submission readiness — accepts (grant, org, application, ...)
     def _f1():
         r = AIService.check_submission_readiness(
-            criteria=_GRANT_FIXTURE['criteria'],
-            responses=_APP_FIXTURE_RESPONSES,
-            documents=[], grant_title=_GRANT_FIXTURE['title'],
+            grant=grant_dict, org=org_dict, application=application_dict,
+            documents=[], language='en',
         )
-        if not _has_keys(r, ('readiness_band', 'gaps')):
-            return {'status': 'fail', 'source': 'shape', 'detail': f'missing keys: {list(r.keys())[:5]}'}
+        # Real return shape uses readiness_score + verdict (not readiness_band)
+        # plus gaps[]. Be permissive about the verdict key name.
+        if not isinstance(r, dict) or not (
+            'verdict' in r or 'readiness_score' in r or 'readiness_band' in r
+        ):
+            return {'status': 'fail', 'source': 'shape',
+                    'detail': f'missing verdict/score: keys={list(r.keys())[:6]}'}
         return {'status': 'ok', 'source': r.get('source', 'claude'),
-                'detail': f"{r.get('readiness_band')}, {len(r.get('gaps') or [])} gaps"}
+                'detail': f"verdict={r.get('verdict', '?')} gaps={len(r.get('gaps') or [])}"}
     surfaces.append(skip_or('check_submission_readiness', _f1))
 
-    # 2. report readiness
+    # 2. report readiness — accepts (grant, org, report, ...)
     def _f2():
         r = AIService.check_report_readiness(
-            grant_title=_GRANT_FIXTURE['title'],
-            grant_objectives=_GRANT_FIXTURE['objectives'],
-            report_narrative=_REPORT_FIXTURE['narrative'],
-            indicators=_REPORT_FIXTURE['indicators'],
-            documents=[],
+            grant=grant_dict, org=org_dict, report=report_dict,
+            prior_reports=[], documents=[], language='en',
         )
-        if not _has_keys(r, ('readiness_band',)):
-            return {'status': 'fail', 'source': 'shape', 'detail': f'missing keys: {list(r.keys())[:5]}'}
+        if not isinstance(r, dict) or not (
+            'verdict' in r or 'readiness_score' in r or 'readiness_band' in r
+        ):
+            return {'status': 'fail', 'source': 'shape',
+                    'detail': f'missing verdict/score: keys={list(r.keys())[:6]}'}
         return {'status': 'ok', 'source': r.get('source', 'claude'),
-                'detail': f"{r.get('readiness_band')}"}
+                'detail': f"verdict={r.get('verdict', '?')}"}
     surfaces.append(skip_or('check_report_readiness', _f2))
 
-    # 3. burden estimator
+    # 3. burden estimator — accepts (grant_draft, language)
     def _f3():
         r = AIService.estimate_applicant_burden(
-            grant_title=_GRANT_FIXTURE['title'],
-            grant_description=_GRANT_FIXTURE['description'],
-            criteria=_GRANT_FIXTURE['criteria'],
-            required_documents=['Audited financials', 'Org chart'],
+            grant_draft={
+                'title': _GRANT_FIXTURE['title'],
+                'description': _GRANT_FIXTURE['description'],
+                'criteria': _GRANT_FIXTURE['criteria'],
+                'eligibility': [],
+                'document_requirements': [
+                    {'key': 'audit', 'label': 'Audited financials'},
+                    {'key': 'org_chart', 'label': 'Org chart'},
+                ],
+                'reporting_requirements': [],
+            },
+            language='en',
         )
-        if not _has_keys(r, ('estimated_hours',)):
-            return {'status': 'fail', 'source': 'shape', 'detail': f'missing keys: {list(r.keys())[:5]}'}
+        if not isinstance(r, dict) or not (
+            'verdict' in r or 'burden_score' in r
+        ):
+            return {'status': 'fail', 'source': 'shape',
+                    'detail': f'missing verdict/burden_score: keys={list(r.keys())[:6]}'}
         return {'status': 'ok', 'source': r.get('source', 'claude'),
-                'detail': f"{r.get('estimated_hours')}h"}
+                'detail': f"verdict={r.get('verdict', '?')} score={r.get('burden_score', '?')}"}
     surfaces.append(skip_or('estimate_applicant_burden', _f3))
 
-    # 4. draft_application — heavy. Skip when AI is off; otherwise run.
+    # 4. draft_application — accepts (grant, org, brief, ...)
     def _f4():
         r = AIService.draft_application(
-            grant_title=_GRANT_FIXTURE['title'],
-            grant_description=_GRANT_FIXTURE['description'],
-            criteria=_GRANT_FIXTURE['criteria'][:2],  # 2 criteria — keep it cheap
-            org_profile={'name': 'Amani Health', 'mission': 'Maternal-health'},
+            grant=grant_dict, org=org_dict,
+            brief='Two-year maternal-health expansion in Kakamega county.',
+            prior_applications=[], prior_documents=[], language='en',
+            existing_responses={},
         )
-        if not _has_keys(r, ('drafts',)) or not isinstance(r.get('drafts'), dict):
-            return {'status': 'fail', 'source': 'shape', 'detail': f'missing/bad drafts'}
+        # Real return shape: { responses: dict, source, ... }
+        if not isinstance(r, dict) or not isinstance(r.get('responses'), dict):
+            return {'status': 'fail', 'source': 'shape',
+                    'detail': f"missing/bad responses: keys={list(r.keys())[:6]}"}
         return {'status': 'ok', 'source': r.get('source', 'claude'),
-                'detail': f"{len(r['drafts'])} drafts"}
+                'detail': f"{len(r['responses'])} response fields"}
     surfaces.append(skip_or('draft_application', _f4))
 
-    # 5. reviewer summary
+    # 5. reviewer summary — accepts (grant, org, application, ...)
     def _f5():
         r = AIService.generate_reviewer_summary(
-            grant_title=_GRANT_FIXTURE['title'],
-            criteria=_GRANT_FIXTURE['criteria'],
-            responses=_APP_FIXTURE_RESPONSES,
-            documents=[],
+            grant=grant_dict, org=org_dict, application=application_dict,
+            documents=[], comparable_applications=[], language='en',
         )
-        if not _has_keys(r, ('per_criterion', 'overall_recommendation')):
-            return {'status': 'fail', 'source': 'shape', 'detail': f'missing keys: {list(r.keys())[:5]}'}
+        # Real return shape uses evidence_per_criterion (not per_criterion)
+        # + draft_rationale. Be permissive about variant key names.
+        if not isinstance(r, dict) or not (
+            'evidence_per_criterion' in r or 'per_criterion' in r
+            or 'one_screen_summary' in r
+        ):
+            return {'status': 'fail', 'source': 'shape',
+                    'detail': f'missing evidence/summary: keys={list(r.keys())[:6]}'}
+        criteria_count = len(
+            r.get('evidence_per_criterion') or r.get('per_criterion') or []
+        )
         return {'status': 'ok', 'source': r.get('source', 'claude'),
-                'detail': f"{len(r.get('per_criterion') or [])} criteria"}
+                'detail': f"{criteria_count} criteria"}
     surfaces.append(skip_or('generate_reviewer_summary', _f5))
 
     # 6. extract_evidence
