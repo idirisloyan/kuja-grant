@@ -324,9 +324,19 @@ def cert_shortcut_overlay_replay(page: Page, base: str) -> None:
                    'overlay not shown after "?"')
             return
 
-    replay = page.get_by_text('Replay onboarding tour', exact=False)
+    # Stable selector: i18n-independent. The button's display text is
+    # localized (admin user might be in Swahili), so falling back to
+    # 'Replay onboarding tour' as English text would miss it.
+    replay = page.locator('[data-testid="shortcut-overlay-replay-tour"]')
     if replay.count() == 0:
-        replay = page.locator('button', has_text='Replay')
+        # Older builds without the testid: fall through to text matches
+        # in any locale we currently support.
+        for txt in ('Replay onboarding tour', 'Cheza tena',
+                    'Rejouer la visite', 'Reproducir el recorrido',
+                    'إعادة تشغيل', 'Ku celi'):
+            replay = page.get_by_text(txt, exact=False)
+            if replay.count() > 0:
+                break
     if replay.count() == 0:
         report('SHORTCUT_REPLAY_LINK', FAIL, 'replay link not in overlay')
         return

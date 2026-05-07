@@ -134,6 +134,7 @@ export function KeyboardShortcutOverlay() {
           <div className="pt-2 border-t border-border">
             <button
               type="button"
+              data-testid="shortcut-overlay-replay-tour"
               className="w-full text-left text-sm text-[hsl(var(--kuja-clay))] hover:text-[hsl(var(--kuja-clay-dark))] hover:underline"
               onClick={() => {
                 setOpen(false);
