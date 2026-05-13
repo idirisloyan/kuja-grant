@@ -483,6 +483,106 @@ def diagram_two_grant_paths():
     return out
 
 
+# ---------------------------------------------------------------------------
+# 7. Organisation Trust Profile — two pillars
+# ---------------------------------------------------------------------------
+
+def diagram_trust_profile():
+    fig, ax = plt.subplots(figsize=(11, 6.3), dpi=200)
+    ax.set_xlim(0, 11); ax.set_ylim(0, 6.5)
+    ax.set_axis_off()
+    ax.text(5.5, 6.15, "Organisation Trust Profile",
+            ha="center", color=NAVY, fontsize=13, fontweight="bold")
+    ax.text(5.5, 5.85,
+            "Two pillars · one source of truth · travels with the organisation across every application",
+            ha="center", color=MUTED, fontsize=9, style="italic")
+
+    # Left pillar — Capacity Profile
+    pillar_w = 4.6; pillar_h = 4.5; gap = 0.4
+    left_x = 0.4; right_x = left_x + pillar_w + gap + 0.4
+    # Left header
+    head_h = 0.65
+    box = FancyBboxPatch((left_x, 1.0 + pillar_h - head_h), pillar_w, head_h,
+                         boxstyle="round,pad=0.02,rounding_size=0.06",
+                         linewidth=1.5, edgecolor=NAVY, facecolor=NAVY, zorder=2)
+    ax.add_patch(box)
+    ax.text(left_x + pillar_w / 2, 1.0 + pillar_h - head_h / 2,
+            "CAPACITY PROFILE",
+            ha="center", va="center", color=WHITE, fontsize=11, fontweight="bold")
+    ax.text(left_x + pillar_w / 2, 1.0 + pillar_h - head_h - 0.25,
+            "Can this organisation execute?",
+            ha="center", va="center", color=NAVY, fontsize=8.5, style="italic")
+    # Left body
+    body = FancyBboxPatch((left_x, 1.0), pillar_w, pillar_h - head_h - 0.4,
+                          boxstyle="round,pad=0.02,rounding_size=0.06",
+                          linewidth=1.3, edgecolor=NAVY, facecolor=SAND, zorder=1)
+    ax.add_patch(body)
+    cap_items = [
+        ("Framework results",
+         "Kuja · STEP · UN-HACT · CHS · NUPAS · donor-custom"),
+        ("Pillar scores",
+         "Governance · Finance · M&E · Programme design · Sustainability"),
+        ("Supporting evidence",
+         "Audited financials, board minutes, MEL plan, policies"),
+        ("Passport version",
+         "Last updated, validity window, refresh prompt"),
+        ("Gap roadmap",
+         "Where to invest improvement, prioritised by likely impact"),
+    ]
+    y0 = 1.0 + pillar_h - head_h - 0.7
+    for i, (k, v) in enumerate(cap_items):
+        y = y0 - i * 0.55
+        ax.text(left_x + 0.2, y, "•  " + k, ha="left", color=NAVY,
+                fontsize=9, fontweight="bold")
+        ax.text(left_x + 0.4, y - 0.22, v, ha="left", color=MUTED, fontsize=7.5)
+
+    # Right pillar — Due Diligence Profile
+    box = FancyBboxPatch((right_x, 1.0 + pillar_h - head_h), pillar_w, head_h,
+                         boxstyle="round,pad=0.02,rounding_size=0.06",
+                         linewidth=1.5, edgecolor=CLAY, facecolor=CLAY, zorder=2)
+    ax.add_patch(box)
+    ax.text(right_x + pillar_w / 2, 1.0 + pillar_h - head_h / 2,
+            "DUE DILIGENCE PROFILE",
+            ha="center", va="center", color=WHITE, fontsize=11, fontweight="bold")
+    ax.text(right_x + pillar_w / 2, 1.0 + pillar_h - head_h - 0.25,
+            "Is this organisation safe to fund?",
+            ha="center", va="center", color=CLAY, fontsize=8.5, style="italic")
+    body = FancyBboxPatch((right_x, 1.0), pillar_w, pillar_h - head_h - 0.4,
+                          boxstyle="round,pad=0.02,rounding_size=0.06",
+                          linewidth=1.3, edgecolor=CLAY, facecolor=CLAY_SOFT, zorder=1)
+    ax.add_patch(body)
+    dd_items = [
+        ("Sanctions screening",
+         "UN · OFAC · EU · continuous · re-checked on every change"),
+        ("Registration & standing",
+         "Government registry · legal name match · status verified"),
+        ("Tax-exempt status",
+         "Country-specific certification · valid through date"),
+        ("Beneficial ownership",
+         "Officer disclosure · ownership chain · conflict checks"),
+        ("Adverse media monitoring",
+         "Daily news scan · reputational signal · context summary"),
+    ]
+    for i, (k, v) in enumerate(dd_items):
+        y = y0 - i * 0.55
+        ax.text(right_x + 0.2, y, "•  " + k, ha="left", color=NAVY,
+                fontsize=9, fontweight="bold")
+        ax.text(right_x + 0.4, y - 0.22, v, ha="left", color=MUTED, fontsize=7.5)
+
+    # Bottom: passporting note
+    ax.text(5.5, 0.55,
+            "Each pillar is verified once and reused across applications, "
+            "with appropriate refresh cadence. The donor sees both side by "
+            "side on the organisation page before committing capital.",
+            ha="center", color=NAVY, fontsize=9, style="italic")
+
+    fig.tight_layout()
+    out = os.path.join(OUT_DIR, "07_trust_profile.png")
+    fig.savefig(out, bbox_inches="tight", facecolor=WHITE)
+    plt.close(fig)
+    return out
+
+
 def generate_all():
     paths = [
         diagram_system_overview(),
@@ -491,6 +591,7 @@ def generate_all():
         diagram_passporting(),
         diagram_ai_integration_map(),
         diagram_two_grant_paths(),
+        diagram_trust_profile(),
     ]
     return paths
 

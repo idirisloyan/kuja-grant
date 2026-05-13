@@ -314,6 +314,7 @@ toc_entries = [
     ("5. Solution Overview", 0),
     ("    5.1 System Architecture", 1),
     ("    5.2 Action-Driven Workspaces", 1),
+    ("    5.3 The Organisation Trust Profile", 1),
     ("6. Functional Requirements", 0),
     ("    6.1 Identity, Access and Authentication", 1),
     ("    6.2 Grant Lifecycle Management (two creation paths)", 1),
@@ -321,26 +322,31 @@ toc_entries = [
     ("    6.4 Capacity Assessment and Passporting", 1),
     ("    6.5 Document Management and Real-Time Analysis", 1),
     ("    6.6 AI-Powered Assistance Across the Workflow", 1),
-    ("    6.7 Compliance and Sanctions Screening", 1),
-    ("    6.8 Government Registry Verification", 1),
-    ("    6.9 Reporting and Outcome Tracking", 1),
-    ("    6.10 Compliance and Risk — Simplified for Both Sides", 1),
-    ("        6.10.1 For NGOs — AI as compliance co-pilot", 2),
-    ("        6.10.2 For donors — pre-assessed, scored, monitored", 2),
-    ("        6.10.3 Shared mechanics", 2),
-    ("    6.11 Collaboration and Notifications", 1),
-    ("    6.12 Organisational Memory and Provenance", 1),
-    ("    6.13 Saved Searches and Personalisation", 1),
-    ("    6.14 Administration and System Health", 1),
-    ("    6.15 Internationalisation and Localisation", 1),
-    ("    6.16 Field Operations: Mobile and Offline Work", 1),
+    ("    6.7 Due Diligence and Trust Verification", 1),
+    ("        6.7.1 Sanctions, AML and CTF Screening", 2),
+    ("        6.7.2 Registration and Standing Verification", 2),
+    ("        6.7.3 Beneficial Ownership Transparency", 2),
+    ("        6.7.4 Adverse Media Monitoring", 2),
+    ("        6.7.5 AI integration across due diligence", 2),
+    ("        6.7.6 Shared mechanics", 2),
+    ("    6.8 Reporting and Outcome Tracking", 1),
+    ("    6.9 Compliance and Risk — Simplified for Both Sides", 1),
+    ("        6.9.1 For NGOs — AI as compliance co-pilot", 2),
+    ("        6.9.2 For donors — pre-assessed, scored, monitored", 2),
+    ("        6.9.3 Shared mechanics", 2),
+    ("    6.10 Collaboration and Notifications", 1),
+    ("    6.11 Organisational Memory and Provenance", 1),
+    ("    6.12 Saved Searches and Personalisation", 1),
+    ("    6.13 Administration and System Health", 1),
+    ("    6.14 Internationalisation and Localisation", 1),
+    ("    6.15 Field Operations: Mobile and Offline Work", 1),
     ("7. Non-Functional Requirements", 0),
     ("    7.1 Performance and Scalability", 1),
     ("    7.2 Reliability and Availability", 1),
     ("    7.3 Security and Privacy", 1),
     ("    7.4 Observability and Operability", 1),
     ("    7.5 Usability, Accessibility, and Inclusivity", 1),
-    ("8. Use Cases (UC-001 through UC-017)", 0),
+    ("8. Use Cases (UC-001 through UC-019)", 0),
     ("9. Feature Flags and Phased Rollout", 0),
     ("APPENDICES", 0),
     ("    A. Status Definitions", 1),
@@ -399,7 +405,7 @@ add_body(doc,
 )
 
 add_body(doc,
-    "Kuja's strategic differentiation rests on five commitments. First, "
+    "Kuja's strategic differentiation rests on six commitments. First, "
     "the platform treats Global South NGOs as first-class participants "
     "rather than translated afterthoughts: every workflow is available "
     "in six languages (English, Arabic, French, Swahili, Somali, and "
@@ -410,15 +416,32 @@ add_body(doc,
     "drafts applications, predicts donor concerns, surfaces compliance "
     "issues before submission, evaluates evidence per criterion, and "
     "generates auditable rationales, all grounded in the NGO's own "
-    "history and the donor's stated criteria. Third, capacity assessments "
-    "are completed once and passported across applications, "
-    "regardless of which framework the donor prefers. Fourth, compliance "
-    "is built in rather than bolted on: live sanctions screening, "
-    "government registry verification, and document-by-document evidence "
-    "analysis run continuously. Fifth, every AI claim is traceable to its "
-    "source, every decision leaves an audit trail, and the donor-NGO "
-    "relationship is supported by structured collaboration tools rather "
-    "than email threads."
+    "history and the donor's stated criteria."
+)
+add_body(doc,
+    "Third, every organisation on Kuja shall present a two-pillar "
+    "Organisation Trust Profile that travels with them across "
+    "applications: a Capacity Profile answering \"can this organisation "
+    "execute?\" and a Due Diligence Profile answering \"is this "
+    "organisation safe to fund?\". Capacity assessments are completed "
+    "once and passported across donor frameworks. Due diligence — "
+    "sanctions screening, registration verification, tax-exempt "
+    "status, beneficial ownership, and adverse media — runs "
+    "continuously on the same passporting principle so that NGOs "
+    "do not repeat the work for every donor."
+)
+add_body(doc,
+    "Fourth, compliance is built in rather than bolted on: AI extracts "
+    "donor reporting requirements, builds a compliance calendar, "
+    "prompts for evidence at the right moment, drafts reports from "
+    "prior data, and pre-assesses every submission from the donor's "
+    "perspective before the donor sees it. Fifth, every AI claim is "
+    "traceable to its source, every decision leaves an audit trail in "
+    "a tamper-evident chain, and the donor–NGO relationship is "
+    "supported by structured in-band collaboration rather than email "
+    "threads. Sixth, the entire experience runs on mobile devices and "
+    "operates offline-first, so field officers in low-connectivity "
+    "areas can draft, capture evidence, and sync when network returns."
 )
 
 add_body(doc,
@@ -726,6 +749,50 @@ add_body(doc,
     "health (the daily probe of every flagship AI surface), demo "
     "readiness findings, stuck document extractions, organisations "
     "pending verification, and failed-login analytics."
+)
+
+heading(doc, "5.3 The Organisation Trust Profile", 2)
+
+add_body(doc,
+    "Every organisation on Kuja shall present an Organisation Trust "
+    "Profile composed of two distinct but complementary pillars. The "
+    "two pillars answer different questions for different audiences "
+    "and run on different cadences — but they appear together on the "
+    "organisation page so donors can see both before committing capital, "
+    "and they passport together so NGOs do not re-do the work for each "
+    "donor."
+)
+
+add_diagram(doc, "trust_profile",
+    "Figure 7 — The Organisation Trust Profile. Two pillars, one "
+    "source of truth, travels with the organisation across every "
+    "application.")
+
+add_bullet_list(doc, [
+    ("Capacity Profile — \"can this organisation execute?\". ",
+     "Sourced from completed capacity assessments across embedded "
+     "frameworks (Kuja, STEP, UN-HACT, CHS, NUPAS) or donor-defined "
+     "custom frameworks. Measures capability across governance, "
+     "finance, monitoring and evaluation, programme design, and "
+     "sustainability. Maintained primarily by the NGO; updated on a "
+     "donor- or organisation-defined refresh cadence. Detailed in "
+     "section 6.4."),
+    ("Due Diligence Profile — \"is this organisation safe to fund?\". ",
+     "Sourced from continuous external verification against "
+     "authoritative third-party sources. Combines sanctions screening, "
+     "registration and standing verification, tax-exempt status, "
+     "beneficial ownership transparency, and adverse media "
+     "monitoring. Maintained by the platform; updated continuously "
+     "or on scheduled cadences appropriate to each source. Detailed "
+     "in section 6.7."),
+])
+
+add_body(doc,
+    "Both pillars passport across applications: an NGO that has been "
+    "screened, verified, and assessed for one donor does not repeat "
+    "the work for the next. Donors see the Trust Profile alongside "
+    "every application from that organisation and can drill into any "
+    "specific check that matters to them."
 )
 
 doc.add_page_break()
@@ -1234,56 +1301,192 @@ add_diagram(doc, "ai_integration_map",
     "and falls back gracefully when AI is unavailable.")
 
 
-# --- 6.7 Compliance and sanctions --------------------------------------
-heading(doc, "6.7 Compliance and Sanctions Screening", 2)
+# --- 6.7 Due Diligence and Trust Verification ----------------------------
+heading(doc, "6.7 Due Diligence and Trust Verification", 2)
+
+add_body(doc,
+    "Due diligence is the second pillar of the Organisation Trust "
+    "Profile. Where capacity assessment answers \"can this organisation "
+    "execute?\", due diligence answers \"is this organisation safe to "
+    "fund?\". The system shall verify the legal, reputational, and "
+    "ownership standing of every organisation through continuous "
+    "external checks against authoritative third-party sources, "
+    "translate the technical findings into plain language donors and "
+    "compliance officers can act on, and passport the result so "
+    "verified organisations do not repeat the work for each donor."
+)
+
+add_body(doc,
+    "Due diligence on Kuja comprises five sub-pillars: sanctions, AML, "
+    "and counter-terrorism financing screening; registration and "
+    "standing verification; tax-exempt status verification; beneficial "
+    "ownership transparency; and adverse media monitoring. Each is "
+    "described below; section 6.7.6 covers the mechanics shared "
+    "across all five."
+)
+
+heading(doc, "6.7.1 Sanctions, AML and CTF Screening", 3)
 
 add_callout(doc, "USE CASE",
-    "When an NGO is added to the platform, the system screens the "
-    "organisation and its named principals against UN, OFAC, and EU "
-    "sanctions lists. The screening runs again automatically when the "
-    "organisation applies for a grant, when a grant is awarded, and on "
-    "a scheduled cadence for organisations with active grants. A "
-    "donor reviewing an application sees a clear status: clear, "
-    "flagged, or pending — and on flag, a plain-language explanation "
-    "of what was matched and the suggested follow-up."
+    "Maria, a compliance officer at a donor foundation, opens an "
+    "application from an NGO new to her portfolio. The Due Diligence "
+    "Profile shows sanctions status as clear (last verified four hours "
+    "ago against UN, OFAC, and EU), with explicit checks for the "
+    "organisation, its named directors, and its declared beneficial "
+    "owners. A separate amber indicator shows one director flagged for "
+    "AML review — the system has plain-language context: the director "
+    "shares a name with a listed entity but the date of birth differs. "
+    "Maria reviews the comparison and marks the match as a false "
+    "positive with a note; the determination is recorded in the audit "
+    "chain. The screening result passports to every application from "
+    "this organisation."
 )
 
 add_numbered_list(doc, [
-    "screen every organisation and its named principals against UN, OFAC, and EU sanctions lists at onboarding, at application submission, at award, and on a recurring schedule for organisations with active grants.",
-    "use a live screening service as the primary feed and shall gracefully fall back to direct downloads of the underlying UN, OFAC, and EU lists when the primary service is unavailable, so that screening is never silently skipped.",
-    "compute a structured screening result per organisation including overall status (clear, flagged, error), check-type breakdown, and matched entity details where applicable.",
-    "persist screening results with timestamps for audit, and shall raise a notification to administrators when a new flag is detected on an organisation with active grants.",
-    "translate technical screening findings into plain-language explanations with suggested follow-up actions.",
+    "screen every organisation, its named principals, and its declared beneficial owners against UN, OFAC, and EU sanctions lists at onboarding, at application submission, at award, and on a continuous schedule for organisations with active grants.",
+    "extend screening to include anti-money-laundering watchlists and counter-terrorism financing designations beyond the headline sanctions lists, so that the platform's coverage matches what a donor compliance officer would expect of a procurement-grade due-diligence service.",
+    "use a live screening service as the primary feed and shall gracefully fall back to direct downloads of the underlying authority lists when the primary service is unavailable, so that screening is never silently skipped.",
+    "compute a structured screening result per organisation including overall status (clear, flagged, error), per-check-type breakdown, matched entity details where applicable, and the timestamp of the last refresh.",
+    "deduplicate against persona matches using country, name variants, and date-of-birth when supplied, to reduce false positives on common names — and shall surface the dedup logic transparently so compliance officers see why a match was discarded.",
+    "persist every screening result with timestamps for audit and shall raise a notification to administrators when a new flag is detected on an organisation with active grants.",
+    "translate technical screening findings into plain-language explanations with suggested follow-up actions, in the language and tone appropriate to the reader's role.",
     "allow administrators to trigger an immediate rescreening run across all organisations with active grants.",
-    "deduplicate against persona matches using country, name variants, and date-of-birth when supplied, to reduce false positives on common names.",
 ])
 
-
-# --- 6.8 Registry verification ------------------------------------------
-heading(doc, "6.8 Government Registry Verification", 2)
+heading(doc, "6.7.2 Registration and Standing Verification", 3)
 
 add_callout(doc, "USE CASE",
-    "An NGO claims to be registered in Kenya under registration number "
+    "An NGO applies to a grant claiming registration in Kenya under "
     "OP.218/051/2017/0/3001. The system queries Kenya's NGO Coordination "
-    "Board registry, verifies the registration is current and the legal "
-    "name matches, and stamps the organisation profile with a verified "
-    "badge dated today. If the registry returns an inconsistency, the "
-    "system raises a verification finding for administrative review "
-    "rather than silently passing."
+    "Board registry, verifies the registration is current and the "
+    "legal name matches the claim, and stamps the organisation profile "
+    "with a verified badge dated today, valid for twelve months. "
+    "Twenty-three months later, the system's scheduled re-verification "
+    "detects that the registration has lapsed (the NGO failed to file "
+    "an annual return). The system flags the change on the next "
+    "donor's review and prompts the NGO to update."
 )
 
 add_numbered_list(doc, [
-    "support live registry verification for organisations claiming registration in Kenya, Nigeria, South Africa, Uganda, Tanzania, Somalia, and Ethiopia.",
-    "compare the registered legal name, status, and (where available) principal officer names against the values claimed by the organisation on the platform.",
-    "stamp organisation profiles with a verification status (verified, unverified, AI-reviewed, expired) and timestamp.",
+    "support live registration verification against government registries for organisations claiming registration in Kenya, Nigeria, South Africa, Uganda, Tanzania, Somalia, and Ethiopia at launch, with a documented roadmap for extending coverage to additional jurisdictions.",
+    "compare the registered legal name, status, registration number, and (where available) principal officer names against the values claimed by the organisation on the platform.",
+    "stamp organisation profiles with a verification status (verified, unverified, AI-reviewed, expired) and timestamp, plus the validity window through which the stamp may be relied upon without re-verification.",
     "raise a verification finding for administrative review where registry data and claimed data diverge, rather than treating divergence as a soft warning the user can ignore.",
-    "support periodic re-verification for organisations with active grants, with configurable expiry windows for previous verification stamps.",
-    "expose a verification dashboard for administrators showing organisations grouped by verification status and expiry urgency.",
+    "support periodic re-verification on a configurable cadence per registry, escalating to active alerts when a previously verified registration lapses, is suspended, or changes status.",
+    "verify tax-exempt or charitable-status certification per country where the platform has access to the authoritative registry, treating tax status as a distinct check from registration itself.",
+    "expose a verification dashboard for administrators showing organisations grouped by verification status, expiry urgency, and pending administrative review.",
+])
+
+heading(doc, "6.7.3 Beneficial Ownership Transparency", 3)
+
+add_callout(doc, "USE CASE",
+    "A donor is finalising a $5M grant to a partner consortium with "
+    "three NGOs. The system has captured each organisation's declared "
+    "beneficial ownership and key officer disclosures, and has run an "
+    "internal cross-check against the donor's own staff directory. "
+    "The system surfaces one match: the legal director of one NGO is "
+    "married to a programme manager on the donor's team. The "
+    "conflict-of-interest finding is raised before award; the donor's "
+    "compliance team is notified, the donor staff member is recused, "
+    "and the determination is recorded in the audit chain — all "
+    "before any funds move."
+)
+
+add_numbered_list(doc, [
+    "capture and verify the declared beneficial owners, board officers, and key principals of every organisation on the platform, with each declaration timestamped and signed by an authorised representative.",
+    "support periodic refresh of beneficial-ownership disclosures with prompts to organisations whose disclosures are approaching the donor-required refresh window.",
+    "cross-check beneficial owners and officers against donor staff directories where the donor has provided one, surfacing potential conflicts of interest for compliance review before award.",
+    "support beneficial-ownership chain disclosure for organisations with parent or affiliate entities, so that ownership transparency extends beyond the immediately filing entity.",
+    "screen all named beneficial owners and officers against the same sanctions, AML, and CTF lists applied to the organisation itself.",
+    "preserve the historical beneficial-ownership record so that retrospective audits can reconstruct who owned or controlled the organisation at the time of any grant.",
+])
+
+heading(doc, "6.7.4 Adverse Media Monitoring", 3)
+
+add_callout(doc, "USE CASE",
+    "A regional news outlet publishes an investigative piece alleging "
+    "financial mismanagement at a previously-funded NGO. Within 24 "
+    "hours, Kuja's adverse media scan picks up the article, classifies "
+    "the signal severity, and raises a risk register entry on the "
+    "organisation with a context summary in plain language. The donor "
+    "receives a notification with the article reference, an "
+    "AI-generated summary of what is alleged, and a suggested "
+    "next-step (request clarification, pause disbursement, refer for "
+    "external investigation). The donor is informed before the issue "
+    "escalates publicly."
+)
+
+add_numbered_list(doc, [
+    "scan a curated set of news sources (regional and international) for adverse media mentions referencing organisations on the platform on at least a daily cadence.",
+    "classify each potential match by relevance (does this article actually reference the organisation in question?) and severity (allegation kind, source credibility, recency).",
+    "raise a risk register entry automatically when an adverse-media match crosses configured severity and relevance thresholds, with a context summary, source link, and suggested follow-up.",
+    "suppress adverse-media noise for organisations that share names with unrelated entities, using country, sector, and prior context to disambiguate.",
+    "preserve the historical adverse-media trail so that donors evaluating a future application from the organisation can see what has surfaced over time and how each finding was resolved.",
+    "respect press-freedom and defamation considerations: adverse-media findings shall be presented as signals for review, not as judgments, and shall be removable on confirmed false-match grounds.",
+])
+
+heading(doc, "6.7.5 AI integration across due diligence", 3)
+add_bullet_list(doc, [
+    ("Plain-language explanation of every finding. ",
+     "The system shall translate every sanctions match, registry "
+     "discrepancy, beneficial-ownership conflict, and adverse-media "
+     "signal into plain language with the context a non-specialist "
+     "reader needs to act on it. The donor compliance officer should "
+     "not need a glossary to triage the daily queue."),
+    ("False-positive triage. ",
+     "The system shall use AI to assess the likelihood of false-match "
+     "on near-name sanctions hits, weighing the available "
+     "disambiguators (country, sector, date of birth, address) and "
+     "recommending the determination — which a compliance officer "
+     "then confirms."),
+    ("Adverse media disambiguation and summarisation. ",
+     "When a news article surfaces, the system shall determine whether "
+     "it actually references the organisation in question (versus a "
+     "namesake) and shall generate a 1–2 sentence summary of the "
+     "allegation, the source, and its credibility."),
+    ("Re-verification scheduling. ",
+     "The system shall use AI to propose appropriate re-verification "
+     "cadences per organisation based on risk profile, jurisdiction, "
+     "and prior findings, rather than applying a flat schedule that "
+     "either over-checks low-risk organisations or under-checks "
+     "high-risk ones."),
+    ("Beneficial-ownership disclosure drafting. ",
+     "Where an organisation owes a beneficial-ownership refresh, the "
+     "system shall prefill the disclosure form from prior submissions, "
+     "registry data, and grant agreements, with the organisation "
+     "confirming or correcting the prefill."),
+])
+
+heading(doc, "6.7.6 Shared mechanics", 3)
+add_bullet_list(doc, [
+    ("Trust Profile passporting. ",
+     "Every due-diligence verification shall be reusable across "
+     "applications without repeating the underlying check. The donor "
+     "sees the verification stamp with its validity window; the "
+     "system re-verifies on schedule or on change without burdening "
+     "the NGO with re-submission."),
+    ("Audit chain. ",
+     "Every screening result, verification stamp, beneficial-ownership "
+     "disclosure, adverse-media finding, and compliance-officer "
+     "determination shall be recorded in the tamper-evident audit "
+     "chain so that the sequence of events is independently "
+     "verifiable for downstream audit, regulatory, or contractual "
+     "review."),
+    ("Donor-side override transparency. ",
+     "A donor compliance officer may classify a flag as a false "
+     "positive or as risk-accepted; the determination, its rationale, "
+     "and the officer's identity shall be recorded so the override "
+     "itself is auditable."),
+    ("Cross-organisation propagation. ",
+     "When a sanctions list update, a registry change, or an adverse "
+     "media item affects a director or beneficial owner who appears "
+     "on multiple organisations, the system shall propagate the "
+     "finding to every affected organisation."),
 ])
 
 
 # --- 6.9 Reporting -----------------------------------------------------
-heading(doc, "6.9 Reporting and Outcome Tracking", 2)
+heading(doc, "6.8 Reporting and Outcome Tracking", 2)
 
 add_callout(doc, "USE CASE",
     "Six months into a grant, Amani Foundation's first quarterly report "
@@ -1321,7 +1524,7 @@ add_bullet_list(doc, [
 
 
 # --- 6.10 Compliance — Flagship Section --------------------------------
-heading(doc, "6.10 Compliance and Risk — Simplified for Both Sides", 2)
+heading(doc, "6.9 Compliance and Risk — Simplified for Both Sides", 2)
 
 add_body(doc,
     "Compliance is the most expensive friction in the grant relationship "
@@ -1345,7 +1548,7 @@ add_diagram(doc, "ngo_compliance_journey",
     "compliance journey, from application pre-flight to ongoing "
     "delivery, reporting, and health monitoring.")
 
-heading(doc, "6.10.1 For NGOs — AI as a compliance co-pilot", 3)
+heading(doc, "6.9.1 For NGOs — AI as a compliance co-pilot", 3)
 
 add_callout(doc, "USE CASE",
     "Fatima's first quarterly report is due in three weeks. The system "
@@ -1382,7 +1585,7 @@ add_numbered_list(doc, [
     "score the report as a whole and the NGO's overall compliance health, so the NGO sees what the donor will see before the donor sees it.",
 ])
 
-heading(doc, "6.10.2 For donors — pre-assessed, scored, monitored", 3)
+heading(doc, "6.9.2 For donors — pre-assessed, scored, monitored", 3)
 
 add_callout(doc, "USE CASE",
     "Sarah, a donor managing twelve active grants, opens her compliance "
@@ -1418,7 +1621,7 @@ add_numbered_list(doc, [
     "summarise the donor's portfolio with an AI-generated insights panel: headline, anomalies (grants drifting, organisations under-performing), and the next decisions the donor owes.",
 ])
 
-heading(doc, "6.10.3 Shared mechanics", 3)
+heading(doc, "6.9.3 Shared mechanics", 3)
 add_bullet_list(doc, [
     ("Plain-language explanations of every finding. ",
      "Whether the audience is an NGO programme officer or a donor "
@@ -1451,7 +1654,7 @@ add_bullet_list(doc, [
 
 
 # --- 6.11 Collaboration & Notifications --------------------------------
-heading(doc, "6.11 Collaboration and Notifications", 2)
+heading(doc, "6.10 Collaboration and Notifications", 2)
 
 add_callout(doc, "USE CASE",
     "A donor reviewer wants the NGO to clarify a discrepancy between "
@@ -1475,7 +1678,7 @@ add_numbered_list(doc, [
 
 
 # --- 6.12 Organisational Memory ----------------------------------------
-heading(doc, "6.12 Organisational Memory and Provenance", 2)
+heading(doc, "6.11 Organisational Memory and Provenance", 2)
 
 add_callout(doc, "USE CASE",
     "Amani has applied to nine grants over the past two years. Across "
@@ -1500,7 +1703,7 @@ add_numbered_list(doc, [
 
 
 # --- 6.13 Saved searches -----------------------------------------------
-heading(doc, "6.13 Saved Searches and Personalisation", 2)
+heading(doc, "6.12 Saved Searches and Personalisation", 2)
 
 add_callout(doc, "USE CASE",
     "A donor reviewer often filters open applications for the maternal "
@@ -1519,7 +1722,7 @@ add_numbered_list(doc, [
 
 
 # --- 6.14 Administration -----------------------------------------------
-heading(doc, "6.14 Administration and System Health", 2)
+heading(doc, "6.13 Administration and System Health", 2)
 
 add_callout(doc, "USE CASE",
     "An administrator opens the system-health dashboard on Monday "
@@ -1544,7 +1747,7 @@ add_numbered_list(doc, [
 
 
 # --- 6.15 Internationalisation -----------------------------------------
-heading(doc, "6.15 Internationalisation and Localisation", 2)
+heading(doc, "6.14 Internationalisation and Localisation", 2)
 
 add_callout(doc, "USE CASE",
     "An NGO programme officer in Mogadishu signs in. The interface, "
@@ -1566,7 +1769,7 @@ add_numbered_list(doc, [
 
 
 # --- 6.16 Field Operations --------------------------------------------
-heading(doc, "6.16 Field Operations: Mobile and Offline Work", 2)
+heading(doc, "6.15 Field Operations: Mobile and Offline Work", 2)
 
 add_callout(doc, "USE CASE",
     "A field officer for a women's protection NGO is documenting a "
@@ -1950,6 +2153,36 @@ use_case(doc, "UC-017",
         "That evening the officer opens her laptop; the draft and the analysed evidence are already waiting in the report editor.",
     ],
     "Field-collected evidence is captured at the point of collection without requiring connectivity, and synced when the network returns.",
+)
+
+use_case(doc, "UC-018",
+    "Donor reviews an NGO's Organisation Trust Profile",
+    "Donor compliance officer",
+    "An application has been submitted by an NGO new to the donor's portfolio. Compliance officer needs to clear the organisation before reviewing the proposal.",
+    [
+        "Compliance officer opens the application; the Trust Profile is shown beside the proposal.",
+        "Left pillar (Capacity Profile): three frameworks completed, pillar scores visible, supporting evidence on file, passport refreshed seven months ago — within the donor's twelve-month window.",
+        "Right pillar (Due Diligence Profile): sanctions clear (UN/OFAC/EU re-checked four hours ago); registration verified against the country registry with name match and active status; tax-exempt status confirmed and valid through next year; beneficial ownership declared, with two named directors and no flagged conflicts against the donor's staff directory; one adverse media item from eighteen months ago, marked resolved with context.",
+        "Officer clicks the adverse-media item; the system shows the original article, the AI-generated summary, and the prior resolution note from a different donor.",
+        "Officer accepts the Trust Profile as sufficient for award; the determination is recorded in the audit chain and the application proceeds to programme review.",
+    ],
+    "Compliance review takes minutes instead of days; the donor's decision is defensible because every check is sourced, dated, and auditable.",
+)
+
+use_case(doc, "UC-019",
+    "AI flags adverse media on a previously-funded organisation",
+    "Donor and Administrator",
+    "Continuous adverse-media scan has run overnight. A regional outlet has published an allegation against a currently-funded NGO.",
+    [
+        "Scan picks up the article and classifies it: high relevance (correct NGO, correct country), moderate severity (financial-mismanagement allegation, regional source, recent).",
+        "System raises a risk register entry on the organisation with severity 'high', proposed owner the donor's programme manager, and an AI-generated context summary.",
+        "Donor receives a notification (in-app and web push); administrator sees the finding in the operations command centre.",
+        "Donor opens the finding, reads the AI summary, and clicks through to the article.",
+        "Donor opens a structured comment thread with the NGO requesting clarification, with the article reference attached.",
+        "NGO responds in-band with their account of the events and uploads supporting documents; the system runs vision-based extraction on the uploads.",
+        "Donor reviews the response, accepts the explanation, and marks the risk as mitigated with rationale. All steps are recorded in the audit chain.",
+    ],
+    "Reputational risk is surfaced before it escalates; the donor's response is structured, in-band, and auditable.",
 )
 
 doc.add_page_break()
