@@ -93,19 +93,20 @@ def _arrow(ax, x1, y1, x2, y2, color=NAVY, dashed=False, label=None):
 # ---------------------------------------------------------------------------
 
 def diagram_system_overview():
-    fig, ax = plt.subplots(figsize=(13, 7.5), dpi=200)
-    ax.set_xlim(0, 13); ax.set_ylim(0, 8.5)
+    # Wider canvas + significantly larger platform box so the 12
+    # capability cells inside have proper breathing room.
+    fig, ax = plt.subplots(figsize=(15, 9), dpi=200)
+    ax.set_xlim(0, 15); ax.set_ylim(0, 10)
     ax.set_axis_off()
 
-    # Title
-    ax.text(6.5, 8.1, "Kuja — An AI-Powered Grant Management System",
-            ha="center", va="center", color=NAVY, fontsize=14, fontweight="bold")
-    ax.text(6.5, 7.75,
+    ax.text(7.5, 9.55, "Kuja — An AI-Powered Grant Management System",
+            ha="center", va="center", color=NAVY, fontsize=15, fontweight="bold")
+    ax.text(7.5, 9.15,
             "Architecture overview — users, capability pillars, and external integrations",
-            ha="center", color=MUTED, fontsize=9, style="italic")
+            ha="center", color=MUTED, fontsize=10, style="italic")
 
     # Left: user roles
-    ax.text(1.65, 7.2, "USERS", ha="center", fontsize=9, color=MUTED, fontweight="bold")
+    ax.text(1.75, 8.7, "USERS", ha="center", fontsize=10, color=MUTED, fontweight="bold")
     roles = [
         ("NGO", "Apply, report,\nmonitor obligations"),
         ("Donor", "Publish, evaluate,\nmonitor"),
@@ -113,30 +114,29 @@ def diagram_system_overview():
         ("Administrator", "Operate\nthe platform"),
     ]
     for i, (r, s) in enumerate(roles):
-        _block(ax, 0.3, 6.3 - i * 1.55, 2.7, 1.15, r, sub=s, fontsize=10)
+        _block(ax, 0.3, 7.1 - i * 1.85, 2.9, 1.4, r, sub=s, fontsize=11)
 
-    # Centre: Kuja platform
-    plat_x, plat_y, plat_w, plat_h = 3.6, 0.6, 5.8, 6.6
+    # Centre: Kuja platform — much larger
+    plat_x, plat_y, plat_w, plat_h = 3.85, 0.55, 7.4, 8.25
     plat = FancyBboxPatch((plat_x, plat_y), plat_w, plat_h,
-                          boxstyle="round,pad=0.04,rounding_size=0.08",
-                          linewidth=1.8, edgecolor=NAVY, facecolor=WHITE, zorder=2)
+                          boxstyle="round,pad=0.04,rounding_size=0.10",
+                          linewidth=2.0, edgecolor=NAVY, facecolor=WHITE, zorder=2)
     ax.add_patch(plat)
-    ax.text(plat_x + plat_w / 2, plat_y + plat_h - 0.35, "KUJA PLATFORM",
-            ha="center", va="center", color=NAVY, fontsize=12, fontweight="bold")
-    ax.text(plat_x + plat_w / 2, plat_y + plat_h - 0.7,
-            "Two trust pillars + AI working partner woven through every workflow",
-            ha="center", color=MUTED, fontsize=7.5, style="italic")
+    ax.text(plat_x + plat_w / 2, plat_y + plat_h - 0.4, "KUJA PLATFORM",
+            ha="center", va="center", color=NAVY, fontsize=14, fontweight="bold")
+    ax.text(plat_x + plat_w / 2, plat_y + plat_h - 0.8,
+            "Two trust pillars + Embedded AI Intelligence woven through every workflow",
+            ha="center", color=MUTED, fontsize=9.5, style="italic")
 
-    # 12 capability cells in a 3 × 4 grid inside the platform box.
-    # Two Trust Profile pillars + Embedded AI are highlighted (clay).
+    # 12 capability cells in a 3 × 4 grid. Two Trust Profile pillars +
+    # Embedded AI Intelligence highlighted in clay.
     capabilities = [
-        # (label, is_flagship)
         ("Identity &\nAccess", False),
         ("Grant\nLifecycle", False),
         ("Application\nLifecycle", False),
-        ("Capacity\nPassport", True),       # Trust pillar 1
-        ("Due\nDiligence", True),           # Trust pillar 2
-        ("Embedded AI\nAssistance", True),  # The AI working partner
+        ("Capacity\nPassport", True),
+        ("Due\nDiligence", True),
+        ("Embedded AI\nIntelligence", True),
         ("Documents\n& Evidence", False),
         ("Compliance\n& Risk Health", False),
         ("Collaboration\n& Notifications", False),
@@ -145,51 +145,52 @@ def diagram_system_overview():
         ("Admin &\nObservability", False),
     ]
     cols = 3; rows = 4
-    inner_x = plat_x + 0.25
-    inner_y = plat_y + 0.4
-    grid_w = plat_w - 0.5
-    grid_h = plat_h - 1.4   # leave room for header
-    cell_w = (grid_w - (cols - 1) * 0.15) / cols
-    cell_h = (grid_h - (rows - 1) * 0.15) / rows
+    gap = 0.22
+    margin = 0.4
+    inner_x = plat_x + margin
+    inner_y = plat_y + 0.5
+    grid_w = plat_w - 2 * margin
+    grid_h = plat_h - 1.7
+    cell_w = (grid_w - (cols - 1) * gap) / cols
+    cell_h = (grid_h - (rows - 1) * gap) / rows
     for idx, (label, flagship) in enumerate(capabilities):
         row = idx // cols
         col = idx % cols
-        cx = inner_x + col * (cell_w + 0.15)
-        cy = inner_y + (rows - 1 - row) * (cell_h + 0.15)
+        cx = inner_x + col * (cell_w + gap)
+        cy = inner_y + (rows - 1 - row) * (cell_h + gap)
         if flagship:
             fill, edge = CLAY_SOFT, CLAY
         else:
             fill, edge = SAND, NAVY
         _block(ax, cx, cy, cell_w, cell_h, label,
-               fill=fill, edge=edge, text=NAVY, fontsize=9)
+               fill=fill, edge=edge, text=NAVY, fontsize=11)
 
     # Right: external services
-    ax.text(11.35, 7.2, "EXTERNAL SERVICES", ha="center", fontsize=9,
+    ax.text(13.5, 8.7, "EXTERNAL SERVICES", ha="center", fontsize=10,
             color=MUTED, fontweight="bold")
     ext = [
-        ("Language model", "AI inference\nfor assistance"),
+        ("Language model", "AI inference\nfor intelligence"),
         ("Sanctions / AML", "UN · OFAC · EU\n+ watchlists"),
         ("Government registries", "7 jurisdictions\n(expanding)"),
         ("Adverse media", "News scan\ndaily cadence"),
         ("Web push", "Mobile + desktop\nnotifications"),
     ]
     for i, (r, s) in enumerate(ext):
-        _block(ax, 10.0, 6.3 - i * 1.25, 2.7, 0.9, r, sub=s,
-               fill=SAND, edge=SKY, fontsize=9.5)
+        _block(ax, 12.0, 7.3 - i * 1.45, 2.9, 1.1, r, sub=s,
+               fill=SAND, edge=SKY, fontsize=10.5)
 
     # Arrows: roles → platform
     for i in range(4):
-        _arrow(ax, 3.05, 6.85 - i * 1.55, 3.55, 5.5 - i * 1.0)
+        _arrow(ax, 3.25, 7.8 - i * 1.85, 3.8, 6.8 - i * 1.5)
     # Arrows: platform → ext
     for i in range(5):
-        _arrow(ax, 9.45, 6.0 - i * 1.0, 9.95, 6.75 - i * 1.25,
+        _arrow(ax, 11.3, 7.0 - i * 1.4, 11.95, 7.85 - i * 1.45,
                color=SKY, dashed=True)
 
-    # Legend / footer
-    ax.text(6.5, 0.25,
-            "Clay-highlighted pillars = the two Trust Profile pillars + the Embedded AI working partner. "
+    ax.text(7.5, 0.2,
+            "Clay-highlighted cells = the two Trust Profile pillars + Embedded AI Intelligence. "
             "Solid arrows = user requests · Dashed arrows = external service integrations.",
-            ha="center", fontsize=8, color=MUTED, style="italic")
+            ha="center", fontsize=8.5, color=MUTED, style="italic")
 
     fig.tight_layout()
     out = os.path.join(OUT_DIR, "01_system_overview.png")
@@ -233,7 +234,7 @@ def diagram_grant_lifecycle():
                cx[i + 1] - box_w / 2, y + box_h / 2)
 
     # AI overlay above each stage
-    ax.text(5.5, 4.65, "AI ASSISTANCE", ha="center", color=CLAY,
+    ax.text(5.5, 4.65, "EMBEDDED AI INTELLIGENCE", ha="center", color=CLAY,
             fontsize=8.5, fontweight="bold")
     ai_touch = [
         "Brief generator\nBurden critique\nMedian-NGO preview",
@@ -285,7 +286,7 @@ def diagram_ngo_compliance_journey():
     ax.set_xlim(0, 13); ax.set_ylim(0, 8.2)
     ax.set_axis_off()
     ax.text(6.5, 7.85,
-            "NGO Compliance Journey — How Embedded AI Supports the NGO Through Every Obligation",
+            "NGO Compliance Journey — How Embedded AI Intelligence Supports the NGO Through Every Obligation",
             ha="center", color=NAVY, fontsize=13, fontweight="bold")
 
     # Timeline arrow background
@@ -344,7 +345,7 @@ def diagram_ngo_compliance_journey():
         _block(ax, x, box_top - box_h, box_w, box_h, "",
                fill=CLAY_SOFT, edge=CLAY)
         # Header inside the box
-        ax.text(cx, box_top - 0.35, "Embedded AI",
+        ax.text(cx, box_top - 0.35, "Embedded AI Intelligence",
                 ha="center", color=CLAY, fontsize=9.5, fontweight="bold")
         # Bullets — fits comfortably with generous spacing.
         for j, it in enumerate(items):
@@ -433,10 +434,10 @@ def diagram_ai_integration_map():
     fig, ax = plt.subplots(figsize=(14, 8.5), dpi=200)
     ax.set_xlim(0, 14); ax.set_ylim(0, 9.5)
     ax.set_axis_off()
-    ax.text(7.0, 9.05, "Embedded AI Across Every Workspace",
+    ax.text(7.0, 9.05, "Embedded AI Intelligence Across Every Workspace",
             ha="center", color=NAVY, fontsize=14, fontweight="bold")
     ax.text(7.0, 8.7,
-            "Each chip is an AI-assisted surface the user encounters in the named workspace.",
+            "Each chip is an AI-driven surface the user encounters in the named workspace.",
             ha="center", color=MUTED, fontsize=9, style="italic")
 
     col_centers = [2.4, 7.0, 11.6]
@@ -556,7 +557,7 @@ def diagram_two_grant_paths():
            fill=SAND, edge=NAVY, fontsize=9.5)
 
     ax.text(5.5, 0.3,
-            "Either entry point lands the donor in the same editable wizard. AI assistance is a starting point, never the final word.",
+            "Either entry point lands the donor in the same editable wizard. Embedded AI intelligence is a starting point, never the final word.",
             ha="center", color=MUTED, fontsize=8.5, style="italic")
 
     fig.tight_layout()

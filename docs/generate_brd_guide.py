@@ -329,7 +329,7 @@ toc_entries = [
     ("    6.3 Application Lifecycle Management", 1),
     ("    6.4 Capacity Assessment and Passporting", 1),
     ("    6.5 Document Management and Real-Time Analysis", 1),
-    ("    6.6 AI-Powered Assistance Across the Workflow", 1),
+    ("    6.6 Embedded AI Intelligence Across the Workflow", 1),
     ("    6.7 Due Diligence and Trust Verification", 1),
     ("        6.7.1 Sanctions, AML and CTF Screening", 2),
     ("        6.7.2 Registration and Standing Verification", 2),
@@ -674,8 +674,8 @@ add_bullet_list(doc, [
      "Uploaded documents are extracted, analysed against the grant's "
      "evidence requirements, and scored for completeness with clear "
      "fallbacks for scanned or low-quality files."),
-    ("Embedded AI. ",
-     "AI assistance is woven into every workflow as a working partner — "
+    ("Embedded AI Intelligence. ",
+     "Intelligence is woven into every workflow as a working partner — "
      "drafting, evaluating, surfacing gaps, generating rationales, "
      "translating findings — never as a generic chatbot."),
     ("Compliance and trust. ",
@@ -926,7 +926,7 @@ add_body(doc,
 
 add_diagram(doc, "grant_lifecycle",
     "Figure 3 — The complete grant lifecycle from publication through "
-    "compliance monitoring, with AI assistance (clay) and compliance "
+    "compliance monitoring, with Embedded AI Intelligence (clay) and compliance "
     "checkpoints (sky) at every stage.")
 
 
@@ -950,7 +950,7 @@ add_numbered_list(doc, [
     "represent an application as a structured entity with grant reference, applicant organisation, per-criterion responses, eligibility responses, attached documents, total funding requested, status, and lifecycle timestamps.",
     "support a four-step application wizard covering eligibility check, proposal responses, document upload, and review-and-submit.",
     "track each application through a documented lifecycle of draft, submitted, under-review, scored, accepted, and rejected, with state transitions audited.",
-    "allow NGOs to save draft applications and return to them later, preserving partial work and the AI assistance state.",
+    "allow NGOs to save draft applications and return to them later, preserving partial work and the AI-drafted state.",
     "auto-save applicant input at regular intervals so that connection drops do not lose work.",
     "support reassignment of applications to alternate reviewers by administrators.",
     "allow donors to issue clarification requests to applicants, with structured responses returned in-band rather than via email.",
@@ -1148,8 +1148,8 @@ add_bullet_list(doc, [
 ])
 
 
-# --- 6.6 AI-Powered Assistance ----------------------------------------
-heading(doc, "6.6 AI-Powered Assistance Across the Workflow", 2)
+# --- 6.6 Embedded AI Intelligence -------------------------------------
+heading(doc, "6.6 Embedded AI Intelligence Across the Workflow", 2)
 
 add_callout(doc, "USE CASE",
     "Across every workspace, the system embeds an action-oriented "
@@ -1166,7 +1166,7 @@ add_callout(doc, "USE CASE",
 
 heading(doc, "6.6.1 Design principles for AI use", 3)
 add_body(doc,
-    "The system applies AI assistance under a small number of explicit "
+    "The system applies embedded AI intelligence under a small number of explicit "
     "design principles, which together distinguish a working AI partner "
     "from a surface-level chatbot. The system shall enforce these "
     "principles for every AI feature it ships."
@@ -2134,7 +2134,7 @@ use_case(doc, "UC-015",
 )
 
 use_case(doc, "UC-016",
-    "NGO responds to a donor revision request with AI assistance",
+    "NGO responds to a donor revision request with AI-drafted updates",
     "NGO",
     "Donor has reviewed a progress report and returned it with revision requests on three sections.",
     [
@@ -2343,7 +2343,7 @@ glossary = [
     ("Application", "An NGO's response to a specific grant, comprising eligibility responses, criterion responses, attached documents, and submission metadata."),
     ("Capacity passport", "The persistent, versioned set of capacity assessment results attached to an organisation, reusable across applications regardless of framework."),
     ("Compliance health score", "A composite score per active grant on a 0–100 scale, combining completion, timeliness, workflow, and importance pillars."),
-    ("AI assistance rail", "The persistent assistive surface in the user interface offering context-appropriate AI actions and answers without leaving the current workspace."),
+    ("Embedded AI intelligence rail", "The persistent assistive surface in the user interface offering context-appropriate AI-driven actions, drafts, and answers without leaving the current workspace."),
     ("Grant", "A donor-published funding opportunity comprising title, description, eligibility, evaluation criteria, document requirements, reporting requirements, and deadline."),
     ("Match score", "A composite score per NGO-grant pair indicating alignment on eligibility, sector, geography, capacity, and track record."),
     ("Organisational memory", "The store of consistent facts derived from an organisation's submissions, used to ground AI drafting and surface provenance."),
