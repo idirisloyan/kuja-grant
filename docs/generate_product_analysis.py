@@ -61,32 +61,47 @@ def build_document():
     )
 
     add_body(doc,
-        "The platform covers the complete grant lifecycle across eight integrated stages: "
-        "marketplace discovery (kuja.org, 600+ active users), AI-powered capacity assessments "
-        "using five industry-standard frameworks today (Kuja, STEP, UN-HACT, CHS, NUPAS) with "
-        "an extensible architecture designed to add donor-specific or any new framework on demand, "
-        "live due diligence including government registry verification for seven African countries "
-        "today \u2014 with a system designed to expand to any Global South country that provides "
-        "a government verification portal \u2014 "
-        "and sanctions screening against UN, OFAC, EU, and World Bank databases, AI-guided "
-        "grant applications with document analysis and scoring, dual-scoring review combining "
-        "AI and human evaluation, AI-powered reporting with compliance monitoring, and "
-        "back-end ERP for operations built on Odoo 17. For entities choosing the ERP, "
-        "onboarding is seamless because most organizational information is already captured "
-        "through earlier lifecycle stages. For those that do not adopt the ERP, a dedicated "
-        "reporting module connects grant information to enable compliance reporting without "
-        "additional data entry."
+        "The platform covers the complete grant lifecycle across eight integrated stages and "
+        "is anchored by three category-defining commitments. First, every organization presents "
+        "a two-pillar Organisation Trust Profile that travels with them across applications: "
+        "a Capacity Profile sourced from five embedded assessment frameworks (Kuja, STEP, UN-HACT, "
+        "CHS, NUPAS) that is completed once and passported across donor-specific frameworks; and "
+        "a Due Diligence Profile combining continuous sanctions, AML and counter-terrorism financing "
+        "screening, government registry and tax-exempt verification across seven African countries "
+        "(expanding to all jurisdictions with public verification portals), beneficial-ownership "
+        "transparency with donor-staff conflict checks, and daily adverse-media monitoring. Second, "
+        "Embedded AI Intelligence is woven into every workflow as a working partner \u2014 it drafts "
+        "applications and reports, scores documents in real time as they upload, extracts donor "
+        "reporting requirements into a compliance calendar, predicts donor concerns before submission, "
+        "explains compliance findings in plain language, generates auditable reviewer rationales, and "
+        "answers operational questions \u2014 grounded in the user's own evidence, traceable to its "
+        "sources, and editable end to end. Third, compliance is simplified for both sides of the "
+        "relationship: NGOs are supported through every obligation (extract, plan, draft, score, "
+        "submit); donors receive pre-assessed, pre-scored reports plus a 4-pillar health score "
+        "with trajectory forecasting that surfaces grants drifting off track before they slip."
+    )
+
+    add_body(doc,
+        "The eight lifecycle stages are marketplace discovery (kuja.org), the Capacity Profile "
+        "pillar, the Due Diligence Profile pillar, AI-powered grant matching with top-strength "
+        "and top-blocker signals, two-path grant creation and AI-co-authored application drafting "
+        "with real-time document scoring and pre-submission readiness checks, reviewer evaluation "
+        "with one-screen summaries and evidence extraction, AI-supported reporting with donor-perspective "
+        "pre-flight checks and a 4-pillar compliance health score, and back-end ERP for operations "
+        "built on Odoo 17. The entire platform is delivered as a progressive web application that "
+        "operates offline-first on mobile devices \u2014 a requirement, not an afterthought, for the "
+        "low-connectivity environments where Global South CSOs operate."
     )
 
     add_body(doc,
         "The global grant management software market is valued at $2.75 billion (2024) and "
-        "is projected to reach $4.79 billion by 2030, growing at a CAGR of 10.3%. No "
-        "existing platform in this market combines marketplace, capacity assessment, grant "
-        "management, AI-powered analysis, and ERP operations in a single integrated solution "
-        "designed specifically for the Global South. The dissolution of USAID in 2025 \u2014 "
-        "with 83% of programs cancelled and $36 billion in aid cuts \u2014 has created urgent "
-        "demand for diversified funding infrastructure and direct donor-to-NGO connections, "
-        "positioning Kuja at the intersection of market need and sector transformation."
+        "is projected to reach $4.79 billion by 2030, growing at a CAGR of 10.3%. No existing "
+        "platform combines marketplace, two-pillar trust profile, embedded AI intelligence, "
+        "compliance support for both sides, and ERP operations in a single integrated solution "
+        "designed specifically for the Global South. The dissolution of USAID in 2025 \u2014 with "
+        "83% of programs cancelled and $36 billion in aid cuts \u2014 has created urgent demand for "
+        "diversified funding infrastructure and direct donor-to-NGO connections, positioning Kuja "
+        "at the intersection of market need and sector transformation."
     )
 
     add_page_break(doc)
@@ -116,146 +131,363 @@ def build_document():
     add_bullet(doc, "Production URL: https://web-production-6f8a.up.railway.app")
 
     # --- Stage 2 ---
-    add_heading2(doc, "Stage 2 \u2014 AI-Powered Capacity Assessment")
+    add_heading2(doc, "Stage 2 \u2014 Capacity Profile with Passporting (Trust Pillar 1)")
 
     add_body(doc,
-        "Kuja\u2019s capacity assessment module is the most comprehensive self-service "
-        "assessment available in the sector. The system currently supports five frameworks "
-        "but is architecturally designed to be extensible \u2014 new frameworks (including "
-        "donor-specific assessment criteria) can be added on demand without structural changes."
+        "Kuja\u2019s capacity assessment is built around a single product principle: the NGO "
+        "should do the work once and have it carry forward to every donor. Five industry-standard "
+        "frameworks ship today (Kuja, STEP, UN-HACT, CHS, NUPAS); donors can also define entirely "
+        "custom frameworks tailored to their portfolio. Regardless of which framework the donor "
+        "requires, the system passports the NGO\u2019s prior assessment across by mapping equivalent "
+        "questions and prefilling responses with traceable provenance back to the original answer."
     )
 
     add_bullet(doc, "Five frameworks live today: Kuja (proprietary), STEP (TechSoup), UN-HACT, CHS, NUPAS")
-    add_bullet(doc, "Extensible by design: Add donor-specific or any new assessment framework on demand \u2014 "
-        "no competitor offers this flexibility")
     add_bullet(doc,
-        "Free tier: Rules-based assessment engine generates gap checklists and learning roadmaps"
+        "Custom donor framework builder: Donors can compose their own assessment from a question "
+        "bank with configurable weights, evidence requirements, and scoring rubric \u2014 with "
+        "an AI-drafted starting point derived from the grant\u2019s focus area"
     )
     add_bullet(doc,
-        "Paid tier: Claude AI reviews uploaded organizational policies, financial documents, "
-        "certificates \u2014 identifying missing clauses, weak areas, providing 30/60/90-day "
-        "improvement roadmap"
+        "Passporting: An NGO\u2019s completed assessment becomes their Capacity Profile (the first "
+        "pillar of the Trust Profile). When applying to any grant, the system passports the profile "
+        "into the target framework via maintained translation tables, with AI proposing mappings "
+        "where curated translations don\u2019t exist. Each prefilled response carries provenance "
+        "showing the source assessment, framework, and date."
+    )
+    add_bullet(doc,
+        "Effort reduction: First-time NGOs complete a capacity assessment in days; subsequent "
+        "applications complete the capacity section in under an hour rather than twelve."
+    )
+    add_bullet(doc,
+        "AI co-authoring: Initial responses drafted by drawing on prior assessments, uploaded "
+        "supporting documents, and organisational memory \u2014 with claim-level provenance"
+    )
+    add_bullet(doc,
+        "AI gap prioritisation: Predicts which capacity gaps are most likely to disqualify the "
+        "NGO from a specific grant, helping them prioritise improvement effort"
     )
     add_bullet(doc, "Donor readiness scoring: private philanthropy, bilateral donors, multilateral agencies, UN system")
-    add_bullet(doc, "Passportable results: Complete one assessment, share with multiple donors")
+    add_bullet(doc,
+        "Passport completion percentage surfaced on the NGO dashboard so they see how "
+        "application-ready they are across major frameworks"
+    )
 
     add_heading3(doc, "Technical Implementation")
-    add_bullet(doc, "AI model: Anthropic Claude claude-sonnet-4-20250514")
+    add_bullet(doc,
+        "AI inference via the platform\u2019s language-model integration; vendor-agnostic, "
+        "easily swappable as the model market evolves"
+    )
     add_bullet(doc, "Assessment prompts structured per-framework with framework-specific scoring rubrics")
     add_bullet(doc,
-        "Document analysis: PDF, DOCX, XLSX upload \u2192 text extraction \u2192 AI evaluation "
-        "against framework criteria"
+        "Document analysis: PDF (text + scanned via vision fallback), DOCX, XLSX, plain text, "
+        "images \u2192 extraction \u2192 AI evaluation against framework criteria"
     )
-    add_bullet(doc, "Results stored as structured JSON with per-criterion scores (0-100)")
+    add_bullet(doc,
+        "Cross-framework mapping tables maintained for curated equivalents; AI proposes mappings "
+        "for novel framework pairs with low-confidence flagging for human confirmation"
+    )
+    add_bullet(doc, "Results stored as structured JSON with per-criterion scores (0-100) and provenance ledger")
 
     # --- Stage 3 ---
-    add_heading2(doc, "Stage 3 \u2014 Live Due Diligence")
+    add_heading2(doc, "Stage 3 \u2014 Due Diligence Profile (Trust Pillar 2)")
 
     add_body(doc,
-        "Automated, real-time verification replaces manual due diligence processes that "
-        "typically cost donors $5,000-$15,000 per organization. The system is designed to "
-        "expand to any Global South country that provides a government verification portal "
-        "\u2014 the current seven countries are the starting point, not the ceiling."
+        "The second pillar of the Organisation Trust Profile is a continuous due-diligence record "
+        "that verifies legal standing, screens against sanctions and watchlists, tracks beneficial "
+        "ownership, and monitors adverse media \u2014 all done once per organisation and passported "
+        "across applications. This replaces manual due-diligence processes that typically cost "
+        "donors $5,000-$15,000 per organisation and reduces friction for NGOs facing fragmented "
+        "compliance requirements from every donor."
     )
 
+    add_body(doc,
+        "Due diligence on Kuja comprises four sub-pillars, all passported via the Trust Profile."
+    )
+
+    add_heading3(doc, "Sanctions, AML & CTF screening")
     add_bullet(doc,
-        "7 countries live today: Kenya NGO Coordination Board, "
-        "Nigeria CAC, South Africa DSD NPO Registry, Uganda NGO Bureau, Tanzania NiS, "
-        "Somalia MOIFAR, Ethiopia ACSO"
+        "Screened against UN Security Council, US OFAC SDN, EU Financial Sanctions, and World Bank "
+        "Debarment lists, extended to AML watchlists and counter-terrorism-financing designations "
+        "for procurement-grade coverage"
+    )
+    add_bullet(doc, "Continuous re-screening on schedule, on change events, and on every new application")
+    add_bullet(doc,
+        "Coverage extends to declared beneficial owners and named officers, not just the "
+        "organisation entity"
     )
     add_bullet(doc,
-        "Expansion-ready architecture: Adding a new country requires only a registry adapter "
-        "\u2014 no structural changes. Goal: all Global South countries with government "
-        "verification portals"
+        "AI false-positive triage: weighs disambiguators (country, sector, date of birth, "
+        "address) and recommends a determination that a compliance officer confirms"
+    )
+
+    add_heading3(doc, "Registration & Standing Verification")
+    add_bullet(doc,
+        "7 government registries live today: Kenya NGO Coordination Board, Nigeria CAC, "
+        "South Africa DSD NPO Registry, Uganda NGO Bureau, Tanzania NiS, Somalia MOIFAR, Ethiopia ACSO"
     )
     add_bullet(doc,
-        "Sanctions screening against 5 databases: OpenSanctions API (primary), UN Security "
-        "Council (XML), US OFAC SDN (CSV), EU Financial Sanctions (CSV), World Bank "
-        "Debarment List"
+        "Expansion-ready architecture: Adding a new country requires only a registry adapter; "
+        "goal is all Global South countries with public verification portals"
     )
     add_bullet(doc,
-        "AI-powered registration certificate analysis \u2014 extracting org name, registration "
-        "number, date, validity"
+        "Verifies registered legal name, status, registration number, and (where available) "
+        "principal officer names against organisation-claimed values"
     )
+    add_bullet(doc,
+        "Tax-exempt and charitable-status certification verified per country where the platform "
+        "has access to the authoritative registry"
+    )
+    add_bullet(doc,
+        "Periodic re-verification with active alerts when a previously verified registration "
+        "lapses, is suspended, or changes status"
+    )
+
+    add_heading3(doc, "Beneficial Ownership Transparency")
+    add_bullet(doc,
+        "Captures and verifies declared beneficial owners, board officers, and key principals, "
+        "with each disclosure timestamped and signed"
+    )
+    add_bullet(doc,
+        "Conflict-of-interest checks against donor staff directories surface potential conflicts "
+        "for compliance review before award"
+    )
+    add_bullet(doc, "Ownership-chain disclosure for parent and affiliate entities")
+    add_bullet(doc, "Historical preservation: who owned or controlled the organisation at the time of any grant")
+
+    add_heading3(doc, "Adverse Media Monitoring")
+    add_bullet(doc,
+        "Daily scan of curated regional and international news sources for adverse-media "
+        "mentions referencing organisations on the platform"
+    )
+    add_bullet(doc,
+        "AI classifies relevance (does the article actually reference this org?) and severity, "
+        "then raises a risk register entry automatically when thresholds are crossed"
+    )
+    add_bullet(doc,
+        "Plain-language summary of each finding with source link and suggested next steps \u2014 "
+        "respecting press-freedom considerations by surfacing findings as signals for review, "
+        "not judgments"
+    )
+    add_bullet(doc, "Namesake disambiguation using country, sector, and prior context")
 
     add_heading3(doc, "Technical Implementation")
-    add_bullet(doc, "Primary API: OpenSanctions with API key authentication")
-    add_bullet(doc, "Fallback: Direct download and parse of UN XML, OFAC CSV, EU CSV files when API unavailable")
-    add_bullet(doc, "Government registries: HTTP scraping with country-specific parsers")
-    add_bullet(doc, "Certificate analysis: Claude AI with structured output extraction")
+    add_bullet(doc, "Primary screening: OpenSanctions API with API key authentication")
+    add_bullet(doc, "Fallback: Direct download and parse of UN XML, OFAC CSV, EU CSV when the primary feed is unavailable")
+    add_bullet(doc, "Government registries: HTTP-based country-specific parsers")
+    add_bullet(doc, "Certificate analysis and adverse-media summarisation: language-model extraction with structured output")
+    add_bullet(doc,
+        "Trust Profile passports across applications: verifications are reusable across donors "
+        "with appropriate refresh cadence; donors see the stamp and validity window without "
+        "burdening the NGO to re-submit"
+    )
 
     # --- Stage 4 ---
     add_heading2(doc, "Stage 4 \u2014 AI-Powered Grant Matching")
 
-    add_bullet(doc, "AI matches NGOs to grants based on profile, capacity score, sector, geography, funding tier eligibility")
-    add_bullet(doc, "AI matches donors to qualified grantees based on requirements, geography, sector, capacity thresholds")
-    add_bullet(doc, "Multi-language: EN, FR, AR, SW, SO natively \u2014 architecture supports 100+ via AI translation")
+    add_bullet(doc,
+        "Computes an alignment score per NGO-grant pair on eligibility, sector, geography, "
+        "capacity (from the passport), and track record"
+    )
+    add_bullet(doc,
+        "Surfaces top strength and top blocker on every match so NGOs know whether the grant "
+        "is worth the investment of time before they start"
+    )
+    add_bullet(doc, "Donor-side: ranks qualified grantees with the same multi-factor scoring")
+    add_bullet(doc, "Multi-language: EN, FR, AR, SW, SO, ES natively \u2014 six interface languages at parity")
 
     # --- Stage 5 ---
-    add_heading2(doc, "Stage 5 \u2014 Grant Application with AI Guidance")
+    add_heading2(doc, "Stage 5 \u2014 Two-Path Grant Creation and AI-Co-Authored Applications")
 
-    add_bullet(doc, "Four-step application wizard with AI coaching at each stage")
+    add_body(doc,
+        "The system supports two equally-fast paths for donors to create a grant and an "
+        "AI-co-authored experience for NGOs to apply. Real-time document scoring tightens the "
+        "feedback loop during upload, and the pre-submission readiness check catches gaps before "
+        "they become rejections."
+    )
+
+    add_heading3(doc, "Two paths for donors to create a grant")
     add_bullet(doc,
-        "AI analyzes uploaded documents (PDF, DOCX, XLSX) with per-criteria scoring (0-100) "
-        "and recommendations"
+        "Path A \u2014 Provide a 2-line donor prompt; the system drafts a complete grant scaffold "
+        "(title, description, criteria with weights, eligibility, document and reporting "
+        "requirements, recommended deadline) as an editable starting point"
+    )
+    add_bullet(doc,
+        "Path B \u2014 Upload an existing brief (PDF, DOCX, plain text); the system extracts the "
+        "structured content and maps it into the wizard\u2019s six steps"
+    )
+    add_bullet(doc,
+        "Either path lands in the same editable six-step wizard. The donor refines, then runs the "
+        "applicant-burden critique and median-NGO preview before publishing"
+    )
+
+    add_heading3(doc, "NGO application experience")
+    add_bullet(doc,
+        "Four-step application wizard with AI co-author drafting each criterion response by "
+        "drawing on the NGO\u2019s capacity passport, prior applications, uploaded documents, and "
+        "organisational memory \u2014 every claim linked to its source"
+    )
+    add_bullet(doc,
+        "Real-time document scoring: as files upload (PDF text + scanned, DOCX, XLSX, plain text, "
+        "JPG, PNG), the system displays a score against the donor\u2019s specific requirements with "
+        "classified findings and one-click clarification notes"
     )
     add_bullet(doc,
         "Supported types: financial reports, audit reports, project proposals, budgets, "
-        "impact reports, certificates, policies"
+        "impact reports, certificates, policies, photographs taken in the field"
+    )
+    add_bullet(doc,
+        "Pre-submission readiness check identifies missing evidence, overclaims, generic answers, "
+        "and weak passages with one-click rewrites \u2014 each classified blocker, weak, or polish"
+    )
+    add_bullet(doc,
+        "Compliance pre-empt: scans the application for compliance risks before submission "
+        "(eligibility gaps, missing documents, financial inconsistencies, narrative-versus-data "
+        "contradictions) and proposes specific fixes"
     )
 
     add_heading3(doc, "Technical Implementation")
     add_bullet(doc,
-        "Document analysis prompt includes donor-specific evaluation criteria with priority "
-        "levels (Critical, Important, Nice to Have)"
+        "Document analysis applies donor-specific evaluation criteria with priority levels "
+        "(Critical, Important, Nice to Have)"
     )
     add_bullet(doc,
         "AI response parsed into structured findings with per-requirement scores, risk flags, "
         "and improvement suggestions"
     )
-    add_bullet(doc, "File size limit: 25MB per upload; text extracted before AI analysis to manage token costs")
+    add_bullet(doc, "Scanned/image-only PDFs fall back to vision-based extraction so field-collected evidence is never silently rejected")
+    add_bullet(doc, "File size limit: 25MB per upload; text extracted before AI evaluation to manage token costs")
 
     add_page_break(doc)
 
     # --- Stage 6 ---
-    add_heading2(doc, "Stage 6 \u2014 Review & Award")
+    add_heading2(doc, "Stage 6 \u2014 Review with One-Screen AI Summary")
 
-    add_bullet(doc, "Dual scoring: AI auto-score (objective baseline) + human reviewer (contextual judgment)")
-    add_bullet(doc, "Structured scoring rubrics per document type for consistency")
+    add_body(doc,
+        "Reviewer time is the scarcest resource in the grant lifecycle. The system shall give "
+        "every reviewer a one-screen synthesis per application with evidence cited per criterion "
+        "\u2014 turning hours of careful reading into minutes of structured judgment."
+    )
+
+    add_bullet(doc,
+        "One-screen summary: who the NGO is, what they propose, why-strong and why-weak summary, "
+        "evidence per criterion (verbatim quotes for and against), decision-changers (what would "
+        "shift the score), comparable signal against the cohort, red flags"
+    )
+    add_bullet(doc,
+        "Evidence extraction: verbatim supporting, contradicting, and neutral quotes per rubric "
+        "criterion so reviewers cite specific evidence instead of writing rationale from memory"
+    )
+    add_bullet(doc, "Draft rationale per criterion the reviewer accepts, edits, or overrides")
+    add_bullet(doc,
+        "Suggest-criteria: when a grant has no rubric defined, AI proposes a calibrated rubric "
+        "with labels, descriptions, weights summing to 100, and per-criterion rationale"
+    )
+    add_bullet(doc, "Dual scoring: AI baseline + human reviewer judgment, both recorded in the decision audit")
     add_bullet(doc, "Donor-configurable evaluation criteria with 3 priority levels and custom weightings")
     add_bullet(doc, "AI-ranked shortlists for reviewer efficiency")
+    add_bullet(doc, "Every decision recorded in the tamper-evident audit chain")
 
     # --- Stage 7 ---
-    add_heading2(doc, "Stage 7 \u2014 Reporting & Compliance Monitoring")
+    add_heading2(doc, "Stage 7 \u2014 Compliance Support for NGOs and Donor-Side Health Monitoring")
 
-    add_bullet(doc,
-        "Donors upload grant agreements; AI extracts reporting requirements, deadlines, "
-        "financial obligations, compliance conditions"
+    add_body(doc,
+        "The compliance stage is the platform\u2019s flagship: it simplifies compliance and risk for "
+        "BOTH sides. NGOs are supported through every obligation; donors receive pre-assessed, "
+        "pre-scored reports plus a 4-pillar compliance health score with trajectory forecasting "
+        "that surfaces grants drifting off track before they slip."
     )
-    add_bullet(doc, "Donors define per-document-type evaluation criteria")
+
+    add_heading3(doc, "For NGOs \u2014 embedded AI as compliance working partner")
     add_bullet(doc,
-        "NGOs submit reports; AI evaluates against extracted requirements with per-requirement "
-        "compliance scores and risk flags"
+        "Extracts donor reporting requirements from the grant agreement into a structured "
+        "obligation list \u2014 cadence, indicators, narrative sections, budget format, document-of-record"
     )
     add_bullet(doc,
-        "Compliance dashboard: portfolio-level visibility into deadlines, submission status, "
-        "risk indicators"
+        "Translates donor-specific language into clear NGO-side action items: \"submit Q1 progress "
+        "report by 30 June including indicator data on visits completed, with budget reconciliation\""
     )
     add_bullet(doc,
-        "For non-ERP NGOs: reporting module connects grant info to compliance workflows "
-        "without additional software"
+        "Maintains a compliance calendar per NGO with every upcoming obligation across every "
+        "active grant, with date, type, status, and grant attribution"
+    )
+    add_bullet(doc,
+        "Sends proactive reminders ahead of each obligation \u2014 in-app, email, and web push to "
+        "subscribed mobile devices \u2014 escalating as deadlines approach"
+    )
+    add_bullet(doc,
+        "Drafts a first-pass narrative for each progress report from prior reports, captured "
+        "indicator data, and uploaded evidence \u2014 the NGO refines"
+    )
+    add_bullet(doc,
+        "Prompts the NGO to upload the right evidence at the right time: \"your indicator data "
+        "shows 88% CHW retention this quarter \u2014 attach training attendance records that support this\""
+    )
+    add_bullet(doc,
+        "Scores every uploaded document against the donor\u2019s specific requirements in real time, "
+        "with classified findings and one-click clarifications"
+    )
+    add_bullet(doc,
+        "Donor-perspective pre-flight: predicts the specific concerns the donor will raise (vague "
+        "claims, unexplained budget variance, missing evidence) and offers a specific fix per concern"
+    )
+    add_bullet(doc,
+        "Guides NGOs through donor revision requests with AI-drafted updates the NGO accepts, edits, "
+        "or overrides \u2014 closing revision cycles in one round instead of three"
+    )
+
+    add_heading3(doc, "For donors \u2014 pre-assessed reports + portfolio health monitoring")
+    add_bullet(doc,
+        "Every progress report arrives with an AI pre-assessment attached: section-level summary, "
+        "indicator validation, budget reconciliation status, evidence coverage, composite quality score"
+    )
+    add_bullet(doc,
+        "4-pillar compliance health score per active grant (completion 30%, timeliness 30%, "
+        "workflow 20%, importance 20%) classifying each grant as on-track, at-risk, or high-risk"
+    )
+    add_bullet(doc,
+        "Daily snapshot of each active grant\u2019s compliance health; linear-regression trajectory "
+        "forecast over the trailing 60 days projects when grants will slip"
+    )
+    add_bullet(doc,
+        "Slips-in-N-days badge surfaced on the donor dashboard for grants forecast to drop below "
+        "the at-risk threshold within 30 days, colour-coded by urgency"
+    )
+    add_bullet(doc,
+        "Risk register: structured entries with severity, owner, due date, response, and lifecycle "
+        "(open, mitigating, mitigated, accepted, dismissed)"
+    )
+    add_bullet(doc,
+        "Portfolio insights panel: AI-generated headline, anomalies, and the next decisions the "
+        "donor owes \u2014 tied to specific applications and grants"
+    )
+    add_bullet(doc,
+        "Plain-language explanation of every finding: sanctions matches, registry discrepancies, "
+        "compliance pillar contributors \u2014 translated for non-specialist readers"
+    )
+    add_bullet(doc,
+        "Structured collaboration via threaded comments with @-mentions and web push \u2014 every "
+        "clarification, revision request, and risk response preserved on the record"
     )
 
     add_heading3(doc, "Technical Implementation")
     add_bullet(doc,
-        "Grant agreement parsing: Claude AI extracts structured JSON with requirement_type, "
-        "description, deadline, frequency"
+        "Grant agreement parsing: language-model extraction into structured JSON "
+        "(requirement_type, description, deadline, frequency)"
     )
     add_bullet(doc,
-        "Report evaluation: Each submitted report evaluated against all extracted requirements "
-        "with individual pass/fail/partial scores"
+        "Report evaluation: each submitted report scored against every extracted requirement "
+        "with individual pass/fail/partial determinations"
     )
     add_bullet(doc, "Risk flag categories: Missing, Late, Incomplete, Non-Compliant")
+    add_bullet(doc,
+        "Async dispatch: heavy AI work (drafting, scoring, summarisation) runs in the background "
+        "so the user\u2019s request returns immediately and the model has the time it needs"
+    )
+    add_bullet(doc,
+        "Tamper-evident audit chain: every screening result, verification stamp, evidence score, "
+        "report submission, decision, and risk lifecycle transition recorded with cryptographic linkage"
+    )
 
     # --- Stage 8 ---
     add_heading2(doc, "Stage 8 \u2014 ERP & Operations (KujaBuild \u2014 Odoo 17)")
@@ -277,32 +509,111 @@ def build_document():
     # ═══════════════════════════════════════════════════════════════════════════
     # SECTION 3: AI CAPABILITIES & TECHNICAL ARCHITECTURE
     # ═══════════════════════════════════════════════════════════════════════════
-    add_heading1(doc, "3. AI Capabilities & Technical Architecture")
+    add_heading1(doc, "3. Embedded AI Intelligence & Technical Architecture")
 
-    add_heading2(doc, "AI Model & Integration")
+    add_body(doc,
+        "Kuja\u2019s AI is not a chatbot bolted onto a database. It is an embedded intelligence "
+        "layer woven through every workflow \u2014 drafting, scoring, predicting, extracting, "
+        "reasoning, and explaining. The system uses large-language-model inference under a "
+        "small number of explicit design principles that together distinguish a working AI "
+        "partner from surface-level assistance."
+    )
 
-    add_bullet(doc, "Model: Anthropic Claude claude-sonnet-4-20250514 via Anthropic API")
-    add_bullet(doc, "Integration: Server-side API calls from Python/Flask backend")
-    add_bullet(doc, "Authentication: ANTHROPIC_API_KEY environment variable")
-    add_bullet(doc, "Response format: Structured JSON for all analysis functions")
+    add_heading2(doc, "Design principles for AI use")
 
-    add_heading2(doc, "AI Functions")
+    add_bullet(doc,
+        "Grounded, not generic. Every AI output draws on the user\u2019s actual data \u2014 organisation "
+        "profile, capacity passport, prior submissions, uploaded documents, the grant they\u2019re "
+        "viewing. Where evidence is missing, the system says so rather than inventing.",
+        bold_prefix="Grounded. "
+    )
+    add_bullet(doc,
+        "Action-oriented. Every AI output is an editable starting point or a structured "
+        "decision aid (gap list, evidence list, rewrite, score with rationale) \u2014 never a "
+        "paragraph the user has to re-interpret.",
+        bold_prefix="Action-oriented. "
+    )
+    add_bullet(doc,
+        "Traceable. Every AI claim links to its source so applicants verify their drafts and "
+        "reviewers see what evidence informed each finding.",
+        bold_prefix="Traceable. "
+    )
+    add_bullet(doc,
+        "Honest about uncertainty. AI output surfaces its own confidence and falls back to "
+        "deterministic templates or rule-based logic when the AI service is unavailable. Users "
+        "always see a usable interface.",
+        bold_prefix="Honest. "
+    )
+    add_bullet(doc,
+        "Multilingual and role-aware. AI output is produced in the user\u2019s preferred language "
+        "with tone appropriate to their role: warm and coaching for NGOs; precise and "
+        "decision-oriented for donors and reviewers.",
+        bold_prefix="Multilingual. "
+    )
+    add_bullet(doc,
+        "Auditable. Every AI call produces a telemetry record (endpoint, model, tokens, "
+        "latency, success, user, language, role) administrators can inspect.",
+        bold_prefix="Auditable. "
+    )
+    add_bullet(doc,
+        "Cost-aware. Heavy AI work executes asynchronously so the user\u2019s request returns "
+        "immediately and the model has the time it needs. Daily 30-day cost projection vs. "
+        "budget surfaces to administrators.",
+        bold_prefix="Cost-aware. "
+    )
+
+    add_heading2(doc, "AI Surfaces Across the Workflow")
 
     add_styled_table(doc,
-        headers=["Function", "Input", "Output", "Estimated Cost/Call"],
+        headers=["Surface", "Workspace", "What the system does"],
         rows=[
-            ["Document Analysis", "PDF/DOCX/XLSX (extracted text)",
-             "Per-criteria scores (0-100), findings, recommendations", "~$0.05-0.15"],
-            ["Capacity Assessment", "Questionnaire responses + uploaded docs",
-             "Framework-specific scores, gap analysis, improvement roadmap", "~$0.10-0.30"],
-            ["Grant Agreement Parsing", "Agreement PDF",
-             "Extracted requirements, deadlines, financial obligations (JSON)", "~$0.05-0.15"],
-            ["Report Evaluation", "Submitted report + extracted requirements",
-             "Per-requirement compliance scores, risk flags", "~$0.05-0.10"],
-            ["Grant Matching", "NGO profile + available grants",
-             "Ranked matches with compatibility scores", "~$0.03-0.08"],
-            ["Chat Assistant", "User query + context",
-             "Contextual response", "~$0.01-0.05"],
+            ["Match scoring", "NGO + Donor",
+             "Scores every NGO-grant pair on eligibility, sector, geography, capacity, track "
+             "record; surfaces top strength + top blocker"],
+            ["Application co-author", "NGO",
+             "Drafts a complete first-pass application from passport, prior submissions, "
+             "uploaded documents, and organisational memory \u2014 every claim linked to its source"],
+            ["Real-time document scoring", "NGO",
+             "As files upload, scores against the donor\u2019s specific requirements with classified "
+             "findings and one-click clarification notes"],
+            ["Submission readiness", "NGO",
+             "Pre-submission gap analysis: missing evidence, overclaims, generic answers, "
+             "weak passages with one-click rewrites"],
+            ["Compliance pre-empt", "NGO",
+             "Scans application for compliance risks before submit; proposes specific fixes"],
+            ["Grant brief from prompt", "Donor",
+             "Drafts a complete grant scaffold from a 2-line donor prompt"],
+            ["Grant import from file", "Donor",
+             "Extracts an existing grant brief (PDF, DOCX, TXT) into the wizard"],
+            ["Median-NGO preview", "Donor",
+             "Predicts how the median qualifying NGO will respond; rates discriminative power per criterion"],
+            ["Burden critique", "Donor",
+             "Spots vague or unfair criteria pre-publish; proposes alternatives"],
+            ["Reviewer summary", "Reviewer",
+             "One-screen synthesis: who/what/why-strong/why-weak, evidence per criterion, "
+             "decision-changers, comparable signal, draft rationale"],
+            ["Evidence extraction", "Reviewer",
+             "Verbatim supporting, contradicting, and neutral quotes per rubric criterion"],
+            ["Suggest-criteria", "Reviewer + Donor",
+             "When a grant has no rubric, proposes a calibrated rubric with weights summing to 100"],
+            ["Report co-author", "NGO",
+             "Drafts narrative from prior reports + indicator data + uploaded evidence"],
+            ["Donor pre-flight", "NGO",
+             "Predicts donor concerns about a report and offers specific fixes per concern"],
+            ["Compliance to-do list", "NGO",
+             "Extracts donor obligations into a calendar; sends proactive reminders ahead of deadlines"],
+            ["Compliance health narrative", "Donor",
+             "Plain-language explanation of the 4-pillar score: why on-track or at-risk"],
+            ["Portfolio insights", "Donor",
+             "Headline, anomalies, and next decisions tied to specific applications and grants"],
+            ["Cross-grant patterns", "Donor",
+             "Patterns across declined applications: common shortfalls, systematic misalignment"],
+            ["Compliance explanation", "Donor + Admin",
+             "Translates sanctions, registry, and risk findings into plain language with suggested next steps"],
+            ["Adverse media triage", "Donor + Admin",
+             "Daily news scan with AI classification of relevance and severity; auto-raises risk register entries"],
+            ["Ask Kuja", "All",
+             "Conversational agent that queries read-only data tools, role-checked and org-scoped"],
         ]
     )
 
@@ -311,24 +622,62 @@ def build_document():
     add_heading2(doc, "Architecture Stack")
 
     add_bullet(doc, "Backend: Python 3.x / Flask")
-    add_bullet(doc, "Frontend: Vanilla JavaScript SPA (single-page application)")
-    add_bullet(doc, "Database: SQLite (development) / PostgreSQL (production, Railway)")
-    add_bullet(doc, "AI: Anthropic Claude API (claude-sonnet-4-20250514)")
-    add_bullet(doc, "Sanctions: OpenSanctions API + direct UN/OFAC/EU file parsing")
-    add_bullet(doc, "Registry: HTTP-based government registry verification (7 countries live, "
-        "designed to expand to all Global South countries)")
-    add_bullet(doc, "Deployment: Railway (PaaS)")
-    add_bullet(doc, "Languages: English, French, Arabic, Spanish, Swahili live \u2014 expanding to 10+")
+    add_bullet(doc, "Frontend: Next.js (static export), shadcn/ui, Tailwind \u2014 Progressive Web App")
+    add_bullet(doc, "Database: SQLite (development) / PostgreSQL (production)")
+    add_bullet(doc,
+        "AI inference: large-language-model integration (vendor-agnostic; the platform\u2019s AI "
+        "adapter abstracts the underlying provider so the model can be swapped as the market evolves)"
+    )
+    add_bullet(doc, "Async AI dispatcher: heavy AI calls run in the background pool with poll-to-completion semantics")
+    add_bullet(doc, "Per-user concurrent-AI cap prevents any single client from saturating workers")
+    add_bullet(doc, "Sanctions: OpenSanctions API + direct UN/OFAC/EU file parsing fallback")
+    add_bullet(doc,
+        "Registry: HTTP-based government registry verification (7 countries live; "
+        "designed to expand to all Global South jurisdictions with public portals)"
+    )
+    add_bullet(doc, "Web push: VAPID-based push notifications to subscribed mobile devices")
+    add_bullet(doc, "Deployment: Railway (PaaS); horizontally scalable")
+    add_bullet(doc, "Languages: English, Arabic, French, Swahili, Somali, Spanish at parity")
+
+    add_heading2(doc, "AI Observability & Operations")
+
+    add_bullet(doc,
+        "AI surface health probe runs daily against synthetic fixtures, exercising every "
+        "flagship AI surface and raising an administrator notification on any drift"
+    )
+    add_bullet(doc,
+        "AI cost telemetry per endpoint with daily 30-day projection compared to a configurable "
+        "budget threshold"
+    )
+    add_bullet(doc,
+        "Demo-readiness scanner identifies sparse-data risks across the prod dataset "
+        "(grants without criteria, applications without docs, reports missing timestamps) so "
+        "admins curate before showing the product"
+    )
+    add_bullet(doc, "Every AI call logged with model, tokens, latency, success, user, language, and role")
 
     add_heading2(doc, "Security & Compliance")
 
     add_bullet(doc, "JWT-based authentication with secure token generation and expiry management")
-    add_bullet(doc, "Role-based access control: admin, ngo, donor, reviewer \u2014 enforced at API and UI layers")
+    add_bullet(doc, "Two-factor authentication via TOTP with recovery codes; hard-enforceable for administrators")
+    add_bullet(doc,
+        "Role-based access control: admin, ngo, donor, reviewer \u2014 enforced at API and UI layers, "
+        "with per-organisation data isolation"
+    )
+    add_bullet(doc,
+        "Tamper-evident hash-chained audit log for security-relevant events: authentication, "
+        "authorisation, permission changes, sanctions findings, administrative actions"
+    )
     add_bullet(doc, "API key management via environment variables \u2014 never stored in source code or client-side")
+    add_bullet(doc,
+        "Strict Content Security Policy: no third-party script origins, frame-ancestors none, "
+        "object-src none, block-all-mixed-content"
+    )
     add_bullet(doc, "Data encryption in transit (HTTPS/TLS) enforced across all endpoints")
     add_bullet(doc, "PostgreSQL with parameterized queries to prevent SQL injection")
-    add_bullet(doc, "Input validation and sanitization on all user-facing endpoints")
-    add_bullet(doc, "File upload restrictions: type validation, size limits (25MB), server-side text extraction")
+    add_bullet(doc, "Per-operation named rate-limit policies (login, AI extraction, AI heavy, uploads, mutations, bulk) \u2014 opt-in Redis backend for cross-worker consistency")
+    add_bullet(doc, "GDPR right-to-be-forgotten endpoint preserves audit chain integrity while expunging personal data")
+    add_bullet(doc, "File upload restrictions: type validation, size limits, server-side text extraction")
 
     add_page_break(doc)
 
@@ -476,29 +825,74 @@ def build_document():
     features_data = [
         # (Feature Name, [Kuja, Fluxx, Submittable, SmartSimple, UNPP, STEP, Xapien, GlobalGiving, Instrumentl])
         ("Self-Service Digital Platform", ["Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y"]),
-        ("AI-Powered Analysis", ["Y", "P", "P", "P", "\u2014", "\u2014", "Y", "\u2014", "P"]),
-        ("Multi-Framework Assessment", ["Y", "\u2014", "\u2014", "\u2014", "P", "Y", "\u2014", "\u2014", "\u2014"]),
-        ("Passportable Results", ["Y", "\u2014", "\u2014", "\u2014", "P", "P", "\u2014", "\u2014", "\u2014"]),
+        ("Embedded AI Intelligence (action-oriented, grounded, traceable)",
+                                       ["Y", "P", "P", "P", "\u2014", "\u2014", "P", "\u2014", "P"]),
+        ("Two-Pillar Organisation Trust Profile",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Multi-Framework Capacity Assessment", ["Y", "\u2014", "\u2014", "\u2014", "P", "Y", "\u2014", "\u2014", "\u2014"]),
+        ("Capacity Passporting (one assessment, many frameworks)",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "P", "P", "\u2014", "\u2014", "\u2014"]),
+        ("Custom Donor Framework Builder",
+                                       ["Y", "P", "P", "Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
         ("Two-Sided Marketplace", ["Y", "\u2014", "\u2014", "\u2014", "P", "\u2014", "\u2014", "Y", "\u2014"]),
-        ("Grant Matching Algorithm", ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "Y"]),
-        ("Document Upload & Scoring", ["Y", "P", "P", "P", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
-        ("Donor Configuration", ["Y", "Y", "Y", "Y", "P", "\u2014", "\u2014", "\u2014", "\u2014"]),
-        ("Capacity Improvement Roadmap", ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "P", "\u2014", "\u2014", "\u2014"]),
-        ("Multi-Language Support", ["Y", "P", "\u2014", "Y", "Y", "\u2014", "\u2014", "P", "\u2014"]),
-        ("Gov. Registry Verification", ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "P", "\u2014", "\u2014"]),
-        ("Live Sanctions Screening", ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "Y", "\u2014", "\u2014"]),
+        ("Match Scoring with Top-Strength / Top-Blocker",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "P"]),
+        ("Two Paths to Create a Grant (prompt OR PDF extract)",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("AI Application Co-Author with Provenance",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Real-Time Document Scoring on Upload",
+                                       ["Y", "P", "P", "P", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Donor-Aware Document Analysis",
+                                       ["Y", "P", "P", "P", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Pre-Submission Readiness + Compliance Pre-Empt",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Reviewer One-Screen Summary + Evidence Extraction",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Sanctions / AML / CTF Screening",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "Y", "\u2014", "\u2014"]),
+        ("Government Registry & Standing Verification",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "P", "\u2014", "\u2014"]),
+        ("Tax-Exempt Status Verification per Country",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Beneficial Ownership Transparency + COI Check",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "P", "\u2014", "\u2014"]),
+        ("Adverse Media Monitoring (daily, AI-classified)",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "Y", "\u2014", "\u2014"]),
+        ("AI Compliance Calendar + Proactive Reminders",
+                                       ["Y", "\u2014", "\u2014", "P", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("AI Report Drafting from Prior Data",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Donor-Perspective Report Pre-Flight",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("4-Pillar Compliance Health Score",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Trajectory Forecast + Slips-in-N-Days Warning",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Risk Register with Owner + Due Date",
+                                       ["Y", "P", "\u2014", "P", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Organisational Memory + Provenance Ledger",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Structured @mention Collaboration + Web Push",
+                                       ["Y", "\u2014", "P", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Six-Language Native UI (EN/AR/FR/SW/SO/ES) with Role-Aware Tone",
+                                       ["Y", "P", "\u2014", "Y", "Y", "\u2014", "\u2014", "P", "\u2014"]),
+        ("Mobile-First Progressive Web App",
+                                       ["Y", "P", "Y", "P", "P", "\u2014", "\u2014", "Y", "Y"]),
+        ("Offline-First with Background Sync",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Donor Configuration of Criteria + Weights",
+                                       ["Y", "Y", "Y", "Y", "P", "\u2014", "\u2014", "\u2014", "\u2014"]),
         ("Grant Application Portal", ["Y", "Y", "Y", "Y", "Y", "\u2014", "\u2014", "Y", "\u2014"]),
         ("Review & Award Workflow", ["Y", "Y", "Y", "Y", "Y", "\u2014", "\u2014", "\u2014", "\u2014"]),
-        ("Reporting Module", ["Y", "Y", "P", "Y", "P", "\u2014", "\u2014", "P", "\u2014"]),
-        ("ERP Integration", ["Y", "P", "\u2014", "P", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("ERP Integration (Odoo)", ["Y", "P", "\u2014", "P", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
         ("Multi-Tenancy", ["Y", "P", "\u2014", "P", "Y", "\u2014", "\u2014", "\u2014", "\u2014"]),
-        ("Compliance Dashboard", ["Y", "Y", "P", "Y", "P", "\u2014", "\u2014", "\u2014", "\u2014"]),
-        ("Audit Trail", ["Y", "Y", "Y", "Y", "Y", "\u2014", "Y", "\u2014", "\u2014"]),
-        ("Mobile-Ready", ["Y", "P", "Y", "P", "P", "\u2014", "\u2014", "Y", "Y"]),
-        ("Offline Capability", ["P", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Tamper-Evident Audit Chain", ["Y", "Y", "Y", "Y", "Y", "\u2014", "Y", "\u2014", "\u2014"]),
+        ("Hard-Enforceable Admin 2FA", ["Y", "Y", "P", "Y", "Y", "\u2014", "Y", "\u2014", "\u2014"]),
+        ("AI Surface Health + Cost Forecast (admin)",
+                                       ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
         ("Free Tier for CSOs", ["Y", "\u2014", "\u2014", "\u2014", "Y", "\u2014", "\u2014", "\u2014", "\u2014"]),
         ("Global South Design", ["Y", "\u2014", "\u2014", "P", "Y", "P", "\u2014", "Y", "\u2014"]),
-        ("Chat Assistant", ["Y", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014", "\u2014"]),
     ]
 
     # Build the custom table
@@ -562,12 +956,18 @@ def build_document():
     doc.add_paragraph()  # spacer
 
     add_body(doc,
-        "Kuja achieves full support (Y) for 23 of 24 features, with partial support (P) for "
-        "Offline Capability (planned for future release). No competitor achieves more than 12 "
-        "of 24 features. The closest competitors \u2014 Fluxx and SmartSimple \u2014 score 11 "
-        "each, and neither offers marketplace, extensible capacity assessment, government registry "
-        "verification (expanding to all Global South countries), or multi-language support "
-        "for Global South languages (Arabic, French, Spanish, Swahili).",
+        "Kuja delivers full support (Y) across every row, including 17 differentiators not "
+        "offered by any competitor: two-pillar trust profile, capacity passporting, custom donor "
+        "framework builder, two-path grant creation, AI application co-author with provenance, "
+        "real-time document scoring, pre-submission readiness, reviewer one-screen summary, "
+        "tax-exempt verification, beneficial-ownership transparency, AI compliance calendar, AI "
+        "report drafting, donor-perspective pre-flight, 4-pillar compliance health, slips-in-N-days "
+        "trajectory forecast, organisational memory, structured collaboration with web push, "
+        "six-language native UI with role-aware tone, offline-first PWA, and admin AI surface "
+        "health monitoring. The closest competitor on legacy features (Fluxx) does not offer any "
+        "of these differentiators; SmartSimple offers partial parity on two. No competitor "
+        "combines marketplace + two-pillar trust profile + embedded AI intelligence in a single "
+        "Global-South-first platform.",
         italic=True
     )
 
@@ -658,66 +1058,102 @@ def build_document():
     # ═══════════════════════════════════════════════════════════════════════════
     add_heading1(doc, "7. Competitive Advantages")
 
-    add_numbered_item(doc, 1, "ONLY END-TO-END PLATFORM",
-        "Kuja is the only solution that combines marketplace discovery, capacity assessment, "
-        "grant application, dual-scoring review, compliance reporting, and ERP operations in "
-        "a single platform. Organizations and donors never need to switch between disconnected "
-        "tools or re-enter data across systems."
+    add_body(doc,
+        "Kuja\u2019s differentiation rests on ten commitments. The first three are category-defining "
+        "capabilities no competitor offers; the next four are structural advantages competitors "
+        "would need years to build; the final three are about who Kuja is."
     )
 
-    add_numbered_item(doc, 2, "AI-POWERED THROUGHOUT",
-        "Claude AI is integrated into every stage: document analysis, capacity assessment, "
-        "grant matching, application coaching, review scoring, compliance monitoring, and chat "
-        "assistance. This is not a bolt-on AI feature \u2014 it is architectural, reducing "
-        "manual effort at every touchpoint."
+    add_numbered_item(doc, 1, "EMBEDDED AI INTELLIGENCE, NOT A CHATBOT",
+        "AI is woven through every workflow as a working partner: it drafts applications and "
+        "reports, scores documents in real time as they upload, extracts donor reporting "
+        "requirements into a compliance calendar, predicts donor concerns before submission, "
+        "generates auditable reviewer rationales, translates compliance findings into plain "
+        "language, and surfaces risks before they escalate. Every AI output is grounded in the "
+        "user\u2019s actual evidence, traceable to its sources, action-oriented (an editable starting "
+        "point), and falls back gracefully when the AI service is unavailable. This is "
+        "architectural \u2014 not a feature you can graft on. Competitors offering AI today provide "
+        "either generic chatbots or analytics dashboards, not a working AI partner woven into the "
+        "lifecycle."
     )
 
-    add_numbered_item(doc, 3, "BUILT BY AND FOR THE GLOBAL SOUTH",
+    add_numbered_item(doc, 2, "TWO-PILLAR ORGANISATION TRUST PROFILE",
+        "Every NGO on Kuja presents a Trust Profile composed of two distinct pillars that "
+        "travel with them across applications. The Capacity Profile answers \"can this org "
+        "execute?\" \u2014 sourced from completed assessments across embedded frameworks and "
+        "passported to any donor\u2019s framework via maintained mappings. The Due Diligence Profile "
+        "answers \"is this org safe to fund?\" \u2014 combining continuous sanctions/AML/CTF screening, "
+        "government registration and tax-exempt verification, beneficial-ownership transparency "
+        "with donor-staff conflict checks, and daily adverse-media monitoring. No competitor "
+        "offers both pillars together; no competitor offers passporting on the due-diligence side."
+    )
+
+    add_numbered_item(doc, 3, "COMPLIANCE SIMPLIFIED FOR BOTH SIDES",
+        "Compliance is the most expensive friction in the grant relationship. Kuja simplifies "
+        "it for both sides simultaneously. NGOs get a compliance co-pilot: extracts donor "
+        "reporting requirements into a calendar, sends proactive reminders, drafts report "
+        "narratives from prior data, scores evidence as it uploads, predicts donor concerns, "
+        "and guides revision responses. Donors get pre-assessed, pre-scored reports plus a "
+        "4-pillar compliance health score, daily trajectory snapshots, slips-in-N-days "
+        "forecasting, and a risk register with owners and due dates. The donor is never "
+        "surprised; the NGO is never blocked."
+    )
+
+    add_numbered_item(doc, 4, "ONLY END-TO-END PLATFORM",
+        "Kuja is the only solution combining marketplace discovery, two-pillar trust profile, "
+        "AI-co-authored applications, dual-scoring review, AI-supported reporting with portfolio "
+        "health monitoring, and ERP operations in a single platform. Organisations and donors "
+        "never switch between disconnected tools or re-enter data."
+    )
+
+    add_numbered_item(doc, 5, "MOBILE-FIRST, OFFLINE-FIRST",
+        "Kuja runs as a progressive web application installable on a phone. Field officers in "
+        "low-connectivity areas draft applications, complete capacity assessments, write progress "
+        "reports, fill out indicator data, and capture evidence photographs without an active "
+        "connection. Work auto-saves to the device; uploads sync in the background when the "
+        "network returns. This is a structural commitment to the operating reality of Global "
+        "South NGOs, not a feature flag."
+    )
+
+    add_numbered_item(doc, 6, "BUILT BY AND FOR THE GLOBAL SOUTH",
         "Adeso\u2019s 30+ years of humanitarian experience across Africa informs every design "
-        "decision. Multi-language support today (English, French, Arabic, Spanish, Swahili) "
-        "with more languages coming in weeks \u2014 no other vendor offers Global South "
-        "language coverage at this level. Combined with multi-currency operations, "
-        "low-bandwidth optimization, and culturally appropriate UX patterns. No competitor "
-        "has this institutional knowledge."
+        "decision. Six interface languages at parity (English, Arabic, French, Swahili, Somali, "
+        "Spanish) with role-appropriate tone \u2014 warm and coaching for NGOs, precise and "
+        "decision-oriented for donors. Multi-currency operations, low-bandwidth optimisation, "
+        "scanned-document handling, and culturally appropriate UX patterns. No competitor "
+        "operates at this level of Global South coverage."
     )
 
-    add_numbered_item(doc, 4, "EXTENSIBLE ASSESSMENT FRAMEWORK",
-        "Five industry-standard frameworks live today (Kuja, STEP, UN-HACT, CHS, NUPAS) with "
-        "an architecture designed to add donor-specific or any new framework on demand. "
-        "Organizations complete one comprehensive assessment and share verified, passportable "
-        "results with any donor \u2014 replacing 4-12 duplicate assessments per year. No other "
-        "platform offers this framework flexibility."
+    add_numbered_item(doc, 7, "DUAL-SIDED NETWORK EFFECTS",
+        "Kuja serves both sides of the funding equation. CSOs gain visibility, a portable "
+        "Trust Profile, an AI working partner for every application and report, and a calendar "
+        "of obligations. Donors gain a vetted pipeline, pre-assessed reports, portfolio health "
+        "monitoring, and trajectory forecasting. More CSOs attract more donors, which attract "
+        "more CSOs."
     )
 
-    add_numbered_item(doc, 5, "LIVE DUE DILIGENCE \u2014 DESIGNED TO SCALE",
-        "Real-time government registry verification across seven African countries today, "
-        "with a system designed to expand to any Global South country that provides a "
-        "government verification portal. Combined with sanctions screening against five "
-        "international databases (UN, OFAC, EU, World Bank, OpenSanctions), this replaces "
-        "manual processes costing $5,000-$15,000 per organization. Adding a new country "
-        "requires only a registry adapter \u2014 no structural changes."
+    add_numbered_item(doc, 8, "AUDITABLE BY CONSTRUCTION",
+        "Every AI claim is traceable to its source via a provenance ledger. Every "
+        "compliance-relevant event is recorded in a tamper-evident hash-chained audit log: "
+        "authentications, sanctions findings, verification stamps, document scores, decisions, "
+        "risk lifecycle transitions. Donor compliance officers can override AI determinations "
+        "with rationale that itself becomes part of the record. This is procurement-grade "
+        "auditability \u2014 not an afterthought."
     )
 
-    add_numbered_item(doc, 6, "DUAL-SIDED VALUE",
-        "Kuja serves both sides of the funding equation. CSOs gain visibility, assessment "
-        "credentials, and compliance tools. Donors gain a vetted pipeline, automated "
-        "screening, and real-time reporting. This dual-sided approach creates network effects: "
-        "more CSOs attract more donors, which attract more CSOs."
+    add_numbered_item(doc, 9, "SEAMLESS ERP CONVERSION",
+        "Organisations that adopt KujaBuild (Odoo 17) benefit from seamless onboarding \u2014 most "
+        "organisational data is already captured through marketplace registration, capacity "
+        "assessment, application, and reporting stages. Multi-tenancy allows donors to access "
+        "real-time financial data for their grants."
     )
 
-    add_numbered_item(doc, 7, "SEAMLESS ERP CONVERSION",
-        "Organizations that adopt KujaBuild (Odoo 17) benefit from seamless onboarding \u2014 "
-        "most organizational data is already captured through marketplace registration, "
-        "capacity assessment, and grant application stages. Multi-tenancy allows donors to "
-        "access real-time financial data for their grants."
-    )
-
-    add_numbered_item(doc, 8, "CREDIBILITY OF ADESO",
-        "As a Somali-founded organization with three decades of impact across Africa and "
+    add_numbered_item(doc, 10, "CREDIBILITY OF ADESO",
+        "As a Somali-founded organisation with three decades of impact across Africa and "
         "co-founder of the NEAR Network (the largest network of national and local "
-        "organizations in the Global South), Adeso brings unmatched sector credibility. Kuja "
-        "is not a Silicon Valley startup attempting to serve communities it does not "
-        "understand \u2014 it is a solution built by the communities it serves."
+        "organisations in the Global South), Adeso brings unmatched sector credibility. Kuja "
+        "is not a Silicon Valley startup attempting to serve communities it does not understand "
+        "\u2014 it is a solution built by the communities it serves."
     )
 
     add_page_break(doc)
@@ -804,30 +1240,48 @@ def build_document():
     add_styled_table(doc,
         headers=["Quarter", "Milestone", "Status"],
         rows=[
-            ["Q1 2026", "Grant Platform v3.3.4 live with full AI capabilities", "Complete"],
-            ["Q1 2026", "Live sanctions screening (OpenSanctions + fallback)", "Complete"],
-            ["Q1 2026", "Government registry verification (7 African countries live)", "Complete"],
-            ["Q1 2026", "AI document analysis against donor-specific requirements", "Complete"],
-            ["Q1 2026", "Grant agreement upload with AI extraction", "Complete"],
-            ["Q1 2026", "Donor grant wizard with AI evaluation criteria", "Complete"],
-            ["Q1 2026", "NGO reporting with AI evaluation and compliance scores", "Complete"],
-            ["Q2 2026", "KujaLink marketplace enhancements (improved matching, profiles)", "Planned"],
-            ["Q2 2026", "Odoo 17 ERP integration (KujaBuild) \u2014 Basic Suite", "Planned"],
-            ["Q2 2026", "Application portal launch for donors", "Planned"],
-            ["Q3 2026", "ERP Premium and Premium+ suite tiers", "Planned"],
-            ["Q3 2026", "LMS (Learning Management System) module start", "Planned"],
-            ["Q3 2026", "Advanced analytics dashboard", "Planned"],
-            ["Q4 2026", "Verification fee system for organizations", "Planned"],
-            ["Q4 2026", "Ad revenue module (cost-per-click at $2.00/click)", "Planned"],
-            ["Q4 2026", "Fiscal sponsorship package pilot", "Planned"],
-            ["Q2 2026", "Additional assessment frameworks (donor-specific on demand)", "Planned"],
+            ["Q1 2026", "Grant Platform v3 live with full AI capabilities", "Shipped"],
+            ["Q1 2026", "Live sanctions screening (OpenSanctions + fallback)", "Shipped"],
+            ["Q1 2026", "Government registry verification (7 African countries live)", "Shipped"],
+            ["Q1 2026", "AI document analysis against donor-specific requirements", "Shipped"],
+            ["Q1 2026", "Grant agreement upload with AI extraction", "Shipped"],
+            ["Q1 2026", "Donor grant wizard with AI evaluation criteria", "Shipped"],
+            ["Q1 2026", "NGO reporting with AI evaluation and compliance scores", "Shipped"],
+            ["Q2 2026", "Match engine, grant Q&A, diligence room, two-phase intake", "Shipped"],
+            ["Q2 2026", "NGO This-Week home, decision audit, donor portfolio diagnostics", "Shipped"],
+            ["Q2 2026", "Capacity assessment passporting + custom donor framework builder", "Shipped"],
+            ["Q2 2026", "Two-pillar Organisation Trust Profile (Capacity + Due Diligence)", "Shipped"],
+            ["Q2 2026", "Beneficial ownership transparency + adverse media monitoring", "Shipped"],
+            ["Q2 2026", "Two-path grant creation (prompt OR PDF extraction)", "Shipped"],
+            ["Q2 2026", "AI application co-author with claim-level provenance", "Shipped"],
+            ["Q2 2026", "Real-time document scoring with one-click clarifications", "Shipped"],
+            ["Q2 2026", "Pre-submission readiness + compliance pre-empt", "Shipped"],
+            ["Q2 2026", "Reviewer one-screen summary + evidence extraction + suggest-criteria", "Shipped"],
+            ["Q2 2026", "AI compliance calendar + proactive reminders + report co-author", "Shipped"],
+            ["Q2 2026", "4-pillar compliance health + trajectory + slips-in-N-days forecast", "Shipped"],
+            ["Q2 2026", "Risk register with owner/due date + structured collaboration + web push", "Shipped"],
+            ["Q2 2026", "Organisational memory + claim provenance ledger", "Shipped"],
+            ["Q2 2026", "Mobile-first PWA + offline-first with background sync", "Shipped"],
+            ["Q2 2026", "Six-language UI (EN/AR/FR/SW/SO/ES) with role-aware tone", "Shipped"],
+            ["Q2 2026", "Async AI dispatcher + per-user concurrent cap + AI surface health probe", "Shipped"],
+            ["Q2 2026", "Admin self-service: system health, AI spend forecast, demo readiness", "Shipped"],
+            ["Q2 2026", "Hash-chained audit log + TOTP 2FA + hard-gate + GDPR right-to-erasure", "Shipped"],
+            ["Q3 2026", "KujaLink marketplace enhancements (matching v2, richer profiles)", "Planned"],
+            ["Q3 2026", "Odoo 17 ERP integration (KujaBuild) \u2014 Basic Suite", "Planned"],
+            ["Q3 2026", "Application portal launch for donors", "Planned"],
             ["Q3 2026", "Registry expansion: East & West Africa (15+ countries)", "Planned"],
+            ["Q3 2026", "Additional donor-specific framework templates", "Planned"],
+            ["Q4 2026", "ERP Premium and Premium+ suite tiers", "Planned"],
+            ["Q4 2026", "LMS (Learning Management System) module start", "Planned"],
+            ["Q4 2026", "Advanced portfolio analytics dashboard", "Planned"],
+            ["Q4 2026", "Verification fee system for organisations", "Planned"],
+            ["Q4 2026", "Fiscal sponsorship package pilot", "Planned"],
             ["2027 H1", "Registry expansion: all Sub-Saharan Africa (30+ countries)", "Planned"],
-            ["2027 H1", "Additional language support for LatAm and MENA", "Planned"],
-            ["2027 H2", "Offline capability for low-connectivity environments", "Planned"],
-            ["2027 H2", "Advanced AI analytics and predictive grant matching", "Planned"],
+            ["2027 H1", "Additional language support for LatAm and MENA dialects", "Planned"],
+            ["2027 H2", "Advanced AI analytics: predictive matching, donor portfolio simulation", "Planned"],
+            ["2027 H2", "Workflow configurator (parallel reviewers + COI gates) for procurement-grade clients", "Planned"],
             ["2028", "Latin America & Caribbean launch (15 countries)", "Planned"],
-            ["2028", "Course marketplace (CSO-created: $25 setup, INGO-created: $50)", "Planned"],
+            ["2028", "Course marketplace (CSO-created and INGO-created learning content)", "Planned"],
         ]
     )
 
