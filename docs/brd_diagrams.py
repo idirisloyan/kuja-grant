@@ -38,19 +38,37 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 def _block(ax, x, y, w, h, label, fill=SAND, edge=NAVY, text=NAVY,
            bold=True, fontsize=9, sub=None):
-    """A rounded block with a centred label, optional subtitle."""
+    """A rounded block with a centred label, optional subtitle.
+
+    When `sub` is provided, the label sits in the upper portion of the
+    box and the subtitle sits in the lower portion, with the gap scaled
+    to the box height so multi-line subtitles do not overlap the label.
+    """
     box = FancyBboxPatch(
         (x, y), w, h, boxstyle="round,pad=0.02,rounding_size=0.06",
         linewidth=1.3, edgecolor=edge, facecolor=fill, zorder=2,
     )
     ax.add_patch(box)
-    ax.text(x + w / 2, y + h / 2 + (0.05 if sub else 0), label,
-            ha="center", va="center", color=text, fontsize=fontsize,
-            fontweight=("bold" if bold else "normal"), zorder=3)
-    if sub:
-        ax.text(x + w / 2, y + h / 2 - 0.12, sub,
-                ha="center", va="center", color=MUTED, fontsize=fontsize - 1.5,
-                zorder=3)
+    if sub is None:
+        # Single label — vertical centre.
+        ax.text(x + w / 2, y + h / 2, label,
+                ha="center", va="center", color=text, fontsize=fontsize,
+                fontweight=("bold" if bold else "normal"), zorder=3)
+    else:
+        # Label in upper portion (centre of top third), subtitle in
+        # centre of bottom two-thirds. Works for single- and multi-line
+        # subs without collisions.
+        sub_lines = str(sub).count("\n") + 1
+        label_lines = str(label).count("\n") + 1
+        # Anchor heights, scaled to the box.
+        label_y = y + h * (0.70 if sub_lines >= 2 else 0.66)
+        sub_y = y + h * 0.30
+        ax.text(x + w / 2, label_y, label,
+                ha="center", va="center", color=text, fontsize=fontsize,
+                fontweight=("bold" if bold else "normal"), zorder=3)
+        ax.text(x + w / 2, sub_y, sub,
+                ha="center", va="center", color=MUTED,
+                fontsize=max(fontsize - 1.5, 7), zorder=3)
 
 
 def _arrow(ax, x1, y1, x2, y2, color=NAVY, dashed=False, label=None):
@@ -75,77 +93,103 @@ def _arrow(ax, x1, y1, x2, y2, color=NAVY, dashed=False, label=None):
 # ---------------------------------------------------------------------------
 
 def diagram_system_overview():
-    fig, ax = plt.subplots(figsize=(11, 6.5), dpi=200)
-    ax.set_xlim(0, 11); ax.set_ylim(0, 7.5)
+    fig, ax = plt.subplots(figsize=(13, 7.5), dpi=200)
+    ax.set_xlim(0, 13); ax.set_ylim(0, 8.5)
     ax.set_axis_off()
 
     # Title
-    ax.text(5.5, 7.1, "Kuja Grant Management System — Architecture Overview",
-            ha="center", va="center", color=NAVY, fontsize=13, fontweight="bold")
+    ax.text(6.5, 8.1, "Kuja — An AI-Powered Grant Management System",
+            ha="center", va="center", color=NAVY, fontsize=14, fontweight="bold")
+    ax.text(6.5, 7.75,
+            "Architecture overview — users, capability pillars, and external integrations",
+            ha="center", color=MUTED, fontsize=9, style="italic")
 
     # Left: user roles
-    ax.text(1.4, 6.4, "USERS", ha="center", fontsize=8, color=MUTED, fontweight="bold")
+    ax.text(1.65, 7.2, "USERS", ha="center", fontsize=9, color=MUTED, fontweight="bold")
     roles = [
-        ("NGO", "Apply, report, monitor obligations"),
-        ("Donor", "Publish, evaluate, monitor"),
-        ("Reviewer", "Evaluate against rubric"),
-        ("Administrator", "Operate the platform"),
+        ("NGO", "Apply, report,\nmonitor obligations"),
+        ("Donor", "Publish, evaluate,\nmonitor"),
+        ("Reviewer", "Evaluate\nagainst rubric"),
+        ("Administrator", "Operate\nthe platform"),
     ]
     for i, (r, s) in enumerate(roles):
-        _block(ax, 0.2, 5.6 - i * 1.35, 2.4, 1.0, r, sub=s)
+        _block(ax, 0.3, 6.3 - i * 1.55, 2.7, 1.15, r, sub=s, fontsize=10)
 
     # Centre: Kuja platform
-    plat = FancyBboxPatch((3.2, 0.9), 4.6, 5.5,
+    plat_x, plat_y, plat_w, plat_h = 3.6, 0.6, 5.8, 6.6
+    plat = FancyBboxPatch((plat_x, plat_y), plat_w, plat_h,
                           boxstyle="round,pad=0.04,rounding_size=0.08",
-                          linewidth=1.6, edgecolor=NAVY, facecolor=WHITE, zorder=2)
+                          linewidth=1.8, edgecolor=NAVY, facecolor=WHITE, zorder=2)
     ax.add_patch(plat)
-    ax.text(5.5, 6.05, "KUJA PLATFORM", ha="center", va="center",
-            color=NAVY, fontsize=11, fontweight="bold")
+    ax.text(plat_x + plat_w / 2, plat_y + plat_h - 0.35, "KUJA PLATFORM",
+            ha="center", va="center", color=NAVY, fontsize=12, fontweight="bold")
+    ax.text(plat_x + plat_w / 2, plat_y + plat_h - 0.7,
+            "Two trust pillars + AI working partner woven through every workflow",
+            ha="center", color=MUTED, fontsize=7.5, style="italic")
 
+    # 12 capability cells in a 3 × 4 grid inside the platform box.
+    # Two Trust Profile pillars + Embedded AI are highlighted (clay).
     capabilities = [
-        ("Identity &\nAccess", 3.4, 4.85),
-        ("Grant\nLifecycle", 5.0, 4.85),
-        ("Application\nLifecycle", 6.6, 4.85),
-        ("Capacity\nPassport", 3.4, 3.65),
-        ("AI\nCo-pilot", 5.0, 3.65),
-        ("Documents\n& Evidence", 6.6, 3.65),
-        ("Compliance\n& Risk", 3.4, 2.45),
-        ("Collaboration\n& Notifications", 5.0, 2.45),
-        ("Org Memory\n& Provenance", 6.6, 2.45),
-        ("Reporting\n& Outcomes", 3.4, 1.25),
-        ("Admin &\nObservability", 5.0, 1.25),
-        ("i18n &\nLocalisation", 6.6, 1.25),
+        # (label, is_flagship)
+        ("Identity &\nAccess", False),
+        ("Grant\nLifecycle", False),
+        ("Application\nLifecycle", False),
+        ("Capacity\nPassport", True),       # Trust pillar 1
+        ("Due\nDiligence", True),           # Trust pillar 2
+        ("Embedded AI\nAssistance", True),  # The AI working partner
+        ("Documents\n& Evidence", False),
+        ("Compliance\n& Risk Health", False),
+        ("Collaboration\n& Notifications", False),
+        ("Org Memory\n& Provenance", False),
+        ("Reporting\n& Outcomes", False),
+        ("Admin &\nObservability", False),
     ]
-    for label, x, y in capabilities:
-        fill = CLAY_SOFT if "AI" in label or "Memory" in label else SAND
-        edge = CLAY if fill == CLAY_SOFT else NAVY
-        _block(ax, x - 0.65, y - 0.45, 1.3, 0.9, label,
-               fill=fill, edge=edge, text=NAVY, fontsize=8)
+    cols = 3; rows = 4
+    inner_x = plat_x + 0.25
+    inner_y = plat_y + 0.4
+    grid_w = plat_w - 0.5
+    grid_h = plat_h - 1.4   # leave room for header
+    cell_w = (grid_w - (cols - 1) * 0.15) / cols
+    cell_h = (grid_h - (rows - 1) * 0.15) / rows
+    for idx, (label, flagship) in enumerate(capabilities):
+        row = idx // cols
+        col = idx % cols
+        cx = inner_x + col * (cell_w + 0.15)
+        cy = inner_y + (rows - 1 - row) * (cell_h + 0.15)
+        if flagship:
+            fill, edge = CLAY_SOFT, CLAY
+        else:
+            fill, edge = SAND, NAVY
+        _block(ax, cx, cy, cell_w, cell_h, label,
+               fill=fill, edge=edge, text=NAVY, fontsize=9)
 
     # Right: external services
-    ax.text(9.6, 6.4, "EXTERNAL SERVICES", ha="center", fontsize=8,
+    ax.text(11.35, 7.2, "EXTERNAL SERVICES", ha="center", fontsize=9,
             color=MUTED, fontweight="bold")
     ext = [
-        ("AI Provider", "Large language model"),
-        ("Sanctions", "UN · OFAC · EU lists"),
-        ("Registries", "7 country registries"),
-        ("Web Push", "VAPID provider"),
+        ("Language model", "AI inference\nfor assistance"),
+        ("Sanctions / AML", "UN · OFAC · EU\n+ watchlists"),
+        ("Government registries", "7 jurisdictions\n(expanding)"),
+        ("Adverse media", "News scan\ndaily cadence"),
+        ("Web push", "Mobile + desktop\nnotifications"),
     ]
     for i, (r, s) in enumerate(ext):
-        _block(ax, 8.4, 5.6 - i * 1.35, 2.4, 1.0, r, sub=s,
-               fill=SAND, edge=SKY)
+        _block(ax, 10.0, 6.3 - i * 1.25, 2.7, 0.9, r, sub=s,
+               fill=SAND, edge=SKY, fontsize=9.5)
 
     # Arrows: roles → platform
     for i in range(4):
-        _arrow(ax, 2.65, 6.1 - i * 1.35, 3.15, 5.8 - i * 0.8)
+        _arrow(ax, 3.05, 6.85 - i * 1.55, 3.55, 5.5 - i * 1.0)
     # Arrows: platform → ext
-    for i in range(4):
-        _arrow(ax, 7.85, 5.8 - i * 0.8, 8.35, 6.1 - i * 1.35,
+    for i in range(5):
+        _arrow(ax, 9.45, 6.0 - i * 1.0, 9.95, 6.75 - i * 1.25,
                color=SKY, dashed=True)
 
-    # Legend
-    ax.text(5.5, 0.45, "Solid arrows = user requests · Dashed arrows = optional service integrations",
-            ha="center", fontsize=7.5, color=MUTED, style="italic")
+    # Legend / footer
+    ax.text(6.5, 0.25,
+            "Clay-highlighted pillars = the two Trust Profile pillars + the Embedded AI working partner. "
+            "Solid arrows = user requests · Dashed arrows = external service integrations.",
+            ha="center", fontsize=8, color=MUTED, style="italic")
 
     fig.tight_layout()
     out = os.path.join(OUT_DIR, "01_system_overview.png")
@@ -232,67 +276,86 @@ def diagram_grant_lifecycle():
 
 
 # ---------------------------------------------------------------------------
-# 3. NGO compliance journey — AI as compliance copilot
+# 3. NGO compliance journey — embedded AI compliance partner
 # ---------------------------------------------------------------------------
 
 def diagram_ngo_compliance_journey():
-    fig, ax = plt.subplots(figsize=(11, 6.5), dpi=200)
-    ax.set_xlim(0, 11); ax.set_ylim(0, 7)
+    # Wider + taller canvas so bullet text never overflows its box.
+    fig, ax = plt.subplots(figsize=(13, 7.5), dpi=200)
+    ax.set_xlim(0, 13); ax.set_ylim(0, 8.2)
     ax.set_axis_off()
-    ax.text(5.5, 6.7, "NGO Compliance Journey — How AI Supports the NGO Through Every Obligation",
-            ha="center", color=NAVY, fontsize=12.5, fontweight="bold")
+    ax.text(6.5, 7.85,
+            "NGO Compliance Journey — How Embedded AI Supports the NGO Through Every Obligation",
+            ha="center", color=NAVY, fontsize=13, fontweight="bold")
 
     # Timeline arrow background
-    ax.annotate("", xy=(10.4, 5.5), xytext=(0.6, 5.5),
+    ax.annotate("", xy=(12.4, 6.4), xytext=(0.6, 6.4),
                 arrowprops=dict(arrowstyle="-|>", color=NAVY, linewidth=2))
 
     phases = [
         ("Application", "Pre-submission",
-         ["Capacity passport prefill", "AI compliance pre-empt",
-          "Document scoring vs. donor req", "Pre-flight readiness check"]),
+         ["Capacity passport prefill",
+          "Document scoring vs. donor",
+          "Pre-flight gap analysis",
+          "Compliance pre-empt"]),
         ("Award", "Contract signing",
-         ["Sanctions re-check", "Registry re-verify",
-          "Reporting reqs auto-extracted"]),
+         ["Sanctions re-check",
+          "Registry re-verify",
+          "Reporting reqs extracted",
+          "Calendar populated"]),
         ("Active grant", "Day-to-day delivery",
-         ["Action dashboard (what's due)", "Proactive deadline nudges",
-          "Evidence prompts as you go", "Org memory captures learnings"]),
+         ["Action dashboard",
+          "Proactive nudges",
+          "Evidence prompts",
+          "Memory captures learnings"]),
         ("Reporting", "Periodic milestones",
-         ["Report co-author from prior data", "Donor pre-flight check",
-          "Indicator tracking", "Budget reconciliation"]),
+         ["AI drafts the narrative",
+          "Donor pre-flight check",
+          "Indicator tracking",
+          "Budget reconciliation"]),
         ("Compliance health", "Continuous",
-         ["4-pillar score", "Trajectory forecast",
-          "Risk register collaboration", "Slips in N days warning"]),
+         ["4-pillar score",
+          "Trajectory forecast",
+          "Risk register response",
+          "Slips-in-N-days warning"]),
     ]
-    n = len(phases); span = 10.4
-    box_w = span / n - 0.18
+    n = len(phases)
+    margin = 0.45
+    usable = 13 - 2 * margin
+    box_w = usable / n - 0.30
     for i, (phase, sub, items) in enumerate(phases):
-        x = 0.6 + i * (span / n)
-        # Phase label on timeline
-        circle = mpatches.Circle((x + box_w / 2, 5.5), 0.15,
-                                 facecolor=CLAY, edgecolor=NAVY, linewidth=1.3, zorder=4)
+        x = margin + i * (usable / n)
+        cx = x + box_w / 2
+        # Phase circle on the timeline
+        circle = mpatches.Circle((cx, 6.4), 0.18,
+                                 facecolor=CLAY, edgecolor=NAVY,
+                                 linewidth=1.3, zorder=4)
         ax.add_patch(circle)
-        ax.text(x + box_w / 2, 5.5, str(i + 1), ha="center", va="center",
-                color=WHITE, fontsize=9, fontweight="bold", zorder=5)
-        # Phase title above
-        ax.text(x + box_w / 2, 6.1, phase, ha="center", color=NAVY,
-                fontsize=10, fontweight="bold")
-        ax.text(x + box_w / 2, 5.85, sub, ha="center", color=MUTED,
-                fontsize=7.5, style="italic")
-        # AI items box below
-        box_h = 2.4
-        _block(ax, x, 5.5 - 0.5 - box_h, box_w, box_h, "",
+        ax.text(cx, 6.4, str(i + 1), ha="center", va="center",
+                color=WHITE, fontsize=10, fontweight="bold", zorder=5)
+        # Phase title + subtitle above the timeline
+        ax.text(cx, 7.05, phase, ha="center", color=NAVY,
+                fontsize=11, fontweight="bold")
+        ax.text(cx, 6.75, sub, ha="center", color=MUTED,
+                fontsize=8.5, style="italic")
+        # AI items box below the timeline
+        box_top = 5.85
+        box_h = 4.5
+        _block(ax, x, box_top - box_h, box_w, box_h, "",
                fill=CLAY_SOFT, edge=CLAY)
-        # Header
-        ax.text(x + box_w / 2, 5.5 - 0.7, "AI co-pilot",
-                ha="center", color=CLAY, fontsize=8.5, fontweight="bold")
+        # Header inside the box
+        ax.text(cx, box_top - 0.35, "Embedded AI",
+                ha="center", color=CLAY, fontsize=9.5, fontweight="bold")
+        # Bullets — fits comfortably with generous spacing.
         for j, it in enumerate(items):
-            ax.text(x + 0.12, 5.5 - 0.95 - j * 0.32,
-                    "•  " + it, ha="left", va="top", color=NAVY, fontsize=7.5)
+            ax.text(x + 0.16, box_top - 0.8 - j * 0.5,
+                    "•  " + it, ha="left", va="top",
+                    color=NAVY, fontsize=8.5)
 
-    ax.text(5.5, 0.3,
+    ax.text(6.5, 0.4,
             "From application through award, delivery, reporting, and ongoing health — "
-            "AI surfaces what to do next and helps the NGO actually do it.",
-            ha="center", color=MUTED, fontsize=8.5, style="italic")
+            "the platform surfaces what to do next and helps the NGO actually do it.",
+            ha="center", color=MUTED, fontsize=9, style="italic")
 
     fig.tight_layout()
     out = os.path.join(OUT_DIR, "03_ngo_compliance_journey.png")
@@ -364,59 +427,79 @@ def diagram_passporting():
 # ---------------------------------------------------------------------------
 
 def diagram_ai_integration_map():
-    fig, ax = plt.subplots(figsize=(11, 6.5), dpi=200)
-    ax.set_xlim(0, 11); ax.set_ylim(0, 7.2)
+    # Wider canvas + taller boxes so the label and the descriptor each
+    # have their own breathing room. Previously the descriptor sat
+    # *outside* the bottom edge of the chip and bled into the chip below.
+    fig, ax = plt.subplots(figsize=(14, 8.5), dpi=200)
+    ax.set_xlim(0, 14); ax.set_ylim(0, 9.5)
     ax.set_axis_off()
-    ax.text(5.5, 6.9, "AI Integration Across Every Workspace",
-            ha="center", color=NAVY, fontsize=13, fontweight="bold")
+    ax.text(7.0, 9.05, "Embedded AI Across Every Workspace",
+            ha="center", color=NAVY, fontsize=14, fontweight="bold")
+    ax.text(7.0, 8.7,
+            "Each chip is an AI-assisted surface the user encounters in the named workspace.",
+            ha="center", color=MUTED, fontsize=9, style="italic")
 
-    # Three columns: NGO, Donor, Reviewer
-    col_y = 5.8
-    headers = [("NGO", 1.8, NAVY), ("Donor", 5.5, NAVY), ("Reviewer", 9.2, NAVY)]
-    for label, cx, c in headers:
-        _block(ax, cx - 1.5, col_y, 3.0, 0.6, label, fill=NAVY,
-               edge=NAVY, text=WHITE, fontsize=11)
+    col_centers = [2.4, 7.0, 11.6]
+    col_w = 3.9
+    headers = [("NGO", col_centers[0]),
+               ("Donor", col_centers[1]),
+               ("Reviewer", col_centers[2])]
+    head_y = 7.95; head_h = 0.55
+    for label, cx in headers:
+        _block(ax, cx - col_w / 2, head_y, col_w, head_h, label, fill=NAVY,
+               edge=NAVY, text=WHITE, fontsize=12)
 
     ngo_items = [
-        ("Match scoring", "Find grants you'll win"),
-        ("Application co-author", "Draft grounded in your evidence"),
-        ("Document real-time scoring", "Score against donor reqs as you upload"),
+        ("Match scoring", "Find grants you can win"),
+        ("Application drafting", "Drafts grounded in your evidence"),
+        ("Real-time doc scoring", "Score against donor reqs as you upload"),
         ("Submission readiness", "Pre-flight gap analysis"),
-        ("Compliance pre-empt", "Catch issues before submit"),
-        ("Report co-author", "Draft from prior data"),
-        ("Report donor pre-flight", "What will the donor ask?"),
+        ("Compliance pre-empt", "Catch issues before you submit"),
+        ("Report drafting", "Drafts from prior reports + data"),
+        ("Donor-perspective pre-flight", "What will the donor ask?"),
         ("Compliance to-do list", "What's due this week"),
     ]
     donor_items = [
-        ("Grant brief generator", "Draft from 2-line prompt"),
-        ("Grant import from PDF", "Extract existing brief into wizard"),
-        ("Median-NGO preview", "Predict applicant pool"),
-        ("Burden critique", "Spot vague or unfair criteria"),
+        ("Grant brief from prompt", "Drafts a complete grant from 2 lines"),
+        ("Grant import from file", "Extracts existing brief into wizard"),
+        ("Median-NGO preview", "Predicts the applicant pool"),
+        ("Burden critique", "Spots vague or unfair criteria"),
         ("Portfolio insights", "Headline + anomalies"),
-        ("Cross-grant patterns", "Patterns across declines"),
+        ("Cross-grant patterns", "Patterns across declined apps"),
         ("Compliance explanation", "Plain-language findings"),
-        ("Health narrative", "Why this grant is on/off track"),
+        ("Health narrative", "Why a grant is on or off track"),
     ]
     rev_items = [
         ("One-screen summary", "Who, what, why, evidence"),
-        ("Evidence extraction", "Verbatim per criterion"),
-        ("Comparable signal", "How this rates vs cohort"),
+        ("Evidence extraction", "Verbatim quotes per criterion"),
+        ("Comparable signal", "How this rates vs the cohort"),
         ("Decision-changers", "What would shift the score"),
         ("Per-criterion rationale", "Draft + paste"),
         ("Red-flag detection", "Inconsistencies surfaced"),
-        ("Suggest-criteria", "When grant has no rubric"),
+        ("Suggest-criteria", "When the grant has no rubric"),
         ("Audit-ready record", "Why the decision was made"),
     ]
-    for col_x, items in [(1.8, ngo_items), (5.5, donor_items), (9.2, rev_items)]:
-        for i, (lbl, sub) in enumerate(items):
-            y_ = 5.2 - i * 0.62
-            _block(ax, col_x - 1.5, y_, 3.0, 0.55, lbl,
-                   fill=CLAY_SOFT, edge=CLAY, fontsize=8.5, sub=None)
-            ax.text(col_x, y_ - 0.05, sub, ha="center", va="bottom",
-                    color=MUTED, fontsize=7)
 
-    ax.text(5.5, 0.3,
-            "Every surface above is grounded, traceable, action-oriented, and falls back gracefully when AI is unavailable.",
+    item_h = 0.78           # chip total height
+    gap = 0.12              # vertical gap between chips
+    top_y = head_y - 0.30   # first chip top edge
+
+    for cx, items in zip(col_centers, [ngo_items, donor_items, rev_items]):
+        for i, (lbl, sub) in enumerate(items):
+            cy = top_y - (i + 1) * (item_h + gap)
+            _block(ax, cx - col_w / 2, cy, col_w, item_h, "",
+                   fill=CLAY_SOFT, edge=CLAY)
+            # Label and descriptor INSIDE the box, vertically stacked.
+            ax.text(cx, cy + item_h - 0.26, lbl,
+                    ha="center", va="center",
+                    color=NAVY, fontsize=9.5, fontweight="bold")
+            ax.text(cx, cy + 0.22, sub,
+                    ha="center", va="center",
+                    color=MUTED, fontsize=8)
+
+    ax.text(7.0, 0.35,
+            "Every surface is grounded in the user's data, traceable to its sources, "
+            "action-oriented (an editable starting point), and falls back gracefully when AI is unavailable.",
             ha="center", color=MUTED, fontsize=8.5, style="italic")
 
     fig.tight_layout()

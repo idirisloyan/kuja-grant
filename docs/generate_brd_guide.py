@@ -221,18 +221,26 @@ for section in doc.sections:
 
 p = doc.add_paragraph()
 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-p.paragraph_format.space_before = Pt(120)
+p.paragraph_format.space_before = Pt(110)
 run = p.add_run("Kuja")
 run.bold = True
-run.font.size = Pt(56)
+run.font.size = Pt(60)
 run.font.color.rgb = RGBColor(0x1B, 0x3A, 0x5C)
 run.font.name = "Calibri"
 
 p = doc.add_paragraph()
 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = p.add_run("Grant Management System")
-run.font.size = Pt(22)
+run = p.add_run("An AI-Powered Grant Management System")
+run.font.size = Pt(20)
 run.font.color.rgb = RGBColor(0x2C, 0x5F, 0x8A)
+run.font.name = "Calibri"
+
+p = doc.add_paragraph()
+p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run = p.add_run("Built for the Global South")
+run.font.size = Pt(14)
+run.font.color.rgb = RGBColor(0x64, 0x74, 0x8B)
+run.italic = True
 run.font.name = "Calibri"
 
 p = doc.add_paragraph()
@@ -253,7 +261,7 @@ run.font.name = "Calibri"
 
 p = doc.add_paragraph()
 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-p.paragraph_format.space_before = Pt(240)
+p.paragraph_format.space_before = Pt(220)
 run = p.add_run("Version 5.0  |  May 2026")
 run.font.size = Pt(12)
 run.font.name = "Calibri"
@@ -275,7 +283,7 @@ add_formatted_table(doc,
         ["2.0", "February 2026", "Kuja Team", "AI services, capacity assessment, sanctions screening"],
         ["3.0", "March 2026", "Kuja Team", "Live sanctions, registry verification, AI reporting, donor requirements"],
         ["4.0", "April 2026", "Kuja Team", "Match engine, grant Q&A, diligence room, two-phase intake lifecycle, NGO This-Week home, decision audit, donor portfolio diagnostics"],
-        ["5.0", "May 2026", "Kuja Team", "Capacity assessment passporting, deep AI co-pilot integration, compliance health & trajectory, risk register, organisational memory & provenance, web push, async AI dispatcher, admin self-service & system health"],
+        ["5.0", "May 2026", "Kuja Team", "Capacity assessment passporting, deeply embedded AI integration as a working partner, compliance health & trajectory, risk register, organisational memory & provenance, web push, async AI dispatcher, admin self-service & system health"],
     ],
     col_widths=[0.7, 1.1, 1.1, 3.6]
 )
@@ -331,7 +339,7 @@ toc_entries = [
     ("        6.7.6 Shared mechanics", 2),
     ("    6.8 Reporting and Outcome Tracking", 1),
     ("    6.9 Compliance and Risk — Simplified for Both Sides", 1),
-    ("        6.9.1 For NGOs — AI as compliance co-pilot", 2),
+    ("        6.9.1 For NGOs — embedded AI as compliance working partner", 2),
     ("        6.9.2 For donors — pre-assessed, scored, monitored", 2),
     ("        6.9.3 Shared mechanics", 2),
     ("    6.10 Collaboration and Notifications", 1),
@@ -412,7 +420,7 @@ add_body(doc,
     "Spanish) with role-appropriate tone, and the system gracefully "
     "handles scanned documents, low-bandwidth connections, and inconsistent "
     "data quality typical of grassroots organisations. Second, AI is "
-    "embedded as a working co-pilot rather than a chatbot — the system "
+    "embedded as a working partner rather than a chatbot — the system "
     "drafts applications, predicts donor concerns, surfaces compliance "
     "issues before submission, evaluates evidence per criterion, and "
     "generates auditable rationales, all grounded in the NGO's own "
@@ -666,7 +674,7 @@ add_bullet_list(doc, [
      "Uploaded documents are extracted, analysed against the grant's "
      "evidence requirements, and scored for completeness with clear "
      "fallbacks for scanned or low-quality files."),
-    ("AI co-pilot. ",
+    ("Embedded AI. ",
      "AI assistance is woven into every workflow as a working partner — "
      "drafting, evaluating, surfacing gaps, generating rationales, "
      "translating findings — never as a generic chatbot."),
@@ -1144,22 +1152,22 @@ add_bullet_list(doc, [
 heading(doc, "6.6 AI-Powered Assistance Across the Workflow", 2)
 
 add_callout(doc, "USE CASE",
-    "Across every workspace, the system surfaces an action-oriented "
-    "AI co-pilot. For an NGO programme officer it drafts narrative "
-    "responses grounded in their evidence. For a donor it predicts how "
-    "the median applicant will respond and warns where criteria are "
-    "vague. For a reviewer it produces a one-screen summary with "
-    "evidence cited per criterion and a draft rationale. For an "
-    "administrator it explains compliance findings in plain language. "
-    "In every case the assistance is grounded in the actual data the "
-    "user is looking at, every claim is sourced, and every output is "
-    "an editable starting point rather than a fait accompli."
+    "Across every workspace, the system embeds an action-oriented "
+    "AI working partner. For an NGO programme officer it drafts "
+    "narrative responses grounded in their evidence. For a donor it "
+    "predicts how the median applicant will respond and warns where "
+    "criteria are vague. For a reviewer it produces a one-screen "
+    "summary with evidence cited per criterion and a draft rationale. "
+    "For an administrator it explains compliance findings in plain "
+    "language. In every case the assistance is grounded in the actual "
+    "data the user is looking at, every claim is sourced, and every "
+    "output is an editable starting point rather than a fait accompli."
 )
 
 heading(doc, "6.6.1 Design principles for AI use", 3)
 add_body(doc,
     "The system applies AI assistance under a small number of explicit "
-    "design principles, which together distinguish a working co-pilot "
+    "design principles, which together distinguish a working AI partner "
     "from a surface-level chatbot. The system shall enforce these "
     "principles for every AI feature it ships."
 )
@@ -1548,7 +1556,7 @@ add_diagram(doc, "ngo_compliance_journey",
     "compliance journey, from application pre-flight to ongoing "
     "delivery, reporting, and health monitoring.")
 
-heading(doc, "6.9.1 For NGOs — AI as a compliance co-pilot", 3)
+heading(doc, "6.9.1 For NGOs — embedded AI as compliance working partner", 3)
 
 add_callout(doc, "USE CASE",
     "Fatima's first quarterly report is due in three weeks. The system "
@@ -1567,7 +1575,8 @@ add_callout(doc, "USE CASE",
 )
 
 add_body(doc,
-    "The system shall act as the NGO's compliance co-pilot across the "
+    "The system shall act as the NGO's embedded AI compliance working "
+    "partner across the "
     "entire grant — from the moment the requirements are agreed to the "
     "moment the final report is accepted. The system shall:"
 )
@@ -2334,7 +2343,7 @@ glossary = [
     ("Application", "An NGO's response to a specific grant, comprising eligibility responses, criterion responses, attached documents, and submission metadata."),
     ("Capacity passport", "The persistent, versioned set of capacity assessment results attached to an organisation, reusable across applications regardless of framework."),
     ("Compliance health score", "A composite score per active grant on a 0–100 scale, combining completion, timeliness, workflow, and importance pillars."),
-    ("Co-pilot rail", "The persistent assistive surface in the user interface offering context-appropriate AI actions and answers without leaving the current workspace."),
+    ("AI assistance rail", "The persistent assistive surface in the user interface offering context-appropriate AI actions and answers without leaving the current workspace."),
     ("Grant", "A donor-published funding opportunity comprising title, description, eligibility, evaluation criteria, document requirements, reporting requirements, and deadline."),
     ("Match score", "A composite score per NGO-grant pair indicating alignment on eligibility, sector, geography, capacity, and track record."),
     ("Organisational memory", "The store of consistent facts derived from an organisation's submissions, used to ground AI drafting and surface provenance."),
