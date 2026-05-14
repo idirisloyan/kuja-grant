@@ -632,7 +632,222 @@ add_brand_bar(s)
 
 
 # ============================================================================
-# SLIDE 14 — Feature comparison (chart)
+# SLIDE 14 — Competitors are mostly donor-centric
+# ============================================================================
+
+s = new_slide()
+slide_title_bar(s, "Most Competitors Are Donor-Centric",
+                "The NGO is the structurally underserved side of the market.")
+
+# Three category cards across the top (60% of slide)
+cat_top = Inches(1.2); cat_h = Inches(4.0); cat_gap = Inches(0.2)
+card_w = (SLIDE_W - Inches(1.0) - 2 * cat_gap) / 3
+
+categories = [
+    ("DONOR-CENTRIC GRANT MANAGEMENT",
+     "Optimised for the funder's workflow. NGOs see a submission portal — not a working partner.",
+     NAVY,
+     [
+         ("Fluxx",        "Enterprise; deep donor lifecycle"),
+         ("Submittable",  "Proven scale (25M apps)"),
+         ("SmartSimple",  "Configurable, 45+ languages"),
+         ("Foundant GLM", "Donor-friendly, user-friendly"),
+         ("Benevity",     "Corporate CSR, $14B+ donations"),
+         ("Bonterra",     "Grantmaker product launched Feb 2026"),
+     ]),
+    ("NGO-DISCOVERY ONLY",
+     "Tools that help NGOs find grants — but stop there. No application, review, reporting, or compliance.",
+     SKY,
+     [
+         ("Instrumentl",  "450K+ funders, 31K+ RFPs"),
+         ("OpenGrants",   "AI matching + writer marketplace"),
+         ("GrantHub",     "Affordable pipeline tracker"),
+     ]),
+    ("TWO-SIDED / SPECIALIST",
+     "Rare. None combine marketplace, trust profile, embedded AI, and compliance support.",
+     CLAY,
+     [
+         ("GlobalGiving",       "Marketplace, 175 countries — no GM"),
+         ("UN Partner Portal",  "UN ↔ CSO only, no AI"),
+         ("TechSoup STEP",      "Assessment only, no GM"),
+         ("Xapien",             "Due diligence specialist, no GM"),
+     ]),
+]
+
+for i, (cat, blurb, color, comps) in enumerate(categories):
+    x = Inches(0.5) + i * (card_w + cat_gap)
+    # Header
+    add_rect(s, x, cat_top, card_w, Inches(0.55), color)
+    add_text(s, x, cat_top, card_w, Inches(0.55), cat,
+             size=11, bold=True, color=WHITE,
+             align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    # Body card
+    add_rect(s, x, cat_top + Inches(0.6), card_w, cat_h - Inches(0.6),
+             SAND, line_color=color)
+    add_text(s, x + Inches(0.2), cat_top + Inches(0.75),
+             card_w - Inches(0.35), Inches(0.85),
+             blurb, size=10, color=NAVY, italic=True)
+    # Competitor list
+    for j, (name, desc) in enumerate(comps):
+        row_y = cat_top + Inches(1.7) + Inches(j * 0.4)
+        add_text(s, x + Inches(0.2), row_y, Inches(1.5), Inches(0.35),
+                 "• " + name, size=10, bold=True, color=color)
+        add_text(s, x + Inches(1.7), row_y,
+                 card_w - Inches(1.85), Inches(0.35),
+                 desc, size=9, color=INK, italic=True)
+
+# Big bottom callout — Kuja's positioning
+callout_top = Inches(5.4); callout_h = Inches(1.65)
+add_rect(s, Inches(0.5), callout_top, SLIDE_W - Inches(1.0), callout_h,
+         CLAY)
+add_text(s, Inches(0.7), callout_top + Inches(0.18),
+         SLIDE_W - Inches(1.4), Inches(0.5),
+         "KUJA — THE ONLY DUAL-SIDED PLATFORM WITH NGO-FIRST AI",
+         size=14, bold=True, color=WHITE,
+         align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+add_text(s, Inches(0.7), callout_top + Inches(0.7),
+         SLIDE_W - Inches(1.4), Inches(0.95),
+         "Marketplace · Two-pillar Organisation Trust Profile · Embedded AI Intelligence working partner "
+         "for NGOs AND donors · Compliance simplified for both sides · Mobile + offline · ERP. "
+         "No competitor combines these — most never tried to serve the NGO at all.",
+         size=11, color=WHITE, italic=True,
+         align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+
+add_brand_bar(s)
+
+
+# ============================================================================
+# SLIDE 15 — Core Feature Matrix (table)
+# ============================================================================
+
+s = new_slide()
+slide_title_bar(s, "Core Feature Matrix",
+                "Y = fully supported · P = partial · — = not available. Kuja column highlighted.")
+
+# Build the table natively in pptx.
+# Rows: 1 header + core feature rows
+# Cols: 1 feature name + 8 competitor cols
+competitors_cols = ["Kuja", "Fluxx", "Submit-\ntable", "Smart-\nSimple",
+                    "Bonterra", "UN Partner\nPortal", "Global-\nGiving", "Instrumentl"]
+# Pick the 18 most decisive features (the differentiators that tell the story)
+feature_rows = [
+    # (Feature, [Kuja, Fluxx, Submittable, SmartSimple, Bonterra, UNPP, GlobalGiving, Instrumentl])
+    ("Embedded AI Intelligence (action-oriented)", ["Y", "P", "P", "P", "P", "—", "—", "P"]),
+    ("Two-Pillar Organisation Trust Profile",      ["Y", "—", "—", "—", "—", "—", "—", "—"]),
+    ("Capacity Passporting (one assessment, many frameworks)",
+                                                   ["Y", "—", "—", "—", "—", "P", "—", "—"]),
+    ("Custom Donor Framework Builder",             ["Y", "P", "P", "Y", "P", "—", "—", "—"]),
+    ("AI Application Co-Author with Provenance",   ["Y", "—", "—", "—", "—", "—", "—", "—"]),
+    ("Real-Time Document Scoring on Upload",       ["Y", "P", "P", "P", "P", "—", "—", "—"]),
+    ("Pre-Submission Readiness + Compliance Pre-Empt",
+                                                   ["Y", "—", "—", "—", "—", "—", "—", "—"]),
+    ("Reviewer One-Screen Summary + Evidence Extraction",
+                                                   ["Y", "—", "—", "—", "—", "—", "—", "—"]),
+    ("Sanctions / AML / CTF Screening",            ["Y", "—", "—", "—", "—", "—", "—", "—"]),
+    ("Govt. Registry & Standing Verification",     ["Y", "—", "—", "—", "—", "—", "—", "—"]),
+    ("Beneficial Ownership + Adverse Media",       ["Y", "—", "—", "—", "—", "—", "—", "—"]),
+    ("AI Compliance Calendar + Reminders",         ["Y", "—", "—", "P", "—", "—", "—", "—"]),
+    ("AI Report Drafting + Donor Pre-Flight",      ["Y", "—", "—", "—", "—", "—", "—", "—"]),
+    ("4-Pillar Health + Slips Forecast",           ["Y", "—", "—", "—", "—", "—", "—", "—"]),
+    ("Two-Sided Marketplace + Match Scoring",      ["Y", "—", "—", "—", "—", "P", "Y", "Y"]),
+    ("Mobile-First PWA + Offline-First",           ["Y", "—", "—", "—", "—", "P", "Y", "Y"]),
+    ("Six-Language UI with Role-Aware Tone",       ["Y", "P", "—", "Y", "—", "Y", "P", "—"]),
+    ("Audit Chain + 2FA + GDPR-Erasure",           ["Y", "Y", "Y", "Y", "P", "Y", "—", "—"]),
+]
+
+n_rows = 1 + len(feature_rows)
+n_cols = 1 + len(competitors_cols)
+
+# Table dimensions
+table_left = Inches(0.4); table_top = Inches(1.05)
+table_width = SLIDE_W - Inches(0.8)
+table_height = Inches(6.0)
+
+table_shape = s.shapes.add_table(n_rows, n_cols,
+                                 table_left, table_top,
+                                 table_width, table_height)
+table = table_shape.table
+
+# Set column widths: feature column wider, competitor columns equal.
+# python-pptx requires integer EMU values, so we int() the division results.
+feature_col_w = Inches(4.2)
+comp_col_w = int((table_width - feature_col_w) / len(competitors_cols))
+table.columns[0].width = feature_col_w
+for ci in range(1, n_cols):
+    table.columns[ci].width = comp_col_w
+
+# Set row heights: header taller for 2-line competitor names
+header_h = Inches(0.55)
+row_h = int((table_height - header_h) / len(feature_rows))
+table.rows[0].height = header_h
+for ri in range(1, n_rows):
+    table.rows[ri].height = row_h
+
+
+def _style_cell(cell, text, *, bold=False, font_size=8.5, fg=INK,
+                bg=None, align=PP_ALIGN.LEFT):
+    cell.text = ""
+    if bg is not None:
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = bg
+    cell.margin_left = Inches(0.06)
+    cell.margin_right = Inches(0.06)
+    cell.margin_top = Inches(0.03)
+    cell.margin_bottom = Inches(0.03)
+    cell.vertical_anchor = MSO_ANCHOR.MIDDLE
+    tf = cell.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    p.alignment = align
+    r = p.add_run()
+    r.text = text
+    r.font.name = FONT
+    r.font.size = Pt(font_size)
+    r.font.bold = bold
+    r.font.color.rgb = fg
+
+
+# Header row
+_style_cell(table.cell(0, 0), "Feature", bold=True, font_size=10,
+            fg=WHITE, bg=NAVY, align=PP_ALIGN.LEFT)
+for ci, comp in enumerate(competitors_cols, start=1):
+    bg = CLAY if comp == "Kuja" else NAVY
+    _style_cell(table.cell(0, ci), comp, bold=True, font_size=9.5,
+                fg=WHITE, bg=bg, align=PP_ALIGN.CENTER)
+
+# Data rows
+for ri, (feat, vals) in enumerate(feature_rows, start=1):
+    row_bg = SAND if ri % 2 == 1 else WHITE
+    _style_cell(table.cell(ri, 0), feat, bold=False, font_size=8.5,
+                fg=INK, bg=row_bg, align=PP_ALIGN.LEFT)
+    for ci, v in enumerate(vals, start=1):
+        if v == "Y":
+            fg = WHITE if competitors_cols[ci - 1] == "Kuja" else GROW
+            bold = True
+        elif v == "P":
+            fg = WHITE if competitors_cols[ci - 1] == "Kuja" else SUN
+            bold = True
+        else:
+            fg = WHITE if competitors_cols[ci - 1] == "Kuja" else MUTED
+            bold = False
+        # Kuja column gets clay shading; other Y cells get a light green hint
+        if competitors_cols[ci - 1] == "Kuja":
+            bg = CLAY
+        else:
+            bg = row_bg
+        _style_cell(table.cell(ri, ci), v, bold=bold,
+                    font_size=11 if v in ("Y", "P") else 10,
+                    fg=fg, bg=bg, align=PP_ALIGN.CENTER)
+
+# Below-table takeaway
+add_text(s, Inches(0.4), Inches(7.05), SLIDE_W - Inches(0.8), Inches(0.22),
+         "Kuja delivers every feature fully. Closest competitor (Fluxx / SmartSimple) "
+         "covers fewer than half — and none on the differentiators specific to Global South NGOs.",
+         size=9.5, color=CLAY, italic=True, align=PP_ALIGN.CENTER)
+
+
+# ============================================================================
+# SLIDE 16 — Feature comparison (chart)
 # ============================================================================
 
 s = new_slide()
@@ -643,7 +858,7 @@ add_brand_bar(s)
 
 
 # ============================================================================
-# SLIDE 15 — Competitive Advantages (category-defining)
+# SLIDE 17 — Competitive Advantages (category-defining)
 # ============================================================================
 
 s = new_slide()
@@ -677,7 +892,7 @@ add_brand_bar(s)
 
 
 # ============================================================================
-# SLIDE 16 — Competitive Advantages (structural)
+# SLIDE 18 — Competitive Advantages (structural)
 # ============================================================================
 
 s = new_slide()
@@ -727,7 +942,7 @@ add_brand_bar(s)
 
 
 # ============================================================================
-# SLIDE 17 — Target market segments
+# SLIDE 19 — Target market segments
 # ============================================================================
 
 s = new_slide()
@@ -774,7 +989,7 @@ add_brand_bar(s)
 
 
 # ============================================================================
-# SLIDE 18 — Roadmap (chart)
+# SLIDE 20 — Roadmap (chart)
 # ============================================================================
 
 s = new_slide()
@@ -785,7 +1000,7 @@ add_brand_bar(s)
 
 
 # ============================================================================
-# SLIDE 19 — Why Adeso, Why Now (closing)
+# SLIDE 21 — Why Adeso, Why Now (closing)
 # ============================================================================
 
 s = new_slide()
