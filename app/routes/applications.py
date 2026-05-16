@@ -478,6 +478,88 @@ def api_debrief_rollup():
     return jsonify({'success': False, 'error': 'Role not supported'}), 403
 
 
+@applications_bp.route('/<int:app_id>/reviewer-briefing', methods=['GET'])
+@login_required
+def api_reviewer_briefing(app_id):
+    """Phase 20B — AI 'what to focus on' brief for reviewers/donors/admins
+    before they score. Cached 10 min."""
+    from app.services.reviewer_briefing_service import ReviewerBriefingService
+    from app.utils.cache import _dashboard_cache
+
+    if current_user.role not in ('reviewer', 'donor', 'admin'):
+        return jsonify({'success': False, 'error': 'auth.access_denied'}), 403
+
+    application = (
+        Application.query.options(db.joinedload(Application.grant))
+        .filter_by(id=app_id).first()
+    )
+    if not application:
+        return jsonify({'success': False, 'error': 'application.not_found'}), 404
+
+    # Reviewer can only brief on apps they're assigned to
+    if current_user.role == 'reviewer':
+        from app.models import Review
+        own = Review.query.filter_by(
+            application_id=app_id, reviewer_user_id=current_user.id
+        ).first()
+        if not own:
+            return jsonify({'success': False, 'error': 'auth.access_denied'}), 403
+    elif current_user.role == 'donor':
+        if not application.grant or application.grant.donor_org_id != current_user.org_id:
+            return jsonify({'success': False, 'error': 'auth.access_denied'}), 403
+
+    cache_key = f'reviewer_briefing_{app_id}'
+    cached = _dashboard_cache.get(cache_key)
+    if cached is not None:
+        return jsonify({'cached': True, **cached})
+    result = ReviewerBriefingService.for_application(
+        application_id=app_id,
+        reviewer_user_id=current_user.id if current_user.role == 'reviewer' else None,
+    )
+    _dashboard_cache.set(cache_key, result)
+    return jsonify(result)
+
+
+@applications_bp.route('/<int:app_id>/timeline', methods=['GET'])
+@login_required
+def api_application_timeline(app_id):
+    """Phase 20A — every action across this application, chronologically.
+
+    Visibility:
+      - admin: any
+      - donor: app must be on their grant
+      - ngo:   app must be theirs
+      - reviewer: must have a Review row on this app
+    """
+    from app.services.application_timeline_service import ApplicationTimelineService
+
+    application = (
+        Application.query.options(db.joinedload(Application.grant))
+        .filter_by(id=app_id).first()
+    )
+    if not application:
+        return jsonify({'success': False, 'error': 'application.not_found'}), 404
+
+    role = current_user.role
+    visible = False
+    if role == 'admin':
+        visible = True
+    elif role == 'ngo':
+        visible = application.ngo_org_id == current_user.org_id
+    elif role == 'donor':
+        visible = bool(application.grant and application.grant.donor_org_id == current_user.org_id)
+    elif role == 'reviewer':
+        from app.models import Review
+        visible = Review.query.filter_by(
+            application_id=app_id, reviewer_user_id=current_user.id
+        ).first() is not None
+    if not visible:
+        return jsonify({'success': False, 'error': 'auth.access_denied'}), 403
+
+    result = ApplicationTimelineService.for_application(application_id=app_id)
+    return jsonify(result)
+
+
 @applications_bp.route('/<int:app_id>/suggest-reviewers', methods=['GET'])
 @login_required
 def api_application_suggest_reviewers(app_id):

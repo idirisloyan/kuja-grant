@@ -1935,6 +1935,96 @@ def make_tests(base):
         assert r.status_code == 403, f"expected 403, got {r.status_code}"
     tests.append(("PHASE19D-002: Suggest reviewers forbidden for NGO", test_phase19d_suggest_reviewers_forbidden_for_ngo))
 
+    def test_phase20a_timeline_shape():
+        """PHASE20A-001: application timeline returns shaped JSON for visible app."""
+        s = login_ok(base, USERS["ngo"])
+        # Find an Amani app
+        apps = s.get(f"{base}/api/applications/",
+                     headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15).json()
+        all_apps = apps.get("applications") or []
+        if not all_apps:
+            return
+        app_id = all_apps[0]["id"]
+        r = s.get(f"{base}/api/applications/{app_id}/timeline",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        assert "events" in data and isinstance(data["events"], list)
+        for e in data["events"][:2]:
+            for k in ("kind", "occurred_at", "title"):
+                assert k in e, f"event missing {k}: {list(e.keys())}"
+    tests.append(("PHASE20A-001: Application timeline returns shape", test_phase20a_timeline_shape))
+
+    def test_phase20a_timeline_cross_org_forbidden():
+        """PHASE20A-002: NGO cannot read timeline for another NGO's app."""
+        s = login_ok(base, USERS["ngo"])
+        # Pick a high app id that's likely on a different NGO
+        r = s.get(f"{base}/api/applications/999999/timeline",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code in (403, 404), f"{r.status_code}"
+    tests.append(("PHASE20A-002: Timeline cross-NGO blocked", test_phase20a_timeline_cross_org_forbidden))
+
+    def test_phase20b_reviewer_briefing_shape():
+        """PHASE20B-001: reviewer-briefing returns shaped JSON or unavailable."""
+        s = login_ok(base, USERS["donor"])
+        # Pick first donor-visible app
+        apps = s.get(f"{base}/api/applications/?status=submitted",
+                     headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15).json()
+        all_apps = apps.get("applications") or []
+        if not all_apps:
+            return
+        app_id = all_apps[0]["id"]
+        r = s.get(f"{base}/api/applications/{app_id}/reviewer-briefing",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=45)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert "source" in data
+        assert data["source"] in ("ai", "sparse", "unavailable")
+        # If AI source, briefing + talking_points present
+        if data["source"] == "ai":
+            assert "talking_points" in data and isinstance(data["talking_points"], list)
+    tests.append(("PHASE20B-001: Reviewer briefing returns shape", test_phase20b_reviewer_briefing_shape))
+
+    def test_phase20b_briefing_forbidden_for_ngo():
+        """PHASE20B-002: NGO cannot read the reviewer briefing for own app."""
+        s = login_ok(base, USERS["ngo"])
+        apps = s.get(f"{base}/api/applications/",
+                     headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15).json()
+        all_apps = apps.get("applications") or []
+        if not all_apps:
+            return
+        app_id = all_apps[0]["id"]
+        r = s.get(f"{base}/api/applications/{app_id}/reviewer-briefing",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 403, f"expected 403, got {r.status_code}"
+    tests.append(("PHASE20B-002: Briefing forbidden for NGO", test_phase20b_briefing_forbidden_for_ngo))
+
+    def test_phase20c_comments_lifecycle():
+        """PHASE20C-001: NGO + donor can post + list comments on an application."""
+        # NGO posts a comment
+        s_ngo = login_ok(base, USERS["ngo"])
+        apps = s_ngo.get(f"{base}/api/applications/",
+                         headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15).json()
+        all_apps = apps.get("applications") or []
+        if not all_apps:
+            return
+        app_id = all_apps[0]["id"]
+        r = s_ngo.post(f"{base}/api/comments/",
+                       json={"entity_kind": "application", "entity_id": app_id,
+                             "body_md": "Smoke test message from NGO."},
+                       headers={"Content-Type": "application/json",
+                                "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code in (200, 201), f"post: {r.status_code} {r.text[:200]}"
+        # NGO can list
+        r = s_ngo.get(f"{base}/api/comments/?entity_kind=application&entity_id={app_id}",
+                      headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200
+        comments = r.json().get("comments") or []
+        assert any("Smoke test message from NGO" in (c.get("body_md") or "") for c in comments), \
+            "smoke comment not visible to NGO who posted it"
+    tests.append(("PHASE20C-001: Comments lifecycle works", test_phase20c_comments_lifecycle))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [
@@ -2030,6 +2120,11 @@ def make_tests(base):
             ("GET", "/api/organizations/1/donor-benchmarks", "donor"),
             ("GET", "/api/organizations/1/ngo-summary", "ngo"),
             ("GET", "/api/organizations/1/ngo-summary", "donor"),
+            # Phase 20 (timeline + reviewer briefing route registrations)
+            ("GET", "/api/applications/1/timeline", "ngo"),
+            ("GET", "/api/applications/1/timeline", "donor"),
+            ("GET", "/api/applications/1/reviewer-briefing", "donor"),
+            ("GET", "/api/comments/?entity_kind=application&entity_id=1", "ngo"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

@@ -13,9 +13,12 @@ import { cn } from '@/lib/utils';
 import type { Application } from '@/lib/types';
 import { InfoTip } from '@/components/shared/info-tip';
 import { ActivityTimeline } from '@/components/applications/ActivityTimeline';
+import { ApplicationTimeline } from '@/components/applications/application-timeline';
 import { StatusSignalsRail } from '@/components/shared/status-signals-rail';
 import { PreflightPanel } from '@/components/shared/preflight-panel';
 import { ReviewerFollowupsPanel } from '@/components/reviews/reviewer-followups-panel';
+import { ReviewerBriefingCard } from '@/components/reviews/reviewer-briefing-card';
+import { ApplicationMessageThread } from '@/components/applications/application-message-thread';
 import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -209,7 +212,14 @@ export default function ApplicationDetailClient() {
       {tab === 'documents' && <EmptyTab icon={Upload} label={t('applications.documents_empty')} />}
       {tab === 'scores' && <ScoresTab application={application} />}
       {tab === 'reviews' && <EmptyTab icon={MessageSquare} label={t('applications.reviews_empty')} />}
-      {tab === 'activity' && <ActivityTimeline applicationId={application.id} />}
+      {tab === 'activity' && (
+        <div className="space-y-3">
+          {/* Phase 20A — richer unified timeline (audit chain + comments + reviews + decisions). */}
+          <ApplicationTimeline applicationId={application.id} />
+          {/* Phase 5.3 legacy AI-call timeline kept below as drilldown. */}
+          <ActivityTimeline applicationId={application.id} />
+        </div>
+      )}
 
       {/* Phase 2 — ASK / RISK / DECISION rails. Renders below the tabs so it
           stays visible regardless of which tab the user is on. */}
@@ -221,6 +231,12 @@ export default function ApplicationDetailClient() {
       {/* Phase 8 — Reviewer follow-ups (donor + reviewer + admin only).
           Renders below the rails so it's visible regardless of tab. */}
       <ReviewerFollowupsGate applicationId={application.id} />
+
+      {/* Phase 20C — donor ↔ NGO threaded conversation. Visible to all
+          parties on the application (server-side gates enforce). */}
+      <div className="pt-2">
+        <ApplicationMessageThread applicationId={application.id} />
+      </div>
     </div>
   );
 }
@@ -233,9 +249,13 @@ function ReviewerFollowupsGate({ applicationId }: { applicationId: number }) {
   if (!user) return null;
   if (!(user.role === 'donor' || user.role === 'reviewer' || user.role === 'admin')) return null;
   return (
-    <div className="pt-2">
-      <h2 className="kuja-eyebrow mb-2">Decision-unlocking questions</h2>
-      <ReviewerFollowupsPanel kind="application" entityId={applicationId} />
+    <div className="pt-2 space-y-3">
+      {/* Phase 20B — pre-scoring briefing (collapsed by default) */}
+      <ReviewerBriefingCard applicationId={applicationId} />
+      <div>
+        <h2 className="kuja-eyebrow mb-2">Decision-unlocking questions</h2>
+        <ReviewerFollowupsPanel kind="application" entityId={applicationId} />
+      </div>
     </div>
   );
 }
