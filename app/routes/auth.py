@@ -390,7 +390,20 @@ def api_login():
     session.permanent = True
     login_user(user, remember=True)
     logger.info(f"User logged in: {user.email} (role: {user.role}) from {client_ip}")
-    return jsonify({'success': True, 'user': user.to_dict(include_org=True)})
+    # Phase 15C — surface stage_labels override at login time too so the
+    # first dashboard render after login already uses custom labels.
+    payload = {'success': True, 'user': user.to_dict(include_org=True)}
+    try:
+        from app.models import Organization
+        if user.org_id:
+            org = db.session.get(Organization, user.org_id)
+            if org:
+                labels = org.get_stage_labels()
+                if labels:
+                    payload['stage_labels'] = labels
+    except Exception:
+        pass
+    return jsonify(payload)
 
 
 @auth_bp.route('/logout', methods=['POST'])
@@ -405,8 +418,24 @@ def api_logout():
 @auth_bp.route('/me', methods=['GET'])
 @login_required
 def api_me():
-    """Return current authenticated user info."""
-    return jsonify({'user': current_user.to_dict(include_org=True)})
+    """Return current authenticated user info.
+
+    Phase 15C — also surface the user's org stage_labels override so the
+    frontend can render custom status labels everywhere without a
+    second fetch.
+    """
+    payload = {'user': current_user.to_dict(include_org=True)}
+    try:
+        from app.models import Organization
+        if current_user.org_id:
+            org = db.session.get(Organization, current_user.org_id)
+            if org:
+                labels = org.get_stage_labels()
+                if labels:
+                    payload['stage_labels'] = labels
+    except Exception:
+        pass
+    return jsonify(payload)
 
 
 @auth_bp.route('/language', methods=['PUT'])

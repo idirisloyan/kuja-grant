@@ -411,6 +411,73 @@ def api_application_debrief(app_id):
     })
 
 
+@applications_bp.route('/debrief/rollup', methods=['GET'])
+@login_required
+def api_debrief_rollup():
+    """Phase 15A — aggregate win/loss debrief reasons for the current user.
+
+    Returns role-scoped rollup:
+      - NGO   → 'why your applications win/lose'
+      - donor → 'why you've awarded/declined'
+      - admin → must specify ?scope=ngo&id= or ?scope=donor&id=
+
+    Query params:
+      ?days=N    lookback window in days (default 365, max 730)
+    """
+    from app.services.debrief_rollup_service import DebriefRollupService
+    from app.utils.cache import _dashboard_cache
+
+    try:
+        days = max(30, min(730, int(request.args.get('days', 365))))
+    except (TypeError, ValueError):
+        days = 365
+
+    role = current_user.role
+    scope = request.args.get('scope')
+    raw_id = request.args.get('id')
+
+    if role == 'ngo':
+        if not current_user.org_id:
+            return jsonify({'success': False, 'error': 'NGO org required'}), 400
+        cache_key = f'debrief_rollup_ngo_{current_user.org_id}_{days}'
+        cached = _dashboard_cache.get(cache_key)
+        if cached is not None:
+            return jsonify({'success': True, 'cached': True, **cached})
+        rollup = DebriefRollupService.for_ngo(
+            ngo_org_id=current_user.org_id, lookback_days=days,
+        )
+        _dashboard_cache.set(cache_key, rollup)
+        return jsonify({'success': True, **rollup})
+
+    if role == 'donor':
+        if not current_user.org_id:
+            return jsonify({'success': False, 'error': 'Donor org required'}), 400
+        cache_key = f'debrief_rollup_donor_{current_user.org_id}_{days}'
+        cached = _dashboard_cache.get(cache_key)
+        if cached is not None:
+            return jsonify({'success': True, 'cached': True, **cached})
+        rollup = DebriefRollupService.for_donor(
+            donor_org_id=current_user.org_id, lookback_days=days,
+        )
+        _dashboard_cache.set(cache_key, rollup)
+        return jsonify({'success': True, **rollup})
+
+    if role == 'admin':
+        if scope not in ('ngo', 'donor') or not raw_id:
+            return jsonify({'success': False, 'error': 'admin must pass scope + id'}), 400
+        try:
+            org_id = int(raw_id)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'id must be int'}), 400
+        if scope == 'ngo':
+            rollup = DebriefRollupService.for_ngo(ngo_org_id=org_id, lookback_days=days)
+        else:
+            rollup = DebriefRollupService.for_donor(donor_org_id=org_id, lookback_days=days)
+        return jsonify({'success': True, **rollup})
+
+    return jsonify({'success': False, 'error': 'Role not supported'}), 403
+
+
 @applications_bp.route('/<int:app_id>/activity', methods=['GET'])
 @login_required
 def api_application_activity(app_id):

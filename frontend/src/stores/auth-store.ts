@@ -15,6 +15,9 @@ interface AuthState {
   /** The currently authenticated user, or null when logged out / unknown. */
   user: User | null;
 
+  /** Phase 15C — per-org stage label overrides from /auth/me. */
+  stageLabels: Record<string, string>;
+
   /** True while the initial session check is in flight. */
   loading: boolean;
 
@@ -37,16 +40,17 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
+  stageLabels: {},
   loading: true,
 
   login: async (email, password) => {
     try {
-      const res = await api.post<{ success: boolean; user: User }>(
+      const res = await api.post<{ success: boolean; user: User; stage_labels?: Record<string, string> }>(
         '/auth/login',
         { email, password },
       );
       if (res.success && res.user) {
-        set({ user: res.user });
+        set({ user: res.user, stageLabels: res.stage_labels ?? {} });
         return true;
       }
       return false;
@@ -65,10 +69,10 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   checkSession: async () => {
     try {
-      const res = await api.get<{ user: User }>('/auth/me');
-      set({ user: res.user, loading: false });
+      const res = await api.get<{ user: User; stage_labels?: Record<string, string> }>('/auth/me');
+      set({ user: res.user, stageLabels: res.stage_labels ?? {}, loading: false });
     } catch {
-      set({ user: null, loading: false });
+      set({ user: null, stageLabels: {}, loading: false });
     }
   },
 

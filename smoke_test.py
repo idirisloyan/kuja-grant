@@ -1473,6 +1473,123 @@ def make_tests(base):
         assert r.status_code < 500, f"500 on debrief PUT: {r.status_code} {r.text[:200]}"
     tests.append(("PHASE14-005: Debrief PUT validates input cleanly", test_phase14_debrief_validation))
 
+    def test_phase15a_debrief_rollup_ngo():
+        """PHASE15A-001: NGO debrief rollup returns shaped JSON (sparse OK)."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/applications/debrief/rollup",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        for k in ("scope", "total_decided", "awarded_total", "rejected_total",
+                  "wins_by_reason", "losses_by_reason", "source"):
+            assert k in data, f"rollup missing {k}: {list(data.keys())}"
+        assert data["source"] in ("rollup", "sparse", "no_debrief")
+    tests.append(("PHASE15A-001: NGO debrief rollup returns shape", test_phase15a_debrief_rollup_ngo))
+
+    def test_phase15a_debrief_rollup_donor():
+        """PHASE15A-002: donor debrief rollup returns shaped JSON."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/applications/debrief/rollup",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        assert "total_decided" in data and isinstance(data["total_decided"], int)
+    tests.append(("PHASE15A-002: Donor debrief rollup returns shape", test_phase15a_debrief_rollup_donor))
+
+    def test_phase15c_org_settings_get_put():
+        """PHASE15C-001: admin can GET + PUT org settings; non-admin caller's own org also works."""
+        s = login_ok(base, USERS["admin"])
+        # Get admin's own org id from /auth/me
+        me = s.get(f"{base}/api/auth/me",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        org_id = (me.get("user") or {}).get("org_id")
+        if not org_id:
+            # Admin may have no org — skip silently
+            return
+        # GET should succeed
+        r = s.get(f"{base}/api/organizations/{org_id}/settings",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"GET settings: {r.status_code} {r.text[:200]}"
+        # PUT — set a stage label, then read it back
+        r = s.put(f"{base}/api/organizations/{org_id}/settings",
+                  json={"settings": {"stage_labels": {"submitted": "In review"}}},
+                  headers={"Content-Type": "application/json",
+                           "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"PUT settings: {r.status_code} {r.text[:200]}"
+        body = r.json()
+        labels = (body.get("settings") or {}).get("stage_labels") or {}
+        assert labels.get("submitted") == "In review", f"label not persisted: {labels}"
+        # Cleanup — clear the override
+        s.put(f"{base}/api/organizations/{org_id}/settings",
+              json={"settings": {"stage_labels": {}}},
+              headers={"Content-Type": "application/json",
+                       "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+    tests.append(("PHASE15C-001: Org settings stage_labels round-trips", test_phase15c_org_settings_get_put))
+
+    def test_phase15d_uat_fixture_cron_admin():
+        """PHASE15D-001: admin can manually trigger UAT fixture cron."""
+        s = login_ok(base, USERS["admin"])
+        r = s.post(f"{base}/api/cron/uat-fixtures",
+                   json={},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=30)
+        assert r.status_code == 200, f"cron: {r.status_code} {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        result = data.get("result", {})
+        for k in ("open_grants_ensured", "debriefs_ensured", "bundles_published"):
+            assert k in result, f"cron result missing {k}: {list(result.keys())}"
+    tests.append(("PHASE15D-001: UAT fixture cron runs as admin", test_phase15d_uat_fixture_cron_admin))
+
+    def test_phase15d_uat_fixture_cron_forbidden():
+        """PHASE15D-002: non-admin without CRON_SECRET cannot trigger cron."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.post(f"{base}/api/cron/uat-fixtures",
+                   json={},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 403, f"expected 403, got {r.status_code}: {r.text[:200]}"
+    tests.append(("PHASE15D-002: UAT cron forbidden for non-admin", test_phase15d_uat_fixture_cron_forbidden))
+
+    def test_phase15e_tags_find_or_create_lifecycle():
+        """PHASE15E-001: tag apply-by-name + list + unassign lifecycle."""
+        s = login_ok(base, USERS["donor"])
+        # Find an existing grant owned by this donor
+        grants = s.get(f"{base}/api/grants/",
+                       headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15).json()
+        gs = grants.get("grants") or []
+        if not gs:
+            return  # nothing to tag — skip silently (preserves CI on empty DB)
+        gid = gs[0]["id"]
+        # Apply a unique-ish tag name
+        tag_name = "smoke-tagged-1"
+        r = s.post(f"{base}/api/tags/apply-by-name",
+                   json={"name": tag_name, "target_kind": "grant", "target_id": gid},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"apply-by-name: {r.status_code} {r.text[:200]}"
+        body = r.json()
+        assert body.get("success") is True
+        tag = body.get("tag") or {}
+        assert tag.get("name") == tag_name
+        tag_id = tag.get("id")
+        # Verify it's on the grant
+        r = s.get(f"{base}/api/tags/by-target?kind=grant&id={gid}",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200
+        names = [t["name"] for t in r.json().get("tags", [])]
+        assert tag_name in names, f"applied tag not visible: {names}"
+        # Cleanup — unassign via DELETE
+        import json as _json
+        r = s.delete(f"{base}/api/tags/assign",
+                     data=_json.dumps({"tag_id": tag_id, "target_kind": "grant", "target_id": gid}),
+                     headers={"Content-Type": "application/json",
+                              "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"unassign: {r.status_code} {r.text[:200]}"
+    tests.append(("PHASE15E-001: Tag find-or-create + list + unassign lifecycle", test_phase15e_tags_find_or_create_lifecycle))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [
@@ -1544,6 +1661,12 @@ def make_tests(base):
             ("GET", "/api/portfolio/ngo/bundle?days=180", "admin"),
             ("GET", "/api/applications/decision-reasons", "donor"),
             ("GET", "/api/applications/decision-reasons", "ngo"),
+            # Phase 15 (debrief rollup, tags, UAT cron route registration)
+            ("GET", "/api/applications/debrief/rollup", "donor"),
+            ("GET", "/api/applications/debrief/rollup", "ngo"),
+            ("GET", "/api/tags", "donor"),
+            ("GET", "/api/tags", "ngo"),
+            ("GET", "/api/tags/by-target?kind=grant&id=1", "donor"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

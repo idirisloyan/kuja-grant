@@ -14,6 +14,7 @@ import type { EligibilityRequirement, Criterion, DocRequirement } from '@/lib/ty
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
 import { LiveDraftersPill } from '@/components/grants/LiveDraftersPill';
 import { GrantAgreementUnpackPanel } from '@/components/grants/grant-agreement-unpack-panel';
+import { TagsEditor } from '@/components/shared/tags-editor';
 
 function formatFunding(amount: number | null, currency: string): string {
   if (!amount) return 'TBD';
@@ -117,6 +118,14 @@ export default function GrantDetailClient() {
             {isDonor && <LiveDraftersPill grantId={grant.id} />}
           </div>
           {grant.donor_org_name && <p className="text-sm text-muted-foreground">{grant.donor_org_name}</p>}
+          {/* Phase 15E — tags. Donor edits; NGO sees read-only. */}
+          <div className="mt-2">
+            <TagsEditor
+              targetKind="grant"
+              targetId={grant.id}
+              editable={isDonor}
+            />
+          </div>
           <div className="mt-2 flex flex-wrap gap-4 text-sm">
             <span className="inline-flex items-center gap-1.5 font-semibold text-[hsl(var(--kuja-grow))]">
               <DollarSign className="h-4 w-4" /> {formatFunding(grant.total_funding, grant.currency)}

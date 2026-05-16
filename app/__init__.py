@@ -182,6 +182,10 @@ def create_app(config_name=None):
                     if 'ai_monthly_budget_usd' not in org_cols:
                         conn.execute(text("ALTER TABLE organizations ADD COLUMN ai_monthly_budget_usd NUMERIC(10, 2)"))
                         org_added.append('ai_monthly_budget_usd')
+                    # Phase 15C — free-form org settings JSON.
+                    if 'settings_json' not in org_cols:
+                        conn.execute(text("ALTER TABLE organizations ADD COLUMN settings_json TEXT"))
+                        org_added.append('settings_json')
                     if org_added:
                         conn.commit()
                         app.logger.info(f"Added organizations columns: {', '.join(org_added)}")

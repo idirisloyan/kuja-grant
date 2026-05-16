@@ -80,3 +80,81 @@ def api_get_organization(org_id):
         data['latest_assessment'] = latest_assessment.to_dict()
 
     return jsonify({'organization': data})
+
+
+# ----------------------------------------------------------------------
+# Phase 15C — per-org settings JSON (stage labels, etc).
+# Admin-only writes; any logged-in user can read their own org settings.
+# ----------------------------------------------------------------------
+
+@organizations_bp.route('/<int:org_id>/settings', methods=['GET'])
+@login_required
+def api_org_settings_get(org_id):
+    org = db.session.get(Organization, org_id)
+    if not org:
+        return jsonify({'success': False, 'error': 'Org not found'}), 404
+    # Read: own org OR admin
+    if current_user.role != 'admin' and org.id != current_user.org_id:
+        return jsonify({'success': False, 'error': 'Insufficient permissions'}), 403
+    return jsonify({
+        'success': True,
+        'org_id': org.id,
+        'settings': org.get_settings(),
+    })
+
+
+_ALLOWED_STAGE_KEYS = ('draft', 'submitted', 'under_review',
+                       'scored', 'awarded', 'rejected')
+
+
+@organizations_bp.route('/<int:org_id>/settings', methods=['PUT'])
+@login_required
+def api_org_settings_put(org_id):
+    """Write the per-org settings JSON.
+
+    Body: { settings: { stage_labels?: { <status>: <label>, ... }, ... } }
+
+    Permissions:
+      - admin: any org
+      - owner / org member with 'admin' on their own org (we treat any
+        member of the org as authorized; tighten later if needed)
+    """
+    from app.utils.helpers import get_request_json
+
+    org = db.session.get(Organization, org_id)
+    if not org:
+        return jsonify({'success': False, 'error': 'Org not found'}), 404
+    if current_user.role != 'admin' and org.id != current_user.org_id:
+        return jsonify({'success': False, 'error': 'Insufficient permissions'}), 403
+
+    data = get_request_json() or {}
+    incoming = data.get('settings')
+    if not isinstance(incoming, dict):
+        return jsonify({'success': False, 'error': 'settings must be an object'}), 400
+
+    # Validate + sanitise stage_labels (only known keys, max 60 chars each)
+    raw_labels = incoming.get('stage_labels') or {}
+    if not isinstance(raw_labels, dict):
+        return jsonify({'success': False, 'error': 'stage_labels must be an object'}), 400
+    cleaned_labels = {}
+    for k, v in raw_labels.items():
+        if k in _ALLOWED_STAGE_KEYS and isinstance(v, str):
+            label = v.strip()[:60]
+            if label:
+                cleaned_labels[k] = label
+
+    cur = org.get_settings()
+    if cleaned_labels:
+        cur['stage_labels'] = cleaned_labels
+    elif 'stage_labels' in cur:
+        # Empty dict explicitly clears the override
+        cur.pop('stage_labels', None)
+
+    org.set_settings(cur)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'org_id': org.id,
+        'settings': org.get_settings(),
+    })

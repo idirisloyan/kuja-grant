@@ -108,8 +108,22 @@ interface StatusBadgeProps {
 export function StatusBadge({ status, kind, className = '' }: StatusBadgeProps) {
   const { t } = useTranslation();
   const role = useAuthStore((s) => s.user?.role);
+  const stageLabels = useAuthStore((s) => s.stageLabels);
 
   const tone = STATUS_TONE[status] ?? 'default';
+
+  // Phase 15C — per-org stage label override wins over i18n + legacy.
+  const override = stageLabels?.[status];
+  if (override) {
+    return (
+      <span
+        className={`inline-flex h-6 items-center rounded-full border px-2 text-[11px] font-medium ${TONE_CLS[tone]} ${className}`}
+        title={status}
+      >
+        {override}
+      </span>
+    );
+  }
 
   let label: string;
   if (kind) {

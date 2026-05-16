@@ -46,6 +46,14 @@ class Organization(db.Model):
     # are skipped (gracefully) and surfaced in /api/admin/ai-spend.
     ai_monthly_budget_usd = db.Column(db.Numeric(10, 2), nullable=True)
 
+    # Phase 15C — free-form org settings JSON. Used for per-org config
+    # the platform should honour but doesn't model with strict columns:
+    #   - 'stage_labels':  per-status display overrides for pipeline UIs
+    #   - 'tag_palette':   reserved for custom tag colors (Phase 15E)
+    # Read via Organization.get_settings() / set_settings(); never write
+    # the raw column directly.
+    settings_json = db.Column(db.Text, nullable=True)
+
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
@@ -80,6 +88,20 @@ class Organization(db.Model):
 
     def set_sdg_ids(self, value):
         self.sdg_ids = _json_dump(value)
+
+    # Phase 15C — settings JSON (free-form per-org config).
+    def get_settings(self) -> dict:
+        return _json_load(self.settings_json) or {}
+
+    def set_settings(self, value: dict):
+        self.settings_json = _json_dump(value or {})
+
+    def get_stage_labels(self) -> dict:
+        """Return per-status display overrides. Empty dict if not set
+        — frontend falls back to the canonical English labels."""
+        s = self.get_settings()
+        labels = s.get('stage_labels') or {}
+        return labels if isinstance(labels, dict) else {}
 
     def to_dict(self):
         return {

@@ -12,6 +12,8 @@ import { StatusBadge } from '@/components/shared/status-badge';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { SavedSearchesBar } from '@/components/shared/saved-searches-bar';
 import { RecencyChip } from '@/components/shared/recency-chip';
+import { ApplicationKanban } from '@/components/applications/application-kanban';
+import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
 
 import { FileText, Eye, ArrowRight, Inbox } from 'lucide-react';
@@ -36,6 +38,11 @@ export default function ApplicationsPage() {
   const router = useRouter();
   const { data, isLoading } = useApplications();
   const all = (data?.applications ?? []) as AppRow[];
+  const viewer = useAuthStore((s) => s.user);
+  // Phase 15B — donors get a pipeline kanban toggle. NGOs stay on the
+  // single-list view since they don't move other people's applications.
+  const canSeeKanban = viewer?.role === 'donor' || viewer?.role === 'admin';
+  const [view, setView] = useState<'table' | 'kanban'>('table');
   // Phase 13.40 — minimal status filter so SavedSearchesBar has something
   // worth capturing. The filter chip strip is keyboard-accessible and
   // i18n-free (status labels come from StatusBadge's role-aware lookup).
@@ -65,14 +72,38 @@ export default function ApplicationsPage() {
             {applications.length} application{applications.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => router.push('/grants')}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
-        >
-          <FileText className="h-4 w-4" />
-          {t('application.browse_grants')}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {canSeeKanban && (
+            <div className="inline-flex rounded-md border border-border overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setView('table')}
+                aria-pressed={view === 'table'}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-semibold',
+                  view === 'table' ? 'bg-[hsl(var(--kuja-clay))] text-white' : 'hover:bg-muted',
+                )}
+              >Table</button>
+              <button
+                type="button"
+                onClick={() => setView('kanban')}
+                aria-pressed={view === 'kanban'}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-semibold border-l border-border',
+                  view === 'kanban' ? 'bg-[hsl(var(--kuja-clay))] text-white' : 'hover:bg-muted',
+                )}
+              >Pipeline</button>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => router.push('/grants')}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
+          >
+            <FileText className="h-4 w-4" />
+            {t('application.browse_grants')}
+          </button>
+        </div>
       </div>
 
       {/* Saved searches + status filter chips */}
@@ -103,7 +134,9 @@ export default function ApplicationsPage() {
         ))}
       </div>
 
-      {applications.length === 0 ? (
+      {canSeeKanban && view === 'kanban' ? (
+        <ApplicationKanban />
+      ) : applications.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
           <Inbox className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
           <p className="kuja-display text-xl">{t('application.no_applications')}</p>

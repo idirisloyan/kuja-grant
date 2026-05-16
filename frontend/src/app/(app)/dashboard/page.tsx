@@ -30,6 +30,8 @@ import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patt
 import { PortfolioDownloadCard } from '@/components/dashboards/portfolio-download-card';
 import { PortfolioAuditTimeline } from '@/components/dashboards/portfolio-audit-timeline';
 import { NGOPortfolioDownloadCard } from '@/components/dashboards/ngo-portfolio-download-card';
+import { DebriefRollupCard } from '@/components/dashboards/debrief-rollup-card';
+import { StageLabelsEditor } from '@/components/dashboards/stage-labels-editor';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -86,6 +88,8 @@ export default function DashboardPage() {
           <CrossGrantPatternsCard />
           {/* Phase 13 — board-ready portfolio PDF + AI exec summary in one click. */}
           <PortfolioDownloadCard />
+          {/* Phase 15A — debrief rollup: "why you award/decline." */}
+          <DebriefRollupCard />
           {/* Phase 13.29 — donor action queue (analog of ThisWeekHome).
               Renders above the existing command center so the donor sees
               "what do I do next?" before "what's the state?" */}
@@ -106,6 +110,8 @@ export default function DashboardPage() {
           {/* Phase 14 — board-ready delivery report PDF + AI summary
               for everything the NGO shipped this period. */}
           <NGOPortfolioDownloadCard />
+          {/* Phase 15A — debrief rollup: "why your apps win/lose." */}
+          <DebriefRollupCard />
           {/* Phase 10.6 — "This Week" action center: opinionated next
               actions backed by /api/ai/ngo-readiness. Renders only when
               ui.this_week_home flag is on; otherwise falls through to
@@ -130,6 +136,8 @@ export default function DashboardPage() {
         <>
           {/* Phase 5 — per-org AI budget gate + skipped rollup */}
           <AIBudgetAdminCard />
+          {/* Phase 15C — customisable stage labels per org */}
+          <StageLabelsEditor />
           <AdminOpsPanel />
         </>
       )}
