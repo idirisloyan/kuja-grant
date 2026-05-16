@@ -10,10 +10,13 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useGrants } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Search, X, Plus, ArrowRight, Inbox, Calendar, Briefcase } from 'lucide-react';
+import { Search, X, Plus, ArrowRight, Inbox, Calendar, Briefcase, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Grant } from '@/lib/types';
 import { SavedSearchesBar } from '@/components/shared/saved-searches-bar';
+import { EmptyState } from '@/components/shared/empty-state';
+import { StarButton } from '@/components/shared/star-button';
+import { useUrlState, useUrlSetState } from '@/lib/hooks/use-url-state';
 
 function formatFunding(amount: number | null | undefined, currency: string = 'USD'): string {
   if (!amount) return 'TBD';
@@ -64,8 +67,8 @@ export default function GrantsPage() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeSectors, setActiveSectors] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useUrlState('q', '');
+  const [activeSectors, setActiveSectors] = useUrlSetState('sector');
   const [sortBy, setSortBy] = useState<SortOption>('deadline');
   const { data, isLoading } = useGrants();
 
@@ -97,12 +100,10 @@ export default function GrantsPage() {
   }, [grants, searchQuery, activeSectors, sortBy]);
 
   const toggleSector = (sector: string) => {
-    setActiveSectors((prev) => {
-      const next = new Set(prev);
-      if (next.has(sector)) next.delete(sector);
-      else next.add(sector);
-      return next;
-    });
+    const next = new Set(activeSectors);
+    if (next.has(sector)) next.delete(sector);
+    else next.add(sector);
+    setActiveSectors(next);
   };
 
   const isNgo = user?.role === 'ngo';
@@ -232,11 +233,40 @@ export default function GrantsPage() {
 
       {/* Grant cards */}
       {filteredGrants.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
-          <Inbox className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="kuja-display text-xl">{t('grant.no_match')}</p>
-          <p className="text-sm text-muted-foreground mt-1">{t('grant.no_match_hint')}</p>
-        </div>
+        <EmptyState
+          icon={Compass}
+          title={
+            (searchQuery || activeSectors.size > 0)
+              ? t('grant.no_match')
+              : (user?.role === 'donor' ? 'No grants yet' : 'No open grants right now')
+          }
+          body={
+            (searchQuery || activeSectors.size > 0)
+              ? t('grant.no_match_hint')
+              : (user?.role === 'donor'
+                  ? 'Create your first grant to start receiving applications.'
+                  : 'Complete your capacity assessment to surface grants matching your profile, or check back tomorrow.')
+          }
+          cta={
+            user?.role === 'donor' ? (
+              <a
+                href="/grants/new"
+                className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[hsl(var(--kuja-clay-dark))]"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Create a grant
+              </a>
+            ) : (
+              <a
+                href="/assessments"
+                className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[hsl(var(--kuja-clay-dark))]"
+              >
+                <ArrowRight className="h-3.5 w-3.5" />
+                Complete capacity assessment
+              </a>
+            )
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredGrants.map((grant) => {
@@ -259,9 +289,12 @@ export default function GrantsPage() {
                       <p className="text-xs text-muted-foreground mt-0.5">{grant.donor_org_name}</p>
                     )}
                   </div>
-                  <span className={cn('kuja-severity border', STATUS_TONE[grant.status] ?? STATUS_TONE.draft)}>
-                    {STATUS_KEYS[grant.status] ? t(STATUS_KEYS[grant.status]) : grant.status}
-                  </span>
+                  <div className="flex items-start gap-1 shrink-0">
+                    <StarButton kind="grant" targetId={grant.id} size="sm" />
+                    <span className={cn('kuja-severity border', STATUS_TONE[grant.status] ?? STATUS_TONE.draft)}>
+                      {STATUS_KEYS[grant.status] ? t(STATUS_KEYS[grant.status]) : grant.status}
+                    </span>
+                  </div>
                 </div>
                 {grant.description && (
                   <p className="text-sm text-muted-foreground line-clamp-2">{grant.description}</p>

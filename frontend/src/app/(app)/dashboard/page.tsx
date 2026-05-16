@@ -23,6 +23,7 @@ import { MatchesCard } from '@/components/dashboards/matches-card';
 import { ThisWeekHome } from '@/components/dashboards/this-week-home';
 import { DonorActionQueue } from '@/components/dashboards/donor-action-queue';
 import { ReviewerActionQueue } from '@/components/dashboards/reviewer-action-queue';
+import { TodayBriefing } from '@/components/dashboards/today-briefing';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -65,6 +66,10 @@ export default function DashboardPage() {
           {t(subtitleKey)}
         </p>
       </div>
+
+      {/* Phase 2 (category-defining UX): Today briefing — top of every
+          dashboard. Deterministic role-aware prioritised action list. */}
+      <TodayBriefing />
 
       {user.role === 'donor' && (
         <>

@@ -16,6 +16,7 @@ import { CopilotRail } from '@/components/copilot/copilot-rail';
 import { OnboardingTourProvider } from '@/components/onboarding/tour-provider';
 import { TwoFactorNagBanner } from '@/components/security/TwoFactorNagBanner';
 import { KeyboardShortcutOverlay } from '@/components/shared/KeyboardShortcutOverlay';
+import { CommandPalette } from '@/components/layout/command-palette';
 
 const SIDEBAR_WIDTH = 280;
 const COLLAPSED_WIDTH = 72;
@@ -60,6 +61,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           renders only for admin users without TOTP enrolled. Dismissible
           per-day via localStorage. */}
       <TwoFactorNagBanner />
+      {/* Phase 2 — Skip-to-main link for keyboard / screen-reader users.
+          Hidden until focused, jumps past the sidebar to the main content. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[9999] focus:rounded-md focus:bg-[hsl(var(--kuja-clay))] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
       <div className="relative min-h-screen bg-[hsl(var(--kuja-quartz))]">
         <Sidebar width={SIDEBAR_WIDTH} collapsedWidth={COLLAPSED_WIDTH} />
         <div
@@ -67,7 +76,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           style={{ paddingLeft: currentWidth }}
         >
           <Header />
-          <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8">
+          <main
+            id="main-content"
+            role="main"
+            aria-label="Main content"
+            tabIndex={-1}
+            className="flex-1 py-6 px-4 sm:px-6 lg:px-8 focus:outline-none"
+          >
             <div className="mx-auto max-w-[1400px]">
               {children}
             </div>
@@ -77,6 +92,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Phase 13.17 — global keyboard shortcut overlay. Cmd/? opens.
             Self-gated: only listens for keydown events; no UI when closed. */}
         <KeyboardShortcutOverlay />
+        {/* Phase 2 — Cmd+K command palette. Listens for Cmd/Ctrl+K and "/"
+            anywhere in the app. */}
+        <CommandPalette />
       </div>
     </OnboardingTourProvider>
   );

@@ -740,6 +740,60 @@ def make_tests(base):
     # =========================================================================
     # --- Phase 1: Trust Profile / Adverse Media / Bank / Passport ---
 
+    # --- Phase 2: Today briefing + watchlist ---
+
+    def test_today_briefing_ngo():
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/dashboard/today",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"Today briefing: {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        assert d.get("role") == "ngo", f"role wrong: {d.get('role')}"
+        assert "items" in d and isinstance(d["items"], list), "Missing items list"
+        assert "headline" in d, "Missing headline"
+        assert "tone" in d, "Missing tone"
+        # Item structure: each must have severity, kind, label, detail, href
+        for it in d["items"]:
+            for key in ("kind", "severity", "label", "detail", "href"):
+                assert key in it, f"Item missing {key}: {it}"
+    tests.append(("TODAY-001: NGO today briefing returns structured items", test_today_briefing_ngo))
+
+    def test_today_briefing_donor():
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/dashboard/today",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"Donor today: {r.status_code}"
+        d = r.json()
+        assert d.get("role") == "donor"
+    tests.append(("TODAY-002: Donor today briefing returns role-appropriate items", test_today_briefing_donor))
+
+    def test_watchlist_toggle():
+        s = login_ok(base, USERS["ngo"])
+        # Find a grant to star
+        gr = s.get(f"{base}/api/grants/",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        grants = gr.get("grants", [])
+        if not grants:
+            return  # no grants, skip
+        gid = grants[0]["id"]
+        # Toggle ON
+        r1 = s.post(f"{base}/api/watchlist/toggle",
+                    json={"kind": "grant", "target_id": gid},
+                    headers={"Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r1.status_code == 200, f"Toggle on: {r1.status_code}: {r1.text[:200]}"
+        d1 = r1.json()
+        assert d1.get("starred") is True, f"Should be starred: {d1}"
+        # Check
+        r2 = s.get(f"{base}/api/watchlist/check/grant/{gid}",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r2.status_code == 200 and r2.json().get("starred") is True, "Star check failed"
+        # Toggle OFF (idempotent)
+        r3 = s.post(f"{base}/api/watchlist/toggle",
+                    json={"kind": "grant", "target_id": gid},
+                    headers={"Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r3.status_code == 200 and r3.json().get("starred") is False, "Toggle off failed"
+    tests.append(("WATCHLIST-001: Star toggle on grant works idempotently", test_watchlist_toggle))
+
     def test_trust_profile_shape():
         """Trust Profile returns the two-pillar synthesis shape."""
         s = login_ok(base, USERS["donor"])
@@ -846,6 +900,12 @@ def make_tests(base):
             ("GET", "/api/adverse-media/1", "donor"),
             ("GET", "/api/bank-verification/1", "donor"),
             ("GET", "/api/passport/1", "donor"),
+            # Phase 2 (category-defining UX) — today briefing + watchlist
+            ("GET", "/api/dashboard/today", "ngo"),
+            ("GET", "/api/dashboard/today", "donor"),
+            ("GET", "/api/dashboard/today", "reviewer"),
+            ("GET", "/api/dashboard/today", "admin"),
+            ("GET", "/api/watchlist", "ngo"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

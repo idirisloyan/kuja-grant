@@ -23,6 +23,26 @@ logger = logging.getLogger('kuja')
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api/dashboard')
 
 
+@dashboard_bp.route('/today', methods=['GET'])
+@login_required
+def api_dashboard_today():
+    """Return a role-aware 'Today' briefing — what should this user act on now?
+
+    Deterministic: walks the DB, derives prioritised items with severity,
+    due-in-days, and a primary action link. Capped at 6 items.
+
+    See app/services/today_briefing_service.py for the full design.
+    """
+    from app.services.today_briefing_service import TodayBriefingService
+    cache_key = f"today_brief_{current_user.id}"
+    cached = _dashboard_cache.get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+    brief = TodayBriefingService.build(current_user)
+    _dashboard_cache.set(cache_key, brief)
+    return jsonify(brief)
+
+
 @dashboard_bp.route('/stats', methods=['GET'])
 @login_required
 def api_dashboard_stats():
@@ -410,3 +430,5 @@ def _build_admin_stats():
     stats['activity_14d'] = activity
 
     return stats
+
+

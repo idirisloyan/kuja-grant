@@ -31,6 +31,7 @@ from app.models.entity_comment import EntityComment
 from app.models.compliance_snapshot import ComplianceSnapshot
 from app.models.saved_search import SavedSearch
 from app.models.push_subscription import PushSubscription
+from app.models.watchlist import WatchlistItem
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -40,5 +41,5 @@ __all__ = [
     'AIThread', 'AIMessage', 'AICallLog', 'AIProvenance',
     'GrantQuestion', 'DiligenceItem',
     'OrgMemory', 'Risk', 'AuditChainEntry', 'EntityComment', 'ComplianceSnapshot',
-    'SavedSearch', 'PushSubscription',
+    'SavedSearch', 'PushSubscription', 'WatchlistItem',
 ]

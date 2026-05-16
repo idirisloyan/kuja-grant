@@ -10,6 +10,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { AiBadge } from '@/components/shared/ai-badge';
+import { EmptyState } from '@/components/shared/empty-state';
 import type { Report } from '@/lib/types';
 import {
   ChevronLeft,
@@ -906,10 +907,19 @@ export default function ReportsPage() {
         {tabValue === 0 && (
           <div className="mt-5 space-y-3">
             {reportsByGrant.length === 0 ? (
-              <div className="py-10 text-center">
-                <div className="text-sm text-muted-foreground">{t('report.no_reports_yet')}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{t('report.no_reports_hint')}</div>
-              </div>
+              <EmptyState
+                icon={Sparkles}
+                title={t('report.no_reports_yet')}
+                body={t('report.no_reports_hint')}
+                cta={
+                  <a
+                    href="/grants"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[hsl(var(--kuja-clay-dark))]"
+                  >
+                    Apply for a grant
+                  </a>
+                }
+              />
             ) : (
               reportsByGrant.map((group) => (
                 <GrantReportGroup key={group.grantId} group={group} mutateReports={mutateReports} />
@@ -921,9 +931,10 @@ export default function ReportsPage() {
         {tabValue === 1 && (
           <div className="mt-5">
             {timelineItems.length === 0 ? (
-              <div className="py-10 text-center">
-                <div className="text-sm text-muted-foreground">{t('report.no_upcoming_deadlines')}</div>
-              </div>
+              <EmptyState
+                title={t('report.no_upcoming_deadlines')}
+                body="No reporting deadlines coming up. Quiet weeks are for catching up on the rest of your portfolio."
+              />
             ) : (
               <div>
                 {timelineItems.map((item) => {

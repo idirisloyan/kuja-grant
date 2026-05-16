@@ -15,7 +15,7 @@ import { supportedLanguages } from '@/i18n';
 import { cn } from '@/lib/utils';
 
 import {
-  Menu, LogOut, Sparkles, ChevronDown, User as UserIcon, Check, Globe,
+  Menu, LogOut, Sparkles, ChevronDown, User as UserIcon, Check, Globe, Search,
 } from 'lucide-react';
 import { ChangelogButton } from './ChangelogButton';
 
@@ -76,6 +76,19 @@ export function Header() {
 
       {/* Right-side actions */}
       <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Phase 2 — Command palette trigger. Cmd+K / Ctrl+K from anywhere
+            also opens it; this button is the visible affordance. */}
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent('kuja:open-command-palette'))}
+          className="hidden md:inline-flex items-center gap-2 rounded-md border border-[hsl(var(--border))] bg-background px-2.5 py-1.5 text-sm text-[hsl(var(--kuja-ink-soft))] hover:text-[hsl(var(--kuja-ink))] hover:border-[hsl(var(--kuja-clay))] transition-colors"
+          aria-label="Open command palette"
+        >
+          <Search className="h-3.5 w-3.5" />
+          <span className="hidden lg:inline">Search…</span>
+          <kbd className="hidden lg:inline-flex items-center rounded border border-[hsl(var(--border))] bg-[hsl(var(--kuja-sand-50))] px-1.5 text-[10px] font-mono">⌘K</kbd>
+        </button>
+
         {/* Ask AI button */}
         <button
           type="button"
