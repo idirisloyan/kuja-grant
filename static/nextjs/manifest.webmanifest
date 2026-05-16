@@ -1,0 +1,42 @@
+{
+  "name": "Kuja Grant Management",
+  "short_name": "Kuja",
+  "description": "AI-powered grant management for the Global South.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#C2410C",
+  "background_color": "#F2F6FA",
+  "lang": "en",
+  "dir": "auto",
+  "categories": ["productivity", "business", "finance"],
+  "icons": [
+    {
+      "src": "/svg/empty-states.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Home",
+      "url": "/dashboard",
+      "description": "Today's priorities and pre-emption watch."
+    },
+    {
+      "name": "Trust Profile",
+      "short_name": "Trust",
+      "url": "/trust",
+      "description": "Two-pillar trust profile + capacity passport."
+    },
+    {
+      "name": "Calendar",
+      "short_name": "Cal",
+      "url": "/calendar",
+      "description": "Every deadline in one view."
+    }
+  ]
+}
