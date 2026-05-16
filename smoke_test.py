@@ -740,6 +740,43 @@ def make_tests(base):
     # =========================================================================
     # --- Phase 1: Trust Profile / Adverse Media / Bank / Passport ---
 
+    # --- Phase 10: Side-by-side compare + AI auto-fill ---
+
+    def test_application_compare_validates_input():
+        """Compare endpoint validates list length + ids before calling AI."""
+        s = login_ok(base, USERS["donor"])
+        # Too few IDs
+        r = s.post(f"{base}/api/applications/compare",
+                   json={"application_ids": [1]},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 400, f"expected 400 for single id, got {r.status_code}"
+        # Too many IDs
+        r = s.post(f"{base}/api/applications/compare",
+                   json={"application_ids": [1, 2, 3, 4, 5]},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 400, f"expected 400 for 5 ids, got {r.status_code}"
+    tests.append(("COMPARE-001: Application compare validates list length", test_application_compare_validates_input))
+
+    def test_autofill_endpoint_shape():
+        """Auto-fill route returns structured response (AI or unavailable)."""
+        s = login_ok(base, USERS["ngo"])
+        gr = s.get(f"{base}/api/grants/",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        grants = [g for g in gr.get("grants", []) if g.get("status") == "open"]
+        if not grants:
+            return
+        gid = grants[0]["id"]
+        r = s.get(f"{base}/api/grants/{gid}/autofill",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=120)
+        assert r.status_code == 200, f"autofill: {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        for k in ("grant_id", "org_id", "source", "criteria"):
+            assert k in d, f"autofill missing {k}: {list(d.keys())}"
+        assert d["source"] in ("ai", "unavailable", "no_input"), f"unexpected source: {d['source']}"
+    tests.append(("AUTOFILL-001: Auto-fill returns structured response", test_autofill_endpoint_shape))
+
     # --- Phase 9: Bundle PDF + document search + notification digest ---
 
     def test_document_search_returns_structured_response():

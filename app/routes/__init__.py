@@ -45,6 +45,7 @@ def register_blueprints(app):
     from app.routes.report_bundle_routes import report_bundle_bp  # Phase 8: bundles + reviewer follow-ups
     from app.routes.document_search_routes import doc_search_bp  # Phase 9: document smart search
     from app.routes.digest_routes import digest_bp  # Phase 9: notification digest
+    from app.routes.autofill_compare_routes import ai_compare_bp  # Phase 10: auto-fill + compare
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -56,5 +57,5 @@ def register_blueprints(app):
                saved_searches_bp, push_bp, trust_bp, watchlist_bp, signals_bp,
                preemption_bp, calendar_bp, messaging_bp, ai_budget_bp,
                notif_pref_bp, preflight_bp, audit_chain_bp, report_bundle_bp,
-               doc_search_bp, digest_bp]:
+               doc_search_bp, digest_bp, ai_compare_bp]:
         app.register_blueprint(bp)

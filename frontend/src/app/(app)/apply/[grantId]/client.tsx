@@ -13,6 +13,7 @@ import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
 import { PreviewAsReviewer } from '@/components/apply/PreviewAsReviewer';
 import { SubmissionReadiness } from '@/components/apply/SubmissionReadiness';
+import { AutofillPanel } from '@/components/apply/autofill-panel';
 import { useFlag } from '@/lib/hooks/use-feature-flags';
 import {
   ArrowLeft,
@@ -1056,6 +1057,18 @@ function ProposalStep({
           grantId={grantId}
           applicationId={applicationId}
           onApplied={(d) => onDraftApplied(d.responses || {})}
+        />
+      )}
+
+      {/* Phase 10 — AI application auto-fill. Pre-fills drafts from
+          the NGO's org profile + assessments + prior apps. Accept per
+          criterion or accept-all. Renders only if there's nothing typed
+          yet (so it doesn't overwrite work in progress). */}
+      {grantId != null && Object.keys(responses).filter(k => (responses[k] || '').trim()).length === 0 && (
+        <AutofillPanel
+          grantId={grantId}
+          alreadyFilledKeys={Object.keys(responses).filter(k => (responses[k] || '').trim())}
+          onAccept={(key, draft) => onResponseChange(key, draft)}
         />
       )}
 

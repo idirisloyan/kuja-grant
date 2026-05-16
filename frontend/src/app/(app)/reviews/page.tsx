@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { ClipboardCheck, FileText, Star, Filter, ChevronDown, GitCompare, Sparkles, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { Review } from '@/lib/types';
 import { fetchReviewerRecommendation, type ReviewerRecommendation } from '@/lib/copilot-api';
+import { ApplicationCompareDialog } from '@/components/reviews/application-compare-dialog';
+import { LayoutGrid } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ReviewsPage() {
@@ -37,6 +39,8 @@ function ReviewerView() {
   const [comparing, setComparing] = useState(false);
   const [compareResult, setCompareResult] = useState<ReviewerRecommendation | null>(null);
   const [compareError, setCompareError] = useState<string | null>(null);
+  // Phase 10 — the new richer side-by-side matrix dialog
+  const [matrixOpen, setMatrixOpen] = useState(false);
 
   const pending = (data?.pending ?? []) as Review[];
   const completed = (data?.completed ?? []) as Review[];
@@ -85,18 +89,31 @@ function ReviewerView() {
           <p className="text-sm text-muted-foreground mt-0.5">{t('review.subtitle_queue')}</p>
         </div>
         {tab === 'pending' && pending.length >= 2 && (
-          <button
-            onClick={runCompare}
-            disabled={selectedAppIds.size < 2 || comparing}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-spark))] hover:opacity-90 text-white text-sm font-medium px-3 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {comparing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitCompare className="h-3.5 w-3.5" />}
-            {comparing
-              ? t('review.compare_button_running')
-              : selectedAppIds.size < 2
-                ? t('review.compare_button_select')
-                : t('review.compare_button_ready', { n: selectedAppIds.size })}
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Phase 10 — richer per-criterion matrix dialog. Open alongside
+                the existing single-recommendation compare. */}
+            <button
+              onClick={() => setMatrixOpen(true)}
+              disabled={selectedAppIds.size < 2}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark))] text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark-soft))] text-sm font-medium px-3 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="AI side-by-side matrix with per-criterion winners"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Side-by-side matrix
+            </button>
+            <button
+              onClick={runCompare}
+              disabled={selectedAppIds.size < 2 || comparing}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-spark))] hover:opacity-90 text-white text-sm font-medium px-3 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {comparing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitCompare className="h-3.5 w-3.5" />}
+              {comparing
+                ? t('review.compare_button_running')
+                : selectedAppIds.size < 2
+                  ? t('review.compare_button_select')
+                  : t('review.compare_button_ready', { n: selectedAppIds.size })}
+            </button>
+          </div>
         )}
       </div>
 
@@ -214,6 +231,19 @@ function ReviewerView() {
           </TableWrap>
         )
       )}
+
+      {/* Phase 10 — side-by-side matrix dialog. Mounted at root level so
+          it can layer above the queue. */}
+      <ApplicationCompareDialog
+        open={matrixOpen}
+        onOpenChange={setMatrixOpen}
+        applicationIds={Array.from(selectedAppIds)}
+        appLabels={Object.fromEntries(
+          pending
+            .filter(r => selectedAppIds.has(r.application_id))
+            .map(r => [r.application_id, (r as unknown as { ngo_org_name?: string }).ngo_org_name || `App #${r.application_id}`])
+        )}
+      />
     </div>
   );
 }
