@@ -145,50 +145,49 @@ class GrantFitCompareService:
             "Return the comparison via the rank_grants tool."
         )
 
-        tool = {
-            'name': 'rank_grants',
-            'description': 'Return the ranked grant comparison.',
-            'input_schema': {
-                'type': 'object',
-                'properties': {
-                    'matrix': {
-                        'type': 'array',
-                        'items': {
-                            'type': 'object',
-                            'properties': {
-                                'grant_id': {'type': 'integer'},
-                                'grant_title': {'type': 'string'},
-                                'fit_score': {'type': 'integer'},
-                                'effort_score': {'type': 'integer'},
-                                'verdict': {
-                                    'type': 'string',
-                                    'enum': ['apply', 'apply_if_capacity', 'skip'],
-                                },
-                                'reasons_to_apply': {
-                                    'type': 'array',
-                                    'items': {'type': 'string'}, 'maxItems': 4,
-                                },
-                                'reasons_to_skip': {
-                                    'type': 'array',
-                                    'items': {'type': 'string'}, 'maxItems': 4,
-                                },
+        tool_schema = {
+            'type': 'object',
+            'properties': {
+                'matrix': {
+                    'type': 'array',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'grant_id': {'type': 'integer'},
+                            'grant_title': {'type': 'string'},
+                            'fit_score': {'type': 'integer'},
+                            'effort_score': {'type': 'integer'},
+                            'verdict': {
+                                'type': 'string',
+                                'enum': ['apply', 'apply_if_capacity', 'skip'],
                             },
-                            'required': ['grant_id', 'fit_score', 'effort_score', 'verdict'],
+                            'reasons_to_apply': {
+                                'type': 'array',
+                                'items': {'type': 'string'}, 'maxItems': 4,
+                            },
+                            'reasons_to_skip': {
+                                'type': 'array',
+                                'items': {'type': 'string'}, 'maxItems': 4,
+                            },
                         },
+                        'required': ['grant_id', 'fit_score', 'effort_score', 'verdict'],
                     },
-                    'recommended_grant_id': {'type': 'integer'},
-                    'second_choice_grant_id': {'type': 'integer'},
-                    'skip_grant_ids': {
-                        'type': 'array', 'items': {'type': 'integer'},
-                    },
-                    'recommendation_rationale': {'type': 'string'},
                 },
-                'required': ['matrix', 'recommended_grant_id', 'recommendation_rationale'],
+                'recommended_grant_id': {'type': 'integer'},
+                'second_choice_grant_id': {'type': 'integer'},
+                'skip_grant_ids': {
+                    'type': 'array', 'items': {'type': 'integer'},
+                },
+                'recommendation_rationale': {'type': 'string'},
             },
+            'required': ['matrix', 'recommended_grant_id', 'recommendation_rationale'],
         }
 
         result = AIService._call_claude_tool(
-            system_prompt, user_message, tool,
+            system_prompt, user_message,
+            tool_name='rank_grants',
+            tool_description='Return the ranked grant comparison.',
+            tool_schema=tool_schema,
             max_tokens=2200,
             endpoint='grant_fit.compare',
         )
