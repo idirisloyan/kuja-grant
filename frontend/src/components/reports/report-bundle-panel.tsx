@@ -17,7 +17,7 @@
 import { useState } from 'react';
 import {
   FileBox, Sparkles, ShieldCheck, FileText, AlertTriangle, CheckCircle2,
-  Loader2, Copy, ExternalLink, BookOpen, Paperclip,
+  Loader2, Copy, ExternalLink, BookOpen, Paperclip, Download,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -215,7 +215,18 @@ export function ReportBundlePanel({ reportId, canPublish }: ReportBundlePanelPro
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Phase 9 — direct PDF download. Same endpoint as JSON but .pdf;
+              browser-handles the download. Available to anyone with read
+              access (donors, reviewers, admin, NGO). */}
+          <a
+            href={`/api/reports/${reportId}/bundle.pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--kuja-ink))] hover:bg-[hsl(var(--kuja-sand-50))]"
+          >
+            <Download className="w-3.5 h-3.5" /> Download PDF
+          </a>
           {canPublish && (
             <button
               type="button"

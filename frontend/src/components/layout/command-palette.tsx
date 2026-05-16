@@ -77,11 +77,22 @@ interface SearchHitOrg {
   country?: string;
 }
 
+interface SearchHitDoc {
+  document_id: number;
+  original_filename: string;
+  doc_type: string | null;
+  application_id: number | null;
+  assessment_id: number | null;
+  snippet: string;
+  match_locations: string[];
+}
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [grantHits, setGrantHits] = useState<SearchHitGrant[]>([]);
   const [orgHits, setOrgHits] = useState<SearchHitOrg[]>([]);
+  const [docHits, setDocHits] = useState<SearchHitDoc[]>([]);
   const [searching, setSearching] = useState(false);
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -106,22 +117,24 @@ export function CommandPalette() {
     };
   }, []);
 
-  // Live search across grants + orgs (debounced 250ms)
+  // Live search across grants + orgs + documents (debounced 250ms)
   useEffect(() => {
     if (!query || query.length < 2) {
-      setGrantHits([]); setOrgHits([]); return;
+      setGrantHits([]); setOrgHits([]); setDocHits([]); return;
     }
     let cancelled = false;
     setSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const [g, o] = await Promise.all([
+        const [g, o, d] = await Promise.all([
           api.get<{ grants?: SearchHitGrant[] }>(`/api/grants/?q=${encodeURIComponent(query)}`).catch(() => ({ grants: [] })),
           api.get<{ organizations?: SearchHitOrg[] }>(`/api/organizations/search?q=${encodeURIComponent(query)}`).catch(() => ({ organizations: [] })),
+          api.get<{ hits?: SearchHitDoc[] }>(`/api/documents/search?q=${encodeURIComponent(query)}`).catch(() => ({ hits: [] })),
         ]);
         if (cancelled) return;
         setGrantHits((g.grants ?? []).slice(0, 5));
         setOrgHits((o.organizations ?? []).slice(0, 5));
+        setDocHits((d.hits ?? []).slice(0, 5));
       } finally {
         if (!cancelled) setSearching(false);
       }
@@ -220,6 +233,44 @@ export function CommandPalette() {
                     )}
                   </div>
                   <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--kuja-clay))]">Trust</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
+
+        {/* Document results (Phase 9) */}
+        {docHits.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Documents">
+              {docHits.map((d) => (
+                <CommandItem
+                  key={`doc-${d.document_id}`}
+                  value={`doc-${d.document_id} ${d.original_filename}`}
+                  onSelect={() => {
+                    // Drill to the underlying application or assessment if present.
+                    if (d.application_id) go(`/applications/${d.application_id}`);
+                    else if (d.assessment_id) go('/assessments');
+                    else go('/organizations/profile');
+                  }}
+                  className="flex items-start gap-2"
+                >
+                  <FileText className="w-4 h-4 text-[hsl(var(--kuja-sky))] mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold truncate">{d.original_filename}</div>
+                    {d.snippet && (
+                      <div
+                        className="text-[11px] text-[hsl(var(--kuja-ink-soft))] line-clamp-2"
+                        dangerouslySetInnerHTML={{ __html: d.snippet }}
+                      />
+                    )}
+                    {d.match_locations.length > 0 && (
+                      <div className="text-[10px] uppercase tracking-wider text-[hsl(var(--kuja-ink-soft))] mt-0.5">
+                        match: {d.match_locations.join(', ')}
+                      </div>
+                    )}
+                  </div>
                 </CommandItem>
               ))}
             </CommandGroup>

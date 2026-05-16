@@ -10,8 +10,9 @@ Routes:
 """
 
 import logging
+import re
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, send_file
 from flask_login import login_required, current_user
 
 from app.extensions import db
@@ -65,6 +66,47 @@ def api_bundle_assemble(report_id):
         return jsonify({'success': False, 'error': 'Could not assemble bundle'}), 500
     _dashboard_cache.set(cache_key, bundle)
     return jsonify({'success': True, 'bundle': bundle})
+
+
+@report_bundle_bp.route('/reports/<int:report_id>/bundle.pdf', methods=['GET'])
+@login_required
+def api_bundle_pdf(report_id):
+    """Download the bundle as a PDF. Same visibility check as the
+    JSON assembly. The PDF is generated on demand from the cached
+    bundle (or a fresh assembly if cache is empty)."""
+    rpt = db.session.get(Report, report_id)
+    if not _report_visible(rpt):
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
+    cache_key = f'report_bundle_{report_id}_{current_user.id}'
+    bundle = _dashboard_cache.get(cache_key)
+    if bundle is None:
+        bundle = ReportBundleService.assemble(report_id, with_ai_summary=True)
+        if bundle:
+            _dashboard_cache.set(cache_key, bundle)
+    if not bundle:
+        return jsonify({'success': False, 'error': 'Could not assemble bundle'}), 500
+
+    try:
+        from app.services.bundle_pdf_service import build_bundle_pdf
+        pdf_bytes = build_bundle_pdf(bundle)
+    except Exception as e:
+        logger.exception(f"Bundle PDF render failed: {e}")
+        return jsonify({'success': False, 'error': 'PDF render failed'}), 500
+
+    # Filename: kuja-bundle-<grant-slug>-<report-id>-<hash6>.pdf
+    grant_title = (bundle.get('cover_meta', {}) or {}).get('grant_title') or 'grant'
+    slug = re.sub(r'[^a-z0-9]+', '-', grant_title.lower()).strip('-')[:60] or 'grant'
+    hash6 = (bundle.get('bundle_hash') or '')[:6]
+    filename = f'kuja-bundle-{slug}-r{report_id}-{hash6}.pdf'
+
+    import io
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=filename,
+    )
 
 
 @report_bundle_bp.route('/reports/<int:report_id>/bundle/publish', methods=['POST'])

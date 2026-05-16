@@ -740,6 +740,66 @@ def make_tests(base):
     # =========================================================================
     # --- Phase 1: Trust Profile / Adverse Media / Bank / Passport ---
 
+    # --- Phase 9: Bundle PDF + document search + notification digest ---
+
+    def test_document_search_returns_structured_response():
+        """ILIKE document search returns the expected response shape."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/documents/search?q=report",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"doc search: {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        for k in ("query", "total", "hits"):
+            assert k in d, f"doc search missing {k}: {list(d.keys())}"
+        assert isinstance(d["hits"], list), "hits must be a list"
+        for h in d["hits"][:1]:
+            for k in ("document_id", "original_filename", "snippet", "match_locations"):
+                assert k in h, f"hit missing {k}: {h}"
+    tests.append(("DOCSEARCH-001: Document search returns structured response", test_document_search_returns_structured_response))
+
+    def test_document_search_short_query_no_500():
+        """Short queries (<2 chars) return empty politely (not 500)."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/documents/search?q=a",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"short query: {r.status_code}"
+        d = r.json()
+        assert d.get("total") == 0, f"short query should return 0: {d}"
+    tests.append(("DOCSEARCH-002: Short queries return empty without 500", test_document_search_short_query_no_500))
+
+    def test_digest_run_for_me():
+        """User-triggered digest endpoint returns structured result."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.post(f"{base}/api/notification-digest/me/run",
+                   json={"frequency": "daily", "force": True},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"digest run: {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        assert d.get("success") is True, f"digest run failed: {d}"
+        result = d.get("result", {})
+        assert "sent" in result, f"missing 'sent' in result: {result}"
+    tests.append(("DIGEST-001: Notification digest /me/run returns structured result", test_digest_run_for_me))
+
+    def test_bundle_pdf_download():
+        """Bundle PDF endpoint streams a valid PDF (starts with %PDF header)."""
+        s = login_ok(base, USERS["ngo"])
+        ar = s.get(f"{base}/api/reports/",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        reports = ar.get("reports", [])
+        if not reports:
+            return
+        rid = reports[0]["id"]
+        r = s.get(f"{base}/api/reports/{rid}/bundle.pdf",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=60)
+        assert r.status_code == 200, f"bundle PDF: {r.status_code}: {r.text[:200]}"
+        assert r.headers.get("Content-Type", "").startswith("application/pdf"), \
+            f"wrong content-type: {r.headers.get('Content-Type')}"
+        body = r.content
+        assert len(body) > 1000, f"PDF body too small: {len(body)} bytes"
+        assert body.startswith(b"%PDF-"), f"missing PDF header (got {body[:8]!r})"
+    tests.append(("BUNDLE-PDF-001: Bundle PDF downloads as valid PDF", test_bundle_pdf_download))
+
     # --- Phase 8: Report bundle + reviewer follow-ups ---
 
     def test_report_bundle_assemble():
@@ -1188,6 +1248,9 @@ def make_tests(base):
             # which may 404, so they validate only that the route exists (not 500)
             ("GET", "/api/reports/1/bundle", "ngo"),
             ("GET", "/api/reviewer/followups/application/1", "donor"),
+            # Phase 9 (search + digest)
+            ("GET", "/api/documents/search?q=test", "ngo"),
+            ("GET", "/api/documents/search?q=test", "donor"),
         ]
         errors_500 = []
         for method, path, role in endpoints:
