@@ -169,18 +169,27 @@ def create_app(config_name=None):
             from sqlalchemy import text, inspect as sa_inspect
             inspector = sa_inspect(db.engine)
             with db.engine.connect() as conn:
-                # Phase 4 — preferred_currency on organizations
+                # Phase 4 / Phase 5 — organizations columns.
+                # Run BEFORE the doc/report ALTERs and commit inline so a
+                # noop in the doc batch (when columns already exist) doesn't
+                # leave our ALTERs uncommitted.
                 try:
                     org_cols = {c['name'] for c in inspector.get_columns('organizations')}
+                    org_added = []
                     if 'preferred_currency' not in org_cols:
                         conn.execute(text("ALTER TABLE organizations ADD COLUMN preferred_currency VARCHAR(3) DEFAULT 'USD'"))
-                        app.logger.info("Added organizations.preferred_currency column")
-                    # Phase 5 — ai_monthly_budget_usd on organizations
+                        org_added.append('preferred_currency')
                     if 'ai_monthly_budget_usd' not in org_cols:
                         conn.execute(text("ALTER TABLE organizations ADD COLUMN ai_monthly_budget_usd NUMERIC(10, 2)"))
-                        app.logger.info("Added organizations.ai_monthly_budget_usd column")
+                        org_added.append('ai_monthly_budget_usd')
+                    if org_added:
+                        conn.commit()
+                        app.logger.info(f"Added organizations columns: {', '.join(org_added)}")
                 except Exception as e:
-                    app.logger.debug(f"organizations column check skipped: {e}")
+                    # Don't leave the connection in a poisoned tx state for the next ALTER batch
+                    try: conn.rollback()
+                    except Exception: pass
+                    app.logger.warning(f"organizations column migration skipped: {e}")
 
                 # Check existing columns and only add missing ones
                 doc_cols = {c['name'] for c in inspector.get_columns('documents')}
