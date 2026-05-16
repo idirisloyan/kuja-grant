@@ -111,22 +111,36 @@ function MetricRow({ m }: { m: CohortMetric }) {
   );
 }
 
-export function DonorCohortCard() {
+interface DonorCohortCardProps {
+  /** When set, admin viewing a specific donor's cohort.
+   *  When omitted, the caller donor's own portfolio is used. */
+  donorOrgId?: number;
+}
+
+export function DonorCohortCard({ donorOrgId }: DonorCohortCardProps = {}) {
   const user = useAuthStore((s) => s.user);
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Render gate: donors see their own; admins see specified donor; others nothing.
+  const canRender =
+    (user?.role === 'donor') ||
+    (user?.role === 'admin' && typeof donorOrgId === 'number');
+
   useEffect(() => {
-    if (!user || user.role !== 'donor') return;
+    if (!canRender) return;
     let cancelled = false;
-    api.get<Resp>('/api/dashboard/donor-cohort-analytics')
+    const url = donorOrgId
+      ? `/api/dashboard/donor-cohort-analytics?donor_org_id=${donorOrgId}`
+      : '/api/dashboard/donor-cohort-analytics';
+    api.get<Resp>(url)
       .then((r) => { if (!cancelled) setData(r); })
       .catch(() => { /* quiet */ })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [user]);
+  }, [canRender, donorOrgId]);
 
-  if (!user || user.role !== 'donor') return null;
+  if (!canRender) return null;
 
   if (loading) {
     return (

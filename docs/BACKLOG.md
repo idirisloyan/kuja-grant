@@ -64,7 +64,13 @@ is the actual money movement.
 
 ## Completed (rolling log)
 
-- **2026-05-16** — Phase 24 (this commit): reviewer auto-assignment,
+- **2026-05-16** — Phase 25 (this commit): auto-assign reviewers on
+  application submit (idempotent); per-scope `<AIChatPanel>` mounted
+  on grant + application detail pages so users can ask Kuja about
+  THIS entity without leaving the page; admin-only DonorCohortCard
+  on `/donors/[id]` for cohort inspection; +222 i18n keys across 6
+  locales covering chat thread, PWA banner, share, cohort strings.
+- **2026-05-16** — Phase 24 (commit `53dd381`): reviewer auto-assignment,
   sustained AI chat threads (`AIChatService` + `/api/ai/threads/*` +
   `/chat` route + `<AIChatPanel>`), donor cohort analytics (your
   funded NGOs vs the cohort), PWA install banner + native share

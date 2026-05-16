@@ -22,6 +22,7 @@ import { PanelCalibrationCard } from '@/components/reviews/panel-calibration-car
 import { ScoreBreakdownCard } from '@/components/applications/score-breakdown-card';
 import { ApplicationMessageThread } from '@/components/applications/application-message-thread';
 import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
+import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
 import { useAuthStore } from '@/stores/auth-store';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
@@ -248,6 +249,9 @@ export default function ApplicationDetailClient() {
       <div className="pt-2">
         <ApplicationMessageThread applicationId={application.id} />
       </div>
+
+      {/* Phase 25B — scoped AI chat: ask Kuja about THIS application. */}
+      <AIChatPanel scope={{ kind: 'application', id: application.id }} />
     </div>
   );
 }

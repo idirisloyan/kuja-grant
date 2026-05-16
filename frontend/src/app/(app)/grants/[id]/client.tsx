@@ -16,6 +16,7 @@ import { LiveDraftersPill } from '@/components/grants/LiveDraftersPill';
 import { GrantAgreementUnpackPanel } from '@/components/grants/grant-agreement-unpack-panel';
 import { TagsEditor } from '@/components/shared/tags-editor';
 import { GrantBroadcastDialog } from '@/components/grants/grant-broadcast-dialog';
+import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
 import { Megaphone } from 'lucide-react';
 
 function formatFunding(amount: number | null, currency: string): string {
@@ -214,6 +215,9 @@ export default function GrantDetailClient() {
           grantId={grant.id}
         />
       )}
+
+      {/* Phase 25B — scoped AI chat: ask Kuja about THIS grant. */}
+      <AIChatPanel scope={{ kind: 'grant', id: grant.id }} />
     </div>
   );
 }

@@ -27,6 +27,8 @@ import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { NameChip } from '@/components/shared/name-chip';
 import { NativeShareButton } from '@/components/shared/native-share-button';
+import { DonorCohortCard } from '@/components/dashboards/donor-cohort-card';
+import { useAuthStore } from '@/stores/auth-store';
 import { TrendingUp, TrendingDown, Minus, Users } from 'lucide-react';
 
 interface BenchmarkMetric {
@@ -96,6 +98,7 @@ function formatUsd(n?: number | null) {
 export default function DonorProfileClient() {
   const params = useParams();
   const router = useRouter();
+  const currentUser = useAuthStore((s) => s.user);
   const [id, setId] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
       const m = window.location.pathname.match(/\/donors\/(\d+)/);
@@ -396,6 +399,11 @@ export default function DonorProfileClient() {
             </button>
           </div>
         </Card>
+      )}
+
+      {/* Phase 25C — admin-only: cohort analytics for this donor. */}
+      {currentUser?.role === 'admin' && data.donor_org_id && (
+        <DonorCohortCard donorOrgId={data.donor_org_id} />
       )}
     </div>
   );

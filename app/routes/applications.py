@@ -270,6 +270,26 @@ def api_submit_application(app_id):
     except Exception as _exc:  # pylint: disable=broad-except
         logger.debug(f"org_memory auto-extraction skipped: {_exc}")
 
+    # Phase 25A — auto-assign a reviewer panel on submit so apps are
+    # never sitting in queue waiting on a donor to pick reviewers.
+    # Idempotent: ReviewerAutoAssignService skips already-assigned. If
+    # the donor has already manually assigned, this is a no-op.
+    try:
+        from app.services.reviewer_auto_assign_service import (
+            ReviewerAutoAssignService,
+        )
+        ra = ReviewerAutoAssignService.run(
+            application_id=application.id,
+            actor_email='system.auto_assign',
+        )
+        if ra.get('ok') and ra.get('assigned'):
+            logger.info(
+                f"auto-assigned {ra['assigned']} reviewer(s) to "
+                f"app {application.id} on submit"
+            )
+    except Exception as _exc:  # pylint: disable=broad-except
+        logger.debug(f"reviewer auto-assign on submit skipped: {_exc}")
+
     logger.info(f"Application submitted: id={app_id} by org {current_user.org_id} (score: {application.ai_score})")
     return jsonify({'success': True, 'application': application.to_dict()})
 
