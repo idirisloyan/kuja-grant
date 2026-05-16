@@ -94,14 +94,22 @@ class DonorProfileService:
 
         decline_rate = round((rejected_count / len(decided)) * 100, 1) if decided else None
 
-        # Sector / country distribution from grants
+        # Sector / country distribution from grants — Grant stores these
+        # as JSON text columns, so use the model's get_* helpers (NOT raw
+        # str iteration which yields single characters).
         sector_counts: Counter = Counter()
         country_counts: Counter = Counter()
         for g in grants:
-            for s in (g.sectors or []):
-                sector_counts[s] += 1
-            for c in (g.countries or []):
-                country_counts[c] += 1
+            gs = g.get_sectors() if hasattr(g, 'get_sectors') else (g.sectors or [])
+            if isinstance(gs, list):
+                for s in gs:
+                    if s and isinstance(s, str):
+                        sector_counts[s] += 1
+            gc = g.get_countries() if hasattr(g, 'get_countries') else (g.countries or [])
+            if isinstance(gc, list):
+                for c in gc:
+                    if c and isinstance(c, str):
+                        country_counts[c] += 1
 
         active_sectors = [
             {'name': s, 'count': n}
