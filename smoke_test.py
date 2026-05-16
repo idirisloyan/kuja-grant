@@ -740,6 +740,54 @@ def make_tests(base):
     # =========================================================================
     # --- Phase 1: Trust Profile / Adverse Media / Bank / Passport ---
 
+    # --- Phase 7: Pre-flight + audit chain ---
+
+    def test_audit_chain_verify():
+        """Admin can hit the chain verify endpoint and gets a structured result."""
+        s = login_ok(base, USERS["admin"])
+        r = s.get(f"{base}/api/audit-chain/verify",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"audit verify: {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        for k in ("ok", "total_checked", "breaks"):
+            assert k in d, f"verify response missing {k}: {d}"
+        assert isinstance(d["breaks"], list), "breaks must be a list"
+    tests.append(("AUDIT-001: Hash-chain verify returns integrity result", test_audit_chain_verify))
+
+    def test_audit_chain_recent():
+        s = login_ok(base, USERS["admin"])
+        r = s.get(f"{base}/api/audit-chain/recent?limit=10",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"audit recent: {r.status_code}"
+        d = r.json()
+        for k in ("total", "limit", "offset", "entries"):
+            assert k in d, f"recent missing {k}: {list(d.keys())}"
+        # Entry shape if any exist
+        for e in d["entries"]:
+            for k in ("id", "seq", "action", "prev_hash", "payload_hash", "created_at"):
+                assert k in e, f"entry missing {k}: {e}"
+    tests.append(("AUDIT-002: Hash-chain recent returns paginated entries", test_audit_chain_recent))
+
+    def test_preflight_application():
+        """Pre-flight on an application returns structured AI or heuristic result."""
+        s = login_ok(base, USERS["ngo"])
+        # Find an application id
+        ar = s.get(f"{base}/api/applications/",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        apps = ar.get("applications", [])
+        if not apps:
+            return  # nothing to test against
+        app_id = apps[0]["id"]
+        r = s.get(f"{base}/api/preflight/application/{app_id}",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=60)
+        assert r.status_code == 200, f"preflight: {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        for k in ("scope", "source", "predicted_overall_score", "predicted_grade",
+                  "criteria", "top_fixes"):
+            assert k in d, f"preflight missing {k}: {list(d.keys())}"
+        assert d["source"] in ("ai", "heuristic_fallback"), f"unexpected source: {d['source']}"
+    tests.append(("PREFLIGHT-001: Application pre-flight returns reviewer-style scoring", test_preflight_application))
+
     # --- Phase 6: Notification preferences + dispatcher ---
 
     def test_notif_prefs_default_shape():
@@ -1091,6 +1139,9 @@ def make_tests(base):
             # Phase 6 (preferences + notifications)
             ("GET", "/api/notification-preferences", "ngo"),
             ("GET", "/api/notification-preferences", "donor"),
+            # Phase 7 (pre-flight + audit chain)
+            ("GET", "/api/audit-chain/verify", "admin"),
+            ("GET", "/api/audit-chain/recent", "admin"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

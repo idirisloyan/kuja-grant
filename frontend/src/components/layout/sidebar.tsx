@@ -91,6 +91,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
       { icon: CheckCircle2, label: t('nav.registration_checks'), href: '/verification' },
       { icon: Shield, label: t('nav.compliance'), href: '/compliance' },
       { icon: Activity, label: t('nav.observability'), href: '/observability' },
+      { icon: ShieldCheck, label: t('nav.audit_chain') || 'Audit chain', href: '/admin/audit-chain' },
     ],
   };
 

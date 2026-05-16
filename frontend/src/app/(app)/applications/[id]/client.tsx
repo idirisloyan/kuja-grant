@@ -14,6 +14,7 @@ import type { Application } from '@/lib/types';
 import { InfoTip } from '@/components/shared/info-tip';
 import { ActivityTimeline } from '@/components/applications/ActivityTimeline';
 import { StatusSignalsRail } from '@/components/shared/status-signals-rail';
+import { PreflightPanel } from '@/components/shared/preflight-panel';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
 const TAB_KEYS: { id: TabId; key: string }[] = [
@@ -114,14 +115,21 @@ export default function ApplicationDetailClient() {
             <p className="text-sm text-muted-foreground">{application.ngo_org_name}</p>
           )}
         </div>
-        {application.ai_score != null && (
-          <div className="flex items-center gap-3">
-            <ScoreRing score={Math.round(application.ai_score)} size={64} label="AI" />
-            {application.human_score != null && (
-              <ScoreRing score={Math.round(application.human_score)} size={64} label="Human" />
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Phase 7 — donor-perspective pre-flight launcher (NGO + admin).
+              Renders for any application, but most useful on drafts. */}
+          {(application.status === 'draft' || application.status === 'submitted') && (
+            <PreflightPanel kind="application" entityId={application.id} />
+          )}
+          {application.ai_score != null && (
+            <>
+              <ScoreRing score={Math.round(application.ai_score)} size={64} label="AI" />
+              {application.human_score != null && (
+                <ScoreRing score={Math.round(application.human_score)} size={64} label="Human" />
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* "Where this stands" summary — replaces the loose meta line so the
