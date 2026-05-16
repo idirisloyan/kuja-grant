@@ -11,6 +11,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { SavedSearchesBar } from '@/components/shared/saved-searches-bar';
+import { RecencyChip } from '@/components/shared/recency-chip';
 import { cn } from '@/lib/utils';
 
 import { FileText, Eye, ArrowRight, Inbox } from 'lucide-react';
@@ -23,6 +24,8 @@ interface AppRow {
   status: string;
   ai_score?: number | null;
   submitted_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 const STATUS_FILTERS = ['all', 'submitted', 'under_review', 'scored', 'accepted', 'rejected'] as const;
@@ -138,9 +141,13 @@ export default function ApplicationsPage() {
                       <div className="font-medium text-foreground">
                         {app.grant_title || `Grant #${app.grant_id}`}
                       </div>
-                      {app.org_name && (
-                        <div className="text-xs text-muted-foreground mt-0.5">{app.org_name}</div>
-                      )}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {app.org_name && (
+                          <div className="text-xs text-muted-foreground">{app.org_name}</div>
+                        )}
+                        {/* PMO-transfer: last-touched chip for at-a-glance staleness */}
+                        <RecencyChip iso={app.updated_at || app.created_at} />
+                      </div>
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={app.status} kind="app" /></td>
                     <td className="px-4 py-3 text-center">

@@ -1344,6 +1344,135 @@ def make_tests(base):
         assert data.get("verified") is False, "verified field should be false"
     tests.append(("PASSPORT-002: Verify endpoint refuses bad slug/token", test_passport_verify_bad_token))
 
+    def test_portfolio_bundle_assembles():
+        """PHASE13-001: donor /api/portfolio/bundle returns shaped JSON."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/portfolio/bundle?days=90",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=30)
+        assert r.status_code == 200, f"portfolio/bundle: {r.status_code} {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True, f"success false: {data}"
+        p = data.get("portfolio") or {}
+        for k in ("donor_org_id", "period_label", "report_count",
+                  "grantee_count", "bundles"):
+            assert k in p, f"portfolio missing {k}: {list(p.keys())}"
+        assert isinstance(p["bundles"], list), "bundles must be list"
+    tests.append(("PHASE13-001: Portfolio bundle assembles for donor", test_portfolio_bundle_assembles))
+
+    def test_portfolio_pdf_downloads():
+        """PHASE13-002: donor /api/portfolio/bundle.pdf returns a real PDF."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/portfolio/bundle.pdf?days=90",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=60)
+        assert r.status_code == 200, f"portfolio bundle.pdf: {r.status_code} {r.text[:200]}"
+        ct = (r.headers.get("Content-Type") or "").lower()
+        assert "application/pdf" in ct, f"expected PDF content-type, got: {ct}"
+        body = r.content
+        assert body.startswith(b"%PDF-"), f"body not a PDF: {body[:8]!r}"
+        assert len(body) > 1000, f"PDF suspiciously small: {len(body)} bytes"
+    tests.append(("PHASE13-002: Portfolio bundle PDF downloads as real PDF", test_portfolio_pdf_downloads))
+
+    def test_portfolio_audit_timeline():
+        """PHASE13-003: donor /api/portfolio/audit-timeline returns entries shape."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/portfolio/audit-timeline?limit=10",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"audit-timeline: {r.status_code} {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True, f"success false: {data}"
+        assert isinstance(data.get("entries"), list), "entries must be a list"
+        # If any entries, validate shape
+        for e in data["entries"][:3]:
+            for k in ("id", "seq", "action", "subject_kind", "payload_hash"):
+                assert k in e, f"entry missing {k}: {list(e.keys())}"
+    tests.append(("PHASE13-003: Portfolio audit timeline returns entries", test_portfolio_audit_timeline))
+
+    def test_calendar_pdf_downloads():
+        """PHASE13-004: /api/calendar/deadlines.pdf returns a real PDF for NGO + donor."""
+        for role in ("ngo", "donor"):
+            s = login_ok(base, USERS[role])
+            r = s.get(f"{base}/api/calendar/deadlines.pdf?days=60",
+                      headers={"X-Requested-With": "XMLHttpRequest"}, timeout=30)
+            assert r.status_code == 200, (
+                f"calendar.pdf ({role}): {r.status_code} {r.text[:200]}"
+            )
+            ct = (r.headers.get("Content-Type") or "").lower()
+            assert "application/pdf" in ct, (
+                f"calendar.pdf ({role}): expected PDF, got {ct}"
+            )
+            body = r.content
+            assert body.startswith(b"%PDF-"), (
+                f"calendar.pdf ({role}): body not a PDF: {body[:8]!r}"
+            )
+    tests.append(("PHASE13-004: Calendar PDF downloads for NGO + donor", test_calendar_pdf_downloads))
+
+    def test_phase14_decision_reasons():
+        """PHASE14-001: /api/applications/decision-reasons returns shaped list."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/applications/decision-reasons",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        reasons = data.get("reasons") or []
+        assert len(reasons) >= 10, f"too few reasons: {len(reasons)}"
+        for r in reasons[:3]:
+            for k in ("code", "label", "tone"):
+                assert k in r, f"reason missing {k}: {r}"
+    tests.append(("PHASE14-001: Decision reasons vocab returned", test_phase14_decision_reasons))
+
+    def test_phase14_ngo_portfolio_bundle():
+        """PHASE14-002: NGO /api/portfolio/ngo/bundle returns shaped JSON."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/portfolio/ngo/bundle?days=180",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=30)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        p = data.get("portfolio") or {}
+        for k in ("ngo_org_id", "ngo_org_name", "report_count",
+                  "donor_count", "period_label", "bundles"):
+            assert k in p, f"portfolio missing {k}: {list(p.keys())}"
+    tests.append(("PHASE14-002: NGO portfolio bundle assembles", test_phase14_ngo_portfolio_bundle))
+
+    def test_phase14_ngo_portfolio_pdf():
+        """PHASE14-003: NGO /api/portfolio/ngo/bundle.pdf returns valid PDF."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/portfolio/ngo/bundle.pdf?days=180",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=60)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        ct = (r.headers.get("Content-Type") or "").lower()
+        assert "application/pdf" in ct, f"expected PDF, got {ct}"
+        assert r.content.startswith(b"%PDF-"), f"not a PDF: {r.content[:8]!r}"
+        assert len(r.content) > 1000, f"PDF too small: {len(r.content)}"
+    tests.append(("PHASE14-003: NGO portfolio PDF downloads", test_phase14_ngo_portfolio_pdf))
+
+    def test_phase14_followups_send_route_exists():
+        """PHASE14-004: outbound-dispatch routes exist + behave on empty body.
+
+        Posting an empty body should NOT 500. Either 404 (no such app)
+        or 400/200 with notice='no_questions' is acceptable. The point
+        is that the route is wired and validates input."""
+        s = login_ok(base, USERS["donor"])
+        r = s.post(f"{base}/api/reviewer/followups/application/1/send",
+                   json={"questions": []},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code < 500, f"500 on followups/send: {r.status_code} {r.text[:200]}"
+    tests.append(("PHASE14-004: Reviewer followups send route registered", test_phase14_followups_send_route_exists))
+
+    def test_phase14_debrief_validation():
+        """PHASE14-005: PUT /debrief rejects bad reason_code with 400."""
+        s = login_ok(base, USERS["donor"])
+        r = s.put(f"{base}/api/applications/1/debrief",
+                  json={"reason_code": "totally_made_up", "notes": ""},
+                  headers={"Content-Type": "application/json",
+                           "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        # 404 if app#1 isn't visible (most likely for donor sarah); 400 if
+        # visible. We just need NOT 500.
+        assert r.status_code < 500, f"500 on debrief PUT: {r.status_code} {r.text[:200]}"
+    tests.append(("PHASE14-005: Debrief PUT validates input cleanly", test_phase14_debrief_validation))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [
@@ -1403,6 +1532,18 @@ def make_tests(base):
             ("GET", "/api/patterns/me", "ngo"),
             ("GET", "/api/patterns/me", "donor"),
             ("GET", "/api/patterns/me", "admin"),
+            # Phase 13 (portfolio bundle + calendar PDF + audit timeline)
+            ("GET", "/api/portfolio/bundle?days=90", "donor"),
+            ("GET", "/api/portfolio/bundle?days=90", "admin"),
+            ("GET", "/api/portfolio/audit-timeline?limit=10", "donor"),
+            ("GET", "/api/portfolio/audit-timeline?limit=10", "admin"),
+            ("GET", "/api/calendar/deadlines.pdf?days=30", "ngo"),
+            ("GET", "/api/calendar/deadlines.pdf?days=30", "donor"),
+            # Phase 14 (NGO portfolio + win/loss debrief + outbound followups)
+            ("GET", "/api/portfolio/ngo/bundle?days=180", "ngo"),
+            ("GET", "/api/portfolio/ngo/bundle?days=180", "admin"),
+            ("GET", "/api/applications/decision-reasons", "donor"),
+            ("GET", "/api/applications/decision-reasons", "ngo"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

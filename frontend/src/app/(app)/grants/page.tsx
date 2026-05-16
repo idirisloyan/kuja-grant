@@ -16,6 +16,8 @@ import type { Grant } from '@/lib/types';
 import { SavedSearchesBar } from '@/components/shared/saved-searches-bar';
 import { EmptyState } from '@/components/shared/empty-state';
 import { StarButton } from '@/components/shared/star-button';
+import { RecencyChip } from '@/components/shared/recency-chip';
+import { NameChip } from '@/components/shared/name-chip';
 import { useUrlState, useUrlSetState } from '@/lib/hooks/use-url-state';
 
 import { formatMoney } from '@/lib/currency';
@@ -285,9 +287,13 @@ export default function GrantsPage() {
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="min-w-0 flex-1">
                     <h3 className="font-semibold text-base text-foreground line-clamp-2">{grant.title}</h3>
-                    {grant.donor_org_name && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{grant.donor_org_name}</p>
-                    )}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {grant.donor_org_name && (
+                        <p className="text-xs text-muted-foreground">{grant.donor_org_name}</p>
+                      )}
+                      {/* PMO-transfer: last-touched chip at-a-glance staleness */}
+                      <RecencyChip iso={grant.updated_at || grant.created_at} />
+                    </div>
                   </div>
                   <div className="flex items-start gap-1 shrink-0">
                     <StarButton kind="grant" targetId={grant.id} size="sm" />
@@ -301,10 +307,10 @@ export default function GrantsPage() {
                 )}
                 {grant.sectors && grant.sectors.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1">
+                    {/* PMO-transfer: deterministic name-hash palette, so the
+                        same sector always gets the same color across pages. */}
                     {grant.sectors.slice(0, 4).map((s: string) => (
-                      <span key={s} className="text-[10px] uppercase tracking-wider rounded bg-muted text-muted-foreground px-1.5 py-0.5">
-                        {s}
-                      </span>
+                      <NameChip key={s} name={s} size="xs" />
                     ))}
                   </div>
                 )}

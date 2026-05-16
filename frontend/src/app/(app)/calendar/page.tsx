@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Calendar as CalendarIcon, Clock, Briefcase, ShieldCheck, Award,
-  ArrowRight, ChevronLeft, ChevronRight,
+  ArrowRight, ChevronLeft, ChevronRight, Download,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -270,12 +270,21 @@ export default function CalendarPage() {
             everything across every donor and grantee, in one view.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {highCount > 0 && (
             <Badge variant="outline" className="border-[hsl(var(--kuja-flag))] text-[hsl(var(--kuja-flag))]">
               {highCount} urgent
             </Badge>
           )}
+          {/* Phase 13 — print/email-friendly PDF of the calendar window */}
+          <a
+            href="/api/calendar/deadlines.pdf?days=120&past=7"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--kuja-ink))] hover:bg-[hsl(var(--kuja-sand-50))]"
+          >
+            <Download className="w-3.5 h-3.5" /> Download PDF
+          </a>
           <div className="inline-flex rounded-md border border-[hsl(var(--border))] overflow-hidden">
             <button
               type="button"

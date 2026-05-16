@@ -19,6 +19,7 @@
 import { useState } from 'react';
 import {
   MessageCircleQuestion, Loader2, Sparkles, Copy, CheckCircle2, AlertCircle,
+  Send,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +55,10 @@ export function ReviewerFollowupsPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  // Phase 14 — outbound dispatch: per-question selection + send-to-NGO
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -74,6 +79,40 @@ export function ReviewerFollowupsPanel({
       setCopiedIdx(i);
       setTimeout(() => setCopiedIdx(null), 1800);
     } catch {/* ignore */}
+  };
+
+  const toggleSelected = (i: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  };
+
+  const sendSelected = async () => {
+    if (!data || selected.size === 0) return;
+    const questions = Array.from(selected).map((i) => data.followups[i]?.question).filter(Boolean) as string[];
+    setSending(true);
+    setSendResult(null);
+    try {
+      const r = await api.post<{ success: boolean; sent?: number; recipients?: number; notice?: string }>(
+        `/api/reviewer/followups/${kind}/${entityId}/send`,
+        { questions },
+      );
+      if (r.success) {
+        const n = r.recipients ?? 0;
+        setSendResult(`Sent to ${n} recipient${n === 1 ? '' : 's'}.`);
+        setSelected(new Set());
+      } else {
+        setSendResult('Send failed.');
+      }
+    } catch (e: unknown) {
+      setSendResult(e instanceof Error ? e.message : 'Send failed');
+    } finally {
+      setSending(false);
+      setTimeout(() => setSendResult(null), 4000);
+    }
   };
 
   return (
@@ -151,6 +190,14 @@ export function ReviewerFollowupsPanel({
           {data.followups.map((f, i) => (
             <li key={i} className="rounded-md border border-[hsl(var(--border))] p-3">
               <div className="flex items-start gap-2">
+                {/* Phase 14 — select for outbound dispatch to NGO */}
+                <input
+                  type="checkbox"
+                  checked={selected.has(i)}
+                  onChange={() => toggleSelected(i)}
+                  aria-label={`Select question ${i + 1} for sending`}
+                  className="mt-1 h-3.5 w-3.5 accent-[hsl(var(--kuja-clay))]"
+                />
                 <Badge variant="outline" className="text-[10px] shrink-0 mt-0.5">{i + 1}</Badge>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[hsl(var(--kuja-ink))] leading-relaxed">{f.question}</p>
@@ -186,6 +233,36 @@ export function ReviewerFollowupsPanel({
             </li>
           ))}
         </ol>
+      )}
+
+      {/* Phase 14 — outbound dispatch footer. Renders when there's at
+          least one follow-up; disabled until something is selected. */}
+      {data && data.followups.length > 0 && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-md border-t border-[hsl(var(--border))] pt-3">
+          <span className="text-[11px] text-[hsl(var(--kuja-ink-soft))]">
+            {selected.size > 0
+              ? `${selected.size} selected — will fan out via the recipient's preferred channels.`
+              : 'Tick the questions you want to forward, then send.'}
+          </span>
+          <div className="flex items-center gap-2">
+            {sendResult && (
+              <span className="text-[11px] text-[hsl(var(--kuja-grow))]">{sendResult}</span>
+            )}
+            <button
+              type="button"
+              onClick={sendSelected}
+              disabled={sending || selected.size === 0}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold',
+                'bg-[hsl(var(--kuja-clay))] text-white hover:opacity-90',
+                'disabled:opacity-40 disabled:cursor-not-allowed',
+              )}
+            >
+              {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              Send to NGO
+            </button>
+          </div>
+        </div>
       )}
     </Card>
   );

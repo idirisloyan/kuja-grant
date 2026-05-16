@@ -242,6 +242,24 @@ def create_app(config_name=None):
                 if 'user_clarification_by_user_id' not in doc_cols:
                     conn.execute(text("ALTER TABLE documents ADD COLUMN user_clarification_by_user_id INTEGER"))
                     added.append('documents.user_clarification_by_user_id')
+                # Phase 14 — Win/loss debrief columns on applications.
+                # Donor-recorded structured learning at the moment of
+                # award/rejection. Controlled vocab so we can aggregate
+                # patterns later (PMO transfer pattern).
+                app_cols = {c['name'] for c in inspector.get_columns('applications')}
+                if 'decision_reason_code' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN decision_reason_code VARCHAR(60)"))
+                    added.append('applications.decision_reason_code')
+                if 'decision_notes' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN decision_notes TEXT"))
+                    added.append('applications.decision_notes')
+                if 'decision_recorded_at' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN decision_recorded_at TIMESTAMP"))
+                    added.append('applications.decision_recorded_at')
+                if 'decision_recorded_by_user_id' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN decision_recorded_by_user_id INTEGER"))
+                    added.append('applications.decision_recorded_by_user_id')
+
                 # Phase 13.15 — TOTP 2FA columns on users.
                 user_cols = {c['name'] for c in inspector.get_columns('users')}
                 if 'totp_secret' not in user_cols:

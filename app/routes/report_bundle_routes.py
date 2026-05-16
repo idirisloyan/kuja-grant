@@ -184,3 +184,145 @@ def api_followups_report(report_id):
         return jsonify({'success': False, 'error': 'Could not compute follow-ups'}), 500
     _dashboard_cache.set(cache_key, result)
     return jsonify({'success': True, **result})
+
+
+# ----------------------------------------------------------------------
+# Phase 14 — Reviewer follow-ups outbound dispatch.
+# Donor/reviewer/admin can fire selected questions to the NGO via the
+# notification dispatcher (in_app + email + sms/whatsapp per prefs).
+# ----------------------------------------------------------------------
+
+from app.utils.helpers import get_request_json
+
+
+def _send_followups_to_org(*, org_id: int, subject: str, deep_link: str,
+                           questions: list[str], related_kind: str,
+                           related_id: int) -> dict:
+    """Fan out the selected follow-up questions to every user in the
+    target NGO org. One Notification per user per dispatch (not one per
+    question) — easier on the user's inbox + matches how a human would
+    forward this."""
+    from app.models import User
+    from app.services.notification_dispatcher import NotificationDispatcher
+
+    users = User.query.filter_by(org_id=org_id, is_active=True).all()
+    if not users:
+        return {'sent': 0, 'recipients': 0, 'channels': [], 'notice': 'no_active_users'}
+
+    cleaned = [q.strip() for q in questions if q and q.strip()][:6]
+    if not cleaned:
+        return {'sent': 0, 'recipients': 0, 'channels': [], 'notice': 'no_questions'}
+
+    body_lines = [
+        'A reviewer has questions about this submission:',
+        '',
+    ]
+    for i, q in enumerate(cleaned, 1):
+        body_lines.append(f'{i}. {q}')
+    body_lines.append('')
+    body_lines.append('Please reply via the platform.')
+    body = '\n'.join(body_lines)
+
+    sent_per_user = []
+    for u in users:
+        results = NotificationDispatcher.dispatch(
+            user_id=u.id,
+            category='reviews',
+            title=subject,
+            body=body,
+            deep_link_url=deep_link,
+            related_kind=related_kind,
+            related_id=related_id,
+        )
+        sent_per_user.append({'user_id': u.id, 'channels': results})
+    return {
+        'sent': len(sent_per_user),
+        'recipients': len(users),
+        'questions': cleaned,
+        'channel_results': sent_per_user,
+    }
+
+
+@report_bundle_bp.route('/reviewer/followups/application/<int:application_id>/send', methods=['POST'])
+@login_required
+def api_followups_application_send(application_id):
+    """Body: { questions: [str, ...] }
+
+    Donor/reviewer/admin fires the selected questions to the NGO behind
+    the application. Records an audit-chain entry so the loop is
+    visible from both sides."""
+    app = db.session.get(Application, application_id)
+    if not _application_visible(app):
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    if current_user.role not in ('donor', 'reviewer', 'admin'):
+        return jsonify({'success': False, 'error': 'Insufficient permissions'}), 403
+
+    data = get_request_json() or {}
+    questions = data.get('questions') or []
+    if not isinstance(questions, list):
+        return jsonify({'success': False, 'error': 'questions must be a list'}), 400
+
+    result = _send_followups_to_org(
+        org_id=app.ngo_org_id,
+        subject=f'Reviewer follow-ups on your application',
+        deep_link=f'/applications/{application_id}',
+        questions=questions,
+        related_kind='application', related_id=application_id,
+    )
+
+    try:
+        from app.models import AuditChainEntry
+        AuditChainEntry.append(
+            action='reviewer_followups.sent',
+            actor_email=getattr(current_user, 'email', None),
+            subject_kind='application', subject_id=application_id,
+            details={
+                'recipients': result.get('recipients'),
+                'question_count': len(result.get('questions', [])),
+                'sender_role': current_user.role,
+            },
+        )
+    except Exception as e:
+        logger.warning(f"Followups audit receipt failed: {e}")
+
+    return jsonify({'success': True, **result})
+
+
+@report_bundle_bp.route('/reviewer/followups/report/<int:report_id>/send', methods=['POST'])
+@login_required
+def api_followups_report_send(report_id):
+    rpt = db.session.get(Report, report_id)
+    if not _report_visible(rpt):
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    if current_user.role not in ('donor', 'reviewer', 'admin'):
+        return jsonify({'success': False, 'error': 'Insufficient permissions'}), 403
+
+    data = get_request_json() or {}
+    questions = data.get('questions') or []
+    if not isinstance(questions, list):
+        return jsonify({'success': False, 'error': 'questions must be a list'}), 400
+
+    result = _send_followups_to_org(
+        org_id=rpt.submitted_by_org_id,
+        subject='Reviewer follow-ups on your report',
+        deep_link='/reports',
+        questions=questions,
+        related_kind='report', related_id=report_id,
+    )
+
+    try:
+        from app.models import AuditChainEntry
+        AuditChainEntry.append(
+            action='reviewer_followups.sent',
+            actor_email=getattr(current_user, 'email', None),
+            subject_kind='report', subject_id=report_id,
+            details={
+                'recipients': result.get('recipients'),
+                'question_count': len(result.get('questions', [])),
+                'sender_role': current_user.role,
+            },
+        )
+    except Exception as e:
+        logger.warning(f"Followups audit receipt failed: {e}")
+
+    return jsonify({'success': True, **result})

@@ -18,10 +18,12 @@ Event kinds:
                            (compliance heuristic; not yet exposed)
 """
 
+import io
 import logging
+import re
 from datetime import date, datetime, timedelta, timezone
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 from flask_login import login_required, current_user
 
 from app.extensions import db
@@ -51,24 +53,19 @@ def _push(events, *, date_obj, kind, severity, label, detail, href, entity_id=No
     })
 
 
-@calendar_bp.route('/deadlines', methods=['GET'])
-@login_required
-def api_calendar_deadlines():
-    """Return events for the current user.
+def _build_calendar_payload(user, days: int, past_days: int) -> dict:
+    """Shared logic between the JSON endpoint and the PDF export route.
 
-    Query params:
-      ?days=N    Lookahead window in days; default 60, max 365
-      ?past=N    Also include events from the last N days (default 7)
+    Returns a dict with `events` (list) + window dates so callers can
+    render to JSON or to a PDF without re-querying.
     """
-    days = max(7, min(365, int(request.args.get('days', 60))))
-    past_days = max(0, min(60, int(request.args.get('past', 7))))
     today = date.today()
     window_start = today - timedelta(days=past_days)
     window_end = today + timedelta(days=days)
     events: list[dict] = []
 
-    role = current_user.role
-    org_id = current_user.org_id
+    role = user.role
+    org_id = user.org_id
 
     # ---- NGO: own grant deadlines (open), own report due dates, own passport
     if role == 'ngo' and org_id:
@@ -207,10 +204,68 @@ def api_calendar_deadlines():
     # Sort by date ASC
     events.sort(key=lambda e: e['date'])
 
+    return {
+        'window_start': window_start,
+        'window_end': window_end,
+        'today': today,
+        'events': events,
+    }
+
+
+@calendar_bp.route('/deadlines', methods=['GET'])
+@login_required
+def api_calendar_deadlines():
+    """Return events for the current user.
+
+    Query params:
+      ?days=N    Lookahead window in days; default 60, max 365
+      ?past=N    Also include events from the last N days (default 7)
+    """
+    days = max(7, min(365, int(request.args.get('days', 60))))
+    past_days = max(0, min(60, int(request.args.get('past', 7))))
+    payload = _build_calendar_payload(current_user, days, past_days)
     return jsonify({
         'success': True,
-        'window_start': window_start.isoformat(),
-        'window_end': window_end.isoformat(),
-        'today': today.isoformat(),
-        'events': events,
+        'window_start': payload['window_start'].isoformat(),
+        'window_end': payload['window_end'].isoformat(),
+        'today': payload['today'].isoformat(),
+        'events': payload['events'],
     })
+
+
+@calendar_bp.route('/deadlines.pdf', methods=['GET'])
+@login_required
+def api_calendar_deadlines_pdf():
+    """Download the user's calendar as a printable PDF.
+
+    Same scoping rules as the JSON endpoint. Useful for offline / email
+    forwarding / wall-printing in field offices.
+    """
+    days = max(7, min(365, int(request.args.get('days', 60))))
+    past_days = max(0, min(60, int(request.args.get('past', 7))))
+    payload = _build_calendar_payload(current_user, days, past_days)
+
+    try:
+        from app.services.calendar_pdf_service import build_calendar_pdf
+        viewer_name = getattr(current_user, 'name', None) or getattr(current_user, 'email', '') or 'User'
+        pdf_bytes = build_calendar_pdf(
+            viewer_name=viewer_name,
+            viewer_role=current_user.role,
+            window_start=payload['window_start'],
+            window_end=payload['window_end'],
+            today=payload['today'],
+            events=payload['events'],
+        )
+    except Exception as e:
+        logger.exception(f'Calendar PDF render failed: {e}')
+        return jsonify({'success': False, 'error': 'PDF render failed'}), 500
+
+    slug = re.sub(r'[^a-z0-9]+', '-',
+                  (getattr(current_user, 'email', '') or 'user').lower()).strip('-')[:40] or 'user'
+    filename = f'kuja-calendar-{slug}-{payload["today"].isoformat()}.pdf'
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=filename,
+    )

@@ -172,6 +172,11 @@ export interface Application {
   eligibility_responses?: Record<string, unknown>;
   // Documents are included by /api/applications/<id> (full detail response).
   documents?: Document[];
+  // Phase 14 — Win/loss debrief.
+  decision_reason_code?: string | null;
+  decision_notes?: string | null;
+  decision_recorded_at?: string | null;
+  decision_recorded_by_user_id?: number | null;
 }
 
 // ---------------------------------------------------------------------------

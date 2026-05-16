@@ -335,6 +335,82 @@ def api_application_status_inline(app_id):
     })
 
 
+@applications_bp.route('/decision-reasons', methods=['GET'])
+@login_required
+def api_decision_reasons():
+    """Phase 14 — controlled vocab for win/loss debrief.
+
+    NGO and donor both fetch this so the UI can render the same chips
+    in the same order on both sides. Stable English codes; frontend
+    localises the labels.
+    """
+    from app.constants import WIN_LOSS_REASONS
+    return jsonify({'success': True, 'reasons': WIN_LOSS_REASONS})
+
+
+@applications_bp.route('/<int:app_id>/debrief', methods=['PUT'])
+@login_required
+def api_application_debrief(app_id):
+    """Phase 14 — record the win/loss debrief on an awarded/rejected app.
+
+    PMO-transfer pattern: donor records a structured reason + free-text
+    notes at the moment of decision. NGOs see this read-only as
+    structured feedback (closes the loop on declined proposals — and
+    explains why winners won).
+
+    Body: { reason_code: str, notes?: str }
+    """
+    from app.constants import WIN_LOSS_CODES
+    from app.utils.api_errors import error_response
+
+    application = (
+        Application.query.options(db.joinedload(Application.grant))
+        .filter_by(id=app_id).first()
+    )
+    if not application:
+        return error_response('application.not_found', 404)
+
+    # Donor must own the grant. Admin can record on any.
+    if current_user.role == 'donor':
+        if not application.grant or application.grant.donor_org_id != current_user.org_id:
+            return error_response('auth.access_denied', 403)
+    elif current_user.role != 'admin':
+        return error_response('auth.access_denied', 403)
+
+    # Only meaningful on a decided application.
+    if application.status not in ('awarded', 'rejected'):
+        return jsonify({'success': False,
+                        'error': 'Debrief is only available after award/rejection'}), 400
+
+    data = get_request_json() or {}
+    reason_code = (data.get('reason_code') or '').strip()
+    if reason_code and reason_code not in WIN_LOSS_CODES:
+        return jsonify({'success': False, 'error': 'Unknown reason_code'}), 400
+
+    notes = (data.get('notes') or '').strip()[:4000]
+
+    application.decision_reason_code = reason_code or None
+    application.decision_notes = notes or None
+    application.decision_recorded_at = datetime.now(timezone.utc)
+    application.decision_recorded_by_user_id = current_user.id
+    db.session.commit()
+
+    log_action(
+        'application.debrief.recorded',
+        current_user.email, 'application', application.id,
+        {'reason_code': reason_code, 'status': application.status},
+    )
+
+    return jsonify({
+        'success': True,
+        'application_id': application.id,
+        'decision_reason_code': application.decision_reason_code,
+        'decision_notes': application.decision_notes,
+        'decision_recorded_at': application.decision_recorded_at.isoformat(),
+        'decision_recorded_by_user_id': application.decision_recorded_by_user_id,
+    })
+
+
 @applications_bp.route('/<int:app_id>/activity', methods=['GET'])
 @login_required
 def api_application_activity(app_id):

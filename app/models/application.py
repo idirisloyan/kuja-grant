@@ -30,6 +30,16 @@ class Application(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
 
+    # Phase 14 — Win/loss debrief (PMO transfer pattern). Donor-recorded
+    # at the moment of award/rejection so NGOs get structured feedback +
+    # the system can aggregate "why we typically win/lose" patterns.
+    # decision_reason_code is from a controlled vocab (see WIN_LOSS_REASONS
+    # in app/constants.py) so analytics are clean across orgs.
+    decision_reason_code = db.Column(db.String(60), nullable=True)
+    decision_notes = db.Column(db.Text, nullable=True)
+    decision_recorded_at = db.Column(db.DateTime, nullable=True)
+    decision_recorded_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
     # Relationships
     documents = db.relationship('Document', backref='application', lazy='dynamic', cascade='all, delete-orphan')
     reviews = db.relationship('Review', backref='application', lazy='dynamic', cascade='all, delete-orphan')
@@ -59,6 +69,10 @@ class Application(db.Model):
             'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'decision_reason_code': self.decision_reason_code,
+            'decision_notes': self.decision_notes,
+            'decision_recorded_at': self.decision_recorded_at.isoformat() if self.decision_recorded_at else None,
+            'decision_recorded_by_user_id': self.decision_recorded_by_user_id,
         }
         if not summary:
             data['responses'] = self.get_responses()

@@ -16,6 +16,7 @@ import { ActivityTimeline } from '@/components/applications/ActivityTimeline';
 import { StatusSignalsRail } from '@/components/shared/status-signals-rail';
 import { PreflightPanel } from '@/components/shared/preflight-panel';
 import { ReviewerFollowupsPanel } from '@/components/reviews/reviewer-followups-panel';
+import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
 import { useAuthStore } from '@/stores/auth-store';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
@@ -58,6 +59,7 @@ export default function ApplicationDetailClient() {
   const { data, isLoading } = useApplication(id);
   const [tab, setTab] = useState<TabId>('responses');
   const application = data?.application;
+  const viewer = useAuthStore((s) => s.user);
 
   useEffect(() => {
     // If donor/admin/reviewer is viewing and the application has been
@@ -168,6 +170,21 @@ export default function ApplicationDetailClient() {
           </div>
         </div>
       </div>
+
+      {/* Phase 14 — Win/loss debrief (PMO transfer pattern). Shows only
+          on awarded/rejected. Donor + admin can edit; everyone else
+          read-only. Closes the feedback loop on declined proposals. */}
+      <DecisionDebriefPanel
+        applicationId={application.id}
+        status={application.status}
+        canEdit={!!viewer && (viewer.role === 'donor' || viewer.role === 'admin')}
+        initial={{
+          decision_reason_code: application.decision_reason_code ?? null,
+          decision_notes: application.decision_notes ?? null,
+          decision_recorded_at: application.decision_recorded_at ?? null,
+          decision_recorded_by_user_id: application.decision_recorded_by_user_id ?? null,
+        }}
+      />
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">

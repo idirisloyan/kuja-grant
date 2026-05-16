@@ -18,7 +18,11 @@
  * offline the request just fails and the UI shows its existing error.
  */
 
-const CACHE_VERSION = 'kuja-v4-1';
+// Bumped Phase 14: portfolio + calendar PDF + win/loss debrief shipped.
+// Old SW shells reference chunks that no longer exist; the activate
+// step purges any cache that doesn't match this prefix so the next
+// page open re-fetches the current bundle.
+const CACHE_VERSION = 'kuja-v14-0';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 

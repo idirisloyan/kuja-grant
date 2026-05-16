@@ -1544,6 +1544,74 @@ def test_20_4_reports_page_content(page, ctx):
 
 
 # ===========================================================================
+# Phase 14 — PMO transfer patterns + portfolio + win/loss
+# ===========================================================================
+
+def test_21_1_donor_portfolio_card_renders(page, ctx):
+    """21.1 Donor dashboard shows the Phase 13/14 portfolio download card."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+    page.wait_for_timeout(4000)
+    body = get_page_text(page)
+    # The card title varies by locale; check for the structurally stable copy.
+    # In English we expect the title or eyebrow string. In other locales the
+    # period_label format (DD MMM YYYY range) still renders.
+    assert any(w in body for w in [
+        "Board-ready PDF", "PDF", "Portfolio review pack",
+        "محفظة", "Portfolio", "portfolio", "Cartera", "Kundi", "portfolio"
+    ]), f"Donor portfolio card missing on dashboard: {body[:400]}"
+
+def test_21_2_donor_audit_timeline_shape(page, ctx):
+    """21.2 Donor dashboard surfaces the audit-chain timeline header."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+    page.wait_for_timeout(4000)
+    body = get_page_text(page)
+    # Title or eyebrow stable token across locales (English fallback always
+    # contains 'audit' or the localized equivalent for the relevant locales).
+    assert any(w in body.lower() for w in [
+        "audit", "تدقيق", "ukaguzi", "audit", "auditoría",
+    ]), f"Audit timeline header missing: {body[:400]}"
+
+def test_21_3_ngo_portfolio_card_renders(page, ctx):
+    """21.3 NGO dashboard shows the Phase 14 NGO delivery report card."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+    page.wait_for_timeout(4000)
+    body = get_page_text(page)
+    assert any(w in body for w in [
+        "Board pack PDF", "Delivery report", "PDF",
+        "تقرير", "ripoti", "rapport", "informe",
+    ]), f"NGO portfolio card missing on dashboard: {body[:400]}"
+
+def test_21_4_grants_list_recency_chip(page, ctx):
+    """21.4 Grants list shows recency chips ("Updated ... ago") on rows."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.goto(f"{ctx['base']}/grants", wait_until="networkidle")
+    page.wait_for_timeout(3000)
+    body = get_page_text(page)
+    # Recency formats use language-specific labels; English includes 'Updated'
+    # and time tokens; other locales include their equivalents. Test for the
+    # numerical time tokens since they're stable.
+    has_recency = any(re.search(rf"\d+\s*{tok}", body)
+                      for tok in ["m ago", "h ago", "d ago", "w ago", "mo ago",
+                                  "min", "saac", "siku", "il y a", "hace",
+                                  "قبل", "ka hor"])
+    assert has_recency or "Updated" in body or "Mis à jour" in body or "Imesasishwa" in body, \
+        f"No recency chip detected on grants list: {body[:500]}"
+
+def test_21_5_calendar_pdf_link_present(page, ctx):
+    """21.5 Calendar page exposes the Phase 13 Download PDF link."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/calendar", wait_until="networkidle")
+    page.wait_for_timeout(3000)
+    # Check for a link to the PDF download endpoint
+    href_link = page.locator('a[href*="calendar/deadlines.pdf"]')
+    assert href_link.count() > 0, \
+        "No calendar PDF download link on /calendar page"
+
+
+# ===========================================================================
 # Main
 # ===========================================================================
 
@@ -1710,6 +1778,13 @@ def main():
                 ("20.2 NGO dashboard stats/content", test_20_2_ngo_dashboard_stats),
                 ("20.3 Grants list has content", test_20_3_grants_list_content),
                 ("20.4 Reports page meaningful content", test_20_4_reports_page_content),
+            ]),
+            ("21. PHASE 14 PMO TRANSFER + PORTFOLIO", [
+                ("21.1 Donor portfolio download card renders", test_21_1_donor_portfolio_card_renders),
+                ("21.2 Donor audit timeline header visible", test_21_2_donor_audit_timeline_shape),
+                ("21.3 NGO portfolio card renders", test_21_3_ngo_portfolio_card_renders),
+                ("21.4 Grants list shows recency chip", test_21_4_grants_list_recency_chip),
+                ("21.5 Calendar PDF download link present", test_21_5_calendar_pdf_link_present),
             ]),
         ]
 

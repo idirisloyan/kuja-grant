@@ -27,6 +27,9 @@ import { TodayBriefing } from '@/components/dashboards/today-briefing';
 import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
 import { AIBudgetAdminCard } from '@/components/dashboards/ai-budget-admin-card';
 import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
+import { PortfolioDownloadCard } from '@/components/dashboards/portfolio-download-card';
+import { PortfolioAuditTimeline } from '@/components/dashboards/portfolio-audit-timeline';
+import { NGOPortfolioDownloadCard } from '@/components/dashboards/ngo-portfolio-download-card';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -81,11 +84,17 @@ export default function DashboardPage() {
           <PreemptionWatchCard scope="me" />
           {/* Phase 11 — cross-grant patterns for the donor's portfolio. */}
           <CrossGrantPatternsCard />
+          {/* Phase 13 — board-ready portfolio PDF + AI exec summary in one click. */}
+          <PortfolioDownloadCard />
           {/* Phase 13.29 — donor action queue (analog of ThisWeekHome).
               Renders above the existing command center so the donor sees
               "what do I do next?" before "what's the state?" */}
           <DonorActionQueue />
           <DonorCommandCenter />
+          {/* Phase 13 — tamper-evident audit timeline at bottom of donor
+              dashboard so the review loop (publish → verify → download) is
+              visible without leaving the page. */}
+          <PortfolioAuditTimeline />
         </>
       )}
       {user.role === 'ngo' && (
@@ -94,6 +103,9 @@ export default function DashboardPage() {
           <PreemptionWatchCard scope="me" />
           {/* Phase 11 — cross-grant patterns ("where you consistently win/lose"). */}
           <CrossGrantPatternsCard />
+          {/* Phase 14 — board-ready delivery report PDF + AI summary
+              for everything the NGO shipped this period. */}
+          <NGOPortfolioDownloadCard />
           {/* Phase 10.6 — "This Week" action center: opinionated next
               actions backed by /api/ai/ngo-readiness. Renders only when
               ui.this_week_home flag is on; otherwise falls through to
