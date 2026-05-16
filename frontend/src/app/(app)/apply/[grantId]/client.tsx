@@ -187,8 +187,32 @@ export default function ApplyWizardClient() {
   const { data, isLoading } = useGrant(grantId);
   const grant = data?.grant;
 
+
   const [step, setStep] = useState(0);
   const [applicationId, setApplicationId] = useState<number | null>(null);
+  // Phase 21D — duplicate-detection: detected existing app on mount (status used in banner)
+  const [resumedDraft, setResumedDraft] = useState<{ id: number; status: string } | null>(null);
+  // Phase 21D — pre-load any existing application for this NGO + grant so
+  // we resume the draft instead of accidentally creating a second one.
+  useEffect(() => {
+    if (!grantId) return;
+    let cancelled = false;
+    api
+      .get<{ applications: Array<{ id: number; grant_id: number; status: string }> }>(
+        `/applications/?grant_id=${grantId}`,
+      )
+      .then((r) => {
+        if (cancelled) return;
+        const mine = (r.applications || []).find((a) => a.grant_id === grantId);
+        if (mine) {
+          setResumedDraft({ id: mine.id, status: mine.status });
+          if (mine.status === 'draft') setApplicationId(mine.id);
+        }
+      })
+      .catch(() => {/* quiet: 404 / empty list is fine */});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grantId]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submissionScore, setSubmissionScore] = useState<number | null>(null);
@@ -729,6 +753,42 @@ export default function ApplyWizardClient() {
         </h1>
         <div className="mt-1 text-sm text-muted-foreground">{grant.donor_org_name}</div>
       </div>
+
+      {/* Phase 21D — existing application banner */}
+      {resumedDraft && (
+        <div
+          className={
+            resumedDraft.status === 'draft'
+              ? 'rounded-md border border-[hsl(var(--kuja-clay))]/40 bg-[hsl(var(--kuja-sand))]/40 p-3 text-sm'
+              : 'rounded-md border border-[hsl(var(--kuja-sun))]/40 bg-[hsl(var(--kuja-sun))]/10 p-3 text-sm'
+          }
+        >
+          {resumedDraft.status === 'draft' ? (
+            <>
+              <strong>Resuming your draft.</strong> You started an application here before —
+              we&apos;ve loaded it so you can pick up where you left off.{' '}
+              <a
+                href={`/applications/${resumedDraft.id}`}
+                className="text-[hsl(var(--kuja-clay))] hover:underline"
+              >
+                View it on /applications
+              </a>.
+            </>
+          ) : (
+            <>
+              <strong>You&apos;ve already submitted to this grant.</strong> The new application
+              you&apos;re starting won&apos;t replace the existing one.{' '}
+              <a
+                href={`/applications/${resumedDraft.id}`}
+                className="text-[hsl(var(--kuja-clay))] hover:underline"
+              >
+                See your existing application
+              </a>{' '}
+              (status: {resumedDraft.status}).
+            </>
+          )}
+        </div>
+      )}
 
       {/* Custom stepper */}
       <div className="flex items-center gap-0 overflow-x-auto py-2">

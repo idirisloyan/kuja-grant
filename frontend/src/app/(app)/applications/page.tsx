@@ -95,6 +95,14 @@ export default function ApplicationsPage() {
               >Pipeline</button>
             </div>
           )}
+          {/* Phase 21C — CSV export (any role; server scopes by role) */}
+          <a
+            href="/api/exports/applications.csv"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand))]/40 text-sm font-medium px-3 py-2"
+            title="Export visible applications as CSV"
+          >
+            <FileText className="h-4 w-4" /> Export CSV
+          </a>
           <button
             type="button"
             onClick={() => router.push('/grants')}

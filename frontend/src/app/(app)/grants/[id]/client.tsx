@@ -15,6 +15,8 @@ import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
 import { LiveDraftersPill } from '@/components/grants/LiveDraftersPill';
 import { GrantAgreementUnpackPanel } from '@/components/grants/grant-agreement-unpack-panel';
 import { TagsEditor } from '@/components/shared/tags-editor';
+import { GrantBroadcastDialog } from '@/components/grants/grant-broadcast-dialog';
+import { Megaphone } from 'lucide-react';
 
 function formatFunding(amount: number | null, currency: string): string {
   if (!amount) return 'TBD';
@@ -65,6 +67,8 @@ export default function GrantDetailClient() {
   const user = useAuthStore((s) => s.user);
   const { data, isLoading } = useGrant(id);
   const [tab, setTab] = useState<TabId>('overview');
+  // Phase 21B — broadcast dialog state (donor + admin only)
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
 
   const grant = data?.grant;
   const isNgo = user?.role === 'ngo';
@@ -140,6 +144,16 @@ export default function GrantDetailClient() {
             )}
           </div>
         </div>
+        {isDonor && (
+          <button
+            type="button"
+            onClick={() => setBroadcastOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand))]/40 text-sm font-medium px-4 py-2"
+            title="Send a clarification to every NGO with an app on this grant"
+          >
+            <Megaphone className="h-4 w-4" /> Broadcast
+          </button>
+        )}
         {isNgo && grant.status === 'open' && !grant.user_application_status && (
           <button
             type="button"
@@ -190,6 +204,16 @@ export default function GrantDetailClient() {
         grantId={grant.id}
         canApply={user?.role === 'ngo' || user?.role === 'admin'}
       />
+
+      {/* Phase 21B — donor broadcast dialog (mounted but only visible
+          when toggled by the header button). */}
+      {isDonor && (
+        <GrantBroadcastDialog
+          open={broadcastOpen}
+          onOpenChange={setBroadcastOpen}
+          grantId={grant.id}
+        />
+      )}
     </div>
   );
 }

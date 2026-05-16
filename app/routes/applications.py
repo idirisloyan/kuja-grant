@@ -478,6 +478,43 @@ def api_debrief_rollup():
     return jsonify({'success': False, 'error': 'Role not supported'}), 403
 
 
+@applications_bp.route('/<int:app_id>/panel-calibration', methods=['GET'])
+@login_required
+def api_application_panel_calibration(app_id):
+    """Phase 21A — variance + outlier detection across reviewers on this app.
+
+    Visible to anyone who can see the application. NGOs benefit too —
+    transparent calibration is the point.
+    """
+    from app.services.panel_calibration_service import PanelCalibrationService
+
+    application = (
+        Application.query.options(db.joinedload(Application.grant))
+        .filter_by(id=app_id).first()
+    )
+    if not application:
+        return jsonify({'success': False, 'error': 'application.not_found'}), 404
+
+    role = current_user.role
+    visible = False
+    if role == 'admin':
+        visible = True
+    elif role == 'ngo':
+        visible = application.ngo_org_id == current_user.org_id
+    elif role == 'donor':
+        visible = bool(application.grant and application.grant.donor_org_id == current_user.org_id)
+    elif role == 'reviewer':
+        from app.models import Review
+        visible = Review.query.filter_by(
+            application_id=app_id, reviewer_user_id=current_user.id
+        ).first() is not None
+    if not visible:
+        return jsonify({'success': False, 'error': 'auth.access_denied'}), 403
+
+    result = PanelCalibrationService.for_application(application_id=app_id)
+    return jsonify(result)
+
+
 @applications_bp.route('/<int:app_id>/reviewer-briefing', methods=['GET'])
 @login_required
 def api_reviewer_briefing(app_id):

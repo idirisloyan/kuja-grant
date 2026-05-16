@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useGrants } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Search, X, Plus, ArrowRight, Inbox, Calendar, Briefcase, Compass } from 'lucide-react';
+import { Search, X, Plus, ArrowRight, Inbox, Calendar, Briefcase, Compass, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Grant } from '@/lib/types';
 import { SavedSearchesBar } from '@/components/shared/saved-searches-bar';
@@ -179,13 +179,22 @@ export default function GrantsPage() {
             </>
           )}
           {!isNgo && (
-            <button
-              type="button"
-              onClick={() => router.push('/grants/new')}
-              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-3 py-2"
-            >
-              <Plus className="h-4 w-4" /> {t('grant.create')}
-            </button>
+            <>
+              <a
+                href="/api/exports/grants.csv"
+                className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand))]/40 text-sm font-medium px-3 py-2"
+                title="Export visible grants as CSV"
+              >
+                <FileText className="h-4 w-4" /> Export CSV
+              </a>
+              <button
+                type="button"
+                onClick={() => router.push('/grants/new')}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-3 py-2"
+              >
+                <Plus className="h-4 w-4" /> {t('grant.create')}
+              </button>
+            </>
           )}
         </div>
       </div>

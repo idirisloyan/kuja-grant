@@ -853,6 +853,43 @@ def api_grant_drafters(grant_id):
 # vs the NGO's profile + history.
 # ----------------------------------------------------------------------
 
+@grants_bp.route('/<int:grant_id>/broadcast', methods=['POST'])
+@login_required
+@role_required('donor', 'admin')
+def api_grant_broadcast(grant_id):
+    """Phase 21B — donor sends one clarification message to every NGO
+    who has applied/drafted on this grant.
+
+    Body: { subject: str, body: str, audience?: 'all'|'drafts'|'submitted' }
+    """
+    from app.services.grant_broadcast_service import GrantBroadcastService
+
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return jsonify({'success': False, 'error': 'Grant not found'}), 404
+    if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
+        return jsonify({'success': False, 'error': 'Insufficient permissions'}), 403
+
+    data = get_request_json() or {}
+    subject = (data.get('subject') or '').strip()
+    body = (data.get('body') or '').strip()
+    audience = (data.get('audience') or 'all').strip()
+    if not subject:
+        return jsonify({'success': False, 'error': 'subject required'}), 400
+    if not body:
+        return jsonify({'success': False, 'error': 'body required'}), 400
+
+    result = GrantBroadcastService.send(
+        grant_id=grant_id,
+        sender_user=current_user,
+        subject=subject,
+        body=body,
+        audience=audience,
+    )
+    status = 200 if result.get('ok') else 400
+    return jsonify({'success': result.get('ok'), **result}), status
+
+
 @grants_bp.route('/fit-compare', methods=['POST'])
 @login_required
 @role_required('ngo', 'admin')

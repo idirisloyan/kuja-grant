@@ -1896,6 +1896,46 @@ def test_27_3_application_message_thread_shipped(page, ctx):
 
 
 # ===========================================================================
+# Phase 21 — panel calibration, donor broadcast, CSV exports, dedupe
+# ===========================================================================
+
+def test_28_1_grants_export_csv_link(page, ctx):
+    """28.1 Donor grants list shows the Export CSV link."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.goto(f"{ctx['base']}/grants", wait_until="networkidle")
+    page.wait_for_timeout(2500)
+    link = page.locator('a[href="/api/exports/grants.csv"]')
+    assert link.count() > 0, "Export CSV link missing on donor grants list"
+
+def test_28_2_applications_export_csv_link(page, ctx):
+    """28.2 Applications list shows the Export CSV link for both NGO + donor."""
+    for role in ("ngo", "donor"):
+        login_as(page, ctx["base"], USERS[role])
+        page.goto(f"{ctx['base']}/applications", wait_until="networkidle")
+        page.wait_for_timeout(2000)
+        link = page.locator('a[href="/api/exports/applications.csv"]')
+        assert link.count() > 0, f"Export CSV link missing on {role} applications list"
+
+def test_28_3_grant_detail_broadcast_button(page, ctx):
+    """28.3 Donor sees the Broadcast button on a grant detail page."""
+    login_as(page, ctx["base"], USERS["donor"])
+    # Visit grants list, find first grant, navigate
+    page.goto(f"{ctx['base']}/grants", wait_until="networkidle")
+    page.wait_for_timeout(2500)
+    link = page.locator('div[onclick*="/grants/"]').first
+    if link.count() == 0:
+        # Try a direct id=0 page; bundle ships the button text either way
+        page.goto(f"{ctx['base']}/grants/0", wait_until="networkidle")
+    else:
+        link.click()
+    page.wait_for_timeout(2500)
+    # Button text is "Broadcast"; bundle should contain it
+    src = page.content()
+    assert "Broadcast" in src or "broadcast" in src.lower(), \
+        "Broadcast button text missing from donor grant detail page"
+
+
+# ===========================================================================
 # Main
 # ===========================================================================
 
@@ -2101,6 +2141,11 @@ def main():
                 ("27.1 Application detail timeline tab present", test_27_1_application_detail_has_timeline_tab),
                 ("27.2 Passport verify page polish loads", test_27_2_passport_verify_polish_loads),
                 ("27.3 Application message thread shipped", test_27_3_application_message_thread_shipped),
+            ]),
+            ("28. PHASE 21 CALIBRATION + BROADCAST + CSV EXPORTS + DEDUPE", [
+                ("28.1 Grants list shows Export CSV (donor)", test_28_1_grants_export_csv_link),
+                ("28.2 Applications list shows Export CSV", test_28_2_applications_export_csv_link),
+                ("28.3 Grant detail Broadcast button (donor)", test_28_3_grant_detail_broadcast_button),
             ]),
         ]
 

@@ -18,6 +18,7 @@ import { StatusSignalsRail } from '@/components/shared/status-signals-rail';
 import { PreflightPanel } from '@/components/shared/preflight-panel';
 import { ReviewerFollowupsPanel } from '@/components/reviews/reviewer-followups-panel';
 import { ReviewerBriefingCard } from '@/components/reviews/reviewer-briefing-card';
+import { PanelCalibrationCard } from '@/components/reviews/panel-calibration-card';
 import { ApplicationMessageThread } from '@/components/applications/application-message-thread';
 import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
 import { useAuthStore } from '@/stores/auth-store';
@@ -231,6 +232,11 @@ export default function ApplicationDetailClient() {
       {/* Phase 8 — Reviewer follow-ups (donor + reviewer + admin only).
           Renders below the rails so it's visible regardless of tab. */}
       <ReviewerFollowupsGate applicationId={application.id} />
+
+      {/* Phase 21A — panel calibration. Auto-hides when there are <1
+          reviews; shows for everyone with read access (transparent
+          calibration is the point). */}
+      <PanelCalibrationCard applicationId={application.id} />
 
       {/* Phase 20C — donor ↔ NGO threaded conversation. Visible to all
           parties on the application (server-side gates enforce). */}

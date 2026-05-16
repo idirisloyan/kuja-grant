@@ -2025,6 +2025,98 @@ def make_tests(base):
             "smoke comment not visible to NGO who posted it"
     tests.append(("PHASE20C-001: Comments lifecycle works", test_phase20c_comments_lifecycle))
 
+    def test_phase21a_panel_calibration_shape():
+        """PHASE21A-001: panel-calibration returns shaped JSON."""
+        s = login_ok(base, USERS["donor"])
+        apps = s.get(f"{base}/api/applications/",
+                     headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15).json()
+        all_apps = apps.get("applications") or []
+        if not all_apps:
+            return
+        app_id = all_apps[0]["id"]
+        r = s.get(f"{base}/api/applications/{app_id}/panel-calibration",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        for k in ("reviewer_count", "calibration_status", "per_reviewer", "outliers"):
+            assert k in data, f"calibration missing {k}: {list(data.keys())}"
+        assert data["calibration_status"] in (
+            "no_reviews", "single", "tight", "normal", "divergent"
+        )
+    tests.append(("PHASE21A-001: Panel calibration returns shape", test_phase21a_panel_calibration_shape))
+
+    def test_phase21b_broadcast_validates():
+        """PHASE21B-001: broadcast requires subject + body + role gate."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.post(f"{base}/api/grants/1/broadcast",
+                   json={"subject": "x", "body": "y"},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 403, f"NGO should be 403, got {r.status_code}"
+        s = login_ok(base, USERS["donor"])
+        r = s.post(f"{base}/api/grants/1/broadcast",
+                   json={"subject": "test"},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code in (400, 403, 404), f"missing body: {r.status_code}"
+    tests.append(("PHASE21B-001: Broadcast validates + gates by role", test_phase21b_broadcast_validates))
+
+    def test_phase21c_csv_export_shapes():
+        """PHASE21C-001: CSV exports return valid UTF-8-BOM CSV."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/exports/grants.csv",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=30)
+        assert r.status_code == 200, f"grants csv: {r.status_code}"
+        ct = (r.headers.get("Content-Type") or "").lower()
+        assert "text/csv" in ct, f"expected csv, got {ct}"
+        body = r.content
+        assert body.startswith(b"\xef\xbb\xbf"), "missing UTF-8 BOM"
+        first = body.decode("utf-8-sig").splitlines()[0] if body else ""
+        assert "id" in first and "title" in first, f"bad header: {first}"
+        # Applications for both NGO + donor
+        for role in ("ngo", "donor"):
+            s = login_ok(base, USERS[role])
+            r = s.get(f"{base}/api/exports/applications.csv",
+                      headers={"X-Requested-With": "XMLHttpRequest"}, timeout=30)
+            assert r.status_code == 200, f"{role} applications csv: {r.status_code}"
+            assert r.content.startswith(b"\xef\xbb\xbf"), f"{role}: missing BOM"
+    tests.append(("PHASE21C-001: CSV exports work for visible scopes", test_phase21c_csv_export_shapes))
+
+    def test_phase21c_csv_grants_forbidden_for_ngo():
+        """PHASE21C-002: NGO cannot export grants (donor + admin only)."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/exports/grants.csv",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 403, f"expected 403, got {r.status_code}"
+    tests.append(("PHASE21C-002: NGO blocked from grants.csv", test_phase21c_csv_grants_forbidden_for_ngo))
+
+    def test_phase21c_csv_bad_kind():
+        """PHASE21C-003: unknown export kind returns 404."""
+        s = login_ok(base, USERS["admin"])
+        r = s.get(f"{base}/api/exports/nonsense.csv",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 404, f"expected 404, got {r.status_code}"
+    tests.append(("PHASE21C-003: Unknown export kind returns 404", test_phase21c_csv_bad_kind))
+
+    def test_phase21d_duplicate_returns_409_with_existing_id():
+        """PHASE21D-001: POSTing a duplicate application returns 409 with existing_application_id."""
+        s = login_ok(base, USERS["ngo"])
+        apps = s.get(f"{base}/api/applications/",
+                     headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15).json()
+        all_apps = apps.get("applications") or []
+        if not all_apps:
+            return
+        grant_id = all_apps[0]["grant_id"]
+        r = s.post(f"{base}/api/applications/",
+                   json={"grant_id": grant_id},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 409, f"expected 409 for duplicate, got {r.status_code}"
+        data = r.json()
+        assert "existing_application_id" in data, f"missing existing_application_id: {list(data.keys())}"
+    tests.append(("PHASE21D-001: Duplicate POST returns 409 with existing_application_id", test_phase21d_duplicate_returns_409_with_existing_id))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [
@@ -2125,6 +2217,12 @@ def make_tests(base):
             ("GET", "/api/applications/1/timeline", "donor"),
             ("GET", "/api/applications/1/reviewer-briefing", "donor"),
             ("GET", "/api/comments/?entity_kind=application&entity_id=1", "ngo"),
+            # Phase 21 (calibration + broadcast registration + csv exports)
+            ("GET", "/api/applications/1/panel-calibration", "donor"),
+            ("GET", "/api/exports/grants.csv", "donor"),
+            ("GET", "/api/exports/applications.csv", "ngo"),
+            ("GET", "/api/exports/applications.csv", "donor"),
+            ("GET", "/api/exports/reviews.csv", "reviewer"),
         ]
         errors_500 = []
         for method, path, role in endpoints:
