@@ -1321,3 +1321,51 @@ def api_admin_flags_me():
                 org_id=getattr(current_user, 'org_id', None),
             )
     return jsonify({'success': True, 'flags': out})
+
+
+# ----------------------------------------------------------------------
+# Phase 17D — Donor merge tool (admin only, name-typed confirmation gate)
+# ----------------------------------------------------------------------
+
+@admin_bp.route('/admin/orgs/merge', methods=['POST'])
+@login_required
+def api_admin_orgs_merge():
+    """Merge two donor orgs. Reparents grants/users/watchlist/signals
+    onto the kept org and deletes the dup.
+
+    Body: { kept_id: int, dup_id: int, confirm_name: str }
+
+    confirm_name MUST exactly equal the duplicate org's name. Returns
+    a structured report so the UI can show "moved N grants…".
+    """
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'admin only'}), 403
+    from app.models import Organization
+    from app.services.org_merge_service import OrgMergeService
+    from app.utils.helpers import get_request_json
+
+    data = get_request_json() or {}
+    try:
+        kept_id = int(data.get('kept_id'))
+        dup_id = int(data.get('dup_id'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'kept_id + dup_id required'}), 400
+    confirm = (data.get('confirm_name') or '').strip()
+    if not confirm:
+        return jsonify({'success': False, 'error': 'confirm_name required'}), 400
+
+    dup = db.session.get(Organization, dup_id)
+    if not dup:
+        return jsonify({'success': False, 'error': 'dup org not found'}), 404
+    if confirm != dup.name:
+        return jsonify({
+            'success': False,
+            'error': f'confirm_name must exactly match the duplicate org name: "{dup.name}"',
+        }), 400
+
+    report = OrgMergeService.merge(
+        kept_id=kept_id, dup_id=dup_id,
+        actor_email=getattr(current_user, 'email', None),
+    )
+    status = 200 if report.get('success') else 400
+    return jsonify(report), status

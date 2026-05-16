@@ -473,6 +473,27 @@ def api_dashboard_benchmarks():
 
 
 # ----------------------------------------------------------------------
+# Phase 17B — NGO onboarding checklist (drops out once all 3 steps done).
+# ----------------------------------------------------------------------
+
+@dashboard_bp.route('/onboarding', methods=['GET'])
+@login_required
+def api_dashboard_onboarding():
+    if current_user.role != 'ngo':
+        return jsonify({'success': False, 'reason': 'not_ngo'})
+    if not current_user.org_id:
+        return jsonify({'success': False, 'reason': 'no_org'})
+    from app.services.onboarding_service import OnboardingService
+    cache_key = f'onboarding_ngo_{current_user.org_id}'
+    cached = _dashboard_cache.get(cache_key)
+    if cached is not None:
+        return jsonify({'cached': True, **cached})
+    result = OnboardingService.for_ngo(ngo_org_id=current_user.org_id)
+    _dashboard_cache.set(cache_key, result)
+    return jsonify(result)
+
+
+# ----------------------------------------------------------------------
 # Phase 16E — Reviewer throughput / SLA dashboard.
 # Reviewer sees their own; admin can inspect any via ?reviewer_id=.
 # ----------------------------------------------------------------------

@@ -18,6 +18,8 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { StarButton } from '@/components/shared/star-button';
 import { RecencyChip } from '@/components/shared/recency-chip';
 import { NameChip } from '@/components/shared/name-chip';
+import { GrantFitCompareDialog } from '@/components/grants/grant-fit-compare-dialog';
+import { Scale } from 'lucide-react';
 import { useUrlState, useUrlSetState } from '@/lib/hooks/use-url-state';
 
 import { formatMoney } from '@/lib/currency';
@@ -72,6 +74,18 @@ export default function GrantsPage() {
   const [searchQuery, setSearchQuery] = useUrlState('q', '');
   const [activeSectors, setActiveSectors] = useUrlSetState('sector');
   const [sortBy, setSortBy] = useState<SortOption>('deadline');
+  // Phase 17C — multi-select for fit comparison (NGO only)
+  const [compareMode, setCompareMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [compareOpen, setCompareOpen] = useState(false);
+  const toggleSelected = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 4) next.add(id);
+      return next;
+    });
+  };
   const { data, isLoading } = useGrants();
 
   const grants: Grant[] = useMemo(() => data?.grants ?? [], [data]);
@@ -132,15 +146,48 @@ export default function GrantsPage() {
             {filteredGrants.length} grant{filteredGrants.length !== 1 ? 's' : ''} found
           </p>
         </div>
-        {!isNgo && (
-          <button
-            type="button"
-            onClick={() => router.push('/grants/new')}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-3 py-2"
-          >
-            <Plus className="h-4 w-4" /> {t('grant.create')}
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {isNgo && (
+            <>
+              {/* Phase 17C — compare-fit selection mode */}
+              <button
+                type="button"
+                onClick={() => {
+                  setCompareMode((v) => !v);
+                  if (compareMode) setSelectedIds(new Set());
+                }}
+                aria-pressed={compareMode}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md border text-sm font-medium px-3 py-2',
+                  compareMode
+                    ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-clay))] text-white'
+                    : 'border-[hsl(var(--border))] hover:bg-[hsl(var(--kuja-sand))]/40',
+                )}
+              >
+                <Scale className="h-4 w-4" />
+                {compareMode ? `${selectedIds.size}/4 selected` : 'Compare fit'}
+              </button>
+              {compareMode && selectedIds.size >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => setCompareOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay-dark))] hover:opacity-90 text-white text-sm font-medium px-3 py-2"
+                >
+                  Run comparison <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </>
+          )}
+          {!isNgo && (
+            <button
+              type="button"
+              onClick={() => router.push('/grants/new')}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-3 py-2"
+            >
+              <Plus className="h-4 w-4" /> {t('grant.create')}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search */}
@@ -281,8 +328,18 @@ export default function GrantsPage() {
             return (
               <div
                 key={grant.id}
-                onClick={() => router.push(`/grants/${grant.id}`)}
-                className="rounded-xl border border-border bg-background p-5 hover:border-[hsl(var(--kuja-clay))] hover:shadow-md transition-all cursor-pointer"
+                onClick={() => {
+                  if (compareMode) toggleSelected(grant.id);
+                  else router.push(`/grants/${grant.id}`);
+                }}
+                className={cn(
+                  'rounded-xl border bg-background p-5 hover:shadow-md transition-all cursor-pointer',
+                  compareMode && selectedIds.has(grant.id)
+                    ? 'border-[hsl(var(--kuja-clay))] ring-2 ring-[hsl(var(--kuja-clay))]/40'
+                    : 'border-border hover:border-[hsl(var(--kuja-clay))]',
+                )}
+                role={compareMode ? 'button' : undefined}
+                aria-pressed={compareMode ? selectedIds.has(grant.id) : undefined}
               >
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="min-w-0 flex-1">
@@ -332,6 +389,13 @@ export default function GrantsPage() {
           })}
         </div>
       )}
+
+      {/* Phase 17C — fit comparison dialog */}
+      <GrantFitCompareDialog
+        open={compareOpen}
+        onOpenChange={setCompareOpen}
+        grantIds={Array.from(selectedIds)}
+      />
     </div>
   );
 }

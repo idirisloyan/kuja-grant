@@ -1653,6 +1653,90 @@ def make_tests(base):
         assert r.status_code == 403, f"expected 403, got {r.status_code}"
     tests.append(("PHASE16E-002: Reviewer throughput forbidden for donor", test_phase16e_reviewer_throughput_forbidden_for_donor))
 
+    def test_phase17a_messaging_channels_reports_email():
+        """PHASE17A-001: messaging/channels surfaces email transport state."""
+        s = login_ok(base, USERS["admin"])
+        r = s.get(f"{base}/api/messaging/channels",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        channels = data.get("channels") or {}
+        assert "email" in channels, f"email channel missing: {list(channels.keys())}"
+        email = channels["email"]
+        assert email.get("transport") in ("sendgrid", "smtp", "log")
+    tests.append(("PHASE17A-001: Email transport status surfaced", test_phase17a_messaging_channels_reports_email))
+
+    def test_phase17b_onboarding_shape():
+        """PHASE17B-001: NGO onboarding endpoint returns shaped JSON."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/dashboard/onboarding",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        if not data.get("success"):
+            # NGOs without org_id return success=False with a reason — accept
+            assert "reason" in data
+            return
+        assert "steps" in data and isinstance(data["steps"], list)
+        for s_ in data["steps"]:
+            for k in ("id", "label", "done", "href"):
+                assert k in s_, f"step missing {k}: {s_}"
+    tests.append(("PHASE17B-001: NGO onboarding shape", test_phase17b_onboarding_shape))
+
+    def test_phase17b_onboarding_donor_skipped():
+        """PHASE17B-002: donor hitting onboarding returns success=False with reason."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/dashboard/onboarding",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200
+        data = r.json()
+        assert data.get("success") is False, "donors shouldn't get onboarding payload"
+    tests.append(("PHASE17B-002: Donor onboarding correctly skipped", test_phase17b_onboarding_donor_skipped))
+
+    def test_phase17c_fit_compare_validates():
+        """PHASE17C-001: fit-compare requires 2-4 grant ids."""
+        s = login_ok(base, USERS["ngo"])
+        # Empty list → 400
+        r = s.post(f"{base}/api/grants/fit-compare",
+                   json={"grant_ids": []},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 400, f"empty list: {r.status_code}"
+        # Too many → 400
+        r = s.post(f"{base}/api/grants/fit-compare",
+                   json={"grant_ids": [1, 2, 3, 4, 5]},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 400, f"too many: {r.status_code}"
+    tests.append(("PHASE17C-001: Fit compare validates input", test_phase17c_fit_compare_validates))
+
+    def test_phase17d_org_merge_requires_confirm_name():
+        """PHASE17D-001: merge endpoint requires matching confirm_name."""
+        s = login_ok(base, USERS["admin"])
+        # Missing confirm_name → 400
+        r = s.post(f"{base}/api/admin/orgs/merge",
+                   json={"kept_id": 1, "dup_id": 2},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code in (400, 404), f"missing confirm: {r.status_code}"
+        # Wrong confirm_name → 400 (if dup exists) or 404 (if not)
+        r = s.post(f"{base}/api/admin/orgs/merge",
+                   json={"kept_id": 1, "dup_id": 2, "confirm_name": "definitely-not-the-name"},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code in (400, 404), f"wrong confirm: {r.status_code}"
+    tests.append(("PHASE17D-001: Merge requires matching confirm_name", test_phase17d_org_merge_requires_confirm_name))
+
+    def test_phase17d_org_merge_forbidden_for_non_admin():
+        """PHASE17D-002: non-admin cannot trigger merge."""
+        s = login_ok(base, USERS["donor"])
+        r = s.post(f"{base}/api/admin/orgs/merge",
+                   json={"kept_id": 1, "dup_id": 2, "confirm_name": "x"},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 403, f"expected 403, got {r.status_code}"
+    tests.append(("PHASE17D-002: Merge forbidden for non-admin", test_phase17d_org_merge_forbidden_for_non_admin))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [
@@ -1736,6 +1820,9 @@ def make_tests(base):
             ("GET", "/api/dashboard/benchmarks", "ngo"),
             ("GET", "/api/dashboard/benchmarks", "donor"),
             ("GET", "/api/dashboard/reviewer-throughput", "reviewer"),
+            # Phase 17 (onboarding + fit compare + merge route registration)
+            ("GET", "/api/dashboard/onboarding", "ngo"),
+            ("GET", "/api/dashboard/onboarding", "donor"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

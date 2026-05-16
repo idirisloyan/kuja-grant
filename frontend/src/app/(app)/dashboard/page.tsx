@@ -34,6 +34,8 @@ import { DebriefRollupCard } from '@/components/dashboards/debrief-rollup-card';
 import { StageLabelsEditor } from '@/components/dashboards/stage-labels-editor';
 import { PeerBenchmarksCard } from '@/components/dashboards/peer-benchmarks-card';
 import { ReviewerThroughputCard } from '@/components/dashboards/reviewer-throughput-card';
+import { OnboardingChecklist } from '@/components/dashboards/onboarding-checklist';
+import { OrgMergeTool } from '@/components/dashboards/org-merge-tool';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -107,6 +109,8 @@ export default function DashboardPage() {
       )}
       {user.role === 'ngo' && (
         <>
+          {/* Phase 17B — first-run checklist (auto-hides once activated). */}
+          <OnboardingChecklist />
           {/* Phase 3 — AI Pre-emption Watch for the NGO's own grants. */}
           <PreemptionWatchCard scope="me" />
           {/* Phase 11 — cross-grant patterns ("where you consistently win/lose"). */}
@@ -147,6 +151,8 @@ export default function DashboardPage() {
           <AIBudgetAdminCard />
           {/* Phase 15C — customisable stage labels per org */}
           <StageLabelsEditor />
+          {/* Phase 17D — donor merge tool */}
+          <OrgMergeTool />
           <AdminOpsPanel />
         </>
       )}

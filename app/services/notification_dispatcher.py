@@ -131,12 +131,31 @@ class NotificationDispatcher:
 
     @classmethod
     def _emit_email_stub(cls, *, user_id: int, title: str, body: str) -> dict:
-        """Email isn't wired in this push — log for future plug-in."""
-        logger.info(
-            f"NOTIF_EMAIL_STUB user={user_id} title={title[:80]!r} "
-            f"body_len={len(body or '')}"
-        )
-        return {'channel': 'email', 'success': True, 'stubbed': True}
+        """Phase 17A — real email transport with graceful fallback.
+
+        Looks up the user's email on User.email; sends via SendGrid /
+        SMTP if configured, else logs. Method name kept for backwards
+        compatibility with existing callers.
+        """
+        from app.models import User
+        from app.services.email_service import EmailService
+        try:
+            user = db.session.get(User, user_id)
+            if not user or not getattr(user, 'email', None):
+                return {'channel': 'email', 'success': False,
+                        'skipped': True, 'reason': 'no_user_email'}
+            result = EmailService.send(to=user.email, subject=title, body=body)
+            return {
+                'channel': 'email',
+                'success': bool(result.get('success')),
+                'transport': result.get('transport'),
+                'stubbed': result.get('transport') == 'log',
+                'message_id': result.get('message_id'),
+                'error': result.get('error'),
+            }
+        except Exception as e:
+            logger.warning(f'email dispatch failed: {e}')
+            return {'channel': 'email', 'success': False, 'error': str(e)[:120]}
 
     @classmethod
     def _emit_external(cls, *, channel: str, user_id: int, body: str) -> dict:

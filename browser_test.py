@@ -1726,6 +1726,40 @@ def test_23_3_reviewer_throughput_card(page, ctx):
 
 
 # ===========================================================================
+# Phase 17 — email, onboarding, fit-compare, merge
+# ===========================================================================
+
+def test_24_1_ngo_onboarding_card_or_hidden(page, ctx):
+    """24.1 NGO dashboard either shows onboarding checklist OR (if fully
+    onboarded) some other content — never errors. We just verify the
+    page is healthy and the dashboard text length is meaningful."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+    page.wait_for_timeout(3000)
+    body = get_page_text(page)
+    assert len(body) > 200, f"NGO dashboard too thin: {body[:300]}"
+
+def test_24_2_grants_compare_fit_button(page, ctx):
+    """24.2 NGO grants list shows the "Compare fit" toggle button."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/grants", wait_until="networkidle")
+    page.wait_for_timeout(2500)
+    btn = page.locator('button:has-text("Compare fit")')
+    assert btn.count() > 0, "Compare fit button missing on NGO grants list"
+
+def test_24_3_admin_dashboard_merge_tool(page, ctx):
+    """24.3 Admin dashboard exposes the donor merge tool."""
+    login_as(page, ctx["base"], USERS["admin"])
+    page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+    page.wait_for_timeout(4000)
+    body = get_page_text(page)
+    has = any(w in body for w in [
+        "Donor merge", "Combine duplicate", "Keep this org", "Delete this duplicate",
+    ])
+    assert has, "Donor merge tool missing on admin dashboard"
+
+
+# ===========================================================================
 # Main
 # ===========================================================================
 
@@ -1911,6 +1945,11 @@ def main():
                 ("23.1 Donor benchmarks card present", test_23_1_donor_dashboard_has_benchmarks),
                 ("23.2 NGO benchmarks card present", test_23_2_ngo_dashboard_has_benchmarks),
                 ("23.3 Reviewer throughput card present", test_23_3_reviewer_throughput_card),
+            ]),
+            ("24. PHASE 17 EMAIL + ONBOARDING + FIT + MERGE", [
+                ("24.1 NGO onboarding renders or is hidden", test_24_1_ngo_onboarding_card_or_hidden),
+                ("24.2 Grants list shows Compare fit button", test_24_2_grants_compare_fit_button),
+                ("24.3 Admin dashboard shows donor merge tool", test_24_3_admin_dashboard_merge_tool),
             ]),
         ]
 

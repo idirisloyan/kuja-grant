@@ -845,3 +845,55 @@ def api_grant_drafters(grant_id):
         'count': int(count),
         'window_days': 14,
     })
+
+
+# ----------------------------------------------------------------------
+# Phase 17C — AI grant fit comparison for NGOs.
+# NGO picks 2-4 grant IDs and asks "which fits best?" AI ranks them
+# vs the NGO's profile + history.
+# ----------------------------------------------------------------------
+
+@grants_bp.route('/fit-compare', methods=['POST'])
+@login_required
+@role_required('ngo', 'admin')
+def api_grant_fit_compare():
+    """Body: { grant_ids: [int, ...] (2-4) }"""
+    from app.services.grant_fit_compare_service import GrantFitCompareService
+    from app.utils.cache import _dashboard_cache
+
+    if not current_user.org_id:
+        return jsonify({'success': False, 'error': 'Org required'}), 400
+
+    data = get_request_json() or {}
+    raw_ids = data.get('grant_ids') or []
+    if not isinstance(raw_ids, list):
+        return jsonify({'success': False, 'error': 'grant_ids must be a list'}), 400
+    try:
+        ids = sorted(set(int(x) for x in raw_ids))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'grant_ids must be ints'}), 400
+    if len(ids) < 2:
+        return jsonify({'success': False, 'error': 'at least 2 grants required'}), 400
+    if len(ids) > 4:
+        return jsonify({'success': False, 'error': 'at most 4 grants allowed'}), 400
+
+    # Visibility: every grant must be open or the NGO has an application on it
+    ngo_org_id = current_user.org_id if current_user.role == 'ngo' else current_user.org_id
+    grants = Grant.query.filter(Grant.id.in_(ids)).all()
+    for g in grants:
+        if g.status not in ('open', 'awarded', 'closed'):
+            return jsonify({'success': False,
+                            'error': f'Grant {g.id} not visible (status={g.status})'}), 403
+
+    cache_key = f"grant_fit_{ngo_org_id}_{'-'.join(str(i) for i in ids)}"
+    cached = _dashboard_cache.get(cache_key)
+    if cached is not None:
+        return jsonify({'cached': True, **cached})
+
+    result = GrantFitCompareService.compare(
+        ngo_org_id=ngo_org_id, grant_ids=ids,
+    )
+    if not result:
+        return jsonify({'success': False, 'error': 'Could not compute comparison'}), 500
+    _dashboard_cache.set(cache_key, result)
+    return jsonify(result)

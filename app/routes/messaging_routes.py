@@ -24,10 +24,27 @@ messaging_bp = Blueprint('messaging', __name__, url_prefix='/api/messaging')
 @messaging_bp.route('/channels', methods=['GET'])
 @login_required
 def api_channel_status():
-    """Return which delivery channels are wired."""
+    """Return which delivery channels are wired.
+
+    Phase 17A — also reports the email transport that the
+    NotificationDispatcher will actually use (sendgrid / smtp / log).
+    """
+    import os as _os
+    channels = MessagingService.channel_status()
+    if _os.getenv('SENDGRID_API_KEY'):
+        email_transport = 'sendgrid'
+    elif _os.getenv('SMTP_HOST'):
+        email_transport = 'smtp'
+    else:
+        email_transport = 'log'
+    channels['email'] = {
+        'wired': email_transport != 'log',
+        'transport': email_transport,
+        'from': _os.getenv('MAIL_FROM') or 'noreply@kuja.local',
+    }
     return jsonify({
         'success': True,
-        'channels': MessagingService.channel_status(),
+        'channels': channels,
     })
 
 
