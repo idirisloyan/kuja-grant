@@ -5,10 +5,10 @@ completes a backlog item should update this file in the same commit.
 
 Updated 2026-05-16.
 
-After Phase 24 (chat threads, auto-assign reviewers, donor cohort
-analytics, PWA polish), the "Full conversational AI co-pilot" and
-"Mobile app shell" items moved from deferred to completed. Payment
-integration remains the sole high-priority deferred item.
+After Phase 26 (report detail page + scoped chat, reviewer auto-assign
+cron sweep, WebAuthn biometric re-auth, Phase 24-26 browser UAT specs),
+the WebAuthn biometric re-auth backlog item also closed. **Payment
+integration is now the only deferred item — everything else has shipped.**
 
 ---
 
@@ -46,13 +46,9 @@ is the actual money movement.
 
 ## Deferred — medium priority
 
-### Biometric (WebAuthn) re-auth on touch devices
-- Phase 24D shipped PWA install banner + native share, but biometric
-  re-auth is still pending — needs a server-side credential store +
-  challenge flow + re-auth gate on sensitive routes (settings
-  changes, document downloads, decision recording).
-- Not a hard blocker; only matters when users install the PWA + keep
-  it backgrounded for hours.
+(none — WebAuthn re-auth shipped in Phase 26C with `WebAuthnService` +
+`/api/auth/webauthn/*` routes + `/settings/security` page +
+`<WebAuthnPanel>` + `require_reauth()` gate helper.)
 
 ---
 
@@ -64,7 +60,15 @@ is the actual money movement.
 
 ## Completed (rolling log)
 
-- **2026-05-16** — Phase 25 (this commit): auto-assign reviewers on
+- **2026-05-16** — Phase 26 (this commit): `/reports/[id]` detail page
+  with scoped `<AIChatPanel>`; nightly reviewer auto-assign sweep cron
+  (`/api/cron/reviewer-auto-assign-sweep` + GH Actions schedule at
+  02:45 UTC); WebAuthn biometric re-auth (`WebAuthnCredential` model +
+  `WebAuthnService` + 6 `/api/auth/webauthn/*` routes + `<WebAuthnPanel>`
+  + `/settings/security` page + `require_reauth()` gate helper for
+  sensitive routes); +10 Playwright browser UAT specs covering Phase
+  24-26 surfaces. 137/137 smoke tests passing.
+- **2026-05-16** — Phase 25 (commit `1c6c7f7`): auto-assign reviewers on
   application submit (idempotent); per-scope `<AIChatPanel>` mounted
   on grant + application detail pages so users can ask Kuja about
   THIS entity without leaving the page; admin-only DonorCohortCard

@@ -2311,6 +2311,78 @@ def make_tests(base):
     tests.append(("PHASE24C-002: Donor cohort analytics forbidden for NGO",
                   test_phase24c_donor_cohort_forbidden_for_ngo))
 
+    # -------------------- Phase 26 (May 2026) --------------------
+
+    def test_phase26b_reviewer_auto_assign_cron_admin():
+        """PHASE26B-001: admin can trigger reviewer auto-assign sweep cron."""
+        s = login_ok(base, USERS["admin"])
+        r = s.post(f"{base}/api/cron/reviewer-auto-assign-sweep",
+                   json={}, headers={"X-Requested-With": "XMLHttpRequest"},
+                   timeout=30)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        result = data.get("result") or {}
+        for k in ("scanned", "apps_assigned", "reviewers_assigned", "skipped"):
+            assert k in result, f"sweep result missing {k}: {list(result.keys())}"
+    tests.append(("PHASE26B-001: Reviewer auto-assign sweep cron as admin",
+                  test_phase26b_reviewer_auto_assign_cron_admin))
+
+    def test_phase26b_cron_forbidden_for_ngo():
+        """PHASE26B-002: NGO cannot trigger reviewer auto-assign sweep cron."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.post(f"{base}/api/cron/reviewer-auto-assign-sweep",
+                   json={}, headers={"X-Requested-With": "XMLHttpRequest"},
+                   timeout=10)
+        assert r.status_code == 403, f"expected 403, got {r.status_code}"
+    tests.append(("PHASE26B-002: Reviewer auto-assign cron forbidden for NGO",
+                  test_phase26b_cron_forbidden_for_ngo))
+
+    def test_phase26c_webauthn_list_empty():
+        """PHASE26C-001: list webauthn credentials returns success + empty for new user."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/auth/webauthn/credentials",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        assert isinstance(data.get("credentials"), list)
+    tests.append(("PHASE26C-001: WebAuthn credential list returns shape",
+                  test_phase26c_webauthn_list_empty))
+
+    def test_phase26c_webauthn_register_begin_works():
+        """PHASE26C-002: register/begin returns publicKey options for an authed user."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.post(f"{base}/api/auth/webauthn/register/begin",
+                   json={}, headers={"X-Requested-With": "XMLHttpRequest"},
+                   timeout=10)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        assert "publicKey" in data, f"missing publicKey: {list(data.keys())}"
+        # publicKey is a JSON-encoded string containing the WebAuthn options
+        import json as _json
+        opts = _json.loads(data["publicKey"])
+        assert "challenge" in opts and "rp" in opts and "user" in opts, \
+            f"opts missing fields: {list(opts.keys())}"
+    tests.append(("PHASE26C-002: WebAuthn register/begin returns options",
+                  test_phase26c_webauthn_register_begin_works))
+
+    def test_phase26c_webauthn_auth_begin_without_creds():
+        """PHASE26C-003: authenticate/begin returns no_credentials for user w/o enrolled devices."""
+        s = login_ok(base, USERS["donor"])
+        r = s.post(f"{base}/api/auth/webauthn/authenticate/begin",
+                   json={}, headers={"X-Requested-With": "XMLHttpRequest"},
+                   timeout=10)
+        # Either 400 with reason=no_credentials, or 200 with success=False
+        if r.status_code == 400:
+            data = r.json()
+            assert data.get("reason") == "no_credentials" or data.get("success") is False
+        else:
+            assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+    tests.append(("PHASE26C-003: WebAuthn authenticate/begin no_credentials path",
+                  test_phase26c_webauthn_auth_begin_without_creds))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [

@@ -35,6 +35,7 @@ from app.models.watchlist import WatchlistItem
 from app.models.status_signal import StatusSignal
 from app.models.notification_preference import NotificationPreference
 from app.models.tag import Tag, TagAssignment
+from app.models.webauthn_credential import WebAuthnCredential
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -47,4 +48,5 @@ __all__ = [
     'SavedSearch', 'PushSubscription', 'WatchlistItem', 'StatusSignal',
     'NotificationPreference',
     'Tag', 'TagAssignment',
+    'WebAuthnCredential',
 ]

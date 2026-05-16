@@ -52,6 +52,87 @@ def api_cron_compliance_rerun():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/reviewer-auto-assign-sweep', methods=['POST'])
+def api_cron_reviewer_auto_assign_sweep():
+    """Phase 26B — nightly safety net for reviewer auto-assignment.
+
+    Phase 25A wired auto-assign into the application submit handler,
+    but apps submitted before Phase 25A — or where the synchronous
+    call failed silently inside the broad-except — can still be
+    sitting in queue without reviewers. This sweep catches them.
+
+    Walks every application in {submitted, under_review} that has
+    zero Review rows and triggers ReviewerAutoAssignService.run()
+    against each. Caps MAX_PER_RUN to avoid bursts.
+
+    Returns a structured report: scanned, assigned, skipped (with
+    reason buckets) so monitoring can alert if backlog grows.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    try:
+        from app.models import Application, Review
+        from app.services.reviewer_auto_assign_service import (
+            ReviewerAutoAssignService,
+        )
+
+        MAX_PER_RUN = 50
+        # Find apps that need reviewers
+        candidates = (
+            Application.query
+            .filter(Application.status.in_(('submitted', 'under_review')))
+            .order_by(Application.submitted_at.asc().nullsfirst())
+            .limit(MAX_PER_RUN * 2)  # buffer because we'll filter out already-assigned
+            .all()
+        )
+
+        scanned = 0
+        assigned_apps = 0
+        total_reviewers_assigned = 0
+        skipped: dict[str, int] = {}
+
+        for app in candidates:
+            if scanned >= MAX_PER_RUN:
+                break
+            # Skip if any reviews already exist
+            has_reviews = (
+                Review.query.filter_by(application_id=app.id).first() is not None
+            )
+            if has_reviews:
+                skipped['already_assigned'] = skipped.get('already_assigned', 0) + 1
+                continue
+            scanned += 1
+            try:
+                r = ReviewerAutoAssignService.run(
+                    application_id=app.id,
+                    actor_email='cron.reviewer_auto_assign_sweep',
+                )
+                if r.get('ok') and r.get('assigned', 0) > 0:
+                    assigned_apps += 1
+                    total_reviewers_assigned += r['assigned']
+                else:
+                    reason = r.get('reason') or 'no_assignment'
+                    skipped[reason] = skipped.get(reason, 0) + 1
+            except Exception as e:
+                logger.warning(
+                    f'auto-assign sweep failed for app={app.id}: {e}'
+                )
+                skipped['exception'] = skipped.get('exception', 0) + 1
+
+        result = {
+            'scanned': scanned,
+            'apps_assigned': assigned_apps,
+            'reviewers_assigned': total_reviewers_assigned,
+            'skipped': skipped,
+            'cap': MAX_PER_RUN,
+        }
+        logger.info(f'reviewer auto-assign sweep cron: {result}')
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception(f'reviewer auto-assign sweep cron failed: {e}')
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/uat-fixtures', methods=['POST'])
 def api_cron_uat_fixtures():
     """Daily-runnable: ensure demo/UAT state stays meaningful.

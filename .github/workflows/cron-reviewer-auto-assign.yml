@@ -1,0 +1,90 @@
+name: Reviewer auto-assign sweep cron
+
+# Phase 26B — nightly safety net for reviewer auto-assignment.
+#
+# Phase 25A wired auto-assign into the application submit handler, but
+# apps submitted before 25A or where the synchronous call failed
+# silently can still sit in queue without reviewers. This cron walks
+# every {submitted, under_review} application that has zero reviews
+# and triggers ReviewerAutoAssignService against each (capped at 50/run).
+#
+# Required repo secrets:
+#   CRON_SECRET — must match CRON_SECRET on Railway
+#   PROD_BASE   — defaults to prod URL if unset
+
+on:
+  # Daily at 02:45 UTC. Picked to land before the UAT-fixtures cron
+  # (03:15 UTC) so the demo data has reviewers attached before fixtures
+  # might rely on review state.
+  schedule:
+    - cron: "45 2 * * *"
+
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Determine base URL
+        id: base
+        run: |
+          if [ -n "${{ secrets.PROD_BASE }}" ]; then
+            echo "url=${{ secrets.PROD_BASE }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://web-production-6f8a.up.railway.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: POST /api/cron/reviewer-auto-assign-sweep
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET repo secret is missing"
+            exit 1
+          fi
+          http_code=$(curl -s -o /tmp/body.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            -d '{}' \
+            "${BASE_URL}/api/cron/reviewer-auto-assign-sweep")
+          echo "HTTP ${http_code}"
+          cat /tmp/body.json || true
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Reviewer auto-assign sweep returned ${http_code}"
+            exit 1
+          fi
+
+      - name: Summarise to step output
+        if: always()
+        run: |
+          if [ -f /tmp/body.json ]; then
+            python3 - <<'PY'
+          import json, os
+          with open('/tmp/body.json') as f:
+              try:
+                  d = json.load(f)
+              except Exception:
+                  print('Cron returned non-JSON body')
+                  raise SystemExit(0)
+          result = d.get('result') or {}
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if not summary:
+              print(json.dumps(result, indent=2))
+              raise SystemExit(0)
+          with open(summary, 'a') as out:
+              out.write('# Reviewer auto-assign sweep run\n\n')
+              for section, value in result.items():
+                  if isinstance(value, dict):
+                      out.write(f'## {section}\n')
+                      for k, v in value.items():
+                          out.write(f'- **{k}**: {v}\n')
+                      out.write('\n')
+                  else:
+                      out.write(f'- **{section}**: {value}\n')
+          PY
+          fi

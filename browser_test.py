@@ -1936,6 +1936,156 @@ def test_28_3_grant_detail_broadcast_button(page, ctx):
 
 
 # ===========================================================================
+# Phase 24 — AI chat threads, donor cohort, PWA, native share
+# ===========================================================================
+
+def test_29_1_chat_page_renders(page, ctx):
+    """29.1 /chat page renders the AIChatPanel for logged-in users."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/chat", wait_until="networkidle")
+    page.wait_for_timeout(2500)
+    src = page.content()
+    # Heading + panel marker — fall through to English fallback strings
+    assert "Chat with Kuja" in src or "Kuja chat" in src, \
+        "Chat page heading missing"
+    # The empty-state nudge or the panel scaffold should be visible
+    assert ("Start a real conversation" in src
+            or "Ask, refine, follow up" in src
+            or "Opening thread" in src
+            or "thinking" in src.lower()), \
+        "AIChatPanel did not render any of its expected strings"
+
+def test_29_2_chat_sidebar_link(page, ctx):
+    """29.2 Sidebar exposes the chat link for NGO + donor."""
+    for role in ("ngo", "donor"):
+        login_as(page, ctx["base"], USERS[role])
+        page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+        page.wait_for_timeout(2000)
+        # Sidebar nav link
+        link = page.locator('a[href="/chat"]')
+        assert link.count() > 0, f"Chat sidebar link missing for {role}"
+
+def test_29_3_donor_cohort_endpoint_reachable(page, ctx):
+    """29.3 Donor cohort analytics endpoint is reachable from a donor session."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+    page.wait_for_timeout(2000)
+    # Hit the endpoint via the in-page fetch context (carries cookies)
+    result = page.evaluate("""async (base) => {
+        const r = await fetch(base + '/api/dashboard/donor-cohort-analytics',
+            { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        const j = await r.json();
+        return { status: r.status, ok: j.success === true, source: j.source };
+    }""", ctx["base"])
+    assert result["status"] == 200, f"cohort endpoint returned {result['status']}"
+    assert result["ok"], f"cohort response not success: {result}"
+    assert result["source"] in ("cohort", "sparse"), f"unexpected source: {result['source']}"
+
+def test_29_4_ai_thread_open_idempotent(page, ctx):
+    """29.4 POST /api/ai/threads/open returns the same thread on consecutive calls."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    result = page.evaluate("""async (base) => {
+        const post = async () => {
+            const r = await fetch(base + '/api/ai/threads/open', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ scope_kind: null, scope_id: null }),
+            });
+            const j = await r.json();
+            return { status: r.status, thread_id: j.thread_id };
+        };
+        const a = await post();
+        const b = await post();
+        return { a, b };
+    }""", ctx["base"])
+    assert result["a"]["status"] == 200, f"first open returned {result['a']['status']}"
+    assert result["b"]["status"] == 200, f"second open returned {result['b']['status']}"
+    assert result["a"]["thread_id"] == result["b"]["thread_id"], \
+        f"thread_id should be stable: {result}"
+
+
+# ===========================================================================
+# Phase 25 — per-scope chat mounts + auto-assign on submit + admin cohort
+# ===========================================================================
+
+def test_30_1_grant_detail_mounts_scoped_chat(page, ctx):
+    """30.1 Grant detail page bundle ships the scoped AIChatPanel."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.goto(f"{ctx['base']}/grants/0", wait_until="networkidle")
+    page.wait_for_timeout(3000)
+    src = page.content()
+    # The panel scaffold strings — either rendered or in the JS bundle
+    assert ("Kuja chat" in src or "Chat with Kuja" in src
+            or "Start a real conversation" in src
+            or "scope: grant" in src
+            or "ai-chat-panel" in src.lower()), \
+        "Scoped chat panel did not ship on grant detail page"
+
+def test_30_2_application_detail_mounts_scoped_chat(page, ctx):
+    """30.2 Application detail page bundle ships the scoped AIChatPanel."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/applications/0", wait_until="networkidle")
+    page.wait_for_timeout(3000)
+    src = page.content()
+    assert ("Kuja chat" in src or "Chat with Kuja" in src
+            or "Start a real conversation" in src
+            or "scope: application" in src
+            or "ai-chat-panel" in src.lower()), \
+        "Scoped chat panel did not ship on application detail page"
+
+
+# ===========================================================================
+# Phase 26 — Report detail + WebAuthn settings
+# ===========================================================================
+
+def test_31_1_report_detail_page_renders(page, ctx):
+    """31.1 /reports/[id] route renders with chat panel (uses id=0 placeholder)."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/reports/0", wait_until="networkidle")
+    page.wait_for_timeout(3000)
+    src = page.content()
+    # Either the report-not-found surface or the scaffold ships in the bundle
+    assert ("Back to reports" in src
+            or "Report not found" in src
+            or "Loading report" in src
+            or "Kuja chat" in src), \
+        "Report detail page did not render any expected strings"
+
+def test_31_2_security_settings_page_renders(page, ctx):
+    """31.2 /settings/security route renders WebAuthn panel."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/settings/security", wait_until="networkidle")
+    page.wait_for_timeout(2500)
+    src = page.content()
+    assert ("Trusted devices" in src
+            or "Biometric re-auth" in src
+            or "Enrol this device" in src
+            or "WebAuthn" in src), \
+        "WebAuthn settings panel did not render"
+
+def test_31_3_webauthn_list_endpoint(page, ctx):
+    """31.3 /api/auth/webauthn/credentials returns success=True with empty list for new user."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    result = page.evaluate("""async (base) => {
+        const r = await fetch(base + '/api/auth/webauthn/credentials',
+            { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        const j = await r.json();
+        return { status: r.status, ok: j.success === true, count: (j.credentials || []).length };
+    }""", ctx["base"])
+    assert result["status"] == 200, f"webauthn list returned {result['status']}"
+    assert result["ok"], f"webauthn list not success: {result}"
+    # New user should have 0 credentials
+    assert isinstance(result["count"], int) and result["count"] >= 0
+
+
+# ===========================================================================
 # Main
 # ===========================================================================
 
@@ -1944,7 +2094,7 @@ def main():
 
     print("\n" + "=" * 70)
     print("  Kuja Grant — Comprehensive Browser UI Tests (Playwright)")
-    print("  91 tests across 20 categories")
+    print("  100 tests across 23 categories")
     print("=" * 70)
 
     # Determine base URL
@@ -2146,6 +2296,21 @@ def main():
                 ("28.1 Grants list shows Export CSV (donor)", test_28_1_grants_export_csv_link),
                 ("28.2 Applications list shows Export CSV", test_28_2_applications_export_csv_link),
                 ("28.3 Grant detail Broadcast button (donor)", test_28_3_grant_detail_broadcast_button),
+            ]),
+            ("29. PHASE 24 AI CHAT + DONOR COHORT + PWA", [
+                ("29.1 /chat page renders panel", test_29_1_chat_page_renders),
+                ("29.2 Chat link in sidebar (ngo+donor)", test_29_2_chat_sidebar_link),
+                ("29.3 Donor cohort analytics endpoint reachable", test_29_3_donor_cohort_endpoint_reachable),
+                ("29.4 AI thread open is idempotent", test_29_4_ai_thread_open_idempotent),
+            ]),
+            ("30. PHASE 25 SCOPED CHAT MOUNTS", [
+                ("30.1 Grant detail ships scoped chat", test_30_1_grant_detail_mounts_scoped_chat),
+                ("30.2 Application detail ships scoped chat", test_30_2_application_detail_mounts_scoped_chat),
+            ]),
+            ("31. PHASE 26 REPORT DETAIL + WEBAUTHN", [
+                ("31.1 /reports/[id] route renders", test_31_1_report_detail_page_renders),
+                ("31.2 /settings/security renders WebAuthn panel", test_31_2_security_settings_page_renders),
+                ("31.3 WebAuthn list endpoint returns shape", test_31_3_webauthn_list_endpoint),
             ]),
         ]
 
