@@ -15,6 +15,8 @@ import { InfoTip } from '@/components/shared/info-tip';
 import { ActivityTimeline } from '@/components/applications/ActivityTimeline';
 import { StatusSignalsRail } from '@/components/shared/status-signals-rail';
 import { PreflightPanel } from '@/components/shared/preflight-panel';
+import { ReviewerFollowupsPanel } from '@/components/reviews/reviewer-followups-panel';
+import { useAuthStore } from '@/stores/auth-store';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
 const TAB_KEYS: { id: TabId; key: string }[] = [
@@ -198,6 +200,25 @@ export default function ApplicationDetailClient() {
         <h2 className="kuja-eyebrow mb-2">Asks · Risks · Decisions</h2>
         <StatusSignalsRail entityKind="application" entityId={application.id} />
       </div>
+
+      {/* Phase 8 — Reviewer follow-ups (donor + reviewer + admin only).
+          Renders below the rails so it's visible regardless of tab. */}
+      <ReviewerFollowupsGate applicationId={application.id} />
+    </div>
+  );
+}
+
+// Phase 8 — gate the reviewer-followups panel to donor/reviewer/admin.
+// NGOs don't see this surface (it's reviewer-side AI, not for the
+// applicant).
+function ReviewerFollowupsGate({ applicationId }: { applicationId: number }) {
+  const user = useAuthStore((s) => s.user);
+  if (!user) return null;
+  if (!(user.role === 'donor' || user.role === 'reviewer' || user.role === 'admin')) return null;
+  return (
+    <div className="pt-2">
+      <h2 className="kuja-eyebrow mb-2">Decision-unlocking questions</h2>
+      <ReviewerFollowupsPanel kind="application" entityId={applicationId} />
     </div>
   );
 }

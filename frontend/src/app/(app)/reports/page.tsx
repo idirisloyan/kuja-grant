@@ -4,6 +4,8 @@ import { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { ReportDraftCoAuthor } from '@/components/reports/ReportDraftCoAuthor';
 import { ReportReadiness } from '@/components/reports/ReportReadiness';
+import { ReportBundlePanel } from '@/components/reports/report-bundle-panel';
+import { useAuthStore } from '@/stores/auth-store';
 import { useApiError } from '@/lib/hooks/use-api-error';
 import { useReports, useUpcomingReports } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -346,6 +348,17 @@ interface PrecheckAnalysis {
   suggestions?: string[];
   recommendation?: string;
   risk_flags?: string[];
+}
+
+// Phase 8 — bundle panel wrapper: handles per-user canPublish derivation
+// without forcing every parent caller to know about user roles.
+function BundleWrap({ report }: { report: Report }) {
+  const user = useAuthStore((s) => s.user);
+  const canPublish = !!(
+    user?.role === 'admin'
+    || (user?.role === 'ngo' && report.submitted_by_org_id === user.org_id)
+  );
+  return <ReportBundlePanel reportId={report.id} canPublish={canPublish} />;
 }
 
 function PreSubmitReviewPanel({ report, mutateReports }: { report: Report; mutateReports: () => void }) {
@@ -1152,6 +1165,9 @@ function ReportRow({ report, mutateReports }: { report: Report; mutateReports: (
                 visible the moment a draft row opens. */}
             <ReportReadiness reportId={report.id} variant="banner" />
             <ReportDraftCoAuthor reportId={report.id} onApplied={() => mutateReports()} />
+            {/* Phase 8 — donor review bundle. NGO assembles + publishes;
+                donors/admin assemble (read-only) to see what they'll review. */}
+            <BundleWrap report={report} />
             <PreSubmitReviewPanel report={report} mutateReports={mutateReports} />
             <AIReportGuidancePanel report={report} />
           </td>

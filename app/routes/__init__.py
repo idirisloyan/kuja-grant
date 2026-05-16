@@ -42,6 +42,7 @@ def register_blueprints(app):
     from app.routes.notification_preferences_routes import notif_pref_bp  # Phase 6: channel prefs
     from app.routes.preflight_routes import preflight_bp  # Phase 7: donor-perspective pre-flight
     from app.routes.audit_chain_routes import audit_chain_bp  # Phase 7: hash-chain admin views
+    from app.routes.report_bundle_routes import report_bundle_bp  # Phase 8: bundles + reviewer follow-ups
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -52,5 +53,5 @@ def register_blueprints(app):
                risks_bp, admin_health_bp, totp_bp, comments_bp, test_bp,
                saved_searches_bp, push_bp, trust_bp, watchlist_bp, signals_bp,
                preemption_bp, calendar_bp, messaging_bp, ai_budget_bp,
-               notif_pref_bp, preflight_bp, audit_chain_bp]:
+               notif_pref_bp, preflight_bp, audit_chain_bp, report_bundle_bp]:
         app.register_blueprint(bp)

@@ -740,6 +740,48 @@ def make_tests(base):
     # =========================================================================
     # --- Phase 1: Trust Profile / Adverse Media / Bank / Passport ---
 
+    # --- Phase 8: Report bundle + reviewer follow-ups ---
+
+    def test_report_bundle_assemble():
+        """Assemble bundle on the first available report; shape must include
+        cover_meta + narrative + indicators + attachments + asks/risks/decisions
+        + trust_snapshot + bundle_hash."""
+        s = login_ok(base, USERS["ngo"])
+        ar = s.get(f"{base}/api/reports/",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        reports = ar.get("reports", [])
+        if not reports:
+            return
+        rid = reports[0]["id"]
+        r = s.get(f"{base}/api/reports/{rid}/bundle",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=60)
+        assert r.status_code == 200, f"bundle assemble: {r.status_code}: {r.text[:200]}"
+        b = r.json().get("bundle", {})
+        for k in ("cover_meta", "narrative_sections", "indicators", "attachments",
+                  "asks", "risks", "decisions", "bundle_hash", "assembled_at"):
+            assert k in b, f"bundle missing {k}: {list(b.keys())}"
+        assert isinstance(b["bundle_hash"], str) and len(b["bundle_hash"]) == 64, \
+            f"bundle_hash should be 64-char sha256: {b['bundle_hash']}"
+    tests.append(("BUNDLE-001: Report bundle assembles with all sections + sha256 hash", test_report_bundle_assemble))
+
+    def test_reviewer_followups_application():
+        """Follow-up suggestions endpoint returns AI structure or graceful
+        unavailable, but never 500s."""
+        s = login_ok(base, USERS["donor"])
+        ar = s.get(f"{base}/api/applications/",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        apps = ar.get("applications", [])
+        if not apps:
+            return
+        aid = apps[0]["id"]
+        r = s.get(f"{base}/api/reviewer/followups/application/{aid}",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=60)
+        assert r.status_code == 200, f"followups: {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        assert "followups" in d and isinstance(d["followups"], list), "missing followups list"
+        assert d.get("source") in ("ai", "unavailable"), f"unexpected source: {d.get('source')}"
+    tests.append(("FOLLOWUPS-001: Reviewer follow-ups endpoint returns structured list", test_reviewer_followups_application))
+
     # --- Phase 7: Pre-flight + audit chain ---
 
     def test_audit_chain_verify():
@@ -1142,6 +1184,10 @@ def make_tests(base):
             # Phase 7 (pre-flight + audit chain)
             ("GET", "/api/audit-chain/verify", "admin"),
             ("GET", "/api/audit-chain/recent", "admin"),
+            # Phase 8 (bundles + reviewer follow-ups) — these read against /1
+            # which may 404, so they validate only that the route exists (not 500)
+            ("GET", "/api/reports/1/bundle", "ngo"),
+            ("GET", "/api/reviewer/followups/application/1", "donor"),
         ]
         errors_500 = []
         for method, path, role in endpoints:
