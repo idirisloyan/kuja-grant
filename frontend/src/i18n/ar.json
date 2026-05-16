@@ -1913,5 +1913,6 @@
   "reviewer_actions.completed": "مكتمل",
   "reviewer_actions.overdue_due": "متأخر (موعد {date})",
   "common.copied": "تم النسخ",
-  "common.copy": "نسخ"
+  "common.copy": "نسخ",
+  "nav.trust_profile": "الملف الشخصي للثقة"
 }

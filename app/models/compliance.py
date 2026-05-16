@@ -16,7 +16,8 @@ class ComplianceCheck(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     org_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, index=True)
     check_type = db.Column(db.String(50), nullable=False)
-    # sanctions_un, sanctions_ofac, sanctions_eu, blacklist, registration
+    # sanctions_un, sanctions_ofac, sanctions_eu, blacklist, registration,
+    # sanctions_personnel, pep_screening, keyword_screening
     status = db.Column(db.String(50), default='pending')  # clear, flagged, pending, error
     result = db.Column(db.Text, nullable=True)  # JSON
     checked_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))

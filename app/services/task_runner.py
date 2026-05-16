@@ -295,6 +295,45 @@ def _run_rescreening(app):
                         'total_checks': len(check_results),
                     })
 
+                    # Phase 1 — refresh adverse media if the previous run is stale (>90 days).
+                    try:
+                        from app.models import AdverseMediaScreening
+                        from app.services.adverse_media_service import AdverseMediaService
+
+                        latest_am = (
+                            AdverseMediaScreening.query
+                            .filter_by(org_id=org_id)
+                            .order_by(AdverseMediaScreening.screened_at.desc())
+                            .first()
+                        )
+                        if latest_am is None or AdverseMediaService.is_stale(latest_am.screened_at):
+                            am_result = AdverseMediaService.screen(
+                                org_name=org.name,
+                                country=org.country or None,
+                                sector=None,
+                                leadership=[],
+                                lookback_months=AdverseMediaService.DEFAULT_LOOKBACK_MONTHS,
+                            )
+                            am = AdverseMediaScreening(
+                                org_id=org_id,
+                                lookback_months=AdverseMediaService.DEFAULT_LOOKBACK_MONTHS,
+                                status=am_result.get('summary', {}).get('overall_status', 'pending'),
+                                source=am_result.get('source', 'unknown'),
+                                ai_confidence=am_result.get('ai_confidence', 0),
+                                ai_notes=(am_result.get('ai_notes') or '')[:8000],
+                            )
+                            am.set_subjects(am_result.get('subjects', []))
+                            am.set_findings(am_result.get('findings', []))
+                            am.set_summary(am_result.get('summary', {}))
+                            db.session.add(am)
+                            db.session.commit()
+                            logger.info(
+                                f"Rescreening: refreshed adverse media for '{org.name}' "
+                                f"(status={am.status}, findings={len(am.get_findings())})"
+                            )
+                    except Exception as e:
+                        logger.warning(f"Adverse media rescreen failed for org {org_id}: {e}")
+
                 except Exception as e:
                     logger.error(f"Rescreening failed for org {org_id} ({org.name}): {e}")
                     results['errors'] += 1

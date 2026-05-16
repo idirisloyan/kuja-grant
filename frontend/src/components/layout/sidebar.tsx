@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, ClipboardCheck, Search, FileText, BarChart3, Building2,
   PlusCircle, Briefcase, Star, Shield, CheckCircle2, ClipboardList,
-  ChevronLeft, ChevronRight, X, Activity, Brain,
+  ChevronLeft, ChevronRight, X, Activity, Brain, ShieldCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
@@ -57,6 +57,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
     ngo: [
       { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
       { icon: ClipboardCheck, label: t('nav.assessment_hub'), href: '/assessments' },
+      { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
       { icon: Search, label: t('nav.browse_grants'), href: '/grants' },
       { icon: FileText, label: t('nav.my_applications'), href: '/applications' },
       { icon: BarChart3, label: t('nav.reports'), href: '/reports' },
@@ -69,6 +70,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
       { icon: Briefcase, label: t('nav.my_grants'), href: '/grants' },
       { icon: Star, label: t('nav.review_applications'), href: '/reviews' },
       { icon: BarChart3, label: t('nav.grant_reports'), href: '/reports' },
+      { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
       { icon: Shield, label: t('nav.compliance'), href: '/compliance' },
       { icon: Search, label: t('nav.org_search'), href: '/organizations/search' },
       { icon: CheckCircle2, label: t('nav.registration_checks'), href: '/verification' },
@@ -83,6 +85,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
       { icon: Briefcase, label: t('nav.all_grants'), href: '/grants' },
       { icon: FileText, label: t('nav.all_applications'), href: '/applications' },
       { icon: Search, label: t('nav.org_search'), href: '/organizations/search' },
+      { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
       { icon: CheckCircle2, label: t('nav.registration_checks'), href: '/verification' },
       { icon: Shield, label: t('nav.compliance'), href: '/compliance' },
       { icon: Activity, label: t('nav.observability'), href: '/observability' },

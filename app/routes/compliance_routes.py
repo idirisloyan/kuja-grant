@@ -23,10 +23,17 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
 
 from app.extensions import db
-from app.models import Organization, ComplianceCheck, RegistrationVerification, Document, Grant
+from app.models import (
+    Organization, ComplianceCheck, RegistrationVerification, Document, Grant,
+    AdverseMediaScreening, BankAccountVerification, CapacityPassport,
+)
 from app.services.compliance_service import ComplianceService
 from app.services.registry_service import RegistryService
 from app.services.ai_service import AIService
+from app.services.adverse_media_service import AdverseMediaService
+from app.services.bank_verification_service import BankVerificationService
+from app.services.trust_profile_service import TrustProfileService
+from app.services.capacity_passport_service import CapacityPassportService
 from app.utils.helpers import get_request_json
 from app.utils.decorators import role_required
 
@@ -423,3 +430,5 @@ def api_update_verification(verification_id):
         'success': True,
         'verification': verification.to_dict(),
     })
+
+

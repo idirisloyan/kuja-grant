@@ -16,6 +16,9 @@ from app.models.document import Document
 from app.models.review import Review
 from app.models.report import Report
 from app.models.compliance import ComplianceCheck, RegistrationVerification
+from app.models.adverse_media import AdverseMediaScreening
+from app.models.bank_verification import BankAccountVerification
+from app.models.capacity_passport import CapacityPassport
 from app.models.notification import Notification
 from app.models.ai_thread import AIThread, AIMessage, AICallLog
 from app.models.ai_provenance import AIProvenance
@@ -32,6 +35,7 @@ from app.models.push_subscription import PushSubscription
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
     'Document', 'Review', 'Report', 'ComplianceCheck', 'RegistrationVerification',
+    'AdverseMediaScreening', 'BankAccountVerification', 'CapacityPassport',
     'Notification',
     'AIThread', 'AIMessage', 'AICallLog', 'AIProvenance',
     'GrantQuestion', 'DiligenceItem',

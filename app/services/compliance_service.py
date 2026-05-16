@@ -108,7 +108,121 @@ class ComplianceService:
                         p_check['result']['entity_type'] = 'individual'
                         checks.append(p_check)
 
+                # PEP screening for personnel (independent of sanctions match)
+                pep_check = cls._check_pep(person_name, country)
+                if pep_check is not None:
+                    checks.append(pep_check)
+
         return checks
+
+    # --- PEP (Politically Exposed Persons) screening ---
+
+    @classmethod
+    def _check_pep(cls, person_name, country=None):
+        """Screen an individual against the OpenSanctions PEP collection.
+
+        Returns a check result dict, or None if the API is unavailable.
+
+        Why this is separate from the sanctions check above: PEP status
+        is not "bad" by itself — it's a "do enhanced due diligence" signal.
+        Conflating it with sanctions matches over-flags benign mentors,
+        board members, etc. By returning a distinct check_type='pep_screening'
+        the UI can render it with appropriate weight (amber, not red).
+        """
+        if not OPENSANCTIONS_API_KEY:
+            return None
+
+        cache_key = f"pep|{person_name}|{country}"
+        cached = _sanctions_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            headers = {
+                'Authorization': f'ApiKey {OPENSANCTIONS_API_KEY}',
+                'Content-Type': 'application/json',
+            }
+            query = {
+                'schema': 'Person',
+                'properties': {'name': [person_name]},
+            }
+            if country:
+                query['properties']['country'] = [country]
+            payload = {'queries': {'q1': query}}
+
+            # Query the PEPs collection specifically (separate from sanctions)
+            resp = requests.post(
+                'https://api.opensanctions.org/match/peps',
+                json=payload,
+                headers=headers,
+                timeout=15,
+            )
+
+            if resp.status_code != 200:
+                logger.warning(
+                    f"OpenSanctions PEP API HTTP {resp.status_code} for '{person_name}': "
+                    f"{resp.text[:200]}"
+                )
+                return None
+
+            envelope = resp.json()
+            inner = (envelope.get('responses') or {}).get('q1') or {}
+            results = inner.get('results', []) or []
+
+            # Filter to high-confidence matches with PEP topics
+            pep_hits = []
+            for m in results[:5]:
+                score = m.get('score', 0)
+                topics = m.get('properties', {}).get('topics', []) or []
+                is_pep = any('role.pep' in str(t) or 'role.rca' in str(t) for t in topics)
+                if score >= 0.6 and (is_pep or m.get('datasets')):
+                    pep_hits.append({
+                        'matched_name': m.get('caption', ''),
+                        'score': int(score * 100),
+                        'topics': topics,
+                        'positions': m.get('properties', {}).get('position', []) or [],
+                        'countries': m.get('properties', {}).get('country', []) or [],
+                        'datasets': m.get('datasets', []),
+                    })
+
+            if pep_hits:
+                check = {
+                    'check_type': 'pep_screening',
+                    'status': 'flagged',
+                    'result': {
+                        'entity': person_name,
+                        'entity_type': 'individual',
+                        'list': 'OpenSanctions PEPs collection (Politically Exposed Persons)',
+                        'reason': (
+                            f'{len(pep_hits)} potential PEP match(es) found for {person_name}. '
+                            'Enhanced due diligence is recommended; PEP status itself is not disqualifying.'
+                        ),
+                        'matches': pep_hits,
+                        'action_required': 'Enhanced due diligence (EDD) and source-of-funds documentation',
+                        'source': 'opensanctions_peps',
+                        'records_searched': inner.get('total', {}).get('value', 0),
+                    },
+                }
+            else:
+                check = {
+                    'check_type': 'pep_screening',
+                    'status': 'clear',
+                    'result': {
+                        'entity': person_name,
+                        'list': 'OpenSanctions PEPs collection',
+                        'match_score': 0,
+                        'message': f'No PEP matches found for {person_name}.',
+                        'source': 'opensanctions_peps',
+                        'records_searched': inner.get('total', {}).get('value', 0),
+                    },
+                }
+
+            _sanctions_cache.set(cache_key, check)
+            return check
+
+        except Exception as e:
+            logger.warning(f"PEP screening failed for '{person_name}': {e}")
+            return None
 
     # --- OpenSanctions API (Primary) ---
 

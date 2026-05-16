@@ -1933,5 +1933,6 @@
   "reviewer_actions.completed": "zimekamilika",
   "reviewer_actions.overdue_due": "Imepitwa (inakomma {date})",
   "common.copied": "Imenakiliwa",
-  "common.copy": "Nakili"
+  "common.copy": "Nakili",
+  "nav.trust_profile": "Wasifu wa Uaminifu"
 }

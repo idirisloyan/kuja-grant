@@ -738,6 +738,90 @@ def make_tests(base):
     # =========================================================================
     # ENDPOINT SCAN: No 500 errors on any critical API endpoint
     # =========================================================================
+    # --- Phase 1: Trust Profile / Adverse Media / Bank / Passport ---
+
+    def test_trust_profile_shape():
+        """Trust Profile returns the two-pillar synthesis shape."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/trust-profile/1",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"Trust profile: {r.status_code}: {r.text[:200]}"
+        data = r.json()
+        prof = data.get("profile") or {}
+        assert "overall" in prof, "Missing overall pillar"
+        assert "capacity" in prof, "Missing capacity pillar"
+        assert "diligence" in prof, "Missing diligence pillar"
+        cap = prof["capacity"]
+        assert "score" in cap and "breakdown" in cap, "Capacity pillar incomplete"
+        dil = prof["diligence"]
+        assert "score" in dil and "breakdown" in dil, "Diligence pillar incomplete"
+        # Diligence breakdown should include all 6 sub-components
+        keys = {c.get("key") for c in dil.get("breakdown", [])}
+        for k in ("registration", "sanctions", "pep", "adverse_media", "bank", "ownership"):
+            assert k in keys, f"Diligence pillar missing key: {k}"
+    tests.append(("TRUST-001: Trust profile returns two-pillar synthesis", test_trust_profile_shape))
+
+    def test_bank_verification_iban_checksum():
+        """Bank verification IBAN checksum catches typo."""
+        s = login_ok(base, USERS["ngo"])
+        # Get NGO's org_id
+        me = s.get(f"{base}/api/auth/me",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        org_id = me.get("user", {}).get("org_id") or me.get("org_id")
+        if not org_id:
+            return  # Skip if we can't resolve
+        # Bad IBAN (checksum fails)
+        r = s.post(f"{base}/api/bank-verification/verify",
+                   json={"org_id": org_id,
+                         "bank_name": "Test Bank",
+                         "bank_country": "KE",
+                         "iban": "KE00ABCD1234567890123456",
+                         "currency": "KES"},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"Bank verify: {r.status_code}: {r.text[:200]}"
+        verif = r.json().get("verification", {})
+        findings = verif.get("findings", [])
+        codes = {f.get("code") for f in findings}
+        assert "iban_checksum_failed" in codes, (
+            f"IBAN checksum should fail on bad input. Got codes: {codes}"
+        )
+    tests.append(("BANK-001: IBAN checksum catches typo", test_bank_verification_iban_checksum))
+
+    def test_adverse_media_list_empty():
+        """Adverse media list endpoint returns empty list for new org (200, not 500)."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/adverse-media/1",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"Adverse media list: {r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert "screenings" in data, "Missing screenings field"
+        assert isinstance(data["screenings"], list), "Screenings not a list"
+    tests.append(("ADVERSE-001: Adverse media list returns 200 with empty list", test_adverse_media_list_empty))
+
+    def test_passport_list_empty():
+        """Passport list endpoint returns empty list for new org (200, not 500)."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/passport/1",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"Passport list: {r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert "passports" in data, "Missing passports field"
+        assert isinstance(data["passports"], list), "Passports not a list"
+    tests.append(("PASSPORT-001: Passport list returns 200 with empty list", test_passport_list_empty))
+
+    def test_passport_verify_bad_token():
+        """Public passport verify endpoint refuses bad token (not 500)."""
+        # No auth needed — public endpoint
+        r = requests.get(f"{base}/api/passport/verify/nonexistent-slug?t=bad",
+                         headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code in (403, 404), (
+            f"Bad passport verify should be 403/404, got {r.status_code}: {r.text[:200]}"
+        )
+        data = r.json()
+        assert data.get("verified") is False, "verified field should be false"
+    tests.append(("PASSPORT-002: Verify endpoint refuses bad slug/token", test_passport_verify_bad_token))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [
@@ -757,6 +841,11 @@ def make_tests(base):
             ("GET", "/api/admin/canary", "admin"),
             ("GET", "/api/auth/me", "ngo"),
             ("GET", "/api/dashboard/stats", "donor"),
+            # Phase 1 (truth-in-claims) — trust profile, adverse media, bank, passport
+            ("GET", "/api/trust-profile/1", "donor"),
+            ("GET", "/api/adverse-media/1", "donor"),
+            ("GET", "/api/bank-verification/1", "donor"),
+            ("GET", "/api/passport/1", "donor"),
         ]
         errors_500 = []
         for method, path, role in endpoints:
