@@ -2217,6 +2217,31 @@ def make_tests(base):
                        "X-Requested-With": "XMLHttpRequest"}, timeout=15)
     tests.append(("PHASE22D-001: Digest cadence GET+PUT lifecycle", test_phase22d_digest_cadence_lifecycle))
 
+    def test_phase23b_portfolio_risk_heatmap_shape():
+        """PHASE23B-001: donor portfolio risk heatmap returns shaped JSON."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/dashboard/portfolio-risk-heatmap",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        for k in ("sectors", "countries", "cells", "total_grants"):
+            assert k in data, f"heatmap missing {k}: {list(data.keys())}"
+        assert isinstance(data["cells"], list)
+        for c in data["cells"][:3]:
+            for k in ("sector", "country", "n_grants", "n_open_risks",
+                      "n_overdue_reports", "n_flagged_apps", "risk_score"):
+                assert k in c, f"cell missing {k}: {list(c.keys())}"
+    tests.append(("PHASE23B-001: Portfolio risk heatmap returns shape", test_phase23b_portfolio_risk_heatmap_shape))
+
+    def test_phase23b_heatmap_forbidden_for_ngo():
+        """PHASE23B-002: NGO cannot fetch donor portfolio risk heatmap."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/dashboard/portfolio-risk-heatmap",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 403, f"expected 403, got {r.status_code}"
+    tests.append(("PHASE23B-002: Heatmap forbidden for NGO", test_phase23b_heatmap_forbidden_for_ngo))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [
@@ -2329,6 +2354,8 @@ def make_tests(base):
             ("GET", "/api/documents/search/global?q=health", "ngo"),
             ("GET", "/api/documents/search/global?q=health", "donor"),
             ("GET", "/api/notification-preferences/digest-cadence", "ngo"),
+            # Phase 23 (portfolio risk heatmap)
+            ("GET", "/api/dashboard/portfolio-risk-heatmap", "donor"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

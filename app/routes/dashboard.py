@@ -6,7 +6,7 @@ SQL aggregates for averages/sums, eager loading for recent items,
 and a 30-second per-user cache.
 """
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from sqlalchemy import func
 
@@ -470,6 +470,39 @@ def api_dashboard_benchmarks():
         return jsonify(result)
 
     return jsonify({'success': False, 'error': 'Role not supported'}), 403
+
+
+# ----------------------------------------------------------------------
+# Phase 23B — Donor portfolio risk heatmap (sector × country grid)
+# ----------------------------------------------------------------------
+
+@dashboard_bp.route('/portfolio-risk-heatmap', methods=['GET'])
+@login_required
+def api_portfolio_risk_heatmap():
+    from app.services.portfolio_risk_heatmap_service import PortfolioRiskHeatmapService
+
+    if current_user.role == 'donor':
+        if not current_user.org_id:
+            return jsonify({'success': False, 'error': 'Donor org required'}), 400
+        donor_id = current_user.org_id
+    elif current_user.role == 'admin':
+        raw = request.args.get('donor_org_id')
+        if not raw:
+            return jsonify({'success': False, 'error': 'admin must pass donor_org_id'}), 400
+        try:
+            donor_id = int(raw)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'donor_org_id must be int'}), 400
+    else:
+        return jsonify({'success': False, 'error': 'Role not supported'}), 403
+
+    cache_key = f'portfolio_risk_heatmap_{donor_id}'
+    cached = _dashboard_cache.get(cache_key)
+    if cached is not None:
+        return jsonify({'cached': True, **cached})
+    result = PortfolioRiskHeatmapService.for_donor(donor_org_id=donor_id)
+    _dashboard_cache.set(cache_key, result)
+    return jsonify(result)
 
 
 # ----------------------------------------------------------------------

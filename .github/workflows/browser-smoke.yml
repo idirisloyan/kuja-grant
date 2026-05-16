@@ -1,0 +1,79 @@
+name: Browser smoke tests
+
+# Phase 23C — runs the Playwright browser_test.py suite on every push +
+# PR against an in-process Flask + SQLite. Captures the screenshots
+# and HTML on failure so triage is fast.
+#
+# Why separate from the Python smoke workflow:
+#   - Playwright + Chromium installation adds ~2 min to setup
+#   - Only PRs that touch frontend/* or app/* need the heavier check
+#   - Skipping on docs/markdown-only commits keeps CI fast
+#
+# The browser_test.py harness already starts an in-process Flask app on
+# its own port (--local), so we don't need to spin up a separate
+# webserver service container.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/src/**"
+      - "frontend/public/**"
+      - "static/nextjs/**"
+      - "app/**"
+      - "browser_test.py"
+      - ".github/workflows/browser-smoke.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/src/**"
+      - "frontend/public/**"
+      - "static/nextjs/**"
+      - "app/**"
+      - "browser_test.py"
+      - ".github/workflows/browser-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install backend deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # Playwright pin matches the version in browser_test.py
+          pip install "playwright>=1.40,<2.0"
+
+      - name: Install Chromium for Playwright
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run browser smoke suite (in-process Flask + SQLite)
+        env:
+          FLASK_ENV: testing
+          # Fake key so AI calls degrade gracefully — the harness asserts
+          # that AI surfaces return shape, not specific content.
+          ANTHROPIC_API_KEY: "ci-fake-key"
+        run: |
+          python browser_test.py --local
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-screenshots
+          path: |
+            test-results/
+            screenshots/
+            *.png
+          if-no-files-found: ignore
+          retention-days: 7

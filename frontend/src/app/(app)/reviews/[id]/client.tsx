@@ -739,6 +739,57 @@ export default function ReviewDetailClient() {
                     </div>
                   )}
 
+                  {/* Phase 23A — NGO response inline (collapsible). Reviewer
+                      sees what they're scoring without flipping tabs. */}
+                  {responses[c.key] && (
+                    <details
+                      className="rounded-md border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--kuja-sand))]/30 p-2"
+                      open
+                    >
+                      <summary className="text-[11px] uppercase tracking-wide font-semibold text-muted-foreground cursor-pointer flex items-center gap-1.5">
+                        <MessageSquare className="h-3 w-3" />
+                        NGO response · {(responses[c.key] || '').trim().split(/\s+/).filter(Boolean).length} words
+                      </summary>
+                      <p className="mt-1.5 text-sm whitespace-pre-wrap leading-relaxed text-foreground max-h-64 overflow-y-auto">
+                        {responses[c.key]}
+                      </p>
+                      {evidence && (evidence.supports.length > 0 || evidence.contradicts.length > 0) && (
+                        <div className="mt-2 space-y-1.5 border-t border-dashed border-[hsl(var(--border))] pt-1.5">
+                          {evidence.supports.length > 0 && (
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wide font-semibold text-[hsl(var(--kuja-grow))]">
+                                AI: supports
+                              </div>
+                              <ul className="space-y-0.5 mt-0.5">
+                                {evidence.supports.slice(0, 2).map((q, i) => (
+                                  <li key={i} className="text-[11px] text-muted-foreground">
+                                    “{q.quote.slice(0, 160)}{q.quote.length > 160 ? '…' : ''}”
+                                    {q.why && <span className="text-[10px] block ml-2 italic">why: {q.why}</span>}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {evidence.contradicts.length > 0 && (
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wide font-semibold text-[hsl(var(--kuja-flag))]">
+                                AI: contradicts
+                              </div>
+                              <ul className="space-y-0.5 mt-0.5">
+                                {evidence.contradicts.slice(0, 2).map((q, i) => (
+                                  <li key={i} className="text-[11px] text-muted-foreground">
+                                    “{q.quote.slice(0, 160)}{q.quote.length > 160 ? '…' : ''}”
+                                    {q.why && <span className="text-[10px] block ml-2 italic">why: {q.why}</span>}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </details>
+                  )}
+
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
                       <div className="kuja-label text-[10px] mb-1">{t('review.detail.score_label')}</div>

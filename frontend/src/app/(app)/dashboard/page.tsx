@@ -36,6 +36,7 @@ import { PeerBenchmarksCard } from '@/components/dashboards/peer-benchmarks-card
 import { ReviewerThroughputCard } from '@/components/dashboards/reviewer-throughput-card';
 import { OnboardingChecklist } from '@/components/dashboards/onboarding-checklist';
 import { OrgMergeTool } from '@/components/dashboards/org-merge-tool';
+import { PortfolioRiskHeatmap } from '@/components/dashboards/portfolio-risk-heatmap';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -98,6 +99,8 @@ export default function DashboardPage() {
           <DebriefRollupCard />
           {/* Phase 16B — anonymous comparison vs peer donors */}
           <PeerBenchmarksCard />
+          {/* Phase 23B — sector × country risk concentration heatmap */}
+          <PortfolioRiskHeatmap />
           {/* Phase 13.29 — donor action queue (analog of ThisWeekHome).
               Renders above the existing command center so the donor sees
               "what do I do next?" before "what's the state?" */}
