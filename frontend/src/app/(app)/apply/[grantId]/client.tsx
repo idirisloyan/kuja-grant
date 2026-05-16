@@ -10,6 +10,7 @@ import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
+import { SubmissionVelocityBar } from '@/components/apply/submission-velocity-bar';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
 import { PreviewAsReviewer } from '@/components/apply/PreviewAsReviewer';
 import { SubmissionReadiness } from '@/components/apply/SubmissionReadiness';
@@ -779,7 +780,21 @@ export default function ApplyWizardClient() {
         />
       )}
       {step === 1 && (
-        <ProposalStep
+        <>
+          {/* Phase 18D — submission velocity bar (zero AI cost, pure word counting) */}
+          <SubmissionVelocityBar
+            criteria={criteria}
+            responses={responses}
+            onJumpToCriterion={(key) => {
+              const el = document.getElementById(`criterion-${key}`);
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const textarea = el.querySelector('textarea');
+                if (textarea) (textarea as HTMLTextAreaElement).focus();
+              }
+            }}
+          />
+          <ProposalStep
           grantId={grantId}
           applicationId={applicationId}
           criteria={criteria}
@@ -805,6 +820,7 @@ export default function ApplyWizardClient() {
             setResponses((prev) => ({ ...prev, ...newResponses }));
           }}
         />
+        </>
       )}
       {step === 2 && (
         <DocumentsStep
@@ -1084,7 +1100,8 @@ function ProposalStep({
         const wcCls = wordCountColor(wc, c.max_words);
 
         return (
-          <Card key={c.key} className="p-5">
+          <div key={c.key} id={`criterion-${c.key}`}>
+          <Card className="p-5">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="flex-1">
                 <div className="text-sm font-semibold text-foreground">{c.label}</div>
@@ -1267,6 +1284,7 @@ function ProposalStep({
               </div>
             )}
           </Card>
+          </div>
         );
       })}
     </div>

@@ -346,7 +346,17 @@ export default function GrantsPage() {
                     <h3 className="font-semibold text-base text-foreground line-clamp-2">{grant.title}</h3>
                     <div className="flex items-center gap-2 mt-0.5">
                       {grant.donor_org_name && (
-                        <p className="text-xs text-muted-foreground">{grant.donor_org_name}</p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (grant.donor_org_id) router.push(`/donors/${grant.donor_org_id}`);
+                          }}
+                          className="text-xs text-muted-foreground hover:text-[hsl(var(--kuja-clay))] hover:underline"
+                          aria-label={`View donor profile for ${grant.donor_org_name}`}
+                        >
+                          {grant.donor_org_name}
+                        </button>
                       )}
                       {/* PMO-transfer: last-touched chip at-a-glance staleness */}
                       <RecencyChip iso={grant.updated_at || grant.created_at} />

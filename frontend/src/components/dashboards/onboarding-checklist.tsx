@@ -48,7 +48,7 @@ export function OnboardingChecklist() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || user.role !== 'ngo') return;
+    if (!user || (user.role !== 'ngo' && user.role !== 'donor')) return;
     let cancelled = false;
     api.get<OnboardingResp>('/api/dashboard/onboarding')
       .then((r) => { if (!cancelled) setData(r); })
@@ -57,7 +57,7 @@ export function OnboardingChecklist() {
     return () => { cancelled = true; };
   }, [user]);
 
-  if (!user || user.role !== 'ngo') return null;
+  if (!user || (user.role !== 'ngo' && user.role !== 'donor')) return null;
 
   if (loading) {
     return (

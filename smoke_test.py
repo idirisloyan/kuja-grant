@@ -1683,15 +1683,16 @@ def make_tests(base):
                 assert k in s_, f"step missing {k}: {s_}"
     tests.append(("PHASE17B-001: NGO onboarding shape", test_phase17b_onboarding_shape))
 
-    def test_phase17b_onboarding_donor_skipped():
-        """PHASE17B-002: donor hitting onboarding returns success=False with reason."""
-        s = login_ok(base, USERS["donor"])
+    def test_phase17b_onboarding_reviewer_skipped():
+        """PHASE17B-002: reviewer (not NGO or donor) gets success=False with reason.
+        (Updated in Phase 18C — donors now ALSO get an onboarding checklist.)"""
+        s = login_ok(base, USERS["reviewer"])
         r = s.get(f"{base}/api/dashboard/onboarding",
                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
         assert r.status_code == 200
         data = r.json()
-        assert data.get("success") is False, "donors shouldn't get onboarding payload"
-    tests.append(("PHASE17B-002: Donor onboarding correctly skipped", test_phase17b_onboarding_donor_skipped))
+        assert data.get("success") is False, "reviewers shouldn't get onboarding payload"
+    tests.append(("PHASE17B-002: Reviewer onboarding correctly skipped", test_phase17b_onboarding_reviewer_skipped))
 
     def test_phase17c_fit_compare_validates():
         """PHASE17C-001: fit-compare requires 2-4 grant ids."""
@@ -1736,6 +1737,74 @@ def make_tests(base):
                             "X-Requested-With": "XMLHttpRequest"}, timeout=15)
         assert r.status_code == 403, f"expected 403, got {r.status_code}"
     tests.append(("PHASE17D-002: Merge forbidden for non-admin", test_phase17d_org_merge_forbidden_for_non_admin))
+
+    def test_phase18a_trust_gap_insights_shape():
+        """PHASE18A-001: trust-profile gap-insights returns shaped JSON."""
+        # NGO viewing their own org
+        s = login_ok(base, USERS["ngo"])
+        me = s.get(f"{base}/api/auth/me",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        org_id = (me.get("user") or {}).get("org_id")
+        if not org_id:
+            return  # NGO without org — skip
+        r = s.get(f"{base}/api/trust-profile/{org_id}/gap-insights",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=30)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert "source" in data
+        assert data["source"] in ("ai", "unavailable")
+        if data["source"] == "ai":
+            assert "actions" in data and isinstance(data["actions"], list)
+            assert "total_estimated_lift" in data
+    tests.append(("PHASE18A-001: Trust gap insights returns shape", test_phase18a_trust_gap_insights_shape))
+
+    def test_phase18a_gap_insights_cross_org_forbidden():
+        """PHASE18A-002: NGO cannot view another org's gap insights."""
+        s = login_ok(base, USERS["ngo"])
+        # Pick an org id that definitely isn't theirs (donor org)
+        r = s.get(f"{base}/api/trust-profile/999999/gap-insights",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        # Either 404 (org doesn't exist) or 403 (cross-org block)
+        assert r.status_code in (403, 404), f"{r.status_code}: {r.text[:200]}"
+    tests.append(("PHASE18A-002: Cross-org gap insights blocked", test_phase18a_gap_insights_cross_org_forbidden))
+
+    def test_phase18b_donor_profile_shape():
+        """PHASE18B-001: donor profile endpoint returns shaped JSON."""
+        s = login_ok(base, USERS["ngo"])
+        # Find a donor org id by listing (note: query param is `type`, not `org_type`)
+        orgs = s.get(f"{base}/api/organizations/?type=donor&per_page=5",
+                     headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15).json()
+        donors = orgs.get("organizations") or []
+        if not donors:
+            return
+        donor_id = donors[0]["id"]
+        r = s.get(f"{base}/api/organizations/{donor_id}/donor-profile",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True, f"profile not success: {data}"
+        for k in ("donor_name", "portfolio_size", "open_grant_count",
+                  "active_sectors", "active_countries", "source"):
+            assert k in data, f"profile missing {k}: {list(data.keys())}"
+        assert data["source"] in ("profile", "sparse")
+    tests.append(("PHASE18B-001: Donor profile returns shape", test_phase18b_donor_profile_shape))
+
+    def test_phase18c_donor_onboarding_shape():
+        """PHASE18C-001: donor onboarding endpoint now returns checklist (not skipped)."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/dashboard/onboarding",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        if not data.get("success"):
+            # donor with no org_id — accept reason
+            assert "reason" in data
+            return
+        assert "steps" in data and len(data["steps"]) == 3
+        for s_ in data["steps"]:
+            for k in ("id", "label", "done", "href"):
+                assert k in s_, f"step missing {k}: {s_}"
+    tests.append(("PHASE18C-001: Donor onboarding shape", test_phase18c_donor_onboarding_shape))
 
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
@@ -1823,6 +1892,10 @@ def make_tests(base):
             # Phase 17 (onboarding + fit compare + merge route registration)
             ("GET", "/api/dashboard/onboarding", "ngo"),
             ("GET", "/api/dashboard/onboarding", "donor"),
+            # Phase 18 (trust gap insights + donor profile)
+            ("GET", "/api/trust-profile/1/gap-insights", "donor"),
+            ("GET", "/api/organizations/1/donor-profile", "ngo"),
+            ("GET", "/api/organizations/1/donor-profile", "donor"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

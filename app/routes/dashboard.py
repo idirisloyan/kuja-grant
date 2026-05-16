@@ -479,16 +479,19 @@ def api_dashboard_benchmarks():
 @dashboard_bp.route('/onboarding', methods=['GET'])
 @login_required
 def api_dashboard_onboarding():
-    if current_user.role != 'ngo':
-        return jsonify({'success': False, 'reason': 'not_ngo'})
+    if current_user.role not in ('ngo', 'donor'):
+        return jsonify({'success': False, 'reason': 'role_not_supported'})
     if not current_user.org_id:
         return jsonify({'success': False, 'reason': 'no_org'})
     from app.services.onboarding_service import OnboardingService
-    cache_key = f'onboarding_ngo_{current_user.org_id}'
+    cache_key = f'onboarding_{current_user.role}_{current_user.org_id}'
     cached = _dashboard_cache.get(cache_key)
     if cached is not None:
         return jsonify({'cached': True, **cached})
-    result = OnboardingService.for_ngo(ngo_org_id=current_user.org_id)
+    if current_user.role == 'ngo':
+        result = OnboardingService.for_ngo(ngo_org_id=current_user.org_id)
+    else:
+        result = OnboardingService.for_donor(donor_org_id=current_user.org_id)
     _dashboard_cache.set(cache_key, result)
     return jsonify(result)
 

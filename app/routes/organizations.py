@@ -103,6 +103,27 @@ def api_org_settings_get(org_id):
     })
 
 
+# ----------------------------------------------------------------------
+# Phase 18B — Public donor profile aggregates.
+# Visible to any logged-in user. Aggregates only — never names specific
+# NGOs that won/lost.
+# ----------------------------------------------------------------------
+
+@organizations_bp.route('/<int:org_id>/donor-profile', methods=['GET'])
+@login_required
+def api_donor_profile(org_id):
+    from app.services.donor_profile_service import DonorProfileService
+    from app.utils.cache import _dashboard_cache
+
+    cache_key = f'donor_profile_{org_id}'
+    cached = _dashboard_cache.get(cache_key)
+    if cached is not None:
+        return jsonify({'cached': True, **cached})
+    result = DonorProfileService.for_donor(donor_org_id=org_id)
+    _dashboard_cache.set(cache_key, result)
+    return jsonify(result)
+
+
 _ALLOWED_STAGE_KEYS = ('draft', 'submitted', 'under_review',
                        'scored', 'awarded', 'rejected')
 

@@ -1760,6 +1760,54 @@ def test_24_3_admin_dashboard_merge_tool(page, ctx):
 
 
 # ===========================================================================
+# Phase 18 — trust gap insights + donor profiles + donor onboarding
+# ===========================================================================
+
+def test_25_1_trust_page_gap_card_or_quiet(page, ctx):
+    """25.1 NGO trust page either shows gap insights card or is quiet — never errors."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    page.goto(f"{ctx['base']}/trust", wait_until="networkidle")
+    page.wait_for_timeout(5000)   # allow AI fetch
+    body = get_page_text(page)
+    assert "Trust Profile" in body or "trust" in body.lower(), \
+        f"trust page didn't render: {body[:300]}"
+
+def test_25_2_donor_profile_page_renders(page, ctx):
+    """25.2 /donors/<id> route serves the donor profile page."""
+    login_as(page, ctx["base"], USERS["ngo"])
+    # Discover a donor id from organizations search if possible
+    # Otherwise hit a known donor (sarah's org). We'll try Amani's donor field.
+    page.goto(f"{ctx['base']}/grants", wait_until="networkidle")
+    page.wait_for_timeout(2500)
+    # Click first donor org name link if present
+    donor_links = page.locator('button[aria-label^="View donor profile"]')
+    if donor_links.count() == 0:
+        # No donor org_id wired on cards — just verify the route loads with id=0
+        page.goto(f"{ctx['base']}/donors/0", wait_until="networkidle")
+        page.wait_for_timeout(2000)
+        body = get_page_text(page)
+        # Should show "not found" gracefully, never 500
+        assert len(body) > 50, "donors page didn't render at all"
+        return
+    donor_links.first.click()
+    page.wait_for_timeout(3000)
+    body = get_page_text(page)
+    has = any(w in body for w in [
+        "Portfolio snapshot", "Decision speed", "Active sectors", "Decline rate",
+    ])
+    assert has, f"donor profile page didn't render expected sections: {body[:500]}"
+
+def test_25_3_donor_onboarding_card(page, ctx):
+    """25.3 Donor dashboard exposes onboarding checklist OR hides it cleanly when activated."""
+    login_as(page, ctx["base"], USERS["donor"])
+    page.goto(f"{ctx['base']}/dashboard", wait_until="networkidle")
+    page.wait_for_timeout(4000)
+    body = get_page_text(page)
+    # Donor dashboard should render meaningful content either way
+    assert len(body) > 200, "donor dashboard too thin"
+
+
+# ===========================================================================
 # Main
 # ===========================================================================
 
@@ -1950,6 +1998,11 @@ def main():
                 ("24.1 NGO onboarding renders or is hidden", test_24_1_ngo_onboarding_card_or_hidden),
                 ("24.2 Grants list shows Compare fit button", test_24_2_grants_compare_fit_button),
                 ("24.3 Admin dashboard shows donor merge tool", test_24_3_admin_dashboard_merge_tool),
+            ]),
+            ("25. PHASE 18 GAP INSIGHTS + DONOR PROFILES + DONOR ONBOARDING", [
+                ("25.1 Trust page gap insights card or quiet", test_25_1_trust_page_gap_card_or_quiet),
+                ("25.2 Donor profile page renders", test_25_2_donor_profile_page_renders),
+                ("25.3 Donor dashboard healthy", test_25_3_donor_onboarding_card),
             ]),
         ]
 

@@ -91,6 +91,77 @@ class OnboardingService:
             'next_step': next_step,
         }
 
+    @classmethod
+    def for_donor(cls, *, donor_org_id: int) -> dict:
+        """Phase 18C — symmetric checklist for new donor orgs.
+
+        Steps:
+          1. Org profile (mission + country)
+          2. First grant published (status='open' ever)
+          3. First decided application (awarded or rejected with debrief)
+        """
+        from app.models import Grant, Application
+
+        org = db.session.get(Organization, donor_org_id)
+        if not org or org.org_type != 'donor':
+            return {'success': False, 'reason': 'not_donor'}
+
+        # Step 1 — profile
+        profile_done = bool(org.mission and org.country)
+
+        # Step 2 — first grant published
+        first_grant = (
+            Grant.query.filter(Grant.donor_org_id == donor_org_id)
+            .filter(Grant.status.in_(('open', 'closed', 'awarded')))
+            .first()
+        )
+
+        # Step 3 — first decision with debrief (closes the learning loop)
+        first_decided = (
+            Application.query.join(Grant)
+            .filter(Grant.donor_org_id == donor_org_id)
+            .filter(Application.status.in_(('awarded', 'rejected')))
+            .filter(Application.decision_reason_code.isnot(None))
+            .first()
+        )
+
+        steps = [
+            {
+                'id': 'profile',
+                'label': 'Complete your donor profile',
+                'caption': 'Mission + country so NGOs can research before applying.',
+                'done': bool(profile_done),
+                'href': '/organizations/profile',
+            },
+            {
+                'id': 'first_grant',
+                'label': 'Publish your first grant',
+                'caption': 'Use the wizard — AI scaffolds eligibility, criteria, and reporting.',
+                'done': bool(first_grant),
+                'href': '/grants/new',
+            },
+            {
+                'id': 'first_debrief',
+                'label': 'Record your first win/loss debrief',
+                'caption': 'Structured feedback on any awarded or declined application.',
+                'done': bool(first_decided),
+                'href': '/applications',
+            },
+        ]
+        done_count = sum(1 for s in steps if s['done'])
+        all_done = done_count == len(steps)
+        next_step = next((s for s in steps if not s['done']), None)
+
+        return {
+            'success': True,
+            'donor_org_id': donor_org_id,
+            'steps': steps,
+            'done_count': done_count,
+            'total_count': len(steps),
+            'all_done': all_done,
+            'next_step': next_step,
+        }
+
     @staticmethod
     def _profile_complete(org: Organization) -> bool:
         for f in REQUIRED_PROFILE_FIELDS:

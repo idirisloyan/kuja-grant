@@ -21,6 +21,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TrustProfileCard } from '@/components/trust/trust-profile-card';
+import { TrustGapInsightsCard } from '@/components/trust/trust-gap-insights-card';
 import { AdverseMediaPanel } from '@/components/trust/adverse-media-panel';
 import { BankVerificationPanel } from '@/components/trust/bank-verification-panel';
 import { CapacityPassportPanel } from '@/components/trust/capacity-passport-panel';
@@ -172,6 +173,10 @@ function TrustProfilePageInner() {
           showActions={canPublish || canRunScreenings}
         />
       )}
+
+      {/* Phase 18A — AI-narrated gap analysis. Renders below the trust
+          profile card for everyone with read access. */}
+      {profile && <TrustGapInsightsCard orgId={orgId} />}
 
       {/* Adverse Media */}
       <div id="am-panel">

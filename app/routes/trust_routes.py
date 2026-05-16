@@ -55,6 +55,40 @@ def api_get_trust_profile(org_id):
     return jsonify({'success': True, 'profile': profile})
 
 
+@trust_bp.route('/trust-profile/<int:org_id>/gap-insights', methods=['GET'])
+@login_required
+def api_trust_gap_insights(org_id):
+    """Phase 18A — AI-narrated gap analysis on top of the trust profile.
+
+    Returns { gap_summary, total_estimated_lift, projected_overall,
+    actions[{ title, detail, target_component, estimated_pillar,
+    estimated_lift_points, effort }] } cached 30 minutes.
+
+    Visibility:
+      - NGO can read their own org
+      - donor / reviewer / admin can read any (it's a review surface)
+    """
+    from app.services.trust_gap_insights_service import TrustGapInsightsService
+    from app.utils.cache import _dashboard_cache
+
+    org = db.session.get(Organization, org_id)
+    if not org:
+        return jsonify({'success': False, 'error': 'Org not found'}), 404
+
+    # Access check
+    if current_user.role == 'ngo' and org.id != current_user.org_id:
+        return jsonify({'success': False, 'error': 'Insufficient permissions'}), 403
+
+    cache_key = f'trust_gap_{org_id}'
+    cached = _dashboard_cache.get(cache_key)
+    if cached is not None:
+        return jsonify({'cached': True, **cached})
+
+    result = TrustGapInsightsService.for_ngo(ngo_org_id=org_id)
+    _dashboard_cache.set(cache_key, result)
+    return jsonify(result)
+
+
 # =============================================================================
 # ADVERSE MEDIA SCREENING
 # =============================================================================

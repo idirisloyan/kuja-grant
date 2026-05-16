@@ -85,6 +85,8 @@ export default function DashboardPage() {
 
       {user.role === 'donor' && (
         <>
+          {/* Phase 18C — donor onboarding checklist (auto-hides once activated). */}
+          <OnboardingChecklist />
           {/* Phase 3 — AI Pre-emption Watch above the action queue.
               "Here's what's likely to slip before it slips." */}
           <PreemptionWatchCard scope="me" />
