@@ -1,0 +1,40 @@
+name: Smoke tests
+
+# Phase 16D — run the Python smoke suite on every push / PR so
+# backend regressions are caught before deploy. Browser tests
+# (browser_test.py / Playwright) are NOT run here yet — they require a
+# fully-built frontend and Chromium; follow-up workflow can add that.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install backend deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run smoke suite (boots in-process Flask + SQLite)
+        env:
+          FLASK_ENV: testing
+          # Use a fake key so AI calls degrade gracefully in CI (the
+          # AI service catches missing keys + returns None).
+          ANTHROPIC_API_KEY: "ci-fake-key"
+        run: |
+          python smoke_test.py

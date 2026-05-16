@@ -1,0 +1,89 @@
+name: UAT fixtures cron
+
+# Phase 16D — daily cron that calls /api/cron/uat-fixtures on prod so
+# demo state stays meaningful even when the team doesn't manually
+# trigger. Idempotent: the endpoint internally skips fixtures that are
+# already in good shape and reports drift via the response payload.
+#
+# Required repo secrets:
+#   CRON_SECRET — must match the CRON_SECRET set on Railway
+#   PROD_BASE   — defaults to the kuja prod URL if unset
+
+on:
+  # Daily at 03:15 UTC. Picked to avoid donor/NGO working-hours traffic
+  # in EAT (GMT+3) so the cron doesn't compete for AI quota.
+  schedule:
+    - cron: "15 3 * * *"
+
+  # Manual trigger so the team can re-pin demo state on demand
+  # (e.g. right before a UAT session).
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Determine base URL
+        id: base
+        run: |
+          if [ -n "${{ secrets.PROD_BASE }}" ]; then
+            echo "url=${{ secrets.PROD_BASE }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://web-production-6f8a.up.railway.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: POST /api/cron/uat-fixtures
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET repo secret is missing"
+            exit 1
+          fi
+          http_code=$(curl -s -o /tmp/body.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            -d '{}' \
+            "${BASE_URL}/api/cron/uat-fixtures")
+          echo "HTTP ${http_code}"
+          cat /tmp/body.json || true
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::UAT fixture cron returned ${http_code}"
+            exit 1
+          fi
+
+      - name: Summarise to step output
+        if: always()
+        run: |
+          if [ -f /tmp/body.json ]; then
+            # Extract the counts for at-a-glance health in the run summary
+            python3 - <<'PY'
+          import json, os
+          with open('/tmp/body.json') as f:
+              try:
+                  d = json.load(f)
+              except Exception:
+                  print('Cron returned non-JSON body')
+                  raise SystemExit(0)
+          result = d.get('result') or {}
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if not summary:
+              print(json.dumps(result, indent=2))
+              raise SystemExit(0)
+          with open(summary, 'a') as out:
+              out.write('# UAT fixture cron run\n\n')
+              for section, value in result.items():
+                  if isinstance(value, dict):
+                      out.write(f'## {section}\n')
+                      for k, v in value.items():
+                          out.write(f'- **{k}**: {v}\n')
+                      out.write('\n')
+                  else:
+                      out.write(f'- **{section}**: {value}\n')
+          PY
+          fi

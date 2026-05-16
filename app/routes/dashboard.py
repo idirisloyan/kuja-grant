@@ -432,3 +432,74 @@ def _build_admin_stats():
     return stats
 
 
+# ----------------------------------------------------------------------
+# Phase 16B — Peer benchmarks (NGO vs same-country NGOs / donor vs donors)
+# ----------------------------------------------------------------------
+
+@dashboard_bp.route('/benchmarks', methods=['GET'])
+@login_required
+def api_dashboard_benchmarks():
+    """Anonymous comparison vs a relevant peer set. Cached 5 minutes.
+
+    Returns { source, peer_count, metrics: [{code, label, self_value,
+    peer_median, percentile, verdict, higher_is_better, unit}] }.
+    """
+    from app.services.peer_benchmark_service import PeerBenchmarkService
+
+    role = current_user.role
+    if role == 'ngo':
+        if not current_user.org_id:
+            return jsonify({'success': False, 'error': 'NGO org required'}), 400
+        cache_key = f'peer_bench_ngo_{current_user.org_id}'
+        cached = _dashboard_cache.get(cache_key)
+        if cached is not None:
+            return jsonify({'cached': True, **cached})
+        result = PeerBenchmarkService.for_ngo(ngo_org_id=current_user.org_id)
+        _dashboard_cache.set(cache_key, result)
+        return jsonify(result)
+
+    if role == 'donor':
+        if not current_user.org_id:
+            return jsonify({'success': False, 'error': 'Donor org required'}), 400
+        cache_key = f'peer_bench_donor_{current_user.org_id}'
+        cached = _dashboard_cache.get(cache_key)
+        if cached is not None:
+            return jsonify({'cached': True, **cached})
+        result = PeerBenchmarkService.for_donor(donor_org_id=current_user.org_id)
+        _dashboard_cache.set(cache_key, result)
+        return jsonify(result)
+
+    return jsonify({'success': False, 'error': 'Role not supported'}), 403
+
+
+# ----------------------------------------------------------------------
+# Phase 16E — Reviewer throughput / SLA dashboard.
+# Reviewer sees their own; admin can inspect any via ?reviewer_id=.
+# ----------------------------------------------------------------------
+
+@dashboard_bp.route('/reviewer-throughput', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_throughput():
+    from flask import request as _request
+    from app.services.reviewer_throughput_service import ReviewerThroughputService
+
+    if current_user.role == 'reviewer':
+        rid = current_user.id
+    elif current_user.role == 'admin':
+        raw = _request.args.get('reviewer_id')
+        if not raw:
+            return jsonify({'success': False, 'error': 'admin must pass reviewer_id'}), 400
+        try:
+            rid = int(raw)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'reviewer_id must be int'}), 400
+    else:
+        return jsonify({'success': False, 'error': 'Role not supported'}), 403
+
+    cache_key = f'reviewer_throughput_{rid}'
+    cached = _dashboard_cache.get(cache_key)
+    if cached is not None:
+        return jsonify({'cached': True, **cached})
+    result = ReviewerThroughputService.for_reviewer(reviewer_user_id=rid)
+    _dashboard_cache.set(cache_key, result)
+    return jsonify(result)

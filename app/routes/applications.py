@@ -478,6 +478,53 @@ def api_debrief_rollup():
     return jsonify({'success': False, 'error': 'Role not supported'}), 403
 
 
+@applications_bp.route('/debrief/insights', methods=['GET'])
+@login_required
+def api_debrief_insights():
+    """Phase 16A — AI-narrated insight on top of the debrief rollup.
+
+    Returns { narrative, recommended_actions[], source } where source
+    is one of 'ai' | 'sparse' | 'unavailable'. Cached 10 minutes per
+    (role, org, lookback) since the underlying rollup is rarely changing.
+    """
+    from app.services.debrief_insights_service import DebriefInsightsService
+    from app.utils.cache import _dashboard_cache
+
+    try:
+        days = max(30, min(730, int(request.args.get('days', 365))))
+    except (TypeError, ValueError):
+        days = 365
+
+    role = current_user.role
+    if role == 'ngo':
+        if not current_user.org_id:
+            return jsonify({'success': False, 'error': 'NGO org required'}), 400
+        cache_key = f'debrief_insights_ngo_{current_user.org_id}_{days}'
+        cached = _dashboard_cache.get(cache_key)
+        if cached is not None:
+            return jsonify({'cached': True, **cached})
+        result = DebriefInsightsService.for_ngo(
+            ngo_org_id=current_user.org_id, lookback_days=days,
+        )
+        _dashboard_cache.set(cache_key, result)
+        return jsonify(result)
+
+    if role == 'donor':
+        if not current_user.org_id:
+            return jsonify({'success': False, 'error': 'Donor org required'}), 400
+        cache_key = f'debrief_insights_donor_{current_user.org_id}_{days}'
+        cached = _dashboard_cache.get(cache_key)
+        if cached is not None:
+            return jsonify({'cached': True, **cached})
+        result = DebriefInsightsService.for_donor(
+            donor_org_id=current_user.org_id, lookback_days=days,
+        )
+        _dashboard_cache.set(cache_key, result)
+        return jsonify(result)
+
+    return jsonify({'success': False, 'error': 'Role not supported'}), 403
+
+
 @applications_bp.route('/<int:app_id>/activity', methods=['GET'])
 @login_required
 def api_application_activity(app_id):

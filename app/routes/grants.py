@@ -388,7 +388,28 @@ def api_publish_grant(grant_id):
                {'title': grant.title, 'donor_org_id': grant.donor_org_id})
 
     logger.info(f"Grant published: {grant.title} (id={grant.id}) by user {current_user.email}")
-    return jsonify({'success': True, 'grant': grant.to_dict()})
+
+    # Phase 16C — fire smart-match notifications. Best-effort, never
+    # blocks the publish response. The service is idempotent (writes an
+    # audit-chain anchor) so a republish doesn't re-fire.
+    notify_summary = None
+    try:
+        from app.services.match_notification_service import MatchNotificationService
+        notify_summary = MatchNotificationService.notify_for_new_grant(grant.id)
+        logger.info(
+            f"Match notifications for grant {grant.id}: {notify_summary}"
+        )
+    except Exception as e:
+        logger.warning(f"Match notifications failed (non-fatal): {e}")
+
+    response = {'success': True, 'grant': grant.to_dict()}
+    if notify_summary:
+        response['match_notifications'] = {
+            'notified': notify_summary.get('notified'),
+            'high_matches': notify_summary.get('high_matches'),
+            'reason': notify_summary.get('reason'),
+        }
+    return jsonify(response)
 
 
 @grants_bp.route('/<int:grant_id>/upload-grant-doc', methods=['POST'])

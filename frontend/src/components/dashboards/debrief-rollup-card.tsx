@@ -19,7 +19,7 @@
 
 import { useEffect, useState } from 'react';
 import {
-  TrendingUp, TrendingDown, BarChart3, Loader2, Sparkles,
+  TrendingUp, TrendingDown, BarChart3, Loader2, Sparkles, Lightbulb,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -71,10 +71,20 @@ function BarRow({ row, tone }: { row: Row; tone: 'win' | 'loss' }) {
   );
 }
 
+interface Insights {
+  success: boolean;
+  source: 'ai' | 'sparse' | 'unavailable';
+  narrative: string | null;
+  recommended_actions: string[];
+}
+
 export function DebriefRollupCard() {
   const user = useAuthStore((s) => s.user);
   const [data, setData] = useState<Rollup | null>(null);
   const [loading, setLoading] = useState(true);
+  // Phase 16A — AI-narrated insights (separate fetch, lazy, never blocks)
+  const [insights, setInsights] = useState<Insights | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -85,6 +95,18 @@ export function DebriefRollupCard() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [user]);
+
+  // Lazy fetch the AI insights only when rollup has actionable data
+  useEffect(() => {
+    if (!data || data.source !== 'rollup') return;
+    let cancelled = false;
+    setInsightsLoading(true);
+    api.get<Insights>('/api/applications/debrief/insights')
+      .then((r) => { if (!cancelled) setInsights(r); })
+      .catch(() => { /* quiet */ })
+      .finally(() => { if (!cancelled) setInsightsLoading(false); });
+    return () => { cancelled = true; };
+  }, [data]);
 
   if (loading || !user) {
     return (
@@ -167,6 +189,45 @@ export function DebriefRollupCard() {
           <div><strong className="tabular-nums">{data.rejected_total}</strong> declined</div>
         </div>
       </div>
+
+      {/* Phase 16A — AI-narrated insight + recommended actions. Renders
+          only when the data is rich enough (source==='ai'). Quiet on
+          sparse/unavailable so the card never wastes space. */}
+      {(insightsLoading || (insights && insights.source === 'ai' && insights.narrative)) && (
+        <div className="mb-4 rounded-md border-l-2 border-[hsl(var(--kuja-spark))] bg-[hsl(var(--kuja-sand))]/40 p-3">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-[hsl(var(--kuja-clay-dark))]">
+            <Lightbulb className="h-3 w-3" />
+            What this means · AI generated
+          </div>
+          {insightsLoading ? (
+            <p className="text-xs text-muted-foreground italic">
+              <Loader2 className="inline h-3 w-3 animate-spin mr-1" />
+              Reading the pattern…
+            </p>
+          ) : (
+            <>
+              <p className="text-sm leading-relaxed text-foreground">
+                {insights?.narrative}
+              </p>
+              {insights?.recommended_actions && insights.recommended_actions.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <div className="text-[10px] uppercase tracking-wide font-semibold text-[hsl(var(--kuja-clay-dark))]">
+                    Try next
+                  </div>
+                  <ul className="space-y-1">
+                    {insights.recommended_actions.map((action, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs">
+                        <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[hsl(var(--kuja-clay))]" />
+                        <span className="leading-relaxed">{action}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

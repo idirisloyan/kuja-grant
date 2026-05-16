@@ -1590,6 +1590,69 @@ def make_tests(base):
         assert r.status_code == 200, f"unassign: {r.status_code} {r.text[:200]}"
     tests.append(("PHASE15E-001: Tag find-or-create + list + unassign lifecycle", test_phase15e_tags_find_or_create_lifecycle))
 
+    def test_phase16a_debrief_insights():
+        """PHASE16A-001: debrief insights endpoint returns shaped JSON for both roles."""
+        for role in ("ngo", "donor"):
+            s = login_ok(base, USERS[role])
+            r = s.get(f"{base}/api/applications/debrief/insights",
+                      headers={"X-Requested-With": "XMLHttpRequest"}, timeout=30)
+            assert r.status_code == 200, f"{role}: {r.status_code} {r.text[:200]}"
+            data = r.json()
+            assert "source" in data, f"insights missing 'source': {list(data.keys())}"
+            assert data["source"] in ("ai", "sparse", "unavailable"), data["source"]
+            # recommended_actions is always a list (may be empty)
+            assert isinstance(data.get("recommended_actions", []), list)
+    tests.append(("PHASE16A-001: Debrief insights returns shape for NGO + donor", test_phase16a_debrief_insights))
+
+    def test_phase16b_peer_benchmarks_ngo():
+        """PHASE16B-001: NGO peer benchmarks return shaped JSON."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/dashboard/benchmarks",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert "source" in data, data
+        assert data["source"] in ("benchmark", "sparse", "unavailable")
+        assert "metrics" in data, data
+        for m in data["metrics"][:1]:
+            for k in ("code", "label", "self_value", "peer_median",
+                      "percentile", "verdict", "higher_is_better"):
+                assert k in m, f"metric missing {k}: {m}"
+    tests.append(("PHASE16B-001: NGO peer benchmarks returns shape", test_phase16b_peer_benchmarks_ngo))
+
+    def test_phase16b_peer_benchmarks_donor():
+        """PHASE16B-002: donor peer benchmarks return shaped JSON."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/dashboard/benchmarks",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("source") in ("benchmark", "sparse", "unavailable")
+    tests.append(("PHASE16B-002: Donor peer benchmarks returns shape", test_phase16b_peer_benchmarks_donor))
+
+    def test_phase16e_reviewer_throughput():
+        """PHASE16E-001: reviewer throughput returns shaped JSON."""
+        s = login_ok(base, USERS["reviewer"])
+        r = s.get(f"{base}/api/dashboard/reviewer-throughput",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        for k in ("queue_count", "completed_last_30d", "sla_status",
+                  "burn_down_14d"):
+            assert k in data, f"throughput missing {k}: {list(data.keys())}"
+        assert data["sla_status"] in ("ok", "watch", "slipping")
+        assert isinstance(data["burn_down_14d"], list) and len(data["burn_down_14d"]) >= 14
+    tests.append(("PHASE16E-001: Reviewer throughput returns shape", test_phase16e_reviewer_throughput))
+
+    def test_phase16e_reviewer_throughput_forbidden_for_donor():
+        """PHASE16E-002: donor (non-admin) cannot fetch reviewer throughput."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/dashboard/reviewer-throughput",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 403, f"expected 403, got {r.status_code}"
+    tests.append(("PHASE16E-002: Reviewer throughput forbidden for donor", test_phase16e_reviewer_throughput_forbidden_for_donor))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [
@@ -1667,6 +1730,12 @@ def make_tests(base):
             ("GET", "/api/tags", "donor"),
             ("GET", "/api/tags", "ngo"),
             ("GET", "/api/tags/by-target?kind=grant&id=1", "donor"),
+            # Phase 16 (insights, benchmarks, reviewer throughput)
+            ("GET", "/api/applications/debrief/insights", "ngo"),
+            ("GET", "/api/applications/debrief/insights", "donor"),
+            ("GET", "/api/dashboard/benchmarks", "ngo"),
+            ("GET", "/api/dashboard/benchmarks", "donor"),
+            ("GET", "/api/dashboard/reviewer-throughput", "reviewer"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

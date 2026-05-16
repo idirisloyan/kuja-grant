@@ -32,6 +32,8 @@ import { PortfolioAuditTimeline } from '@/components/dashboards/portfolio-audit-
 import { NGOPortfolioDownloadCard } from '@/components/dashboards/ngo-portfolio-download-card';
 import { DebriefRollupCard } from '@/components/dashboards/debrief-rollup-card';
 import { StageLabelsEditor } from '@/components/dashboards/stage-labels-editor';
+import { PeerBenchmarksCard } from '@/components/dashboards/peer-benchmarks-card';
+import { ReviewerThroughputCard } from '@/components/dashboards/reviewer-throughput-card';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -90,6 +92,8 @@ export default function DashboardPage() {
           <PortfolioDownloadCard />
           {/* Phase 15A — debrief rollup: "why you award/decline." */}
           <DebriefRollupCard />
+          {/* Phase 16B — anonymous comparison vs peer donors */}
+          <PeerBenchmarksCard />
           {/* Phase 13.29 — donor action queue (analog of ThisWeekHome).
               Renders above the existing command center so the donor sees
               "what do I do next?" before "what's the state?" */}
@@ -112,6 +116,8 @@ export default function DashboardPage() {
           <NGOPortfolioDownloadCard />
           {/* Phase 15A — debrief rollup: "why your apps win/lose." */}
           <DebriefRollupCard />
+          {/* Phase 16B — anonymous comparison vs same-country NGOs */}
+          <PeerBenchmarksCard />
           {/* Phase 10.6 — "This Week" action center: opinionated next
               actions backed by /api/ai/ngo-readiness. Renders only when
               ui.this_week_home flag is on; otherwise falls through to
@@ -126,6 +132,9 @@ export default function DashboardPage() {
       )}
       {user.role === 'reviewer' && (
         <>
+          {/* Phase 16E — throughput + SLA at the top so the reviewer
+              knows immediately whether they're slipping. */}
+          <ReviewerThroughputCard />
           {/* Phase 13.29 — reviewer action queue. Pending assignments
               top-of-page, then the existing detailed queue below. */}
           <ReviewerActionQueue />
