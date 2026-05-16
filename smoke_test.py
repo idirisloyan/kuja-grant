@@ -740,6 +740,32 @@ def make_tests(base):
     # =========================================================================
     # --- Phase 1: Trust Profile / Adverse Media / Bank / Passport ---
 
+    # --- Phase 5: AI budget gate ---
+
+    def test_ai_budget_me():
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/ai-budget/me",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"ai-budget/me: {r.status_code}"
+        d = r.json()
+        assert "status" in d, "Missing status field"
+        st = d["status"]
+        for k in ("allowed", "spent_usd", "budget_usd"):
+            assert k in st, f"status missing {k}: {st}"
+        assert st["allowed"] is True, "Default org should be allowed (NULL budget = unlimited)"
+    tests.append(("AIBUDGET-001: /api/ai-budget/me returns structured status", test_ai_budget_me))
+
+    def test_ai_budget_admin_spend():
+        s = login_ok(base, USERS["admin"])
+        r = s.get(f"{base}/api/ai-budget/admin/spend",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"admin spend: {r.status_code}"
+        d = r.json()
+        assert "report" in d
+        assert "orgs" in d["report"] and isinstance(d["report"]["orgs"], list)
+        assert "skipped_by_endpoint" in d["report"]
+    tests.append(("AIBUDGET-002: admin spend report returns rollup", test_ai_budget_admin_spend))
+
     # --- Phase 4: Messaging channels + currency preference ---
 
     def test_messaging_channels_status():
@@ -1014,6 +1040,9 @@ def make_tests(base):
             ("GET", "/api/calendar/deadlines", "admin"),
             # Phase 4 (Global South affordances) — messaging
             ("GET", "/api/messaging/channels", "admin"),
+            # Phase 5 (integrity) — AI budget
+            ("GET", "/api/ai-budget/me", "ngo"),
+            ("GET", "/api/ai-budget/admin/spend", "admin"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

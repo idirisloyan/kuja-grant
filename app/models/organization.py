@@ -40,6 +40,12 @@ class Organization(db.Model):
     # ISO 4217. Fallback chain on display: grant.currency → org.preferred_currency → 'USD'.
     preferred_currency = db.Column(db.String(3), nullable=True, default='USD')
 
+    # Phase 5 (integrity & polish) — per-org monthly AI budget (USD).
+    # NULL = unlimited (default). When set, AIBudgetService.enforce_budget()
+    # checks month-to-date spend before invoking Claude; over-budget calls
+    # are skipped (gracefully) and surfaced in /api/admin/ai-spend.
+    ai_monthly_budget_usd = db.Column(db.Numeric(10, 2), nullable=True)
+
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
@@ -99,6 +105,7 @@ class Organization(db.Model):
             'focus_areas': self.get_focus_areas(),
             'sdg_ids': self.get_sdg_ids(),
             'preferred_currency': self.preferred_currency or 'USD',
+            'ai_monthly_budget_usd': float(self.ai_monthly_budget_usd) if self.ai_monthly_budget_usd is not None else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

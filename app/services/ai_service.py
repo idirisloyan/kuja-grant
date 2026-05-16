@@ -494,6 +494,33 @@ class AIService:
                 except Exception:
                     role = None
 
+            # Phase 5 — per-org AI budget gate. If over cap, record a
+            # "skipped due to budget" row and fall back gracefully.
+            _budget_org_id = None
+            try:
+                if current_user and current_user.is_authenticated:
+                    _budget_org_id = getattr(current_user, 'org_id', None)
+            except Exception:
+                pass
+            if _budget_org_id:
+                try:
+                    from app.services.ai_budget_service import AIBudgetService, BudgetExceededError
+                    try:
+                        AIBudgetService.enforce_budget(_budget_org_id)
+                    except BudgetExceededError as bex:
+                        logger.warning(
+                            f"AI_BUDGET_SKIP endpoint={endpoint or '-'} org={_budget_org_id} "
+                            f"spent=${bex.spent_usd:.2f}/${bex.budget_usd:.2f}"
+                        )
+                        AIBudgetService.record_skipped(
+                            endpoint=endpoint or '-', org_id=_budget_org_id,
+                            user_id=getattr(current_user, 'id', None),
+                            role=role, language=language,
+                        )
+                        return None
+                except Exception as gate_err:
+                    logger.debug(f"budget gate skipped (error): {gate_err}")
+
             # Layer the language directive — uses native language name so the
             # model thinks in that language rather than translating from English.
             if language and language != 'en' and language in LANG_NATIVE:
@@ -673,6 +700,32 @@ class AIService:
                         role = getattr(current_user, 'role', None)
                 except Exception:
                     role = None
+
+            # Phase 5 — budget gate (mirrors _call_claude). Falls back when over cap.
+            _budget_org_id = None
+            try:
+                if current_user and current_user.is_authenticated:
+                    _budget_org_id = getattr(current_user, 'org_id', None)
+            except Exception:
+                pass
+            if _budget_org_id:
+                try:
+                    from app.services.ai_budget_service import AIBudgetService, BudgetExceededError
+                    try:
+                        AIBudgetService.enforce_budget(_budget_org_id)
+                    except BudgetExceededError as bex:
+                        logger.warning(
+                            f"AI_BUDGET_SKIP endpoint={endpoint or '-'} tool={tool_name} "
+                            f"org={_budget_org_id} spent=${bex.spent_usd:.2f}/${bex.budget_usd:.2f}"
+                        )
+                        AIBudgetService.record_skipped(
+                            endpoint=endpoint or '-', org_id=_budget_org_id,
+                            user_id=getattr(current_user, 'id', None),
+                            role=role, language=language,
+                        )
+                        return None
+                except Exception as gate_err:
+                    logger.debug(f"budget gate skipped (error): {gate_err}")
 
             if language and language != 'en' and language in LANG_NATIVE:
                 native = LANG_NATIVE[language]

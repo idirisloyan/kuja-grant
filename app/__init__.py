@@ -175,8 +175,12 @@ def create_app(config_name=None):
                     if 'preferred_currency' not in org_cols:
                         conn.execute(text("ALTER TABLE organizations ADD COLUMN preferred_currency VARCHAR(3) DEFAULT 'USD'"))
                         app.logger.info("Added organizations.preferred_currency column")
+                    # Phase 5 — ai_monthly_budget_usd on organizations
+                    if 'ai_monthly_budget_usd' not in org_cols:
+                        conn.execute(text("ALTER TABLE organizations ADD COLUMN ai_monthly_budget_usd NUMERIC(10, 2)"))
+                        app.logger.info("Added organizations.ai_monthly_budget_usd column")
                 except Exception as e:
-                    app.logger.debug(f"organizations.preferred_currency check skipped: {e}")
+                    app.logger.debug(f"organizations column check skipped: {e}")
 
                 # Check existing columns and only add missing ones
                 doc_cols = {c['name'] for c in inspector.get_columns('documents')}

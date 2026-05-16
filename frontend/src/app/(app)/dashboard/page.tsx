@@ -25,6 +25,7 @@ import { DonorActionQueue } from '@/components/dashboards/donor-action-queue';
 import { ReviewerActionQueue } from '@/components/dashboards/reviewer-action-queue';
 import { TodayBriefing } from '@/components/dashboards/today-briefing';
 import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
+import { AIBudgetAdminCard } from '@/components/dashboards/ai-budget-admin-card';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -108,7 +109,13 @@ export default function DashboardPage() {
           <ReviewerQueue />
         </>
       )}
-      {user.role === 'admin' && <AdminOpsPanel />}
+      {user.role === 'admin' && (
+        <>
+          {/* Phase 5 — per-org AI budget gate + skipped rollup */}
+          <AIBudgetAdminCard />
+          <AdminOpsPanel />
+        </>
+      )}
     </div>
   );
 }
