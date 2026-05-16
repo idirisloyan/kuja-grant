@@ -26,6 +26,7 @@ import { ReviewerActionQueue } from '@/components/dashboards/reviewer-action-que
 import { TodayBriefing } from '@/components/dashboards/today-briefing';
 import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
 import { AIBudgetAdminCard } from '@/components/dashboards/ai-budget-admin-card';
+import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -78,6 +79,8 @@ export default function DashboardPage() {
           {/* Phase 3 — AI Pre-emption Watch above the action queue.
               "Here's what's likely to slip before it slips." */}
           <PreemptionWatchCard scope="me" />
+          {/* Phase 11 — cross-grant patterns for the donor's portfolio. */}
+          <CrossGrantPatternsCard />
           {/* Phase 13.29 — donor action queue (analog of ThisWeekHome).
               Renders above the existing command center so the donor sees
               "what do I do next?" before "what's the state?" */}
@@ -89,6 +92,8 @@ export default function DashboardPage() {
         <>
           {/* Phase 3 — AI Pre-emption Watch for the NGO's own grants. */}
           <PreemptionWatchCard scope="me" />
+          {/* Phase 11 — cross-grant patterns ("where you consistently win/lose"). */}
+          <CrossGrantPatternsCard />
           {/* Phase 10.6 — "This Week" action center: opinionated next
               actions backed by /api/ai/ngo-readiness. Renders only when
               ui.this_week_home flag is on; otherwise falls through to

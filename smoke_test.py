@@ -740,6 +740,54 @@ def make_tests(base):
     # =========================================================================
     # --- Phase 1: Trust Profile / Adverse Media / Bank / Passport ---
 
+    # --- Phase 11: Grant agreement unpack + cross-grant patterns ---
+
+    def test_grant_unpack_returns_structure():
+        """Grant unpack returns a structured response (AI or unavailable),
+        never 500s."""
+        s = login_ok(base, USERS["admin"])
+        gr = s.get(f"{base}/api/grants/",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        grants = gr.get("grants", [])
+        if not grants:
+            return
+        gid = grants[0]["id"]
+        r = s.post(f"{base}/api/grants/{gid}/unpack-agreement",
+                   json={},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"},
+                   timeout=120)
+        assert r.status_code in (200, 403), f"unpack: {r.status_code}: {r.text[:200]}"
+        if r.status_code == 200:
+            d = r.json()
+            for k in ("grant_id", "source", "executive_summary",
+                      "reporting_obligations", "indicators",
+                      "payment_milestones", "budget_breakdown",
+                      "key_contacts", "conditions", "key_dates"):
+                assert k in d, f"unpack missing {k}: {list(d.keys())}"
+            assert d["source"] in ("ai", "unavailable", "no_input"), \
+                f"unexpected source: {d['source']}"
+    tests.append(("UNPACK-001: Grant agreement unpack returns structured response", test_grant_unpack_returns_structure))
+
+    def test_patterns_me_for_ngo():
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/patterns/me",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=60)
+        assert r.status_code == 200, f"patterns me: {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        assert d.get("success") is True
+        for k in ("source", "patterns", "top_3_actions", "summary"):
+            assert k in d, f"patterns missing {k}: {list(d.keys())}"
+        assert d["source"] in ("ai", "no_data", "unavailable"), f"unexpected source: {d['source']}"
+    tests.append(("PATTERNS-001: Cross-grant patterns /me returns structured response", test_patterns_me_for_ngo))
+
+    def test_patterns_me_for_donor():
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/patterns/me",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=60)
+        assert r.status_code == 200, f"patterns donor: {r.status_code}"
+    tests.append(("PATTERNS-002: Cross-grant patterns /me works for donor", test_patterns_me_for_donor))
+
     # --- Phase 10: Side-by-side compare + AI auto-fill ---
 
     def test_application_compare_validates_input():
@@ -1288,6 +1336,10 @@ def make_tests(base):
             # Phase 9 (search + digest)
             ("GET", "/api/documents/search?q=test", "ngo"),
             ("GET", "/api/documents/search?q=test", "donor"),
+            # Phase 11 (patterns + unpack route registration)
+            ("GET", "/api/patterns/me", "ngo"),
+            ("GET", "/api/patterns/me", "donor"),
+            ("GET", "/api/patterns/me", "admin"),
         ]
         errors_500 = []
         for method, path, role in endpoints:
