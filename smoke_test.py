@@ -740,6 +740,41 @@ def make_tests(base):
     # =========================================================================
     # --- Phase 1: Trust Profile / Adverse Media / Bank / Passport ---
 
+    # --- Phase 3: Preemption + calendar ---
+
+    def test_preemption_me_ngo():
+        """Pre-emption /me endpoint returns the expected structure for NGO."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/preemption/me",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=60)
+        assert r.status_code == 200, f"Preemption me: {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        assert d.get("success") is True
+        assert "findings" in d, "Missing findings"
+        assert "source" in d, "Missing source"
+        assert d["source"] in ("ai", "deterministic_fallback", "no_input"), f"Unexpected source: {d['source']}"
+    tests.append(("PREEMPT-001: Preemption /me works for NGO", test_preemption_me_ngo))
+
+    def test_preemption_me_donor():
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/preemption/me",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=60)
+        assert r.status_code == 200, f"Preemption donor: {r.status_code}: {r.text[:200]}"
+    tests.append(("PREEMPT-002: Preemption /me works for donor", test_preemption_me_donor))
+
+    def test_calendar_returns_events():
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/calendar/deadlines?days=60",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"Calendar: {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        assert "events" in d and isinstance(d["events"], list), "Missing events list"
+        assert "window_start" in d and "window_end" in d, "Missing window fields"
+        for ev in d["events"][:3]:
+            for k in ("date", "kind", "severity", "label", "href"):
+                assert k in ev, f"Event missing {k}: {ev}"
+    tests.append(("CALENDAR-001: Calendar returns structured events", test_calendar_returns_events))
+
     # --- Phase 2: Today briefing + watchlist ---
 
     def test_today_briefing_ngo():
@@ -944,6 +979,13 @@ def make_tests(base):
             ("GET", "/api/dashboard/today", "reviewer"),
             ("GET", "/api/dashboard/today", "admin"),
             ("GET", "/api/watchlist", "ngo"),
+            # Phase 3 (AI-deepening) — preemption + calendar
+            ("GET", "/api/preemption/me", "ngo"),
+            ("GET", "/api/preemption/me", "donor"),
+            ("GET", "/api/preemption/me", "admin"),
+            ("GET", "/api/calendar/deadlines", "ngo"),
+            ("GET", "/api/calendar/deadlines", "donor"),
+            ("GET", "/api/calendar/deadlines", "admin"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

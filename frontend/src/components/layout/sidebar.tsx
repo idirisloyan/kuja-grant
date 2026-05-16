@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, ClipboardCheck, Search, FileText, BarChart3, Building2,
   PlusCircle, Briefcase, Star, Shield, CheckCircle2, ClipboardList,
-  ChevronLeft, ChevronRight, X, Activity, Brain, ShieldCheck,
+  ChevronLeft, ChevronRight, X, Activity, Brain, ShieldCheck, Calendar,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
@@ -56,6 +56,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   const navItems: Record<UserRole, NavItem[]> = {
     ngo: [
       { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
+      { icon: Calendar, label: t('nav.calendar') || 'Calendar', href: '/calendar' },
       { icon: ClipboardCheck, label: t('nav.assessment_hub'), href: '/assessments' },
       { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
       { icon: Search, label: t('nav.browse_grants'), href: '/grants' },
@@ -66,6 +67,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
     ],
     donor: [
       { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
+      { icon: Calendar, label: t('nav.calendar') || 'Calendar', href: '/calendar' },
       { icon: PlusCircle, label: t('nav.create_grant'), href: '/grants/new' },
       { icon: Briefcase, label: t('nav.my_grants'), href: '/grants' },
       { icon: Star, label: t('nav.review_applications'), href: '/reviews' },

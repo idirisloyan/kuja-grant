@@ -1934,5 +1934,6 @@
   "reviewer_actions.overdue_due": "Imepitwa (inakomma {date})",
   "common.copied": "Imenakiliwa",
   "common.copy": "Nakili",
-  "nav.trust_profile": "Wasifu wa Uaminifu"
+  "nav.trust_profile": "Wasifu wa Uaminifu",
+  "nav.calendar": "Kalenda"
 }

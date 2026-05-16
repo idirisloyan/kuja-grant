@@ -1914,5 +1914,6 @@
   "reviewer_actions.overdue_due": "En retard (échéance {date})",
   "common.copied": "Copié",
   "common.copy": "Copier",
-  "nav.trust_profile": "Profil de confiance"
+  "nav.trust_profile": "Profil de confiance",
+  "nav.calendar": "Calendrier"
 }

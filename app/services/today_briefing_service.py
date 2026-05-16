@@ -1,12 +1,15 @@
 """
-TodayBriefingService — Phase 2 (May 2026 category-defining UX)
-==============================================================
+TodayBriefingService — Phase 2 + Phase 3 (May 2026)
+====================================================
 
 Assembles "what should I act on today" for any role: NGO, donor, reviewer, admin.
 
 The pattern is deterministic — we walk the DB and surface concrete items
-with explicit urgency, severity, count, and a primary action link. AI is
-optional layered narration on top (cached, falls back to template).
+with explicit urgency, severity, count, and a primary action link.
+
+Phase 3 layered AI narration on top — Claude wraps the deterministic items
+in an executive-voice paragraph that explains the situation in one breath.
+Cached (1h per user), falls back to the deterministic headline if AI fails.
 
 Output shape:
 
@@ -73,8 +76,13 @@ class TodayBriefingService:
     MAX_ITEMS = 6
 
     @classmethod
-    def build(cls, user) -> dict:
-        """Top-level dispatch by role."""
+    def build(cls, user, *, with_narration: bool = True) -> dict:
+        """Top-level dispatch by role.
+
+        If with_narration is True, layers a Claude-narrated headline +
+        context paragraph on top of the deterministic items. Falls back
+        cleanly when AI is unavailable.
+        """
         role = getattr(user, 'role', None)
         if role == 'ngo':
             items = cls._ngo_items(user)
@@ -88,16 +96,108 @@ class TodayBriefingService:
             items = []
 
         items = cls._sort_and_cap(items)
-        headline, tone = cls._headline(role, items)
+        det_headline, tone = cls._headline(role, items)
+
+        # Phase 3 — AI narration layer (cheap, cached upstream by caller)
+        narrated_headline = det_headline
+        narration = None
+        if with_narration and items:
+            narrated_headline, narration = cls._narrate(role, items, det_headline, tone)
 
         return {
             'briefing_date': date.today().isoformat(),
             'role': role,
-            'headline': headline,
+            'headline': narrated_headline or det_headline,
+            'deterministic_headline': det_headline,   # always available for clients that want it
+            'narration': narration,                   # 1-2 sentence executive context; null if no AI
             'tone': tone,
             'items': items,
             'computed_at': datetime.now(timezone.utc).isoformat(),
         }
+
+    # ------------------------------------------------------------------
+    # AI narration
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def _narrate(cls, role: str, items: list[dict], det_headline: str, tone: str) -> tuple[str | None, str | None]:
+        """Ask Claude to produce a one-line executive headline + 1-2 sentence
+        context paragraph that frames the day. Returns (headline, paragraph)
+        or (None, None) on failure — caller falls back to det_headline.
+        """
+        try:
+            from app.services.ai_service import AIService
+        except Exception:
+            return (None, None)
+
+        # Build a compact item digest the model can reason over
+        digest_lines = []
+        for it in items[:8]:
+            severity = it.get('severity', 'info')
+            label = it.get('label', '')
+            detail = it.get('detail', '')
+            digest_lines.append(f"- [{severity}] {label} — {detail}")
+        digest = "\n".join(digest_lines)
+
+        role_label = {
+            'ngo': 'NGO programme officer / executive director',
+            'donor': 'donor portfolio manager',
+            'reviewer': 'grant reviewer',
+            'admin': 'platform administrator',
+        }.get(role, 'user')
+
+        system_prompt = (
+            "You are a focused executive briefing writer for the Kuja grant management platform. "
+            "Given a deterministic list of today's priorities, produce a CONCISE, factual two-part briefing:\n"
+            "  1) a one-line headline (max 90 chars, no exclamation marks, no AI/LLM-style hedging)\n"
+            "  2) a 1-2 sentence context paragraph that explains the situation\n\n"
+            "Tone: calm, professional, action-orienting. Avoid filler words ('it appears that', 'as we can see'). "
+            "Don't invent items — only synthesize what's in the digest. "
+            "Use the user's role as the implicit subject ('Two reports are overdue.') — never address them as 'you' more than once. "
+            "If items are mixed severity, lead with the highest. "
+            "Match the deterministic headline's spirit but improve the prose."
+        )
+
+        user_message = (
+            f"Role: {role_label}\n"
+            f"Mood: {tone}\n"
+            f"Deterministic headline (already calculated, you don't need to match it exactly): {det_headline}\n\n"
+            f"Today's items ({len(items)} total):\n{digest}\n\n"
+            "Return your briefing via the executive_briefing tool. "
+            "If the deterministic headline is already perfect, you can return it unchanged in the headline field."
+        )
+
+        parsed = AIService._call_claude_tool(
+            system_prompt,
+            user_message,
+            tool_name='executive_briefing',
+            tool_description='Compose a one-line headline and 1-2 sentence context paragraph for the day.',
+            tool_schema={
+                'type': 'object',
+                'properties': {
+                    'headline': {
+                        'type': 'string',
+                        'description': 'One-line briefing headline. Max 90 chars.',
+                    },
+                    'context': {
+                        'type': 'string',
+                        'description': '1-2 sentence paragraph framing the situation.',
+                    },
+                },
+                'required': ['headline', 'context'],
+            },
+            max_tokens=400,
+            endpoint='today_briefing.narrate',
+        )
+
+        if not parsed:
+            return (None, None)
+
+        headline = (parsed.get('headline') or '').strip()[:120]
+        context = (parsed.get('context') or '').strip()[:600]
+        if not headline or not context:
+            return (None, None)
+        return (headline, context)
 
     # ------------------------------------------------------------------
     # Sorting + headline

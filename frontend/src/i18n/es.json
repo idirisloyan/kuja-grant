@@ -1914,5 +1914,6 @@
   "reviewer_actions.overdue_due": "Vencido (vence {date})",
   "common.copied": "Copiado",
   "common.copy": "Copiar",
-  "nav.trust_profile": "Perfil de Confianza"
+  "nav.trust_profile": "Perfil de Confianza",
+  "nav.calendar": "Calendario"
 }

@@ -1914,5 +1914,6 @@
   "reviewer_actions.completed": "completed",
   "reviewer_actions.overdue_due": "Overdue (due {date})",
   "common.copied": "Copied",
-  "common.copy": "Copy"
+  "common.copy": "Copy",
+  "nav.calendar": "Calendar"
 }

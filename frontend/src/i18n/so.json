@@ -1934,5 +1934,6 @@
   "reviewer_actions.overdue_due": "Wakhtiga wuu dhammaaday (mara dhamaad {date})",
   "common.copied": "Waa la koobiyay",
   "common.copy": "Koobi",
-  "nav.trust_profile": "Tirinta Aaminaadda"
+  "nav.trust_profile": "Tirinta Aaminaadda",
+  "nav.calendar": "Jadwalka"
 }

@@ -24,6 +24,7 @@ import {
   Clipboard, Edit, Newspaper, Award, Compass, ArrowRight, CheckCircle2,
   ListChecks, Loader2,
 } from 'lucide-react';
+// Sparkles is also used inline in the AI pill below
 import { Card } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,8 @@ interface TodayBriefing {
   briefing_date: string;
   role: string;
   headline: string;
+  deterministic_headline?: string;
+  narration?: string | null;
   tone: Tone;
   items: BriefingItem[];
   computed_at: string;
@@ -238,9 +241,19 @@ export function TodayBriefing({ exploreHrefOverride }: { exploreHrefOverride?: s
   return (
     <Card className={cn('border-l-4 p-4 sm:p-5', TONE_BORDER[data.tone] ?? TONE_BORDER.opportunity)}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="min-w-0">
-          <div className="kuja-eyebrow">Today, {new Date(data.briefing_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</div>
+        <div className="min-w-0 flex-1">
+          <div className="kuja-eyebrow flex items-center gap-1.5">
+            <span>Today, {new Date(data.briefing_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+            {data.narration && (
+              <span className="kuja-ai-pill text-[9px]" title="AI-synthesised">
+                <Sparkles className="w-2.5 h-2.5" /> Briefed
+              </span>
+            )}
+          </div>
           <h2 className="kuja-display text-xl mt-1 text-balance">{data.headline}</h2>
+          {data.narration && (
+            <p className="mt-1.5 text-sm text-[hsl(var(--kuja-ink-soft))] leading-relaxed">{data.narration}</p>
+          )}
         </div>
         <span className="text-[10px] uppercase tracking-wider font-semibold text-[hsl(var(--kuja-ink-soft))] mt-1">
           {data.items.length} item{data.items.length === 1 ? '' : 's'}
