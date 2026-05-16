@@ -100,6 +100,30 @@ def api_bundle_pdf(report_id):
     hash6 = (bundle.get('bundle_hash') or '')[:6]
     filename = f'kuja-bundle-{slug}-r{report_id}-{hash6}.pdf'
 
+    # Phase 12 — donor-review audit receipt. Every donor / admin / reviewer
+    # download writes a hash-anchored row to the audit chain so the NGO can
+    # later prove the bundle was reviewed (and by whom, when). NGOs
+    # downloading their own bundles don't fire receipts (avoids self-
+    # reviewed noise in the audit log).
+    try:
+        from app.models import AuditChainEntry
+        if current_user.role in ('donor', 'reviewer', 'admin'):
+            AuditChainEntry.append(
+                action='report_bundle.download_pdf',
+                actor_email=getattr(current_user, 'email', None),
+                subject_kind='report',
+                subject_id=report_id,
+                details={
+                    'bundle_hash': bundle.get('bundle_hash'),
+                    'reviewer_role': current_user.role,
+                    'pdf_bytes': len(pdf_bytes),
+                    'filename': filename,
+                },
+            )
+    except Exception as e:
+        # Never block the download on an audit failure
+        logger.warning(f"Bundle PDF audit receipt failed: {e}")
+
     import io
     return send_file(
         io.BytesIO(pdf_bytes),

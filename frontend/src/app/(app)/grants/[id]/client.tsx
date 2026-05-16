@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import type { EligibilityRequirement, Criterion, DocRequirement } from '@/lib/types';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
 import { LiveDraftersPill } from '@/components/grants/LiveDraftersPill';
+import { GrantAgreementUnpackPanel } from '@/components/grants/grant-agreement-unpack-panel';
 
 function formatFunding(amount: number | null, currency: string): string {
   if (!amount) return 'TBD';
@@ -172,6 +173,14 @@ export default function GrantDetailClient() {
       {tab === 'documents' && <DocumentsTab requirements={grant.doc_requirements ?? []} t={t} />}
       {tab === 'qa' && <GrantQAPanel grantId={grant.id} />}
       {tab === 'applications' && <ApplicationsTab grantId={grant.id} t={t} />}
+
+      {/* Phase 12 — Agreement smart-unpack with apply-to-calendar action.
+          Visible whenever the user has read access to the grant; "Apply"
+          button gated to NGO + admin (the backend enforces too). */}
+      <GrantAgreementUnpackPanel
+        grantId={grant.id}
+        canApply={user?.role === 'ngo' || user?.role === 'admin'}
+      />
     </div>
   );
 }

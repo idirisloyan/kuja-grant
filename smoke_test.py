@@ -740,6 +740,69 @@ def make_tests(base):
     # =========================================================================
     # --- Phase 1: Trust Profile / Adverse Media / Bank / Passport ---
 
+    # --- Phase 12: Apply-unpack + bundle PDF audit receipt ---
+
+    def test_apply_unpack_endpoint_exists():
+        """Apply-unpack endpoint accepts auth + responds without 500
+        (it may legitimately 400 'unpack not available' for empty grants)."""
+        s = login_ok(base, USERS["admin"])
+        gr = s.get(f"{base}/api/grants/",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        grants = gr.get("grants", [])
+        if not grants:
+            return
+        gid = grants[0]["id"]
+        r = s.post(f"{base}/api/grants/{gid}/apply-unpack",
+                   json={},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"},
+                   timeout=120)
+        # 200 (applied), 400 (no unpack available), or 403 (no scope) — never 500
+        assert r.status_code in (200, 400, 403), \
+            f"apply-unpack: {r.status_code}: {r.text[:200]}"
+        if r.status_code == 200:
+            d = r.json()
+            for k in ("grant_id", "reports_created", "signals_created",
+                      "reports_skipped", "signals_skipped"):
+                assert k in d, f"apply-unpack response missing {k}: {list(d.keys())}"
+    tests.append(("APPLYUNPACK-001: Apply-unpack endpoint returns structured response", test_apply_unpack_endpoint_exists))
+
+    def test_bundle_pdf_writes_audit_receipt():
+        """Downloading a bundle PDF as a donor adds an audit-chain row."""
+        s_admin = login_ok(base, USERS["admin"])
+        before = s_admin.get(f"{base}/api/audit-chain/recent?limit=5",
+                             headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        before_count = before.get("total", 0)
+
+        # Download as donor
+        s_donor = login_ok(base, USERS["donor"])
+        rep = s_donor.get(f"{base}/api/reports/",
+                          headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        reports = rep.get("reports", [])
+        if not reports:
+            return
+        rid = reports[0]["id"]
+        pdf = s_donor.get(f"{base}/api/reports/{rid}/bundle.pdf",
+                          headers={"X-Requested-With": "XMLHttpRequest"}, timeout=120)
+        # If donor can't see the report, that's not a test failure (data dependent)
+        if pdf.status_code == 404:
+            return
+        assert pdf.status_code == 200, f"PDF download: {pdf.status_code}: {pdf.text[:200]}"
+
+        # Check audit chain grew
+        after = s_admin.get(f"{base}/api/audit-chain/recent?limit=10",
+                            headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        after_count = after.get("total", 0)
+        assert after_count > before_count, (
+            f"audit chain should have grown after donor PDF download: "
+            f"before={before_count} after={after_count}"
+        )
+        # Verify the most recent entry is the bundle-download
+        recent_entries = after.get("entries", [])
+        assert any(e.get("action") == "report_bundle.download_pdf" for e in recent_entries), \
+            f"expected report_bundle.download_pdf in recent entries: {[e.get('action') for e in recent_entries[:5]]}"
+    tests.append(("BUNDLEPDF-002: Bundle PDF download by donor writes audit receipt", test_bundle_pdf_writes_audit_receipt))
+
     # --- Phase 11: Grant agreement unpack + cross-grant patterns ---
 
     def test_grant_unpack_returns_structure():
