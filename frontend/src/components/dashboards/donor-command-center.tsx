@@ -21,6 +21,7 @@ import { VerdictCard, type VerdictAction } from './verdict-card';
 import { ChartCard } from './chart-card';
 import { SizedChart } from './sized-chart';
 import { PortfolioDiagnosticsCard } from './portfolio-diagnostics-card';
+import { DonorCohortCard } from './donor-cohort-card';
 import { fetchDonorPortfolioInsights, type DonorPortfolioInsights, type DonorActionType } from '@/lib/copilot-api';
 import { api } from '@/lib/api';
 
@@ -183,6 +184,9 @@ export function DonorCommandCenter() {
 
       {/* Phase 2.3 — cross-grant diagnostics with anomalies + per-grant rollup */}
       <PortfolioDiagnosticsCard />
+
+      {/* Phase 24C — your funded NGOs vs the cohort */}
+      <DonorCohortCard />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ChartCard

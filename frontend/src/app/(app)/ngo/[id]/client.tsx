@@ -20,6 +20,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { NameChip } from '@/components/shared/name-chip';
+import { NativeShareButton } from '@/components/shared/native-share-button';
 
 interface NGOSummary {
   success: boolean;
@@ -179,6 +180,12 @@ export default function NGOSummaryClient() {
               <p className="mt-2 text-sm leading-relaxed">{data.mission}</p>
             )}
           </div>
+          <NativeShareButton
+            url={typeof window !== 'undefined' ? window.location.href : ''}
+            title={`${data.ngo_name ?? 'Organisation'} · Kuja`}
+            text={`${data.ngo_name ?? 'Organisation'} on Kuja — trust profile, capacity, and delivery snapshot.`}
+            label="Share profile"
+          />
         </div>
       </Card>
 

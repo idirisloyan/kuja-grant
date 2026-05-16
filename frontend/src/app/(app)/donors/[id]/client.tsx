@@ -26,6 +26,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { NameChip } from '@/components/shared/name-chip';
+import { NativeShareButton } from '@/components/shared/native-share-button';
 import { TrendingUp, TrendingDown, Minus, Users } from 'lucide-react';
 
 interface BenchmarkMetric {
@@ -205,6 +206,12 @@ export default function DonorProfileClient() {
               <p className="mt-2 text-sm leading-relaxed">{data.mission}</p>
             )}
           </div>
+          <NativeShareButton
+            url={typeof window !== 'undefined' ? window.location.href : ''}
+            title={`${data.donor_name ?? 'Donor'} · Kuja`}
+            text={`${data.donor_name ?? 'Donor'} on Kuja — portfolio + funding patterns at a glance.`}
+            label="Share profile"
+          />
         </div>
       </Card>
 

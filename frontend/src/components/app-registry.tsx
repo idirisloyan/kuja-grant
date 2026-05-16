@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect } from 'react';
 import { Toaster } from 'sonner';
+import { PWAInstallBanner } from './shared/pwa-install-banner';
 
 // ---------------------------------------------------------------------------
 // AppRegistry — thin client wrapper.
@@ -133,6 +134,7 @@ export function AppRegistry({ children }: { children: ReactNode }) {
     <>
       {children}
       <Toaster richColors position="top-right" />
+      <PWAInstallBanner />
     </>
   );
 }

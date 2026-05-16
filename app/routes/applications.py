@@ -637,6 +637,46 @@ def api_application_timeline(app_id):
     return jsonify(result)
 
 
+@applications_bp.route('/<int:app_id>/auto-assign-reviewers', methods=['POST'])
+@login_required
+def api_application_auto_assign_reviewers(app_id):
+    """Phase 24A — POST one click to auto-assign top reviewers.
+
+    Body: { panel_size?: int (default 3, max 5) }
+
+    Uses ReviewerMatchService (Phase 19D) for ranking + ReviewerAutoAssign
+    for the writes. Skips already-assigned reviewers; idempotent across
+    repeat calls.
+    """
+    from app.services.reviewer_auto_assign_service import ReviewerAutoAssignService
+
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'success': False, 'error': 'auth.access_denied'}), 403
+
+    application = (
+        Application.query.options(db.joinedload(Application.grant))
+        .filter_by(id=app_id).first()
+    )
+    if not application:
+        return jsonify({'success': False, 'error': 'application.not_found'}), 404
+    if current_user.role == 'donor':
+        if not application.grant or application.grant.donor_org_id != current_user.org_id:
+            return jsonify({'success': False, 'error': 'auth.access_denied'}), 403
+
+    data = get_request_json() or {}
+    try:
+        panel_size = int(data.get('panel_size', 3))
+    except (TypeError, ValueError):
+        panel_size = 3
+
+    result = ReviewerAutoAssignService.run(
+        application_id=app_id, panel_size=panel_size,
+        actor_email=getattr(current_user, 'email', None),
+    )
+    status = 200 if result.get('ok') else 400
+    return jsonify({'success': result.get('ok'), **result}), status
+
+
 @applications_bp.route('/<int:app_id>/suggest-reviewers', methods=['GET'])
 @login_required
 def api_application_suggest_reviewers(app_id):

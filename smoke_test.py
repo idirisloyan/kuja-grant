@@ -2242,6 +2242,75 @@ def make_tests(base):
         assert r.status_code == 403, f"expected 403, got {r.status_code}"
     tests.append(("PHASE23B-002: Heatmap forbidden for NGO", test_phase23b_heatmap_forbidden_for_ngo))
 
+    # -------------------- Phase 24 (May 2026) --------------------
+
+    def test_phase24a_auto_assign_route_exists():
+        """PHASE24A-001: auto-assign-reviewers route exists and is donor-gated."""
+        s = login_ok(base, USERS["ngo"])
+        # NGOs may not use this endpoint
+        r = s.post(f"{base}/api/applications/1/auto-assign-reviewers",
+                   json={"panel_size": 3},
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code in (403, 404), f"expected 403/404, got {r.status_code}"
+    tests.append(("PHASE24A-001: Auto-assign reviewers forbidden for NGO",
+                  test_phase24a_auto_assign_route_exists))
+
+    def test_phase24b_thread_open_resume():
+        """PHASE24B-001: opening a global thread returns a thread_id, idempotent."""
+        s = login_ok(base, USERS["ngo"])
+        r1 = s.post(f"{base}/api/ai/threads/open",
+                    json={"scope_kind": None, "scope_id": None},
+                    headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r1.status_code == 200, f"{r1.status_code}: {r1.text[:200]}"
+        d1 = r1.json()
+        assert d1.get("success") is True and isinstance(d1.get("thread_id"), int)
+        # Second call should return the same thread (resume)
+        r2 = s.post(f"{base}/api/ai/threads/open",
+                    json={"scope_kind": None, "scope_id": None},
+                    headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        d2 = r2.json()
+        assert d2.get("thread_id") == d1.get("thread_id"), "expected resume same thread"
+    tests.append(("PHASE24B-001: AI thread open/resume returns stable id",
+                  test_phase24b_thread_open_resume))
+
+    def test_phase24b_thread_reset_works():
+        """PHASE24B-002: thread reset returns success without touching the AI."""
+        s = login_ok(base, USERS["ngo"])
+        r1 = s.post(f"{base}/api/ai/threads/open",
+                    json={"scope_kind": None, "scope_id": None},
+                    headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        tid = r1.json().get("thread_id")
+        assert tid, "thread_id missing"
+        r2 = s.post(f"{base}/api/ai/threads/{tid}/reset",
+                    json={}, headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r2.status_code == 200, f"{r2.status_code}: {r2.text[:200]}"
+        assert r2.json().get("success") is True
+    tests.append(("PHASE24B-002: AI thread reset succeeds",
+                  test_phase24b_thread_reset_works))
+
+    def test_phase24c_donor_cohort_analytics_shape():
+        """PHASE24C-001: donor cohort analytics returns shaped JSON."""
+        s = login_ok(base, USERS["donor"])
+        r = s.get(f"{base}/api/dashboard/donor-cohort-analytics",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        assert data.get("source") in ("cohort", "sparse")
+        assert "cohort_size" in data
+        assert isinstance(data.get("metrics", []), list)
+    tests.append(("PHASE24C-001: Donor cohort analytics returns shape",
+                  test_phase24c_donor_cohort_analytics_shape))
+
+    def test_phase24c_donor_cohort_forbidden_for_ngo():
+        """PHASE24C-002: NGO cannot fetch donor cohort analytics."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/dashboard/donor-cohort-analytics",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 403, f"expected 403, got {r.status_code}"
+    tests.append(("PHASE24C-002: Donor cohort analytics forbidden for NGO",
+                  test_phase24c_donor_cohort_forbidden_for_ngo))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [

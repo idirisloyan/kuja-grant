@@ -1919,3 +1919,101 @@ def api_ai_call_feedback(call_id):
         db.session.rollback()
         logger.error(f"helpfulness patch failed: {e}")
         return error_response('server.unexpected', 500)
+
+
+# ----------------------------------------------------------------------
+# Phase 24B — Sustained AI conversation threads
+# ----------------------------------------------------------------------
+
+_ALLOWED_SCOPE_KINDS = ('global', 'grant', 'application', 'report', None)
+
+
+def _parse_scope():
+    """Pull scope_kind + scope_id from the request body or query."""
+    from flask import request as _request
+    data = _request.get_json(silent=True) or {}
+    kind = (data.get('scope_kind') or _request.args.get('scope_kind') or '').strip() or None
+    if kind == 'global':
+        kind = None
+    raw_id = data.get('scope_id') or _request.args.get('scope_id')
+    sid = None
+    if raw_id not in (None, '', 'null'):
+        try:
+            sid = int(raw_id)
+        except (TypeError, ValueError):
+            sid = None
+    return kind, sid
+
+
+@ai_bp.route('/threads/open', methods=['POST'])
+@login_required
+def api_ai_thread_open():
+    """Open or resume a chat thread for the current user, scoped to an
+    entity if provided.
+
+    Body: { scope_kind?: 'grant'|'application'|'report'|'global', scope_id?: int }
+    """
+    from app.services.ai_chat_service import AIChatService
+    kind, sid = _parse_scope()
+    if kind not in _ALLOWED_SCOPE_KINDS:
+        return jsonify({'success': False, 'error': 'bad scope_kind'}), 400
+    thread = AIChatService.open_or_resume(
+        user_id=current_user.id, scope_kind=kind, scope_id=sid,
+    )
+    messages = AIChatService.list_messages(thread=thread)
+    return jsonify({
+        'success': True,
+        'thread_id': thread.id,
+        'scope_kind': thread.scope_kind,
+        'scope_id': thread.scope_id,
+        'title': thread.title,
+        'messages': messages,
+    })
+
+
+@ai_bp.route('/threads/<int:thread_id>/messages', methods=['POST'])
+@login_required
+def api_ai_thread_post(thread_id):
+    """Post a user message + receive Claude's reply.
+
+    Body: { content: str }
+    """
+    from app.services.ai_chat_service import AIChatService
+    from app.models import AIThread
+
+    thread = db.session.get(AIThread, thread_id)
+    if not thread or thread.user_id != current_user.id:
+        return jsonify({'success': False, 'error': 'thread not found'}), 404
+
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return jsonify({'success': False, 'error': 'ai.rate_limited'}), 429
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json() or {}
+    content = (data.get('content') or '').strip()
+    if not content:
+        return jsonify({'success': False, 'error': 'content required'}), 400
+
+    result = AIChatService.post_message(
+        thread=thread, user_text=content,
+        user_role=current_user.role,
+        user_language=getattr(current_user, 'language', 'en') or 'en',
+    )
+    if not result.get('success'):
+        return jsonify(result), 503
+    return jsonify(result)
+
+
+@ai_bp.route('/threads/<int:thread_id>/reset', methods=['POST'])
+@login_required
+def api_ai_thread_reset(thread_id):
+    """Wipe all messages in a thread (keep the thread row)."""
+    from app.services.ai_chat_service import AIChatService
+    from app.models import AIThread
+
+    thread = db.session.get(AIThread, thread_id)
+    if not thread or thread.user_id != current_user.id:
+        return jsonify({'success': False, 'error': 'thread not found'}), 404
+    result = AIChatService.reset_thread(thread=thread)
+    return jsonify(result)

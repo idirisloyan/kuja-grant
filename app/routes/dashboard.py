@@ -506,6 +506,48 @@ def api_portfolio_risk_heatmap():
 
 
 # ----------------------------------------------------------------------
+# Phase 24C — Donor cohort analytics (your funded NGOs vs cohort).
+# ----------------------------------------------------------------------
+
+@dashboard_bp.route('/donor-cohort-analytics', methods=['GET'])
+@login_required
+def api_donor_cohort_analytics():
+    """Compare caller donor's awarded portfolio against other donors'
+    awarded portfolios across capacity, AI score, diversity, small-org
+    funding share, and grantee reporting compliance.
+
+    Donors see their own portfolio; admin can inspect any via
+    ?donor_org_id=. Cached 5 minutes.
+    """
+    from app.services.donor_cohort_analytics_service import (
+        DonorCohortAnalyticsService,
+    )
+
+    if current_user.role == 'donor':
+        if not current_user.org_id:
+            return jsonify({'success': False, 'error': 'Donor org required'}), 400
+        donor_id = current_user.org_id
+    elif current_user.role == 'admin':
+        raw = request.args.get('donor_org_id')
+        if not raw:
+            return jsonify({'success': False, 'error': 'admin must pass donor_org_id'}), 400
+        try:
+            donor_id = int(raw)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'donor_org_id must be int'}), 400
+    else:
+        return jsonify({'success': False, 'error': 'Role not supported'}), 403
+
+    cache_key = f'donor_cohort_analytics_{donor_id}'
+    cached = _dashboard_cache.get(cache_key)
+    if cached is not None:
+        return jsonify({'cached': True, **cached})
+    result = DonorCohortAnalyticsService.for_donor(donor_org_id=donor_id)
+    _dashboard_cache.set(cache_key, result)
+    return jsonify(result)
+
+
+# ----------------------------------------------------------------------
 # Phase 17B — NGO onboarding checklist (drops out once all 3 steps done).
 # ----------------------------------------------------------------------
 
