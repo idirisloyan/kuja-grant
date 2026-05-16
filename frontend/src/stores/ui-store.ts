@@ -19,6 +19,10 @@ interface UIState {
   /** Whether the AI assistant side-panel is open. */
   aiPanelOpen: boolean;
 
+  /** Phase 4 — low-bandwidth mode: defer AI auto-calls, suppress chart
+   *  caption auto-fetch, omit non-essential illustrations. Persists. */
+  lowBandwidth: boolean;
+
   /** Toggle the sidebar between expanded and collapsed. */
   toggleSidebar: () => void;
 
@@ -33,6 +37,22 @@ interface UIState {
 
   /** Imperatively set the AI panel state. */
   setAIPanel: (open: boolean) => void;
+
+  /** Toggle low-bandwidth mode + persist to localStorage. */
+  toggleLowBandwidth: () => void;
+}
+
+// Read the persisted low-bandwidth preference on initial state setup
+function readLowBandwidth(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem('kuja.lowBandwidth') === '1';
+  } catch { return false; }
+}
+
+function writeLowBandwidth(value: boolean) {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem('kuja.lowBandwidth', value ? '1' : '0'); } catch { /* ignore */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -43,6 +63,7 @@ export const useUIStore = create<UIState>((set) => ({
   sidebarCollapsed: false,
   sidebarMobileOpen: false,
   aiPanelOpen: false,
+  lowBandwidth: readLowBandwidth(),
 
   toggleSidebar: () =>
     set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
@@ -58,4 +79,11 @@ export const useUIStore = create<UIState>((set) => ({
 
   setAIPanel: (open) =>
     set({ aiPanelOpen: open }),
+
+  toggleLowBandwidth: () =>
+    set((s) => {
+      const next = !s.lowBandwidth;
+      writeLowBandwidth(next);
+      return { lowBandwidth: next };
+    }),
 }));

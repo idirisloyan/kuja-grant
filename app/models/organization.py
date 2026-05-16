@@ -35,6 +35,11 @@ class Organization(db.Model):
     geographic_areas = db.Column(db.Text, nullable=True)  # JSON array
     focus_areas = db.Column(db.Text, nullable=True)        # JSON array
     sdg_ids = db.Column(db.Text, nullable=True)            # JSON array
+
+    # Phase 4 (Global South affordances) — preferred currency for $-displays.
+    # ISO 4217. Fallback chain on display: grant.currency → org.preferred_currency → 'USD'.
+    preferred_currency = db.Column(db.String(3), nullable=True, default='USD')
+
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
@@ -93,6 +98,7 @@ class Organization(db.Model):
             'geographic_areas': self.get_geographic_areas(),
             'focus_areas': self.get_focus_areas(),
             'sdg_ids': self.get_sdg_ids(),
+            'preferred_currency': self.preferred_currency or 'USD',
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
+import { COMMON_CURRENCIES } from '@/lib/currency';
 import {
   Building2, Save, Loader2, CheckCircle, MapPin, Calendar,
   DollarSign, Users, Target, Globe,
@@ -48,6 +49,7 @@ export default function OrgProfilePage() {
   const [country, setCountry] = useState('');
   const [yearEstablished, setYearEstablished] = useState('');
   const [annualBudget, setAnnualBudget] = useState('');
+  const [preferredCurrency, setPreferredCurrency] = useState('USD');
   const [staffCount, setStaffCount] = useState('');
   const [mission, setMission] = useState('');
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
@@ -64,6 +66,7 @@ export default function OrgProfilePage() {
         setCountry(o.country || '');
         setYearEstablished(o.year_established ? String(o.year_established) : '');
         setAnnualBudget(o.annual_budget || '');
+        setPreferredCurrency(o.preferred_currency || 'USD');
         setStaffCount(o.staff_count || '');
         setMission(o.mission || '');
         setSelectedSectors(o.sectors || []);
@@ -91,6 +94,7 @@ export default function OrgProfilePage() {
         name, country,
         year_established: yearEstablished ? Number(yearEstablished) : null,
         annual_budget: annualBudget,
+        preferred_currency: preferredCurrency,
         staff_count: staffCount,
         mission, sectors: selectedSectors, website,
       });
@@ -99,7 +103,7 @@ export default function OrgProfilePage() {
     } catch {
       // noop
     } finally { setSaving(false); }
-  }, [user?.org_id, name, country, yearEstablished, annualBudget, staffCount, mission, selectedSectors, website]);
+  }, [user?.org_id, name, country, yearEstablished, annualBudget, preferredCurrency, staffCount, mission, selectedSectors, website]);
 
   if (loading) {
     return (
@@ -243,6 +247,20 @@ export default function OrgProfilePage() {
               <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <input type="text" value={annualBudget} onChange={(e) => { setAnnualBudget(e.target.value); setSaved(false); }}
                 placeholder="e.g., $500,000" className={inputCls} />
+            </div>
+          </Field>
+          <Field label="Preferred currency" icon={DollarSign}>
+            <div className="relative">
+              <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <select
+                value={preferredCurrency}
+                onChange={(e) => { setPreferredCurrency(e.target.value); setSaved(false); }}
+                className={inputCls}
+              >
+                {COMMON_CURRENCIES.map(c => (
+                  <option key={c.code} value={c.code}>{c.label}</option>
+                ))}
+              </select>
             </div>
           </Field>
           <Field label={t('org.field.staff')} icon={Users}>

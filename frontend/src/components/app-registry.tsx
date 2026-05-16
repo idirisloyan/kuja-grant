@@ -102,10 +102,31 @@ function installStaleBuildDetector() {
   window.setTimeout(check, 90_000);
 }
 
+// Phase 4 — eager service worker registration so the offline cache layer
+// kicks in for everyone (not only users who grant push permission).
+// Idempotent: navigator.serviceWorker.register returns the existing
+// registration if /sw.js is already controlling this scope.
+function installServiceWorker() {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+  // Defer to after first paint so it never competes with the initial render.
+  const register = () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Silent — SW failure shouldn't block the app. The user just loses
+      // offline shell + caching benefits, not core functionality.
+    });
+  };
+  if (document.readyState === 'complete') {
+    register();
+  } else {
+    window.addEventListener('load', register, { once: true });
+  }
+}
+
 export function AppRegistry({ children }: { children: ReactNode }) {
   useEffect(() => {
     installRSCConsoleSilencer();
     installStaleBuildDetector();
+    installServiceWorker();
   }, []);
 
   return (

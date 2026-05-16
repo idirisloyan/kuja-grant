@@ -169,6 +169,15 @@ def create_app(config_name=None):
             from sqlalchemy import text, inspect as sa_inspect
             inspector = sa_inspect(db.engine)
             with db.engine.connect() as conn:
+                # Phase 4 — preferred_currency on organizations
+                try:
+                    org_cols = {c['name'] for c in inspector.get_columns('organizations')}
+                    if 'preferred_currency' not in org_cols:
+                        conn.execute(text("ALTER TABLE organizations ADD COLUMN preferred_currency VARCHAR(3) DEFAULT 'USD'"))
+                        app.logger.info("Added organizations.preferred_currency column")
+                except Exception as e:
+                    app.logger.debug(f"organizations.preferred_currency check skipped: {e}")
+
                 # Check existing columns and only add missing ones
                 doc_cols = {c['name'] for c in inspector.get_columns('documents')}
                 report_cols = {c['name'] for c in inspector.get_columns('reports')}

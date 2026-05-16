@@ -18,12 +18,12 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { StarButton } from '@/components/shared/star-button';
 import { useUrlState, useUrlSetState } from '@/lib/hooks/use-url-state';
 
+import { formatMoney } from '@/lib/currency';
+
 function formatFunding(amount: number | null | undefined, currency: string = 'USD'): string {
-  if (!amount) return 'TBD';
-  const symbol = currency === 'USD' ? '$' : currency + ' ';
-  if (amount >= 1_000_000) return `${symbol}${(amount / 1_000_000).toFixed(1)}M`;
-  if (amount >= 1_000) return `${symbol}${(amount / 1_000).toFixed(0)}K`;
-  return `${symbol}${amount.toLocaleString()}`;
+  if (amount === null || amount === undefined) return 'TBD';
+  // Phase 4 — compact mode for the grant cards (KSh 1.2M reads better than KSh 1,200,000.00)
+  return formatMoney(amount, { currency, compact: amount >= 1_000 });
 }
 
 function getDaysLeft(

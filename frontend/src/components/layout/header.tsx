@@ -15,7 +15,7 @@ import { supportedLanguages } from '@/i18n';
 import { cn } from '@/lib/utils';
 
 import {
-  Menu, LogOut, Sparkles, ChevronDown, User as UserIcon, Check, Globe, Search,
+  Menu, LogOut, Sparkles, ChevronDown, User as UserIcon, Check, Globe, Search, Signal, SignalLow,
 } from 'lucide-react';
 import { ChangelogButton } from './ChangelogButton';
 
@@ -23,7 +23,7 @@ export function Header() {
   const router = useRouter();
   const { user, logout, setLanguage } = useAuthStore();
   const language = user?.language ?? 'en';
-  const { setMobileSidebarOpen } = useUIStore();
+  const { setMobileSidebarOpen, lowBandwidth, toggleLowBandwidth } = useUIStore();
   const { t } = useTranslation();
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -76,6 +76,24 @@ export function Header() {
 
       {/* Right-side actions */}
       <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Phase 4 — Low-bandwidth toggle. Persisted to localStorage; AI
+            auto-calls + chart captions defer to manual when on. */}
+        <button
+          type="button"
+          onClick={toggleLowBandwidth}
+          className={cn(
+            'hidden sm:inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors',
+            lowBandwidth
+              ? 'border-[hsl(var(--kuja-sun))] bg-[hsl(var(--kuja-sun)/0.1)] text-[hsl(var(--kuja-sun))]'
+              : 'border-[hsl(var(--border))] text-[hsl(var(--kuja-ink-soft))] hover:text-[hsl(var(--kuja-ink))] hover:border-[hsl(var(--kuja-clay))]',
+          )}
+          aria-pressed={lowBandwidth}
+          title={lowBandwidth ? 'Low-bandwidth ON — AI calls deferred' : 'Toggle low-bandwidth mode'}
+        >
+          {lowBandwidth ? <SignalLow className="h-3.5 w-3.5" /> : <Signal className="h-3.5 w-3.5" />}
+          <span className="hidden lg:inline">{lowBandwidth ? 'Low BW' : 'Full BW'}</span>
+        </button>
+
         {/* Phase 2 — Command palette trigger. Cmd+K / Ctrl+K from anywhere
             also opens it; this button is the visible affordance. */}
         <button

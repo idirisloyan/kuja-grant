@@ -63,6 +63,7 @@ export interface Organization {
   city: string | null;
   year_established: number | null;
   annual_budget: string | null;
+  preferred_currency?: string;
   staff_count: string | null;
   sectors: string[];
   description: string | null;

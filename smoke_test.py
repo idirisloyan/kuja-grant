@@ -740,6 +740,32 @@ def make_tests(base):
     # =========================================================================
     # --- Phase 1: Trust Profile / Adverse Media / Bank / Passport ---
 
+    # --- Phase 4: Messaging channels + currency preference ---
+
+    def test_messaging_channels_status():
+        s = login_ok(base, USERS["admin"])
+        r = s.get(f"{base}/api/messaging/channels",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"messaging channels: {r.status_code}"
+        d = r.json()
+        chans = d.get("channels", {})
+        assert "log_fallback" in chans and chans["log_fallback"] is True, "log fallback should always be true"
+        assert "sms" in chans and "whatsapp" in chans, "missing sms/whatsapp keys"
+    tests.append(("MSG-001: Messaging channel status reports adapter wiring", test_messaging_channels_status))
+
+    def test_messaging_log_send():
+        """Test send via log channel always succeeds (no Twilio env needed)."""
+        s = login_ok(base, USERS["admin"])
+        r = s.post(f"{base}/api/messaging/test",
+                   json={"channel": "log", "to": "+254700000000", "body": "smoke test"},
+                   headers={"Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest"},
+                   timeout=10)
+        assert r.status_code == 200, f"messaging test: {r.status_code}"
+        d = r.json()
+        assert d.get("success") is True, f"log channel should always succeed: {d}"
+        assert d.get("result", {}).get("channel") == "log", f"channel should be log: {d}"
+    tests.append(("MSG-002: Log-channel send always succeeds", test_messaging_log_send))
+
     # --- Phase 3: Preemption + calendar ---
 
     def test_preemption_me_ngo():
@@ -986,6 +1012,8 @@ def make_tests(base):
             ("GET", "/api/calendar/deadlines", "ngo"),
             ("GET", "/api/calendar/deadlines", "donor"),
             ("GET", "/api/calendar/deadlines", "admin"),
+            # Phase 4 (Global South affordances) — messaging
+            ("GET", "/api/messaging/channels", "admin"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

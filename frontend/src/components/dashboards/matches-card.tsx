@@ -21,6 +21,7 @@ import { useFlag } from '@/lib/hooks/use-feature-flags';
 import { fetchMatchesForMe, type MatchForOrg } from '@/lib/copilot-api';
 import { ScoreBreakdown } from '@/components/shared/score-breakdown';
 import { cn } from '@/lib/utils';
+import { formatMoney } from '@/lib/currency';
 
 // Component max points must mirror the backend match_engine weights.
 const MATCH_COMPONENT_MAX: Record<string, number> = {
@@ -132,8 +133,8 @@ export function MatchesCard({ limit = 5, className = '' }: Props) {
                     <ArrowUpRight className="h-3.5 w-3.5 flex-shrink-0" />
                   </Link>
                   <div className="mt-0.5 text-[11px] text-muted-foreground">
-                    {m.grant.total_funding && m.grant.currency
-                      ? `${m.grant.currency} ${m.grant.total_funding.toLocaleString()}`
+                    {m.grant.total_funding
+                      ? formatMoney(m.grant.total_funding, { currency: m.grant.currency || 'USD', compact: true })
                       : ''}
                     {m.grant.deadline ? ` · ${formatDate(m.grant.deadline)}` : ''}
                   </div>

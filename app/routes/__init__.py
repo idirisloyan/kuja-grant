@@ -37,6 +37,7 @@ def register_blueprints(app):
     from app.routes.status_signals import signals_bp  # Phase 2: ASK/RISK/DECISION rails
     from app.routes.preemption_routes import preemption_bp  # Phase 3: AI compliance pre-emption scanner
     from app.routes.calendar_routes import calendar_bp  # Phase 3: cross-entity calendar
+    from app.routes.messaging_routes import messaging_bp  # Phase 4: WhatsApp/SMS adapter
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -46,5 +47,5 @@ def register_blueprints(app):
                match_bp, questions_bp, diligence_bp, org_memory_bp,
                risks_bp, admin_health_bp, totp_bp, comments_bp, test_bp,
                saved_searches_bp, push_bp, trust_bp, watchlist_bp, signals_bp,
-               preemption_bp, calendar_bp]:
+               preemption_bp, calendar_bp, messaging_bp]:
         app.register_blueprint(bp)

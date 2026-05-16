@@ -15,6 +15,13 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: 'Kuja — Grant intelligence for the Global South',
   description: 'Unified grant platform: donor co-pilot, NGO readiness coaching, reviewer intelligence, ongoing compliance. Built for African organizations.',
+  manifest: '/manifest.webmanifest',
+  themeColor: '#C2410C',
+  appleWebApp: {
+    capable: true,
+    title: 'Kuja',
+    statusBarStyle: 'default',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

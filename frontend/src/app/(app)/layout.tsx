@@ -17,6 +17,7 @@ import { OnboardingTourProvider } from '@/components/onboarding/tour-provider';
 import { TwoFactorNagBanner } from '@/components/security/TwoFactorNagBanner';
 import { KeyboardShortcutOverlay } from '@/components/shared/KeyboardShortcutOverlay';
 import { CommandPalette } from '@/components/layout/command-palette';
+import { OfflineBanner } from '@/components/layout/offline-banner';
 
 const SIDEBAR_WIDTH = 280;
 const COLLAPSED_WIDTH = 72;
@@ -57,6 +58,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <OnboardingTourProvider>
+      {/* Phase 4 — offline indicator. Slim amber banner when navigator.onLine
+          is false; green "back online" flash on reconnect. Sits above the
+          2FA banner since "the app can't reach the server" is more urgent. */}
+      <OfflineBanner />
       {/* Phase 13.15 — 2FA nag banner above the app shell. Self-gated:
           renders only for admin users without TOTP enrolled. Dismissible
           per-day via localStorage. */}
