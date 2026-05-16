@@ -767,6 +767,44 @@ def make_tests(base):
         assert d.get("role") == "donor"
     tests.append(("TODAY-002: Donor today briefing returns role-appropriate items", test_today_briefing_donor))
 
+    def test_status_signal_create_list_resolve():
+        """ASK/RISK/DECISION rails CRUD lifecycle."""
+        s = login_ok(base, USERS["ngo"])
+        # Get an application id
+        ar = s.get(f"{base}/api/applications/",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10).json()
+        apps = ar.get("applications", [])
+        if not apps:
+            return  # no apps in seed, skip
+        app_id = apps[0]["id"]
+        # Create an ASK signal
+        r1 = s.post(f"{base}/api/signals",
+                    json={"entity_kind": "application", "entity_id": app_id,
+                          "kind": "ask", "body": "Need budget approval from leadership"},
+                    headers={"Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest"},
+                    timeout=10)
+        assert r1.status_code == 200, f"Create signal: {r1.status_code}: {r1.text[:200]}"
+        sig = r1.json().get("signal", {})
+        sig_id = sig.get("id")
+        assert sig_id, f"No id in created signal: {r1.json()}"
+        # List
+        r2 = s.get(f"{base}/api/signals/application/{app_id}",
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r2.status_code == 200
+        listed = r2.json().get("signals", [])
+        assert any(x["id"] == sig_id for x in listed), "Created signal not in list"
+        # Resolve
+        r3 = s.post(f"{base}/api/signals/{sig_id}/resolve",
+                    json={"note": "approved"},
+                    headers={"Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest"},
+                    timeout=10)
+        assert r3.status_code == 200
+        assert r3.json().get("signal", {}).get("status") == "resolved"
+        # Clean up
+        s.delete(f"{base}/api/signals/{sig_id}",
+                 headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+    tests.append(("SIGNAL-001: ASK/RISK/DECISION CRUD lifecycle works", test_status_signal_create_list_resolve))
+
     def test_watchlist_toggle():
         s = login_ok(base, USERS["ngo"])
         # Find a grant to star

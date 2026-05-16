@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import type { Application } from '@/lib/types';
 import { InfoTip } from '@/components/shared/info-tip';
 import { ActivityTimeline } from '@/components/applications/ActivityTimeline';
+import { StatusSignalsRail } from '@/components/shared/status-signals-rail';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
 const TAB_KEYS: { id: TabId; key: string }[] = [
@@ -182,6 +183,13 @@ export default function ApplicationDetailClient() {
       {tab === 'scores' && <ScoresTab application={application} />}
       {tab === 'reviews' && <EmptyTab icon={MessageSquare} label={t('applications.reviews_empty')} />}
       {tab === 'activity' && <ActivityTimeline applicationId={application.id} />}
+
+      {/* Phase 2 — ASK / RISK / DECISION rails. Renders below the tabs so it
+          stays visible regardless of which tab the user is on. */}
+      <div className="pt-2">
+        <h2 className="kuja-eyebrow mb-2">Asks · Risks · Decisions</h2>
+        <StatusSignalsRail entityKind="application" entityId={application.id} />
+      </div>
     </div>
   );
 }

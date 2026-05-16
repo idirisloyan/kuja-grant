@@ -32,6 +32,7 @@ from app.models.compliance_snapshot import ComplianceSnapshot
 from app.models.saved_search import SavedSearch
 from app.models.push_subscription import PushSubscription
 from app.models.watchlist import WatchlistItem
+from app.models.status_signal import StatusSignal
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -41,5 +42,5 @@ __all__ = [
     'AIThread', 'AIMessage', 'AICallLog', 'AIProvenance',
     'GrantQuestion', 'DiligenceItem',
     'OrgMemory', 'Risk', 'AuditChainEntry', 'EntityComment', 'ComplianceSnapshot',
-    'SavedSearch', 'PushSubscription', 'WatchlistItem',
+    'SavedSearch', 'PushSubscription', 'WatchlistItem', 'StatusSignal',
 ]
