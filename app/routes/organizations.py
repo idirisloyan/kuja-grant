@@ -124,6 +124,85 @@ def api_donor_profile(org_id):
     return jsonify(result)
 
 
+@organizations_bp.route('/<int:org_id>/ngo-summary', methods=['GET'])
+@login_required
+def api_ngo_summary(org_id):
+    """Phase 19C — public read-only NGO summary (opt-in)."""
+    from app.services.ngo_summary_service import NGOSummaryService
+    from app.utils.cache import _dashboard_cache
+
+    cache_key = f'ngo_summary_{org_id}'
+    cached = _dashboard_cache.get(cache_key)
+    if cached is not None:
+        return jsonify({'cached': True, **cached})
+    result = NGOSummaryService.for_ngo(ngo_org_id=org_id)
+    _dashboard_cache.set(cache_key, result)
+    return jsonify(result)
+
+
+@organizations_bp.route('/<int:org_id>/ngo-summary/publish', methods=['POST'])
+@login_required
+def api_ngo_summary_publish(org_id):
+    """NGO owner (or admin) flips the public-summary opt-in switch."""
+    from app.services.ngo_summary_service import NGOSummaryService
+    from app.utils.cache import _dashboard_cache
+
+    org = db.session.get(Organization, org_id)
+    if not org:
+        return jsonify({'success': False, 'error': 'Org not found'}), 404
+    if current_user.role != 'admin' and org.id != current_user.org_id:
+        return jsonify({'success': False, 'error': 'Insufficient permissions'}), 403
+
+    result = NGOSummaryService.publish(ngo_org_id=org_id)
+    # Bust cache so the new state is visible immediately
+    _dashboard_cache.set(f'ngo_summary_{org_id}', None)
+    return jsonify(result)
+
+
+@organizations_bp.route('/<int:org_id>/ngo-summary/unpublish', methods=['POST'])
+@login_required
+def api_ngo_summary_unpublish(org_id):
+    from app.services.ngo_summary_service import NGOSummaryService
+    from app.utils.cache import _dashboard_cache
+
+    org = db.session.get(Organization, org_id)
+    if not org:
+        return jsonify({'success': False, 'error': 'Org not found'}), 404
+    if current_user.role != 'admin' and org.id != current_user.org_id:
+        return jsonify({'success': False, 'error': 'Insufficient permissions'}), 403
+
+    result = NGOSummaryService.unpublish(ngo_org_id=org_id)
+    _dashboard_cache.set(f'ngo_summary_{org_id}', None)
+    return jsonify(result)
+
+
+@organizations_bp.route('/<int:org_id>/donor-benchmarks', methods=['GET'])
+@login_required
+def api_donor_benchmarks(org_id):
+    """Phase 19A — peer benchmarks for any donor (visible to all logged-in
+    users so NGOs can research before applying).
+
+    Returns the same shape as /api/dashboard/benchmarks for self, but
+    scoped to a named donor's metrics vs other donors on the platform.
+    """
+    from app.services.peer_benchmark_service import PeerBenchmarkService
+    from app.utils.cache import _dashboard_cache
+
+    org = db.session.get(Organization, org_id)
+    if not org:
+        return jsonify({'success': False, 'error': 'Org not found'}), 404
+    if org.org_type != 'donor':
+        return jsonify({'success': False, 'reason': 'not_donor'}), 400
+
+    cache_key = f'donor_benchmarks_public_{org_id}'
+    cached = _dashboard_cache.get(cache_key)
+    if cached is not None:
+        return jsonify({'cached': True, **cached})
+    result = PeerBenchmarkService.for_donor(donor_org_id=org_id)
+    _dashboard_cache.set(cache_key, result)
+    return jsonify(result)
+
+
 _ALLOWED_STAGE_KEYS = ('draft', 'submitted', 'under_review',
                        'scored', 'awarded', 'rejected')
 

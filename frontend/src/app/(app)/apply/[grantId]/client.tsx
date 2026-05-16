@@ -11,6 +11,7 @@ import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
 import { SubmissionVelocityBar } from '@/components/apply/submission-velocity-bar';
+import { PastWinsPopover } from '@/components/apply/past-wins-popover';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
 import { PreviewAsReviewer } from '@/components/apply/PreviewAsReviewer';
 import { SubmissionReadiness } from '@/components/apply/SubmissionReadiness';
@@ -1121,6 +1122,16 @@ function ProposalStep({
               value={text}
               onChange={(e) => onResponseChange(c.key, e.target.value)}
               className={TA_CLS}
+            />
+
+            {/* Phase 19B — "from your past wins" suggester (zero AI cost,
+                lazy-loads only when the NGO opens the dropdown). */}
+            <PastWinsPopover
+              applicationId={applicationId}
+              criterionKey={c.key}
+              criterionLabel={c.label}
+              currentText={text}
+              onUse={(suggestedText) => onResponseChange(c.key, suggestedText)}
             />
 
             <div className="mt-3 flex items-center justify-between">

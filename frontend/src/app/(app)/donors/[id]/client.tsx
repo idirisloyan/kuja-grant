@@ -26,6 +26,26 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { NameChip } from '@/components/shared/name-chip';
+import { TrendingUp, TrendingDown, Minus, Users } from 'lucide-react';
+
+interface BenchmarkMetric {
+  code: string;
+  label: string;
+  self_value: number;
+  peer_median: number;
+  peer_count: number;
+  percentile: number;
+  verdict: 'above' | 'around' | 'below';
+  higher_is_better: boolean;
+  unit: string;
+}
+
+interface BenchmarksResp {
+  success: boolean;
+  source: 'benchmark' | 'sparse' | 'unavailable';
+  peer_count: number;
+  metrics: BenchmarkMetric[];
+}
 
 interface DonorProfile {
   success: boolean;
@@ -94,6 +114,7 @@ export default function DonorProfileClient() {
 
   const [data, setData] = useState<DonorProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [bench, setBench] = useState<BenchmarksResp | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -103,6 +124,10 @@ export default function DonorProfileClient() {
       .then((r) => { if (!cancelled) setData(r); })
       .catch(() => {/* quiet */})
       .finally(() => { if (!cancelled) setLoading(false); });
+    // Phase 19A — lazy fetch peer benchmarks too (separate quiet call)
+    api.get<BenchmarksResp>(`/api/organizations/${id}/donor-benchmarks`)
+      .then((r) => { if (!cancelled) setBench(r); })
+      .catch(() => {/* quiet */});
     return () => { cancelled = true; };
   }, [id]);
 
@@ -309,6 +334,39 @@ export default function DonorProfileClient() {
                 {data.reporting_burden.median_requirements_per_grant}
               </strong> reporting requirements per grant
             </span>
+          </div>
+        </Card>
+      )}
+
+      {/* Phase 19A — anonymous peer benchmarks for this donor */}
+      {bench && bench.success && bench.source === 'benchmark' && bench.metrics.length > 0 && (
+        <Card className="p-4">
+          <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+            <Users className="h-4 w-4 text-[hsl(var(--kuja-clay))]" /> How they compare to peer donors
+          </h3>
+          <p className="text-[10px] text-muted-foreground mb-3">
+            Anonymous comparison vs {bench.peer_count} other donors on the platform.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {bench.metrics.map((m) => {
+              const Icon = m.verdict === 'above' ? TrendingUp
+                : m.verdict === 'below' ? TrendingDown : Minus;
+              const tone = m.verdict === 'above' ? 'text-[hsl(var(--kuja-grow))]'
+                : m.verdict === 'below' ? 'text-[hsl(var(--kuja-flag))]'
+                : 'text-[hsl(var(--kuja-ink-soft))]';
+              return (
+                <div key={m.code} className="rounded-md border border-[hsl(var(--border))] p-2 space-y-1">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{m.label}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-lg font-semibold tabular-nums">{m.self_value}{m.unit}</span>
+                    <Icon className={`h-3.5 w-3.5 ${tone}`} />
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    peers median {m.peer_median}{m.unit} · {m.percentile}th pct
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}

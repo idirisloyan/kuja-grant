@@ -478,6 +478,83 @@ def api_debrief_rollup():
     return jsonify({'success': False, 'error': 'Role not supported'}), 403
 
 
+@applications_bp.route('/<int:app_id>/suggest-reviewers', methods=['GET'])
+@login_required
+def api_application_suggest_reviewers(app_id):
+    """Phase 19D — rank reviewers for this application by domain match,
+    throughput, and depth. Donor/admin only.
+
+    Returns top 5 (configurable via ?top=N up to 10).
+    """
+    from app.services.reviewer_match_service import ReviewerMatchService
+
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'success': False, 'error': 'auth.access_denied'}), 403
+
+    application = (
+        Application.query.options(db.joinedload(Application.grant))
+        .filter_by(id=app_id).first()
+    )
+    if not application:
+        return jsonify({'success': False, 'error': 'application.not_found'}), 404
+    if current_user.role == 'donor':
+        if not application.grant or application.grant.donor_org_id != current_user.org_id:
+            return jsonify({'success': False, 'error': 'auth.access_denied'}), 403
+
+    try:
+        top = max(1, min(10, int(request.args.get('top', 5))))
+    except (TypeError, ValueError):
+        top = 5
+
+    result = ReviewerMatchService.suggest_for_application(
+        application_id=app_id, top_n=top,
+    )
+    return jsonify(result)
+
+
+@applications_bp.route('/<int:app_id>/past-wins', methods=['GET'])
+@login_required
+def api_application_past_wins(app_id):
+    """Phase 19B — surface "from your past wins" suggestions for a
+    specific criterion on the application the NGO is currently drafting.
+
+    Query params:
+      ?criterion_key=<str>   (required)
+      ?criterion_label=<str> (optional, helps fuzzy match)
+
+    Returns ranked candidates (top 3) from the NGO's own past awarded
+    applications. No cross-org leakage.
+    """
+    from app.services.past_wins_service import PastWinsService
+
+    application = (
+        Application.query.options(db.joinedload(Application.grant))
+        .filter_by(id=app_id).first()
+    )
+    if not application:
+        return jsonify({'success': False, 'error': 'application.not_found'}), 404
+
+    # Only the NGO that owns this application (or admin) can see their past wins
+    if current_user.role == 'ngo':
+        if application.ngo_org_id != current_user.org_id:
+            return jsonify({'success': False, 'error': 'auth.access_denied'}), 403
+    elif current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'auth.access_denied'}), 403
+
+    criterion_key = (request.args.get('criterion_key') or '').strip()
+    if not criterion_key:
+        return jsonify({'success': False, 'error': 'criterion_key required'}), 400
+    criterion_label = (request.args.get('criterion_label') or '').strip() or None
+
+    result = PastWinsService.for_ngo_criterion(
+        ngo_org_id=application.ngo_org_id,
+        criterion_key=criterion_key,
+        criterion_label=criterion_label,
+        exclude_application_id=app_id,
+    )
+    return jsonify(result)
+
+
 @applications_bp.route('/debrief/insights', methods=['GET'])
 @login_required
 def api_debrief_insights():
