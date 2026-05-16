@@ -143,3 +143,36 @@ def api_test_notification():
         related_kind='test',
     )
     return jsonify({'success': True, 'results': results})
+
+
+# ----------------------------------------------------------------------
+# Phase 22D — per-user digest cadence (daily / weekly / off)
+# ----------------------------------------------------------------------
+
+_ALLOWED_CADENCES = ('daily', 'weekly', 'off')
+
+
+@notif_pref_bp.route('/digest-cadence', methods=['GET'])
+@login_required
+def api_get_digest_cadence():
+    return jsonify({
+        'success': True,
+        'digest_cadence': getattr(current_user, 'digest_cadence', 'weekly') or 'weekly',
+        'allowed': list(_ALLOWED_CADENCES),
+    })
+
+
+@notif_pref_bp.route('/digest-cadence', methods=['PUT'])
+@login_required
+def api_set_digest_cadence():
+    """Body: { cadence: 'daily' | 'weekly' | 'off' }"""
+    data = get_request_json() or {}
+    cadence = (data.get('cadence') or '').strip().lower()
+    if cadence not in _ALLOWED_CADENCES:
+        return jsonify({
+            'success': False,
+            'error': f'cadence must be one of: {", ".join(_ALLOWED_CADENCES)}',
+        }), 400
+    current_user.digest_cadence = cadence
+    db.session.commit()
+    return jsonify({'success': True, 'digest_cadence': cadence})

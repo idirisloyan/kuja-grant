@@ -41,6 +41,11 @@ class User(UserMixin, db.Model):
     # JSON list of bcrypt-hashed single-use recovery codes.
     totp_recovery_codes = db.Column(db.Text, nullable=True)
 
+    # Phase 22D — notification digest cadence: 'daily' | 'weekly' | 'off'.
+    # Controls whether NotificationDigestService.run_for_all_eligible
+    # includes this user on a given run.
+    digest_cadence = db.Column(db.String(10), nullable=False, default='weekly')
+
     # Relationships
     organization = db.relationship('Organization', backref=db.backref('users', lazy='dynamic'))
     reviews = db.relationship('Review', backref='reviewer', lazy='dynamic')

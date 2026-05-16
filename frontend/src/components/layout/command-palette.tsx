@@ -87,12 +87,23 @@ interface SearchHitDoc {
   match_locations: string[];
 }
 
+// Phase 22B — cross-entity global search hit (grants/apps/reports/docs)
+interface GlobalHit {
+  kind: 'grant' | 'application' | 'report' | 'document';
+  id: number;
+  title: string;
+  snippet: string;
+  href: string;
+  badge?: string;
+}
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [grantHits, setGrantHits] = useState<SearchHitGrant[]>([]);
   const [orgHits, setOrgHits] = useState<SearchHitOrg[]>([]);
   const [docHits, setDocHits] = useState<SearchHitDoc[]>([]);
+  const [contentHits, setContentHits] = useState<GlobalHit[]>([]);
   const [searching, setSearching] = useState(false);
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -120,21 +131,31 @@ export function CommandPalette() {
   // Live search across grants + orgs + documents (debounced 250ms)
   useEffect(() => {
     if (!query || query.length < 2) {
-      setGrantHits([]); setOrgHits([]); setDocHits([]); return;
+      setGrantHits([]); setOrgHits([]); setDocHits([]); setContentHits([]); return;
     }
     let cancelled = false;
     setSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const [g, o, d] = await Promise.all([
+        const [g, o, d, c] = await Promise.all([
           api.get<{ grants?: SearchHitGrant[] }>(`/api/grants/?q=${encodeURIComponent(query)}`).catch(() => ({ grants: [] })),
           api.get<{ organizations?: SearchHitOrg[] }>(`/api/organizations/search?q=${encodeURIComponent(query)}`).catch(() => ({ organizations: [] })),
           api.get<{ hits?: SearchHitDoc[] }>(`/api/documents/search?q=${encodeURIComponent(query)}`).catch(() => ({ hits: [] })),
+          // Phase 22B — cross-entity content search (grants/apps/reports/docs)
+          query.length >= 3
+            ? api.get<{ results?: GlobalHit[] }>(`/api/documents/search/global?q=${encodeURIComponent(query)}`).catch(() => ({ results: [] }))
+            : Promise.resolve({ results: [] }),
         ]);
         if (cancelled) return;
         setGrantHits((g.grants ?? []).slice(0, 5));
         setOrgHits((o.organizations ?? []).slice(0, 5));
         setDocHits((d.hits ?? []).slice(0, 5));
+        // Filter the global hits to NON-grant kinds since grants already
+        // have their own section above (avoids duplicates).
+        const nonGrantContent = ((c as { results?: GlobalHit[] }).results ?? [])
+          .filter((h) => h.kind !== 'grant' && h.kind !== 'document')
+          .slice(0, 8);
+        setContentHits(nonGrantContent);
       } finally {
         if (!cancelled) setSearching(false);
       }
@@ -271,6 +292,42 @@ export function CommandPalette() {
                       </div>
                     )}
                   </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
+
+        {/* Phase 22B — cross-entity content search (applications + reports
+            content). Renders only when there are non-grant/non-document hits. */}
+        {contentHits.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="In your content">
+              {contentHits.map((c) => (
+                <CommandItem
+                  key={`content-${c.kind}-${c.id}`}
+                  value={`content-${c.kind}-${c.id} ${c.title}`}
+                  onSelect={() => go(c.href)}
+                  className="flex items-start gap-2"
+                >
+                  {c.kind === 'application'
+                    ? <FileText className="w-4 h-4 text-[hsl(var(--kuja-clay))] mt-0.5" />
+                    : c.kind === 'report'
+                      ? <BarChart3 className="w-4 h-4 text-[hsl(var(--kuja-grow))] mt-0.5" />
+                      : <Activity className="w-4 h-4 text-[hsl(var(--kuja-ink-soft))] mt-0.5" />}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold truncate">{c.title}</div>
+                    {c.snippet && (
+                      <div
+                        className="text-[11px] text-[hsl(var(--kuja-ink-soft))] line-clamp-2"
+                        dangerouslySetInnerHTML={{ __html: c.snippet }}
+                      />
+                    )}
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--kuja-ink-soft))]">
+                    {c.kind}{c.badge ? ` · ${c.badge}` : ''}
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>

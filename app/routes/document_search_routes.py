@@ -36,3 +36,18 @@ def api_document_search():
         })
     result = DocumentSearchService.search(query=q, user=current_user)
     return jsonify({'success': True, **result})
+
+
+@doc_search_bp.route('/search/global', methods=['GET'])
+@login_required
+def api_global_search():
+    """Phase 22B — cross-entity search across grants, applications,
+    reports, and documents (all role-scoped).
+
+    Query params:
+      q: required, minimum 3 characters
+    """
+    from app.services.global_search_service import GlobalSearchService
+    q = (request.args.get('q') or '').strip()
+    result = GlobalSearchService.search(query=q, user=current_user)
+    return jsonify(result)

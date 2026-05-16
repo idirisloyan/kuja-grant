@@ -19,6 +19,7 @@ import { PreflightPanel } from '@/components/shared/preflight-panel';
 import { ReviewerFollowupsPanel } from '@/components/reviews/reviewer-followups-panel';
 import { ReviewerBriefingCard } from '@/components/reviews/reviewer-briefing-card';
 import { PanelCalibrationCard } from '@/components/reviews/panel-calibration-card';
+import { ScoreBreakdownCard } from '@/components/applications/score-breakdown-card';
 import { ApplicationMessageThread } from '@/components/applications/application-message-thread';
 import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
 import { useAuthStore } from '@/stores/auth-store';
@@ -237,6 +238,10 @@ export default function ApplicationDetailClient() {
           reviews; shows for everyone with read access (transparent
           calibration is the point). */}
       <PanelCalibrationCard applicationId={application.id} />
+
+      {/* Phase 22A — per-criterion score breakdown. NGOs see WHY they
+          got the score they did; donors/reviewers see full comments. */}
+      <ScoreBreakdownCard applicationId={application.id} />
 
       {/* Phase 20C — donor ↔ NGO threaded conversation. Visible to all
           parties on the application (server-side gates enforce). */}

@@ -1,0 +1,81 @@
+name: Compliance rerun cron
+
+# Phase 22C — daily cron that re-screens NGOs whose adverse-media
+# screening is older than 90 days. Bounded to MAX_PER_RUN=25 per tick.
+#
+# Required repo secrets (already used by cron-uat-fixtures.yml):
+#   CRON_SECRET — must match the CRON_SECRET set on Railway
+#   PROD_BASE   — defaults to the kuja prod URL if unset
+
+on:
+  # Daily at 04:45 UTC (30 min after the UAT fixtures cron, so they
+  # don't compete for AI quota on the same Railway worker).
+  schedule:
+    - cron: "45 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Determine base URL
+        id: base
+        run: |
+          if [ -n "${{ secrets.PROD_BASE }}" ]; then
+            echo "url=${{ secrets.PROD_BASE }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://web-production-6f8a.up.railway.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: POST /api/cron/compliance-rerun
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET repo secret is missing"
+            exit 1
+          fi
+          http_code=$(curl -s -o /tmp/body.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            -d '{}' \
+            --max-time 600 \
+            "${BASE_URL}/api/cron/compliance-rerun")
+          echo "HTTP ${http_code}"
+          cat /tmp/body.json || true
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Compliance rerun cron returned ${http_code}"
+            exit 1
+          fi
+
+      - name: Summarise to step output
+        if: always()
+        run: |
+          if [ -f /tmp/body.json ]; then
+            python3 - <<'PY'
+          import json, os
+          with open('/tmp/body.json') as f:
+              try:
+                  d = json.load(f)
+              except Exception:
+                  print('Cron returned non-JSON body')
+                  raise SystemExit(0)
+          result = d.get('result') or {}
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if not summary:
+              print(json.dumps(result, indent=2))
+              raise SystemExit(0)
+          with open(summary, 'a') as out:
+              out.write('# Compliance rerun cron\n\n')
+              for k, v in result.items():
+                  if isinstance(v, list):
+                      out.write(f'- **{k}**: {len(v)} entries\n')
+                  else:
+                      out.write(f'- **{k}**: {v}\n')
+          PY
+          fi

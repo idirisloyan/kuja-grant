@@ -278,6 +278,10 @@ def create_app(config_name=None):
                 if 'totp_recovery_codes' not in user_cols:
                     conn.execute(text("ALTER TABLE users ADD COLUMN totp_recovery_codes TEXT"))
                     added.append('users.totp_recovery_codes')
+                # Phase 22D — notification digest cadence.
+                if 'digest_cadence' not in user_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN digest_cadence VARCHAR(10) NOT NULL DEFAULT 'weekly'"))
+                    added.append('users.digest_cadence')
                 if added:
                     conn.commit()
                     app.logger.info(f"Added missing columns: {', '.join(added)}")

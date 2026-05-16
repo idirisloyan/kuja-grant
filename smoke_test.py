@@ -2117,6 +2117,106 @@ def make_tests(base):
         assert "existing_application_id" in data, f"missing existing_application_id: {list(data.keys())}"
     tests.append(("PHASE21D-001: Duplicate POST returns 409 with existing_application_id", test_phase21d_duplicate_returns_409_with_existing_id))
 
+    def test_phase22a_score_breakdown_shape():
+        """PHASE22A-001: score-breakdown endpoint returns shaped JSON."""
+        s = login_ok(base, USERS["ngo"])
+        apps = s.get(f"{base}/api/applications/",
+                     headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15).json()
+        all_apps = apps.get("applications") or []
+        if not all_apps:
+            return
+        app_id = all_apps[0]["id"]
+        r = s.get(f"{base}/api/applications/{app_id}/score-breakdown",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        for k in ("criteria_breakdown", "reviewer_count",
+                  "strongest_criteria", "weakest_criteria"):
+            assert k in data, f"breakdown missing {k}: {list(data.keys())}"
+        assert isinstance(data["criteria_breakdown"], list)
+    tests.append(("PHASE22A-001: Score breakdown returns shape", test_phase22a_score_breakdown_shape))
+
+    def test_phase22b_global_search_short_query():
+        """PHASE22B-001: global search rejects too-short query."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/documents/search/global?q=ab",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200
+        data = r.json()
+        assert data.get("success") is True
+        assert data.get("reason") == "query_too_short"
+        assert data.get("results") == []
+    tests.append(("PHASE22B-001: Global search rejects too-short query", test_phase22b_global_search_short_query))
+
+    def test_phase22b_global_search_real_query():
+        """PHASE22B-002: real query returns shaped results with totals."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/documents/search/global?q=health",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=30)
+        assert r.status_code == 200
+        data = r.json()
+        assert data.get("success") is True
+        assert "results" in data and isinstance(data["results"], list)
+        assert "totals" in data
+        for k in ("grants", "applications", "reports", "documents"):
+            assert k in data["totals"]
+        for hit in data["results"][:3]:
+            for k in ("kind", "id", "title", "snippet", "href"):
+                assert k in hit, f"result missing {k}: {list(hit.keys())}"
+    tests.append(("PHASE22B-002: Global search returns shaped results", test_phase22b_global_search_real_query))
+
+    def test_phase22c_compliance_rerun_cron_admin():
+        """PHASE22C-001: admin can trigger compliance rerun cron."""
+        s = login_ok(base, USERS["admin"])
+        r = s.post(f"{base}/api/cron/compliance-rerun",
+                   json={},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=120)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        result = data.get("result", {})
+        for k in ("ngos_total", "reran", "skipped_fresh", "skipped_capacity"):
+            assert k in result, f"missing {k}: {list(result.keys())}"
+    tests.append(("PHASE22C-001: Compliance rerun cron runs as admin", test_phase22c_compliance_rerun_cron_admin))
+
+    def test_phase22c_compliance_rerun_forbidden_for_ngo():
+        """PHASE22C-002: NGO cannot trigger compliance rerun."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.post(f"{base}/api/cron/compliance-rerun",
+                   json={},
+                   headers={"Content-Type": "application/json",
+                            "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 403, f"expected 403, got {r.status_code}"
+    tests.append(("PHASE22C-002: Compliance rerun forbidden for NGO", test_phase22c_compliance_rerun_forbidden_for_ngo))
+
+    def test_phase22d_digest_cadence_lifecycle():
+        """PHASE22D-001: digest cadence GET + PUT works end-to-end."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/notification-preferences/digest-cadence",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200
+        data = r.json()
+        assert data.get("digest_cadence") in ("daily", "weekly", "off")
+        r = s.put(f"{base}/api/notification-preferences/digest-cadence",
+                  json={"cadence": "daily"},
+                  headers={"Content-Type": "application/json",
+                           "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200
+        assert r.json().get("digest_cadence") == "daily"
+        r = s.put(f"{base}/api/notification-preferences/digest-cadence",
+                  json={"cadence": "yearly"},
+                  headers={"Content-Type": "application/json",
+                           "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 400, f"expected 400 for bad cadence, got {r.status_code}"
+        # Cleanup
+        s.put(f"{base}/api/notification-preferences/digest-cadence",
+              json={"cadence": "weekly"},
+              headers={"Content-Type": "application/json",
+                       "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+    tests.append(("PHASE22D-001: Digest cadence GET+PUT lifecycle", test_phase22d_digest_cadence_lifecycle))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [
@@ -2223,6 +2323,12 @@ def make_tests(base):
             ("GET", "/api/exports/applications.csv", "ngo"),
             ("GET", "/api/exports/applications.csv", "donor"),
             ("GET", "/api/exports/reviews.csv", "reviewer"),
+            # Phase 22 (score breakdown + global search + digest cadence)
+            ("GET", "/api/applications/1/score-breakdown", "ngo"),
+            ("GET", "/api/applications/1/score-breakdown", "donor"),
+            ("GET", "/api/documents/search/global?q=health", "ngo"),
+            ("GET", "/api/documents/search/global?q=health", "donor"),
+            ("GET", "/api/notification-preferences/digest-cadence", "ngo"),
         ]
         errors_500 = []
         for method, path, role in endpoints:

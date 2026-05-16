@@ -33,6 +33,25 @@ def _is_authorized() -> bool:
     return False
 
 
+@cron_bp.route('/compliance-rerun', methods=['POST'])
+def api_cron_compliance_rerun():
+    """Phase 22C — re-screen NGOs whose adverse-media screening is stale.
+
+    Caps MAX_PER_RUN per tick. Structured drift report so monitoring can
+    alert if backlog grows (skipped_capacity > 0 for multiple days in a row).
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    try:
+        from app.services.compliance_rerun_service import ComplianceRerunService
+        result = ComplianceRerunService.run()
+        logger.info(f'compliance rerun cron: {result}')
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception(f'compliance rerun cron failed: {e}')
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/uat-fixtures', methods=['POST'])
 def api_cron_uat_fixtures():
     """Daily-runnable: ensure demo/UAT state stays meaningful.

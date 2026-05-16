@@ -122,34 +122,53 @@ class NotificationDigestService:
         }
 
     @classmethod
-    def run_for_all_eligible(cls) -> dict:
+    def run_for_all_eligible(cls, *, frequency_filter: str | None = None) -> dict:
         """Cron entry point: iterates users whose digest preference is on.
 
-        We treat the absence of an explicit pref as 'off' so this never
-        fires for someone who never opted in.
+        Phase 22D — honors User.digest_cadence (daily/weekly/off) as the
+        canonical setting. Falls back to the legacy "digest:<freq>"
+        channels-list convention so older installs keep working.
+
+        If `frequency_filter` is provided ('daily' or 'weekly'), only
+        users on that exact cadence are picked — so a daily cron can
+        call run_for_all_eligible(frequency_filter='daily') without
+        also re-firing weekly users.
         """
-        # Find every user with at least one NotificationPreference row that
-        # has a digest setting we recognise.
-        rows = NotificationPreference.query.all()
+        from app.models import User
+
+        # Use the User table as the authoritative source so users who
+        # never set a NotificationPreference row also get digests.
+        users = User.query.filter(User.is_active == True).all()  # noqa: E712
         seen = set()
         results = []
-        for r in rows:
-            if r.user_id in seen:
+
+        # Build legacy channels-prefix lookup once (back-compat)
+        legacy_pref_by_user: dict[int, str] = {}
+        for r in NotificationPreference.query.all():
+            if r.user_id in legacy_pref_by_user:
                 continue
-            channels = r.get_channels() or []
-            # Convention: "digest:daily" or "digest:weekly" in channels list
-            digest_pref = None
-            for c in channels:
+            for c in (r.get_channels() or []):
                 if c.startswith('digest:'):
-                    digest_pref = c.split(':', 1)[1]
+                    legacy_pref_by_user[r.user_id] = c.split(':', 1)[1]
                     break
-            if digest_pref not in cls.LOOKBACK_DAYS:
+
+        for u in users:
+            if u.id in seen:
                 continue
-            seen.add(r.user_id)
-            results.append(cls.run_for_user(r.user_id, frequency=digest_pref))
+            cadence = (getattr(u, 'digest_cadence', None) or '').strip().lower()
+            if cadence in ('', None) and u.id in legacy_pref_by_user:
+                cadence = legacy_pref_by_user[u.id]
+            if cadence not in cls.LOOKBACK_DAYS:
+                # 'off' or unset → skip
+                continue
+            if frequency_filter and cadence != frequency_filter:
+                continue
+            seen.add(u.id)
+            results.append(cls.run_for_user(u.id, frequency=cadence))
 
         return {
             'eligible_users': len(seen),
+            'frequency_filter': frequency_filter,
             'results': results,
             'ran_at': datetime.now(timezone.utc).isoformat(),
         }

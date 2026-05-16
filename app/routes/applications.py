@@ -478,6 +478,46 @@ def api_debrief_rollup():
     return jsonify({'success': False, 'error': 'Role not supported'}), 403
 
 
+@applications_bp.route('/<int:app_id>/score-breakdown', methods=['GET'])
+@login_required
+def api_application_score_breakdown(app_id):
+    """Phase 22A — per-criterion human-score decomposition.
+
+    NGO sees aggregated panel comments + mean per criterion (no
+    reviewer attribution).
+    Donor/reviewer/admin see all comments.
+    """
+    from app.services.score_breakdown_service import ScoreBreakdownService
+
+    application = (
+        Application.query.options(db.joinedload(Application.grant))
+        .filter_by(id=app_id).first()
+    )
+    if not application:
+        return jsonify({'success': False, 'error': 'application.not_found'}), 404
+
+    role = current_user.role
+    visible = False
+    if role == 'admin':
+        visible = True
+    elif role == 'ngo':
+        visible = application.ngo_org_id == current_user.org_id
+    elif role == 'donor':
+        visible = bool(application.grant and application.grant.donor_org_id == current_user.org_id)
+    elif role == 'reviewer':
+        from app.models import Review
+        visible = Review.query.filter_by(
+            application_id=app_id, reviewer_user_id=current_user.id
+        ).first() is not None
+    if not visible:
+        return jsonify({'success': False, 'error': 'auth.access_denied'}), 403
+
+    result = ScoreBreakdownService.for_application(
+        application_id=app_id, viewer_role=role,
+    )
+    return jsonify(result)
+
+
 @applications_bp.route('/<int:app_id>/panel-calibration', methods=['GET'])
 @login_required
 def api_application_panel_calibration(app_id):
