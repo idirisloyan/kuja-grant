@@ -33,6 +33,7 @@ from app.models.saved_search import SavedSearch
 from app.models.push_subscription import PushSubscription
 from app.models.watchlist import WatchlistItem
 from app.models.status_signal import StatusSignal
+from app.models.notification_preference import NotificationPreference
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -43,4 +44,5 @@ __all__ = [
     'GrantQuestion', 'DiligenceItem',
     'OrgMemory', 'Risk', 'AuditChainEntry', 'EntityComment', 'ComplianceSnapshot',
     'SavedSearch', 'PushSubscription', 'WatchlistItem', 'StatusSignal',
+    'NotificationPreference',
 ]

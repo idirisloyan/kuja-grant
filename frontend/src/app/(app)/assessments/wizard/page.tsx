@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useDraftAutosave, getDraftSavedAt } from '@/lib/hooks/use-draft-autosave';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAssessmentFrameworks } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -69,11 +70,37 @@ export default function AssessmentWizardPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
-  const [orgProfile, setOrgProfile] = useState<OrgProfile>({
-    name: user?.org_name || '', country: '', year_established: '',
-    annual_budget: '', staff_count: '', mission: '', sectors: '',
-  });
-  const [checklistResponses, setChecklistResponses] = useState<Record<string, boolean>>({});
+  // Phase 6 — local-storage autosave so a draft assessment survives
+  // browser closes, offline gaps, and accidental navigation. The
+  // draft key is per-user + per-framework so switching frameworks
+  // doesn't clobber the other one's in-progress data.
+  const draftScope = `${user?.id ?? 'anon'}.${selectedFramework || 'none'}`;
+  const [orgProfile, setOrgProfile] = useDraftAutosave<OrgProfile>(
+    `kuja.draft.assessment.${draftScope}.profile`,
+    {
+      name: user?.org_name || '', country: '', year_established: '',
+      annual_budget: '', staff_count: '', mission: '', sectors: '',
+    },
+  );
+  const [checklistResponses, setChecklistResponses] = useDraftAutosave<Record<string, boolean>>(
+    `kuja.draft.assessment.${draftScope}.checklist`,
+    {},
+  );
+
+  // Show a "Draft restored" hint when localStorage had data on mount.
+  const [draftRestoredNote, setDraftRestoredNote] = useState<string | null>(null);
+  useEffect(() => {
+    const profileSaved = getDraftSavedAt(`kuja.draft.assessment.${draftScope}.profile`);
+    if (profileSaved) {
+      const mins = Math.floor((Date.now() - profileSaved.getTime()) / 60000);
+      setDraftRestoredNote(
+        mins < 1 ? 'Draft restored from local autosave (just now).'
+        : `Draft restored from local autosave (${mins} min ago).`,
+      );
+      const t = window.setTimeout(() => setDraftRestoredNote(null), 6000);
+      return () => window.clearTimeout(t);
+    }
+  }, [draftScope]);
   const [docUploads, setDocUploads] = useState<Record<string, DocFile>>({});
   const [results, setResults] = useState<AssessmentResult | null>(null);
 
@@ -235,6 +262,12 @@ export default function AssessmentWizardPage() {
       >
         <ArrowLeft className="h-4 w-4" /> {t('assessment.back_to_assessments')}
       </button>
+
+      {draftRestoredNote && (
+        <div className="rounded-md border border-[hsl(var(--kuja-grow)/0.3)] bg-[hsl(var(--kuja-grow)/0.05)] px-3 py-2 text-xs text-[hsl(var(--kuja-grow))]">
+          {draftRestoredNote}
+        </div>
+      )}
 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>

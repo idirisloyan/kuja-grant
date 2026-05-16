@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
 import { COMMON_CURRENCIES } from '@/lib/currency';
+import { MyAIUsageCard } from '@/components/dashboards/my-ai-usage-card';
 import {
   Building2, Save, Loader2, CheckCircle, MapPin, Calendar,
   DollarSign, Users, Target, Globe,
@@ -152,6 +153,10 @@ export default function OrgProfilePage() {
           </button>
         </div>
       </div>
+
+      {/* Phase 6 — own-org AI usage transparency. Renders nothing if the
+          /api/ai-budget/me call fails or the user isn't in an org. */}
+      <MyAIUsageCard />
 
       {/* Profile completion progress — shows the user how complete their
           profile is and motivates them to fill the gaps. AI suggestions

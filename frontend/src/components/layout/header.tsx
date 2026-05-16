@@ -15,7 +15,7 @@ import { supportedLanguages } from '@/i18n';
 import { cn } from '@/lib/utils';
 
 import {
-  Menu, LogOut, Sparkles, ChevronDown, User as UserIcon, Check, Globe, Search, Signal, SignalLow,
+  Menu, LogOut, Sparkles, ChevronDown, User as UserIcon, Check, Globe, Search, Signal, SignalLow, Bell,
 } from 'lucide-react';
 import { ChangelogButton } from './ChangelogButton';
 
@@ -206,6 +206,15 @@ export function Header() {
                 <div className="text-sm font-medium text-foreground truncate">{user.name}</div>
                 <div className="text-[11px] text-muted-foreground truncate">{user.email}</div>
               </div>
+              <a
+                href="/settings/notifications"
+                role="menuitem"
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                onClick={() => setUserMenuOpen(false)}
+              >
+                <Bell className="h-4 w-4 text-muted-foreground" />
+                {t('header.notification_settings') || 'Notification settings'}
+              </a>
               <button
                 type="button"
                 role="menuitem"

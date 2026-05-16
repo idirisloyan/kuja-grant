@@ -740,6 +740,51 @@ def make_tests(base):
     # =========================================================================
     # --- Phase 1: Trust Profile / Adverse Media / Bank / Passport ---
 
+    # --- Phase 6: Notification preferences + dispatcher ---
+
+    def test_notif_prefs_default_shape():
+        """GET /api/notification-preferences returns all 4 categories with defaults."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/notification-preferences",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"prefs GET: {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        cats = d.get("categories", [])
+        assert len(cats) == 4, f"Expected 4 categories, got {len(cats)}"
+        cat_names = {c.get("category") for c in cats}
+        for expected in ("deadlines", "reviews", "compliance", "decisions"):
+            assert expected in cat_names, f"Missing category: {expected}"
+        catalog = d.get("catalog", {})
+        for k in ("categories", "channels", "defaults"):
+            assert k in catalog, f"catalog missing {k}"
+    tests.append(("NOTIFPREF-001: Default prefs shape returned", test_notif_prefs_default_shape))
+
+    def test_notif_prefs_upsert_and_test_send():
+        """PUT prefs + POST /test fires through dispatcher (in_app always wins)."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.put(f"{base}/api/notification-preferences",
+                  json={"categories": [
+                      {"category": "compliance", "channels": ["in_app", "sms"],
+                       "phone_e164": "+254700000999", "whatsapp_e164": None},
+                      {"category": "deadlines", "channels": ["in_app"]},
+                  ]},
+                  headers={"Content-Type": "application/json",
+                           "X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"prefs PUT: {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        comp = next(c for c in d["categories"] if c["category"] == "compliance")
+        assert "in_app" in comp["channels"] and "sms" in comp["channels"], f"PUT didn't persist: {comp}"
+        # Test fire
+        r2 = s.post(f"{base}/api/notification-preferences/test",
+                    json={"category": "compliance"},
+                    headers={"Content-Type": "application/json",
+                             "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r2.status_code == 200, f"prefs test: {r2.status_code}"
+        results = r2.json().get("results", [])
+        channels_fired = {x["channel"] for x in results if x.get("success") and not x.get("skipped")}
+        assert "in_app" in channels_fired, f"in_app should fire: {results}"
+    tests.append(("NOTIFPREF-002: Upsert + test dispatch fans out to in_app", test_notif_prefs_upsert_and_test_send))
+
     # --- Phase 5: AI budget gate ---
 
     def test_ai_budget_me():
@@ -1043,6 +1088,9 @@ def make_tests(base):
             # Phase 5 (integrity) — AI budget
             ("GET", "/api/ai-budget/me", "ngo"),
             ("GET", "/api/ai-budget/admin/spend", "admin"),
+            # Phase 6 (preferences + notifications)
+            ("GET", "/api/notification-preferences", "ngo"),
+            ("GET", "/api/notification-preferences", "donor"),
         ]
         errors_500 = []
         for method, path, role in endpoints:
