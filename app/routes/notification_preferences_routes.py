@@ -27,6 +27,14 @@ notif_pref_bp = Blueprint(
     'notif_pref', __name__, url_prefix='/api/notification-preferences',
 )
 
+# Phase 28B — alias blueprint so /api/notifications/preferences works
+# (the path the team's 2026-05-16 retest expected). Same handlers,
+# different prefix — discoverability without forcing UI callers to
+# change.
+notif_pref_alias_bp = Blueprint(
+    'notif_pref_alias', __name__, url_prefix='/api/notifications/preferences',
+)
+
 
 def _load_my_prefs(user_id: int) -> dict:
     """Return current prefs as {categories: [{category, channels, ...}],
@@ -176,3 +184,42 @@ def api_set_digest_cadence():
     current_user.digest_cadence = cadence
     db.session.commit()
     return jsonify({'success': True, 'digest_cadence': cadence})
+
+
+# ----------------------------------------------------------------------
+# Phase 28B — alias routes for /api/notifications/preferences.
+# Same handlers as above; new prefix so external API discovery finds
+# them at the canonical-looking path the team's 2026-05-16 retest
+# expected. UI keeps calling the original /api/notification-preferences
+# path; both work.
+# ----------------------------------------------------------------------
+
+@notif_pref_alias_bp.route('', methods=['GET'])
+@login_required
+def api_get_prefs_alias():
+    return jsonify({'success': True, **_load_my_prefs(current_user.id)})
+
+
+@notif_pref_alias_bp.route('', methods=['PUT'])
+@login_required
+def api_put_prefs_alias():
+    # Delegate to the original handler so behaviour stays identical.
+    return api_put_prefs()
+
+
+@notif_pref_alias_bp.route('/test', methods=['POST'])
+@login_required
+def api_test_notification_alias():
+    return api_test_notification()
+
+
+@notif_pref_alias_bp.route('/digest-cadence', methods=['GET'])
+@login_required
+def api_get_digest_cadence_alias():
+    return api_get_digest_cadence()
+
+
+@notif_pref_alias_bp.route('/digest-cadence', methods=['PUT'])
+@login_required
+def api_set_digest_cadence_alias():
+    return api_set_digest_cadence()

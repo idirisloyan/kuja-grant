@@ -209,7 +209,24 @@ function NowTab({ scope, role }: { scope: CopilotScope; role: string }) {
     if (res.ok) {
       setItems(res.data.suggestions || []);
     } else {
-      setError(res.message);
+      // Phase 28C — treat transient/server-side errors (5xx, timeouts,
+      // job failures) as quiet "no suggestions right now" instead of
+      // surfacing red error text on every admin/donor page. The team's
+      // 2026-05-16 retest caught the noise on /admin/audit-chain where
+      // a 502 from /api/ai/suggestions was rendered as
+      // "Imeshindwa kupakia mapendekezo — Application failed to respond."
+      // Only show error text for genuine client-side issues (4xx that
+      // aren't auth — e.g. validation) so the rail stays calm.
+      const transient = !res.code
+        || res.code === 'NETWORK'
+        || res.code === 'JOB_TIMEOUT'
+        || res.code === 'JOB_FAILED'
+        || /^HTTP_5\d\d$/.test(res.code)
+        || res.code === 'HTTP_429'
+        || res.code === 'HTTP_408';
+      if (!transient) {
+        setError(res.message);
+      }
       setItems([]);
     }
     setLoading(false);
@@ -525,7 +542,19 @@ function InsightsTab({ scope, role }: { scope: CopilotScope; role: string }) {
             ?? d.suggestions?.map((x) => ({ title: x.title, body: x.detail ?? '', severity: x.severity })),
         });
       } else {
-        setError(res.message);
+        // Phase 28C — same resilience as NowTab: swallow transient
+        // failures (5xx/timeout/job-failed) so a Railway 502 doesn't
+        // paint angry red text in the Insights tab.
+        const transient = !res.code
+          || res.code === 'NETWORK'
+          || res.code === 'JOB_TIMEOUT'
+          || res.code === 'JOB_FAILED'
+          || /^HTTP_5\d\d$/.test(res.code)
+          || res.code === 'HTTP_429'
+          || res.code === 'HTTP_408';
+        if (!transient) {
+          setError(res.message);
+        }
       }
       setLoading(false);
     })();

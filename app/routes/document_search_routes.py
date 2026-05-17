@@ -5,6 +5,12 @@ Blueprint prefix: /api/documents
 Routes:
   GET /api/documents/search?q=<query>   - cross-document ILIKE search,
                                           scoped to caller's visibility
+  GET /api/documents/search/global       - cross-entity search
+
+Phase 28A also registers a second blueprint at /api/search as an alias
+for the global search, because the team's 2026-05-16 retest expected
+that path. The UI's command palette uses /api/documents/search/global
+under the hood; the alias is for direct API discoverability.
 """
 
 import logging
@@ -17,6 +23,9 @@ from app.services.document_search_service import DocumentSearchService
 logger = logging.getLogger('kuja')
 
 doc_search_bp = Blueprint('doc_search', __name__, url_prefix='/api/documents')
+
+# Phase 28A — clean top-level alias for global search.
+search_alias_bp = Blueprint('search_alias', __name__, url_prefix='/api')
 
 
 @doc_search_bp.route('/search', methods=['GET'])
@@ -46,6 +55,23 @@ def api_global_search():
 
     Query params:
       q: required, minimum 3 characters
+    """
+    from app.services.global_search_service import GlobalSearchService
+    q = (request.args.get('q') or '').strip()
+    result = GlobalSearchService.search(query=q, user=current_user)
+    return jsonify(result)
+
+
+# Phase 28A — top-level alias so /api/search?q=kenya works as the team
+# expected during the 2026-05-16 retest. Forwards to the same service.
+@search_alias_bp.route('/search', methods=['GET'])
+@login_required
+def api_search_alias():
+    """Alias for /api/documents/search/global — top-level discoverability.
+
+    The UI's command palette already calls the namespaced path; this
+    alias exists so direct API callers and integration tests find a
+    sensible /api/search endpoint.
     """
     from app.services.global_search_service import GlobalSearchService
     q = (request.args.get('q') or '').strip()

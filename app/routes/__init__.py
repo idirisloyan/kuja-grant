@@ -39,11 +39,11 @@ def register_blueprints(app):
     from app.routes.calendar_routes import calendar_bp  # Phase 3: cross-entity calendar
     from app.routes.messaging_routes import messaging_bp  # Phase 4: WhatsApp/SMS adapter
     from app.routes.ai_budget_routes import ai_budget_bp  # Phase 5: per-org AI budget gate
-    from app.routes.notification_preferences_routes import notif_pref_bp  # Phase 6: channel prefs
+    from app.routes.notification_preferences_routes import notif_pref_bp, notif_pref_alias_bp  # Phase 6 + Phase 28B alias
     from app.routes.preflight_routes import preflight_bp  # Phase 7: donor-perspective pre-flight
     from app.routes.audit_chain_routes import audit_chain_bp  # Phase 7: hash-chain admin views
     from app.routes.report_bundle_routes import report_bundle_bp  # Phase 8: bundles + reviewer follow-ups
-    from app.routes.document_search_routes import doc_search_bp  # Phase 9: document smart search
+    from app.routes.document_search_routes import doc_search_bp, search_alias_bp  # Phase 9 + Phase 28A alias
     from app.routes.digest_routes import digest_bp  # Phase 9: notification digest
     from app.routes.autofill_compare_routes import ai_compare_bp  # Phase 10: auto-fill + compare
     from app.routes.phase11_routes import phase11_bp  # Phase 11: agreement unpack + cross-grant patterns
@@ -62,7 +62,7 @@ def register_blueprints(app):
                risks_bp, admin_health_bp, totp_bp, comments_bp, test_bp,
                saved_searches_bp, push_bp, trust_bp, watchlist_bp, signals_bp,
                preemption_bp, calendar_bp, messaging_bp, ai_budget_bp,
-               notif_pref_bp, preflight_bp, audit_chain_bp, report_bundle_bp,
-               doc_search_bp, digest_bp, ai_compare_bp, phase11_bp,
+               notif_pref_bp, notif_pref_alias_bp, preflight_bp, audit_chain_bp, report_bundle_bp,
+               doc_search_bp, search_alias_bp, digest_bp, ai_compare_bp, phase11_bp,
                portfolio_bp, cron_bp, tags_bp, exports_bp, webauthn_bp]:
         app.register_blueprint(bp)

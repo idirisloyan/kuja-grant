@@ -2383,6 +2383,67 @@ def make_tests(base):
     tests.append(("PHASE26C-003: WebAuthn authenticate/begin no_credentials path",
                   test_phase26c_webauthn_auth_begin_without_creds))
 
+    # -------------------- Phase 28 (May 2026 retest gaps) --------------------
+
+    def test_phase28a_search_alias_works():
+        """PHASE28A-001: /api/search alias returns 200 with shaped global-search result."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/search?q=kenya",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        # Shape from GlobalSearchService.search — should at least have results / totals.
+        data = r.json()
+        assert isinstance(data, dict), f"expected dict, got {type(data)}"
+    tests.append(("PHASE28A-001: /api/search alias returns shape",
+                  test_phase28a_search_alias_works))
+
+    def test_phase28b_notif_prefs_alias_get_works():
+        """PHASE28B-001: /api/notifications/preferences alias returns prefs shape."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/notifications/preferences",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        assert "categories" in data and "catalog" in data
+    tests.append(("PHASE28B-001: /api/notifications/preferences alias returns shape",
+                  test_phase28b_notif_prefs_alias_get_works))
+
+    def test_phase28b_notif_prefs_alias_digest_cadence_works():
+        """PHASE28B-002: digest-cadence under alias path also works."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/notifications/preferences/digest-cadence",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        assert data.get("digest_cadence") in ("daily", "weekly", "off")
+    tests.append(("PHASE28B-002: /api/notifications/preferences/digest-cadence alias",
+                  test_phase28b_notif_prefs_alias_digest_cadence_works))
+
+    def test_phase28d_clear_all_lockouts_works():
+        """PHASE28D-001: admin can bulk-clear all email/user lockouts."""
+        s = login_ok(base, USERS["admin"])
+        r = s.post(f"{base}/api/admin/clear-all-lockouts",
+                   json={}, headers={"X-Requested-With": "XMLHttpRequest"},
+                   timeout=10)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        assert "users_reset" in data and "attempts_deleted" in data
+    tests.append(("PHASE28D-001: bulk lockout clear as admin",
+                  test_phase28d_clear_all_lockouts_works))
+
+    def test_phase28d_clear_all_lockouts_forbidden_for_ngo():
+        """PHASE28D-002: NGO cannot bulk-clear lockouts."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.post(f"{base}/api/admin/clear-all-lockouts",
+                   json={}, headers={"X-Requested-With": "XMLHttpRequest"},
+                   timeout=10)
+        assert r.status_code == 403, f"expected 403, got {r.status_code}"
+    tests.append(("PHASE28D-002: bulk lockout clear forbidden for NGO",
+                  test_phase28d_clear_all_lockouts_forbidden_for_ngo))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [

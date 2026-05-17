@@ -692,6 +692,62 @@ def api_admin_clear_lockout():
     })
 
 
+@admin_bp.route('/admin/clear-all-lockouts', methods=['POST'])
+@login_required
+def api_admin_clear_all_lockouts():
+    """Phase 28D — bulk clear ALL email + per-user lockouts.
+
+    QA convenience: a single button the team can hit before kicking
+    off a multi-role browser sweep so prior test runs don't lock out
+    sarah/fatima/james accounts mid-cert. The team's 2026-05-16 retest
+    flagged exactly this friction.
+
+    Body: {} (no args; affects every user + every login_attempts row)
+
+    Returns: { success, users_reset: int, attempts_deleted: int }
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    users_reset = 0
+    attempts_deleted = 0
+    try:
+        try:
+            res = db.session.execute(
+                text("UPDATE users SET failed_login_count = 0, "
+                     "last_failed_login = NULL, locked_until = NULL "
+                     "WHERE failed_login_count > 0 OR locked_until IS NOT NULL")
+            )
+            users_reset = res.rowcount or 0
+        except Exception as e:
+            logger.warning(f"clear-all-lockouts user reset failed: {e}")
+            db.session.rollback()
+
+        try:
+            res = db.session.execute(text("DELETE FROM login_attempts"))
+            attempts_deleted = res.rowcount or 0
+        except Exception as e:
+            logger.warning(f"clear-all-lockouts attempts delete failed: {e}")
+            db.session.rollback()
+
+        db.session.commit()
+        logger.info(
+            f"clear-all-lockouts: users_reset={users_reset} "
+            f"attempts_deleted={attempts_deleted} by admin={current_user.email}"
+        )
+    except Exception as e:
+        logger.error(f"clear-all-lockouts failed: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': 'bulk reset failed',
+                        'detail': str(e)[:200]}), 500
+
+    return jsonify({
+        'success': True,
+        'users_reset': users_reset,
+        'attempts_deleted': attempts_deleted,
+    })
+
+
 @admin_bp.route('/admin/security-events', methods=['GET'])
 @login_required
 def api_admin_security_events():
