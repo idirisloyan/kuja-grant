@@ -78,18 +78,35 @@ def main():
             "32.8": "admin", "32.9": "donor",
         }
 
-        # Monkey-patch login_as to skip if already authenticated in this context.
-        original_login_as = bt.login_as
+        # Monkey-patch login_as to avoid browser-navigation races during auth.
+        # We use the context request client so the session cookie lands in the
+        # same browser context the page will later use.
         def cached_login_as(page, base, email, password=bt.PASS, timeout=15000):
-            # Check if we already have an auth cookie that works.
             try:
-                page.goto(f"{base}/dashboard", wait_until="domcontentloaded", timeout=10000)
-                page.wait_for_timeout(800)
-                if "/login" not in page.url:
-                    return True  # session is alive, skip login
+                me = page.context.request.get(
+                    f"{base}/api/auth/me",
+                    headers={"X-Requested-With": "XMLHttpRequest"},
+                    timeout=timeout,
+                )
+                if me.status == 200:
+                    return True
             except Exception:
                 pass
-            return original_login_as(page, base, email, password, timeout)
+
+            # Prime the cookie domain before hitting the login API directly.
+            try:
+                page.goto(f"{base}/login/", wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(500)
+            except Exception:
+                pass
+
+            login = page.context.request.post(
+                f"{base}/api/auth/login",
+                data={"email": email, "password": password},
+                headers={"X-Requested-With": "XMLHttpRequest"},
+                timeout=timeout,
+            )
+            return login.status == 200
         bt.login_as = cached_login_as
 
         for name, fn in strict_tests:

@@ -2444,6 +2444,72 @@ def make_tests(base):
     tests.append(("PHASE28D-002: bulk lockout clear forbidden for NGO",
                   test_phase28d_clear_all_lockouts_forbidden_for_ngo))
 
+    # -------------------- Phase 29 (May 2026 — real-user metrics) --------------------
+
+    def test_phase29d_admin_metrics_returns_shape():
+        """PHASE29D-001: admin /api/admin/metrics returns full shaped JSON."""
+        s = login_ok(base, USERS["admin"])
+        r = s.get(f"{base}/api/admin/metrics",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=20)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        for k in ("dau", "wau", "mau", "event_counts_30d", "funnels",
+                  "chat_by_language", "search_by_language",
+                  "ab_application_submit"):
+            assert k in data, f"metrics missing {k}: {list(data.keys())}"
+        for w in ("dau", "wau", "mau"):
+            for k in ("total", "by_role", "by_language", "window_days"):
+                assert k in data[w], f"{w} missing {k}"
+        for fk in ("chat", "application", "report"):
+            assert fk in data["funnels"], f"funnels missing {fk}"
+            assert "stages" in data["funnels"][fk]
+    tests.append(("PHASE29D-001: admin metrics returns shape",
+                  test_phase29d_admin_metrics_returns_shape))
+
+    def test_phase29d_admin_metrics_forbidden_for_ngo():
+        """PHASE29D-002: NGO cannot fetch admin metrics."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/admin/metrics",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 403, f"expected 403, got {r.status_code}"
+    tests.append(("PHASE29D-002: admin metrics forbidden for NGO",
+                  test_phase29d_admin_metrics_forbidden_for_ngo))
+
+    def test_phase29b_session_start_event_recorded():
+        """PHASE29B-001: login records a session.start event.
+
+        Verifies via metrics rather than direct DB peek so the test
+        survives schema changes. WAU total should be >= 1 immediately
+        after admin logs in.
+        """
+        s = login_ok(base, USERS["admin"])
+        r = s.get(f"{base}/api/admin/metrics",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=20)
+        assert r.status_code == 200
+        data = r.json()
+        wau_total = data.get("wau", {}).get("total", 0)
+        assert wau_total >= 1, f"expected WAU >= 1 after admin login, got {wau_total}"
+    tests.append(("PHASE29B-001: login records session.start (WAU > 0)",
+                  test_phase29b_session_start_event_recorded))
+
+    def test_phase29c_ab_arm_deterministic():
+        """PHASE29C-001: ab_arm bucketing is stable across calls."""
+        from app.utils.feature_flags import ab_arm
+        a1 = ab_arm('test_experiment', org_id=42)
+        a2 = ab_arm('test_experiment', org_id=42)
+        assert a1 == a2, f"expected stable bucketing, got {a1!r} then {a2!r}"
+        assert a1 in ('A', 'B'), f"unexpected arm: {a1!r}"
+        # Different org should ideally land in a different arm (over many trials)
+        # — for two specific ids we can't guarantee, but ab_arm should return
+        # *some* valid arm.
+        a3 = ab_arm('test_experiment', org_id=99)
+        assert a3 in ('A', 'B')
+        # None subject returns None
+        assert ab_arm('test_experiment') is None
+    tests.append(("PHASE29C-001: ab_arm bucketing is deterministic",
+                  test_phase29c_ab_arm_deterministic))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [

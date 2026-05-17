@@ -270,6 +270,19 @@ def api_submit_application(app_id):
     except Exception as _exc:  # pylint: disable=broad-except
         logger.debug(f"org_memory auto-extraction skipped: {_exc}")
 
+    # Phase 29B — record the submit event for funnel analytics.
+    # Best-effort: a failure here does NOT block the submit.
+    try:
+        from app.services.user_event_service import UserEventService
+        UserEventService.record(
+            user=current_user, event_name='application.submit',
+            application_id=application.id,
+            grant_id=application.grant_id,
+            ai_score=application.ai_score,
+        )
+    except Exception:
+        pass
+
     # Phase 25A — auto-assign a reviewer panel on submit so apps are
     # never sitting in queue waiting on a donor to pick reviewers.
     # Idempotent: ReviewerAutoAssignService skips already-assigned. If
@@ -420,6 +433,17 @@ def api_application_debrief(app_id):
         current_user.email, 'application', application.id,
         {'reason_code': reason_code, 'status': application.status},
     )
+
+    # Phase 29B — donor decision behaviour funnel event.
+    try:
+        from app.services.user_event_service import UserEventService
+        UserEventService.record(
+            user=current_user, event_name='donor.decision_recorded',
+            application_id=application.id, status=application.status,
+            reason_code=reason_code or None,
+        )
+    except Exception:
+        pass
 
     return jsonify({
         'success': True,

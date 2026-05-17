@@ -76,4 +76,18 @@ def api_search_alias():
     from app.services.global_search_service import GlobalSearchService
     q = (request.args.get('q') or '').strip()
     result = GlobalSearchService.search(query=q, user=current_user)
+
+    # Phase 29B — record search usage so we can see which features
+    # users discover via search vs the sidebar nav.
+    try:
+        from app.services.user_event_service import UserEventService
+        results = result.get('results') if isinstance(result, dict) else None
+        UserEventService.record(
+            user=current_user, event_name='search.query',
+            query_length=len(q),
+            result_count=len(results) if isinstance(results, list) else 0,
+        )
+    except Exception:
+        pass
+
     return jsonify(result)

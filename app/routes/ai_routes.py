@@ -1961,6 +1961,17 @@ def api_ai_thread_open():
         user_id=current_user.id, scope_kind=kind, scope_id=sid,
     )
     messages = AIChatService.list_messages(thread=thread)
+
+    # Phase 29B — funnel: did the user open a chat thread?
+    try:
+        from app.services.user_event_service import UserEventService
+        UserEventService.record(
+            user=current_user, event_name='chat.thread_open',
+            thread_id=thread.id, scope_kind=kind, scope_id=sid,
+        )
+    except Exception:
+        pass
+
     return jsonify({
         'success': True,
         'thread_id': thread.id,
@@ -2002,6 +2013,20 @@ def api_ai_thread_post(thread_id):
     )
     if not result.get('success'):
         return jsonify(result), 503
+
+    # Phase 29B — funnel: completed the open → message_sent transition.
+    try:
+        from app.services.user_event_service import UserEventService
+        UserEventService.record(
+            user=current_user, event_name='chat.message_sent',
+            thread_id=thread.id,
+            scope_kind=thread.scope_kind,
+            scope_id=thread.scope_id,
+            message_length=len(content),
+        )
+    except Exception:
+        pass
+
     return jsonify(result)
 
 

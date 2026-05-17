@@ -373,3 +373,39 @@ def list_flags() -> list[dict[str, Any]]:
             'global_value': get_value(key),
         })
     return out
+
+
+# ----------------------------------------------------------------------
+# Phase 29C — deterministic A/B bucketing.
+# ----------------------------------------------------------------------
+
+def ab_arm(experiment: str, *, org_id: int | None = None,
+           user_id: int | None = None, arms: tuple = ('A', 'B')) -> str | None:
+    """Deterministically bucket a subject into one of `arms` for `experiment`.
+
+    Stable across requests (same org_id always lands in the same arm
+    for a given experiment name). Returns None if neither org_id nor
+    user_id is available — analytics queries then report the event
+    under an `(unbucketed)` bucket so we still capture baseline.
+
+    Usage:
+        from app.utils.feature_flags import ab_arm
+        from app.services.user_event_service import UserEventService
+
+        arm = ab_arm('readiness_check_v2', org_id=current_user.org_id)
+        # ... later when recording an outcome event
+        UserEventService.record(
+            user=current_user, event_name='application.submit',
+            ab_arm=arm, application_id=app.id,
+        )
+
+    The default ('A','B') gives 50/50. Pass arms=('control','variant')
+    for clearer dashboards; pass arms=('A','B','C') for a 3-way split.
+    """
+    import hashlib
+    subject = str(org_id) if org_id is not None else (str(user_id) if user_id is not None else None)
+    if subject is None:
+        return None
+    h = hashlib.sha256(f"{experiment}|{subject}".encode('utf-8')).digest()
+    idx = h[0] % len(arms)
+    return arms[idx]

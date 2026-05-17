@@ -36,6 +36,7 @@ from app.models.status_signal import StatusSignal
 from app.models.notification_preference import NotificationPreference
 from app.models.tag import Tag, TagAssignment
 from app.models.webauthn_credential import WebAuthnCredential
+from app.models.user_event import UserEvent
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -49,4 +50,5 @@ __all__ = [
     'NotificationPreference',
     'Tag', 'TagAssignment',
     'WebAuthnCredential',
+    'UserEvent',
 ]

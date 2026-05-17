@@ -692,6 +692,58 @@ def api_admin_clear_lockout():
     })
 
 
+@admin_bp.route('/admin/metrics', methods=['GET'])
+@login_required
+def api_admin_metrics():
+    """Phase 29D — real-user behavioural metrics.
+
+    Reads from the UserEvent table (Phase 29A) to surface:
+      - DAU + WAU broken down by role + language
+      - Top event counts over trailing 30 days
+      - 5 critical funnels (apply, report, chat, search, decisions)
+      - Per-language adoption of chat
+      - A/B outcome split (will be empty until experiments are wired)
+
+    Admin-only. Returns shaped JSON the frontend dashboard renders.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    from app.services.user_event_service import UserEventService
+    try:
+        return jsonify({
+            'success': True,
+            'dau': UserEventService.active_users(days=1),
+            'wau': UserEventService.active_users(days=7),
+            'mau': UserEventService.active_users(days=30),
+            'event_counts_30d': UserEventService.event_counts(days=30),
+            'funnels': {
+                'chat': UserEventService.funnel(
+                    stages=['chat.thread_open', 'chat.message_sent'],
+                ),
+                'application': UserEventService.funnel(
+                    stages=['application.start_draft', 'application.submit'],
+                ),
+                'report': UserEventService.funnel(
+                    stages=['report.start_draft', 'report.submit'],
+                ),
+            },
+            'chat_by_language': UserEventService.feature_usage_by_language(
+                event_name='chat.message_sent',
+            ),
+            'search_by_language': UserEventService.feature_usage_by_language(
+                event_name='search.query',
+            ),
+            'ab_application_submit': UserEventService.ab_outcome(
+                outcome_event='application.submit',
+            ),
+        })
+    except Exception as e:
+        logger.exception(f'admin metrics failed: {e}')
+        return jsonify({'success': False, 'error': 'metrics build failed',
+                        'detail': str(e)[:200]}), 500
+
+
 @admin_bp.route('/admin/clear-all-lockouts', methods=['POST'])
 @login_required
 def api_admin_clear_all_lockouts():

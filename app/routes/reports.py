@@ -273,6 +273,23 @@ def api_submit_report(report_id):
         logger.error(f"Report AI analysis failed: {e}")
 
     db.session.commit()
+
+    # Phase 29B — funnel event.
+    try:
+        from app.services.user_event_service import UserEventService
+        compliance_score = None
+        try:
+            compliance_score = (report.get_ai_analysis() or {}).get('compliance_score')
+        except Exception:
+            pass
+        UserEventService.record(
+            user=current_user, event_name='report.submit',
+            report_id=report.id, grant_id=report.grant_id,
+            compliance_score=compliance_score,
+        )
+    except Exception:
+        pass
+
     return jsonify({'success': True, 'report': report.to_dict()})
 
 

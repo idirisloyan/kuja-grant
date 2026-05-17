@@ -390,6 +390,13 @@ def api_login():
     session.permanent = True
     login_user(user, remember=True)
     logger.info(f"User logged in: {user.email} (role: {user.role}) from {client_ip}")
+
+    # Phase 29B — session start event powers DAU/WAU.
+    try:
+        from app.services.user_event_service import UserEventService
+        UserEventService.record(user=user, event_name='session.start')
+    except Exception:
+        pass
     # Phase 15C — surface stage_labels override at login time too so the
     # first dashboard render after login already uses custom labels.
     payload = {'success': True, 'user': user.to_dict(include_org=True)}
