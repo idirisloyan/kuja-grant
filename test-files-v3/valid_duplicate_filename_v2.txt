@@ -1,0 +1,3 @@
+Second instance with the SAME LOGICAL NAME.
+Tests: upload service should either rename, version,
+or replace — not silently overwrite with no audit trail.

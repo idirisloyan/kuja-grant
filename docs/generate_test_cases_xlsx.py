@@ -77,20 +77,32 @@ STATUS_OPTIONS = ["", "PASS", "FAIL", "BLOCKED", "N/A", "IN PROGRESS"]
 # Column layout (per test-case tab)
 # ---------------------------------------------------------------------------
 COLUMNS = [
-    ("ID",                10),
-    ("Test Case",         28),
-    ("Priority",          11),
-    ("Requirement",       16),
-    ("Prerequisites",     30),
-    ("Steps",             50),
-    ("Test Data",         28),
-    ("Expected Result",   50),
-    ("Pass Criteria",     30),
-    ("Status",            14),
-    ("Tester",            14),
-    ("Run Date",          12),
+    ("ID",                  10),
+    ("Test Case",           28),
+    ("Priority",            11),
+    ("Type",                14),
+    ("Requirement",         16),
+    ("Environment / Device", 16),
+    ("Data Dependency",     22),
+    ("Cleanup",             18),
+    ("Prerequisites",       30),
+    ("Steps",               50),
+    ("Test Data",           24),
+    ("Expected Result",     50),
+    ("Pass Criteria",       28),
+    ("Automation",          16),
+    ("Status",              14),
+    ("Tester",              12),
+    ("Run Date",            12),
+    ("Build Verified",      16),
     ("Comments / Defect ID", 32),
 ]
+
+# Column indexes used by helpers (1-based).
+COL_PRIORITY = 3
+COL_TYPE = 4
+COL_AUTOMATION = 14
+COL_STATUS = 15
 
 
 def _safe_sheet_name(name: str) -> str:
@@ -134,42 +146,189 @@ def _coerce_text(v) -> str:
     return str(v)
 
 
+# Inferred-default helpers — the team's 2026-05-17 feedback called for
+# extra tracking columns (Type, Automation Candidate, Environment, Data
+# Dependency, Cleanup, Build Verified). Existing test cases don't carry
+# explicit values for these so we infer sensible defaults from category
+# and id ranges. New tests can set the fields explicitly and override.
+
+def _infer_type(tc: dict) -> str:
+    """Returns one of: happy_path, negative, edge, security, privacy,
+    accessibility, performance, i18n, analytics, e2e."""
+    if tc.get("type"):
+        return tc["type"]
+    cat = (tc.get("category") or "").lower()
+    name = (tc.get("name") or "").lower()
+    if "accessibility" in cat:
+        return "accessibility"
+    if "performance" in cat or "slo" in cat:
+        return "performance"
+    if "privacy" in cat or "leakage" in cat:
+        return "privacy"
+    if "cross-browser" in cat or "device matrix" in cat:
+        return "edge"
+    if "integrity" in cat or "workflow" in cat:
+        return "edge"
+    if "i18n" in cat or "rtl" in cat:
+        return "i18n"
+    if "metrics" in cat or "feedback" in cat:
+        return "analytics"
+    if "e2e" in cat or "workflows" in cat:
+        return "e2e"
+    if "edge" in cat:
+        return "edge"
+    if "negative" in cat:
+        return "negative"
+    if "forbidden" in name or "rejected" in name or "blocked" in name or "denied" in name:
+        return "negative"
+    if "xss" in name or "injection" in name or "auth" in name and "begin" not in name:
+        return "security"
+    return "happy_path"
+
+
+def _infer_automation(tc: dict) -> str:
+    """Returns one of: manual, api, browser, already_automated, not_worth_automating."""
+    if tc.get("automation"):
+        return tc["automation"]
+    cat = (tc.get("category") or "").lower()
+    if "accessibility" in cat or "cross-browser" in cat or "device matrix" in cat:
+        return "browser"
+    if "privacy" in cat or "metrics" in cat or "integrity" in cat:
+        return "api"
+    if "performance" in cat or "slo" in cat:
+        return "browser"
+    return "manual"
+
+
+def _infer_environment(tc: dict) -> str:
+    if tc.get("environment"):
+        return tc["environment"]
+    name = (tc.get("name") or "").lower()
+    cat = (tc.get("category") or "").lower()
+    if "ios" in name or "iphone" in name or "android" in name or "mobile" in name:
+        return "mobile"
+    if "safari" in name:
+        return "Safari"
+    if "firefox" in name:
+        return "Firefox"
+    if "edge" in cat:  # category "Edge" — not Edge browser
+        return "any"
+    if "rtl" in cat or "arabic" in name or "i18n" in cat:
+        return "RTL-capable browser"
+    return "desktop"
+
+
+def _infer_data_dep(tc: dict) -> str:
+    if tc.get("data_dep"):
+        return tc["data_dep"]
+    pre = (tc.get("prereqs") or "").lower()
+    # Extract the most important phrase from prereqs as a quick summary
+    if "fresh" in pre:
+        return "fresh account"
+    if "no credentials" in pre or "no enrolled" in pre:
+        return "user with no WebAuthn credentials"
+    if "admin" in pre:
+        return "admin account"
+    if "reviewer" in pre:
+        return "reviewer with assignments"
+    if "draft application" in pre:
+        return "NGO with draft application"
+    if "submitted" in pre and "application" in pre:
+        return "submitted application"
+    if "awarded" in pre:
+        return "awarded application"
+    if "donor with" in pre:
+        return "donor + portfolio"
+    if "two ngo" in pre or "two donor" in pre or "two user" in pre:
+        return "two accounts (isolation test)"
+    return "default seed"
+
+
+def _infer_cleanup(tc: dict) -> str:
+    if tc.get("cleanup"):
+        return tc["cleanup"]
+    name = (tc.get("name") or "").lower()
+    cat = (tc.get("category") or "").lower()
+    if "lockout" in name:
+        return "clear-lockout endpoint"
+    if "feedback" in cat or "broadcast" in name or "decision" in name:
+        return "leaves data — auto-rolled into metrics"
+    if "create" in name or "draft" in name or "submit" in name:
+        return "delete created entity or auto-expire"
+    if "performance" in cat or "concurrency" in name:
+        return "none"
+    if "accessibility" in cat or "cross-browser" in cat:
+        return "none"
+    return "none"
+
+
+TYPE_FILL = {
+    "happy_path":     PatternFill("solid", fgColor="E1F5FE"),  # light blue
+    "negative":       PatternFill("solid", fgColor="FFCDD2"),  # light red
+    "edge":           PatternFill("solid", fgColor="FFE0B2"),  # light amber
+    "security":       PatternFill("solid", fgColor="FFCCBC"),  # peach
+    "privacy":        PatternFill("solid", fgColor="D7CCC8"),  # warm grey
+    "accessibility":  PatternFill("solid", fgColor="C8E6C9"),  # light green
+    "performance":    PatternFill("solid", fgColor="B3E5FC"),  # cyan
+    "i18n":           PatternFill("solid", fgColor="E1BEE7"),  # lavender
+    "analytics":      PatternFill("solid", fgColor="D1C4E9"),  # purple
+    "e2e":            PatternFill("solid", fgColor="FFF9C4"),  # pale yellow
+}
+
+
 def _write_test_case(ws, row_idx: int, tc: dict):
     priority_short = _priority_short(tc.get("priority", ""))
+    type_value = _infer_type(tc)
+    automation_value = _infer_automation(tc)
+    environment_value = _infer_environment(tc)
+    data_dep_value = _infer_data_dep(tc)
+    cleanup_value = _infer_cleanup(tc)
+
     row_values = [
         _coerce_text(tc.get("id")),
         _coerce_text(tc.get("name")),
         _coerce_text(tc.get("priority")),
+        type_value,
         _coerce_text(tc.get("requirement")),
+        environment_value,
+        data_dep_value,
+        cleanup_value,
         _coerce_text(tc.get("prereqs")),
         _coerce_text(tc.get("steps")),
         _coerce_text(tc.get("data")),
         _coerce_text(tc.get("expected")),
         _coerce_text(tc.get("criteria")),
-        "",  # Status (filled by tester)
+        automation_value,
+        "",  # Status (tester)
         "",  # Tester
         "",  # Run Date
+        "",  # Build Verified
         "",  # Comments
     ]
+    centered_cols = {COL_PRIORITY, COL_TYPE, 6, 8, COL_AUTOMATION,
+                     COL_STATUS, COL_STATUS + 1, COL_STATUS + 2, COL_STATUS + 3}
     for col_idx, value in enumerate(row_values, start=1):
         cell = ws.cell(row=row_idx, column=col_idx, value=value)
         cell.font = BODY_FONT
         cell.border = THIN_BORDER
-        if col_idx in (3, 10, 11, 12):  # Priority, Status, Tester, Run Date
-            cell.alignment = BODY_ALIGN_CENTER
-        else:
-            cell.alignment = BODY_ALIGN
+        cell.alignment = BODY_ALIGN_CENTER if col_idx in centered_cols else BODY_ALIGN
 
     # Color the priority cell
-    priority_cell = ws.cell(row=row_idx, column=3)
+    priority_cell = ws.cell(row=row_idx, column=COL_PRIORITY)
     if priority_short in PRIORITY_FILL:
         priority_cell.fill = PRIORITY_FILL[priority_short]
         priority_cell.font = Font(name="Calibri", size=10, bold=True)
 
+    # Color the type cell
+    type_cell = ws.cell(row=row_idx, column=COL_TYPE)
+    if type_value in TYPE_FILL:
+        type_cell.fill = TYPE_FILL[type_value]
+        type_cell.font = Font(name="Calibri", size=10, bold=True)
+
 
 def _add_status_validation_and_formatting(ws, last_row: int):
     """Dropdown on Status column + conditional fill for PASS/FAIL/BLOCKED."""
-    status_col_letter = get_column_letter(10)
+    status_col_letter = get_column_letter(COL_STATUS)
     rng = f"{status_col_letter}2:{status_col_letter}{last_row}"
 
     dv = DataValidation(
@@ -343,8 +502,12 @@ def build_workbook():
         summary.cell(row=row_offset, column=5, value=p2).alignment = BODY_ALIGN_CENTER
         summary.cell(row=row_offset, column=6, value=p3).alignment = BODY_ALIGN_CENTER
 
-        # Live formulas counting Status cells in the source tab
-        rng = f"'{sheet_name}'!J{first_row}:J{last_row}"
+        # Live formulas counting Status cells in the source tab.
+        # Status column moved from J → O (column 15) when the Type +
+        # Automation + Env + Data Dep + Cleanup + Build Verified columns
+        # were added in the 2026-05-17 redline pass.
+        status_letter = get_column_letter(COL_STATUS)
+        rng = f"'{sheet_name}'!{status_letter}{first_row}:{status_letter}{last_row}"
         summary.cell(row=row_offset, column=7, value=f'=COUNTIF({rng},"PASS")').alignment = BODY_ALIGN_CENTER
         summary.cell(row=row_offset, column=8, value=f'=COUNTIF({rng},"FAIL")').alignment = BODY_ALIGN_CENTER
         summary.cell(row=row_offset, column=9, value=f'=COUNTIF({rng},"BLOCKED")').alignment = BODY_ALIGN_CENTER

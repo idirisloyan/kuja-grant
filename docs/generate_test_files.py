@@ -873,6 +873,296 @@ def create_valid_csv_data():
     print("  Created: valid_beneficiary_data.csv")
 
 
+# ═══════════════════════════════════════════════════════════════════
+# ADDITIONAL FIXTURES — 2026-05-17 team redline
+# Privacy + AI-adversarial + file-shape edge coverage. Each fixture
+# maps to specific test cases in CAT 24/26/27/31/34.
+# ═══════════════════════════════════════════════════════════════════
+
+def create_password_protected_pdf():
+    """A real PDF that cannot be opened without a password.
+    Tests: upload accepts but extraction service must surface a clean
+    'password-protected' error rather than crashing."""
+    path = os.path.join(TEST_DIR, 'invalid_password_protected.pdf')
+    # Minimal encrypted PDF (FPDF doesn't encrypt; ship raw bytes that
+    # mark the document as encrypted with a known-bad password). Real
+    # encryption tests would need pikepdf; this is enough to confirm
+    # the upload service detects /Encrypt and bails out.
+    content = (
+        b'%PDF-1.4\n'
+        b'1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'
+        b'2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n'
+        b'3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <<>> >>\nendobj\n'
+        b'4 0 obj\n<< /Filter /Standard /V 1 /R 2 /O <abc> /U <def> /P -3904 >>\nendobj\n'
+        b'trailer\n<< /Size 5 /Root 1 0 R /Encrypt 4 0 R /ID [<aa><bb>] >>\n'
+        b'%%EOF\n'
+    )
+    with open(path, 'wb') as f:
+        f.write(content)
+    print(f"  Created: invalid_password_protected.pdf")
+
+
+def create_password_protected_xlsx():
+    """A placeholder file shaped like an encrypted OOXML container.
+    Tests: spreadsheet ingest service should fail gracefully on encrypted
+    OOXML (proper test would need msoffcrypto-tool; this triggers the
+    'cannot read sheets' error path)."""
+    path = os.path.join(TEST_DIR, 'invalid_password_protected.xlsx')
+    # Write a valid-looking but unparseable OLE compound document header
+    with open(path, 'wb') as f:
+        f.write(b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1')  # OLE2 magic
+        f.write(b'\x00' * 512)  # padding
+    print(f"  Created: invalid_password_protected.xlsx")
+
+
+def create_scanned_image_only_pdf():
+    """A PDF that contains only a raster image with no extractable text.
+    Tests: AI ingest must either OCR it or surface 'no text extracted'
+    rather than analysing zero content."""
+    path = os.path.join(TEST_DIR, 'invalid_scanned_image_only.pdf')
+    if HAS_FPDF:
+        pdf = FPDF()
+        pdf.add_page()
+        # Single colored rectangle with no text content
+        pdf.set_fill_color(220, 220, 220)
+        pdf.rect(20, 40, 170, 220, 'F')
+        pdf.set_fill_color(180, 180, 180)
+        pdf.rect(40, 70, 130, 30, 'F')
+        pdf.rect(40, 120, 130, 30, 'F')
+        pdf.rect(40, 170, 130, 30, 'F')
+        # No add_text() calls — page contains visual elements only
+        pdf.output(path)
+    else:
+        # Fallback: minimal PDF with no text content
+        with open(path, 'wb') as f:
+            f.write(b'%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n'
+                    b'2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n'
+                    b'3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n'
+                    b'trailer<</Size 4/Root 1 0 R>>%%EOF\n')
+    print(f"  Created: invalid_scanned_image_only.pdf")
+
+
+def create_mixed_language_narrative():
+    """Project report mixing Arabic and English narrative across paragraphs.
+    Tests: AI must handle mixed-script content, preserve meaning, and not
+    silently drop the non-English passages."""
+    path = os.path.join(TEST_DIR, 'valid_mixed_language_report.txt')
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write("PROJECT IMPACT REPORT — Q1 2026\n")
+        f.write("=" * 50 + "\n\n")
+        f.write("Project: Community Health Worker Training in Mogadishu\n")
+        f.write("Reporting period: January - March 2026\n\n")
+        f.write("EXECUTIVE SUMMARY\n\n")
+        f.write("In Q1 2026, our team trained 47 community health workers (CHWs) ")
+        f.write("across three districts. The training covered maternal health, ")
+        f.write("nutrition, and immunisation tracking.\n\n")
+        f.write("ملخص تنفيذي\n\n")
+        f.write("في الربع الأول من عام 2026، قمنا بتدريب 47 من العاملين الصحيين المجتمعيين ")
+        f.write("في ثلاث مناطق في مقديشو. شمل التدريب صحة الأم والتغذية ومتابعة التطعيم. ")
+        f.write("تم تحقيق جميع المؤشرات المخطط لها لهذا الربع.\n\n")
+        f.write("KEY METRICS\n")
+        f.write("- CHWs trained: 47 (target: 45) ✓\n")
+        f.write("- Districts reached: 3 (target: 3) ✓\n")
+        f.write("- Follow-up assessments completed: 41 of 47 (87%)\n\n")
+        f.write("CHALLENGES\n")
+        f.write("Security situation in two sub-districts limited access in February. ")
+        f.write("We adapted by holding training sessions in neighbouring locations.\n\n")
+        f.write("الخطوات التالية\n")
+        f.write("الربع الثاني سيركز على المتابعة الميدانية ودعم العاملين الصحيين المدربين.\n")
+    print(f"  Created: valid_mixed_language_report.txt")
+
+
+def create_unicode_filename_sample():
+    """A small valid text file whose filename contains Unicode characters.
+    Tests: filename normalisation in upload service; URL-safe storage."""
+    # Use a Unicode-rich filename
+    fname = 'تقرير_المالية_2026.txt'
+    path = os.path.join(TEST_DIR, fname)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write("تقرير مالي للربع الأول 2026\n")
+        f.write("=" * 40 + "\n")
+        f.write("الإيرادات: 1,250,000 دولار\n")
+        f.write("النفقات: 1,180,000 دولار\n")
+        f.write("الفائض: 70,000 دولار\n")
+    # Print ASCII-safe to avoid cp1252 crash on Windows terminals
+    safe = fname.encode('ascii', errors='replace').decode('ascii')
+    print(f"  Created: {safe} (Unicode filename — Arabic characters)")
+
+
+def create_duplicate_filename_pair():
+    """Two files with the same logical name (one in a sub-context) to test
+    upload de-duplication / collision handling."""
+    base = os.path.join(TEST_DIR, 'valid_duplicate_filename.txt')
+    with open(base, 'w', encoding='utf-8') as f:
+        f.write("First instance of duplicate-filename test.\n")
+        f.write("This is the original version uploaded at T0.\n")
+    print(f"  Created: valid_duplicate_filename.txt (first)")
+
+    # Same logical filename, different timestamp/content
+    base2 = os.path.join(TEST_DIR, 'valid_duplicate_filename_v2.txt')
+    with open(base2, 'w', encoding='utf-8') as f:
+        f.write("Second instance with the SAME LOGICAL NAME.\n")
+        f.write("Tests: upload service should either rename, version,\n")
+        f.write("or replace — not silently overwrite with no audit trail.\n")
+    print(f"  Created: valid_duplicate_filename_v2.txt (second)")
+
+
+def create_corrupt_xlsx():
+    """An XLSX file that's truncated mid-ZIP. Tests graceful failure of
+    spreadsheet ingest."""
+    path = os.path.join(TEST_DIR, 'invalid_corrupt.xlsx')
+    if HAS_OPENPYXL:
+        # Build a valid one, then truncate
+        wb = Workbook()
+        ws = wb.active
+        ws['A1'] = 'header'
+        ws['A2'] = 'data'
+        wb.save(path)
+        # Truncate to 200 bytes — kills the central directory
+        with open(path, 'rb') as f:
+            data = f.read()
+        with open(path, 'wb') as f:
+            f.write(data[:200])
+    else:
+        with open(path, 'wb') as f:
+            f.write(b'PK\x03\x04' + b'\x00' * 100)  # ZIP header + garbage
+    print(f"  Created: invalid_corrupt.xlsx")
+
+
+def create_pii_heavy_report():
+    """Report narrative containing many PII fields (names, phone numbers,
+    national IDs, addresses). Tests: privacy scrubber must flag this
+    before public surfaces render it."""
+    path = os.path.join(TEST_DIR, 'invalid_pii_heavy_report.txt')
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write("BENEFICIARY OUTREACH REPORT\n")
+        f.write("=" * 50 + "\n\n")
+        f.write("CASE 001\n")
+        f.write("Name: Mariam Hassan Mohamed\n")
+        f.write("DOB: 1982-04-12\n")
+        f.write("National ID: 12345678X\n")
+        f.write("Phone: +254 712 345 678\n")
+        f.write("Address: Plot 47, Eastleigh, Nairobi, Kenya\n")
+        f.write("Email: mariam.hassan@example.com\n")
+        f.write("Notes: Single mother of 3, lives with relatives. Receives quarterly food aid.\n\n")
+        f.write("CASE 002\n")
+        f.write("Name: Ahmed Yusuf Abdi\n")
+        f.write("DOB: 1975-09-23\n")
+        f.write("National ID: 87654321Y\n")
+        f.write("Phone: +252 61 234 5678\n")
+        f.write("Address: Hodan district, Mogadishu, Somalia\n")
+        f.write("Bank account: 4400-1234-5678-9012 (Salaam Bank)\n\n")
+        f.write("CASE 003\n")
+        f.write("Name: Grace Wanjiku Kimani\n")
+        f.write("DOB: 1990-11-04\n")
+        f.write("National ID: 33445566Z\n")
+        f.write("Phone: +254 720 999 888\n")
+        f.write("Passport: A1234567\n\n")
+        f.write("(End — 47 more cases redacted for brevity.)\n")
+    print(f"  Created: invalid_pii_heavy_report.txt")
+
+
+def create_contradictory_evidence_report():
+    """A report whose numbers contradict its narrative. Tests: AI grounding
+    should flag the contradiction rather than confabulating a consistent
+    story."""
+    path = os.path.join(TEST_DIR, 'adversarial_contradictory_report.txt')
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write("END-OF-PROJECT IMPACT REPORT\n")
+        f.write("=" * 50 + "\n\n")
+        f.write("NARRATIVE SUMMARY\n")
+        f.write("We are pleased to report that this project exceeded all expectations. ")
+        f.write("Every target was achieved or surpassed. Community satisfaction was unanimous. ")
+        f.write("Funding was deployed efficiently with significant cost savings. The project ")
+        f.write("reached every household in the target population.\n\n")
+        f.write("QUANTITATIVE INDICATORS\n")
+        f.write("- Households reached: 42 of 500 target (8.4%)\n")
+        f.write("- Budget utilization: 187% (overspent)\n")
+        f.write("- Survey response rate: 12 of 50 invited (24%)\n")
+        f.write("- Satisfaction score: 3.2/10 (n=12)\n")
+        f.write("- Project duration overrun: 8 months past planned end-date\n\n")
+        f.write("BUDGET VARIANCE\n")
+        f.write("Original budget: USD 200,000\n")
+        f.write("Final spend: USD 374,000\n")
+        f.write("Variance: +87% (no formal amendment filed)\n\n")
+        f.write("CONCLUSION\n")
+        f.write("In summary, the project was a complete success and should serve as a model ")
+        f.write("for future programmes.\n")
+    print(f"  Created: adversarial_contradictory_report.txt")
+
+
+def create_polished_but_empty_narrative():
+    """Long, beautifully-written narrative that asserts impact without ANY ")
+    concrete evidence. Tests: AI evaluator must downgrade for missing
+    evidence rather than reward polished prose."""
+    path = os.path.join(TEST_DIR, 'adversarial_polished_no_evidence.txt')
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write("PROJECT NARRATIVE — TRANSFORMATIVE IMPACT\n")
+        f.write("=" * 50 + "\n\n")
+        f.write("Our project has had a deeply transformative impact on the communities ")
+        f.write("we serve. The work undertaken in the past twelve months represents a ")
+        f.write("paradigm shift in how grassroots organisations can mobilise resources ")
+        f.write("and effect change at scale. Through collaborative partnerships, ")
+        f.write("evidence-based interventions, and a relentless commitment to ")
+        f.write("community-centred design, we have achieved outcomes that far exceed ")
+        f.write("our initial projections.\n\n")
+        f.write("Our beneficiaries report feeling empowered, supported, and ")
+        f.write("seen — outcomes that, while difficult to quantify, speak to the ")
+        f.write("profound dignity-centred approach that guides our work. We have ")
+        f.write("nurtured a culture of trust and mutual accountability that has ")
+        f.write("rippled out far beyond the direct intervention.\n\n")
+        f.write("The synergies created between our programmatic, advocacy, and ")
+        f.write("capacity-building workstreams have produced multiplier effects ")
+        f.write("that traditional impact frameworks struggle to capture. We are ")
+        f.write("confident that the seeds planted this year will yield ")
+        f.write("generational dividends.\n\n")
+        f.write("(No specific numbers, no beneficiary counts, no spend figures, ")
+        f.write("no comparisons to baseline, no methodology — entire 1200-word ")
+        f.write("narrative continues in this register.)\n")
+    print(f"  Created: adversarial_polished_no_evidence.txt")
+
+
+def create_extremely_long_narrative():
+    """Valid but extremely long narrative — 50KB+. Tests that ingest
+    doesn't OOM and AI summariser handles oversized input correctly."""
+    path = os.path.join(TEST_DIR, 'valid_extremely_long_report.txt')
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write("ANNUAL IMPACT REPORT 2025 — FULL NARRATIVE\n")
+        f.write("=" * 60 + "\n\n")
+        # Produce ~50KB of substantive content
+        sections = [
+            "EXECUTIVE SUMMARY",
+            "PROGRAMME ACHIEVEMENTS",
+            "GEOGRAPHIC REACH",
+            "PARTNERSHIPS AND COLLABORATION",
+            "MONITORING AND EVALUATION",
+            "FINANCIAL MANAGEMENT",
+            "CHALLENGES AND ADAPTATIONS",
+            "CASE STUDIES",
+            "STAFF AND ORGANISATIONAL DEVELOPMENT",
+            "LOOKING AHEAD: 2026 STRATEGIC PRIORITIES",
+        ]
+        para = (
+            "This section describes the work undertaken with full statistical "
+            "rigour: beneficiary counts, geographic distribution, intervention "
+            "schedules, partner contributions, and measured outcomes. Specific "
+            "figures include 12,847 beneficiaries reached across 23 districts; "
+            "USD 1,847,000 deployed with 96.4% absorption rate; 142 partner "
+            "engagements; and outcome improvements averaging 34.2% above "
+            "baseline. Detailed methodology appears in Annex A; raw data is "
+            "available on request from the M&E unit.\n\n"
+        )
+        for i, sec in enumerate(sections, start=1):
+            f.write(f"\n{i}. {sec}\n")
+            f.write("-" * 60 + "\n\n")
+            for j in range(15):
+                f.write(f"{i}.{j+1}. ")
+                f.write(para)
+        f.write("\n--- END OF REPORT (target ~50KB reached) ---\n")
+    size = os.path.getsize(path)
+    print(f"  Created: valid_extremely_long_report.txt ({size:,} bytes)")
+
+
 def create_valid_txt_report():
     """Valid text file for testing."""
     path = os.path.join(TEST_DIR, 'valid_meeting_minutes.txt')
@@ -934,6 +1224,20 @@ def main():
     create_malicious_html()
 
     print()
+    print("Creating ADDITIONAL fixtures (2026-05-17 team redline)...")
+    create_password_protected_pdf()
+    create_password_protected_xlsx()
+    create_scanned_image_only_pdf()
+    create_mixed_language_narrative()
+    create_unicode_filename_sample()
+    create_duplicate_filename_pair()  # creates two files
+    create_corrupt_xlsx()
+    create_pii_heavy_report()
+    create_contradictory_evidence_report()
+    create_polished_but_empty_narrative()
+    create_extremely_long_narrative()
+
+    print()
     print("Packaging into ZIP...")
     zip_path = os.path.join(DOCS_DIR, 'kuja-test-files-v3.zip')
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -942,7 +1246,9 @@ def main():
             if os.path.isfile(fpath):
                 zf.write(fpath, f'kuja-test-files-v3/{fname}')
                 size = os.path.getsize(fpath)
-                print(f"  Added: {fname} ({size:,} bytes)")
+                # ASCII-safe print (terminal may be cp1252 on Windows)
+                safe = fname.encode('ascii', errors='replace').decode('ascii')
+                print(f"  Added: {safe} ({size:,} bytes)")
 
     zip_size = os.path.getsize(zip_path)
     file_count = len([f for f in os.listdir(TEST_DIR) if os.path.isfile(os.path.join(TEST_DIR, f))])

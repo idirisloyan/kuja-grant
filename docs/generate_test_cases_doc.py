@@ -5712,6 +5712,885 @@ test_cases.extend(core_edge_cases)
 
 
 # ============================================================================
+# CATEGORY 32: ACCESSIBILITY  (TC-700 to TC-709)
+# Keyboard, focus, screen-reader, contrast, RTL keyboard, reduced motion.
+# ============================================================================
+
+a11y_cases = [
+    {
+        "id": "TC-700", "name": "Donor Dashboard Tab Order Sensible", "category": "Accessibility",
+        "priority": "P1 - Critical", "requirement": "FR-A11Y-KBD-001",
+        "type": "accessibility", "automation": "browser", "environment": "desktop",
+        "prereqs": "Donor logged in. Disable mouse and use Tab only.",
+        "steps": (
+            "1. Land on /dashboard\n"
+            "2. Press Tab repeatedly to traverse the page\n"
+            "3. Track the focus order"
+        ),
+        "data": "Keyboard-only navigation.",
+        "expected": (
+            "1. Order is: skip-link → sidebar nav → header search → header actions →\n"
+            "   verdict card actions → diagnostics card → funnel charts → chat composer (if visible) →\n"
+            "   footer\n"
+            "2. No focus trap, no skipped controls\n"
+            "3. Skip-link visible on first tab press"
+        ),
+        "criteria": "Pass: Logical order, every interactive control reachable. Fail: Skipped controls or trap."
+    },
+    {
+        "id": "TC-701", "name": "Visible Focus Ring On Every Interactive Element", "category": "Accessibility",
+        "priority": "P1 - Critical", "requirement": "FR-A11Y-FOCUS-001",
+        "type": "accessibility", "automation": "browser", "environment": "desktop",
+        "prereqs": "Any page.",
+        "steps": (
+            "1. Tab through 20+ interactive elements\n"
+            "2. Observe each focus state"
+        ),
+        "data": "All elements.",
+        "expected": (
+            "1. Every focused control shows a visible ring (≥2px, ≥3:1 contrast)\n"
+            "2. Custom buttons + shadcn primitives keep the ring\n"
+            "3. No `outline: none` without a replacement"
+        ),
+        "criteria": "Pass: Ring on all. Fail: Any element receives focus invisibly."
+    },
+    {
+        "id": "TC-702", "name": "Modal / Dialog Escape Closes And Returns Focus", "category": "Accessibility",
+        "priority": "P1 - Critical", "requirement": "FR-A11Y-MODAL-001",
+        "type": "accessibility", "automation": "browser", "environment": "desktop",
+        "prereqs": "Pages with modals: chat reset confirm, grant broadcast dialog, micro-survey, WebAuthn settings.",
+        "steps": (
+            "1. Open each modal\n"
+            "2. Press Esc"
+        ),
+        "data": "Esc key.",
+        "expected": (
+            "1. Modal closes\n"
+            "2. Focus returns to the trigger element\n"
+            "3. Page state unchanged (no destructive side effect)"
+        ),
+        "criteria": "Pass: Clean close + focus return. Fail: Esc ignored or focus lost."
+    },
+    {
+        "id": "TC-703", "name": "Screen-Reader Labels On Icon-Only Controls", "category": "Accessibility",
+        "priority": "P1 - Critical", "requirement": "FR-A11Y-SR-001",
+        "type": "accessibility", "automation": "browser", "environment": "desktop",
+        "prereqs": "NVDA/VoiceOver active.",
+        "steps": (
+            "1. Tab to each icon-only button: collapse sidebar, delete chip, reorder arrows,\n"
+            "   close banner, share button, micro-survey X, chat reset, WebAuthn revoke\n"
+            "2. Confirm each is announced"
+        ),
+        "data": "Icon-only controls.",
+        "expected": (
+            "1. Each control has aria-label or visually-hidden text\n"
+            "2. Screen reader announces a meaningful name (not 'button' or 'svg')\n"
+            "3. Role is correct (button vs link)"
+        ),
+        "criteria": "Pass: All named. Fail: ANY unnamed icon control."
+    },
+    {
+        "id": "TC-704", "name": "Form Error Announcement (aria-live)", "category": "Accessibility",
+        "priority": "P2 - High", "requirement": "FR-A11Y-FORM-001",
+        "type": "accessibility", "automation": "browser", "environment": "desktop",
+        "prereqs": "Forms: login, create grant, submit application, submit report, micro-survey.",
+        "steps": (
+            "1. Submit each form with invalid input\n"
+            "2. Listen for screen-reader announcement"
+        ),
+        "data": "Invalid inputs.",
+        "expected": (
+            "1. Error appears in an aria-live='polite' region\n"
+            "2. Screen reader reads the error within ~1s\n"
+            "3. Focus moves to the first invalid field"
+        ),
+        "criteria": "Pass: Errors announced. Fail: Silent failures."
+    },
+    {
+        "id": "TC-705", "name": "Color Contrast — Badges, Score States, Heatmap", "category": "Accessibility",
+        "priority": "P1 - Critical", "requirement": "FR-A11Y-CONTRAST-001",
+        "type": "accessibility", "automation": "browser", "environment": "desktop",
+        "prereqs": "Pages with status badges, score rings, risk heatmap, NPS pills.",
+        "steps": (
+            "1. Use a contrast checker (axe/Lighthouse)\n"
+            "2. Inspect: PASS/FAIL status badges, P1/P2/P3 priority pills,\n"
+            "   above/around/below verdict pills, heatmap cells, AI compliance score badges"
+        ),
+        "data": "Contrast audit.",
+        "expected": (
+            "1. Text contrast ≥ 4.5:1 (normal) or ≥ 3:1 (large)\n"
+            "2. Non-text UI ≥ 3:1\n"
+            "3. Color is not the SOLE meaning indicator (icons/text supplement)"
+        ),
+        "criteria": "Pass: All ratios meet WCAG AA. Fail: Any below threshold."
+    },
+    {
+        "id": "TC-706", "name": "Chart Alt/Summary Text", "category": "Accessibility",
+        "priority": "P2 - High", "requirement": "FR-A11Y-CHART-001",
+        "type": "accessibility", "automation": "browser", "environment": "desktop",
+        "prereqs": "Pages with charts: funnel funnels, review velocity, risk heatmap, score rings.",
+        "steps": (
+            "1. Inspect each chart for aria-label or aria-describedby\n"
+            "2. Verify a text summary exists next to or under each chart"
+        ),
+        "data": "Charts.",
+        "expected": (
+            "1. Every chart has accessible name\n"
+            "2. Text summary describes the key insight (e.g. 'Submitted: 12, Under review: 4, Awarded: 2')\n"
+            "3. Data also available in tabular form somewhere on the page"
+        ),
+        "criteria": "Pass: Charts accessible. Fail: Image-only with no text equivalent."
+    },
+    {
+        "id": "TC-707", "name": "RTL + Keyboard Behavior In Arabic", "category": "Accessibility",
+        "priority": "P2 - High", "requirement": "FR-A11Y-RTL-KBD-001",
+        "type": "accessibility", "automation": "browser", "environment": "desktop",
+        "prereqs": "Arabic-language user.",
+        "steps": (
+            "1. Tab through the dashboard\n"
+            "2. Use arrow keys in lists / dropdowns / chat"
+        ),
+        "data": "Arabic + keyboard.",
+        "expected": (
+            "1. Tab still moves DOM order (not visual right-to-left)\n"
+            "2. Arrow keys in horizontal controls follow visual direction (right = next in RTL)\n"
+            "3. No focus trap caused by direction flip\n"
+            "4. Modals open in the correct visual position"
+        ),
+        "criteria": "Pass: RTL + keyboard correct. Fail: Reversed Tab or trapped focus."
+    },
+    {
+        "id": "TC-708", "name": "Prefers-Reduced-Motion Respected", "category": "Accessibility",
+        "priority": "P3 - Medium", "requirement": "FR-A11Y-MOTION-001",
+        "type": "accessibility", "automation": "browser", "environment": "desktop",
+        "prereqs": "OS-level 'reduce motion' enabled.",
+        "steps": (
+            "1. Open the app\n"
+            "2. Observe animations: loaders, transitions, chart entry, install banner slide-in,\n"
+            "   chat 'thinking…' shimmer, micro-survey appearance"
+        ),
+        "data": "Reduced motion.",
+        "expected": (
+            "1. Animations removed or massively shortened\n"
+            "2. No spinners with fast strobe; replaced with subtle text or static state\n"
+            "3. No automatic carousel or auto-advancing content\n"
+            "4. Page still fully functional"
+        ),
+        "criteria": "Pass: Honors preference. Fail: Animations play anyway."
+    },
+    {
+        "id": "TC-709", "name": "Skip-To-Content Link Present", "category": "Accessibility",
+        "priority": "P2 - High", "requirement": "FR-A11Y-SKIP-001",
+        "type": "accessibility", "automation": "browser", "environment": "desktop",
+        "prereqs": "Any page.",
+        "steps": (
+            "1. Fresh tab\n"
+            "2. Press Tab once"
+        ),
+        "data": "First tab press.",
+        "expected": (
+            "1. 'Skip to main content' link appears visually (not just SR-only)\n"
+            "2. Activating it jumps focus past the sidebar/header to main\n"
+            "3. Aria-hidden chrome (nav, brand bar) is not announced repeatedly"
+        ),
+        "criteria": "Pass: Skip-link works. Fail: Missing or activates nothing."
+    },
+]
+test_cases.extend(a11y_cases)
+
+
+# ============================================================================
+# CATEGORY 33: CROSS-BROWSER + DEVICE MATRIX  (TC-720 to TC-727)
+# Each test is one (flow × platform) combination; multiple per flow to
+# capture the platform-specific delta.
+# ============================================================================
+
+xbrowser_cases = [
+    {
+        "id": "TC-720", "name": "Sustained Chat — Safari Desktop", "category": "Cross-Browser",
+        "priority": "P2 - High", "requirement": "FR-XBROWSER-CHAT-001",
+        "type": "edge", "automation": "browser", "environment": "Safari desktop",
+        "prereqs": "Safari ≥17 on macOS.",
+        "steps": (
+            "1. Log in, open /chat\n"
+            "2. Send a message\n"
+            "3. Send follow-up referencing first turn\n"
+            "4. Click Reset"
+        ),
+        "data": "Three-turn conversation.",
+        "expected": (
+            "1. Composer enabled within 5s\n"
+            "2. Reply lands\n"
+            "3. Memory of first turn works\n"
+            "4. Reset confirm dialog displays correctly (no Safari-specific layout bug)"
+        ),
+        "criteria": "Pass: Functional parity with Chrome. Fail: Any Safari regression."
+    },
+    {
+        "id": "TC-721", "name": "WebAuthn — iPhone Safari Face ID", "category": "Cross-Browser",
+        "priority": "P2 - High", "requirement": "FR-XBROWSER-WEBAUTHN-001",
+        "type": "security", "automation": "manual", "environment": "iPhone Safari",
+        "prereqs": "iPhone with Face ID, iOS 17+, signed in.",
+        "steps": (
+            "1. Open /settings/security in mobile Safari\n"
+            "2. Tap 'Enrol this device'\n"
+            "3. Approve Face ID prompt\n"
+            "4. Reload page\n"
+            "5. Tap trash icon to revoke"
+        ),
+        "data": "iOS biometric.",
+        "expected": (
+            "1. Face ID prompt fires (no 'Use your security key' confusion)\n"
+            "2. Device appears in list labeled 'iPhone/iPad'\n"
+            "3. Revoke confirms + removes\n"
+            "4. No iOS-specific WebAuthn API quirks (passkeys store works)"
+        ),
+        "criteria": "Pass: Full iOS flow. Fail: Any silent failure."
+    },
+    {
+        "id": "TC-722", "name": "PWA Install — Platform Behaviour Matrix", "category": "Cross-Browser",
+        "priority": "P2 - High", "requirement": "FR-XBROWSER-PWA-001",
+        "type": "edge", "automation": "manual", "environment": "matrix",
+        "prereqs": "Fresh browser session on each platform.",
+        "steps": (
+            "1. Chrome desktop — load app, wait 10s\n"
+            "2. Edge desktop — same\n"
+            "3. Firefox desktop — same\n"
+            "4. Safari desktop — same\n"
+            "5. iPhone Safari — same\n"
+            "6. Android Chrome — same"
+        ),
+        "data": "Install banner detection across 6 platforms.",
+        "expected": (
+            "1. Chrome desktop: banner SHOWS\n"
+            "2. Edge desktop: banner SHOWS\n"
+            "3. Firefox desktop: banner does NOT show (no beforeinstallprompt)\n"
+            "4. Safari desktop: banner does NOT show; share-sheet path works\n"
+            "5. iPhone Safari: banner does NOT show; manual 'Add to Home Screen' works\n"
+            "6. Android Chrome: banner SHOWS"
+        ),
+        "criteria": "Pass: Matrix matches. Fail: Any platform misbehaves (especially false positive on iOS)."
+    },
+    {
+        "id": "TC-723", "name": "Native Share — Chrome Desktop Falls Back To Clipboard", "category": "Cross-Browser",
+        "priority": "P3 - Medium", "requirement": "FR-XBROWSER-SHARE-001",
+        "type": "edge", "automation": "browser", "environment": "Chrome desktop",
+        "prereqs": "Chrome desktop on donor profile.",
+        "steps": (
+            "1. Click 'Share profile'"
+        ),
+        "data": "Chrome desktop.",
+        "expected": (
+            "1. Chrome desktop has navigator.share — system share-style picker appears\n"
+            "   OR clipboard fallback if Chrome version pre-share-API\n"
+            "2. Either path completes without error"
+        ),
+        "criteria": "Pass: Some share path works. Fail: Silent failure."
+    },
+    {
+        "id": "TC-724", "name": "Native Share — Firefox Desktop Clipboard Path", "category": "Cross-Browser",
+        "priority": "P3 - Medium", "requirement": "FR-XBROWSER-SHARE-002",
+        "type": "edge", "automation": "browser", "environment": "Firefox desktop",
+        "prereqs": "Firefox desktop on donor profile.",
+        "steps": (
+            "1. Click 'Share profile'"
+        ),
+        "data": "Firefox.",
+        "expected": (
+            "1. navigator.share missing → clipboard fallback fires\n"
+            "2. 'Copied' toast appears\n"
+            "3. URL is in clipboard"
+        ),
+        "criteria": "Pass: Clipboard path. Fail: Silent failure."
+    },
+    {
+        "id": "TC-725", "name": "Donor Dashboard — Mobile Chrome Layout", "category": "Cross-Browser",
+        "priority": "P2 - High", "requirement": "FR-XBROWSER-MOBILE-001",
+        "type": "edge", "automation": "browser", "environment": "Android Chrome",
+        "prereqs": "Android device or Chrome DevTools mobile emulator.",
+        "steps": (
+            "1. Open /dashboard\n"
+            "2. Inspect: verdict card, funnel chart, risk heatmap, cohort card"
+        ),
+        "data": "Narrow viewport.",
+        "expected": (
+            "1. All cards stack vertically, no horizontal scroll\n"
+            "2. Charts shrink responsively (legend may collapse)\n"
+            "3. Hero verdict actions remain tap-targets ≥44px\n"
+            "4. Sidebar collapses to drawer"
+        ),
+        "criteria": "Pass: Clean mobile layout. Fail: Horizontal scroll or unreachable controls."
+    },
+    {
+        "id": "TC-726", "name": "Audit Chain Page — Edge Desktop", "category": "Cross-Browser",
+        "priority": "P3 - Medium", "requirement": "FR-XBROWSER-AUDIT-001",
+        "type": "happy_path", "automation": "browser", "environment": "Edge desktop",
+        "prereqs": "Admin in Edge.",
+        "steps": (
+            "1. Open /admin/audit-chain\n"
+            "2. Verify table loads + paginates"
+        ),
+        "data": "Edge desktop.",
+        "expected": "Identical to Chrome — Edge runs Blink so should be parity.",
+        "criteria": "Pass: Parity. Fail: Edge regression."
+    },
+    {
+        "id": "TC-727", "name": "Chat Composer — iPhone Safari Keyboard Behaviour", "category": "Cross-Browser",
+        "priority": "P2 - High", "requirement": "FR-XBROWSER-CHAT-002",
+        "type": "edge", "automation": "manual", "environment": "iPhone Safari",
+        "prereqs": "iPhone Safari, signed in.",
+        "steps": (
+            "1. Open /chat\n"
+            "2. Tap composer — keyboard appears\n"
+            "3. Type a message\n"
+            "4. Tap Send\n"
+            "5. Verify message bubble + reply visible above keyboard"
+        ),
+        "data": "iOS soft keyboard.",
+        "expected": (
+            "1. Composer scrolls into view when focused\n"
+            "2. Send button still tap-able when keyboard up\n"
+            "3. New bubbles auto-scroll into the visible region\n"
+            "4. Keyboard doesn't obscure the latest message"
+        ),
+        "criteria": "Pass: iOS-friendly. Fail: Keyboard covers UI."
+    },
+]
+test_cases.extend(xbrowser_cases)
+
+
+# ============================================================================
+# CATEGORY 34: PRIVACY + DATA LEAKAGE  (TC-740 to TC-749)
+# ============================================================================
+
+privacy_cases = [
+    {
+        "id": "TC-740", "name": "Public Donor Profile Raw Payload Audit", "category": "Privacy",
+        "priority": "P1 - Critical", "requirement": "FR-PRIV-DONOR-001",
+        "type": "privacy", "automation": "api", "environment": "any",
+        "prereqs": "Logged in user.",
+        "steps": (
+            "1. GET /api/organizations/14/donor-profile\n"
+            "2. GET /api/organizations/14/donor-benchmarks\n"
+            "3. Inspect raw JSON in both"
+        ),
+        "data": "Raw API responses.",
+        "expected": (
+            "1. NO NGO names in either response\n"
+            "2. NO application IDs or report IDs\n"
+            "3. NO grantee-specific dollar amounts\n"
+            "4. Only: aggregate counts, medians, sector/country lists with counts"
+        ),
+        "criteria": "Pass: All clean. Fail: ANY identifying field leaks."
+    },
+    {
+        "id": "TC-741", "name": "Public NGO Summary Unpublished Returns 404", "category": "Privacy",
+        "priority": "P1 - Critical", "requirement": "FR-PRIV-NGO-001",
+        "type": "privacy", "automation": "api", "environment": "any",
+        "prereqs": "NGO that has NOT opted into public summary.",
+        "steps": (
+            "1. GET /ngo/<slug> (no auth)\n"
+            "2. GET /api/organizations/<id>/ngo-summary (if exists)"
+        ),
+        "data": "Unpublished NGO.",
+        "expected": (
+            "1. Both return 404 (NOT 403, NOT empty 200)\n"
+            "2. Response body reveals no metadata about the NGO existing\n"
+            "3. Different timing-attack resistance: 404 within same response budget as a published one"
+        ),
+        "criteria": "Pass: Opaque 404. Fail: Reveals existence or returns data."
+    },
+    {
+        "id": "TC-742", "name": "Export Scoping By Role — Donor", "category": "Privacy",
+        "priority": "P1 - Critical", "requirement": "FR-PRIV-EXPORT-001",
+        "type": "privacy", "automation": "api", "environment": "any",
+        "prereqs": "Two donor orgs, one NGO.",
+        "steps": (
+            "1. Donor A: GET /api/exports/grants.csv\n"
+            "2. Donor A: GET /api/exports/applications.csv\n"
+            "3. Donor A: GET /api/exports/reviews.csv\n"
+            "4. Inspect each CSV"
+        ),
+        "data": "Donor exports.",
+        "expected": (
+            "1. Only Donor A's grants appear (no Donor B's)\n"
+            "2. Applications scoped to Donor A's grants only\n"
+            "3. Reviews scoped to applications on Donor A's grants\n"
+            "4. No PII for unrelated NGOs"
+        ),
+        "criteria": "Pass: Scoped. Fail: ANY cross-donor leak."
+    },
+    {
+        "id": "TC-743", "name": "Export Scoping By Role — NGO Blocked From Donor Exports", "category": "Privacy",
+        "priority": "P1 - Critical", "requirement": "FR-PRIV-EXPORT-002",
+        "type": "privacy", "automation": "api", "environment": "any",
+        "prereqs": "NGO login.",
+        "steps": (
+            "1. NGO: GET /api/exports/grants.csv\n"
+            "2. NGO: GET /api/exports/reviews.csv"
+        ),
+        "data": "NGO blocked.",
+        "expected": "Both return 403.",
+        "criteria": "Pass: Blocked. Fail: Any 200."
+    },
+    {
+        "id": "TC-744", "name": "Cohort Analytics Raw Payload Has No Identifiers", "category": "Privacy",
+        "priority": "P1 - Critical", "requirement": "FR-PRIV-COHORT-001",
+        "type": "privacy", "automation": "api", "environment": "any",
+        "prereqs": "Donor with cohort data.",
+        "steps": (
+            "1. GET /api/dashboard/donor-cohort-analytics\n"
+            "2. JSON.parse + walk every field"
+        ),
+        "data": "Cohort raw.",
+        "expected": (
+            "1. No NGO names anywhere\n"
+            "2. No other donor names\n"
+            "3. No grant IDs or application IDs\n"
+            "4. Only metric codes, self_value, cohort_median, cohort_count, percentile, verdict"
+        ),
+        "criteria": "Pass: Clean. Fail: Any identifier."
+    },
+    {
+        "id": "TC-745", "name": "Chat Thread Cross-User Isolation API-Level", "category": "Privacy",
+        "priority": "P1 - Critical", "requirement": "FR-PRIV-CHAT-001",
+        "type": "security", "automation": "api", "environment": "any",
+        "prereqs": "User A opens thread, gets thread_id. User B logs in.",
+        "steps": (
+            "1. User B: GET /api/ai/threads/<A's thread_id>/messages\n"
+            "2. User B: POST /api/ai/threads/<A's thread_id>/messages\n"
+            "3. User B: POST /api/ai/threads/<A's thread_id>/reset"
+        ),
+        "data": "Cross-user thread access.",
+        "expected": "All three return 404 'thread not found' (matches the not-yours-doesn't-exist pattern).",
+        "criteria": "Pass: 404 on all. Fail: Any 200 or 403 (the latter still reveals existence)."
+    },
+    {
+        "id": "TC-746", "name": "Passport Verify URL With Invalid Token", "category": "Privacy",
+        "priority": "P1 - Critical", "requirement": "FR-PRIV-PASSPORT-001",
+        "type": "security", "automation": "api", "environment": "any",
+        "prereqs": "Public passport URL with token.",
+        "steps": (
+            "1. Visit valid /trust/verify/<slug>?token=valid\n"
+            "2. Visit /trust/verify/<slug>?token=tampered\n"
+            "3. Visit /trust/verify/<slug> without token\n"
+            "4. Visit /trust/verify/<unrevoked-slug>?token=oldrevoked"
+        ),
+        "data": "Token attack matrix.",
+        "expected": (
+            "1. Valid: passport visible\n"
+            "2. Tampered: 'Token invalid' page; no passport data\n"
+            "3. Missing token: 'Token required' page\n"
+            "4. Revoked: 'This passport has been revoked' page"
+        ),
+        "criteria": "Pass: All four states. Fail: Tampered/revoked still grants access."
+    },
+    {
+        "id": "TC-747", "name": "Notification Content Doesn't Leak Other Users", "category": "Privacy",
+        "priority": "P2 - High", "requirement": "FR-PRIV-NOTIF-001",
+        "type": "privacy", "automation": "api", "environment": "any",
+        "prereqs": "User A and User B with overlapping interest in a grant.",
+        "steps": (
+            "1. User A receives a notification\n"
+            "2. GET /api/notifications/ as User A → inspect body\n"
+            "3. GET /api/notifications/ as User B → inspect body"
+        ),
+        "data": "Cross-user notification visibility.",
+        "expected": (
+            "1. Each user sees only their own notifications\n"
+            "2. Body never names other users\n"
+            "3. Deep-link URLs in body reference resources the recipient can access"
+        ),
+        "criteria": "Pass: Per-user only. Fail: Cross-user leak."
+    },
+    {
+        "id": "TC-748", "name": "Search Permission Filtering", "category": "Privacy",
+        "priority": "P1 - Critical", "requirement": "FR-PRIV-SEARCH-001",
+        "type": "privacy", "automation": "api", "environment": "any",
+        "prereqs": "Three users: NGO A, NGO B, donor C. Each owns some applications.",
+        "steps": (
+            "1. NGO A: GET /api/search?q=common-term\n"
+            "2. NGO B: same query\n"
+            "3. Donor C: same query"
+        ),
+        "data": "Same query, three roles.",
+        "expected": (
+            "1. NGO A sees only their applications + public grants\n"
+            "2. NGO B sees only their applications + public grants\n"
+            "3. Donor C sees only their grants + applications to their grants\n"
+            "4. No user sees another's draft applications, internal reports, or unpublished grants"
+        ),
+        "criteria": "Pass: Strict scoping. Fail: Cross-role visibility."
+    },
+    {
+        "id": "TC-749", "name": "Audit Chain Visibility — Non-Admin Blocked", "category": "Privacy",
+        "priority": "P1 - Critical", "requirement": "FR-PRIV-AUDIT-001",
+        "type": "privacy", "automation": "api", "environment": "any",
+        "prereqs": "NGO + donor + reviewer logins.",
+        "steps": (
+            "1. As NGO: GET /api/audit-chain/recent\n"
+            "2. As donor: same\n"
+            "3. As reviewer: same"
+        ),
+        "data": "Non-admin attempts.",
+        "expected": "All three return 403.",
+        "criteria": "Pass: Admin-only. Fail: Any non-admin reads chain."
+    },
+]
+test_cases.extend(privacy_cases)
+
+
+# ============================================================================
+# CATEGORY 35: WORKFLOW INTEGRITY  (TC-760 to TC-769)
+# Invalid transitions, idempotency, concurrency, side-effect correctness.
+# ============================================================================
+
+integrity_cases = [
+    {
+        "id": "TC-760", "name": "Double-Click Submit Application", "category": "Workflow Integrity",
+        "priority": "P1 - Critical", "requirement": "FR-INT-SUBMIT-001",
+        "type": "edge", "automation": "browser", "environment": "any",
+        "prereqs": "NGO with draft application.",
+        "steps": (
+            "1. Click Submit\n"
+            "2. Immediately click Submit again (before first request returns)\n"
+            "3. Wait for both responses\n"
+            "4. Inspect: application status, audit chain entries, reviewer assignments,\n"
+            "   notification deliveries, user_events"
+        ),
+        "data": "Double-submit race.",
+        "expected": (
+            "1. Exactly ONE state transition draft → submitted\n"
+            "2. Exactly ONE 'application.submit' user_event\n"
+            "3. Exactly ONE 'reviewer.auto_assigned' audit entry\n"
+            "4. Exactly ONE submission notification per reviewer\n"
+            "5. Second click returns the idempotent 'already submitted' response"
+        ),
+        "criteria": "Pass: All exactly-once. Fail: Any duplicate."
+    },
+    {
+        "id": "TC-761", "name": "Cron Idempotency — Reviewer Auto-Assign Sweep", "category": "Workflow Integrity",
+        "priority": "P2 - High", "requirement": "FR-INT-CRON-001",
+        "type": "edge", "automation": "api", "environment": "any",
+        "prereqs": "Admin login.",
+        "steps": (
+            "1. POST /api/cron/reviewer-auto-assign-sweep (run 1)\n"
+            "2. POST /api/cron/reviewer-auto-assign-sweep (run 2, immediately)"
+        ),
+        "data": "Back-to-back runs.",
+        "expected": (
+            "1. Run 1: assigns reviewers as available\n"
+            "2. Run 2: result.apps_assigned=0, result.skipped.already_assigned matches run 1's assignments"
+        ),
+        "criteria": "Pass: Idempotent. Fail: Double-assign."
+    },
+    {
+        "id": "TC-762", "name": "Cron Idempotency — UAT Fixtures", "category": "Workflow Integrity",
+        "priority": "P3 - Medium", "requirement": "FR-INT-CRON-002",
+        "type": "edge", "automation": "api", "environment": "any",
+        "prereqs": "Admin login.",
+        "steps": (
+            "1. POST /api/cron/uat-fixtures twice"
+        ),
+        "data": "Back-to-back UAT cron.",
+        "expected": "Second run reports no-op or 'already in good shape'.",
+        "criteria": "Pass: Idempotent. Fail: Duplicate fixture data."
+    },
+    {
+        "id": "TC-763", "name": "Broadcast Retry Doesn't Duplicate Messages", "category": "Workflow Integrity",
+        "priority": "P2 - High", "requirement": "FR-INT-BROADCAST-001",
+        "type": "edge", "automation": "browser", "environment": "any",
+        "prereqs": "Donor with a grant + applicants.",
+        "steps": (
+            "1. Open broadcast dialog\n"
+            "2. Fill subject + body\n"
+            "3. Click Send\n"
+            "4. Before response lands, click Send again\n"
+            "5. Check each applicant's inbox + in-app notification list"
+        ),
+        "data": "Double-send broadcast.",
+        "expected": (
+            "1. UI disables Send button after first click\n"
+            "2. Each recipient sees ONE message, not two\n"
+            "3. donor.broadcast_sent event recorded once"
+        ),
+        "criteria": "Pass: Exactly-once. Fail: Duplicate messages."
+    },
+    {
+        "id": "TC-764", "name": "Concurrent Reviewer Submit + Donor View", "category": "Workflow Integrity",
+        "priority": "P2 - High", "requirement": "FR-INT-CONCURRENT-001",
+        "type": "edge", "automation": "browser", "environment": "any",
+        "prereqs": "Reviewer + donor on the same application detail page.",
+        "steps": (
+            "1. Reviewer submits a score → POST /complete\n"
+            "2. Donor refreshes the page during the in-flight POST"
+        ),
+        "data": "Concurrent operations.",
+        "expected": (
+            "1. Reviewer's POST succeeds with 200\n"
+            "2. Donor's refresh shows the updated score after the POST commits\n"
+            "3. No stale optimistic state\n"
+            "4. final_score recalculated based on the new review"
+        ),
+        "criteria": "Pass: Consistent state. Fail: Stale data or 500."
+    },
+    {
+        "id": "TC-765", "name": "Decision Record Writes ALL Expected Side Effects", "category": "Workflow Integrity",
+        "priority": "P1 - Critical", "requirement": "FR-INT-DECISION-001",
+        "type": "edge", "automation": "browser", "environment": "any",
+        "prereqs": "Donor with a scored application.",
+        "steps": (
+            "1. Donor records decision='awarded' with reason_code\n"
+            "2. Inspect: application row, audit chain, debrief rollup, user_event,\n"
+            "   notifications, app status"
+        ),
+        "data": "Single decision.",
+        "expected": (
+            "1. application.status = 'awarded'\n"
+            "2. application.decision_reason_code set\n"
+            "3. application.decision_recorded_at + by_user_id set\n"
+            "4. Audit chain entry 'application.debrief.recorded'\n"
+            "5. donor.decision_recorded user_event\n"
+            "6. NGO notification dispatched per their prefs\n"
+            "7. Debrief rollup includes this in aggregate"
+        ),
+        "criteria": "Pass: All effects. Fail: Any missing."
+    },
+    {
+        "id": "TC-766", "name": "Invalid Status Transition Rejected", "category": "Workflow Integrity",
+        "priority": "P2 - High", "requirement": "FR-INT-STATE-001",
+        "type": "negative", "automation": "api", "environment": "any",
+        "prereqs": "Application in status 'awarded'.",
+        "steps": (
+            "1. PATCH /api/applications/<id>/status with new_status='draft'\n"
+            "2. PATCH with new_status='submitted'"
+        ),
+        "data": "Backward transitions.",
+        "expected": "Both return 400 with clear error; no state change.",
+        "criteria": "Pass: Blocked. Fail: Backward transition accepted."
+    },
+    {
+        "id": "TC-767", "name": "Report Submit Doesn't Re-Trigger AI On Resubmit", "category": "Workflow Integrity",
+        "priority": "P2 - High", "requirement": "FR-INT-REPORT-001",
+        "type": "edge", "automation": "api", "environment": "any",
+        "prereqs": "Report submitted once.",
+        "steps": (
+            "1. POST /api/reports/<id>/submit again"
+        ),
+        "data": "Re-submit.",
+        "expected": (
+            "1. 400 'Report cannot be submitted' OR idempotent 200 with existing ai_analysis\n"
+            "2. AI cost endpoint does NOT charge twice\n"
+            "3. revision_history correctly accumulates only on intentional revisions"
+        ),
+        "criteria": "Pass: No double AI. Fail: Duplicate AI run + double cost."
+    },
+    {
+        "id": "TC-768", "name": "Org Merge Side Effects Audit", "category": "Workflow Integrity",
+        "priority": "P1 - Critical", "requirement": "FR-INT-MERGE-001",
+        "type": "edge", "automation": "api", "environment": "any",
+        "prereqs": "Two donor orgs to merge: SRC + DST. Admin login.",
+        "steps": (
+            "1. POST /api/admin/orgs/merge with source_id=SRC, target_id=DST, confirm_name=SRC.name\n"
+            "2. Inspect: grants, applications, users, audit chain, user_events"
+        ),
+        "data": "Single merge.",
+        "expected": (
+            "1. All SRC's grants now belong to DST\n"
+            "2. All SRC's users now belong to DST\n"
+            "3. SRC row marked deleted/archived\n"
+            "4. Audit chain entry 'org.merged' with merge_source_id\n"
+            "5. user_events historical rows preserve original org_id (no rewrite)"
+        ),
+        "criteria": "Pass: Clean migration. Fail: Orphan records or history rewrite."
+    },
+    {
+        "id": "TC-769", "name": "Notification Dedupe Within Same Hour", "category": "Workflow Integrity",
+        "priority": "P3 - Medium", "requirement": "FR-INT-NOTIF-001",
+        "type": "edge", "automation": "api", "environment": "any",
+        "prereqs": "Notification dispatcher live.",
+        "steps": (
+            "1. Trigger the same notification twice in 5 minutes (same user, category, related_id)"
+        ),
+        "data": "Duplicate trigger.",
+        "expected": "Second send is deduped (no second in-app + no second email).",
+        "criteria": "Pass: Deduped. Fail: User receives two."
+    },
+]
+test_cases.extend(integrity_cases)
+
+
+# ============================================================================
+# CATEGORY 36: PERFORMANCE + SLO  (TC-780 to TC-789)
+# Explicit latency budgets per critical operation.
+# ============================================================================
+
+slo_cases = [
+    {
+        "id": "TC-780", "name": "First Chat Reply Latency SLO", "category": "Performance SLO",
+        "priority": "P2 - High", "requirement": "FR-SLO-CHAT-001",
+        "type": "performance", "automation": "browser", "environment": "any",
+        "prereqs": "Fresh chat thread.",
+        "steps": (
+            "1. Send first message\n"
+            "2. Time from POST to reply land"
+        ),
+        "data": "Cold start.",
+        "expected": (
+            "1. p50 ≤ 8s\n"
+            "2. p95 ≤ 15s\n"
+            "3. p99 ≤ 25s\n"
+            "4. Failure surfaces a friendly 'try again' within the 25s cap"
+        ),
+        "criteria": "Pass: Within budget. Fail: Sustained slow first reply."
+    },
+    {
+        "id": "TC-781", "name": "Follow-Up Chat Reply Latency SLO", "category": "Performance SLO",
+        "priority": "P2 - High", "requirement": "FR-SLO-CHAT-002",
+        "type": "performance", "automation": "browser", "environment": "any",
+        "prereqs": "Thread with 1-2 turns already.",
+        "steps": (
+            "1. Send follow-up\n"
+            "2. Time the reply"
+        ),
+        "data": "Warm path.",
+        "expected": "p50 ≤ 5s, p95 ≤ 10s.",
+        "criteria": "Pass: Faster than first. Fail: As slow as first or slower."
+    },
+    {
+        "id": "TC-782", "name": "Donor Dashboard Total Load Time", "category": "Performance SLO",
+        "priority": "P2 - High", "requirement": "FR-SLO-DASH-001",
+        "type": "performance", "automation": "browser", "environment": "any",
+        "prereqs": "Donor session.",
+        "steps": (
+            "1. Hard-refresh /dashboard\n"
+            "2. Time to interactive (TTI)\n"
+            "3. Time until verdict card has content (not 'loading…')"
+        ),
+        "data": "Cold load.",
+        "expected": (
+            "1. First contentful paint ≤ 2.5s\n"
+            "2. TTI ≤ 5s (page can be clicked)\n"
+            "3. Verdict card has AI synthesis ≤ 15s\n"
+            "4. Other cards (diagnostics, heatmap, cohort) ≤ 20s each\n"
+            "5. Page remains responsive throughout (no freeze)"
+        ),
+        "criteria": "Pass: Budgets met. Fail: Any threshold exceeded sustained."
+    },
+    {
+        "id": "TC-783", "name": "Reviewer Summary Generation Latency", "category": "Performance SLO",
+        "priority": "P3 - Medium", "requirement": "FR-SLO-REV-001",
+        "type": "performance", "automation": "browser", "environment": "any",
+        "prereqs": "Reviewer opens assignment.",
+        "steps": (
+            "1. Open application detail as reviewer\n"
+            "2. Time until briefing card has content"
+        ),
+        "data": "Cold AI summary.",
+        "expected": "p95 ≤ 20s.",
+        "criteria": "Pass: Budget met. Fail: Sustained slowness."
+    },
+    {
+        "id": "TC-784", "name": "Report Pre-Flight Latency", "category": "Performance SLO",
+        "priority": "P3 - Medium", "requirement": "FR-SLO-REPORT-001",
+        "type": "performance", "automation": "browser", "environment": "any",
+        "prereqs": "NGO with draft report.",
+        "steps": (
+            "1. Click 'Run pre-flight'\n"
+            "2. Time until analysis renders"
+        ),
+        "data": "Pre-flight.",
+        "expected": "p95 ≤ 25s.",
+        "criteria": "Pass: Within budget. Fail: Beyond 30s without progress."
+    },
+    {
+        "id": "TC-785", "name": "Global Search Response Time", "category": "Performance SLO",
+        "priority": "P2 - High", "requirement": "FR-SLO-SEARCH-001",
+        "type": "performance", "automation": "api", "environment": "any",
+        "prereqs": "Logged in.",
+        "steps": (
+            "1. GET /api/search?q=kenya (5 reps)\n"
+            "2. GET /api/search?q=ed (short, rejected)\n"
+            "3. GET /api/search?q=<50-char-string>"
+        ),
+        "data": "Common + edge queries.",
+        "expected": (
+            "1. Common: p95 ≤ 1s\n"
+            "2. Short rejected: ≤ 200ms\n"
+            "3. Long query: ≤ 2s"
+        ),
+        "criteria": "Pass: All budgets. Fail: Slow on common."
+    },
+    {
+        "id": "TC-786", "name": "Bundle Generation (Portfolio PDF/ZIP)", "category": "Performance SLO",
+        "priority": "P3 - Medium", "requirement": "FR-SLO-BUNDLE-001",
+        "type": "performance", "automation": "browser", "environment": "any",
+        "prereqs": "Donor with portfolio.",
+        "steps": (
+            "1. Trigger portfolio bundle download\n"
+            "2. Time from click to download complete"
+        ),
+        "data": "Real portfolio.",
+        "expected": "p95 ≤ 45s for portfolios ≤ 20 grants.",
+        "criteria": "Pass: Bounded. Fail: Hangs."
+    },
+    {
+        "id": "TC-787", "name": "Page Stays Responsive Under Background AI Polling", "category": "Performance SLO",
+        "priority": "P1 - Critical", "requirement": "FR-SLO-RESP-001",
+        "type": "performance", "automation": "browser", "environment": "any",
+        "prereqs": "Donor on /dashboard with 4 async AI cards loading.",
+        "steps": (
+            "1. While AI cards load, scroll the page\n"
+            "2. Click sidebar nav item\n"
+            "3. Hover charts"
+        ),
+        "data": "Active AI polling.",
+        "expected": (
+            "1. Scroll stays smooth (≥30fps)\n"
+            "2. Nav clicks navigate within 500ms\n"
+            "3. No main-thread blocking from polling code"
+        ),
+        "criteria": "Pass: Responsive. Fail: Jank or stuck UI."
+    },
+    {
+        "id": "TC-788", "name": "Multiple Concurrent Dashboard Loads", "category": "Performance SLO",
+        "priority": "P2 - High", "requirement": "FR-SLO-CONC-001",
+        "type": "performance", "automation": "api", "environment": "any",
+        "prereqs": "Stress harness.",
+        "steps": (
+            "1. Fire 10 simultaneous donor /dashboard loads from different IPs"
+        ),
+        "data": "10× concurrent.",
+        "expected": (
+            "1. All 10 return 200\n"
+            "2. p95 TTI degrades gracefully (≤ 2× single-user budget)\n"
+            "3. No 502/503 from rate-limit saturation\n"
+            "4. AI rate-limit at 40/min still keeps the worker pool sane"
+        ),
+        "criteria": "Pass: Graceful degradation. Fail: Errors or worker wedge."
+    },
+    {
+        "id": "TC-789", "name": "Async AI Poll Loop Eventually Terminates", "category": "Performance SLO",
+        "priority": "P2 - High", "requirement": "FR-SLO-POLL-001",
+        "type": "performance", "automation": "browser", "environment": "any",
+        "prereqs": "Trigger an AI job that the backend never completes (simulate).",
+        "steps": (
+            "1. Watch poll cadence (250ms, 500ms, 1s, 1.5s, 2s, 2s, ...)\n"
+            "2. Wait beyond the 30-poll cap"
+        ),
+        "data": "Stuck job.",
+        "expected": (
+            "1. Poll loop terminates at 30 attempts (~50s total)\n"
+            "2. Error 'AI job exceeded poll budget' surfaces\n"
+            "3. UI returns to actionable state (not stuck spinner)"
+        ),
+        "criteria": "Pass: Terminates. Fail: Polls forever."
+    },
+]
+test_cases.extend(slo_cases)
+
+
+# ============================================================================
 # ── BUILD THE WORD DOCUMENT ──────────────────────────────────────────────────
 # ============================================================================
 

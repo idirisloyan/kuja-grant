@@ -1,0 +1,28 @@
+BENEFICIARY OUTREACH REPORT
+==================================================
+
+CASE 001
+Name: Mariam Hassan Mohamed
+DOB: 1982-04-12
+National ID: 12345678X
+Phone: +254 712 345 678
+Address: Plot 47, Eastleigh, Nairobi, Kenya
+Email: mariam.hassan@example.com
+Notes: Single mother of 3, lives with relatives. Receives quarterly food aid.
+
+CASE 002
+Name: Ahmed Yusuf Abdi
+DOB: 1975-09-23
+National ID: 87654321Y
+Phone: +252 61 234 5678
+Address: Hodan district, Mogadishu, Somalia
+Bank account: 4400-1234-5678-9012 (Salaam Bank)
+
+CASE 003
+Name: Grace Wanjiku Kimani
+DOB: 1990-11-04
+National ID: 33445566Z
+Phone: +254 720 999 888
+Passport: A1234567
+
+(End — 47 more cases redacted for brevity.)
