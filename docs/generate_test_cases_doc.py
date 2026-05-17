@@ -4189,7 +4189,7 @@ donor_edge_cases = [
         "priority": "P2 - High", "requirement": "FR-COHORT-EDGE-002",
         "prereqs": "Donor with 1 awarded application (below MIN_SAMPLE=2).",
         "steps": (
-            "1. Open cohort card",
+            "1. Open cohort card\n"
             "2. Inspect metric rows"
         ),
         "data": "Donor with N=1.",
