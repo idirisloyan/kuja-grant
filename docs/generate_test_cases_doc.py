@@ -3715,6 +3715,2003 @@ test_cases.extend(wiring_cases)
 
 
 # ============================================================================
+# CATEGORY 22: AI CHAT — EDGE CASES + SECURITY  (TC-400 to TC-414)
+# ============================================================================
+
+chat_edge_cases = [
+    {
+        "id": "TC-400", "name": "Empty Chat Message Rejected", "category": "AI Chat Edge",
+        "priority": "P2 - High", "requirement": "FR-CHAT-VAL-001",
+        "prereqs": "Open /chat, thread is active.",
+        "steps": (
+            "1. Click in the composer\n"
+            "2. Type only whitespace (' ' x10)\n"
+            "3. Press Send"
+        ),
+        "data": "Whitespace-only message.",
+        "expected": (
+            "1. Send button is disabled when only whitespace present\n"
+            "2. If somehow submitted, server returns success=False reason=empty_message\n"
+            "3. No assistant call is made, no token spend"
+        ),
+        "criteria": "Pass: Empty rejected. Fail: Empty message triggers AI call."
+    },
+    {
+        "id": "TC-401", "name": "Chat Message Exceeds Max Length", "category": "AI Chat Edge",
+        "priority": "P2 - High", "requirement": "FR-CHAT-VAL-002",
+        "prereqs": "Open /chat.",
+        "steps": (
+            "1. Paste 5000 characters into the composer\n"
+            "2. Verify the textarea visually accepts only up to 4000\n"
+            "3. Click Send"
+        ),
+        "data": "Long-form text >4000 chars.",
+        "expected": (
+            "1. textarea maxLength enforces 4000 hard cap\n"
+            "2. Server truncates anything beyond MAX_USER_MESSAGE_CHARS\n"
+            "3. AI receives the truncated form, no 413 error"
+        ),
+        "criteria": "Pass: Bounded to 4000. Fail: Send fails or unbounded."
+    },
+    {
+        "id": "TC-402", "name": "Chat Rate Limit Returns 429", "category": "AI Chat Edge",
+        "priority": "P2 - High", "requirement": "FR-CHAT-RATE-001",
+        "prereqs": "Logged in. Open /chat.",
+        "steps": (
+            "1. Send a message and wait for reply\n"
+            "2. Send a second message immediately\n"
+            "3. Continue sending without pause until rate limit hits"
+        ),
+        "data": "Repeated rapid sends.",
+        "expected": (
+            "1. After N messages within the window, server returns 429\n"
+            "2. UI shows 'ai.rate_limited' error or graceful banner\n"
+            "3. Subsequent send succeeds after window resets"
+        ),
+        "criteria": "Pass: 429 fired + recovery works. Fail: No limit or stuck after."
+    },
+    {
+        "id": "TC-403", "name": "Composer Disabled While Awaiting Reply", "category": "AI Chat Edge",
+        "priority": "P2 - High", "requirement": "FR-CHAT-UX-001",
+        "prereqs": "Open /chat.",
+        "steps": (
+            "1. Send a message\n"
+            "2. While 'thinking…' placeholder is showing, try to type\n"
+            "3. Try to click Send"
+        ),
+        "data": "In-flight request.",
+        "expected": (
+            "1. Composer textarea is disabled during the assistant turn\n"
+            "2. Send button is disabled\n"
+            "3. Re-enables exactly when the assistant reply lands"
+        ),
+        "criteria": "Pass: Properly disabled. Fail: Concurrent sends fire."
+    },
+    {
+        "id": "TC-404", "name": "Reset Confirmation Cancel Preserves Thread", "category": "AI Chat Edge",
+        "priority": "P3 - Medium", "requirement": "FR-CHAT-RESET-001",
+        "prereqs": "Open /chat with at least one exchange.",
+        "steps": (
+            "1. Click Reset\n"
+            "2. When the confirm dialog appears, click Cancel"
+        ),
+        "data": "Reset cancellation.",
+        "expected": (
+            "1. Dialog closes\n"
+            "2. All messages remain visible\n"
+            "3. Thread state unchanged on the server"
+        ),
+        "criteria": "Pass: Cancel cancels. Fail: Thread wiped on cancel."
+    },
+    {
+        "id": "TC-405", "name": "Thread Title Auto-Set From First Message", "category": "AI Chat Edge",
+        "priority": "P3 - Medium", "requirement": "FR-CHAT-TITLE-001",
+        "prereqs": "Open a fresh chat thread (after reset or new user).",
+        "steps": (
+            "1. Send first message 'Summarise my open risks please.'\n"
+            "2. Refresh the page"
+        ),
+        "data": "First user message.",
+        "expected": (
+            "1. Header now shows the truncated message as the thread title\n"
+            "2. Title is limited to ~90 chars\n"
+            "3. Refresh preserves the title"
+        ),
+        "criteria": "Pass: Title set + persisted. Fail: Title empty or wrong."
+    },
+    {
+        "id": "TC-406", "name": "Chat Reply In User's Language (Arabic)", "category": "AI Chat Edge",
+        "priority": "P2 - High", "requirement": "FR-CHAT-I18N-001",
+        "prereqs": "Logged in as user with language='ar'.",
+        "steps": (
+            "1. Open /chat\n"
+            "2. Send message in Arabic: 'ما هي مخاطري الحالية؟'\n"
+            "3. Wait for reply"
+        ),
+        "data": "Arabic prompt.",
+        "expected": (
+            "1. Reply lands in Arabic\n"
+            "2. RTL layout in the assistant bubble\n"
+            "3. No mid-reply language switching"
+        ),
+        "criteria": "Pass: Arabic reply. Fail: English reply or mixed languages."
+    },
+    {
+        "id": "TC-407", "name": "Chat Reply In Swahili", "category": "AI Chat Edge",
+        "priority": "P3 - Medium", "requirement": "FR-CHAT-I18N-002",
+        "prereqs": "Logged in as user with language='sw'.",
+        "steps": (
+            "1. Open /chat\n"
+            "2. Send message in Swahili: 'Nipe muhtasari wa hatari zangu.'\n"
+            "3. Wait for reply"
+        ),
+        "data": "Swahili prompt.",
+        "expected": "Reply lands in Swahili.",
+        "criteria": "Pass: Swahili. Fail: Other language."
+    },
+    {
+        "id": "TC-408", "name": "AI Service Unavailable Graceful Fallback", "category": "AI Chat Edge",
+        "priority": "P2 - High", "requirement": "FR-CHAT-FALLBACK-001",
+        "prereqs": "Block /api/ai/threads/<id>/messages OR set ANTHROPIC_API_KEY invalid in test env.",
+        "steps": (
+            "1. Send a message\n"
+            "2. Wait for response"
+        ),
+        "data": "AI call fails.",
+        "expected": (
+            "1. Server returns success=False with reason='ai_call_failed'\n"
+            "2. UI shows '[AI unavailable — please try again in a moment.]'\n"
+            "3. Composer re-enables\n"
+            "4. No crash, no infinite spinner"
+        ),
+        "criteria": "Pass: Friendly fallback. Fail: Crash or spinner forever."
+    },
+    {
+        "id": "TC-409", "name": "Anti-Hallucination — Asking About Unloaded Scope", "category": "AI Chat Edge",
+        "priority": "P1 - Critical", "requirement": "FR-CHAT-HONESTY-001",
+        "prereqs": "Open /chat (global scope).",
+        "steps": (
+            "1. Ask: 'What was the AI score on application #99999?'\n"
+            "2. Wait for reply"
+        ),
+        "data": "Question referencing data not in scope.",
+        "expected": (
+            "1. Assistant does NOT invent a score\n"
+            "2. Reply says something like 'I don't have that loaded — try the application page'\n"
+            "3. No false numbers, no apologies-then-confabulation"
+        ),
+        "criteria": "Pass: Honest refusal. Fail: Made-up score."
+    },
+    {
+        "id": "TC-410", "name": "XSS Sanitization in User Message", "category": "AI Chat Edge",
+        "priority": "P1 - Critical", "requirement": "FR-CHAT-SEC-001",
+        "prereqs": "Open /chat.",
+        "steps": (
+            "1. Send: <script>alert('xss')</script>\n"
+            "2. Send: <img src=x onerror=alert(1)>\n"
+            "3. Send: <iframe src='evil.com'>"
+        ),
+        "data": "XSS payloads.",
+        "expected": (
+            "1. No alert dialogs appear\n"
+            "2. Bubbles render the literal escaped text\n"
+            "3. View-source confirms HTML entities, not raw tags\n"
+            "4. No iframe loads"
+        ),
+        "criteria": "Pass: All escaped. Fail: ANY dialog or unescaped HTML."
+    },
+    {
+        "id": "TC-411", "name": "Open Chat When User Has No Org", "category": "AI Chat Edge",
+        "priority": "P3 - Medium", "requirement": "FR-CHAT-EDGE-001",
+        "prereqs": "User account exists but org_id is NULL (rare for production but possible during onboarding).",
+        "steps": (
+            "1. Open /chat\n"
+            "2. Try to send a message"
+        ),
+        "data": "Orphan user.",
+        "expected": (
+            "1. Thread opens (user_id is the keying field)\n"
+            "2. Message sends and gets reply\n"
+            "3. Reply does NOT reference any org-specific data"
+        ),
+        "criteria": "Pass: Works gracefully. Fail: 500 or blocked."
+    },
+    {
+        "id": "TC-412", "name": "Long Chat History Beyond 12-Message Cap", "category": "AI Chat Edge",
+        "priority": "P2 - High", "requirement": "FR-CHAT-COST-001",
+        "prereqs": "Open chat with at least 15 prior messages.",
+        "steps": (
+            "1. Send a new message: 'What did I ask you in the very first message?'\n"
+            "2. Wait for reply"
+        ),
+        "data": "Long thread.",
+        "expected": (
+            "1. UI shows all 15+ bubbles\n"
+            "2. Server only sends the last 12 to Claude\n"
+            "3. Reply correctly says it doesn't recall the earliest message\n"
+            "4. Cost-tagged endpoint='ai.chat' for budget guard"
+        ),
+        "criteria": "Pass: History capped at 12. Fail: All 15 sent + cost spike."
+    },
+    {
+        "id": "TC-413", "name": "Two Browser Tabs Same User", "category": "AI Chat Edge",
+        "priority": "P3 - Medium", "requirement": "FR-CHAT-CONCURRENT-001",
+        "prereqs": "Logged in as fatima. Open /chat in two tabs.",
+        "steps": (
+            "1. Send a message in tab A\n"
+            "2. Switch to tab B and send a different message\n"
+            "3. Wait for both replies\n"
+            "4. Refresh tab A"
+        ),
+        "data": "Two-tab session.",
+        "expected": (
+            "1. Both messages land in the same underlying thread\n"
+            "2. After refresh, tab A sees both user messages + both replies\n"
+            "3. Server thread is the canonical source of truth"
+        ),
+        "criteria": "Pass: Convergence. Fail: Two threads created."
+    },
+    {
+        "id": "TC-414", "name": "Reset Thread Without Any Messages", "category": "AI Chat Edge",
+        "priority": "P3 - Medium", "requirement": "FR-CHAT-RESET-002",
+        "prereqs": "Fresh user. Open /chat. Thread row exists, no messages.",
+        "steps": (
+            "1. Click Reset\n"
+            "2. Confirm prompt"
+        ),
+        "data": "Empty thread.",
+        "expected": (
+            "1. Reset returns success=true\n"
+            "2. No errors\n"
+            "3. Empty-state still rendered"
+        ),
+        "criteria": "Pass: No-op safe. Fail: 500 or odd state."
+    },
+]
+test_cases.extend(chat_edge_cases)
+
+
+# ============================================================================
+# CATEGORY 23: REVIEWER AUTO-ASSIGN — EDGE CASES  (TC-420 to TC-431)
+# ============================================================================
+
+reviewer_edge_cases = [
+    {
+        "id": "TC-420", "name": "Auto-Assign With Empty Reviewer Pool", "category": "Reviewer Auto Edge",
+        "priority": "P2 - High", "requirement": "FR-REV-AUTO-EDGE-001",
+        "prereqs": "Test env where no reviewers exist for the application's sector/country.",
+        "steps": (
+            "1. Submit an application\n"
+            "2. POST /api/applications/<id>/auto-assign-reviewers\n"
+            "3. Inspect response"
+        ),
+        "data": "Sector with no matching reviewers.",
+        "expected": (
+            "1. Response ok=true, assigned=0, reason='no_reviewers_in_pool'\n"
+            "2. No reviewer rows created\n"
+            "3. No 500 error\n"
+            "4. Application status unchanged"
+        ),
+        "criteria": "Pass: Graceful zero. Fail: 500 or fake assignments."
+    },
+    {
+        "id": "TC-421", "name": "Auto-Assign All-Slipping Pool Fallback", "category": "Reviewer Auto Edge",
+        "priority": "P2 - High", "requirement": "FR-REV-AUTO-EDGE-002",
+        "prereqs": "Test env where the only matching reviewers are flagged 'busy queue'.",
+        "steps": (
+            "1. POST auto-assign\n"
+            "2. Verify the panel still populates"
+        ),
+        "data": "Slipping pool only.",
+        "expected": (
+            "1. Service falls back to slipping reviewers (rather than leaving empty)\n"
+            "2. Assigned count > 0\n"
+            "3. Reasoning shows 'busy queue — assign carefully' string"
+        ),
+        "criteria": "Pass: Fallback works. Fail: Empty panel."
+    },
+    {
+        "id": "TC-422", "name": "Auto-Assign Skips Already-Assigned Reviewer", "category": "Reviewer Auto Edge",
+        "priority": "P1 - Critical", "requirement": "FR-REV-AUTO-IDEMP-001",
+        "prereqs": "Application has 1 manually-assigned reviewer who is also top-ranked.",
+        "steps": (
+            "1. POST auto-assign with panel_size=3"
+        ),
+        "data": "Top-ranked reviewer is already assigned.",
+        "expected": (
+            "1. Manually-assigned reviewer is NOT duplicated\n"
+            "2. Service adds 2 NEW reviewers from the remaining ranked list\n"
+            "3. Response shows already_assigned=1, assigned=2"
+        ),
+        "criteria": "Pass: No dupes. Fail: Duplicate or only 2 assigned."
+    },
+    {
+        "id": "TC-423", "name": "Auto-Assign On Non-Existent Application", "category": "Reviewer Auto Edge",
+        "priority": "P2 - High", "requirement": "FR-REV-AUTO-VAL-001",
+        "prereqs": "Donor login.",
+        "steps": (
+            "1. POST /api/applications/999999999/auto-assign-reviewers"
+        ),
+        "data": "Bogus application id.",
+        "expected": (
+            "1. Response 400 or 404 with reason='application_not_found'\n"
+            "2. No reviewer rows created\n"
+            "3. No 500"
+        ),
+        "criteria": "Pass: Clean validation error. Fail: 500."
+    },
+    {
+        "id": "TC-424", "name": "Auto-Assign Forbidden For NGO Role", "category": "Reviewer Auto Edge",
+        "priority": "P1 - Critical", "requirement": "FR-REV-AUTO-AUTH-001",
+        "prereqs": "NGO login (fatima@amani.org).",
+        "steps": (
+            "1. POST /api/applications/<id>/auto-assign-reviewers"
+        ),
+        "data": "NGO trying to trigger.",
+        "expected": "403 or 404 (depending on app ownership)",
+        "criteria": "Pass: NGO blocked. Fail: NGO can trigger."
+    },
+    {
+        "id": "TC-425", "name": "Auto-Assign Panel Size Cap", "category": "Reviewer Auto Edge",
+        "priority": "P2 - High", "requirement": "FR-REV-AUTO-CAP-001",
+        "prereqs": "Donor login. Application exists.",
+        "steps": (
+            "1. POST auto-assign with panel_size=10"
+        ),
+        "data": "panel_size=10 exceeds MAX_PANEL_SIZE.",
+        "expected": (
+            "1. Service caps at MAX_PANEL_SIZE (5)\n"
+            "2. assigned count <= 5\n"
+            "3. No 5xx error"
+        ),
+        "criteria": "Pass: Capped. Fail: Honors absurd size."
+    },
+    {
+        "id": "TC-426", "name": "Cron Sweep With No Candidates", "category": "Reviewer Auto Edge",
+        "priority": "P2 - High", "requirement": "FR-REV-CRON-EDGE-001",
+        "prereqs": "Test env where every application already has a reviewer.",
+        "steps": (
+            "1. POST /api/cron/reviewer-auto-assign-sweep as admin"
+        ),
+        "data": "Already-assigned ecosystem.",
+        "expected": (
+            "1. Response success=true\n"
+            "2. result.scanned=0\n"
+            "3. result.apps_assigned=0\n"
+            "4. result.skipped.already_assigned >= number of submitted apps in scan budget"
+        ),
+        "criteria": "Pass: Clean empty sweep. Fail: 500 or wrong counts."
+    },
+    {
+        "id": "TC-427", "name": "Cron Sweep Caps At MAX_PER_RUN", "category": "Reviewer Auto Edge",
+        "priority": "P3 - Medium", "requirement": "FR-REV-CRON-CAP-001",
+        "prereqs": "Test env with 100+ submitted apps with zero reviewers (unrealistic in prod).",
+        "steps": (
+            "1. POST /api/cron/reviewer-auto-assign-sweep"
+        ),
+        "data": "Large backlog.",
+        "expected": (
+            "1. result.scanned <= 50\n"
+            "2. result.cap=50 in response\n"
+            "3. Backlog persists; next sweep picks up more"
+        ),
+        "criteria": "Pass: Capped. Fail: Unbounded sweep."
+    },
+    {
+        "id": "TC-428", "name": "Cron Sweep With Wrong CRON_SECRET", "category": "Reviewer Auto Edge",
+        "priority": "P1 - Critical", "requirement": "FR-REV-CRON-AUTH-001",
+        "prereqs": "Not logged in. Use a bad Bearer token.",
+        "steps": (
+            "1. POST with Authorization: Bearer wrong-secret\n"
+            "2. POST with no header at all"
+        ),
+        "data": "Wrong / missing secret.",
+        "expected": "Both return 403 forbidden.",
+        "criteria": "Pass: 403 in both cases. Fail: Any 200."
+    },
+    {
+        "id": "TC-429", "name": "Audit Chain Anchor For Auto-Assign", "category": "Reviewer Auto Edge",
+        "priority": "P2 - High", "requirement": "FR-REV-AUDIT-001",
+        "prereqs": "Submit an application that triggers auto-assign.",
+        "steps": (
+            "1. Submit application as NGO\n"
+            "2. As admin, GET /api/audit-chain/recent?limit=10\n"
+            "3. Look for action='reviewer.auto_assigned'"
+        ),
+        "data": "Audit chain query.",
+        "expected": (
+            "1. Entry exists with action='reviewer.auto_assigned'\n"
+            "2. subject_kind='application', subject_id matches\n"
+            "3. details contains panel_size_requested, assigned, reviewer_ids"
+        ),
+        "criteria": "Pass: Entry anchored. Fail: Missing audit row."
+    },
+    {
+        "id": "TC-430", "name": "Match Score Reasoning Surfaces On Panel", "category": "Reviewer Auto Edge",
+        "priority": "P3 - Medium", "requirement": "FR-REV-UI-001",
+        "prereqs": "Auto-assigned application detail page as donor.",
+        "steps": (
+            "1. Open application detail\n"
+            "2. Inspect each reviewer row in the panel"
+        ),
+        "data": "Auto-assigned panel.",
+        "expected": (
+            "1. Each row shows numeric match score\n"
+            "2. Reasons array shown (e.g. 'sector fit: education', 'country fit: Kenya')\n"
+            "3. If reviewer was a 'slipping' pick: warning indicator"
+        ),
+        "criteria": "Pass: Reasoning visible. Fail: Score only or no info."
+    },
+    {
+        "id": "TC-431", "name": "Auto-Assign After Reviewer Removed", "category": "Reviewer Auto Edge",
+        "priority": "P3 - Medium", "requirement": "FR-REV-AUTO-REASSIGN-001",
+        "prereqs": "Application has 3 auto-assigned reviewers. Donor removes one.",
+        "steps": (
+            "1. Donor removes 1 reviewer (DELETE Review row)\n"
+            "2. POST auto-assign with panel_size=3"
+        ),
+        "data": "Reduced panel.",
+        "expected": (
+            "1. Service tops up: 1 new reviewer added\n"
+            "2. Existing 2 are not duplicated\n"
+            "3. Net 3 reviewers"
+        ),
+        "criteria": "Pass: Top-up correct. Fail: Wrong total."
+    },
+]
+test_cases.extend(reviewer_edge_cases)
+
+
+# ============================================================================
+# CATEGORY 24: DONOR INTEL EDGE CASES + PRIVACY  (TC-440 to TC-451)
+# ============================================================================
+
+donor_edge_cases = [
+    {
+        "id": "TC-440", "name": "Cohort Card With Zero Awarded Apps", "category": "Donor Intel Edge",
+        "priority": "P2 - High", "requirement": "FR-COHORT-EDGE-001",
+        "prereqs": "Brand-new donor org with no awarded applications yet.",
+        "steps": (
+            "1. Log in as fresh donor\n"
+            "2. Visit /dashboard\n"
+            "3. Scroll to cohort card"
+        ),
+        "data": "Donor with empty portfolio.",
+        "expected": (
+            "1. Card shows 'Once you've awarded a couple of grants…' empty state\n"
+            "2. No fake metric rows\n"
+            "3. No 'sparse' message (cohort has data; donor doesn't)"
+        ),
+        "criteria": "Pass: Honest empty state. Fail: Fake numbers."
+    },
+    {
+        "id": "TC-441", "name": "Cohort Per-Metric Sparseness", "category": "Donor Intel Edge",
+        "priority": "P2 - High", "requirement": "FR-COHORT-EDGE-002",
+        "prereqs": "Donor with 1 awarded application (below MIN_SAMPLE=2).",
+        "steps": (
+            "1. Open cohort card",
+            "2. Inspect metric rows"
+        ),
+        "data": "Donor with N=1.",
+        "expected": (
+            "1. Metrics with self_sample_size < MIN_SAMPLE are OMITTED\n"
+            "2. Card may show fewer than 6 metric rows\n"
+            "3. Footer accurately shows portfolio_size=1"
+        ),
+        "criteria": "Pass: Per-metric honesty. Fail: Lies with N=1."
+    },
+    {
+        "id": "TC-442", "name": "Cohort Anonymity — Every Metric Audited", "category": "Donor Intel Edge",
+        "priority": "P1 - Critical", "requirement": "FR-COHORT-PRIV-002",
+        "prereqs": "Donor with active portfolio + cohort data.",
+        "steps": (
+            "1. Inspect every visible metric: capacity, AI score, country diversity, sector diversity, small-org share, reports on time\n"
+            "2. Open dev tools, inspect raw JSON of /api/dashboard/donor-cohort-analytics"
+        ),
+        "data": "Full page + raw API.",
+        "expected": (
+            "1. NO NGO names anywhere in metric rows or raw JSON\n"
+            "2. NO specific donor names\n"
+            "3. NO grant titles or IDs\n"
+            "4. Only: codes, medians, percentiles, counts, verdicts"
+        ),
+        "criteria": "Pass: Zero identifying data. Fail: ANY leak."
+    },
+    {
+        "id": "TC-443", "name": "Cross-Donor Cohort Isolation", "category": "Donor Intel Edge",
+        "priority": "P1 - Critical", "requirement": "FR-COHORT-AUTH-001",
+        "prereqs": "Two donors: sarah (org 14) and david (org 7).",
+        "steps": (
+            "1. Log in as sarah\n"
+            "2. GET /api/dashboard/donor-cohort-analytics\n"
+            "3. Log out\n"
+            "4. Log in as david\n"
+            "5. GET same endpoint\n"
+            "6. Compare results"
+        ),
+        "data": "Two donor sessions.",
+        "expected": (
+            "1. Each call scopes to caller's own donor_org_id\n"
+            "2. Results may differ in self_value, never expose other donor's identifiers\n"
+            "3. Cohort_size for each excludes the caller (other_donors filter)"
+        ),
+        "criteria": "Pass: Strict isolation. Fail: Cross-donor leak."
+    },
+    {
+        "id": "TC-444", "name": "Admin Cohort Inspect — Bad donor_org_id", "category": "Donor Intel Edge",
+        "priority": "P2 - High", "requirement": "FR-COHORT-VAL-001",
+        "prereqs": "Admin login.",
+        "steps": (
+            "1. GET /api/dashboard/donor-cohort-analytics (no donor_org_id)\n"
+            "2. GET with donor_org_id=abc (non-int)\n"
+            "3. GET with donor_org_id=99999 (non-existent)\n"
+            "4. GET with donor_org_id=14 (real)"
+        ),
+        "data": "Validation cases.",
+        "expected": (
+            "1. No param → 400 'admin must pass donor_org_id'\n"
+            "2. Non-int → 400 'donor_org_id must be int'\n"
+            "3. Non-existent → 200 with reason='not_donor' or success=False\n"
+            "4. Real → 200 with full shape"
+        ),
+        "criteria": "Pass: All validations clean. Fail: 500 on any."
+    },
+    {
+        "id": "TC-445", "name": "Heatmap With Single Grant", "category": "Donor Intel Edge",
+        "priority": "P3 - Medium", "requirement": "FR-RISK-EDGE-001",
+        "prereqs": "Donor with exactly 1 grant.",
+        "steps": (
+            "1. Visit /dashboard, see heatmap"
+        ),
+        "data": "Single-grant donor.",
+        "expected": (
+            "1. Heatmap renders with 1 cell\n"
+            "2. No 'sparse' message\n"
+            "3. No 5xx error"
+        ),
+        "criteria": "Pass: Renders. Fail: Blank or error."
+    },
+    {
+        "id": "TC-446", "name": "Heatmap With No Grants", "category": "Donor Intel Edge",
+        "priority": "P3 - Medium", "requirement": "FR-RISK-EDGE-002",
+        "prereqs": "Fresh donor with no grants.",
+        "steps": (
+            "1. Visit /dashboard"
+        ),
+        "data": "Empty portfolio.",
+        "expected": (
+            "1. Heatmap shows 0 cells\n"
+            "2. Empty state explanation visible\n"
+            "3. total_grants=0 in response"
+        ),
+        "criteria": "Pass: Honest empty. Fail: Fake cells."
+    },
+    {
+        "id": "TC-447", "name": "Heatmap Forbidden For NGO", "category": "Donor Intel Edge",
+        "priority": "P1 - Critical", "requirement": "FR-RISK-AUTH-001",
+        "prereqs": "NGO login.",
+        "steps": (
+            "1. GET /api/dashboard/portfolio-risk-heatmap"
+        ),
+        "data": "NGO request.",
+        "expected": "403 'Role not supported'",
+        "criteria": "Pass: 403. Fail: Data leak."
+    },
+    {
+        "id": "TC-448", "name": "Cohort Excludes Caller From 'cohort_size'", "category": "Donor Intel Edge",
+        "priority": "P2 - High", "requirement": "FR-COHORT-CALC-001",
+        "prereqs": "Total donors on platform = N.",
+        "steps": (
+            "1. Log in as any donor\n"
+            "2. Inspect cohort_size in response"
+        ),
+        "data": "Cohort calculation.",
+        "expected": (
+            "1. cohort_size = N - 1 (caller excluded)\n"
+            "2. Caller's own portfolio not double-counted in any metric"
+        ),
+        "criteria": "Pass: Excluded. Fail: Includes self."
+    },
+    {
+        "id": "TC-449", "name": "Risk Heatmap Sectors Use get_sectors() Helper", "category": "Donor Intel Edge",
+        "priority": "P3 - Medium", "requirement": "FR-RISK-CALC-001",
+        "prereqs": "Donor with grants where sectors JSON has mixed types (strings, dicts).",
+        "steps": (
+            "1. Fetch heatmap"
+        ),
+        "data": "Messy JSON.",
+        "expected": (
+            "1. Service uses get_sectors() helper\n"
+            "2. Filters out non-string entries silently\n"
+            "3. No 500 error"
+        ),
+        "criteria": "Pass: Robust parsing. Fail: 500 on dict in list."
+    },
+    {
+        "id": "TC-450", "name": "Donor Broadcast Empty Audience", "category": "Donor Intel Edge",
+        "priority": "P2 - High", "requirement": "FR-BROADCAST-EDGE-001",
+        "prereqs": "Donor with grant that has zero applications.",
+        "steps": (
+            "1. Send broadcast"
+        ),
+        "data": "Empty audience.",
+        "expected": (
+            "1. Response ok=true, recipient_count=0\n"
+            "2. No notifications dispatched\n"
+            "3. No 500 error"
+        ),
+        "criteria": "Pass: Clean zero. Fail: 500."
+    },
+    {
+        "id": "TC-451", "name": "Donor Broadcast Cross-Donor Forbidden", "category": "Donor Intel Edge",
+        "priority": "P1 - Critical", "requirement": "FR-BROADCAST-AUTH-001",
+        "prereqs": "Two donors; donor A tries to broadcast on donor B's grant.",
+        "steps": (
+            "1. Log in as donor A\n"
+            "2. POST broadcast on donor B's grant"
+        ),
+        "data": "Cross-donor attempt.",
+        "expected": "403 or 404 (grant not visible).",
+        "criteria": "Pass: Blocked. Fail: Broadcast sent."
+    },
+]
+test_cases.extend(donor_edge_cases)
+
+
+# ============================================================================
+# CATEGORY 25: PWA + WEBAUTHN NEGATIVES  (TC-460 to TC-474)
+# ============================================================================
+
+webauthn_pwa_neg_cases = [
+    {
+        "id": "TC-460", "name": "Install Banner Hidden On iOS Safari", "category": "PWA Negatives",
+        "priority": "P2 - High", "requirement": "FR-PWA-IOS-001",
+        "prereqs": "iPhone running Safari (NOT Chrome on iOS).",
+        "steps": (
+            "1. Open the app in mobile Safari\n"
+            "2. Wait 10 seconds"
+        ),
+        "data": "iOS Safari session.",
+        "expected": (
+            "1. No install banner appears (beforeinstallprompt not fired)\n"
+            "2. App is still fully usable\n"
+            "3. Manual 'Add to Home Screen' via Safari share sheet works"
+        ),
+        "criteria": "Pass: No banner, normal usage. Fail: Banner shows or app breaks."
+    },
+    {
+        "id": "TC-461", "name": "Install Banner Hidden When PWA Already Installed", "category": "PWA Negatives",
+        "priority": "P3 - Medium", "requirement": "FR-PWA-INSTALLED-001",
+        "prereqs": "PWA installed (display-mode: standalone).",
+        "steps": (
+            "1. Launch the installed PWA\n"
+            "2. Wait 10 seconds"
+        ),
+        "data": "Standalone session.",
+        "expected": (
+            "1. Banner does NOT appear\n"
+            "2. Check via window.matchMedia('(display-mode: standalone)').matches → true\n"
+            "3. localStorage may already have dismiss flag"
+        ),
+        "criteria": "Pass: No banner. Fail: Banner shown to installed users."
+    },
+    {
+        "id": "TC-462", "name": "appinstalled Event Sets Dismiss Flag", "category": "PWA Negatives",
+        "priority": "P3 - Medium", "requirement": "FR-PWA-APPINSTALLED-001",
+        "prereqs": "Banner is showing.",
+        "steps": (
+            "1. Click 'Install'\n"
+            "2. Approve browser's install dialog\n"
+            "3. PWA installs\n"
+            "4. Check localStorage"
+        ),
+        "data": "Install flow.",
+        "expected": (
+            "1. appinstalled event fires\n"
+            "2. localStorage 'kuja_pwa_install_dismissed_v1' = '1'\n"
+            "3. Banner state hidden"
+        ),
+        "criteria": "Pass: Flag set. Fail: Banner re-shows post-install."
+    },
+    {
+        "id": "TC-463", "name": "localStorage Blocked (Incognito)", "category": "PWA Negatives",
+        "priority": "P3 - Medium", "requirement": "FR-PWA-LS-001",
+        "prereqs": "Browser in incognito with localStorage disabled.",
+        "steps": (
+            "1. Open the app\n"
+            "2. See install banner\n"
+            "3. Click 'Not now'\n"
+            "4. Reload"
+        ),
+        "data": "No localStorage.",
+        "expected": (
+            "1. No crash on read attempt\n"
+            "2. Banner may re-appear (no persistence) — acceptable in incognito\n"
+            "3. No console errors thrown to user"
+        ),
+        "criteria": "Pass: Graceful degradation. Fail: Crash."
+    },
+    {
+        "id": "TC-464", "name": "Native Share When navigator.share Unavailable", "category": "PWA Negatives",
+        "priority": "P3 - Medium", "requirement": "FR-SHARE-FALLBACK-001",
+        "prereqs": "Desktop browser without navigator.share API (older Chrome).",
+        "steps": (
+            "1. Click 'Share profile' button"
+        ),
+        "data": "Desktop browser.",
+        "expected": (
+            "1. Code detects missing navigator.share\n"
+            "2. Falls back to navigator.clipboard.writeText(url)\n"
+            "3. Toast 'Link copied' appears\n"
+            "4. Button label switches to 'Copied' for ~1.5s"
+        ),
+        "criteria": "Pass: Clipboard fallback works. Fail: Silent failure."
+    },
+    {
+        "id": "TC-465", "name": "Native Share AbortError When User Cancels", "category": "PWA Negatives",
+        "priority": "P3 - Medium", "requirement": "FR-SHARE-CANCEL-001",
+        "prereqs": "Mobile browser with native share.",
+        "steps": (
+            "1. Click 'Share profile'\n"
+            "2. When share sheet opens, dismiss it (back gesture)"
+        ),
+        "data": "Aborted share.",
+        "expected": (
+            "1. No clipboard fallback (AbortError detected)\n"
+            "2. No error toast\n"
+            "3. Button returns to idle state"
+        ),
+        "criteria": "Pass: Clean cancellation. Fail: Error or unwanted fallback."
+    },
+    {
+        "id": "TC-466", "name": "WebAuthn Registration Cancelled By User", "category": "WebAuthn Negatives",
+        "priority": "P2 - High", "requirement": "FR-WEBAUTHN-CANCEL-001",
+        "prereqs": "User on /settings/security.",
+        "steps": (
+            "1. Click 'Enrol this device'\n"
+            "2. When biometric prompt appears, cancel it"
+        ),
+        "data": "Cancelled enrolment.",
+        "expected": (
+            "1. No credential created\n"
+            "2. No error toast (AbortError suppressed)\n"
+            "3. Trusted devices list unchanged\n"
+            "4. Button returns to enabled state"
+        ),
+        "criteria": "Pass: Silent cancel. Fail: Error or partial enrolment."
+    },
+    {
+        "id": "TC-467", "name": "WebAuthn Register With Same Device Twice", "category": "WebAuthn Negatives",
+        "priority": "P2 - High", "requirement": "FR-WEBAUTHN-DUPE-001",
+        "prereqs": "User has enrolled device A.",
+        "steps": (
+            "1. Click 'Enrol this device' again on the same device\n"
+            "2. Approve the biometric prompt"
+        ),
+        "data": "Re-enrolment attempt.",
+        "expected": (
+            "1. Browser may prevent (exclude_credentials list passed)\n"
+            "2. OR new credential id allocated, treated as separate\n"
+            "3. Either way, no crash"
+        ),
+        "criteria": "Pass: Handled. Fail: Crash."
+    },
+    {
+        "id": "TC-468", "name": "WebAuthn Auth Begin With No Credentials", "category": "WebAuthn Negatives",
+        "priority": "P2 - High", "requirement": "FR-WEBAUTHN-AUTH-EDGE-001",
+        "prereqs": "User without any enrolled credentials.",
+        "steps": (
+            "1. POST /api/auth/webauthn/authenticate/begin"
+        ),
+        "data": "No credentials.",
+        "expected": (
+            "1. Response 400 with reason='no_credentials'\n"
+            "2. Client UI hides the 'Use biometric' option"
+        ),
+        "criteria": "Pass: Honest empty. Fail: 500 or fake challenge."
+    },
+    {
+        "id": "TC-469", "name": "WebAuthn Sign-Count Regression (Clone)", "category": "WebAuthn Negatives",
+        "priority": "P1 - Critical", "requirement": "FR-WEBAUTHN-CLONE-001",
+        "prereqs": "Manually set the stored sign_count to a higher value than what the device will return.",
+        "steps": (
+            "1. Manipulate DB: UPDATE webauthn_credentials SET sign_count=999 WHERE id=X\n"
+            "2. User authenticates (device returns sign_count=2)\n"
+            "3. Server verifies"
+        ),
+        "data": "Sign-count regression.",
+        "expected": (
+            "1. Response success=False, reason='sign_count_regression'\n"
+            "2. Server logs WARNING with user_id, cred_id, both counts\n"
+            "3. User cannot complete biometric auth until credential rotated"
+        ),
+        "criteria": "Pass: Hard fail. Fail: Authentication proceeds."
+    },
+    {
+        "id": "TC-470", "name": "Re-Auth Token Single-Use", "category": "WebAuthn Negatives",
+        "priority": "P1 - Critical", "requirement": "FR-WEBAUTHN-TOKEN-001",
+        "prereqs": "User has just completed biometric auth and has a valid reauth_token.",
+        "steps": (
+            "1. Use the token in X-Reauth-Token header on a gated request\n"
+            "2. Use the same token again on a second request"
+        ),
+        "data": "Token reuse.",
+        "expected": (
+            "1. First request: gate passes\n"
+            "2. Second request: 403 reauth_invalid_or_expired"
+        ),
+        "criteria": "Pass: Token consumed once. Fail: Reusable token."
+    },
+    {
+        "id": "TC-471", "name": "Re-Auth Token Expiration (5 min)", "category": "WebAuthn Negatives",
+        "priority": "P2 - High", "requirement": "FR-WEBAUTHN-TOKEN-002",
+        "prereqs": "Fresh reauth_token issued.",
+        "steps": (
+            "1. Wait 6 minutes\n"
+            "2. Use the token"
+        ),
+        "data": "Expired token.",
+        "expected": "403 reauth_invalid_or_expired.",
+        "criteria": "Pass: Expires. Fail: Token never expires."
+    },
+    {
+        "id": "TC-472", "name": "Re-Auth Token Cross-User Attempt", "category": "WebAuthn Negatives",
+        "priority": "P1 - Critical", "requirement": "FR-WEBAUTHN-TOKEN-003",
+        "prereqs": "User A has a valid token; user B is logged in.",
+        "steps": (
+            "1. User B sends a gated request with user A's X-Reauth-Token"
+        ),
+        "data": "Cross-user token reuse.",
+        "expected": "403 — token bound to user_id at issue.",
+        "criteria": "Pass: Blocked. Fail: Cross-user bypass."
+    },
+    {
+        "id": "TC-473", "name": "require_reauth() Bypass For Unenrolled User", "category": "WebAuthn Negatives",
+        "priority": "P2 - High", "requirement": "FR-WEBAUTHN-OPTIN-001",
+        "prereqs": "User logged in with NO WebAuthn credentials.",
+        "steps": (
+            "1. Send a gated request WITHOUT X-Reauth-Token header"
+        ),
+        "data": "Unenrolled user.",
+        "expected": (
+            "1. Helper returns None (treated as pass)\n"
+            "2. Request proceeds normally\n"
+            "3. Logged in unenrolled users are not blocked from app features"
+        ),
+        "criteria": "Pass: Opt-in only. Fail: Locks out unenrolled."
+    },
+    {
+        "id": "TC-474", "name": "Revoke Non-Existent Credential", "category": "WebAuthn Negatives",
+        "priority": "P3 - Medium", "requirement": "FR-WEBAUTHN-REVOKE-001",
+        "prereqs": "User logged in.",
+        "steps": (
+            "1. DELETE /api/auth/webauthn/credentials/9999999"
+        ),
+        "data": "Bad credential id.",
+        "expected": "404 not_found",
+        "criteria": "Pass: 404. Fail: 500 or 200."
+    },
+]
+test_cases.extend(webauthn_pwa_neg_cases)
+
+
+# ============================================================================
+# CATEGORY 26: METRICS EVENT RECORDING + INGEST  (TC-480 to TC-499)
+# ============================================================================
+
+metrics_event_cases = [
+    {
+        "id": "TC-480", "name": "Event Recording Is Non-Blocking", "category": "Metrics Events",
+        "priority": "P1 - Critical", "requirement": "FR-METRICS-NONBLOCK-001",
+        "prereqs": "Test env where the user_events table is artificially broken (e.g. revoke INSERT permission).",
+        "steps": (
+            "1. Log in (would normally record session.start)\n"
+            "2. Verify login still succeeds"
+        ),
+        "data": "Broken event storage.",
+        "expected": (
+            "1. Login completes with 200\n"
+            "2. Event recording exception is logged but does NOT raise\n"
+            "3. User session is established"
+        ),
+        "criteria": "Pass: Best-effort. Fail: Event failure breaks login."
+    },
+    {
+        "id": "TC-481", "name": "session.start Event On Every Login", "category": "Metrics Events",
+        "priority": "P1 - Critical", "requirement": "FR-METRICS-EVT-001",
+        "prereqs": "Admin can view metrics.",
+        "steps": (
+            "1. Note session.start count\n"
+            "2. Log in 3 times (with logouts in between)\n"
+            "3. Refresh metrics"
+        ),
+        "data": "Multiple logins.",
+        "expected": "session.start count incremented by 3.",
+        "criteria": "Pass: 3 increments. Fail: Missing events."
+    },
+    {
+        "id": "TC-482", "name": "application.start_draft On POST /applications/", "category": "Metrics Events",
+        "priority": "P2 - High", "requirement": "FR-METRICS-EVT-002",
+        "prereqs": "NGO login.",
+        "steps": (
+            "1. Create a new application via POST /api/applications/\n"
+            "2. Admin checks event_counts_30d"
+        ),
+        "data": "Draft creation.",
+        "expected": "application.start_draft count > 0 with grant_id in props.",
+        "criteria": "Pass: Captured. Fail: Missing."
+    },
+    {
+        "id": "TC-483", "name": "application.submit On Submit", "category": "Metrics Events",
+        "priority": "P1 - Critical", "requirement": "FR-METRICS-EVT-003",
+        "prereqs": "NGO with draft application.",
+        "steps": (
+            "1. POST /api/applications/<id>/submit\n"
+            "2. Check event_counts"
+        ),
+        "data": "Submit.",
+        "expected": "application.submit count incremented with application_id, grant_id, ai_score props.",
+        "criteria": "Pass: Captured. Fail: Missing."
+    },
+    {
+        "id": "TC-484", "name": "report.preflight_used On Precheck", "category": "Metrics Events",
+        "priority": "P2 - High", "requirement": "FR-METRICS-EVT-004",
+        "prereqs": "NGO with draft report.",
+        "steps": (
+            "1. POST /api/reports/<id>/precheck\n"
+            "2. Check event_counts"
+        ),
+        "data": "Precheck call.",
+        "expected": "report.preflight_used count incremented with compliance_score in props.",
+        "criteria": "Pass: Captured. Fail: Missing."
+    },
+    {
+        "id": "TC-485", "name": "readiness_check.used On Submission Readiness", "category": "Metrics Events",
+        "priority": "P2 - High", "requirement": "FR-METRICS-EVT-005",
+        "prereqs": "NGO with application.",
+        "steps": (
+            "1. POST /api/ai/submission-readiness with application_id\n"
+            "2. Check event_counts"
+        ),
+        "data": "Readiness check.",
+        "expected": "readiness_check.used recorded with application_id BEFORE the async wrap (so it persists even if AI fails).",
+        "criteria": "Pass: Captured pre-async. Fail: Lost on AI failure."
+    },
+    {
+        "id": "TC-486", "name": "reviewer.assignment_opened Only For Reviewer Role", "category": "Metrics Events",
+        "priority": "P2 - High", "requirement": "FR-METRICS-EVT-006",
+        "prereqs": "Two users: a reviewer + a donor who can inspect reviews.",
+        "steps": (
+            "1. Donor opens GET /api/reviews/<id>\n"
+            "2. Reviewer opens GET /api/reviews/<id>\n"
+            "3. Compare events"
+        ),
+        "data": "Two role views.",
+        "expected": (
+            "1. Donor view does NOT record reviewer.assignment_opened\n"
+            "2. Reviewer view DOES record the event"
+        ),
+        "criteria": "Pass: Role-scoped. Fail: Recorded for wrong role."
+    },
+    {
+        "id": "TC-487", "name": "reviewer.review_submitted On Complete", "category": "Metrics Events",
+        "priority": "P2 - High", "requirement": "FR-METRICS-EVT-007",
+        "prereqs": "Reviewer with assigned review + scores entered.",
+        "steps": (
+            "1. POST /api/reviews/<id>/complete"
+        ),
+        "data": "Complete action.",
+        "expected": "reviewer.review_submitted event with review_id, application_id, score.",
+        "criteria": "Pass: Captured. Fail: Missing."
+    },
+    {
+        "id": "TC-488", "name": "trust_profile.viewed Scopes Correctly", "category": "Metrics Events",
+        "priority": "P3 - Medium", "requirement": "FR-METRICS-EVT-008",
+        "prereqs": "NGO + donor + reviewer + admin sessions.",
+        "steps": (
+            "1. NGO views own org (should record own_org=true)\n"
+            "2. NGO views another org (should NOT record)\n"
+            "3. Donor/reviewer/admin view any org (should record own_org=false)"
+        ),
+        "data": "Cross-role views.",
+        "expected": "Event count matches the access-scope rule.",
+        "criteria": "Pass: Matches rule. Fail: Recorded for cross-org NGO."
+    },
+    {
+        "id": "TC-489", "name": "donor.broadcast_sent Only On Success", "category": "Metrics Events",
+        "priority": "P3 - Medium", "requirement": "FR-METRICS-EVT-009",
+        "prereqs": "Donor login.",
+        "steps": (
+            "1. POST broadcast with invalid body (no subject)\n"
+            "2. POST broadcast with valid body"
+        ),
+        "data": "Failure + success.",
+        "expected": (
+            "1. Invalid: no event recorded\n"
+            "2. Valid: event recorded with grant_id, audience, recipient count"
+        ),
+        "criteria": "Pass: Only success counted. Fail: Failures counted too."
+    },
+    {
+        "id": "TC-490", "name": "search.query Records With Length + Count", "category": "Metrics Events",
+        "priority": "P3 - Medium", "requirement": "FR-METRICS-EVT-010",
+        "prereqs": "Any logged-in user.",
+        "steps": (
+            "1. GET /api/search?q=kenya"
+        ),
+        "data": "Search call.",
+        "expected": (
+            "1. Event search.query recorded\n"
+            "2. props.query_length=5\n"
+            "3. props.result_count = actual hits"
+        ),
+        "criteria": "Pass: Captured. Fail: Missing or wrong props."
+    },
+    {
+        "id": "TC-491", "name": "chat.thread_open Idempotent Per Visit", "category": "Metrics Events",
+        "priority": "P3 - Medium", "requirement": "FR-METRICS-EVT-011",
+        "prereqs": "Logged in user.",
+        "steps": (
+            "1. POST /api/ai/threads/open three times in a row"
+        ),
+        "data": "Repeat opens.",
+        "expected": (
+            "1. Each call records chat.thread_open\n"
+            "2. (Not deduplicated server-side; the 'open' event represents intent each time)"
+        ),
+        "criteria": "Pass: 3 events. Fail: Only 1."
+    },
+    {
+        "id": "TC-492", "name": "chat.message_sent Records With Length", "category": "Metrics Events",
+        "priority": "P3 - Medium", "requirement": "FR-METRICS-EVT-012",
+        "prereqs": "Chat thread open.",
+        "steps": (
+            "1. Send a 50-character message\n"
+            "2. Check event"
+        ),
+        "data": "Message.",
+        "expected": "chat.message_sent recorded with message_length=50.",
+        "criteria": "Pass: Captured. Fail: Missing length."
+    },
+    {
+        "id": "TC-493", "name": "ab_arm() Deterministic Across Calls", "category": "Metrics Events",
+        "priority": "P2 - High", "requirement": "FR-AB-DETERMIN-001",
+        "prereqs": "Python shell or test.",
+        "steps": (
+            "1. Call ab_arm('exp_x', org_id=42) ten times\n"
+            "2. Call with different org_id"
+        ),
+        "data": "Bucketing.",
+        "expected": (
+            "1. Same arm returned every call for org=42\n"
+            "2. Different org may land in different arm (over many trials ~50/50)"
+        ),
+        "criteria": "Pass: Stable. Fail: Random per call."
+    },
+    {
+        "id": "TC-494", "name": "ab_arm() Returns None Without Subject", "category": "Metrics Events",
+        "priority": "P3 - Medium", "requirement": "FR-AB-EDGE-001",
+        "prereqs": "Caller without org_id and user_id.",
+        "steps": (
+            "1. ab_arm('exp_x')"
+        ),
+        "data": "No subject.",
+        "expected": "Returns None.",
+        "criteria": "Pass: None. Fail: Random arm."
+    },
+    {
+        "id": "TC-495", "name": "ab_arm() Custom Arms Tuple", "category": "Metrics Events",
+        "priority": "P3 - Medium", "requirement": "FR-AB-CUSTOM-001",
+        "prereqs": "Python shell.",
+        "steps": (
+            "1. ab_arm('exp', org_id=1, arms=('control','variant','holdout'))"
+        ),
+        "data": "3-way split.",
+        "expected": "Returns one of the three; stable per org_id.",
+        "criteria": "Pass: 3-way works. Fail: Errors or wrong arm."
+    },
+    {
+        "id": "TC-496", "name": "Generic Event Ingest Empty event_name", "category": "Metrics Events",
+        "priority": "P3 - Medium", "requirement": "FR-INGEST-VAL-001",
+        "prereqs": "Logged in user.",
+        "steps": (
+            "1. POST /api/ai/events/track with empty event_name"
+        ),
+        "data": "Empty.",
+        "expected": "400 'event_name required'",
+        "criteria": "Pass: 400. Fail: 500 or silent accept."
+    },
+    {
+        "id": "TC-497", "name": "Generic Event Ingest Non-Whitelisted Name", "category": "Metrics Events",
+        "priority": "P2 - High", "requirement": "FR-INGEST-VAL-002",
+        "prereqs": "Logged in user.",
+        "steps": (
+            "1. POST event_name='attack.exfiltrate'"
+        ),
+        "data": "Attack name.",
+        "expected": "400 'event_name not allowed' + 'allowed' list in body.",
+        "criteria": "Pass: Whitelist enforced. Fail: Arbitrary names accepted."
+    },
+    {
+        "id": "TC-498", "name": "Generic Event Ingest Non-Dict Props", "category": "Metrics Events",
+        "priority": "P3 - Medium", "requirement": "FR-INGEST-VAL-003",
+        "prereqs": "Logged in user.",
+        "steps": (
+            "1. POST props=['array','not','dict']"
+        ),
+        "data": "Wrong type.",
+        "expected": "400 'props must be an object'",
+        "criteria": "Pass: 400. Fail: Crash."
+    },
+    {
+        "id": "TC-499", "name": "Generic Event Ingest Oversized Props", "category": "Metrics Events",
+        "priority": "P3 - Medium", "requirement": "FR-INGEST-CAP-001",
+        "prereqs": "Logged in user.",
+        "steps": (
+            "1. POST with props containing a 10KB string value"
+        ),
+        "data": "Oversized payload.",
+        "expected": (
+            "1. Service replaces props with {'truncated': true}\n"
+            "2. 200 success\n"
+            "3. Underlying event still recorded with truncated marker"
+        ),
+        "criteria": "Pass: Truncated. Fail: 500 or unbounded storage."
+    },
+]
+test_cases.extend(metrics_event_cases)
+
+
+# ============================================================================
+# CATEGORY 27: NPS FEEDBACK EDGE CASES  (TC-510 to TC-519)
+# ============================================================================
+
+feedback_cases = [
+    {
+        "id": "TC-510", "name": "Feedback Uniqueness Per Target", "category": "NPS Feedback",
+        "priority": "P2 - High", "requirement": "FR-FEEDBACK-UNIQ-001",
+        "prereqs": "User has submitted feedback for application=123.",
+        "steps": (
+            "1. POST /api/feedback with same surface + related_kind + related_id\n"
+            "2. Check returned 'created' field"
+        ),
+        "data": "Re-submission.",
+        "expected": (
+            "1. Service upserts: returns created=false, feedback.id same as before\n"
+            "2. Score updated to the new value\n"
+            "3. Only one row exists in DB (uniqueness constraint enforced)"
+        ),
+        "criteria": "Pass: Upserts. Fail: Duplicate row or 500."
+    },
+    {
+        "id": "TC-511", "name": "Feedback Comment Cap At 500 Chars", "category": "NPS Feedback",
+        "priority": "P3 - Medium", "requirement": "FR-FEEDBACK-CAP-001",
+        "prereqs": "Logged in user.",
+        "steps": (
+            "1. POST feedback with comment of 1000 chars"
+        ),
+        "data": "Long comment.",
+        "expected": (
+            "1. Server stores only the first 500 chars\n"
+            "2. Returned feedback.comment is truncated\n"
+            "3. No 400 error"
+        ),
+        "criteria": "Pass: Cap enforced. Fail: Full stored or 500."
+    },
+    {
+        "id": "TC-512", "name": "NPS Calculation Correctness", "category": "NPS Feedback",
+        "priority": "P2 - High", "requirement": "FR-NPS-CALC-001",
+        "prereqs": "Submit known mix: 4 promoters (9-10), 3 passives (7-8), 2 detractors (0-6).",
+        "steps": (
+            "1. Hit /api/admin/metrics as admin\n"
+            "2. Inspect nps.overall_nps"
+        ),
+        "data": "9 responses.",
+        "expected": (
+            "1. overall_nps = ((4-2)/9)*100 ≈ 22.2\n"
+            "2. promoters=4, passives=3, detractors=2"
+        ),
+        "criteria": "Pass: Correct math. Fail: Wrong calc."
+    },
+    {
+        "id": "TC-513", "name": "NPS Empty State", "category": "NPS Feedback",
+        "priority": "P3 - Medium", "requirement": "FR-NPS-EMPTY-001",
+        "prereqs": "Fresh DB with no UserFeedback rows.",
+        "steps": (
+            "1. GET /api/admin/metrics"
+        ),
+        "data": "No responses.",
+        "expected": (
+            "1. nps.total_responses=0\n"
+            "2. nps.overall_nps=null\n"
+            "3. by_surface=[], by_language={}, histogram all-zeros"
+        ),
+        "criteria": "Pass: Empty shape correct. Fail: Crash or fake numbers."
+    },
+    {
+        "id": "TC-514", "name": "NPS By-Language Rollup", "category": "NPS Feedback",
+        "priority": "P3 - Medium", "requirement": "FR-NPS-LANG-001",
+        "prereqs": "Responses from users in en, ar, sw, so.",
+        "steps": (
+            "1. GET admin metrics\n"
+            "2. Inspect nps.by_language"
+        ),
+        "data": "Multi-language responses.",
+        "expected": (
+            "1. by_language has keys for each language with responses\n"
+            "2. Each entry: {responses, nps}\n"
+            "3. Per-language NPS calculated independently"
+        ),
+        "criteria": "Pass: Per-language rollup. Fail: Aggregated only."
+    },
+    {
+        "id": "TC-515", "name": "Feedback Recent Comments Limit", "category": "NPS Feedback",
+        "priority": "P3 - Medium", "requirement": "FR-NPS-RECENT-001",
+        "prereqs": "30+ feedback rows with comments.",
+        "steps": (
+            "1. GET admin metrics"
+        ),
+        "data": "Many comments.",
+        "expected": "nps_recent_comments has exactly 10 most-recent entries.",
+        "criteria": "Pass: Capped at 10. Fail: Unbounded."
+    },
+    {
+        "id": "TC-516", "name": "Feedback Surface Not In Allowed List", "category": "NPS Feedback",
+        "priority": "P2 - High", "requirement": "FR-FEEDBACK-VAL-001",
+        "prereqs": "Logged in user.",
+        "steps": (
+            "1. POST /api/feedback {surface: 'made_up_surface', score: 5}"
+        ),
+        "data": "Bad surface.",
+        "expected": "400 with reason='surface_not_allowed' + allowed list.",
+        "criteria": "Pass: Whitelist enforced. Fail: Accepted."
+    },
+    {
+        "id": "TC-517", "name": "Feedback Non-Int Score", "category": "NPS Feedback",
+        "priority": "P3 - Medium", "requirement": "FR-FEEDBACK-VAL-002",
+        "prereqs": "Logged in user.",
+        "steps": (
+            "1. POST {surface:'application_submit', score:'nine'}"
+        ),
+        "data": "String score.",
+        "expected": "400 with reason='score_must_be_int'",
+        "criteria": "Pass: 400. Fail: 500 or silent coerce."
+    },
+    {
+        "id": "TC-518", "name": "Feedback Unauthenticated", "category": "NPS Feedback",
+        "priority": "P1 - Critical", "requirement": "FR-FEEDBACK-AUTH-001",
+        "prereqs": "Not logged in.",
+        "steps": (
+            "1. POST /api/feedback {surface:'application_submit', score:5}"
+        ),
+        "data": "No session.",
+        "expected": "401 (login_required redirects to login)",
+        "criteria": "Pass: Auth required. Fail: Anonymous submit allowed."
+    },
+    {
+        "id": "TC-519", "name": "/api/feedback/my Returns Only Caller's", "category": "NPS Feedback",
+        "priority": "P1 - Critical", "requirement": "FR-FEEDBACK-AUTH-002",
+        "prereqs": "Two users with submitted feedback.",
+        "steps": (
+            "1. Log in as user A\n"
+            "2. GET /api/feedback/my\n"
+            "3. Log in as user B\n"
+            "4. GET /api/feedback/my"
+        ),
+        "data": "Two sessions.",
+        "expected": "Each user only sees their own feedback rows.",
+        "criteria": "Pass: Strict isolation. Fail: Cross-user leak."
+    },
+]
+test_cases.extend(feedback_cases)
+
+
+# ============================================================================
+# CATEGORY 28: COMPREHENSIVE END-TO-END WORKFLOWS  (TC-530 to TC-535)
+# ============================================================================
+
+e2e_phase_cases = [
+    {
+        "id": "TC-530", "name": "Full NGO Journey: Register → Submit → Survey", "category": "E2E Workflows",
+        "priority": "P1 - Critical", "requirement": "E2E-NGO-001",
+        "prereqs": "Fresh NGO account.",
+        "steps": (
+            "1. Log in as NGO\n"
+            "2. Visit /dashboard, complete onboarding checklist\n"
+            "3. Visit /assessments, complete a capacity assessment\n"
+            "4. Visit /grants, find a matching grant\n"
+            "5. Click Apply, create draft (event: application.start_draft)\n"
+            "6. Fill responses\n"
+            "7. Run readiness check (event: readiness_check.used)\n"
+            "8. Apply 1 AI suggestion (event: ai_assist.suggestion_accepted via ingest)\n"
+            "9. Submit (events: application.submit + auto-assign fires)\n"
+            "10. Open chat on the app, ask a follow-up (event: chat.message_sent)\n"
+            "11. Wait for micro-survey, submit score 9"
+        ),
+        "data": "Full NGO flow.",
+        "expected": (
+            "1. All events recorded in /admin/metrics\n"
+            "2. Reviewer panel auto-populated after submit\n"
+            "3. NPS bumped by 1 with score 9\n"
+            "4. Audit chain has 'reviewer.auto_assigned' entry"
+        ),
+        "criteria": "Pass: All events visible + state correct. Fail: Any missing."
+    },
+    {
+        "id": "TC-531", "name": "Full Donor Journey: Publish → Decide → Cohort", "category": "E2E Workflows",
+        "priority": "P1 - Critical", "requirement": "E2E-DONOR-001",
+        "prereqs": "Fresh donor account.",
+        "steps": (
+            "1. Log in as donor\n"
+            "2. Visit /grants/new, create grant\n"
+            "3. Publish\n"
+            "4. Wait for applicants\n"
+            "5. Send broadcast to all applicants (event: donor.broadcast_sent)\n"
+            "6. Review apps with auto-assigned panels\n"
+            "7. Record decision with reason code (event: donor.decision_recorded)\n"
+            "8. Visit /dashboard\n"
+            "9. Inspect cohort card\n"
+            "10. Inspect risk heatmap"
+        ),
+        "data": "Full donor flow.",
+        "expected": (
+            "1. All events captured\n"
+            "2. Cohort sparse-honest if <3 other donors\n"
+            "3. Risk heatmap renders with cells"
+        ),
+        "criteria": "Pass: Full flow + visible metrics. Fail: Any break."
+    },
+    {
+        "id": "TC-532", "name": "Full Reviewer Journey: Open → Score → Submit", "category": "E2E Workflows",
+        "priority": "P1 - Critical", "requirement": "E2E-REV-001",
+        "prereqs": "Reviewer with auto-assigned reviews.",
+        "steps": (
+            "1. Log in as reviewer\n"
+            "2. Visit /dashboard, see throughput card\n"
+            "3. Visit /reviews\n"
+            "4. Open an assigned review (event: reviewer.assignment_opened)\n"
+            "5. Read briefing card\n"
+            "6. Enter per-criterion scores\n"
+            "7. POST complete (event: reviewer.review_submitted)\n"
+            "8. Return to /dashboard, verify throughput updated"
+        ),
+        "data": "Full reviewer flow.",
+        "expected": (
+            "1. assignment_opened fires only for reviewer role\n"
+            "2. review_submitted fires on POST complete\n"
+            "3. Application's human_score recalculated"
+        ),
+        "criteria": "Pass: Both events + state. Fail: Either missing."
+    },
+    {
+        "id": "TC-533", "name": "Full Report Cycle: Draft → Preflight → Submit → Decision", "category": "E2E Workflows",
+        "priority": "P2 - High", "requirement": "E2E-REPORT-001",
+        "prereqs": "NGO with awarded application.",
+        "steps": (
+            "1. Create report draft (event: report.start_draft)\n"
+            "2. Run pre-flight (event: report.preflight_used)\n"
+            "3. Fix flagged issues\n"
+            "4. Submit (event: report.submit)\n"
+            "5. Wait for AI compliance score\n"
+            "6. Micro-survey appears, submit score 8\n"
+            "7. Donor logs in, reviews report, marks accepted\n"
+            "8. NGO checks /reports, sees status updated"
+        ),
+        "data": "Report lifecycle.",
+        "expected": (
+            "1. Full funnel report.start_draft → report.submit captured\n"
+            "2. Preflight event also captured\n"
+            "3. NPS for report_submit incremented\n"
+            "4. Report status transitions correctly"
+        ),
+        "criteria": "Pass: Complete cycle + events. Fail: Any drop."
+    },
+    {
+        "id": "TC-534", "name": "Cross-Role A/B Experiment Walkthrough", "category": "E2E Workflows",
+        "priority": "P2 - High", "requirement": "E2E-AB-001",
+        "prereqs": "Developer adds ab_arm() call at app.submit site.",
+        "steps": (
+            "1. Two NGO orgs in different ab arms submit applications\n"
+            "2. Wait for event recording\n"
+            "3. Admin checks /admin/metrics → ab_application_submit by_arm"
+        ),
+        "data": "A/B run.",
+        "expected": (
+            "1. by_arm shows non-empty buckets (A + B)\n"
+            "2. Each org's submits land in their assigned arm\n"
+            "3. Same org always lands in same arm (deterministic)"
+        ),
+        "criteria": "Pass: Bucketing visible. Fail: Single bucket or random."
+    },
+    {
+        "id": "TC-535", "name": "Multi-User Concurrent Session Stress", "category": "E2E Workflows",
+        "priority": "P3 - Medium", "requirement": "E2E-STRESS-001",
+        "prereqs": "Test runner that can fire 10 parallel sessions.",
+        "steps": (
+            "1. 10 parallel logins (different users)\n"
+            "2. Each user submits an application\n"
+            "3. Each opens chat + sends 3 messages"
+        ),
+        "data": "10×5 = 50 events.",
+        "expected": (
+            "1. All 10 session.start events recorded\n"
+            "2. All 10 application.submit events recorded\n"
+            "3. ~30 chat.message_sent events (allow some rate-limited if AI quota exhausted)\n"
+            "4. No 500 errors\n"
+            "5. Rate-limited requests return 429 cleanly"
+        ),
+        "criteria": "Pass: Clean concurrent execution. Fail: 500s or lost events."
+    },
+]
+test_cases.extend(e2e_phase_cases)
+
+
+# ============================================================================
+# CATEGORY 29: I18N + RTL EDGE CASES FOR NEW COMPONENTS  (TC-550 to TC-557)
+# ============================================================================
+
+i18n_new_cases = [
+    {
+        "id": "TC-550", "name": "Chat Panel Renders Right-To-Left In Arabic", "category": "I18N RTL",
+        "priority": "P2 - High", "requirement": "FR-I18N-CHAT-001",
+        "prereqs": "User with language='ar'.",
+        "steps": (
+            "1. Open /chat\n"
+            "2. Inspect <html dir> attribute\n"
+            "3. Send + receive messages\n"
+            "4. Check message bubble alignment"
+        ),
+        "data": "Arabic session.",
+        "expected": (
+            "1. html dir='rtl'\n"
+            "2. User bubbles right-aligned\n"
+            "3. Assistant bubbles right-aligned for Arabic text\n"
+            "4. Composer reads right-to-left"
+        ),
+        "criteria": "Pass: Clean RTL. Fail: Mirrored or LTR-only layout."
+    },
+    {
+        "id": "TC-551", "name": "Micro-Survey In Arabic", "category": "I18N RTL",
+        "priority": "P3 - Medium", "requirement": "FR-I18N-SURVEY-001",
+        "prereqs": "Arabic-language user submitting an application.",
+        "steps": (
+            "1. After submit, wait for survey\n"
+            "2. Inspect question text and layout"
+        ),
+        "data": "Arabic survey.",
+        "expected": (
+            "1. Question text appears in Arabic (or English fallback if not translated)\n"
+            "2. Layout reads RTL (button positions mirrored)\n"
+            "3. Score buttons 0-10 still in their natural order"
+        ),
+        "criteria": "Pass: RTL applied. Fail: LTR forced."
+    },
+    {
+        "id": "TC-552", "name": "PWA Install Banner Translated To Swahili", "category": "I18N RTL",
+        "priority": "P3 - Medium", "requirement": "FR-I18N-PWA-001",
+        "prereqs": "Swahili user, supported browser.",
+        "steps": (
+            "1. Trigger banner via beforeinstallprompt\n"
+            "2. Inspect text"
+        ),
+        "data": "Swahili banner.",
+        "expected": "Title + body + button labels in Swahili (or graceful EN fallback).",
+        "criteria": "Pass: Translated. Fail: English only."
+    },
+    {
+        "id": "TC-553", "name": "Cohort Card Verdict Pills Translated", "category": "I18N RTL",
+        "priority": "P3 - Medium", "requirement": "FR-I18N-COHORT-001",
+        "prereqs": "Donor with language='fr'.",
+        "steps": (
+            "1. Visit /dashboard, locate cohort card"
+        ),
+        "data": "French session.",
+        "expected": "Verdict pills (above/around/below) shown in French.",
+        "criteria": "Pass: Translated. Fail: English only."
+    },
+    {
+        "id": "TC-554", "name": "Mixed Number + Arabic Text Wrapping", "category": "I18N RTL",
+        "priority": "P3 - Medium", "requirement": "FR-I18N-MIXED-001",
+        "prereqs": "Arabic UI rendering a cohort row with metric value '82%'.",
+        "steps": (
+            "1. View the row"
+        ),
+        "data": "Mixed content.",
+        "expected": (
+            "1. Number renders as '82%' (LTR within RTL row) — correct Unicode bidi\n"
+            "2. No '%82' reversal\n"
+            "3. No layout shift between numeric + text segments"
+        ),
+        "criteria": "Pass: Correct bidi. Fail: Reversed."
+    },
+    {
+        "id": "TC-555", "name": "Long Label Truncation In Somali", "category": "I18N RTL",
+        "priority": "P3 - Medium", "requirement": "FR-I18N-LABEL-001",
+        "prereqs": "Somali user, sidebar visible.",
+        "steps": (
+            "1. Inspect long nav labels in Somali"
+        ),
+        "data": "Long words.",
+        "expected": "Labels truncate with ellipsis or wrap cleanly; no horizontal scroll.",
+        "criteria": "Pass: Clean overflow. Fail: Scroll or overlap."
+    },
+    {
+        "id": "TC-556", "name": "Date Formatting Localized", "category": "I18N RTL",
+        "priority": "P3 - Medium", "requirement": "FR-I18N-DATE-001",
+        "prereqs": "Donor in en vs ar vs sw.",
+        "steps": (
+            "1. View deadline shown on a grant card across all three locales"
+        ),
+        "data": "Same date.",
+        "expected": (
+            "1. EN: 'Jan 15, 2026'\n"
+            "2. AR: '١٥ يناير ٢٠٢٦' (Arabic numerals + Arabic month) — or graceful fallback to en-US for missing locale\n"
+            "3. SW: '15 Jan 2026'"
+        ),
+        "criteria": "Pass: Localized. Fail: Same format everywhere."
+    },
+    {
+        "id": "TC-557", "name": "Switching Language Mid-Session", "category": "I18N RTL",
+        "priority": "P2 - High", "requirement": "FR-I18N-SWITCH-001",
+        "prereqs": "Logged-in user.",
+        "steps": (
+            "1. PUT /api/auth/language with new lang code\n"
+            "2. Refresh /dashboard"
+        ),
+        "data": "Mid-session switch.",
+        "expected": (
+            "1. UI re-renders in the new locale\n"
+            "2. html lang + dir attributes update\n"
+            "3. Existing chat threads preserved but new replies arrive in new lang"
+        ),
+        "criteria": "Pass: Clean switch. Fail: Stale strings."
+    },
+]
+test_cases.extend(i18n_new_cases)
+
+
+# ============================================================================
+# CATEGORY 30: PERFORMANCE + CONCURRENCY EDGE CASES  (TC-570 to TC-579)
+# ============================================================================
+
+perf_cases = [
+    {
+        "id": "TC-570", "name": "Rate Limit /api/ai/ Caps At 40/min", "category": "Performance",
+        "priority": "P2 - High", "requirement": "FR-PERF-RATE-001",
+        "prereqs": "Single IP / single user.",
+        "steps": (
+            "1. Fire 50 POST requests to /api/ai/insight-narrate?async=true within 60s\n"
+            "2. Count 200 vs 429 responses"
+        ),
+        "data": "Sustained burst.",
+        "expected": (
+            "1. First ~40 succeed (status 202)\n"
+            "2. Remaining return 429 with Retry-After header\n"
+            "3. Window resets after 60s; subsequent burst allowed"
+        ),
+        "criteria": "Pass: 40/min cap honored. Fail: Unbounded or wrong cap."
+    },
+    {
+        "id": "TC-571", "name": "/api/ai/jobs/ Status Polls NOT Rate-Limited", "category": "Performance",
+        "priority": "P1 - Critical", "requirement": "FR-PERF-RATE-002",
+        "prereqs": "Single IP.",
+        "steps": (
+            "1. Fire 30 GET requests to /api/ai/jobs/anyid in 30s"
+        ),
+        "data": "Poll burst.",
+        "expected": "0/30 return 429 (cap is 600/min on this specific path).",
+        "criteria": "Pass: 0 limited. Fail: Any 429."
+    },
+    {
+        "id": "TC-572", "name": "Login Rate Limit Per IP", "category": "Performance",
+        "priority": "P1 - Critical", "requirement": "FR-PERF-LOGIN-001",
+        "prereqs": "Single IP.",
+        "steps": (
+            "1. POST /api/auth/login 31 times within 60s"
+        ),
+        "data": "Login burst.",
+        "expected": "31st request returns 429 (default 30/min/IP).",
+        "criteria": "Pass: Capped. Fail: Unbounded."
+    },
+    {
+        "id": "TC-573", "name": "Email Lockout After 5 Failed Logins", "category": "Performance",
+        "priority": "P1 - Critical", "requirement": "FR-PERF-LOCKOUT-001",
+        "prereqs": "Test email account.",
+        "steps": (
+            "1. POST 5 logins with wrong password for the same email\n"
+            "2. POST a 6th login with the correct password"
+        ),
+        "data": "Brute force pattern.",
+        "expected": (
+            "1. 6th attempt returns 429 with 'Email lockout' message\n"
+            "2. Lockout persists for LOCKOUT_DURATION_MINUTES (default 15)\n"
+            "3. Admin can clear via /api/admin/clear-lockout"
+        ),
+        "criteria": "Pass: Lockout enforced. Fail: Brute-forceable."
+    },
+    {
+        "id": "TC-574", "name": "Concurrent Application Submits — Same User", "category": "Performance",
+        "priority": "P2 - High", "requirement": "FR-PERF-CONCURRENT-001",
+        "prereqs": "NGO with 1 draft application.",
+        "steps": (
+            "1. Fire two simultaneous POST /api/applications/<id>/submit"
+        ),
+        "data": "Race condition.",
+        "expected": (
+            "1. One succeeds (status flips to 'submitted')\n"
+            "2. Second sees idempotent path: returns success with 'already submitted' message\n"
+            "3. No double auto-assign\n"
+            "4. No double scoring"
+        ),
+        "criteria": "Pass: Idempotent. Fail: Double work."
+    },
+    {
+        "id": "TC-575", "name": "Slow AI Response Doesn't Block Other Endpoints", "category": "Performance",
+        "priority": "P2 - High", "requirement": "FR-PERF-ASYNC-001",
+        "prereqs": "Trigger a slow AI call (e.g. donor-portfolio-insights cold start).",
+        "steps": (
+            "1. Fire the slow AI request (expect 5-15s)\n"
+            "2. Concurrently fire /api/health and /api/version"
+        ),
+        "data": "Long + short requests.",
+        "expected": (
+            "1. /api/health returns 200 within 1 second\n"
+            "2. /api/version returns 200 within 1 second\n"
+            "3. AI call returns when done (5-15s) but doesn't wedge other workers"
+        ),
+        "criteria": "Pass: Non-blocking. Fail: All endpoints hang."
+    },
+    {
+        "id": "TC-576", "name": "Heavy AI Call Capped At 300s", "category": "Performance",
+        "priority": "P2 - High", "requirement": "FR-PERF-AICAP-001",
+        "prereqs": "Trigger an AI call (e.g. analyze_report on a large document).",
+        "steps": (
+            "1. Fire the call\n"
+            "2. Time the response"
+        ),
+        "data": "Large input.",
+        "expected": (
+            "1. Response within ~300s (max runtime cap)\n"
+            "2. Either success or graceful timeout, NOT silent hang\n"
+            "3. Job classification (light/medium/heavy) honored"
+        ),
+        "criteria": "Pass: Bounded. Fail: Unbounded hang."
+    },
+    {
+        "id": "TC-577", "name": "Cron Endpoint Authentication Methods", "category": "Performance",
+        "priority": "P2 - High", "requirement": "FR-PERF-CRON-001",
+        "prereqs": "CRON_SECRET set.",
+        "steps": (
+            "1. POST /api/cron/reviewer-auto-assign-sweep with Bearer CRON_SECRET\n"
+            "2. POST same URL with admin session cookie\n"
+            "3. POST with no auth"
+        ),
+        "data": "Three auth modes.",
+        "expected": "Both #1 and #2 → 200. #3 → 403.",
+        "criteria": "Pass: Both auth modes work. Fail: Either blocked."
+    },
+    {
+        "id": "TC-578", "name": "AI Job Polling Backoff", "category": "Performance",
+        "priority": "P3 - Medium", "requirement": "FR-PERF-POLL-001",
+        "prereqs": "Frontend issues an async AI call.",
+        "steps": (
+            "1. Inspect network tab during a copilot-rail load\n"
+            "2. Time intervals between poll requests"
+        ),
+        "data": "Poll cadence.",
+        "expected": (
+            "1. Intervals follow exponential backoff (250ms, 500ms, 1s, 1.5s, 2s, cap)\n"
+            "2. Total polls capped at 30 attempts (~50s total)\n"
+            "3. After cap, error 'AI job exceeded poll budget' surfaces"
+        ),
+        "criteria": "Pass: Backoff working. Fail: Tight polling or no cap."
+    },
+    {
+        "id": "TC-579", "name": "Audit Chain Hash Integrity", "category": "Performance",
+        "priority": "P1 - Critical", "requirement": "FR-PERF-AUDIT-001",
+        "prereqs": "At least 20 audit chain entries in the DB.",
+        "steps": (
+            "1. GET /api/audit-chain/verify\n"
+            "2. Inspect response"
+        ),
+        "data": "Verify request.",
+        "expected": (
+            "1. Response success=true\n"
+            "2. All entries verified: each row's previous_hash matches the prior row's computed hash\n"
+            "3. Any tampering would surface as a specific row's mismatch"
+        ),
+        "criteria": "Pass: Chain intact. Fail: Hash mismatch or 500."
+    },
+]
+test_cases.extend(perf_cases)
+
+
+# ============================================================================
+# CATEGORY 31: CORE SYSTEM EDGE CASES + SECURITY  (TC-600 to TC-619)
+# Fills coverage gaps in older categories: documents, auth, audit chain,
+# compliance, risk, search, and notifications.
+# ============================================================================
+
+core_edge_cases = [
+    {
+        "id": "TC-600", "name": "Document Upload Size Limit Enforced", "category": "Core Edge",
+        "priority": "P1 - Critical", "requirement": "FR-DOC-LIMIT-001",
+        "prereqs": "Logged in user with upload access.",
+        "steps": (
+            "1. Try uploading a 20MB PDF (above MAX_CONTENT_LENGTH = 16MB)\n"
+            "2. Try uploading a 1MB file (well under)\n"
+            "3. Try uploading a 17MB file"
+        ),
+        "data": "Various sizes.",
+        "expected": (
+            "1. 20MB returns 413 (Payload Too Large) before hitting Gunicorn\n"
+            "2. 1MB succeeds\n"
+            "3. 17MB returns 413 with clean message"
+        ),
+        "criteria": "Pass: Cap enforced cleanly. Fail: 502 from Gunicorn or silent truncation."
+    },
+    {
+        "id": "TC-601", "name": "Document Upload Disallowed File Type", "category": "Core Edge",
+        "priority": "P2 - High", "requirement": "FR-DOC-TYPE-001",
+        "prereqs": "Upload UI.",
+        "steps": (
+            "1. Try uploading .exe\n"
+            "2. Try uploading .zip\n"
+            "3. Try uploading .docx (allowed)"
+        ),
+        "data": "Mixed file types.",
+        "expected": (
+            "1. .exe rejected with clear error\n"
+            "2. .zip rejected\n"
+            "3. .docx accepted"
+        ),
+        "criteria": "Pass: Whitelist enforced. Fail: Any disallowed accepted."
+    },
+    {
+        "id": "TC-602", "name": "Application Submit With No Responses Filled", "category": "Core Edge",
+        "priority": "P1 - Critical", "requirement": "FR-APP-SUBMIT-VAL-001",
+        "prereqs": "NGO with draft application, zero criterion responses.",
+        "steps": (
+            "1. POST /api/applications/<id>/submit"
+        ),
+        "data": "Empty responses.",
+        "expected": (
+            "1. 400 with 'missing_criteria' list of every criterion label\n"
+            "2. Application status remains 'draft'\n"
+            "3. No AI scoring, no auto-assign"
+        ),
+        "criteria": "Pass: Pre-submit validation. Fail: Submitted empty."
+    },
+    {
+        "id": "TC-603", "name": "Application Submit After Deadline", "category": "Core Edge",
+        "priority": "P2 - High", "requirement": "FR-APP-DEADLINE-001",
+        "prereqs": "Grant with deadline in the past + NGO draft.",
+        "steps": (
+            "1. POST submit"
+        ),
+        "data": "Past deadline.",
+        "expected": "400 'The application deadline has passed'.",
+        "criteria": "Pass: Blocked. Fail: Late submit accepted."
+    },
+    {
+        "id": "TC-604", "name": "Duplicate Application Attempt", "category": "Core Edge",
+        "priority": "P1 - Critical", "requirement": "FR-APP-DUPE-001",
+        "prereqs": "NGO already has application for grant X.",
+        "steps": (
+            "1. POST /api/applications/ with same grant_id again"
+        ),
+        "data": "Duplicate attempt.",
+        "expected": (
+            "1. 409 Conflict\n"
+            "2. existing_application_id returned in body\n"
+            "3. Banner on UI shows link to existing"
+        ),
+        "criteria": "Pass: Properly de-duped. Fail: Duplicate row created."
+    },
+    {
+        "id": "TC-605", "name": "Report Submit On Already-Submitted Report", "category": "Core Edge",
+        "priority": "P2 - High", "requirement": "FR-REP-IDEMP-001",
+        "prereqs": "Report already in status 'submitted'.",
+        "steps": (
+            "1. POST /api/reports/<id>/submit again"
+        ),
+        "data": "Re-submit.",
+        "expected": "400 'Report cannot be submitted in current status' OR idempotent 200; never double-records AI analysis.",
+        "criteria": "Pass: Safe re-submit. Fail: Double AI run."
+    },
+    {
+        "id": "TC-606", "name": "Cross-Org Application Access Denied", "category": "Core Edge",
+        "priority": "P1 - Critical", "requirement": "FR-APP-AUTH-001",
+        "prereqs": "Two NGOs. NGO A has application X; NGO B logged in.",
+        "steps": (
+            "1. NGO B GET /api/applications/<X.id>\n"
+            "2. NGO B POST /api/applications/<X.id>/submit"
+        ),
+        "data": "Cross-org probe.",
+        "expected": "Both return 403 or 404.",
+        "criteria": "Pass: Isolated. Fail: Cross-org access."
+    },
+    {
+        "id": "TC-607", "name": "Global Search Special Characters", "category": "Core Edge",
+        "priority": "P3 - Medium", "requirement": "FR-SEARCH-CHAR-001",
+        "prereqs": "Logged in.",
+        "steps": (
+            "1. GET /api/search?q=' OR 1=1 --\n"
+            "2. GET /api/search?q=<script>alert(1)</script>\n"
+            "3. GET /api/search?q=日本語\n"
+            "4. GET /api/search?q=العربية"
+        ),
+        "data": "Adversarial + unicode queries.",
+        "expected": (
+            "1. SQL injection attempts safely parameterized (no SQL error)\n"
+            "2. XSS payload returns escaped in JSON\n"
+            "3. Unicode queries succeed (Japanese, Arabic both work)"
+        ),
+        "criteria": "Pass: Safe + unicode-aware. Fail: SQL error or XSS reflection."
+    },
+    {
+        "id": "TC-608", "name": "Global Search Very Short Query Rejected", "category": "Core Edge",
+        "priority": "P3 - Medium", "requirement": "FR-SEARCH-MIN-001",
+        "prereqs": "Logged in.",
+        "steps": (
+            "1. GET /api/search?q=a\n"
+            "2. GET /api/search?q=ab"
+        ),
+        "data": "Short queries.",
+        "expected": "Returns empty results with 'minimum length' message, not an error.",
+        "criteria": "Pass: Graceful. Fail: 500 or unbounded scan."
+    },
+    {
+        "id": "TC-609", "name": "Audit Chain Tamper Detection", "category": "Core Edge",
+        "priority": "P1 - Critical", "requirement": "FR-AUDIT-TAMPER-001",
+        "prereqs": "DB access. Audit chain has entries.",
+        "steps": (
+            "1. Manually edit one audit_chain row's 'details' field in the DB\n"
+            "2. GET /api/audit-chain/verify"
+        ),
+        "data": "Tampered row.",
+        "expected": (
+            "1. Verify returns success=false\n"
+            "2. Specific row reported as 'hash_mismatch'\n"
+            "3. Subsequent row also flagged (chain broken)"
+        ),
+        "criteria": "Pass: Tamper detected. Fail: Tampering silently accepted."
+    },
+    {
+        "id": "TC-610", "name": "Audit Chain Append-Only Enforcement", "category": "Core Edge",
+        "priority": "P1 - Critical", "requirement": "FR-AUDIT-IMMUT-001",
+        "prereqs": "Admin user.",
+        "steps": (
+            "1. Attempt DELETE /api/audit-chain/<id> (no such endpoint)\n"
+            "2. Attempt PATCH /api/audit-chain/<id>"
+        ),
+        "data": "Mutation attempts.",
+        "expected": "Both return 404 — no mutation endpoint exists by design.",
+        "criteria": "Pass: 404. Fail: Any 200 (would break immutability)."
+    },
+    {
+        "id": "TC-611", "name": "Compliance Health Band Boundaries", "category": "Core Edge",
+        "priority": "P2 - High", "requirement": "FR-COMPLIANCE-BAND-001",
+        "prereqs": "NGOs with varied compliance health scores: 79, 80, 89, 90.",
+        "steps": (
+            "1. Inspect each NGO's compliance_health_band"
+        ),
+        "data": "Boundary scores.",
+        "expected": (
+            "1. 79 → 'attention' or appropriate band\n"
+            "2. 80 → next band starts here\n"
+            "3. Bands consistent with documented thresholds\n"
+            "4. No off-by-one"
+        ),
+        "criteria": "Pass: Boundaries correct. Fail: Off-by-one."
+    },
+    {
+        "id": "TC-612", "name": "Risk Status Lifecycle Transitions", "category": "Core Edge",
+        "priority": "P2 - High", "requirement": "FR-RISK-LIFE-001",
+        "prereqs": "A Risk row in 'open' status.",
+        "steps": (
+            "1. Transition open → mitigated\n"
+            "2. Transition mitigated → resolved\n"
+            "3. Attempt resolved → open (illegal)"
+        ),
+        "data": "State transitions.",
+        "expected": "Legal transitions succeed; illegal return 400.",
+        "criteria": "Pass: State machine enforced. Fail: Any path accepted."
+    },
+    {
+        "id": "TC-613", "name": "Org Merge Refuses Same-Org", "category": "Core Edge",
+        "priority": "P2 - High", "requirement": "FR-MERGE-SELF-001",
+        "prereqs": "Admin login.",
+        "steps": (
+            "1. POST merge with source_id = target_id"
+        ),
+        "data": "Self merge.",
+        "expected": "400 with clear message.",
+        "criteria": "Pass: Refused. Fail: Self-merge succeeds."
+    },
+    {
+        "id": "TC-614", "name": "Org Merge Confirm Name Mismatch", "category": "Core Edge",
+        "priority": "P1 - Critical", "requirement": "FR-MERGE-CONFIRM-001",
+        "prereqs": "Admin login.",
+        "steps": (
+            "1. POST merge with confirm_name='Wrong Org Name'"
+        ),
+        "data": "Wrong confirmation.",
+        "expected": "400 with 'confirm_name does not match' error.",
+        "criteria": "Pass: Safety check works. Fail: Merge proceeds."
+    },
+    {
+        "id": "TC-615", "name": "Notification Digest Cadence Off", "category": "Core Edge",
+        "priority": "P3 - Medium", "requirement": "FR-DIGEST-OFF-001",
+        "prereqs": "User has digest_cadence='off'.",
+        "steps": (
+            "1. Trigger the digest cron"
+        ),
+        "data": "Off setting.",
+        "expected": "User is excluded from the digest batch.",
+        "criteria": "Pass: Respected. Fail: User still receives digest."
+    },
+    {
+        "id": "TC-616", "name": "Notification Preferences Invalid Channel", "category": "Core Edge",
+        "priority": "P3 - Medium", "requirement": "FR-NOTIF-VAL-001",
+        "prereqs": "Logged in.",
+        "steps": (
+            "1. PUT /api/notification-preferences with channel='telepathy'"
+        ),
+        "data": "Bogus channel.",
+        "expected": "Channel silently filtered out (in_app retained as minimum).",
+        "criteria": "Pass: Filtered. Fail: Stored as-is."
+    },
+    {
+        "id": "TC-617", "name": "GDPR Right To Erasure", "category": "Core Edge",
+        "priority": "P1 - Critical", "requirement": "FR-GDPR-001",
+        "prereqs": "Test user account with applications + reports.",
+        "steps": (
+            "1. Admin triggers GDPR erasure for the user"
+        ),
+        "data": "Erasure request.",
+        "expected": (
+            "1. User row marked deleted/anonymized\n"
+            "2. Personal data scrubbed from related records\n"
+            "3. Audit chain shows the erasure event (without re-storing the PII)"
+        ),
+        "criteria": "Pass: Compliant erasure. Fail: PII remains."
+    },
+    {
+        "id": "TC-618", "name": "Session Expiry On Inactivity", "category": "Core Edge",
+        "priority": "P2 - High", "requirement": "FR-SESSION-EXP-001",
+        "prereqs": "Logged in user.",
+        "steps": (
+            "1. Note session cookie expiry\n"
+            "2. Wait past the expiry\n"
+            "3. Make a request"
+        ),
+        "data": "Expired session.",
+        "expected": "401 returned; UI redirects to /login.",
+        "criteria": "Pass: Expires. Fail: Indefinite session."
+    },
+    {
+        "id": "TC-619", "name": "Health/Ready Probes Always Fast", "category": "Core Edge",
+        "priority": "P1 - Critical", "requirement": "FR-PROBE-FAST-001",
+        "prereqs": "Production URL.",
+        "steps": (
+            "1. GET /api/health (10x in 10s)\n"
+            "2. GET /api/ready (10x in 10s)\n"
+            "3. Time each"
+        ),
+        "data": "Probe storm.",
+        "expected": (
+            "1. /api/health < 200ms each\n"
+            "2. /api/ready < 500ms each (includes DB ping)\n"
+            "3. No 5xx even if AI calls are saturating workers"
+        ),
+        "criteria": "Pass: Probes resilient. Fail: Hang or 5xx."
+    },
+]
+test_cases.extend(core_edge_cases)
+
+
+# ============================================================================
 # ── BUILD THE WORD DOCUMENT ──────────────────────────────────────────────────
 # ============================================================================
 
