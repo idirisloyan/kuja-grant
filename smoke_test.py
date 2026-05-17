@@ -2510,6 +2510,98 @@ def make_tests(base):
     tests.append(("PHASE29C-001: ab_arm bucketing is deterministic",
                   test_phase29c_ab_arm_deterministic))
 
+    # -------------------- Phase 30 (May 2026 — funnel events) --------------------
+
+    def test_phase30_generic_event_ingest_works():
+        """PHASE30-001: /api/ai/events/track accepts whitelisted event names."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.post(f"{base}/api/ai/events/track",
+                   json={"event_name": "feature.tap",
+                         "props": {"feature": "test", "n": 1}},
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+    tests.append(("PHASE30-001: generic event ingest accepts whitelisted",
+                  test_phase30_generic_event_ingest_works))
+
+    def test_phase30_generic_event_ingest_rejects_unknown():
+        """PHASE30-002: /api/ai/events/track rejects non-whitelisted event."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.post(f"{base}/api/ai/events/track",
+                   json={"event_name": "fake.bogus"},
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 400, f"expected 400, got {r.status_code}"
+    tests.append(("PHASE30-002: generic event ingest rejects unknown",
+                  test_phase30_generic_event_ingest_rejects_unknown))
+
+    # -------------------- Phase 31 (May 2026 — micro-surveys) --------------------
+
+    def test_phase31a_feedback_submit_works():
+        """PHASE31A-001: POST /api/feedback persists a valid response."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.post(f"{base}/api/feedback",
+                   json={"surface": "application_submit", "score": 9,
+                         "related_kind": "application", "related_id": 99999,
+                         "comment": "Smoke test"},
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        assert "feedback" in data
+    tests.append(("PHASE31A-001: POST /api/feedback persists", test_phase31a_feedback_submit_works))
+
+    def test_phase31a_feedback_rejects_bad_surface():
+        """PHASE31A-002: bad surface name returns 400."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.post(f"{base}/api/feedback",
+                   json={"surface": "nonexistent_surface", "score": 8},
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 400, f"expected 400, got {r.status_code}"
+    tests.append(("PHASE31A-002: feedback rejects bad surface",
+                  test_phase31a_feedback_rejects_bad_surface))
+
+    def test_phase31a_feedback_rejects_score_out_of_range():
+        """PHASE31A-003: score >10 or <0 returns 400."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.post(f"{base}/api/feedback",
+                   json={"surface": "application_submit", "score": 15},
+                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 400
+        r2 = s.post(f"{base}/api/feedback",
+                    json={"surface": "application_submit", "score": -1},
+                    headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r2.status_code == 400
+    tests.append(("PHASE31A-003: feedback rejects bad scores",
+                  test_phase31a_feedback_rejects_score_out_of_range))
+
+    def test_phase31a_my_feedback_returns_list():
+        """PHASE31A-004: /api/feedback/my returns the caller's responses."""
+        s = login_ok(base, USERS["ngo"])
+        r = s.get(f"{base}/api/feedback/my",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        assert isinstance(data.get("feedback"), list)
+    tests.append(("PHASE31A-004: /api/feedback/my returns list",
+                  test_phase31a_my_feedback_returns_list))
+
+    def test_phase31a_metrics_includes_nps():
+        """PHASE31A-005: admin /api/admin/metrics includes nps + nps_recent_comments."""
+        s = login_ok(base, USERS["admin"])
+        r = s.get(f"{base}/api/admin/metrics",
+                  headers={"X-Requested-With": "XMLHttpRequest"}, timeout=20)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert "nps" in data, f"metrics missing nps: {list(data.keys())}"
+        nps = data["nps"]
+        for k in ("window_days", "total_responses", "overall_nps",
+                  "by_surface", "by_language", "histogram"):
+            assert k in nps, f"nps missing {k}: {list(nps.keys())}"
+    tests.append(("PHASE31A-005: admin metrics includes NPS rollup",
+                  test_phase31a_metrics_includes_nps))
+
     def test_endpoint_scan():
         """Hit every critical API endpoint and assert none returns 500."""
         endpoints = [

@@ -23,6 +23,7 @@ import { ScoreBreakdownCard } from '@/components/applications/score-breakdown-ca
 import { ApplicationMessageThread } from '@/components/applications/application-message-thread';
 import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
+import { MicroSurvey } from '@/components/shared/micro-survey';
 import { useAuthStore } from '@/stores/auth-store';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
@@ -252,6 +253,19 @@ export default function ApplicationDetailClient() {
 
       {/* Phase 25B — scoped AI chat: ask Kuja about THIS application. */}
       <AIChatPanel scope={{ kind: 'application', id: application.id }} />
+
+      {/* Phase 31B — one-question NPS micro-survey for NGO viewing their
+          own submitted application. Skips other roles + drafts. */}
+      {viewer?.role === 'ngo'
+        && application.status !== 'draft'
+        && application.ngo_org_id === viewer?.org_id && (
+        <MicroSurvey
+          surface="application_submit"
+          relatedKind="application"
+          relatedId={application.id}
+          question="How helpful was Kuja in preparing this application?"
+        />
+      )}
     </div>
   );
 }

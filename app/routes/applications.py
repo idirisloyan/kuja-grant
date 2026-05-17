@@ -146,6 +146,17 @@ def api_create_application():
     logger.info(
         f"Application created: grant={grant_id}, org={current_user.org_id}, app_id={application.id}"
     )
+
+    # Phase 30A — funnel: NGO starts a draft. Pairs with application.submit.
+    try:
+        from app.services.user_event_service import UserEventService
+        UserEventService.record(
+            user=current_user, event_name='application.start_draft',
+            application_id=application.id, grant_id=grant_id,
+        )
+    except Exception:
+        pass
+
     return jsonify({'success': True, 'application': application.to_dict()}), 201
 
 

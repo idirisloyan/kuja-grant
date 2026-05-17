@@ -23,6 +23,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
+import { MicroSurvey } from '@/components/shared/micro-survey';
 
 interface ReportDetail {
   id: number;
@@ -210,6 +211,16 @@ export default function ReportDetailClient() {
 
       {/* Phase 26A — scoped AI chat: ask Kuja about THIS report. */}
       <AIChatPanel scope={{ kind: 'report', id: data.id }} />
+
+      {/* Phase 31B — micro-survey on submitted reports. */}
+      {data.status && data.status !== 'draft' && (
+        <MicroSurvey
+          surface="report_submit"
+          relatedKind="report"
+          relatedId={data.id}
+          question="How helpful was Kuja in preparing this report?"
+        />
+      )}
     </div>
   );
 }

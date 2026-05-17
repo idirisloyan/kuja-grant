@@ -710,6 +710,7 @@ def api_admin_metrics():
         return jsonify({'error': 'Admin access required'}), 403
 
     from app.services.user_event_service import UserEventService
+    from app.services.user_feedback_service import UserFeedbackService
     try:
         return jsonify({
             'success': True,
@@ -727,6 +728,16 @@ def api_admin_metrics():
                 'report': UserEventService.funnel(
                     stages=['report.start_draft', 'report.submit'],
                 ),
+                'review': UserEventService.funnel(
+                    stages=['reviewer.assignment_opened',
+                            'reviewer.review_submitted'],
+                ),
+                'readiness_to_submit': UserEventService.funnel(
+                    stages=['readiness_check.used', 'application.submit'],
+                ),
+                'preflight_to_submit': UserEventService.funnel(
+                    stages=['report.preflight_used', 'report.submit'],
+                ),
             },
             'chat_by_language': UserEventService.feature_usage_by_language(
                 event_name='chat.message_sent',
@@ -734,9 +745,18 @@ def api_admin_metrics():
             'search_by_language': UserEventService.feature_usage_by_language(
                 event_name='search.query',
             ),
+            'readiness_by_language': UserEventService.feature_usage_by_language(
+                event_name='readiness_check.used',
+            ),
+            'preflight_by_language': UserEventService.feature_usage_by_language(
+                event_name='report.preflight_used',
+            ),
             'ab_application_submit': UserEventService.ab_outcome(
                 outcome_event='application.submit',
             ),
+            # Phase 31A — NPS rollup from UserFeedback.
+            'nps': UserFeedbackService.nps_summary(days=30),
+            'nps_recent_comments': UserFeedbackService.recent_comments(limit=10),
         })
     except Exception as e:
         logger.exception(f'admin metrics failed: {e}')

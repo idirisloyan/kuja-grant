@@ -101,6 +101,19 @@ def api_get_review(review_id):
             data['grant'] = application.grant.to_dict(summary=True)
             data['grant_criteria'] = application.grant.get_criteria()
 
+    # Phase 30C — reviewer opens an assignment. Only emit for reviewers
+    # (not donors/admins inspecting) so the metric reflects actual work.
+    if current_user.role == 'reviewer':
+        try:
+            from app.services.user_event_service import UserEventService
+            UserEventService.record(
+                user=current_user, event_name='reviewer.assignment_opened',
+                review_id=review.id, application_id=review.application_id,
+                status=review.status,
+            )
+        except Exception:
+            pass
+
     return jsonify({'review': data})
 
 
@@ -264,6 +277,17 @@ def api_complete_review(review_id):
                 application.status = 'scored'
 
     db.session.commit()
+
+    # Phase 30C — funnel: reviewer completed work. Pairs with assignment_opened.
+    try:
+        from app.services.user_event_service import UserEventService
+        UserEventService.record(
+            user=current_user, event_name='reviewer.review_submitted',
+            review_id=review.id, application_id=review.application_id,
+            score=review.overall_score,
+        )
+    except Exception:
+        pass
 
     logger.info(f"Review completed: review_id={review_id}, score={review.overall_score}")
     return jsonify({'success': True, 'review': review.to_dict()})

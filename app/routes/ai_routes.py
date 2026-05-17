@@ -1368,6 +1368,17 @@ def api_ai_submission_readiness():
     captured_lang = current_user.language or 'en'
     captured_app_id = application.id
 
+    # Phase 30A — record usage immediately (before the async wrap so we
+    # capture intent even if the AI call later fails).
+    try:
+        from app.services.user_event_service import UserEventService
+        UserEventService.record(
+            user=current_user, event_name='readiness_check.used',
+            application_id=captured_app_id,
+        )
+    except Exception:
+        pass
+
     # Phase 13.43 — async-capable.
     from app.services.ai_jobs import maybe_async_jsonify
     def _work():
@@ -2042,3 +2053,40 @@ def api_ai_thread_reset(thread_id):
         return jsonify({'success': False, 'error': 'thread not found'}), 404
     result = AIChatService.reset_thread(thread=thread)
     return jsonify(result)
+
+
+# ----------------------------------------------------------------------
+# Phase 30D — generic client-side event ingest (suggestion_accepted etc.)
+# ----------------------------------------------------------------------
+
+@ai_bp.route('/events/track', methods=['POST'])
+@login_required
+def api_track_event():
+    """Generic event ingest for frontend-only signals that can't be
+    captured server-side (e.g. user clicked 'accept this AI suggestion',
+    user tapped 'install Kuja'). Whitelisted event_name vocabulary so
+    arbitrary client code can't pollute metrics.
+
+    Body: { event_name: str, props?: dict }
+    """
+    from app.utils.helpers import get_request_json
+    from app.services.user_event_service import UserEventService
+    from app.models.user_event import EVENT_NAMES
+
+    data = get_request_json() or {}
+    event_name = (data.get('event_name') or '').strip()
+    if not event_name:
+        return jsonify({'success': False, 'error': 'event_name required'}), 400
+    if event_name not in EVENT_NAMES:
+        return jsonify({'success': False, 'error': 'event_name not allowed',
+                        'allowed': sorted(EVENT_NAMES)}), 400
+
+    props = data.get('props') or {}
+    if not isinstance(props, dict):
+        return jsonify({'success': False, 'error': 'props must be an object'}), 400
+    # Caps to avoid abuse.
+    if len(str(props)) > 4000:
+        props = {'truncated': True}
+
+    UserEventService.record(user=current_user, event_name=event_name, **props)
+    return jsonify({'success': True})

@@ -52,6 +52,7 @@ def register_blueprints(app):
     from app.routes.tags_routes import tags_bp  # Phase 15E: tags + segmentation (find-or-create)
     from app.routes.exports_routes import exports_bp  # Phase 21C: CSV exports for grants/applications/reviews
     from app.routes.webauthn_routes import webauthn_bp  # Phase 26C: biometric re-auth
+    from app.routes.feedback_routes import feedback_bp  # Phase 31A: micro-survey ingest
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -64,5 +65,6 @@ def register_blueprints(app):
                preemption_bp, calendar_bp, messaging_bp, ai_budget_bp,
                notif_pref_bp, notif_pref_alias_bp, preflight_bp, audit_chain_bp, report_bundle_bp,
                doc_search_bp, search_alias_bp, digest_bp, ai_compare_bp, phase11_bp,
-               portfolio_bp, cron_bp, tags_bp, exports_bp, webauthn_bp]:
+               portfolio_bp, cron_bp, tags_bp, exports_bp, webauthn_bp,
+               feedback_bp]:
         app.register_blueprint(bp)

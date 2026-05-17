@@ -886,6 +886,19 @@ def api_grant_broadcast(grant_id):
         body=body,
         audience=audience,
     )
+
+    # Phase 30D — funnel: donor sent a broadcast.
+    if result.get('ok'):
+        try:
+            from app.services.user_event_service import UserEventService
+            UserEventService.record(
+                user=current_user, event_name='donor.broadcast_sent',
+                grant_id=grant_id, audience=audience,
+                recipients=result.get('recipient_count'),
+            )
+        except Exception:
+            pass
+
     status = 200 if result.get('ok') else 400
     return jsonify({'success': result.get('ok'), **result}), status
 

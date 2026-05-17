@@ -51,16 +51,52 @@ interface AbOutcome {
   by_arm: Record<string, number>;
 }
 
+interface NpsBySurface {
+  surface: string;
+  responses: number;
+  nps: number;
+  avg_score: number;
+}
+
+interface NpsSummary {
+  window_days: number;
+  total_responses: number;
+  overall_nps: number | null;
+  promoters?: number;
+  passives?: number;
+  detractors?: number;
+  by_surface: NpsBySurface[];
+  by_language: Record<string, { responses: number; nps: number }>;
+  histogram: Record<string, number>;
+}
+
+interface NpsComment {
+  surface: string;
+  score: number;
+  bucket: 'promoter' | 'passive' | 'detractor';
+  comment: string;
+  language?: string | null;
+  role?: string | null;
+  created_at?: string | null;
+}
+
 interface MetricsResp {
   success: boolean;
   dau: ActiveUsers;
   wau: ActiveUsers;
   mau: ActiveUsers;
   event_counts_30d: EventCount[];
-  funnels: { chat: Funnel; application: Funnel; report: Funnel };
+  funnels: {
+    chat: Funnel; application: Funnel; report: Funnel;
+    review?: Funnel; readiness_to_submit?: Funnel; preflight_to_submit?: Funnel;
+  };
   chat_by_language: LangBreakdown;
   search_by_language: LangBreakdown;
+  readiness_by_language?: LangBreakdown;
+  preflight_by_language?: LangBreakdown;
   ab_application_submit: AbOutcome;
+  nps?: NpsSummary;
+  nps_recent_comments?: NpsComment[];
 }
 
 function StatTile({ label, value, sub }: { label: string; value: number | string; sub?: string }) {
@@ -221,8 +257,94 @@ export default function AdminMetricsPage() {
           <FunnelView title="Chat: open → message sent" funnel={data.funnels.chat} />
           <FunnelView title="Application: draft → submit" funnel={data.funnels.application} />
           <FunnelView title="Report: draft → submit" funnel={data.funnels.report} />
+          {data.funnels.review && (
+            <FunnelView title="Review: assignment opened → submitted" funnel={data.funnels.review} />
+          )}
+          {data.funnels.readiness_to_submit && (
+            <FunnelView title="Readiness check → app submit (causal-ish)" funnel={data.funnels.readiness_to_submit} />
+          )}
+          {data.funnels.preflight_to_submit && (
+            <FunnelView title="Report pre-flight → submit (causal-ish)" funnel={data.funnels.preflight_to_submit} />
+          )}
         </div>
       </div>
+
+      {/* NPS micro-survey results */}
+      {data.nps && (
+        <Card className="p-4 sm:p-5">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--kuja-clay))]">NPS feedback</div>
+          <h2 className="kuja-display text-lg mb-2">Did Kuja help? (1-question micro-survey)</h2>
+          {data.nps.total_responses === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No survey responses yet. The micro-survey fires after application + report
+              submits — first answers will appear here within hours of real submits.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                <StatTile label="NPS (-100…+100)" value={data.nps.overall_nps ?? '—'} />
+                <StatTile label="Responses" value={data.nps.total_responses} sub={`last ${data.nps.window_days}d`} />
+                <StatTile label="Promoters (9-10)" value={data.nps.promoters ?? 0} />
+                <StatTile label="Detractors (0-6)" value={data.nps.detractors ?? 0} />
+              </div>
+              {data.nps.by_surface.length > 0 && (
+                <div className="mb-3">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">By surface</div>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-muted-foreground border-b border-[hsl(var(--border))]">
+                        <th className="py-1">Surface</th>
+                        <th className="py-1 text-right">Responses</th>
+                        <th className="py-1 text-right">NPS</th>
+                        <th className="py-1 text-right">Avg score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.nps.by_surface.map((r) => (
+                        <tr key={r.surface} className="border-b border-[hsl(var(--border))]/40">
+                          <td className="py-1.5 font-mono">{r.surface}</td>
+                          <td className="py-1.5 text-right tabular-nums">{r.responses}</td>
+                          <td className="py-1.5 text-right tabular-nums font-semibold">{r.nps}</td>
+                          <td className="py-1.5 text-right tabular-nums">{r.avg_score}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {Object.keys(data.nps.by_language).length > 0 && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">NPS by language</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(data.nps.by_language).map(([lang, v]) => (
+                      <span key={lang}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--kuja-sand))]/30 px-2 py-0.5 text-xs">
+                        <span className="font-medium">{lang}</span>
+                        <span className="text-muted-foreground">NPS {v.nps}</span>
+                        <span className="text-muted-foreground">· n={v.responses}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {data.nps_recent_comments && data.nps_recent_comments.length > 0 && (
+                <div className="mt-3">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Recent comments</div>
+                  <div className="space-y-1.5">
+                    {data.nps_recent_comments.map((c, i) => (
+                      <div key={i} className="text-xs border-l-2 border-[hsl(var(--kuja-clay))] pl-2">
+                        <span className="font-medium">[{c.score}] </span>
+                        <span className="text-muted-foreground">{c.surface} · {c.role ?? 'unknown'} · {c.language ?? '?'}</span>
+                        <div>{c.comment}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+      )}
 
       {/* Language parity */}
       <Card className="p-4 sm:p-5">

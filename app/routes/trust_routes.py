@@ -52,6 +52,21 @@ def api_get_trust_profile(org_id):
     profile = TrustProfileService.build(org_id)
     if profile is None:
         return jsonify({'error': 'Organization not found', 'success': False}), 404
+
+    # Phase 30D — track trust-profile visits. Filters to NGO viewing
+    # own org + donor/reviewer/admin viewing any (matches access scope).
+    try:
+        from app.services.user_event_service import UserEventService
+        is_own = current_user.role == 'ngo' and current_user.org_id == org_id
+        is_external = current_user.role in ('donor', 'reviewer', 'admin')
+        if is_own or is_external:
+            UserEventService.record(
+                user=current_user, event_name='trust_profile.viewed',
+                viewed_org_id=org_id, own_org=is_own,
+            )
+    except Exception:
+        pass
+
     return jsonify({'success': True, 'profile': profile})
 
 

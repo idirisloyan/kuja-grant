@@ -125,6 +125,16 @@ def api_create_report():
     db.session.add(report)
     db.session.commit()
 
+    # Phase 30B — funnel: start of a draft. Pairs with report.submit.
+    try:
+        from app.services.user_event_service import UserEventService
+        UserEventService.record(
+            user=current_user, event_name='report.start_draft',
+            report_id=report.id, grant_id=grant_id,
+        )
+    except Exception:
+        pass
+
     return jsonify({'success': True, 'report': report.to_dict()}), 201
 
 
@@ -236,6 +246,18 @@ def api_precheck_report(report_id):
     # call. Status stays unchanged.
     report.set_ai_analysis(analysis)
     db.session.commit()
+
+    # Phase 30B — funnel event for pre-flight adoption.
+    try:
+        from app.services.user_event_service import UserEventService
+        compliance_score = (analysis or {}).get('compliance_score')
+        UserEventService.record(
+            user=current_user, event_name='report.preflight_used',
+            report_id=report.id, grant_id=report.grant_id,
+            compliance_score=compliance_score,
+        )
+    except Exception:
+        pass
 
     return jsonify({'success': True, 'analysis': analysis, 'report_id': report.id})
 
