@@ -3021,6 +3021,700 @@ test_cases.extend(e2e_cases)
 
 
 # ============================================================================
+# CATEGORY 16: SUSTAINED AI CHAT  (TC-320 to TC-326)   — Phase 24B, 25B, 26A
+# ============================================================================
+
+chat_cases = [
+    {
+        "id": "TC-320", "name": "Open Chat With Kuja From Sidebar", "category": "AI Chat",
+        "priority": "P1 - Critical", "requirement": "FR-CHAT-001",
+        "prereqs": "Logged in as NGO (fatima@amani.org) or donor (sarah@globalhealth.org).",
+        "steps": (
+            "1. From the sidebar, click 'Chat with Kuja'\n"
+            "2. Verify /chat page loads with the AIChatPanel rendered\n"
+            "3. Verify the composer textarea is visible and NOT disabled\n"
+            "4. Verify three example prompts are shown\n"
+            "5. Type 'What should I prioritise today?' into the composer\n"
+            "6. Press Enter to send"
+        ),
+        "data": "Message: 'What should I prioritise today?'",
+        "expected": (
+            "1. Composer becomes enabled within 5 seconds (after thread open)\n"
+            "2. User bubble appears immediately with the typed text\n"
+            "3. Assistant 'thinking…' placeholder shows next\n"
+            "4. Within ~10 seconds, assistant reply replaces the placeholder\n"
+            "5. Reply references the user's actual portfolio (no invented numbers)"
+        ),
+        "criteria": "Pass: Composer is enabled and reply lands. Fail: Composer stays disabled or no response."
+    },
+    {
+        "id": "TC-321", "name": "Chat Remembers Prior Turns", "category": "AI Chat",
+        "priority": "P1 - Critical", "requirement": "FR-CHAT-002",
+        "prereqs": "TC-320 completed successfully. Existing chat thread with at least one exchange.",
+        "steps": (
+            "1. Send a first message: 'Summarise my open risks.'\n"
+            "2. Wait for the reply.\n"
+            "3. Send a follow-up: 'Now rewrite that in a less formal tone.'\n"
+            "4. Wait for the reply."
+        ),
+        "data": "Two-turn conversation.",
+        "expected": (
+            "1. Second reply explicitly references the content of the first reply\n"
+            "2. Tone is noticeably less formal than the first reply\n"
+            "3. No mention of having 'lost context' or 'starting fresh'\n"
+            "4. Reset button is visible at the top of the panel"
+        ),
+        "criteria": "Pass: Second reply builds on the first. Fail: Reply ignores the prior turn."
+    },
+    {
+        "id": "TC-322", "name": "Reset Chat Thread Wipes Messages", "category": "AI Chat",
+        "priority": "P2 - High", "requirement": "FR-CHAT-003",
+        "prereqs": "TC-321 completed. Chat has at least 2 user messages.",
+        "steps": (
+            "1. Click 'Reset' in the chat header.\n"
+            "2. Confirm the prompt: 'Clear this conversation? The thread starts fresh.'\n"
+            "3. Verify the message list clears.\n"
+            "4. Verify the empty-state nudge with 3 example prompts reappears.\n"
+            "5. Send a fresh message and verify no prior context is referenced."
+        ),
+        "data": "Reset action.",
+        "expected": (
+            "1. All bubbles disappear immediately\n"
+            "2. Thread title returns to 'New conversation'\n"
+            "3. Next reply has no memory of pre-reset turns"
+        ),
+        "criteria": "Pass: Clean reset. Fail: Bubbles remain or prior context leaks."
+    },
+    {
+        "id": "TC-323", "name": "Per-Scope Chat On Grant Detail", "category": "AI Chat",
+        "priority": "P1 - Critical", "requirement": "FR-CHAT-004",
+        "prereqs": "Logged in as donor. At least one published grant exists.",
+        "steps": (
+            "1. Open any grant detail page /grants/<id>\n"
+            "2. Scroll to the AIChatPanel at the bottom\n"
+            "3. Verify thread shows 'scope: grant'\n"
+            "4. Send: 'What are the top 3 risks reviewers will flag?'\n"
+            "5. Wait for reply"
+        ),
+        "data": "Real grant id.",
+        "expected": (
+            "1. Reply references actual grant title, criteria, or sectors\n"
+            "2. Reply does NOT mention other grants the donor owns\n"
+            "3. Thread is distinct from /chat global thread (separate history)"
+        ),
+        "criteria": "Pass: Reply uses scope context. Fail: Generic answer or cross-scope leak."
+    },
+    {
+        "id": "TC-324", "name": "Per-Scope Chat On Application Detail", "category": "AI Chat",
+        "priority": "P1 - Critical", "requirement": "FR-CHAT-004",
+        "prereqs": "Logged in as NGO. At least one application exists.",
+        "steps": (
+            "1. Open /applications/<id>\n"
+            "2. Scroll to the AIChatPanel\n"
+            "3. Send: 'Where is this application weakest vs the criteria?'\n"
+            "4. Wait for reply"
+        ),
+        "data": "Real application id.",
+        "expected": (
+            "1. Reply references this application's actual criteria responses\n"
+            "2. Reply does NOT invent scores or amounts not in the app data"
+        ),
+        "criteria": "Pass: Scope-aware reply. Fail: Hallucinated content."
+    },
+    {
+        "id": "TC-325", "name": "Per-Scope Chat On Report Detail", "category": "AI Chat",
+        "priority": "P2 - High", "requirement": "FR-CHAT-004",
+        "prereqs": "Logged in as NGO. At least one report exists.",
+        "steps": (
+            "1. Open /reports/<id>\n"
+            "2. Verify the page renders title, status, dates, attachments count\n"
+            "3. Scroll to the scoped AIChatPanel\n"
+            "4. Send: 'What evidence is missing from this report?'"
+        ),
+        "data": "Real report id.",
+        "expected": (
+            "1. Page renders cleanly (no 'Could not load report')\n"
+            "2. Chat reply references actual report content/requirements"
+        ),
+        "criteria": "Pass: Page + chat both load. Fail: 'Could not load' or generic reply."
+    },
+    {
+        "id": "TC-326", "name": "Chat Thread Isolation Across Users", "category": "AI Chat",
+        "priority": "P1 - Critical", "requirement": "FR-CHAT-005",
+        "prereqs": "Two test users available: fatima and sarah.",
+        "steps": (
+            "1. Log in as fatima@amani.org\n"
+            "2. Visit /chat, send: 'My secret project is X'\n"
+            "3. Log out\n"
+            "4. Log in as sarah@globalhealth.org\n"
+            "5. Visit /chat\n"
+            "6. Verify no trace of fatima's message"
+        ),
+        "data": "Two test sessions.",
+        "expected": (
+            "1. sarah's /chat shows empty-state or her own prior history only\n"
+            "2. No bleed of fatima's content into sarah's view"
+        ),
+        "criteria": "Pass: Strict per-user isolation. Fail: Any cross-user leak."
+    },
+]
+test_cases.extend(chat_cases)
+
+
+# ============================================================================
+# CATEGORY 17: REVIEWER AUTO-ASSIGNMENT  (TC-330 to TC-334)  — Phase 24A, 25A, 26B
+# ============================================================================
+
+reviewer_auto_cases = [
+    {
+        "id": "TC-330", "name": "Auto-Assign Fires On Application Submit", "category": "Reviewer Assignment",
+        "priority": "P1 - Critical", "requirement": "FR-REV-AUTO-001",
+        "prereqs": "Logged in as NGO with a draft application ready to submit.",
+        "steps": (
+            "1. Open the draft application detail page\n"
+            "2. Click 'Submit Application'\n"
+            "3. After submit succeeds, navigate to the same application as donor\n"
+            "4. Inspect the reviewer panel section"
+        ),
+        "data": "Draft application.",
+        "expected": (
+            "1. Panel shows ~3 reviewer rows immediately\n"
+            "2. Each row shows reviewer name + match score + 1-2 reasons\n"
+            "3. No 'Assign reviewers' empty state"
+        ),
+        "criteria": "Pass: Panel auto-populated. Fail: Empty panel or zero reviewers."
+    },
+    {
+        "id": "TC-331", "name": "Manual Auto-Assign Is Idempotent", "category": "Reviewer Assignment",
+        "priority": "P2 - High", "requirement": "FR-REV-AUTO-002",
+        "prereqs": "Application already has 3 auto-assigned reviewers (from TC-330).",
+        "steps": (
+            "1. Open application detail as donor\n"
+            "2. Click the 'Auto-assign reviewers' manual button\n"
+            "3. Click it again\n"
+            "4. Re-inspect the panel"
+        ),
+        "data": "Already-assigned application.",
+        "expected": (
+            "1. No duplicate reviewer rows created\n"
+            "2. Original 3 assignments unchanged\n"
+            "3. Response includes count of existing assignments skipped"
+        ),
+        "criteria": "Pass: No dupes. Fail: Duplicate reviewers appear."
+    },
+    {
+        "id": "TC-332", "name": "Auto-Assign Sweep Cron Backfills Unassigned Apps", "category": "Reviewer Assignment",
+        "priority": "P2 - High", "requirement": "FR-REV-AUTO-003",
+        "prereqs": "Admin login. Optional: at least one application with zero reviewers.",
+        "steps": (
+            "1. Log in as admin@kuja.org\n"
+            "2. POST /api/cron/reviewer-auto-assign-sweep (via curl or admin tool)\n"
+            "3. Parse response JSON"
+        ),
+        "data": "Cron POST {}",
+        "expected": (
+            "1. Response success=true\n"
+            "2. result.scanned, result.apps_assigned, result.reviewers_assigned all present\n"
+            "3. If sweep ran today, apps_assigned >= 0"
+        ),
+        "criteria": "Pass: Drift report shape returned. Fail: 500 or missing fields."
+    },
+    {
+        "id": "TC-333", "name": "Reviewer Briefing Card Visible On Assignment", "category": "Reviewer Assignment",
+        "priority": "P2 - High", "requirement": "FR-REV-BRIEF-001",
+        "prereqs": "Logged in as reviewer (james@reviewer.org) with at least one assigned review.",
+        "steps": (
+            "1. Open any assigned application detail page\n"
+            "2. Locate the reviewer briefing card"
+        ),
+        "data": "Assigned review.",
+        "expected": (
+            "1. One-paragraph AI brief is rendered\n"
+            "2. Brief lists applicant context, key strengths, red flags to probe\n"
+            "3. No 'Briefing unavailable' message"
+        ),
+        "criteria": "Pass: Briefing renders. Fail: Card missing or error string."
+    },
+    {
+        "id": "TC-334", "name": "Side-By-Side Reviewer Score Comparison", "category": "Reviewer Assignment",
+        "priority": "P2 - High", "requirement": "FR-REV-SBS-001",
+        "prereqs": "Application has 2+ completed reviews from different reviewers.",
+        "steps": (
+            "1. Open application detail as donor\n"
+            "2. Locate the score-breakdown section\n"
+            "3. Switch to the side-by-side view"
+        ),
+        "data": "Multi-reviewer application.",
+        "expected": (
+            "1. Each reviewer's per-criterion scores appear in adjacent columns\n"
+            "2. Divergence on any criterion is visually highlighted\n"
+            "3. If divergence >20pts, panel calibration card surfaces with action"
+        ),
+        "criteria": "Pass: All reviewers visible side-by-side. Fail: Only one or aggregated only."
+    },
+]
+test_cases.extend(reviewer_auto_cases)
+
+
+# ============================================================================
+# CATEGORY 18: DONOR COHORT + RISK HEATMAP + COMMAND CENTER  (TC-340 to TC-345)
+# ============================================================================
+
+donor_intel_cases = [
+    {
+        "id": "TC-340", "name": "Donor Dashboard Cohort Analytics Card", "category": "Donor Intelligence",
+        "priority": "P2 - High", "requirement": "FR-COHORT-001",
+        "prereqs": "Logged in as donor (sarah@globalhealth.org).",
+        "steps": (
+            "1. Navigate to /dashboard\n"
+            "2. Scroll to the 'Portfolio quality vs cohort' card\n"
+            "3. Inspect metric rows + verdict pills"
+        ),
+        "data": "Donor session.",
+        "expected": (
+            "1. Card renders without 'unavailable' message\n"
+            "2. Shows either metric rows OR a 'sparse honesty' fallback message\n"
+            "3. With <3 other donors: shows 'Only N other donors on the platform'\n"
+            "4. With ≥3: shows your value, cohort median, percentile, verdict pill per metric"
+        ),
+        "criteria": "Pass: Card honest about sample. Fail: Fake numbers or 'unavailable'."
+    },
+    {
+        "id": "TC-341", "name": "Admin Can Inspect Any Donor's Cohort", "category": "Donor Intelligence",
+        "priority": "P2 - High", "requirement": "FR-COHORT-002",
+        "prereqs": "Logged in as admin.",
+        "steps": (
+            "1. Navigate to /donors/14 (Sarah's donor org)\n"
+            "2. Scroll to the bottom of the page\n"
+            "3. Verify cohort card appears (admin-only path)"
+        ),
+        "data": "Admin viewing donor profile.",
+        "expected": (
+            "1. Cohort card visible at end of /donors/[id]\n"
+            "2. Same content as donor sees on their own dashboard\n"
+            "3. Other donor profiles also expose this card to admin"
+        ),
+        "criteria": "Pass: Admin sees cohort card. Fail: Card hidden for admin."
+    },
+    {
+        "id": "TC-342", "name": "Donor Cohort NGOs Stay Anonymous", "category": "Donor Intelligence",
+        "priority": "P1 - Critical", "requirement": "FR-COHORT-PRIV-001",
+        "prereqs": "Donor on /dashboard cohort card.",
+        "steps": (
+            "1. Inspect cohort card content carefully\n"
+            "2. Check for any NGO name appearing in metric breakdowns"
+        ),
+        "data": "Page content scan.",
+        "expected": (
+            "1. NO NGO names appear\n"
+            "2. NO specific dollar amounts of other donors\n"
+            "3. Only counts + medians + percentiles + verdicts"
+        ),
+        "criteria": "Pass: Anonymous medians only. Fail: ANY identifying leak."
+    },
+    {
+        "id": "TC-343", "name": "Portfolio Risk Heatmap Renders Grid", "category": "Donor Intelligence",
+        "priority": "P2 - High", "requirement": "FR-RISK-001",
+        "prereqs": "Logged in as donor.",
+        "steps": (
+            "1. Navigate to /dashboard\n"
+            "2. Locate the 'Portfolio risk' heatmap section\n"
+            "3. Inspect sector × country grid cells"
+        ),
+        "data": "Donor dashboard.",
+        "expected": (
+            "1. Grid renders with up to 10×10 cells\n"
+            "2. Each cell shows grants/risks/overdue-reports counts\n"
+            "3. Cell color reflects aggregate risk score\n"
+            "4. Empty cells render as muted"
+        ),
+        "criteria": "Pass: Grid + colors render. Fail: Empty or error."
+    },
+    {
+        "id": "TC-344", "name": "Donor Verdict Card Action Buttons Route Correctly", "category": "Donor Intelligence",
+        "priority": "P2 - High", "requirement": "FR-VERDICT-001",
+        "prereqs": "Logged in as donor.",
+        "steps": (
+            "1. Navigate to /dashboard\n"
+            "2. Locate top hero 'Today's portfolio decisions' card\n"
+            "3. Verify card shows AI synthesis text + 1-3 action buttons\n"
+            "4. Click an action button"
+        ),
+        "data": "Donor dashboard.",
+        "expected": (
+            "1. Hero loads within ~8s (AI synthesis is async)\n"
+            "2. No 'Briefing unavailable' message\n"
+            "3. Clicking an action navigates to the appropriate page (review/grant/etc.)"
+        ),
+        "criteria": "Pass: Verdict + working actions. Fail: 'Unavailable' or broken nav."
+    },
+    {
+        "id": "TC-345", "name": "Donor Broadcast To All Applicants", "category": "Donor Intelligence",
+        "priority": "P2 - High", "requirement": "FR-BROADCAST-001",
+        "prereqs": "Donor with at least one grant + 1+ applications.",
+        "steps": (
+            "1. Open a grant detail page\n"
+            "2. Click 'Broadcast' button in header\n"
+            "3. Fill subject + body\n"
+            "4. Select audience ('All applicants')\n"
+            "5. Send"
+        ),
+        "data": "Subject + body + audience.",
+        "expected": (
+            "1. Response success=true with recipient count\n"
+            "2. Donor.broadcast_sent UserEvent recorded\n"
+            "3. Applicants receive in-app notification + email per their prefs"
+        ),
+        "criteria": "Pass: Broadcast delivered. Fail: 500 or no notifications."
+    },
+]
+test_cases.extend(donor_intel_cases)
+
+
+# ============================================================================
+# CATEGORY 19: PWA INSTALL + NATIVE SHARE + WEBAUTHN  (TC-350 to TC-356)
+# ============================================================================
+
+pwa_security_cases = [
+    {
+        "id": "TC-350", "name": "PWA Install Banner Appears On Chrome", "category": "PWA + Security",
+        "priority": "P3 - Medium", "requirement": "FR-PWA-001",
+        "prereqs": "Chrome desktop or Android, first-time visit (or after clearing localStorage).",
+        "steps": (
+            "1. Visit the app in Chrome\n"
+            "2. Wait up to 10 seconds\n"
+            "3. Observe bottom-right corner"
+        ),
+        "data": "Fresh browser session.",
+        "expected": (
+            "1. Install banner appears: 'Install Kuja for faster access'\n"
+            "2. Two buttons: 'Install' + 'Not now'\n"
+            "3. 'X' dismiss control in corner"
+        ),
+        "criteria": "Pass: Banner shows. Fail: Banner missing or appears in unsupported browsers."
+    },
+    {
+        "id": "TC-351", "name": "Install Banner Dismissal Persists", "category": "PWA + Security",
+        "priority": "P3 - Medium", "requirement": "FR-PWA-002",
+        "prereqs": "TC-350 completed and banner is showing.",
+        "steps": (
+            "1. Click 'Not now' (or the X)\n"
+            "2. Reload the page\n"
+            "3. Wait 10 seconds"
+        ),
+        "data": "localStorage flag.",
+        "expected": (
+            "1. Banner does NOT reappear after dismissal\n"
+            "2. localStorage shows 'kuja_pwa_install_dismissed_v1' set\n"
+            "3. Other sessions on the same browser also respect dismissal"
+        ),
+        "criteria": "Pass: Dismissal sticky. Fail: Banner reappears."
+    },
+    {
+        "id": "TC-352", "name": "Native Share Button On Donor Profile", "category": "PWA + Security",
+        "priority": "P3 - Medium", "requirement": "FR-SHARE-001",
+        "prereqs": "Logged in user. Navigate to /donors/<id>.",
+        "steps": (
+            "1. Click 'Share profile' button in the hero\n"
+            "2. On mobile: verify system share sheet opens\n"
+            "3. On desktop: verify clipboard receives the URL + toast appears"
+        ),
+        "data": "Profile URL.",
+        "expected": (
+            "1. Mobile: system share sheet appears with the donor URL + title\n"
+            "2. Desktop: 'Copied' toast appears, clipboard has the URL\n"
+            "3. Button label switches to 'Copied' for ~1.5s"
+        ),
+        "criteria": "Pass: Share works on both. Fail: Button missing or no action."
+    },
+    {
+        "id": "TC-353", "name": "Native Share Button On NGO Profile", "category": "PWA + Security",
+        "priority": "P3 - Medium", "requirement": "FR-SHARE-001",
+        "prereqs": "Logged in user. Navigate to /ngo/<id>.",
+        "steps": (
+            "1. Click 'Share profile' button in the hero\n"
+            "2. Verify share behavior matches TC-352"
+        ),
+        "data": "NGO URL.",
+        "expected": "Same as TC-352 but with NGO context.",
+        "criteria": "Pass: Share works. Fail: Missing or broken."
+    },
+    {
+        "id": "TC-354", "name": "WebAuthn Device Enrolment", "category": "PWA + Security",
+        "priority": "P2 - High", "requirement": "FR-AUTH-WEBAUTHN-001",
+        "prereqs": "Logged in user. HTTPS production URL. Browser supports WebAuthn.",
+        "steps": (
+            "1. Navigate to /settings/security\n"
+            "2. Click 'Enrol this device'\n"
+            "3. Approve the browser's biometric/security-key prompt\n"
+            "4. Verify the device appears in the trusted-devices list"
+        ),
+        "data": "Touch ID / Face ID / Windows Hello / security key.",
+        "expected": (
+            "1. Browser shows native biometric prompt\n"
+            "2. After approval, device appears with label + 'Added today'\n"
+            "3. Server stores credential (verify via /api/auth/webauthn/credentials)"
+        ),
+        "criteria": "Pass: Device enrolled. Fail: Prompt blocked or device not listed."
+    },
+    {
+        "id": "TC-355", "name": "WebAuthn Credential List Returns Shape", "category": "PWA + Security",
+        "priority": "P2 - High", "requirement": "FR-AUTH-WEBAUTHN-002",
+        "prereqs": "Logged in user (any role).",
+        "steps": (
+            "1. GET /api/auth/webauthn/credentials\n"
+            "2. Parse JSON response"
+        ),
+        "data": "Authenticated GET.",
+        "expected": (
+            "1. Response success=true\n"
+            "2. 'credentials' array present (may be empty for new user)\n"
+            "3. Each row has: id, label, created_at, last_used_at"
+        ),
+        "criteria": "Pass: Shape correct. Fail: 500 or missing fields."
+    },
+    {
+        "id": "TC-356", "name": "WebAuthn Unsupported-Browser Fallback", "category": "PWA + Security",
+        "priority": "P3 - Medium", "requirement": "FR-AUTH-WEBAUTHN-003",
+        "prereqs": "Visit /settings/security in a browser that lacks WebAuthn support.",
+        "steps": (
+            "1. Navigate to /settings/security\n"
+            "2. Observe the WebAuthn panel"
+        ),
+        "data": "Old Chrome/Firefox or no WebAuthn API.",
+        "expected": (
+            "1. Panel renders a yellow warning card\n"
+            "2. Message: 'Your browser doesn't support WebAuthn'\n"
+            "3. 'Enrol' button is NOT rendered\n"
+            "4. No crash or blank screen"
+        ),
+        "criteria": "Pass: Graceful fallback. Fail: Broken button or crash."
+    },
+]
+test_cases.extend(pwa_security_cases)
+
+
+# ============================================================================
+# CATEGORY 20: REAL-USER METRICS + NPS MICRO-SURVEY  (TC-360 to TC-366)
+# ============================================================================
+
+metrics_cases = [
+    {
+        "id": "TC-360", "name": "Admin Metrics Dashboard Loads", "category": "Metrics + Feedback",
+        "priority": "P1 - Critical", "requirement": "FR-METRICS-001",
+        "prereqs": "Logged in as admin.",
+        "steps": (
+            "1. Navigate to /admin/metrics\n"
+            "2. Wait for the page to settle"
+        ),
+        "data": "Admin session.",
+        "expected": (
+            "1. Page renders with stat tiles: DAU, WAU, MAU\n"
+            "2. WAU breakdowns by role + language render as chips\n"
+            "3. Six funnels visible: chat, application, report, review,\n"
+            "   readiness→submit, preflight→submit\n"
+            "4. Language parity card with chat + search adoption\n"
+            "5. Event volume table\n"
+            "6. NPS feedback card (sparse-honest if no responses)"
+        ),
+        "criteria": "Pass: Full page renders. Fail: 'Could not load metrics' or missing sections."
+    },
+    {
+        "id": "TC-361", "name": "Login Records session.start Event", "category": "Metrics + Feedback",
+        "priority": "P1 - Critical", "requirement": "FR-METRICS-002",
+        "prereqs": "Admin login + access to /admin/metrics.",
+        "steps": (
+            "1. Note WAU total before login\n"
+            "2. Log out\n"
+            "3. Log in as a different user\n"
+            "4. Refresh /admin/metrics\n"
+            "5. Verify WAU total increased OR session.start count incremented"
+        ),
+        "data": "Two sequential logins.",
+        "expected": (
+            "1. WAU total reflects the new session\n"
+            "2. event_counts_30d shows session.start with count > 0\n"
+            "3. by_role and by_language breakdowns also updated"
+        ),
+        "criteria": "Pass: Event recorded. Fail: Counts unchanged after login."
+    },
+    {
+        "id": "TC-362", "name": "Non-Admin Cannot Access Metrics", "category": "Metrics + Feedback",
+        "priority": "P1 - Critical", "requirement": "FR-METRICS-AUTH-001",
+        "prereqs": "Logged in as NGO or donor.",
+        "steps": (
+            "1. GET /api/admin/metrics\n"
+            "2. OR navigate to /admin/metrics in browser"
+        ),
+        "data": "Non-admin role.",
+        "expected": (
+            "1. API returns 403 with 'Admin access required'\n"
+            "2. Page shows 'Admin access required' warning card"
+        ),
+        "criteria": "Pass: Properly gated. Fail: Metrics exposed to non-admin."
+    },
+    {
+        "id": "TC-363", "name": "Micro-Survey Appears After Application Submit", "category": "Metrics + Feedback",
+        "priority": "P2 - High", "requirement": "FR-FEEDBACK-001",
+        "prereqs": "Logged in as NGO. Application submitted (not draft). First time on this app detail.",
+        "steps": (
+            "1. Submit an application\n"
+            "2. Navigate to the application detail page\n"
+            "3. Wait ~1 second after page load"
+        ),
+        "data": "Submitted application, own NGO.",
+        "expected": (
+            "1. Micro-survey card appears bottom-right\n"
+            "2. Question: 'How helpful was Kuja in preparing this application?'\n"
+            "3. 0-10 score row + optional comment\n"
+            "4. 'Not now' and 'X' both dismiss"
+        ),
+        "criteria": "Pass: Survey shows once. Fail: Doesn't appear or re-appears."
+    },
+    {
+        "id": "TC-364", "name": "Submitting Feedback Persists + Affects NPS", "category": "Metrics + Feedback",
+        "priority": "P2 - High", "requirement": "FR-FEEDBACK-002",
+        "prereqs": "TC-363 micro-survey visible.",
+        "steps": (
+            "1. Click score 9\n"
+            "2. Optional: type a short comment\n"
+            "3. Click Send\n"
+            "4. Wait for 'Thanks — feedback saved' confirmation\n"
+            "5. Log in as admin and refresh /admin/metrics"
+        ),
+        "data": "Score 9 with or without comment.",
+        "expected": (
+            "1. Survey shows 'Thanks' confirmation then dismisses\n"
+            "2. NPS card on /admin/metrics shows total_responses incremented\n"
+            "3. By-surface table shows application_submit row\n"
+            "4. Comment (if any) appears in recent-comments stream"
+        ),
+        "criteria": "Pass: NPS updates. Fail: Submit fails or NPS unchanged."
+    },
+    {
+        "id": "TC-365", "name": "Survey Won't Re-Prompt Same Surface", "category": "Metrics + Feedback",
+        "priority": "P3 - Medium", "requirement": "FR-FEEDBACK-003",
+        "prereqs": "TC-364 completed (response saved).",
+        "steps": (
+            "1. Reload the application detail page\n"
+            "2. Wait ~3 seconds"
+        ),
+        "data": "Same application as TC-363.",
+        "expected": (
+            "1. Survey does NOT reappear (localStorage flag set)\n"
+            "2. The chat panel, score breakdown, etc. all still render normally"
+        ),
+        "criteria": "Pass: One-and-done. Fail: Survey re-appears."
+    },
+    {
+        "id": "TC-366", "name": "Generic Event Ingest Whitelist", "category": "Metrics + Feedback",
+        "priority": "P3 - Medium", "requirement": "FR-METRICS-INGEST-001",
+        "prereqs": "Any logged-in user.",
+        "steps": (
+            "1. POST /api/ai/events/track {event_name: 'feature.tap', props: {feature: 'test'}}\n"
+            "2. POST same endpoint with {event_name: 'fake.unknown'}"
+        ),
+        "data": "Whitelisted + non-whitelisted event names.",
+        "expected": (
+            "1. First call: 200 with success=true\n"
+            "2. Second call: 400 with 'event_name not allowed' + allowed list"
+        ),
+        "criteria": "Pass: Whitelist enforced. Fail: Arbitrary names accepted."
+    },
+]
+test_cases.extend(metrics_cases)
+
+
+# ============================================================================
+# CATEGORY 21: API ALIASES + WIRING FIXES  (TC-370 to TC-374) — Phase 27, 28
+# ============================================================================
+
+wiring_cases = [
+    {
+        "id": "TC-370", "name": "/api/api/ Double-Prefix Returns 404", "category": "API Wiring",
+        "priority": "P1 - Critical", "requirement": "FR-WIRING-001",
+        "prereqs": "Logged in as admin.",
+        "steps": (
+            "1. GET /api/api/reports/1\n"
+            "2. GET /api/api/trust-profile/9\n"
+            "3. GET /api/api/audit-chain/recent\n"
+            "4. GET /api/api/organizations/14/donor-profile"
+        ),
+        "data": "All URLs with intentional /api/api/ prefix.",
+        "expected": (
+            "1. All four return 404 (these paths never existed)\n"
+            "2. No 200 responses — proves the team's 2026-05-16 bug pattern\n"
+            "   would still 404 if it ever recurred via copy-paste"
+        ),
+        "criteria": "Pass: 404 on all four. Fail: Any 200 means double-prefix accepted."
+    },
+    {
+        "id": "TC-371", "name": "Correct Path Equivalents Return 200", "category": "API Wiring",
+        "priority": "P1 - Critical", "requirement": "FR-WIRING-002",
+        "prereqs": "Admin login.",
+        "steps": (
+            "1. GET /api/trust-profile/9\n"
+            "2. GET /api/audit-chain/recent?limit=10\n"
+            "3. GET /api/organizations/14/donor-profile"
+        ),
+        "data": "Properly-pathed URLs.",
+        "expected": "All three return 200 with shaped JSON.",
+        "criteria": "Pass: All 200. Fail: Any 404 or 5xx."
+    },
+    {
+        "id": "TC-372", "name": "/api/search Alias Returns Global Results", "category": "API Wiring",
+        "priority": "P2 - High", "requirement": "FR-SEARCH-ALIAS-001",
+        "prereqs": "Logged in user.",
+        "steps": (
+            "1. GET /api/search?q=kenya\n"
+            "2. Parse response"
+        ),
+        "data": "Query: kenya",
+        "expected": (
+            "1. Response 200\n"
+            "2. 'results' array present with matching grants/apps/reports\n"
+            "3. Each hit has kind, id, snippet, href"
+        ),
+        "criteria": "Pass: Alias works. Fail: 404 (regression to pre-Phase-28A)."
+    },
+    {
+        "id": "TC-373", "name": "/api/notifications/preferences Alias", "category": "API Wiring",
+        "priority": "P2 - High", "requirement": "FR-NOTIF-ALIAS-001",
+        "prereqs": "Logged in user.",
+        "steps": (
+            "1. GET /api/notifications/preferences\n"
+            "2. Parse response"
+        ),
+        "data": "Alias path.",
+        "expected": (
+            "1. Response 200, success=true\n"
+            "2. 'categories' array + 'catalog' object present\n"
+            "3. /api/notification-preferences (original) also still works"
+        ),
+        "criteria": "Pass: Alias parity. Fail: 404 alias or original broken."
+    },
+    {
+        "id": "TC-374", "name": "Bulk Lockout Clear Resets All Accounts", "category": "API Wiring",
+        "priority": "P2 - High", "requirement": "FR-LOCKOUT-CLEAR-001",
+        "prereqs": "Logged in as admin. At least one account with failed_login_count > 0 (optional).",
+        "steps": (
+            "1. POST /api/admin/clear-all-lockouts {}\n"
+            "2. Parse response\n"
+            "3. Verify NGO can no longer return 403 from login due to lockout"
+        ),
+        "data": "Admin POST.",
+        "expected": (
+            "1. success=true\n"
+            "2. users_reset + attempts_deleted counts returned\n"
+            "3. NGO cannot trigger this endpoint (403)"
+        ),
+        "criteria": "Pass: Bulk reset works + role-gated. Fail: 500 or open to NGO."
+    },
+]
+test_cases.extend(wiring_cases)
+
+
+# ============================================================================
 # ── BUILD THE WORD DOCUMENT ──────────────────────────────────────────────────
 # ============================================================================
 
@@ -3055,7 +3749,7 @@ def build_document():
 
     subtitle = doc.add_paragraph()
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = subtitle.add_run("Version 3.0 - Test Cases Document")
+    run = subtitle.add_run("Version 5.0 - Test Cases Document (Phase 24-31 coverage)")
     run.bold = True
     run.font.size = Pt(18)
     run.font.color.rgb = RGBColor(63, 81, 181)
@@ -3347,7 +4041,7 @@ def build_document():
     set_cell_text(row.cells[4], str(total_p3), bold=True, size=10, alignment=WD_ALIGN_PARAGRAPH.CENTER)
 
     # ── SAVE ──
-    output_path = r"C:\Users\IdirisLoyan\kuja-grant\docs\Kuja_Grant_v3.0_Test_Cases.docx"
+    output_path = r"C:\Users\IdirisLoyan\kuja-grant\docs\Kuja_Grant_v5.0_Test_Cases.docx"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     doc.save(output_path)
     print(f"Document saved to: {output_path}")

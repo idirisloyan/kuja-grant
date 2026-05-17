@@ -1156,6 +1156,53 @@ def build_document():
         "\u2014 it is a solution built by the communities it serves."
     )
 
+    add_numbered_item(doc, 11, "SUSTAINED AI CONVERSATION INSTEAD OF ONE-SHOT PROMPTS",
+        "Every AI surface in Kuja used to be one-shot \u2014 ask, answer, forget. Phase 24 added a "
+        "sustained chat with three operating modes: a global thread at /chat, plus per-entity "
+        "threads embedded on every grant, application, and report detail page so context is "
+        "automatic. Users can ask follow-ups, refine in place, compare across turns, and reset "
+        "when they want to start fresh. Per-user thread isolation, last-12-message history cap, "
+        "and an anti-hallucination discipline footer prevent the assistant from inventing "
+        "numbers or making up answers about data outside its scope. No other grant platform "
+        "exposes an actual conversational interface, let alone scopes it deterministically to "
+        "the entity being viewed."
+    )
+
+    add_numbered_item(doc, 12, "AUTOMATIC REVIEWER ASSIGNMENT THAT JUST WORKS",
+        "Manual reviewer assignment was the single most common cause of applications sitting in "
+        "queue for days at most donors. Kuja\u2019s reviewer match service ranks candidates by "
+        "sector fit, country fit, throughput health, and current workload \u2014 and Phase 25 wired "
+        "this directly into the application submit handler. NGOs submit, panels populate "
+        "automatically with reasoning, reviewers are notified, and a nightly safety-net cron at "
+        "02:45 UTC sweeps any application that slipped through. Donors retain a one-tap manual "
+        "override; idempotency prevents duplicates. The donor never has to think about it."
+    )
+
+    add_numbered_item(doc, 13, "PORTFOLIO COHORT ANALYTICS \u2014 BENCHMARKING DONORS HONESTLY",
+        "Donors making portfolio-level decisions can now see how the NGOs THEY fund compare "
+        "against the NGOs OTHER donors fund: grantee capacity score, AI score at award, "
+        "country and sector diversity, share of funding to small/emerging organisations, and "
+        "grantee report on-time rate. Each metric shows the donor\u2019s value, cohort median, "
+        "percentile rank, and a verdict pill (above/on par/below). When the cohort is too small "
+        "to fairly compare (fewer than three other donors, or below per-metric sample minimums) "
+        "the card surfaces an explicit sparseness message rather than fake numbers. No competitor "
+        "exposes anonymised cross-donor portfolio benchmarks with this discipline."
+    )
+
+    add_numbered_item(doc, 14, "REAL-USER METRICS BUILT IN, NOT BOLTED ON",
+        "Phase 29-31 added a behavioural metrics layer that records every meaningful user "
+        "action to a dedicated UserEvent table, lightweight enough that recording is "
+        "non-blocking and best-effort. The admin metrics dashboard at /admin/metrics surfaces "
+        "DAU/WAU/MAU with role and language breakdowns, six funnel views (chat, application, "
+        "report, review, readiness\u2192submit, pre-flight\u2192submit), per-language adoption of "
+        "flagship features (the parity signal that should drive deep i18n investment), and a "
+        "deterministic A/B bucketing helper so any feature can be tested against a control arm. "
+        "A 1-question NPS micro-survey fires at moments-of-completion (application + report "
+        "submit) to capture perceived value alongside behavioural data. This means product "
+        "decisions \u2014 including the next round of deep i18n investment \u2014 can be data-driven "
+        "rather than guessed."
+    )
+
     add_page_break(doc)
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -1266,6 +1313,13 @@ def build_document():
             ["Q2 2026", "Async AI dispatcher + per-user concurrent cap + AI surface health probe", "Shipped"],
             ["Q2 2026", "Admin self-service: system health, AI spend forecast, demo readiness", "Shipped"],
             ["Q2 2026", "Hash-chained audit log + TOTP 2FA + hard-gate + GDPR right-to-erasure", "Shipped"],
+            ["Q2 2026", "Sustained AI chat threads (global + per grant/application/report scope)", "Shipped"],
+            ["Q2 2026", "Reviewer auto-assignment on submit + nightly backfill cron", "Shipped"],
+            ["Q2 2026", "Donor cohort analytics (your funded NGOs vs the cohort)", "Shipped"],
+            ["Q2 2026", "PWA install banner + native share API + biometric (WebAuthn) re-auth", "Shipped"],
+            ["Q2 2026", "Report detail page with scoped chat", "Shipped"],
+            ["Q2 2026", "Real-user metrics infrastructure (UserEvent + 6 funnels + A/B bucketing + admin dashboard)", "Shipped"],
+            ["Q2 2026", "NPS micro-survey at moments-of-completion with per-language rollup", "Shipped"],
             ["Q3 2026", "KujaLink marketplace enhancements (matching v2, richer profiles)", "Planned"],
             ["Q3 2026", "Odoo 17 ERP integration (KujaBuild) \u2014 Basic Suite", "Planned"],
             ["Q3 2026", "Application portal launch for donors", "Planned"],

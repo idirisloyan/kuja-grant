@@ -1815,6 +1815,182 @@ add_numbered_list(doc, [
 doc.add_page_break()
 
 
+# --- 6.16 Sustained AI conversation ---------------------------------------
+heading(doc, "6.16 Sustained AI Conversation (Kuja Chat)", 2)
+
+add_callout(doc, "USE CASE",
+    "An NGO programme officer in Kampala is preparing a grant application. "
+    "She opens the chat panel embedded at the bottom of the grant detail "
+    "page and asks 'what are the top three risks reviewers will flag?'. "
+    "Kuja responds, referencing the grant's actual criteria. She follows "
+    "up with 'now rewrite that less formally' and the assistant remembers "
+    "the previous answer and adjusts in place. Twelve minutes later she "
+    "returns from a meeting; the chat is exactly where she left it."
+)
+
+add_body(doc,
+    "Until Phase 24, every AI surface was one-shot: ask, answer, forget. "
+    "The platform shall now expose a sustained AI conversation that "
+    "remembers prior turns within a thread, allowing users to ask "
+    "follow-ups, refine in place, and compare across answers. Threads "
+    "are scoped: a global chat at /chat, plus per-entity chats embedded "
+    "in grant, application, and report detail pages so that scope context "
+    "is automatic."
+)
+
+add_numbered_list(doc, [
+    "expose a dedicated chat page accessible from a top-level 'Chat with Kuja' navigation item for both NGO and donor roles.",
+    "embed a per-entity chat panel at the bottom of grant, application, and report detail pages, scoped to the entity being viewed so the assistant has its title, criteria, status, and other relevant context automatically available.",
+    "persist chat threads per user and per scope so that returning to the same entity or to /chat resumes the same conversation history rather than starting over.",
+    "send the last twelve messages of history to the language model on each turn so the assistant can follow up coherently while keeping cost bounded per interaction.",
+    "enforce per-user thread isolation: no user shall be able to read another user's chat history under any circumstance.",
+    "provide a reset action that wipes all messages in a thread (keeping the thread row so any UI references survive) and surfaces a confirmation prompt before destruction.",
+    "include a discipline footer in every system prompt instructing the assistant never to invent grant amounts, status values, or scores it cannot see in the scope context, and to say 'I don't have that loaded in this thread — try the corresponding page' when asked about data outside scope.",
+    "rate-limit chat message sends per user so a single user cannot saturate the AI worker pool, returning a 429 with a friendly retry-after when the limit is hit.",
+    "remain a strictly opt-in interaction: no chat thread shall ever auto-fire AI calls without an explicit user message.",
+])
+
+add_diagram(doc, "ai_grounding")
+
+doc.add_page_break()
+
+
+# --- 6.17 Reviewer auto-assignment ----------------------------------------
+heading(doc, "6.17 Reviewer Auto-Assignment", 2)
+
+add_callout(doc, "USE CASE",
+    "An NGO submits an application late on a Friday. By Monday morning, "
+    "the donor opens the application and sees three reviewers already "
+    "assigned with match scores and reasoning ('sector fit', 'country "
+    "fit', 'capacity available'). No manual donor action was needed; "
+    "the reviewers were notified Friday night and one has already "
+    "started work."
+)
+
+add_body(doc,
+    "Manual reviewer assignment was the single most common cause of "
+    "applications sitting in queue for days. The platform shall pre-"
+    "populate review panels automatically on submission using the same "
+    "ranking service that powers the manual 'Suggest reviewers' UI, with "
+    "a nightly safety net to catch any application that slipped through."
+)
+
+add_numbered_list(doc, [
+    "rank candidate reviewers per application using sector fit, country fit, throughput health, and current workload, exposing the ranking through a service that is shared between the manual UI and the automatic assignment paths.",
+    "fire reviewer auto-assignment automatically when an application transitions to the 'submitted' status, picking the top three reviewers from the ranking and creating Review rows in the 'assigned' state.",
+    "treat the auto-assignment as idempotent: running it again on an application that already has reviewers shall NOT create duplicates; it shall only top up the panel if a reviewer was removed.",
+    "prefer reviewers flagged as 'healthy throughput' over those flagged as 'busy queue'; when the healthy pool cannot satisfy the panel size, fall back to busy reviewers rather than leaving the panel empty.",
+    "run a nightly cron at 02:45 UTC that sweeps every application in {submitted, under_review} status with zero reviewers and triggers the same auto-assignment service, capped at 50 applications per run.",
+    "audit-chain each auto-assignment event with action='reviewer.auto_assigned', subject_kind='application', and a details object capturing the requested panel size, reviewers actually assigned, and any that were skipped as already-assigned.",
+    "never override a manual donor reviewer pick: if the donor manually assigned a reviewer the auto-assignment shall recognise the existing Review row and skip it.",
+])
+
+doc.add_page_break()
+
+
+# --- 6.18 Donor portfolio intelligence ------------------------------------
+heading(doc, "6.18 Donor Portfolio Intelligence", 2)
+
+add_callout(doc, "USE CASE",
+    "A donor opens her dashboard on Monday morning. The hero card shows "
+    "the AI's synthesis of today's portfolio decisions. The risk heatmap "
+    "shows one sector × country cell flashing red because three grantees "
+    "have overdue reports. The cohort card shows her portfolio funds "
+    "27% small/emerging orgs — well above the cohort median of 14%. "
+    "She knows in 60 seconds what to act on."
+)
+
+add_body(doc,
+    "Donors making portfolio-level decisions need a single surface that "
+    "synthesises everything happening across their grants without "
+    "requiring them to click through every grant in turn. The platform "
+    "shall provide a donor command centre that fuses AI synthesis, "
+    "anomaly detection, risk concentration, peer benchmarks, and cohort-"
+    "based portfolio quality signals into one dashboard."
+)
+
+add_numbered_list(doc, [
+    "render a hero 'Today's portfolio decisions' card on the donor dashboard with an AI synthesis paragraph and up to three clickable action buttons that route to the page where the action can be completed.",
+    "render a portfolio diagnostics card surfacing cross-grant anomalies (grants where review velocity, scoring distribution, or report timeliness drift from the donor's portfolio norms).",
+    "render a portfolio risk heatmap as a sector × country grid with up to 10×10 cells, each cell colour-coded by aggregate risk score and exposing counts of grants, open risks, overdue reports, and flagged applications.",
+    "render an anonymous peer benchmarks card comparing the donor's operational metrics (decision speed, decline rate, portfolio size) against medians across other donors on the platform.",
+    "render a donor cohort analytics card comparing the donor's *portfolio quality* (grantee capacity score, AI score at award, country and sector diversity, share of funding to small/emerging organisations, grantee report on-time rate) against medians across other donors.",
+    "treat sample-size sparseness honestly across every card: when fewer than three other donors exist (or below per-metric minimums), the card shall render a 'not enough peers to fairly compare' message rather than fake confident numbers.",
+    "never expose another donor's name, another grantee's name, or any specific dollar amount in cohort or benchmark surfaces; counts, medians, and verdict pills only.",
+    "expose an admin-only path that lets administrators inspect any donor's cohort analytics from /donors/[id], so platform operations can investigate without impersonating the donor.",
+])
+
+doc.add_page_break()
+
+
+# --- 6.19 Biometric re-authentication -------------------------------------
+heading(doc, "6.19 Biometric and Hardware-Key Re-Authentication", 2)
+
+add_callout(doc, "USE CASE",
+    "A donor finance lead has the platform installed on her phone as a "
+    "PWA. She returns to it on Monday morning, browses portfolio data, "
+    "then taps 'Record decision' to mark an application as awarded. The "
+    "platform asks for Face ID before recording the decision; her phone "
+    "scans her face and the decision lands with biometric provenance."
+)
+
+add_body(doc,
+    "The platform's password login is sufficient for most flows, but "
+    "high-stakes actions (recording award decisions, changing notification "
+    "preferences, downloading sensitive documents) benefit from a second "
+    "factor that doesn't add friction. The platform shall expose a "
+    "WebAuthn-based biometric and hardware-key enrolment flow, with a "
+    "gate helper that any sensitive route can opt into."
+)
+
+add_numbered_list(doc, [
+    "expose a Security settings page where the user can enrol and manage trusted devices (platform authenticators like Touch ID / Face ID / Windows Hello, and cross-platform authenticators like security keys).",
+    "support enrolment of multiple devices per user so that a user with a phone, a laptop, and a hardware key can maintain all three as valid second factors.",
+    "store the WebAuthn public-key credential plus a strictly-monotonic sign count for each device; sign-count regression on any subsequent authentication shall be treated as a hard authentication failure (clone detection).",
+    "expose a require_reauth() helper that any sensitive route can call to gate the request behind a recent biometric assertion; users without any enrolled credentials shall be treated as bypass (opt-in by design).",
+    "issue short-lived (5 minute) single-use re-auth tokens on successful biometric assertion, validated via an X-Reauth-Token header on the subsequent sensitive request.",
+    "render a clean fallback message in browsers that do not support WebAuthn (older Chrome / Firefox builds) rather than a broken-looking enrol button.",
+    "never store private key material; the private key remains on the authenticator at all times.",
+])
+
+doc.add_page_break()
+
+
+# --- 6.20 Real-user metrics + feedback ------------------------------------
+heading(doc, "6.20 Real-User Metrics and In-Product Feedback", 2)
+
+add_callout(doc, "USE CASE",
+    "A product lead opens /admin/metrics. The dashboard shows 23 weekly "
+    "active users, 14 of whom worked in English and 6 in Arabic, 2 in "
+    "Swahili, 1 in Somali. The chat funnel shows 38% of users who open "
+    "a thread send a message. The readiness check → submit funnel shows "
+    "the AI-assisted arm submits 22% more than the control. NPS for "
+    "report submits is +47 across 19 responses. She knows where the "
+    "product is actually winning and where the next investment should go."
+)
+
+add_body(doc,
+    "The platform shall instrument real-user behavioural events and "
+    "explicit perceived-value feedback so that product decisions can be "
+    "data-driven rather than guessed. The infrastructure shall be "
+    "lightweight, non-blocking, and analyst-friendly."
+)
+
+add_numbered_list(doc, [
+    "record a UserEvent row for each user action of interest with stable event_name vocabulary, user_id, org_id (denormalised for fast filters), role, language at event time, an optional A/B arm tag, optional JSON props, and an indexed timestamp.",
+    "instrument at minimum the following events: session.start, application.start_draft, application.submit, report.start_draft, report.submit, report.preflight_used, readiness_check.used, chat.thread_open, chat.message_sent, search.query, donor.decision_recorded, donor.broadcast_sent, reviewer.assignment_opened, reviewer.review_submitted, trust_profile.viewed.",
+    "treat event recording as best-effort: a failure to persist an event shall NEVER raise an exception that affects the user-visible request.",
+    "expose a deterministic A/B bucketing helper that hashes (experiment_name, org_id) to a stable arm so the same organisation always lands in the same arm for a given experiment.",
+    "expose an admin metrics dashboard at /admin/metrics rendering: DAU, WAU, and MAU with role and language breakdowns; the top thirty-day event counts; at least six funnel views (chat, application, report, review, readiness → submit, pre-flight → submit); per-language adoption of chat and search and AI assistance features; and the A/B outcome split for application submits.",
+    "fire a one-question NPS-style micro-survey at moments-of-completion (application submit, report submit) on the entity's detail page for the user who completed the action; surveys shall be dismissible with one tap and shall remember dismissal in localStorage so the same surface is never re-prompted on the same device.",
+    "persist micro-survey responses with the surface name, related entity, 0-10 score, optional comment up to 500 characters, and the user's language at response time, enforcing a uniqueness constraint of one response per (user, surface, related_kind, related_id).",
+    "surface an NPS rollup in the admin metrics dashboard with overall score, promoters/passives/detractors counts, per-surface breakdown, per-language breakdown, and a recent-comments stream.",
+    "gate all metrics surfaces to admin role only; non-admin requests shall return 403.",
+])
+
+doc.add_page_break()
+
+
 # ===========================================================================
 # 7. NON-FUNCTIONAL REQUIREMENTS
 # ===========================================================================

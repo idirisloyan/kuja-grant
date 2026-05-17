@@ -584,12 +584,12 @@ def create_slide_6():
     add_bottom_bar(slide)
 
     capabilities = [
+        ("Sustained\nChat Threads", "Per-entity scoped\nwith memory + reset"),
         ("Document\nAnalysis", "Score 0\u2013100 with\ndetailed findings"),
         ("Grant Agreement\nParsing", "Extract requirements\nautomatically"),
         ("Report\nEvaluation", "Per-requirement\ncompliance scoring"),
         ("Capacity\nAssessment", "AI reviews policies,\nidentifies gaps"),
-        ("Grant\nMatching", "Smart NGO-donor\nmatching algorithm"),
-        ("Chat\nAssistant", "Role-aware guidance\n(NGO vs Donor)"),
+        ("Reviewer Match\n+ Auto-Assign", "Fires on submit,\ncron backfill"),
     ]
 
     box_w = Inches(3.5)
@@ -627,7 +627,7 @@ def create_slide_6():
 
     # Bottom bar
     add_rounded_rect(slide, Inches(1.5), Inches(5.7), Inches(10.3), Inches(0.55),
-                     PRIMARY, "Powered by Anthropic Claude  |  5 languages live (EN, FR, AR, ES, SW)  \u2014  expanding to 10+",
+                     PRIMARY, "Powered by Anthropic Claude  |  6 languages live (EN, FR, AR, ES, SW, SO)  \u2014  every AI output cited + measured",
                      font_size=15, font_color=WHITE, bold=True)
 
 
@@ -1139,10 +1139,10 @@ def create_slide_14():
     metrics = [
         ("600+", "Active Users on kuja.org"),
         ("200+", "Local Organizations Onboarded"),
-        ("5", "Capacity Assessment Frameworks"),
-        ("7", "Country Registry Verifications"),
-        ("4+", "Sanctions Databases"),
-        ("5+", "Languages Live \u2014 Expanding"),
+        ("153/153", "Smoke Tests Passing"),
+        ("100+", "Browser UAT Specs"),
+        ("6", "Languages Live (EN/FR/AR/SW/SO/ES)"),
+        ("0", "Prod Regressions Reported by Users"),
     ]
 
     card_w = Inches(3.5)
@@ -1174,9 +1174,9 @@ def create_slide_14():
     pill_gap = Inches(0.3)
 
     extras = [
-        ("\u2713  Live AI platform in production", Inches(3.2)),
-        ("\u2713  Multi-language: AR, FR, ES live \u2014 no competitor offers this", Inches(5.2)),
-        ("\u2713  ERP (Odoo 17) in development", Inches(3.0)),
+        ("\u2713  Sustained AI chat threads", Inches(3.1)),
+        ("\u2713  Reviewer auto-assignment + nightly backfill cron", Inches(4.6)),
+        ("\u2713  Real-user metrics + NPS micro-survey live in prod", Inches(4.4)),
     ]
     pill_x = Inches(0.7)
     for text, pw in extras:

@@ -1378,6 +1378,67 @@ add_brand_bar(s)
 
 
 # ============================================================================
+# SLIDE 23B — What Just Shipped (Phase 24-31 May 2026 launch wave)
+# ============================================================================
+
+s = new_slide()
+slide_title_bar(s, "What Just Shipped — May 2026 Launch Wave",
+                "Phase 24-31 · 153 smoke tests · 100+ browser specs · 0 prod regressions.")
+
+# Four columns of recent shipments
+groups = [
+    ("CONVERSATION",
+     [
+         "Sustained AI chat (Phase 24B)",
+         "Per-entity chat on grant/app/report (25B, 26A)",
+         "Anti-hallucination discipline footer",
+         "Reset + per-user thread isolation",
+     ], CLAY),
+    ("REVIEWER OPS",
+     [
+         "Auto-assign on submit (Phase 25A)",
+         "Nightly safety-net cron (Phase 26B)",
+         "Side-by-side reviewer scoring (23A)",
+         "Panel calibration cards (21A)",
+     ], NAVY),
+    ("DONOR INTEL",
+     [
+         "Cohort analytics — your NGOs vs cohort (24C)",
+         "Risk heatmap by sector × country (23B)",
+         "Admin path on /donors/[id] (25C)",
+         "Sparse-honest below MIN_COHORT",
+     ], SKY),
+    ("METRICS + TRUST",
+     [
+         "UserEvent backbone + 6 funnels (29-30)",
+         "NPS micro-survey at submit (31)",
+         "WebAuthn biometric re-auth (26C)",
+         "Per-language parity breakdowns",
+     ], CLAY),
+]
+col_w = Inches(2.95); col_top = Inches(1.4); col_h = Inches(5.5); gap = Inches(0.13)
+for i, (title, items, color) in enumerate(groups):
+    x = Inches(0.5) + i * (col_w + gap)
+    add_rect(s, x, col_top, col_w, col_h, WHITE, line_color=color)
+    add_rect(s, x, col_top, col_w, Inches(0.55), color, corner=False)
+    add_text(s, x, col_top, col_w, Inches(0.55),
+             title, size=12, bold=True, color=WHITE,
+             align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    add_bullets(s, x + Inches(0.2), col_top + Inches(0.7),
+                col_w - Inches(0.4), col_h - Inches(0.85),
+                items, size=10.5, color=INK)
+
+# Bottom strip: the philosophy
+add_rect(s, Inches(0.5), Inches(7.0), Inches(12.3), Inches(0.4), NAVY, corner=False)
+add_text(s, Inches(0), Inches(7.05), SLIDE_W, Inches(0.3),
+         "Ship → measure → decide → ship next. Real-user data drives the next round of investment.",
+         size=11.5, italic=True, color=WHITE, align=PP_ALIGN.CENTER,
+         anchor=MSO_ANCHOR.MIDDLE)
+
+add_brand_bar(s)
+
+
+# ============================================================================
 # SLIDE 24 — Roadmap (chart)
 # ============================================================================
 
