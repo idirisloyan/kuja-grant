@@ -70,13 +70,15 @@ _RATE_LIMIT_RULES = [
     # reviewer-side 429 noise: a single page load could fire 5+ AI jobs
     # × ~5 status polls each = 25 hits before any user interaction.
     (r'^/api/ai/jobs/', 600, 60),
-    # General AI cap bumped 20 → 60/min. Original 20 was too tight for
-    # normal dashboard browsing: a reviewer hitting /dashboard then
-    # /reviews then a single application detail can legitimately fire
-    # 8-12 AI calls (insight-narrate, suggestions, reviewer briefing,
-    # comparison, etc.) before any "spam" pattern. 60/min still rate-
-    # limits abusers but doesn't punish normal navigation.
-    (r'^/api/ai/', 60, 60),
+    # General AI cap bumped 20 → 40/min. Original 20 was too tight for
+    # normal dashboard browsing (a reviewer touching dashboard + reviews
+    # + an app detail legitimately fires 8-12 AI calls), but bumping
+    # to 60 saturated the single Gunicorn worker — AI calls run 5-26s
+    # each, so even a modest concurrent load wedges the worker. 40/min
+    # is a compromise that doesn't punish normal navigation but caps
+    # worker pressure. Real long-term fix is to add more workers or
+    # move AI to a dedicated task queue.
+    (r'^/api/ai/', 40, 60),
     (r'^/api/documents/upload$', 10, 60),
     (r'^/api/grants/\d+/upload-grant-doc$', 10, 60),
     (r'^/api/compliance/screen$', 5, 60),
