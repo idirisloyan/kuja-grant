@@ -59,10 +59,24 @@ _endpoint_rate_limiter = EndpointRateLimiter()
 
 # Rate limit rules: (endpoint pattern, max_requests, window_seconds)
 # Patterns are matched against request.path using re.match.
+# IMPORTANT: ordering matters — first match wins. Exclusions must come
+# before the broader pattern they should not be counted against.
 _LOGIN_RATE_PER_MIN = int(os.getenv('RATE_LIMIT_LOGIN_PER_IP_PER_MIN', '30'))
 _RATE_LIMIT_RULES = [
     (r'^/api/auth/login$', _LOGIN_RATE_PER_MIN, 60),
-    (r'^/api/ai/', 20, 60),
+    # AI job *status polls* are NOT generations — exclude them from the
+    # AI rate limit so dashboard polling doesn't trip the limiter that
+    # was meant for actual model calls. Caught the team's 2026-05-16
+    # reviewer-side 429 noise: a single page load could fire 5+ AI jobs
+    # × ~5 status polls each = 25 hits before any user interaction.
+    (r'^/api/ai/jobs/', 600, 60),
+    # General AI cap bumped 20 → 60/min. Original 20 was too tight for
+    # normal dashboard browsing: a reviewer hitting /dashboard then
+    # /reviews then a single application detail can legitimately fire
+    # 8-12 AI calls (insight-narrate, suggestions, reviewer briefing,
+    # comparison, etc.) before any "spam" pattern. 60/min still rate-
+    # limits abusers but doesn't punish normal navigation.
+    (r'^/api/ai/', 60, 60),
     (r'^/api/documents/upload$', 10, 60),
     (r'^/api/grants/\d+/upload-grant-doc$', 10, 60),
     (r'^/api/compliance/screen$', 5, 60),

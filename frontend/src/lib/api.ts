@@ -63,6 +63,14 @@ async function apiFetch<T>(
     opts.body = JSON.stringify(body);
   }
 
+  // Tolerate both conventions: callers may pass either '/api/foo' (full)
+  // or '/foo' (path-only). Prior to this normalization, '/api/foo' was
+  // double-prefixed to '/api/api/foo' and silently 404'd — the team's
+  // 2026-05-16 browser sweep flagged this on donor profile, trust
+  // profile, report detail, audit chain, dashboard hero cards, and the
+  // chat composer's thread-open call.
+  const normalizedPath = path.startsWith('/api/') ? path.slice(4) : path;
+
   // Phase 13.23 + 13.38 — retry transient 5xx on idempotent GETs.
   // Railway's edge / Gunicorn worker recycle occasionally produces a
   // single 502/503/504 that resolves on the next attempt. Retry up to
@@ -71,13 +79,13 @@ async function apiFetch<T>(
   // failures — a stuck backend will still surface within ~1s.
   // Mutating verbs (POST/PUT/PATCH/DELETE) are NEVER retried —
   // potential double-write risk.
-  let res = await fetch(`/api${path}`, opts);
+  let res = await fetch(`/api${normalizedPath}`, opts);
   if (method === 'GET') {
     const backoffs = [250, 750];
     for (const delay of backoffs) {
       if (res.status !== 502 && res.status !== 503 && res.status !== 504) break;
       await new Promise((resolve) => setTimeout(resolve, delay));
-      res = await fetch(`/api${path}`, opts);
+      res = await fetch(`/api${normalizedPath}`, opts);
     }
   }
 
