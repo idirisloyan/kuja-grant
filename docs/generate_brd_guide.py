@@ -313,6 +313,9 @@ heading(doc, "Table of Contents", 1)
 
 toc_entries = [
     ("1. Executive Summary", 0),
+    ("    1.1 Targeted Customers", 1),
+    ("    1.2 Benefits — by Stakeholder", 1),
+    ("    1.3 Why Now", 1),
     ("2. The Problem We Address", 0),
     ("    2.1 The NGO experience today", 1),
     ("    2.2 The donor experience today", 1),
@@ -320,7 +323,7 @@ toc_entries = [
     ("3. Vision and Objectives", 0),
     ("4. Target Users", 0),
     ("5. Solution Overview", 0),
-    ("    5.1 System Architecture", 1),
+    ("    5.1 System Architecture (13 capability pillars)", 1),
     ("    5.2 Action-Driven Workspaces", 1),
     ("    5.3 The Organisation Trust Profile", 1),
     ("6. Functional Requirements", 0),
@@ -348,6 +351,18 @@ toc_entries = [
     ("    6.13 Administration and System Health", 1),
     ("    6.14 Internationalisation and Localisation", 1),
     ("    6.15 Field Operations: Mobile and Offline Work", 1),
+    ("    6.16 Sustained AI Conversation (Kuja Chat)", 1),
+    ("    6.17 Reviewer Auto-Assignment", 1),
+    ("    6.18 Donor Portfolio Intelligence", 1),
+    ("    6.19 Biometric and Hardware-Key Re-Authentication", 1),
+    ("    6.20 Real-User Metrics and In-Product Feedback", 1),
+    ("    6.21 Hash-Chained Audit Log + AI Provenance Ledger", 1),
+    ("    6.22 Match Engine + Smart-Match Notifications", 1),
+    ("    6.23 Donor Broadcast + Multi-Channel Notifications", 1),
+    ("    6.24 Portfolio Bundles, Calendar PDF, CSV Exports", 1),
+    ("    6.25 Public Profiles: Donor Profile + NGO Summary URL", 1),
+    ("    6.26 Application Timeline, Kanban Board, and Tags", 1),
+    ("    6.27 Onboarding (NGO and Donor)", 1),
     ("7. Non-Functional Requirements", 0),
     ("    7.1 Performance and Scalability", 1),
     ("    7.2 Reliability and Availability", 1),
@@ -359,6 +374,7 @@ toc_entries = [
     ("APPENDICES", 0),
     ("    A. Status Definitions", 1),
     ("    B. Glossary", 1),
+    ("    C. Shipped Capability Inventory", 1),
 ]
 for entry, level in toc_entries:
     p = doc.add_paragraph()
@@ -457,6 +473,157 @@ add_body(doc,
     "is written in requirement form (\"the system shall…\") so it can "
     "serve as the basis for partner integrations, accreditation reviews, "
     "and continued product evolution."
+)
+
+heading(doc, "1.1 Targeted Customers", 2)
+
+add_body(doc,
+    "Kuja serves five overlapping market segments. Each segment uses a "
+    "subset of the platform's pillars; many organisations span more than "
+    "one segment over time."
+)
+
+add_formatted_table(doc,
+    ["Segment", "Indicative count", "Primary Kuja value"],
+    [
+        ["African civil-society organisations (CSOs)",
+         "100,000+ registered across the continent",
+         "Findability via the marketplace · portable two-pillar Trust "
+         "Profile · AI-co-authored applications · proactive compliance "
+         "calendar · capacity passport that travels across donors"],
+        ["Global South CSOs outside Africa (LatAm, MENA, S/SE Asia)",
+         "500,000+ in target geographies",
+         "Same value proposition as African CSOs; Phase-2 geographic "
+         "expansion (currently English/Arabic/French/Spanish + Swahili/"
+         "Somali for the African baseline)"],
+        ["Bilateral and multilateral donors",
+         "50+ major institutions globally",
+         "Pre-assessed pipeline · portfolio risk heatmap · cohort "
+         "benchmarks · pre-flighted reports · auditable rationale on "
+         "every decision · procurement-grade audit chain"],
+        ["Private foundations and corporate philanthropy",
+         "200,000+ globally",
+         "Donor portal · grant publishing in two paths (AI-from-prompt "
+         "or PDF-extract) · burden-estimator before publish · NGO match "
+         "intelligence"],
+        ["International NGOs (INGOs) sourcing local partners",
+         "1,000+ INGOs with sub-grantee programmes",
+         "Marketplace + capacity assessment integration · standardised "
+         "due-diligence outputs across multiple partners · audit trail "
+         "for upward reporting to their own funders"],
+    ],
+    col_widths=[2.1, 1.4, 3.0]
+)
+
+heading(doc, "1.2 Benefits — by Stakeholder", 2)
+
+add_body(doc,
+    "Kuja's value is concrete and measurable. Each stakeholder gets a "
+    "specific bundle of benefits, and the platform's metrics surface "
+    "(§6.20) is instrumented to track every benefit listed here."
+)
+
+heading(doc, "Benefits for NGOs", 3)
+add_bullet_list(doc, [
+    ("Apply once, present everywhere. ",
+     "Capacity assessment + due-diligence verification + organisational "
+     "memory passport across applications. NGOs stop repeating the same "
+     "vetting work for every donor."),
+    ("Write better applications faster. ",
+     "AI co-author drafts from the org's prior work; readiness check "
+     "flags gaps before submit; past-wins suggester reuses winning "
+     "answers; AI compliance pre-empt catches issues donors would "
+     "otherwise flag at review."),
+    ("Stay compliant proactively. ",
+     "Reporting calendar auto-extracted from grant agreements; deadline "
+     "alerts before due dates; report pre-flight against donor "
+     "requirements; one-click clarifications via donor-NGO message "
+     "thread; risk register surfaces compliance issues with owners "
+     "and due dates."),
+    ("See and lift your trust score. ",
+     "Two-pillar Trust Profile makes the score visible; AI trust gap "
+     "insights prioritise the highest-leverage actions; capacity "
+     "passport URL the NGO can share with funders directly."),
+    ("Work anywhere, even offline. ",
+     "PWA installable on phone; offline-first drafts; background-sync "
+     "uploads when network returns; six interface languages with "
+     "role-appropriate tone."),
+])
+
+heading(doc, "Benefits for donors", 3)
+add_bullet_list(doc, [
+    ("Make decisions faster, on better evidence. ",
+     "AI-generated reviewer summary per application; evidence "
+     "extraction shows verbatim supporting/contradicting quotes; "
+     "side-by-side panel scoring with calibration alerts when "
+     "reviewers diverge."),
+    ("Reduce manual reviewer ops to zero. ",
+     "Automatic reviewer panel assignment on submit; nightly "
+     "safety-net cron catches any that slip through; throughput "
+     "dashboard surfaces slipping reviewers before deadlines "
+     "are missed."),
+    ("See your portfolio at a glance. ",
+     "Today's verdict + diagnostics + sector × country risk heatmap + "
+     "peer benchmarks + cohort analytics show what to act on without "
+     "clicking through every grant."),
+    ("Compliance done with you, not to you. ",
+     "Pre-assessed reports; daily compliance health score per grantee; "
+     "sanctions + adverse media monitoring continuous; auditable rationale "
+     "on every decision; tamper-evident chain for upward reporting."),
+    ("Publish grants in minutes, not days. ",
+     "Two paths: AI generates a full grant scaffold from a two-line "
+     "prompt, OR extracts criteria + requirements from your existing "
+     "grant PDF. AI burden estimator critiques the draft before publish. "
+     "Median-NGO preview predicts how applicants will respond per "
+     "criterion."),
+])
+
+heading(doc, "Benefits for reviewers", 3)
+add_bullet_list(doc, [
+    ("Score with evidence, not memory. ",
+     "Per-application AI briefing card; evidence extraction provides "
+     "verbatim quotes; side-by-side rubric scoring; comparable cohort "
+     "signal."),
+    ("Get assigned the right reviews. ",
+     "Match service ranks reviewers by sector + country + throughput + "
+     "workload; assignments arrive without queue lag."),
+    ("Stay on track. ",
+     "Throughput dashboard surfaces SLAs and slipping work; reviewer "
+     "follow-ups handled in-band via the application thread."),
+])
+
+heading(doc, "Benefits for administrators + operators", 3)
+add_bullet_list(doc, [
+    ("Self-service operations. ",
+     "System health probes, AI surface health, AI cost forecasting, "
+     "compliance rerun cron, reviewer auto-assign sweep, UAT fixture "
+     "cron, bulk lockout clear — all available from the admin pages."),
+    ("Real-user metrics, not just smoke tests. ",
+     "/admin/metrics shows DAU/WAU/MAU + 6 funnels + per-language "
+     "adoption + A/B outcomes + NPS rollup — so investment decisions "
+     "are data-driven."),
+    ("Procurement-grade audit. ",
+     "Hash-chained immutable audit log on every meaningful action; "
+     "tamper detection via verify endpoint; configurable retention; "
+     "AI claim-level provenance."),
+    ("Org hygiene tools. ",
+     "Donor merge (confirm-name protected); GDPR right-to-erasure; "
+     "stage label customisation per org; tagging and segmentation."),
+])
+
+heading(doc, "1.3 Why Now", 2)
+
+add_body(doc,
+    "Three structural shifts make this the moment for Kuja. First, the "
+    "2025 dissolution of USAID (USD 36B in cuts and 83% of programmes "
+    "cancelled) created urgent demand for diversified funding "
+    "infrastructure and direct donor-to-NGO connections. Second, 92% "
+    "of nonprofits already use AI but 76% lack a coherent strategy "
+    "— a pre-built AI working partner removes the strategy gap. Third, "
+    "donor compliance expectations have escalated past what manual "
+    "processes can sustain; pre-assessed, pre-scored, continuously-"
+    "monitored grantees are now table stakes, not differentiation. "
+    "Kuja addresses all three shifts in one platform."
 )
 
 
@@ -607,23 +774,42 @@ add_formatted_table(doc,
     [
         ["NGO",
          "Secure funding aligned to mission and capacity.",
-         "Complete capacity passport · discover matching grants · draft "
-         "and submit applications · respond to clarifications · upload "
-         "evidence · submit progress reports · monitor compliance health"],
+         "Complete capacity passport (Kuja / STEP / UN-HACT / CHS / NUPAS) · "
+         "discover matching grants via smart match notifications · draft and "
+         "submit applications with AI co-author + readiness check · reuse "
+         "past winning answers · upload evidence with real-time AI scoring · "
+         "submit progress reports with AI pre-flight · respond to clarifications "
+         "via in-band threads · monitor compliance health + trust profile · "
+         "chat with Kuja per grant/application/report · share NGO public "
+         "summary URL (opt-in) · receive proactive deadline + match alerts"],
         ["Donor",
          "Deploy capital to highest-impact, lowest-risk programmes.",
-         "Publish grants · define eligibility and rubric · review "
-         "applications · score and decide · monitor compliance and "
-         "trajectory · review reports · flag risks · request clarification"],
+         "Publish grants from a prompt OR by uploading an existing grant PDF · "
+         "define eligibility + criteria with AI burden-estimator + median-NGO "
+         "preview · review applications with auto-assigned reviewer panels "
+         "(top-3 by sector/country/throughput) · monitor portfolio risk heatmap "
+         "(sector × country) · benchmark portfolio quality against the donor "
+         "cohort · run a side-by-side reviewer score comparison · record "
+         "decisions with controlled-vocab reason codes (debrief rollup) · "
+         "broadcast updates to all applicants · review reports with per-"
+         "requirement compliance · export portfolio bundles (PDF + ZIP) · "
+         "manage compliance + risk register"],
         ["Reviewer",
          "Evaluate applications consistently against the rubric.",
-         "Score per criterion · cite evidence · raise red flags · compare "
-         "applications · submit decision package"],
+         "View auto-assigned reviews with AI briefing card · score per "
+         "criterion · use evidence-extraction to cite verbatim quotes · "
+         "raise red flags · compare applications · monitor own throughput "
+         "(median turnaround + slipping indicator)"],
         ["Administrator",
          "Operate the platform safely and observably.",
-         "Manage users and organisations · monitor system health · review "
-         "AI surface health · manage feature flags · review failed logins "
-         "· trigger sanctions rescreening · review audit chain"],
+         "Manage users + organisations · monitor system health + AI surface "
+         "health · manage feature flags · review failed-login analytics · "
+         "trigger sanctions rescreening cron · trigger reviewer auto-assign "
+         "sweep · review hash-chained audit log + verify integrity · merge "
+         "duplicate donor orgs (confirm-name protected) · access /admin/metrics "
+         "for DAU/WAU/MAU + 6 funnels + NPS rollup + per-language adoption · "
+         "bulk-clear email lockouts for QA cycles · process GDPR right-to-"
+         "erasure requests"],
     ],
     col_widths=[1.0, 1.8, 3.6]
 )
@@ -664,28 +850,83 @@ add_body(doc,
 )
 
 add_bullet_list(doc, [
-    ("Identity and access. ",
-     "Multi-tenant organisations; role-based access control; two-factor "
-     "authentication for administrators; per-organisation data isolation."),
+    ("Identity, access and re-authentication. ",
+     "Multi-tenant organisations; role-based access control; password + "
+     "TOTP 2FA + optional WebAuthn biometric or hardware-key re-auth for "
+     "sensitive routes; per-organisation data isolation; email-lockout "
+     "brute-force protection; GDPR right-to-erasure."),
     ("Lifecycle management. ",
-     "Grants, applications, capacity assessments, and reports follow "
-     "explicit state machines with audit trails and lifecycle telemetry."),
+     "Grants, applications, capacity assessments, and reports each "
+     "follow explicit state machines with audit trails and lifecycle "
+     "telemetry; status transitions are validated; concurrent operations "
+     "are idempotent."),
     ("Document intelligence. ",
-     "Uploaded documents are extracted, analysed against the grant's "
-     "evidence requirements, and scored for completeness with clear "
-     "fallbacks for scanned or low-quality files."),
-    ("Embedded AI Intelligence. ",
-     "Intelligence is woven into every workflow as a working partner — "
-     "drafting, evaluating, surfacing gaps, generating rationales, "
-     "translating findings — never as a generic chatbot."),
-    ("Compliance and trust. ",
-     "Live sanctions screening, government registry verification, "
-     "compliance health scoring, risk register, provenance tracking, "
-     "and hash-chained audit log."),
-    ("Operations and observability. ",
+     "Uploaded documents (PDF, DOCX, XLSX, CSV, TXT, images) are "
+     "extracted, scored 0-100 in real time against donor-specific "
+     "evidence requirements, and surface clear fallbacks when OCR or "
+     "structured parsing fails."),
+    ("Embedded AI intelligence. ",
+     "Intelligence woven into 27+ workflow surfaces as a working partner "
+     "— drafting, evaluating, surfacing gaps, generating rationales, "
+     "translating findings — never as a generic chatbot. See §6.6 for "
+     "the full surface inventory."),
+    ("Sustained AI conversation. ",
+     "A real chat that remembers the last 12 turns, scoped globally or "
+     "to a specific grant / application / report, with anti-hallucination "
+     "discipline and per-user thread isolation. See §6.16."),
+    ("Trust + compliance + diligence. ",
+     "Two-pillar Trust Profile (Capacity + Diligence) per organisation, "
+     "with live sanctions screening (UN + OFAC + EU + AML/CTF watchlists, "
+     "with OpenSanctions primary feed + direct-download fallback), "
+     "government registration verification for 7 African countries, "
+     "tax-exempt status checks, beneficial-ownership transparency, daily "
+     "adverse media monitoring, compliance health scoring across 4 "
+     "pillars, bank account verification via checksum + connector, and "
+     "risk register with owners and due dates."),
+    ("Reviewer intelligence. ",
+     "Match ranking by sector + country + throughput + workload; "
+     "automatic panel assignment on submit + nightly safety-net cron; "
+     "per-assignment AI briefing; evidence extraction; side-by-side "
+     "score comparison; panel-calibration divergence detection; "
+     "throughput dashboard with slipping indicator."),
+    ("Portfolio intelligence (donor). ",
+     "Hero verdict synthesis; cross-grant diagnostics; sector × country "
+     "risk heatmap; peer benchmarks (operational metrics) and donor "
+     "cohort analytics (portfolio quality); broadcast to applicants; "
+     "decision-debrief rollup with controlled-vocab reason codes."),
+    ("Discovery + matching. ",
+     "Smart NGO-grant matching algorithm with notifications, global "
+     "cross-entity search (grants/apps/reports/orgs), saved searches "
+     "with reorder + reuse, past-wins suggester, document smart-search, "
+     "watchlist (personal stars), and grant-fit-compare AI."),
+    ("Collaboration + notifications. ",
+     "Donor↔NGO threaded messaging per application; reviewer follow-ups "
+     "(outbound email asking for evidence); per-user notification "
+     "preferences across five channels (in-app, email, SMS, WhatsApp, "
+     "web push); per-user digest cadence (daily/weekly/off); proactive "
+     "deadline + match + risk alerts."),
+    ("Provenance + auditability. ",
+     "Hash-chained tamper-evident audit log on every meaningful action; "
+     "AI claim-level provenance (where did this number come from?); "
+     "organisational memory (extracted re-usable items from prior "
+     "applications); append-only by design; integrity verify endpoint; "
+     "configurable retention."),
+    ("Real-user metrics + feedback. ",
+     "Lightweight UserEvent backbone capturing 12+ behavioural events; "
+     "admin dashboard with DAU/WAU/MAU + 6 funnels + per-language "
+     "adoption + A/B outcome split; one-question NPS micro-survey at "
+     "moments-of-completion with sparse-honest rollup."),
+    ("Mobile-first PWA + field operations. ",
+     "Installable progressive web app with offline-first drafts, "
+     "background-sync uploads, install-banner promotion (where browser "
+     "supports), native share API for donor + NGO public profiles, "
+     "service-worker cache layer."),
+    ("Operations + observability. ",
      "Admin self-service for system health, AI cost forecasting, demo "
-     "readiness scanning, flagship AI surface health monitoring, audit "
-     "retention configuration, and failed-login analytics."),
+     "readiness scanning, flagship AI surface health monitoring, "
+     "compliance rerun cron, UAT fixture cron, audit retention "
+     "configuration, donor org-merge tool (confirm-name protected), "
+     "bulk lockout clear for QA cycles, and failed-login analytics."),
 ])
 
 heading(doc, "5.2 Action-Driven Workspaces", 2)
@@ -1293,11 +1534,67 @@ add_formatted_table(doc,
          "Surface a small list of context-appropriate next actions on "
          "every workspace page, scoped to the user's role and current "
          "scope (a grant, an application, an organisation)."],
-        ["Ask Kuja",
+        ["Ask Kuja (streaming)",
          "All",
-         "Conversational agent that answers operational questions by "
-         "querying a registry of read-only data tools, role-checked and "
-         "organisation-scoped, with three-step maximum iteration."],
+         "Streaming conversational agent for one-shot operational "
+         "questions; queries a registry of read-only data tools, "
+         "role-checked and organisation-scoped, with three-step "
+         "maximum iteration. Distinct from the sustained chat thread "
+         "described in §6.16."],
+        ["Sustained chat threads",
+         "NGO and donor",
+         "Real conversation thread (last 12 messages cap) the user "
+         "can return to. Three scopes: global (/chat), grant, "
+         "application, report. Per-user isolated; anti-hallucination "
+         "system prompt prevents inventing data outside scope. "
+         "See §6.16."],
+        ["Reviewer briefing",
+         "Reviewer",
+         "One-paragraph AI brief on every assigned application "
+         "covering applicant context, key strengths, and red flags "
+         "to probe. Renders on the review detail page."],
+        ["Trust gap insights",
+         "NGO",
+         "AI reads the two-pillar trust score + sub-components and "
+         "prioritises the highest-leverage actions the NGO can take "
+         "to lift it; each action carries an estimated lift in "
+         "points and an effort tag."],
+        ["Debrief insights + rollup",
+         "NGO and donor",
+         "AI synthesises win/loss patterns from the controlled-"
+         "vocabulary decision reason codes recorded at award/reject, "
+         "surfacing the reasons that drive most outcomes."],
+        ["Grant fit compare",
+         "NGO",
+         "Side-by-side comparison of 2-4 grants for one NGO, "
+         "highlighting fit on sector, country, capacity, and "
+         "reporting burden."],
+        ["Past wins suggester",
+         "NGO",
+         "On the apply page, surfaces re-usable answers from the "
+         "NGO's prior winning applications with a similarity score, "
+         "so they don't write from a blank page."],
+        ["Donor portfolio diagnostics",
+         "Donor",
+         "Cross-grant anomaly detection surfacing grants where "
+         "review velocity, scoring distribution, or report "
+         "timeliness drift from the donor's portfolio norms."],
+        ["Donor cohort analytics",
+         "Donor and admin",
+         "How the NGOs this donor funds compare against the NGOs "
+         "other donors fund — capacity, AI score at award, country "
+         "+ sector diversity, share of funding to small/emerging "
+         "orgs, grantee report on-time rate. Sparse-honest when "
+         "the cohort is too small to fairly compare. See §6.18."],
+        ["NGO readiness console",
+         "NGO",
+         "3-step onboarding checklist (capacity assess + profile + "
+         "browse grants) that disappears once complete."],
+        ["Grant agreement smart-unpack",
+         "NGO and donor",
+         "AI extracts reporting requirements, milestones, and "
+         "deadlines from an uploaded grant agreement PDF and emits "
+         "them as a compliance calendar."],
     ],
     col_widths=[1.6, 1.1, 3.7]
 )
@@ -1991,6 +2288,201 @@ add_numbered_list(doc, [
 doc.add_page_break()
 
 
+# --- 6.21 Hash-chained audit log + AI provenance ----------------------
+heading(doc, "6.21 Hash-Chained Audit Log + AI Provenance Ledger", 2)
+
+add_callout(doc, "USE CASE",
+    "An audit firm reviewing a donor's grant-making process asks for the "
+    "complete decision trail on a specific awarded grant. The platform's "
+    "admin exports the audit-chain entries scoped to that grant: every "
+    "application transition, every reviewer assignment, every decision, "
+    "every payment intent, every compliance finding. Each entry carries "
+    "a hash of the previous entry, so the auditor can verify that no "
+    "row has been silently edited or deleted between events. AI-generated "
+    "claims in the file carry a provenance link back to the exact source "
+    "document and the model call that produced them."
+)
+
+add_body(doc,
+    "Procurement-grade auditability is a non-negotiable for donor "
+    "compliance officers and the audit firms that review them. The "
+    "platform shall maintain a tamper-evident chronological log of "
+    "every meaningful action, plus a separate ledger tracking the "
+    "provenance of AI-generated claims back to their underlying "
+    "evidence."
+)
+
+add_numbered_list(doc, [
+    "append an AuditChainEntry row for every meaningful platform action including (non-exhaustively): user logins, role changes, organisation merges, grant publication, application submission, reviewer assignment, decision recording, status transitions, document uploads, compliance findings, sanctions screening results, risk lifecycle events, payment intents (when payment integration ships), and GDPR erasures.",
+    "compute each entry's hash as a function of the prior entry's hash + the row's content, forming an unbroken chain whose integrity can be verified end-to-end via a verify endpoint.",
+    "expose a verify endpoint that walks the entire chain and reports either 'integrity ok' with the latest hash, or 'hash mismatch at row X' identifying the first broken link.",
+    "make the audit log append-only by design: no platform code path exposes an UPDATE or DELETE endpoint for audit rows. Administrative requests to alter audit data shall be rejected.",
+    "support configurable retention with a prune cron that archives (rather than deletes) older entries past the retention window.",
+    "scope every audit entry to a subject (subject_kind + subject_id) so retrieval can be narrowed to a single grant, application, organisation, or user.",
+    "maintain a separate AIProvenance ledger for every AI-generated claim, recording the AI call id, the source documents consulted, and the specific spans of source text that supported the claim, so any donor reviewer can ask 'where did this number come from?' and get a verifiable answer.",
+    "expose audit chain visibility to administrators only; non-admin GETs return 403.",
+])
+
+doc.add_page_break()
+
+
+# --- 6.22 Match engine + smart-match notifications --------------------
+heading(doc, "6.22 Match Engine + Smart-Match Notifications", 2)
+
+add_callout(doc, "USE CASE",
+    "An NGO updates its capacity profile to add a new sector (climate "
+    "resilience). Within seconds, the system has re-scored every open "
+    "grant against this NGO's profile and surfaces three strong "
+    "matches the NGO had not seen before. Two of the three trigger "
+    "an in-app + email match notification that lands in the NGO's "
+    "preferred language."
+)
+
+add_body(doc,
+    "The platform shall do the matching work both sides would otherwise "
+    "do manually. On the NGO side: discover grants worth applying to. On "
+    "the donor side: see which NGOs are likely fits for a published grant."
+)
+
+add_numbered_list(doc, [
+    "score every NGO-grant pair on dimensions including: sector alignment, geographic alignment, eligibility match, capacity profile fit (against the donor's required capacity threshold if specified), historical match (has the NGO won a similar grant before?), and language compatibility.",
+    "surface the top match score plus the single top strength and the single top blocker so the user can act on each pair without reading the full breakdown.",
+    "fire a smart-match notification to the NGO when a new grant is published that scores above the configured match threshold for that NGO. The notification respects the user's channel preferences (in-app + email by default; SMS/WhatsApp/web-push opt-in).",
+    "expose a reverse view to donors showing the ranked list of NGOs likely to qualify for their published grant, with the same strength/blocker structure.",
+    "re-score continuously: when an NGO updates their capacity profile, or when a donor edits their grant's criteria, all affected pairs shall be re-scored within ~1 minute.",
+    "expose a saved-search facility so users can persist common discovery queries (e.g. 'open grants in water/sanitation, deadline within 60 days, eligibility = registered Somali NGO') and re-run them with one click.",
+    "expose a personal watchlist (star) so an NGO can mark grants they're tracking; starred grants generate deadline reminders even if the NGO has not yet started a draft.",
+])
+
+doc.add_page_break()
+
+
+# --- 6.23 Donor broadcast + multi-channel notifications ---------------
+heading(doc, "6.23 Donor Broadcast + Multi-Channel Notifications", 2)
+
+add_callout(doc, "USE CASE",
+    "A donor extends the deadline on a popular grant by two weeks. From "
+    "the grant detail page she clicks Broadcast, writes a one-paragraph "
+    "update, selects audience = 'all applicants' (including drafts), and "
+    "sends. Within seconds 47 NGOs receive the update in-app + by email "
+    "(per their channel preferences), and the donor.broadcast_sent event "
+    "is recorded for the metrics rollup."
+)
+
+add_numbered_list(doc, [
+    "expose a donor broadcast tool on every grant detail page that sends a single message to applicants on that grant, with audience selectable as: all applicants, drafts only, or submitted only.",
+    "enforce ownership: only the donor who owns the grant (or an admin) shall be able to broadcast; the grant id must match the caller's org. Cross-donor broadcasts are forbidden.",
+    "dispatch each broadcast through the notification dispatcher so it respects each recipient's per-channel preferences.",
+    "support five notification channels: in-app (always on for every user, every category), email (default for most categories), SMS, WhatsApp, and web push (opt-in via the user's preferences page).",
+    "allow per-user, per-category channel selection so a user can (for example) take deadline reminders by SMS but compliance findings only in-app.",
+    "support a per-user digest cadence setting of daily / weekly / off that controls whether the user is included in the digest cron's batch.",
+    "deduplicate notifications: the same (user, category, related_kind, related_id) shall not fire more than once within a configured window (default 1 hour) to prevent storm conditions.",
+    "record a donor.broadcast_sent event with grant_id, audience, and recipient_count for the metrics rollup; failed broadcasts shall not record the event.",
+])
+
+doc.add_page_break()
+
+
+# --- 6.24 Portfolio bundles + calendar PDF + CSV exports --------------
+heading(doc, "6.24 Portfolio Bundles, Calendar PDF, and CSV Exports", 2)
+
+add_callout(doc, "USE CASE",
+    "A donor receives an annual audit request. She clicks 'Download "
+    "portfolio bundle' on her dashboard. Within seconds a PDF + ZIP "
+    "downloads containing: cover page, every grant she runs, every "
+    "awarded application, every submitted report, and the audit-chain "
+    "entries scoped to her portfolio. The bundle is signed with the "
+    "platform's hash anchor so the auditor can verify nothing has been "
+    "edited between download and review."
+)
+
+add_numbered_list(doc, [
+    "allow donors and NGOs to download a portfolio bundle as a PDF + ZIP combining every artefact in their visible scope: grants (donor) or applications (NGO), reports, audit anchors, decision debriefs, and trust profile snapshot at time of download.",
+    "stamp each bundle with the platform's audit-chain hash at the moment of generation so external auditors can verify content has not been altered.",
+    "generate a calendar PDF for NGO and donor users showing every upcoming deadline in their scope (application deadlines, report due dates, capacity passport expiries, sanctions re-screen schedule) on a single printable page.",
+    "expose CSV exports for the three most-needed datasets: grants (donor + admin scoped), applications (NGO + donor + admin scoped), reviews (donor + admin scoped). NGO users shall be blocked from grants.csv and reviews.csv exports.",
+    "scope every export to the caller's role and ownership: a donor's CSV contains only their grants and applications to their grants; an NGO's CSV contains only their applications; an admin can export any.",
+    "support export of a single application as a self-contained PDF for offline review (the 'reviewer take-home').",
+    "respect document-level access control inside bundles: if the caller cannot see a particular document on the website, it shall not appear in their bundle.",
+])
+
+doc.add_page_break()
+
+
+# --- 6.25 Public profiles: donor profile + NGO summary URL ------------
+heading(doc, "6.25 Public Profiles: Donor Profile + NGO Summary URL", 2)
+
+add_callout(doc, "USE CASE",
+    "An NGO is researching a donor before deciding whether to apply. They "
+    "visit the donor's public profile page on Kuja: portfolio size, total "
+    "committed funding, median decision speed, decline rate, top sectors "
+    "funded, typical grant size band, and a reporting-burden signal. "
+    "Identities of past grantees are never exposed — counts and medians "
+    "only. The NGO decides whether to invest the application effort with "
+    "an honest baseline, not a marketing claim."
+)
+
+add_numbered_list(doc, [
+    "expose a public donor profile page accessible to any logged-in user, presenting aggregate facts derived from the donor's actual track record: portfolio size, total committed, decision speed (median submission → decision), decline rate, top 8 sectors and top 8 countries funded with grant counts, typical grant size band, reporting-burden signal.",
+    "enforce anonymity: the public donor profile shall NEVER expose specific NGO names, application ids, grant titles, or individual grant amounts.",
+    "treat sample-size sparseness honestly: if the donor has fewer than MIN_DECIDED_FOR_FULL_PROFILE (3) decided applications, the page shall surface 'not enough data to fairly characterise' rather than fake confident numbers.",
+    "expose an opt-in public NGO summary URL at /ngo/<slug> that an NGO can publish from their organisation settings. Until published, the URL shall return 404 (no metadata leakage).",
+    "include in the NGO public summary: trust profile at-a-glance, delivery snapshot (awarded grants, active grants, reports submitted), sectors and geographies, capacity passport badge if present. The summary shall NEVER expose individual application contents, internal compliance findings, or unredacted financial detail.",
+    "support a capacity passport public verification URL at /trust/verify/<slug>?token=<t> for third parties (banks, registries, INGOs) to verify an NGO's capacity passport without needing a platform account.",
+    "expose a 'Share profile' native-share button on both public profile pages using the navigator.share API where available, falling back to clipboard copy + toast on desktop browsers without the share API.",
+])
+
+doc.add_page_break()
+
+
+# --- 6.26 Application timeline + kanban + tags ------------------------
+heading(doc, "6.26 Application Timeline, Kanban Board, and Tags", 2)
+
+add_callout(doc, "USE CASE",
+    "A donor opens a complex application that has been in the queue for "
+    "three weeks. The activity timeline shows every event in chronological "
+    "order: created, AI-scored, eight reviewer assignments, three "
+    "clarifications via the message thread, a panel calibration alert when "
+    "two reviewers diverged by 25 points, the panel discussion, and the "
+    "final decision being recorded. The donor adds a tag 'priority-2026' "
+    "for cross-portfolio reporting."
+)
+
+add_numbered_list(doc, [
+    "render an application timeline on each application detail page showing every meaningful event chronologically: created, submitted, AI-scored, reviewer assigned, reviewer scored, panel calibration alert (if any), clarification message exchanged, decision recorded, debrief recorded, etc. Each event shows actor, timestamp, and any structured detail.",
+    "expose an application kanban view on the donor + admin /applications surface with columns by status (Submitted / Under review / Scored / Awarded / Rejected). Cards shall be drag-able to flip status; the corresponding application API call shall validate the transition.",
+    "allow organisations to customise application stage labels (e.g. rename 'Submitted' → 'Received for triage') via the org settings page; the rename shall propagate to every list view, kanban column, and timeline event for that org's users.",
+    "expose a tags + segmentation system: any logged-in user with appropriate scope can apply free-form or controlled-vocabulary tags to applications + grants, and filter list views by tag. Tags shall be org-scoped (an org's tags are not visible to other orgs).",
+    "show a duplicate-application banner with a link to the existing application when an NGO attempts to apply to a grant they have already applied to (return 409 from the create-application API).",
+    "show donor↔NGO threaded messaging on the bottom of each application detail page; both parties see the full thread; server-side gates enforce visibility (no cross-NGO leakage).",
+    "show the per-criterion score breakdown card on application detail: AI score per criterion + weight + comments; NGO sees what the AI saw; donors and reviewers see all reviewer comments side-by-side.",
+])
+
+doc.add_page_break()
+
+
+# --- 6.27 Onboarding (NGO + donor) ------------------------------------
+heading(doc, "6.27 Onboarding (NGO and Donor)", 2)
+
+add_callout(doc, "USE CASE",
+    "A new NGO signs up. Their dashboard shows three onboarding steps: "
+    "complete a capacity assessment, complete the organisation profile, "
+    "browse open grants. The checklist disappears once all three are "
+    "done. They never see an empty dashboard or a 'getting started' "
+    "modal — the next action is always one click away."
+)
+
+add_numbered_list(doc, [
+    "render an onboarding checklist on the NGO dashboard with three steps: complete a capacity assessment, complete the organisation profile (name, country, sectors, contact), browse open grants. The checklist shall disappear once all three are done.",
+    "render an onboarding checklist on the donor dashboard with steps: complete the donor profile (name, country, mission, website), publish a first grant, set notification preferences. The checklist disappears once all three are done.",
+    "never show a step that the user has already completed; never show the checklist at all once all steps for that role are complete.",
+    "treat onboarding state as derived (read from underlying org + grant + assessment data) rather than stored — so completing the underlying action in any way (via the wizard, via API, via admin import) advances the checklist automatically.",
+    "track session.start events from the first login so the metrics dashboard can answer 'how many NGOs reach application.submit within 7 days of first session.start?' as a funnel.",
+])
+
+doc.add_page_break()
+
+
 # ===========================================================================
 # 7. NON-FUNCTIONAL REQUIREMENTS
 # ===========================================================================
@@ -2537,6 +3029,197 @@ add_formatted_table(doc,
     ["Term", "Definition"],
     glossary,
     col_widths=[1.6, 4.8]
+)
+
+
+heading(doc, "Appendix C: Shipped Capability Inventory", 2)
+
+add_body(doc,
+    "Every backend service and supporting model that the platform has "
+    "shipped to production, grouped by capability pillar. This appendix "
+    "is a verifiability bridge between the requirement sections above "
+    "and the actual code; partners and auditors can cross-reference any "
+    "requirement to a concrete service module."
+)
+
+heading(doc, "Identity, access, security", 3)
+add_formatted_table(doc,
+    ["Component", "Type", "Purpose"],
+    [
+        ["User",                    "model",   "Auth + role + language + 2FA"],
+        ["WebAuthnCredential",      "model",   "Per-device biometric / hardware-key credential"],
+        ["webauthn_service",        "service", "Registration + auth + clone detection (sign-count regression)"],
+        ["audit_chain (model + service)", "both", "Hash-chained tamper-evident provenance log"],
+        ["audit_prune",             "service", "Configurable retention sweeper"],
+    ],
+    col_widths=[2.4, 1.0, 3.4]
+)
+
+heading(doc, "Lifecycle entities + state", 3)
+add_formatted_table(doc,
+    ["Component", "Type", "Purpose"],
+    [
+        ["Organization",     "model",   "Multi-tenant org record"],
+        ["Grant",            "model",   "Donor-published funding opportunity"],
+        ["Application",      "model",   "NGO response to a grant"],
+        ["Report",           "model",   "Progress report on awarded grant"],
+        ["Review",           "model",   "Reviewer score + comments per application"],
+        ["Assessment",       "model",   "Capacity assessment instance"],
+        ["Document",         "model",   "Uploaded file with extracted text + AI score"],
+        ["DiligenceItem",    "model",   "Due-diligence questionnaire response"],
+        ["Risk",             "model",   "Polymorphic risk row (severity + owner + due date)"],
+        ["StatusSignal",     "model",   "Lightweight ASK/RISK/DECISION rail entry"],
+        ["Tag + TagAssignment", "model",   "Per-org tags + polymorphic assignment"],
+        ["WatchlistItem",    "model",   "Personal star per user per target"],
+        ["SavedSearch",      "model",   "Persisted discovery query"],
+        ["EntityComment",    "model",   "Threaded messaging on apps/reports"],
+        ["GrantQuestion",    "model",   "Q&A on grant detail"],
+    ],
+    col_widths=[2.4, 1.0, 3.4]
+)
+
+heading(doc, "AI services", 3)
+add_formatted_table(doc,
+    ["Component", "Type", "Purpose"],
+    [
+        ["ai_service",                  "service", "Core Claude wrapper (free text + tool-use + cost-tagged endpoints)"],
+        ["ai_chat_service",             "service", "Sustained thread chat (Phase 24B)"],
+        ["ai_jobs",                     "service", "Async-mode dispatcher with status polling"],
+        ["ai_agent",                    "service", "Tool-use agent with read-only data registry"],
+        ["ai_budget_service",           "service", "Per-org AI cost cap with enforcement gate"],
+        ["ai_surface_health",           "service", "Health probe across flagship AI surfaces"],
+        ["ai_provenance (model)",       "model",   "Claim → source mapping ledger"],
+        ["AIThread + AIMessage + AICallLog", "model", "Persistent chat threads + cost tracking"],
+        ["scoring_engine",              "service", "Per-criterion AI scoring of applications"],
+        ["application_autofill_service","service", "Pre-fill application from org passport + prior work"],
+        ["application_compare_service", "service", "Side-by-side comparison of N applications"],
+        ["apply_unpack_service",        "service", "Extract reusable answers from past applications"],
+        ["grant_agreement_unpack_service", "service", "Extract reporting reqs + deadlines from PDF"],
+        ["grant_fit_compare_service",   "service", "AI compare 2-4 grants for an NGO"],
+        ["copilot_service",             "service", "Streaming co-pilot rail (Now / Ask / Insights)"],
+        ["org_memory_service",          "service", "Auto-extracted reusable items from submissions"],
+        ["past_wins_service",           "service", "Suggest re-usable winning answers"],
+        ["preflight_service",           "service", "Donor-perspective pre-submission check"],
+        ["score_breakdown_service",     "service", "Per-criterion explanation card"],
+        ["trust_gap_insights_service",  "service", "AI prioritises actions to lift trust score"],
+        ["debrief_insights_service",    "service", "AI win/loss patterns from decision reasons"],
+        ["cross_grant_patterns_service","service", "AI patterns across declined apps"],
+        ["compliance_preemption_service", "service", "AI pre-submit compliance scan"],
+        ["today_briefing_service",      "service", "AI 'today's priorities' per role"],
+    ],
+    col_widths=[2.4, 1.0, 3.4]
+)
+
+heading(doc, "Trust + diligence + compliance", 3)
+add_formatted_table(doc,
+    ["Component", "Type", "Purpose"],
+    [
+        ["trust_profile_service",       "service", "Two-pillar trust profile assembly"],
+        ["capacity_passport_service",   "service", "Capacity passport + public verify URLs"],
+        ["adverse_media_service",       "service", "Sanctions + adverse media (OpenSanctions primary + UN/OFAC/EU fallback)"],
+        ["bank_verification_service",   "service", "IBAN + account checksum + connector verification"],
+        ["registry_service",            "service", "Government registry verification (7 African countries)"],
+        ["compliance_service",          "service", "Per-grant compliance checks + findings"],
+        ["compliance_health",           "service", "4-pillar health score + trajectory"],
+        ["compliance_rerun_service",    "service", "Nightly re-screen stale orgs"],
+        ["CapacityPassport (model)",    "model",   "Versioned passport + public URLs"],
+        ["AdverseMediaScreening",       "model",   "Screening results with timestamps + bands"],
+        ["BankAccountVerification",     "model",   "IBAN check + connector results"],
+        ["ComplianceCheck + RegistrationVerification", "model", "Per-org checks + registry verifications"],
+        ["ComplianceSnapshot",          "model",   "Daily health snapshots for trajectory"],
+    ],
+    col_widths=[2.4, 1.0, 3.4]
+)
+
+heading(doc, "Reviewer intelligence", 3)
+add_formatted_table(doc,
+    ["Component", "Type", "Purpose"],
+    [
+        ["reviewer_match_service",      "service", "Rank reviewers by sector/country/throughput/workload"],
+        ["reviewer_auto_assign_service","service", "Pick top-N panel on submit + cron sweep"],
+        ["reviewer_briefing_service",   "service", "One-paragraph AI brief per assignment"],
+        ["reviewer_followups_service",  "service", "Outbound evidence-request emails"],
+        ["reviewer_throughput_service", "service", "Per-reviewer SLA + slipping indicator"],
+        ["panel_calibration_service",   "service", "Detect divergent panel scores"],
+    ],
+    col_widths=[2.4, 1.0, 3.4]
+)
+
+heading(doc, "Donor portfolio intelligence", 3)
+add_formatted_table(doc,
+    ["Component", "Type", "Purpose"],
+    [
+        ["donor_profile_service",            "service", "Public donor profile aggregates"],
+        ["donor_cohort_analytics_service",   "service", "NGOs you fund vs cohort"],
+        ["peer_benchmark_service",           "service", "NGO + donor peer benchmarks"],
+        ["portfolio_risk_heatmap_service",   "service", "Sector × country risk grid"],
+        ["portfolio_bundle_service",         "service", "Donor portfolio PDF + ZIP"],
+        ["ngo_portfolio_service",            "service", "NGO portfolio bundle"],
+        ["ngo_summary_service",              "service", "Public NGO summary URL (opt-in)"],
+        ["grant_broadcast_service",          "service", "One-shot message to all applicants"],
+        ["bundle_pdf_service",               "service", "Report bundle PDF assembly"],
+        ["calendar_pdf_service",             "service", "Cross-entity deadline calendar PDF"],
+        ["csv_export_service",               "service", "Role-scoped CSV exports"],
+        ["debrief_rollup_service",           "service", "Win/loss aggregate rollups"],
+    ],
+    col_widths=[2.4, 1.0, 3.4]
+)
+
+heading(doc, "Discovery, matching, search", 3)
+add_formatted_table(doc,
+    ["Component", "Type", "Purpose"],
+    [
+        ["match_engine",                "service", "NGO-grant pair scoring"],
+        ["match_notification_service",  "service", "Smart-match outbound notification"],
+        ["global_search_service",       "service", "Cross-entity search (grants/apps/reports/orgs)"],
+        ["document_search_service",     "service", "ILIKE search across visible documents"],
+    ],
+    col_widths=[2.4, 1.0, 3.4]
+)
+
+heading(doc, "Collaboration, notifications, onboarding", 3)
+add_formatted_table(doc,
+    ["Component", "Type", "Purpose"],
+    [
+        ["notification_service",        "service", "Core in-app notification API"],
+        ["notification_dispatcher",     "service", "Multi-channel fan-out (in-app/email/SMS/WhatsApp/push)"],
+        ["notification_digest_service", "service", "Daily/weekly per-user digest cron"],
+        ["NotificationPreference",      "model",   "Per-user per-category channel selection"],
+        ["PushSubscription",            "model",   "Web push subscription"],
+        ["web_push",                    "service", "Web push subscribe/dispatch"],
+        ["email_service",               "service", "Outbound email transport"],
+        ["messaging_service",           "service", "SMS + WhatsApp connector adapter"],
+        ["onboarding_service",          "service", "NGO + donor onboarding checklist computation"],
+        ["org_merge_service",           "service", "Admin-gated donor merge (confirm-name protected)"],
+    ],
+    col_widths=[2.4, 1.0, 3.4]
+)
+
+heading(doc, "Metrics + feedback (Phase 29-31)", 3)
+add_formatted_table(doc,
+    ["Component", "Type", "Purpose"],
+    [
+        ["UserEvent (model)",      "model",   "Behavioural event row (15+ instrumented vocab)"],
+        ["UserEventService",       "service", "Record + aggregate (DAU/funnel/per-language/A-B)"],
+        ["ab_arm() helper",        "util",    "Deterministic experiment bucketing"],
+        ["UserFeedback (model)",   "model",   "1-question NPS micro-survey response"],
+        ["UserFeedbackService",    "service", "Record + NPS rollup + per-language + recent comments"],
+    ],
+    col_widths=[2.4, 1.0, 3.4]
+)
+
+heading(doc, "Operations", 3)
+add_formatted_table(doc,
+    ["Component", "Type", "Purpose"],
+    [
+        ["task_runner",          "service", "In-process async job runner"],
+        ["distributed_lock",     "service", "Per-key serialisation primitive"],
+        ["ai_mock",              "service", "Deterministic AI stub for tests"],
+        ["uat_fixture_service",  "service", "Daily UAT fixture maintenance cron"],
+        ["demo_readiness",       "service", "Demo state scan (admin self-check)"],
+        ["audit",                "service", "Console + DB audit logger"],
+    ],
+    col_widths=[2.4, 1.0, 3.4]
 )
 
 
