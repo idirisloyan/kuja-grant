@@ -68,6 +68,15 @@ class Network(db.Model):
     # Feature toggles per-network (lets us roll features out without env vars)
     features = db.Column(db.Text, nullable=True)  # JSON dict
 
+    # Phase 33 — membership configuration. Both stored as JSON to keep the
+    # network table thin; helpers below decode + give sensible defaults.
+    eligibility_questions_json = db.Column(db.Text, nullable=True)
+    required_documents_config_json = db.Column(db.Text, nullable=True)
+    # Periodic due-diligence cadence (months). 24 = re-assess every 2 years.
+    assessment_refresh_months = db.Column(
+        db.Integer, nullable=False, default=24,
+    )
+
     is_default = db.Column(db.Boolean, nullable=False, default=False)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
 
@@ -100,6 +109,41 @@ class Network(db.Model):
 
     def feature_enabled(self, key: str, *, default: bool = False) -> bool:
         return bool(self.get_features().get(key, default))
+
+    # --- Membership configuration helpers ---
+    # Defaults model NEAR's actual onboarding (5 yes/no questions + a fixed
+    # required-document list). Networks can override per-row.
+    DEFAULT_ELIGIBILITY_QUESTIONS = [
+        {"key": "registered_nonprofit", "label": "Is your organisation a registered non-profit?", "required": True},
+        {"key": "global_south_hq", "label": "Is your HQ in a non-OECD-DAC country?", "required": True},
+        {"key": "locally_rooted", "label": "Is your governance + leadership locally rooted?", "required": True},
+        {"key": "governance_docs", "label": "Do you have governance documents (bylaws, board minutes)?", "required": True},
+        {"key": "code_of_conduct", "label": "Do you have a code of conduct or safeguarding policy?", "required": True},
+    ]
+    DEFAULT_REQUIRED_DOCUMENTS = [
+        {"key": "registration_cert", "label": "Registration certificate", "required": True},
+        {"key": "bylaws", "label": "Bylaws / governing instrument", "required": True},
+        {"key": "board_list_passports", "label": "Board list with passport copies", "required": True},
+        {"key": "code_of_conduct", "label": "Code of conduct", "required": True},
+        {"key": "latest_audit", "label": "Latest audited financial statement", "required": True},
+        {"key": "latest_annual_report", "label": "Latest annual report", "required": True},
+        {"key": "reference_letter_1", "label": "Reference letter #1 (from donor/network/INGO/NEAR member)", "required": True},
+        {"key": "reference_letter_2", "label": "Reference letter #2 (from donor/network/INGO/NEAR member)", "required": True},
+    ]
+
+    def get_eligibility_questions(self) -> list[dict]:
+        val = _json_load(self.eligibility_questions_json)
+        return val if isinstance(val, list) and val else list(self.DEFAULT_ELIGIBILITY_QUESTIONS)
+
+    def set_eligibility_questions(self, value) -> None:
+        self.eligibility_questions_json = _json_dump(value or [])
+
+    def get_required_documents(self) -> list[dict]:
+        val = _json_load(self.required_documents_config_json)
+        return val if isinstance(val, list) and val else list(self.DEFAULT_REQUIRED_DOCUMENTS)
+
+    def set_required_documents(self, value) -> None:
+        self.required_documents_config_json = _json_dump(value or [])
 
     # --- Public dict ---
     def to_dict(self, *, include_governance: bool = False) -> dict:

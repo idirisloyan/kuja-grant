@@ -142,6 +142,68 @@ def create_app(config_name=None):
         # Now that all models are registered, create any missing tables
         db.create_all()
 
+        # Phase 33 — networks + network_memberships + documents had new
+        # columns added in v610. db.create_all() doesn't ALTER existing
+        # tables, and local dev SQLite skips migrations, so back-fill the
+        # columns by hand. Idempotent: each check guards on column presence.
+        try:
+            from sqlalchemy import inspect as sa_inspect, text
+            inspector = sa_inspect(db.engine)
+            with db.engine.connect() as conn:
+                tables = inspector.get_table_names()
+                if "networks" in tables:
+                    cols = {c["name"] for c in inspector.get_columns("networks")}
+                    if "eligibility_questions_json" not in cols:
+                        conn.execute(text("ALTER TABLE networks ADD COLUMN eligibility_questions_json TEXT"))
+                    if "required_documents_config_json" not in cols:
+                        conn.execute(text("ALTER TABLE networks ADD COLUMN required_documents_config_json TEXT"))
+                    if "assessment_refresh_months" not in cols:
+                        conn.execute(text("ALTER TABLE networks ADD COLUMN assessment_refresh_months INTEGER DEFAULT 24"))
+                if "network_memberships" in tables:
+                    cols = {c["name"] for c in inspector.get_columns("network_memberships")}
+                    if "eligibility_answers_json" not in cols:
+                        conn.execute(text("ALTER TABLE network_memberships ADD COLUMN eligibility_answers_json TEXT"))
+                    if "assessment_next_refresh_due_at" not in cols:
+                        conn.execute(text("ALTER TABLE network_memberships ADD COLUMN assessment_next_refresh_due_at TIMESTAMP"))
+                    if "cooldown_until" not in cols:
+                        conn.execute(text("ALTER TABLE network_memberships ADD COLUMN cooldown_until TIMESTAMP"))
+                if "documents" in tables:
+                    cols = {c["name"] for c in inspector.get_columns("documents")}
+                    if "network_membership_id" not in cols:
+                        conn.execute(text("ALTER TABLE documents ADD COLUMN network_membership_id INTEGER"))
+                conn.commit()
+        except Exception as e:
+            app.logger.warning(f"Phase 33 column back-fill skipped: {e}")
+
+        # Phase 32 — guarantee the default Network row exists. The
+        # migration seeds it on a fresh Postgres deploy, but local SQLite
+        # bootstraps via db.create_all() (no migration), so we'd otherwise
+        # boot with an empty networks table and the host-resolver would
+        # return None for every request.
+        try:
+            from app.models import Network, DEFAULT_NETWORK_SLUG
+            if not Network.query.filter_by(slug=DEFAULT_NETWORK_SLUG).first():
+                default_net = Network(
+                    slug=DEFAULT_NETWORK_SLUG,
+                    name="Kuja Marketplace",
+                    mission_short="AI-powered grant management for the Global South.",
+                    brand_color_hex="#C2410C",
+                    default_language="en",
+                    home_url="https://kuja.org",
+                    oversight_body_min_signers=2,
+                    membership_review_days=60,
+                    default_assessment_framework="kuja",
+                    assessment_framework_display="Kuja Capacity Assessment",
+                    default_currency="USD",
+                    is_default=True,
+                    is_active=True,
+                )
+                db.session.add(default_net)
+                db.session.commit()
+                app.logger.info("Seeded default 'kuja' Network row (bootstrap path)")
+        except Exception as e:
+            app.logger.warning(f"Default network bootstrap skipped: {e}")
+
     # -----------------------------------------------------------------
     # Ensure lockout columns exist (safety net for migration timing)
     # -----------------------------------------------------------------

@@ -146,6 +146,74 @@ def make_tests(base):
         assert net.get("is_active") is True, "default network not active"
     tests.append(("Network /current returns default Kuja brand", test_network_current))
 
+    # --- Membership config (Phase 33) ---
+    def test_membership_config():
+        r = requests.get(f"{base}/api/network/membership/config", timeout=5)
+        assert r.status_code == 200, f"/membership/config = {r.status_code}"
+        data = r.json()
+        assert data.get("success") is True, f"success != True: {data}"
+        qs = data.get("eligibility_questions") or []
+        docs = data.get("required_documents") or []
+        assert len(qs) >= 1, f"no eligibility questions: {qs}"
+        assert len(docs) >= 1, f"no required documents: {docs}"
+        # Sanity: required-doc list mentions registration cert (NEAR-style default)
+        assert any("registration" in (d.get("key") or "") for d in docs), \
+            f"registration cert not in required docs: {docs}"
+    tests.append(("Membership /config exposes questions + docs", test_membership_config))
+
+    # --- Membership apply (Phase 33) ---
+    def test_membership_apply():
+        s = login_ok(base, USERS["ngo"])
+        body = {
+            "eligibility_answers": {
+                "registered_nonprofit": "yes",
+                "global_south_hq": "yes",
+                "locally_rooted": "yes",
+                "governance_docs": "yes",
+                "code_of_conduct": "yes",
+            },
+            "country": "Kenya",
+            "region": "East Africa",
+        }
+        r = s.post(
+            f"{base}/api/network/membership/apply",
+            json=body,
+            headers={"X-Requested-With": "XMLHttpRequest"},
+            timeout=10,
+        )
+        assert r.status_code == 200, f"apply returned {r.status_code}: {r.text[:300]}"
+        data = r.json()
+        assert data.get("success") is True
+        m = data.get("membership") or {}
+        assert m.get("status") in ("pending", "under_review", "active"), \
+            f"unexpected status: {m.get('status')}"
+        assert m.get("network_id") == 1, f"network_id != 1: {m.get('network_id')}"
+    tests.append(("Membership apply (NGO) succeeds", test_membership_apply))
+
+    # --- Membership pending list is admin-gated (Phase 33) ---
+    def test_membership_pending_admin_only():
+        s_ngo = login_ok(base, USERS["ngo"])
+        r = s_ngo.get(
+            f"{base}/api/network/membership/pending",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+            timeout=10,
+        )
+        assert r.status_code == 403, \
+            f"NGO should not access /pending: got {r.status_code}"
+
+        s_admin = login_ok(base, USERS["admin"])
+        r2 = s_admin.get(
+            f"{base}/api/network/membership/pending?status=all",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+            timeout=10,
+        )
+        assert r2.status_code == 200, \
+            f"admin /pending returned {r2.status_code}: {r2.text[:200]}"
+        data = r2.json()
+        assert data.get("success") is True
+        assert isinstance(data.get("memberships"), list)
+    tests.append(("Membership /pending gated to admin", test_membership_pending_admin_only))
+
     # --- Login all roles ---
     for role, email in USERS.items():
         def _make(e=email, rl=role):
