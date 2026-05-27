@@ -453,3 +453,97 @@ export function useDeclaration(id: number | null) {
     fetcher,
   );
 }
+
+// ---------------------------------------------------------------------------
+// Window report (Phase 37)
+// ---------------------------------------------------------------------------
+
+export interface WindowReportSignature {
+  id: number;
+  signer_user_id: number;
+  status: string;
+  signature_method: string | null;
+  recusal_reason: string | null;
+  rejection_reason: string | null;
+  signed_at: string | null;
+}
+
+export interface WindowReportGrantBrief {
+  id: number;
+  title: string;
+  amount: number | null;
+  status: string | null;
+  currency: string | null;
+}
+
+export interface WindowReportMonitoringVisit {
+  id: number;
+  visit_mode: string;
+  visit_date: string;
+  community_feedback_summary: string | null;
+  observations_md: string | null;
+}
+
+export interface WindowReportDeclaration {
+  id: number;
+  title: string;
+  status: string;
+  crisis_type: string | null;
+  country: string | null;
+  severity: string | null;
+  declared_at: string | null;
+  applications_open_at: string | null;
+  applications_close_at: string | null;
+  decision_at: string | null;
+  proposed_total_amount: number | null;
+  evidence_row_id: number | null;
+  signatures: WindowReportSignature[];
+  signed_count: number;
+  recused_count: number;
+  rejected_count: number;
+  signed_active_audit_id: number | null;
+  grants: WindowReportGrantBrief[];
+  monitoring_visits: WindowReportMonitoringVisit[];
+}
+
+export interface WindowReport {
+  success: boolean;
+  window: {
+    id: number; fund_id: number; name: string; slug: string; status: string;
+    crisis_type: string | null;
+    max_grant_amount: number | null; decision_sla_days: number | null;
+    application_window_hours: number | null;
+    direct_to_community_single_min_pct: number | null;
+    direct_to_community_consortium_min_pct: number | null;
+  };
+  fund: { id: number; name: string; slug: string; currency: string } | null;
+  stats: {
+    declarations_total: number;
+    declarations_active: number;
+    declarations_closed: number;
+    declarations_cancelled: number;
+    grants_total: number;
+    ngos_reached: number;
+    countries_covered: string[];
+    countries_count: number;
+    total_disbursed_estimate: number;
+  };
+  sla: {
+    target_app_window_hours: number;
+    target_decision_days: number;
+    app_window_hits: number;
+    app_window_misses: number;
+    decision_hits: number;
+    decision_misses: number;
+  };
+  declarations: WindowReportDeclaration[];
+  audit_chain: { ok: boolean | null; total: number | null };
+  generated_at: string;
+}
+
+export function useWindowReport(windowId: number | null) {
+  return useSWR<WindowReport>(
+    windowId ? `/windows/${windowId}/report` : null,
+    fetcher,
+  );
+}

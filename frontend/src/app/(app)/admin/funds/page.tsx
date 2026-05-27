@@ -21,9 +21,10 @@ import {
 } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
+import Link from 'next/link';
 import {
   Plus, Coins, Inbox, ChevronDown, ChevronRight, Sparkles,
-  Lock, Gauge, Loader2,
+  Lock, Gauge, Loader2, BarChart3,
 } from 'lucide-react';
 
 export default function FundsAdminPage() {
@@ -319,18 +320,28 @@ function WindowCard({ window: w, onUpdate }: { window: FundWindow; onUpdate: () 
             {w.max_grant_amount && <> · max {w.max_grant_amount.toLocaleString()}</>}
           </div>
         </div>
-        {!hasRubric && (
-          <button
-            type="button"
-            onClick={seedRubric}
-            disabled={seeding}
-            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-border hover:bg-background disabled:opacity-50"
-            title="Seed the NEAR Change Fund 5-area rubric on this window"
+        <div className="flex gap-1 shrink-0">
+          {!hasRubric && (
+            <button
+              type="button"
+              onClick={seedRubric}
+              disabled={seeding}
+              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-border hover:bg-background disabled:opacity-50"
+              title="Seed the NEAR Change Fund 5-area rubric on this window"
+            >
+              {seeding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+              Seed Change Fund rubric
+            </button>
+          )}
+          <Link
+            href={`/admin/windows/${w.id}/report`}
+            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-border hover:bg-background"
+            title="View window report"
           >
-            {seeding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-            Seed Change Fund rubric
-          </button>
-        )}
+            <BarChart3 className="w-3 h-3" />
+            Report
+          </Link>
+        </div>
       </div>
 
       {/* Tiny SLA chip strip */}
