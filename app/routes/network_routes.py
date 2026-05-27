@@ -11,10 +11,12 @@ Phase 33+ will add membership endpoints (apply, list, review, decision).
 
 import logging
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 
 from app.utils.network import get_current_network
+from app.utils.helpers import get_request_json
+from app.utils.decorators import role_required
 
 logger = logging.getLogger("kuja")
 
@@ -75,4 +77,47 @@ def api_network_list():
     return jsonify({
         "success": True,
         "networks": [n.to_dict(include_governance=True) for n in rows],
+    })
+
+
+@network_bp.route("/<int:network_id>/host-aliases", methods=["PUT"])
+@role_required("admin")
+def api_update_host_aliases(network_id):
+    """Admin: update host_aliases for a network. Used by ops to wire a new
+    Railway-style URL or custom subdomain to a tenant without redeploying.
+
+    Body: { host_aliases: [str, str, ...] }   — REPLACES the existing list
+
+    Audit-anchored. Idempotent if value is unchanged.
+    """
+    from app.extensions import db
+    from app.models import Network
+    net = Network.query.get_or_404(network_id)
+
+    body = get_request_json() or {}
+    aliases = body.get("host_aliases")
+    if not isinstance(aliases, list):
+        return jsonify({"success": False, "error": "host_aliases must be a list"}), 400
+    cleaned = [str(a).strip().lower() for a in aliases if str(a).strip()]
+
+    old = net.get_host_aliases()
+    net.set_host_aliases(cleaned)
+    db.session.commit()
+
+    try:
+        from app.models import AuditChainEntry
+        AuditChainEntry.append(
+            action="network.host_aliases.updated",
+            actor_email=current_user.email,
+            subject_kind="network",
+            subject_id=net.id,
+            details={"old": old, "new": cleaned},
+        )
+    except Exception:
+        pass
+
+    return jsonify({
+        "success": True,
+        "network_id": net.id,
+        "host_aliases": net.get_host_aliases(),
     })
