@@ -59,6 +59,7 @@ def register_blueprints(app):
     from app.routes.crisis_monitoring_routes import crisis_bp  # Phase 35: weekly crisis monitoring
     from app.routes.emergency_declaration_routes import emergency_bp  # Phase 36: multi-sig declarations
     from app.routes.window_report_routes import window_report_bp  # Phase 37: window reports + monitoring visits
+    from app.routes.network_ai_routes import network_ai_bp  # Phase 38: 7 network AI surfaces
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -73,5 +74,5 @@ def register_blueprints(app):
                doc_search_bp, search_alias_bp, digest_bp, ai_compare_bp, phase11_bp,
                portfolio_bp, cron_bp, tags_bp, exports_bp, webauthn_bp,
                feedback_bp, network_bp, network_membership_bp, fund_bp, crisis_bp,
-               emergency_bp, window_report_bp]:
+               emergency_bp, window_report_bp, network_ai_bp]:
         app.register_blueprint(bp)

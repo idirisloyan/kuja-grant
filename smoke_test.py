@@ -639,6 +639,23 @@ def make_tests(base):
                 pass
     tests.append(("Window report + monitoring visit", test_window_report_and_visit))
 
+    # --- Phase 38: AI surfaces fallback path ---
+    # Smoke harness has no Anthropic key → exercises the deterministic
+    # fallback paths in NetworkAIService. We just verify the endpoints
+    # are reachable + return structured payloads (never 500).
+    def test_phase38_ai_surfaces_reachable():
+        s = login_ok(base, USERS["admin"])
+        H = {"X-Requested-With": "XMLHttpRequest"}
+
+        # The cross-window patterns endpoint is the cheapest to verify
+        # because it doesn't need a specific entity id.
+        r = s.post(f"{base}/api/networks/patterns/ai-detect", headers=H, timeout=10)
+        assert r.status_code == 200, f"patterns: {r.status_code} {r.text[:200]}"
+        body = r.json()
+        assert body.get("success") is True
+        assert "patterns" in body  # may be [] if no windows
+    tests.append(("Phase 38 AI surfaces reachable + fallback shape", test_phase38_ai_surfaces_reachable))
+
     # --- Login all roles ---
     for role, email in USERS.items():
         def _make(e=email, rl=role):
