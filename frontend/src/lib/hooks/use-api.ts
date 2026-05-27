@@ -340,3 +340,116 @@ export function useWindowRubric(windowId: number | null) {
     fetcher,
   );
 }
+
+// ---------------------------------------------------------------------------
+// Crisis Monitoring (Phase 35)
+// ---------------------------------------------------------------------------
+
+export interface CrisisRow {
+  id: number;
+  report_id: number;
+  country: string;
+  region: string | null;
+  event_type: string | null;
+  event_title: string | null;
+  hdi_band: string | null;
+  gov_capacity_band: string | null;
+  people_impacted_estimate: number | null;
+  attention_band: string | null;
+  composite_score: number | null;
+  narrative: string | null;
+  flagged_for_ob: boolean;
+}
+
+export interface CrisisReport {
+  id: number;
+  network_id: number;
+  period_start: string;
+  period_end: string;
+  summary_md: string | null;
+  status: string;
+  generated_by: string;
+  cron_anchor_audit_id: number | null;
+  published_at: string | null;
+  row_count: number;
+  flagged_row_count: number;
+  rows?: CrisisRow[];
+}
+
+export function useLatestCrisisReport() {
+  return useSWR<{ success: boolean; report: CrisisReport | null }>(
+    '/crisis/reports/latest/published',
+    fetcher,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Emergency Declarations (Phase 36)
+// ---------------------------------------------------------------------------
+
+export interface DeclarationSignature {
+  id: number;
+  declaration_id: number;
+  signer_user_id: number;
+  required_order: number;
+  status: 'pending' | 'signed' | 'recused' | 'rejected';
+  signature_method: string | null;
+  declared_no_coi: boolean | null;
+  recusal_reason: string | null;
+  rejection_reason: string | null;
+  signed_at: string | null;
+}
+
+export interface DeclarationDocument {
+  id: number;
+  declaration_id: number;
+  document_id: number | null;
+  kind: string;
+  note: string | null;
+  created_at: string | null;
+}
+
+export interface EmergencyDeclaration {
+  id: number;
+  network_id: number;
+  fund_id: number;
+  window_id: number;
+  evidence_row_id: number | null;
+  evidence_report_id: number | null;
+  title: string;
+  crisis_type: string | null;
+  region: string | null;
+  country: string | null;
+  severity: string | null;
+  summary_md: string | null;
+  proposed_total_amount: number | null;
+  shortlisted_org_ids: number[];
+  status: 'draft' | 'in_review' | 'signed_active' | 'cancelled' | 'closed';
+  status_reason: string | null;
+  declared_at: string | null;
+  applications_open_at: string | null;
+  applications_close_at: string | null;
+  decision_at: string | null;
+  applicants_notified_at: string | null;
+  signed_active_audit_id: number | null;
+  created_by_user_id: number | null;
+  created_at: string | null;
+  signed_count: number;
+  rejected_count: number;
+  recused_count: number;
+  required_signer_count: number;
+  signatures?: DeclarationSignature[];
+  documents?: DeclarationDocument[];
+}
+
+export function useDeclarations(status?: string) {
+  const url = status ? `/declarations?status=${encodeURIComponent(status)}` : '/declarations';
+  return useSWR<{ success: boolean; declarations: EmergencyDeclaration[] }>(url, fetcher);
+}
+
+export function useDeclaration(id: number | null) {
+  return useSWR<{ success: boolean; declaration: EmergencyDeclaration }>(
+    id ? `/declarations/${id}` : null,
+    fetcher,
+  );
+}

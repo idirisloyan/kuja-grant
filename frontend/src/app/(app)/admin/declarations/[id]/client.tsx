@@ -1,0 +1,559 @@
+'use client';
+
+/**
+ * /admin/declarations/<id> — Phase 36 (May 2026).
+ *
+ * Multi-sig workflow page. Shows:
+ *   - Header with status, SLA timestamps, signed/total counter
+ *   - Summary block (title + crisis_type + country + severity + summary_md)
+ *   - Signers panel (signature status, sign/recuse/reject controls for
+ *     the signer themselves, manual_admin override for admins)
+ *   - Documents list
+ *   - Drafter actions (submit, cancel)
+ *
+ * Self-sign UX:
+ *   - If TOTP is enrolled: prompt for 6-digit code, then call /sign.
+ *   - If not enrolled: admin attestation via manual_admin (admin only).
+ */
+
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { api, ApiError } from '@/lib/api';
+import { useDeclaration, type EmergencyDeclaration } from '@/lib/hooks/use-api';
+import { useAuthStore } from '@/stores/auth-store';
+import {
+  CheckCircle2, XCircle, AlertCircle, Loader2, ChevronLeft,
+  Shield, Lock, Clock, FileText,
+} from 'lucide-react';
+
+const STATUS_COLOUR: Record<EmergencyDeclaration['status'], string> = {
+  draft: 'bg-muted text-muted-foreground',
+  in_review: 'bg-[hsl(var(--kuja-sun))]/15 text-[hsl(var(--kuja-sun))]',
+  signed_active: 'bg-[hsl(var(--kuja-grow))]/15 text-[hsl(var(--kuja-grow))]',
+  cancelled: 'bg-destructive/15 text-destructive',
+  closed: 'bg-muted text-muted-foreground',
+};
+
+export default function DeclarationDetailClient() {
+  const params = useParams();
+  const idParam = String(params?.id ?? '0');
+  const id = Number(idParam);
+  const router = useRouter();
+  const viewer = useAuthStore((s) => s.user);
+  const { data, isLoading, mutate } = useDeclaration(id);
+  const d = data?.declaration;
+
+  if (viewer && viewer.role !== 'admin') {
+    return (
+      <div className="p-6 text-sm">
+        <p className="text-destructive">Only platform admins can view this page.</p>
+      </div>
+    );
+  }
+
+  if (isLoading || !d) {
+    return (
+      <div className="space-y-3">
+        <div className="kuja-shimmer h-10 w-72 rounded" />
+        <div className="kuja-shimmer h-32 rounded" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <button
+        type="button"
+        onClick={() => router.push('/admin/declarations')}
+        className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+      >
+        <ChevronLeft className="w-3 h-3" /> Back to declarations
+      </button>
+
+      {/* Header */}
+      <div className="border border-border rounded-lg bg-card p-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <h1 className="kuja-display text-2xl">{d.title}</h1>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold capitalize ${STATUS_COLOUR[d.status]}`}>
+                {d.status.replace('_', ' ')}
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
+              {d.country && <span>{d.country}</span>}
+              {d.crisis_type && <span>{d.crisis_type}</span>}
+              {d.severity && <span>severity: {d.severity}</span>}
+              {d.proposed_total_amount && (
+                <span>proposed: {d.proposed_total_amount.toLocaleString()}</span>
+              )}
+            </div>
+          </div>
+          <DrafterActions d={d} onChange={mutate} />
+        </div>
+
+        {/* Signature counter */}
+        <div className="mt-4 flex items-center gap-3 text-xs">
+          <Shield className="w-4 h-4 text-muted-foreground" />
+          <strong>{d.signed_count}</strong> / {d.required_signer_count} signed
+          {d.recused_count > 0 && (
+            <span className="text-muted-foreground">· {d.recused_count} recused</span>
+          )}
+          {d.rejected_count > 0 && (
+            <span className="text-destructive">· {d.rejected_count} rejected</span>
+          )}
+        </div>
+
+        {/* SLA timestamps */}
+        <SlaPanel d={d} />
+      </div>
+
+      {/* Summary */}
+      {d.summary_md && (
+        <div className="border border-border rounded-lg bg-card p-5">
+          <h2 className="font-semibold text-sm mb-2">Summary</h2>
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">{d.summary_md}</p>
+        </div>
+      )}
+
+      {/* Evidence anchor */}
+      {d.evidence_row_id && (
+        <div className="border border-border rounded-lg bg-card p-5 text-xs">
+          <h2 className="font-semibold text-sm mb-2 flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Evidence anchor
+          </h2>
+          <div className="text-muted-foreground">
+            Crisis Monitoring row #{d.evidence_row_id}
+            {d.evidence_report_id && <> · Report #{d.evidence_report_id}</>}
+          </div>
+        </div>
+      )}
+
+      {/* Signers */}
+      <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+        <h2 className="font-semibold text-sm">Signers</h2>
+        {(d.signatures ?? []).length === 0 && (
+          <div className="text-xs text-muted-foreground italic">No signer slots yet.</div>
+        )}
+        <ul className="space-y-2">
+          {(d.signatures ?? []).map((s) => (
+            <SignerRow
+              key={s.id}
+              declarationId={d.id}
+              decl={d}
+              sig={s}
+              onChange={mutate}
+            />
+          ))}
+        </ul>
+      </section>
+
+      {/* Documents */}
+      <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+        <h2 className="font-semibold text-sm">Supporting documents</h2>
+        {(d.documents ?? []).length === 0 ? (
+          <div className="text-xs text-muted-foreground italic">No documents attached.</div>
+        ) : (
+          <ul className="space-y-1.5 text-xs">
+            {(d.documents ?? []).map((doc) => (
+              <li key={doc.id} className="flex items-center gap-2">
+                <FileText className="w-3 h-3 text-muted-foreground" />
+                <span className="capitalize">{doc.kind.replace('_', ' ')}</span>
+                {doc.note && <span className="text-muted-foreground italic">— {doc.note}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Audit anchor chip */}
+      {d.signed_active_audit_id && (
+        <div className="text-[10px] text-muted-foreground">
+          Activation audit-chain anchor: #{d.signed_active_audit_id}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SlaPanel({ d }: { d: EmergencyDeclaration }) {
+  const items = [
+    { label: 'Declared', value: d.declared_at },
+    { label: 'Apps open', value: d.applications_open_at },
+    { label: 'Apps close', value: d.applications_close_at },
+    { label: 'Decision', value: d.decision_at },
+    { label: 'Notified', value: d.applicants_notified_at },
+  ];
+  const hasAny = items.some((i) => i.value);
+  if (!hasAny) return null;
+  return (
+    <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2 text-[10px]">
+      {items.map((i) => (
+        <div key={i.label} className="space-y-0.5">
+          <div className="uppercase tracking-wide text-muted-foreground">{i.label}</div>
+          <div className="font-medium">
+            {i.value ? (
+              <span className="text-foreground">
+                <Clock className="w-3 h-3 inline mr-1" />
+                {new Date(i.value).toLocaleString()}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DrafterActions({ d, onChange }: { d: EmergencyDeclaration; onChange: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+
+  async function submit() {
+    setBusy(true);
+    try {
+      await api.post(`/declarations/${d.id}/submit`);
+      toast.success('Submitted for signature.');
+      onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Submit failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancel() {
+    if (!cancelReason.trim()) {
+      toast.error('Cancellation reason is required.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/declarations/${d.id}/cancel`, { reason: cancelReason.trim() });
+      toast.success('Declaration cancelled.');
+      onChange();
+      setShowCancel(false);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Cancel failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (d.status === 'draft') {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy || (d.signatures ?? []).length < d.required_signer_count}
+          title={
+            (d.signatures ?? []).length < d.required_signer_count
+              ? `Add at least ${d.required_signer_count} signer slots first`
+              : ''
+          }
+          className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'Submit for signature'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowCancel(true)}
+          className="px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
+        >
+          Cancel
+        </button>
+        {showCancel && (
+          <div className="basis-full flex gap-2 mt-2">
+            <input
+              type="text"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Reason"
+              className="flex-1 px-2 py-1 rounded-md border border-border bg-background text-xs"
+            />
+            <button
+              type="button"
+              onClick={cancel}
+              disabled={busy}
+              className="px-3 py-1 rounded-md bg-destructive text-destructive-foreground text-xs font-semibold disabled:opacity-50"
+            >
+              Confirm cancel
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (d.status === 'in_review') {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowCancel(true)}
+          className="px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
+        >
+          Cancel
+        </button>
+        {showCancel && (
+          <div className="mt-2 flex gap-2">
+            <input
+              type="text"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Reason"
+              className="flex-1 px-2 py-1 rounded-md border border-border bg-background text-xs"
+            />
+            <button
+              type="button"
+              onClick={cancel}
+              disabled={busy}
+              className="px-3 py-1 rounded-md bg-destructive text-destructive-foreground text-xs font-semibold disabled:opacity-50"
+            >
+              Confirm cancel
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+  return null;
+}
+
+function SignerRow({
+  declarationId, decl, sig, onChange,
+}: {
+  declarationId: number;
+  decl: EmergencyDeclaration;
+  sig: NonNullable<EmergencyDeclaration['signatures']>[number];
+  onChange: () => void;
+}) {
+  const viewer = useAuthStore((s) => s.user);
+  const isSelf = viewer?.id === sig.signer_user_id;
+  const isAdmin = viewer?.role === 'admin';
+
+  const [busy, setBusy] = useState(false);
+  const [showSign, setShowSign] = useState(false);
+  const [showRecuse, setShowRecuse] = useState(false);
+  const [showReject, setShowReject] = useState(false);
+  const [totpCode, setTotpCode] = useState('');
+  const [noCoi, setNoCoi] = useState(false);
+  const [reason, setReason] = useState('');
+  const [method, setMethod] = useState<'totp' | 'manual_admin'>('totp');
+
+  const canAct = sig.status === 'pending' && decl.status === 'in_review' && (isSelf || isAdmin);
+
+  async function sign() {
+    if (!noCoi) {
+      toast.error('You must affirm no conflict of interest to sign.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const body: Record<string, unknown> = {
+        signature_method: method,
+        declared_no_coi: true,
+      };
+      if (method === 'totp') body.totp_code = totpCode;
+      await api.post(`/declarations/${declarationId}/signatures/${sig.id}/sign`, body);
+      toast.success('Signed.');
+      setShowSign(false);
+      setTotpCode('');
+      setNoCoi(false);
+      onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Sign failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function recuse() {
+    if (!reason.trim()) {
+      toast.error('Recusal reason is required.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/declarations/${declarationId}/signatures/${sig.id}/recuse`,
+        { reason: reason.trim() });
+      toast.success('Recused.');
+      setShowRecuse(false);
+      setReason('');
+      onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Recuse failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reject() {
+    if (!reason.trim()) {
+      toast.error('Rejection reason is required.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/declarations/${declarationId}/signatures/${sig.id}/reject`,
+        { reason: reason.trim() });
+      toast.success('Rejected.');
+      setShowReject(false);
+      setReason('');
+      onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Reject failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const statusIcon = sig.status === 'signed'
+    ? <CheckCircle2 className="w-4 h-4 text-[hsl(var(--kuja-grow))]" />
+    : sig.status === 'rejected'
+    ? <XCircle className="w-4 h-4 text-destructive" />
+    : sig.status === 'recused'
+    ? <AlertCircle className="w-4 h-4 text-muted-foreground" />
+    : <Lock className="w-4 h-4 text-muted-foreground" />;
+
+  return (
+    <li className="border border-border rounded-md bg-background p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {statusIcon}
+          <div>
+            <div className="text-sm font-medium">User #{sig.signer_user_id}</div>
+            <div className="text-xs text-muted-foreground capitalize">
+              {sig.status.replace('_', ' ')}
+              {sig.signature_method && <> · via {sig.signature_method}</>}
+              {sig.signed_at && <> · {new Date(sig.signed_at).toLocaleString()}</>}
+            </div>
+            {sig.recusal_reason && (
+              <div className="text-xs italic text-muted-foreground mt-0.5">
+                Recused: {sig.recusal_reason}
+              </div>
+            )}
+            {sig.rejection_reason && (
+              <div className="text-xs italic text-destructive mt-0.5">
+                Rejected: {sig.rejection_reason}
+              </div>
+            )}
+          </div>
+        </div>
+        {canAct && (
+          <div className="flex gap-1">
+            <button type="button" onClick={() => setShowSign(true)}
+              className="px-2 py-1 rounded-md bg-[hsl(var(--kuja-grow))] text-white text-xs font-semibold hover:opacity-90">
+              Sign
+            </button>
+            <button type="button" onClick={() => setShowRecuse(true)}
+              className="px-2 py-1 rounded-md border border-border text-xs font-semibold hover:bg-muted">
+              Recuse
+            </button>
+            <button type="button" onClick={() => setShowReject(true)}
+              className="px-2 py-1 rounded-md border border-border text-xs font-semibold hover:bg-muted">
+              Reject
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Sign dialog */}
+      {showSign && (
+        <div className="mt-3 border-t border-border pt-3 space-y-2">
+          <label className="flex items-start gap-2 text-xs">
+            <input type="checkbox" checked={noCoi} onChange={(e) => setNoCoi(e.target.checked)}
+              className="mt-0.5" />
+            <span>
+              I affirm that I have <strong>no conflict of interest</strong> with this
+              declaration (affected country, recipient orgs, or financial relationship).
+            </span>
+          </label>
+          {isAdmin && !isSelf ? (
+            <label className="text-xs space-y-1 block">
+              <span className="text-muted-foreground">Signature method</span>
+              <select
+                value={method}
+                onChange={(e) => setMethod(e.target.value as 'totp' | 'manual_admin')}
+                className="px-2 py-1 rounded-md border border-border bg-background text-xs"
+              >
+                <option value="manual_admin">Manual attestation (admin)</option>
+                <option value="totp">TOTP (signer must provide code)</option>
+              </select>
+            </label>
+          ) : null}
+          {method === 'totp' && (
+            <label className="text-xs space-y-1 block">
+              <span className="text-muted-foreground">TOTP code (6 digits)</span>
+              <input type="text" value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="123456" maxLength={6} inputMode="numeric"
+                className="px-2 py-1 rounded-md border border-border bg-background text-sm w-32 tracking-widest" />
+            </label>
+          )}
+          <div className="flex gap-2">
+            <button type="button" onClick={sign} disabled={busy || !noCoi}
+              className="px-3 py-1 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50">
+              {busy ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'Confirm signature'}
+            </button>
+            <button type="button" onClick={() => { setShowSign(false); setTotpCode(''); setNoCoi(false); }}
+              className="px-3 py-1 rounded-md border border-border text-xs font-semibold hover:bg-muted">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Recuse dialog */}
+      {showRecuse && (
+        <div className="mt-3 border-t border-border pt-3 space-y-2">
+          <label className="text-xs space-y-1 block">
+            <span className="text-muted-foreground">
+              Recusal reason (visible in the audit chain — be specific)
+            </span>
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)}
+              rows={2} className="w-full px-2 py-1 rounded-md border border-border bg-background text-xs" />
+          </label>
+          <div className="flex gap-2">
+            <button type="button" onClick={recuse} disabled={busy || !reason.trim()}
+              className="px-3 py-1 rounded-md bg-muted text-foreground text-xs font-semibold disabled:opacity-50">
+              {busy ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'Confirm recusal'}
+            </button>
+            <button type="button" onClick={() => { setShowRecuse(false); setReason(''); }}
+              className="px-3 py-1 rounded-md border border-border text-xs font-semibold hover:bg-muted">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Reject dialog */}
+      {showReject && (
+        <div className="mt-3 border-t border-border pt-3 space-y-2">
+          <label className="text-xs space-y-1 block">
+            <span className="text-muted-foreground">
+              Rejection reason (this cancels the WHOLE declaration)
+            </span>
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)}
+              rows={2} className="w-full px-2 py-1 rounded-md border border-border bg-background text-xs" />
+          </label>
+          <div className="flex gap-2">
+            <button type="button" onClick={reject} disabled={busy || !reason.trim()}
+              className="px-3 py-1 rounded-md bg-destructive text-destructive-foreground text-xs font-semibold disabled:opacity-50">
+              {busy ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'Confirm rejection'}
+            </button>
+            <button type="button" onClick={() => { setShowReject(false); setReason(''); }}
+              className="px-3 py-1 rounded-md border border-border text-xs font-semibold hover:bg-muted">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </li>
+  );
+}

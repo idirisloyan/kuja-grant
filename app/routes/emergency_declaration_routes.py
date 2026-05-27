@@ -37,13 +37,14 @@ from flask_login import login_required, current_user
 from app.extensions import db
 from app.models import (
     EmergencyDeclaration, DeclarationSignature, DeclarationDocument,
-    Fund, FundWindow, User, Document,
+    Fund, FundWindow, User, Document, Grant,
     CrisisMonitoringReport, CrisisMonitoringRow,
     SIGNATURE_METHODS, DOCUMENT_KINDS,
 )
 from app.utils.network import get_current_network_id
 from app.utils.helpers import get_request_json
 from app.utils.decorators import role_required
+from app.services.reauth_service import verify_reauth
 
 logger = logging.getLogger("kuja")
 
@@ -304,7 +305,8 @@ def _load_my_signature(declaration_id: int, sig_id: int):
 
 def _finalize_after_signature(d: EmergencyDeclaration):
     """After a sign/recuse/reject, see if the declaration should activate
-    or cancel automatically."""
+    or cancel automatically. On activation, auto-create draft grants for
+    every shortlisted org."""
     if d.rejected_count() > 0 and d.status == "in_review":
         d.status = "cancelled"
         d.status_reason = "Rejected by a signer"
@@ -315,7 +317,101 @@ def _finalize_after_signature(d: EmergencyDeclaration):
             details={"declaration_id": d.id},
         )
         return
-    d.maybe_activate(actor_email=current_user.email)
+
+    transitioned = d.maybe_activate(actor_email=current_user.email)
+    if transitioned:
+        _create_grant_drafts_for_declaration(d)
+
+
+def _create_grant_drafts_for_declaration(d: EmergencyDeclaration) -> None:
+    """On signed_active, materialise one draft Grant per shortlisted org.
+
+    Each grant is linked to the window via fund_window_id (Phase 34 link),
+    starts in 'draft' status (donor org = network's default donor? — for
+    now we use the declaration creator's org as donor placeholder), and
+    references the proposed per-org amount split evenly.
+
+    Per-org amounts can be tailored by the secretariat before publish.
+    """
+    org_ids = d.get_shortlisted_org_ids()
+    if not org_ids:
+        return  # nothing to do
+
+    # Get the parent window to use as the funding context
+    window = FundWindow.query.get(d.window_id)
+    if not window:
+        logger.warning(
+            f"Declaration {d.id} signed_active but window {d.window_id} missing"
+        )
+        return
+
+    # Donor org: use the declaration creator's org. If the creator has no
+    # org (typical for platform admins), look up any donor org on the
+    # network as a placeholder. The secretariat can reassign before
+    # publish.
+    creator = User.query.get(d.created_by_user_id) if d.created_by_user_id else None
+    donor_org_id = (creator.org_id if creator and creator.org_id else None)
+    if not donor_org_id:
+        # Fall back to the first donor org we can find (preserves the
+        # NOT NULL constraint on grants.donor_org_id).
+        from app.models import Organization
+        donor = Organization.query.filter_by(org_type="donor").first()
+        donor_org_id = donor.id if donor else None
+    if not donor_org_id:
+        logger.warning(
+            f"Declaration {d.id} signed_active but no donor org available — "
+            "skipping grant auto-creation"
+        )
+        return
+
+    # Per-org amount: even split of proposed_total_amount.
+    per_org_amount = None
+    if d.proposed_total_amount is not None and len(org_ids) > 0:
+        try:
+            per_org_amount = float(d.proposed_total_amount) / len(org_ids)
+        except Exception:
+            per_org_amount = None
+    if per_org_amount is None and window.max_grant_amount is not None:
+        per_org_amount = float(window.max_grant_amount)
+
+    created = []
+    for org_id in org_ids:
+        # Idempotency: skip if a grant for this declaration + org already
+        # exists (re-running activation shouldn't duplicate).
+        existing = Grant.query.filter_by(
+            fund_window_id=window.id,
+            donor_org_id=donor_org_id,
+            title=f"{d.title} — Org #{org_id}",
+        ).first()
+        if existing:
+            continue
+        g = Grant(
+            donor_org_id=donor_org_id,
+            title=f"{d.title} — Org #{org_id}",
+            description=d.summary_md or "",
+            total_funding=per_org_amount,
+            currency="USD",  # window currency is on the parent fund; fine for draft
+            status="draft",
+            fund_window_id=window.id,
+        )
+        db.session.add(g)
+        created.append({"org_id": org_id, "title": g.title})
+
+    if created:
+        db.session.flush()
+        d._anchor(
+            action="emergency.declaration.grants_auto_created",
+            actor_email=current_user.email,
+            details={
+                "declaration_id": d.id,
+                "window_id": window.id,
+                "grants_created": created,
+                "per_org_amount": per_org_amount,
+            },
+        )
+        logger.info(
+            f"Declaration {d.id} activated: created {len(created)} draft grant(s)"
+        )
 
 
 @emergency_bp.route(
@@ -339,7 +435,6 @@ def api_sign(declaration_id, sig_id):
     body = get_request_json() or {}
     method = (body.get("signature_method") or "totp").strip()
     declared_no_coi = bool(body.get("declared_no_coi", False))
-    token_hint = (body.get("token_hint") or "").strip() or None
 
     if not declared_no_coi:
         return jsonify({
@@ -348,9 +443,51 @@ def api_sign(declaration_id, sig_id):
         }), 400
     if method not in SIGNATURE_METHODS:
         return jsonify({"success": False, "error": f"Unknown signature_method '{method}'"}), 400
-    # NB: full TOTP/WebAuthn verification lands in Phase 36b. For now we
-    # require the signer to be authenticated and trust the method name
-    # they provide. The token_hint is recorded for audit forensics.
+
+    # Phase 36b — verify the chosen re-auth factor. For self-sign, the
+    # signer themselves provides the factor. For manual_admin, an admin
+    # is attesting on behalf of the signer (paper-signature ceremony).
+    is_self_signing = (s.signer_user_id == current_user.id)
+    target_user = User.query.get(s.signer_user_id)
+
+    # manual_admin requires the actor to be an admin AND distinct from the signer
+    if method == "manual_admin" and is_self_signing:
+        return jsonify({
+            "success": False,
+            "error": "manual_admin signature cannot be used for self-signing",
+        }), 400
+
+    # Skip re-auth for the manual_admin path (admin override is the
+    # attestation itself); enforce for the user-facing methods.
+    if method != "manual_admin":
+        reauth = verify_reauth(
+            user=target_user,
+            method=method,
+            totp_code=body.get("totp_code"),
+            webauthn_assertion=body.get("webauthn_assertion"),
+            acting_admin=current_user if current_user.role == "admin" else None,
+        )
+        if not reauth["ok"]:
+            return jsonify({
+                "success": False,
+                "error": reauth["message"],
+                "code": reauth["code"],
+            }), 400
+        token_hint = reauth.get("code", "")[:40]
+    else:
+        # Admin override path
+        reauth = verify_reauth(
+            user=target_user, method="manual_admin",
+            acting_admin=current_user,
+        )
+        if not reauth["ok"]:
+            return jsonify({
+                "success": False,
+                "error": reauth["message"],
+                "code": reauth["code"],
+            }), 400
+        token_hint = f"manual_admin:by_user_{current_user.id}"
+
     if not s.sign(method=method, declared_no_coi=True, token_hint=token_hint):
         return jsonify({
             "success": False,

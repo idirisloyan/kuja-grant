@@ -401,13 +401,17 @@ def make_tests(base):
         assert rd.status_code == 200, f"declaration create: {rd.text[:200]}"
         decl_id = rd.json()["declaration"]["id"]
 
-        # 4. Add 2 signer slots (admin + ngo user just for testing the flow)
-        admin_me = s.get(f"{base}/api/auth/me", headers=H, timeout=5).json()["user"]
+        # 4. Add 2 signer slots — donor + ngo, both attested by admin
+        # via manual_admin (paper-signature ceremony path).
+        # Admin cannot manual_admin-attest for themselves (rejected at
+        # the route), so we use two OTHER users as the signers.
+        s_donor = login_ok(base, USERS["donor"])
+        donor_me = s_donor.get(f"{base}/api/auth/me", headers=H, timeout=5).json()["user"]
         s_ngo = login_ok(base, USERS["ngo"])
         ngo_me = s_ngo.get(f"{base}/api/auth/me", headers=H, timeout=5).json()["user"]
 
         rs1 = s.post(f"{base}/api/declarations/{decl_id}/signers", json={
-            "user_id": admin_me["id"], "required_order": 0,
+            "user_id": donor_me["id"], "required_order": 0,
         }, headers=H, timeout=10)
         assert rs1.status_code == 200, f"add signer 1: {rs1.text[:200]}"
         sig1_id = rs1.json()["signature"]["id"]
@@ -427,40 +431,99 @@ def make_tests(base):
         # 6. Try to sign WITHOUT declared_no_coi → must fail with 400
         rfail = s.post(
             f"{base}/api/declarations/{decl_id}/signatures/{sig1_id}/sign",
-            json={"signature_method": "totp", "declared_no_coi": False},
+            json={"signature_method": "manual_admin", "declared_no_coi": False},
             headers=H, timeout=10,
         )
         assert rfail.status_code == 400, \
             f"sign without COI affirmation should fail: got {rfail.status_code}"
 
-        # 7. Admin signs (with COI affirmation)
-        r_sign = s.post(
+        # 7. Sign via TOTP without code → must fail (Phase 36b re-auth)
+        r_no_code = s.post(
             f"{base}/api/declarations/{decl_id}/signatures/{sig1_id}/sign",
-            json={"signature_method": "totp", "declared_no_coi": True,
-                  "token_hint": "test-totp"},
-            headers=H, timeout=10,
-        )
-        assert r_sign.status_code == 200, f"admin sign: {r_sign.text[:200]}"
-        # Still in_review (need 2 signers)
-        assert r_sign.json()["declaration"]["status"] == "in_review"
-
-        # 8. NGO user signs (network min_signers default = 2 → should activate)
-        r_sign2 = s_ngo.post(
-            f"{base}/api/declarations/{decl_id}/signatures/{sig2_id}/sign",
             json={"signature_method": "totp", "declared_no_coi": True},
             headers=H, timeout=10,
         )
-        assert r_sign2.status_code == 200, f"ngo sign: {r_sign2.text[:200]}"
+        assert r_no_code.status_code == 400, \
+            f"sign via TOTP without code should fail: got {r_no_code.status_code}"
+        assert "totp" in r_no_code.json().get("code", "").lower(), \
+            f"expected TOTP-related error code: {r_no_code.json()}"
+
+        # 8. Admin attests via manual_admin for the donor slot
+        r_sign = s.post(
+            f"{base}/api/declarations/{decl_id}/signatures/{sig1_id}/sign",
+            json={"signature_method": "manual_admin", "declared_no_coi": True},
+            headers=H, timeout=10,
+        )
+        assert r_sign.status_code == 200, f"admin manual-attest 1: {r_sign.text[:200]}"
+        assert r_sign.json()["declaration"]["status"] == "in_review"
+
+        # 9. Admin attests via manual_admin for the ngo slot → activates
+        r_sign2 = s.post(
+            f"{base}/api/declarations/{decl_id}/signatures/{sig2_id}/sign",
+            json={"signature_method": "manual_admin", "declared_no_coi": True},
+            headers=H, timeout=10,
+        )
+        assert r_sign2.status_code == 200, f"admin manual-attest 2: {r_sign2.text[:200]}"
         result = r_sign2.json()["declaration"]
-        # Now should be signed_active
         assert result["status"] == "signed_active", \
             f"expected signed_active, got '{result['status']}'"
         assert result["signed_count"] >= 2
         assert result["signed_active_audit_id"], "audit anchor missing"
-        # SLA timestamps now set
         assert result["applications_open_at"]
         assert result["applications_close_at"]
     tests.append(("Emergency Declaration multi-sig end-to-end", test_emergency_declaration_flow))
+
+    # --- Phase 36b: manual_admin can't self-sign ---
+    def test_manual_admin_no_self_sign():
+        s = login_ok(base, USERS["admin"])
+        H = {"X-Requested-With": "XMLHttpRequest"}
+        # Get admin id
+        me = s.get(f"{base}/api/auth/me", headers=H, timeout=5).json()["user"]
+        admin_id = me["id"]
+
+        # Set up minimal declaration with admin as a signer
+        import time
+        rf = s.post(f"{base}/api/funds", json={
+            "slug": f"smoke-self-sign-{int(time.time())}", "name": "Self-sign guard",
+        }, headers=H, timeout=10)
+        fund_id = rf.json()["fund"]["id"]
+        rw = s.post(f"{base}/api/funds/{fund_id}/windows", json={
+            "slug": "w1", "name": "W1", "status": "open",
+        }, headers=H, timeout=10)
+        window_id = rw.json()["window"]["id"]
+        rr = s.post(f"{base}/api/crisis/reports", json={}, headers=H, timeout=10)
+        report_id = rr.json()["report"]["id"]
+        rrow = s.post(f"{base}/api/crisis/reports/{report_id}/rows", json={
+            "country": "KEN", "hdi_band": "low_hdi",
+        }, headers=H, timeout=10)
+        evidence_row = rrow.json()["row"]["id"]
+        s.post(f"{base}/api/crisis/reports/{report_id}/publish", headers=H, timeout=10)
+        rd = s.post(f"{base}/api/declarations", json={
+            "fund_id": fund_id, "window_id": window_id, "title": "Self-sign guard",
+            "evidence_row_id": evidence_row,
+        }, headers=H, timeout=10)
+        decl_id = rd.json()["declaration"]["id"]
+        # Add admin as a signer + a dummy second slot
+        rs = s.post(f"{base}/api/declarations/{decl_id}/signers",
+                    json={"user_id": admin_id}, headers=H, timeout=10)
+        admin_sig_id = rs.json()["signature"]["id"]
+        # Need 2 signers to submit (default min)
+        donor_me = login_ok(base, USERS["donor"]).get(
+            f"{base}/api/auth/me", headers=H, timeout=5,
+        ).json()["user"]
+        s.post(f"{base}/api/declarations/{decl_id}/signers",
+               json={"user_id": donor_me["id"]}, headers=H, timeout=10)
+        s.post(f"{base}/api/declarations/{decl_id}/submit", headers=H, timeout=10)
+
+        # Admin attempts manual_admin on their own signature slot → 400
+        r_self = s.post(
+            f"{base}/api/declarations/{decl_id}/signatures/{admin_sig_id}/sign",
+            json={"signature_method": "manual_admin", "declared_no_coi": True},
+            headers=H, timeout=10,
+        )
+        assert r_self.status_code == 400, \
+            f"admin self-attest via manual_admin should fail: got {r_self.status_code}"
+    tests.append(("manual_admin cannot self-sign", test_manual_admin_no_self_sign))
 
     # --- Login all roles ---
     for role, email in USERS.items():
