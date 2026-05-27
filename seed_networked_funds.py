@@ -39,11 +39,19 @@ def main():
     parser.add_argument("--base", default=DEFAULT_BASE, help="API base URL")
     parser.add_argument("--email", default=DEFAULT_EMAIL, help="Admin email")
     parser.add_argument("--password", default=DEFAULT_PASSWORD, help="Admin password")
+    parser.add_argument(
+        "--network-slug", default=None,
+        help="Target a specific network via X-Network-Override header (e.g. 'near'). "
+             "Default: route via host header (kuja default).",
+    )
     args = parser.parse_args()
 
     base = args.base.rstrip("/")
     s = requests.Session()
     H = {"X-Requested-With": "XMLHttpRequest"}
+    if args.network_slug:
+        H["X-Network-Override"] = args.network_slug
+        print(f"== Using X-Network-Override: {args.network_slug} ==")
 
     print(f"== Seeding networked-funds demo data on {base} ==\n")
 

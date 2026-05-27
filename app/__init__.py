@@ -209,8 +209,38 @@ def create_app(config_name=None):
                 db.session.add(default_net)
                 db.session.commit()
                 app.logger.info("Seeded default 'kuja' Network row (bootstrap path)")
+
+            # Phase 32 — also seed the NEAR Network so the multi-tenant
+            # mode is demoable. NEAR uses the same internal framework
+            # key ('kuja' → so existing test data keeps validating) but
+            # displays as "NEAR Capacity Assessment" everywhere.
+            if not Network.query.filter_by(slug="near").first():
+                near_net = Network(
+                    slug="near",
+                    name="NEAR Network",
+                    mission_short=(
+                        "A world where local communities have the resources "
+                        "and agency to address the challenges that impact them."
+                    ),
+                    brand_color_hex="#0F766E",  # NEAR teal
+                    default_language="en",
+                    home_url="https://near.ngo",
+                    oversight_body_min_signers=2,
+                    membership_review_days=60,
+                    default_assessment_framework="kuja",
+                    assessment_framework_display="NEAR Capacity Assessment",
+                    default_currency="USD",
+                    is_default=False,
+                    is_active=True,
+                )
+                # host_aliases as JSON string list (model has helper but
+                # not on a fresh instance; encode directly here)
+                near_net.set_host_aliases(["near.kuja.org", "app.near.ngo"])
+                db.session.add(near_net)
+                db.session.commit()
+                app.logger.info("Seeded 'near' Network row (bootstrap path)")
         except Exception as e:
-            app.logger.warning(f"Default network bootstrap skipped: {e}")
+            app.logger.warning(f"Network bootstrap skipped: {e}")
 
     # -----------------------------------------------------------------
     # Ensure lockout columns exist (safety net for migration timing)

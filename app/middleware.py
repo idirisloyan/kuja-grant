@@ -280,6 +280,26 @@ def register_middleware(app):
         try:
             from flask import g
             from app.models import Network
+
+            # Phase 32 demo override: admins can switch the resolved
+            # network via X-Network-Override header (slug) without needing
+            # real subdomain DNS. Used by the frontend's localStorage-
+            # persisted overrides for switching between near + kuja in
+            # the same browser session. Silently ignored for non-admins.
+            override_slug = (request.headers.get('X-Network-Override', '') or '').strip().lower()
+            if override_slug:
+                try:
+                    if current_user.is_authenticated and getattr(current_user, 'role', None) == 'admin':
+                        net = Network.query.filter_by(slug=override_slug, is_active=True).first()
+                        if net:
+                            g.network = net
+                            g.network_id = net.id
+                            return
+                except Exception:
+                    # current_user may not be available in early-error
+                    # paths — fall through to host-header resolution.
+                    pass
+
             host = request.headers.get('Host', '')
             net = Network.resolve_from_host(host)
             g.network = net

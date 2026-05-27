@@ -47,6 +47,18 @@ async function apiFetch<T>(
     'X-Requested-With': 'XMLHttpRequest',
   };
 
+  // Phase 32 demo override: if the admin has set a network override
+  // via ?network=<slug> (persisted to localStorage), forward it as the
+  // X-Network-Override header. Server enforces admin-only honour.
+  if (typeof window !== 'undefined') {
+    try {
+      const override = window.localStorage.getItem('kuja_network_override');
+      if (override) headers['X-Network-Override'] = override;
+    } catch {
+      // localStorage unavailable (private mode, etc.) — skip silently.
+    }
+  }
+
   const opts: RequestInit = {
     method,
     credentials: 'include',
