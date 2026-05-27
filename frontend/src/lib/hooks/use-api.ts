@@ -184,3 +184,74 @@ export function useRegistries() {
     fetcher,
   );
 }
+
+// ---------------------------------------------------------------------------
+// Network membership (Phase 33)
+// ---------------------------------------------------------------------------
+
+export interface EligibilityQuestion {
+  key: string;
+  label: string;
+  required?: boolean;
+}
+
+export interface RequiredDocument {
+  key: string;
+  label: string;
+  required?: boolean;
+}
+
+export interface MembershipConfig {
+  success: boolean;
+  network: { id: number; slug: string; name: string; assessment_framework_display: string | null };
+  eligibility_questions: EligibilityQuestion[];
+  required_documents: RequiredDocument[];
+  membership_review_days: number;
+}
+
+export interface Membership {
+  id: number;
+  network_id: number;
+  org_id: number;
+  status: 'pending' | 'under_review' | 'active' | 'rejected' | 'suspended' | 'expelled';
+  status_reason: string | null;
+  member_tier: string;
+  parent_membership_id: number | null;
+  region: string | null;
+  country: string | null;
+  required_documents_status: Record<string, unknown>;
+  eligibility_answers: Record<string, string>;
+  capacity_assessment_id: number | null;
+  applied_at: string | null;
+  reviewed_at: string | null;
+  joined_at: string | null;
+  suspended_at: string | null;
+  assessment_next_refresh_due_at: string | null;
+  cooldown_until: string | null;
+  is_assessment_fresh: boolean;
+  created_at: string | null;
+  org_name?: string;
+  org?: { id: number; name: string; country: string | null };
+}
+
+export function useMembershipConfig() {
+  return useSWR<MembershipConfig>('/network/membership/config', fetcher, {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
+export function useMyMemberships() {
+  return useSWR<{ success: boolean; memberships: Membership[] }>(
+    '/network/membership/me',
+    fetcher,
+  );
+}
+
+/** Admin/OB: list pending memberships in the current network. */
+export function usePendingMemberships(status: string = 'under_review') {
+  return useSWR<{ success: boolean; memberships: Membership[] }>(
+    `/network/membership/pending?status=${encodeURIComponent(status)}`,
+    fetcher,
+  );
+}
