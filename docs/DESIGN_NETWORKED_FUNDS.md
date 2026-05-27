@@ -214,6 +214,155 @@ User.network_role                       JSON
 
 ---
 
+## 3B. NEAR Change Fund — process specifics (2026-05-26 update)
+
+Additional context from NEAR's IKEA Foundation concept note (Change Fund) and operating-criteria summary. This sharpens Phases 34–37 considerably and introduces two new first-class concepts: the **Crisis Monitoring Report** and the **per-window Evaluation Rubric**.
+
+### 3B.1 Sizing data points
+
+- NEAR network: **349 CSOs + 20+ national/regional networks**, **44 countries** (Global South).
+- Change Fund track record: **~$6.2M disbursed** across **63 grants** in **24 crisis-affected countries** (4 years).
+- IKEA Foundation ask: **€5M** to consolidate + scale the model.
+- Standard grant range: **$150,000–$250,000**, **up to 6 months**.
+- Bridge Funding window: smaller grants at **$25,000** (introduced 2025 after US aid suspension).
+- Network design assumption: budget for **≤2,000 member orgs per network** and **≤100 grants per fund per year**. Comfortably handled by the current Postgres schema.
+
+### 3B.2 The Crisis Monitoring Report — new entity
+
+The OB doesn't declare an emergency arbitrarily. They consume a **weekly Humanitarian Crisis Monitoring Report** produced by the secretariat, covering every country where the network has members. The report scores each country/event on a 4-factor formula:
+
+1. **Country HDI ranking** (lower HDI → higher weight).
+2. **Government response capacity + vulnerability** to natural disasters and conflict.
+3. **Number of people directly impacted.**
+4. **Media + donor community attention** ("forgotten emergencies" tend to score lower here — useful for surfacing them).
+
+Members can submit ad-hoc **crisis alerts** any time outside the weekly cycle; these are rolled into the next report and the secretariat can promote one to the OB immediately.
+
+**Proposed model:**
+
+```python
+class CrisisMonitoringReport:
+    id; network_id (FK); period_start; period_end (week)
+    summary_md (Markdown); generated_by ('cron' | 'manual')
+    cron_anchor_audit_id (FK to AuditChainEntry — anchored)
+    published_at
+
+class CrisisMonitoringRow:
+    id; report_id (FK); country (ISO-3); region; event_type
+    hdi_band; gov_capacity_band; people_impacted_estimate
+    attention_band; composite_score (0-100)
+    narrative (AI-drafted); flagged_for_ob (bool)
+
+class CrisisSignal:    # member-submitted ad-hoc alert
+    id; network_id; submitted_by_org_id; country
+    event_type; description; submitted_at; rolled_into_report_id
+```
+
+Generated weekly by a cron job (extends the existing `cron_routes`); AI drafts the narrative using public news feeds + member-submitted signals; secretariat reviews + approves before publishing. The report ID + the specific row become **mandatory evidence** when the OB declares a crisis.
+
+### 3B.3 The 5-area Evaluation Rubric — new entity per window
+
+The OB evaluates every application against **five rubric areas with specific quantitative thresholds**. These need to be first-class data so the AI can score systematically and the secretariat can produce a defensible summary.
+
+| # | Area | Specific criteria with thresholds |
+|---|---|---|
+| 1 | **Project objectives + activities** | Aligned with Crisis Monitoring Report? · Activities adequately budgeted? · Sectoral response consistent with the crisis? |
+| 2 | **Region + target population** | Operational presence in affected area? · Beneficiary count aligns with budget? · **Per-beneficiary cost** reasonable vs peers? |
+| 3 | **Budget + financial** | Member previously managed funding at this scale (audit review)? · **≥80% direct-to-community** (or ≥70% for consortia)? · Budget matches narrative? · Unit costs allowable + reasonable? · Required template used? · All activities reflected in budget? · Beneficiaries identified in budget lines? |
+| 4 | **MEL + reporting** | MEL plan sufficient for activity level? · MEL adequately budgeted? |
+| 5 | **General considerations** | Relative strength + impact ranking when applications compete for limited funds. |
+
+**Proposed model:**
+
+```python
+class WindowEvaluationRubric:
+    id; window_id (FK to FundWindow)
+    name; is_default (bool); created_by_user_id
+
+class WindowEvaluationCriterion:
+    id; rubric_id (FK); area (one of the 5 above); name; weight
+    threshold_kind ('hard_gate' | 'soft_score'); threshold_value (e.g. '0.80')
+    threshold_meaning (Markdown — explains "≥80% direct-to-community" etc)
+    ai_evaluator_key (which AI scoring function applies — see §3B.5)
+
+class ApplicationScore:
+    id; application_id; criterion_id
+    ai_score (0-100); ai_evidence (Markdown); ai_flags (JSON list)
+    human_score (nullable); human_note; finalized_by_user_id; finalized_at
+```
+
+Seeded automatically when a NEAR Change Fund window is created (Phase 34 ships the seed). Networks can edit per-window before opening for applications.
+
+### 3B.4 SLA contract (the 72-hour / 6-day commitment)
+
+NEAR commits to these turnaround times publicly. Make them first-class on `EmergencyDeclaration`:
+
+| Milestone | Target | Field |
+|---|---|---|
+| OB declares crisis | T0 | `declared_at` |
+| Application window opens | T0 | `applications_open_at` |
+| Application window closes | T0 + 72hrs | `applications_close_at` |
+| OB decision | T0 + 5–6 days | `decision_at` |
+| Members notified of decisions | T0 + 6 days | `applicants_notified_at` |
+| Grant agreement signed | T0 + 10 days (target) | `agreement_signed_at` per grant |
+
+Every declaration's window report (Phase 36) shows actual-vs-target per milestone. Useful for board reporting + donor accountability.
+
+### 3B.5 Risk management — 4 pillars as scheduled processes
+
+NEAR articulates risk management as four mutually-reinforcing pillars. Each maps to a concrete platform feature:
+
+| Pillar | Platform mapping |
+|---|---|
+| **Due diligence** (initial + periodic) | Capacity assessment at membership + `NetworkMembership.assessment_next_refresh_due_at` (default = `Network.assessment_refresh_months`, e.g. 24). Grant-disbursement gate blocks when assessment is stale. |
+| **Regular reporting** (mid + end, more for high-risk) | Existing report module; new `Grant.reporting_intensity = 'standard' \| 'high_risk'` toggles whether quarterly check-ins are required. |
+| **Progress calls + monitoring visits** | New `MonitoringVisit` entity (in-person or virtual) — captures observations, photos, attendance, action items. Audit-chained. Lands in Phase 36 alongside reporting. |
+| **Feedback mechanisms** | Existing feedback module + new "Network external evaluation" upload anchored to the network (not a single grant). |
+
+### 3B.6 Conflict-of-interest discipline (governance)
+
+Every OB signer affirms **no COI** with the affected country/member at signature time. Add to `DeclarationSignature`:
+
+```python
+declared_no_coi (bool, nullable) -- True when signing; False/null when recusing
+recusal_reason (String, nullable)
+```
+
+If `declared_no_coi=False`, the signature does NOT count toward the threshold, and a recusal audit entry is written. The window report shows recusal counts per declaration — a transparency signal donors care about.
+
+### 3B.7 Streamlined application template per window
+
+NEAR explicitly says they use "streamlined application templates designed to minimize transaction costs for local responders." Each window owns a minimal template targeted at the rubric:
+
+```python
+class FundWindow:
+    ...
+    application_template_json (Text)  # ordered list of question blocks
+    expected_completion_minutes (Integer)  # surfaced to applicants
+```
+
+Template question blocks (proposed default for Change Fund Emergency Response):
+1. Crisis alignment (free text — links back to Crisis Monitoring Report)
+2. Target population + community-participation narrative (free text + numeric beneficiary count)
+3. Sectoral response (multi-select + free text)
+4. Budget upload (file + structured line-items)
+5. MEL plan (free text + key indicators)
+6. Operational presence in affected area (yes/no + evidence)
+7. Prior funding managed (single numeric + audit-link)
+
+AI extracts structured signal from each block to feed the rubric scorer (§3B.3).
+
+### 3B.8 Constituent voice — explicit narrative + monitoring fields
+
+NEAR's rubric scores **community participation in design and delivery** explicitly. Track it both in the application and in monitoring visits:
+
+- `Application.community_participation_narrative` (free text — required)
+- `MonitoringVisit.community_feedback_summary` (free text — captured during visit)
+
+These flow into the window report and the public anonymised summary as proof of locally-led discipline.
+
+---
+
 ## 4. The three new workflows
 
 ### 4.1 Network membership onboarding
@@ -309,16 +458,19 @@ Every transition writes an `AuditChainEntry` with action `network.membership.{tr
 
 ## 6. AI vision for networks
 
-Every AI surface Kuja already ships continues to work; we add **four new network-specific AI surfaces**:
+Every AI surface Kuja already ships continues to work; we add **seven new network-specific AI surfaces** (originally four; expanded post-IKEA-concept-note):
 
-| Surface | Audience | What it does |
-|---|---|---|
-| **Membership reviewer brief** | Oversight Body | One-paragraph AI summary of a pending membership application: applicant context, capacity assessment highlights, document completeness, similar approved members for comparison, red flags. Reduces the 60-day review to an informed-decision-in-an-hour. |
-| **Emergency declaration draft assist** | Secretariat | When drafting a declaration, AI pulls from news feeds + the network's recent activity in the region + the affected NGOs' active grants to draft the situation summary, suggest shortlisted NGOs based on geographic + sector fit, and propose realistic per-NGO amounts. |
-| **Window narrative generator** | Fund manager | At report time, AI drafts the narrative sections of the window report ("How the Fund responded to the Sahel crisis in 2026") from the structured data, leaving humans to fact-check + refine. |
-| **Cross-window pattern detector** | Network leadership | AI scans across declarations + outcomes to surface patterns ("Bridge Funding declarations issued faster than Emergency Response — is the review chain working?"). Feeds the network's strategic decisions. |
+| # | Surface | Audience | What it does |
+|---|---|---|---|
+| 1 | **Membership reviewer brief** | Oversight Body | One-paragraph AI summary of a pending membership application: applicant context, capacity assessment highlights, document completeness, similar approved members for comparison, red flags. Reduces the 60-day review to an informed-decision-in-an-hour. |
+| 2 | **Crisis Monitoring Report drafter** | Secretariat | Weekly cron pulls public news feeds + ReliefWeb + ACAPS + government press releases for every country where the network has members. Scores each event against the 4-factor formula (HDI / gov capacity / scale / attention). Drafts narrative per country row. Secretariat reviews + publishes. |
+| 3 | **Emergency declaration draft assist** | Secretariat | When drafting a declaration, AI pulls from the latest Crisis Monitoring Report + network's recent activity in the region + the affected NGOs' active grants to draft the situation summary, suggest shortlisted NGOs based on geographic + sector fit, and propose realistic per-NGO amounts. |
+| 4 | **Application rubric scorer** | Secretariat → OB | For each application, AI scores against every `WindowEvaluationCriterion`: cites evidence from the application text, flags missing info, scores 0–100 per criterion, summarises strengths/weaknesses. Secretariat can override; finalised score feeds the OB's deliberation pack. |
+| 5 | **Direct-to-community ratio classifier** | Secretariat | Parses the uploaded budget (line-items or file). Classifies each line as `direct_community`, `operational_overhead`, or `indirect`. Returns the ratio. Hard-flags if below the window's threshold (80% single / 70% consortium). Always shows reasoning + lets the secretariat reclassify. |
+| 6 | **Window narrative generator** | Fund manager | At report time, AI drafts the narrative sections of the window report ("How the Fund responded to the Sahel crisis in 2026") from the structured data, leaving humans to fact-check + refine. |
+| 7 | **Cross-window pattern detector** | Network leadership | AI scans across declarations + outcomes to surface patterns ("Bridge Funding declarations issued faster than Emergency Response — is the review chain working?"). Feeds the network's strategic decisions. |
 
-All four follow the existing AI discipline: grounded in actual data, every claim provenance-tracked, never invents amounts, always cite source.
+All seven follow the existing AI discipline: grounded in actual data, every claim provenance-tracked, never invents amounts, always cite source.
 
 ---
 
@@ -332,18 +484,21 @@ All four follow the existing AI discipline: grounded in actual data, every claim
 
 ## 8. Phased delivery
 
-Suggested 6-phase plan. Each phase is 1-2 weeks of focused work, ships independently behind a feature flag, and adds incremental value.
+Revised plan (post-IKEA-concept-note). Originally 6 phases; expanded to 8 to surface the Crisis Monitoring Report and the Evaluation Rubric as distinct phases — they're large enough to deserve their own scope and they're what makes the platform usable for NEAR's specific OB process.
+
+Each phase is 1-2 weeks of focused work, ships independently behind a feature flag, and adds incremental value.
 
 | Phase | Scope | Why this order |
 |---|---|---|
-| **32 — Multi-tenant foundation** | `Network` entity, host-header middleware, default "Kuja Marketplace" network seeded with all existing data, subdomain routing scaffolding, per-network branding skin. Existing functionality continues to work scoped to the default network. | Unblocks every later phase. Highest-risk because of the migration; ship first. |
-| **33 — Network membership** | `NetworkMembership`, member-application flow with mandatory capacity gate, document upload pipeline (reuses existing Document model), Oversight Body review dashboard, audit chain anchors on transitions. Rename "Kuja" framework display label per network. | Lets NEAR start onboarding members without the rest. Highest user-facing value, soonest. |
-| **34 — Funds + Windows** | `Fund` + `FundWindow` entities, `Grant.fund_window_id`, donor + fund-manager UI for fund/window management, window-scoped grant listing. | Lets NEAR publish grants under a window. Prerequisite to emergency declarations. |
-| **35 — Emergency declaration** | `EmergencyDeclaration` + `DeclarationSignature` + `DeclarationDocument`, draft → sign → active state machine, multi-signature UX with TOTP/WebAuthn, auto pre-disbursement re-check, auto grant-creation under window. | The big workflow. Replaces NEAR's manual emergency process. |
-| **36 — Window reporting** | Per-window aggregation service, window report PDF generator (extends existing bundle_pdf_service), CSV exports, opt-in public anonymised summary. | The artefact NEAR's stakeholders ask for. |
-| **37 — Network-specific AI surfaces** | Membership reviewer brief · declaration draft assist · window narrative generator · cross-window pattern detector. | Polish layer; everything else works without these but these are what makes the platform "intelligent" for network funders. |
+| **32 — Multi-tenant foundation** ✅ in flight | `Network` entity, host-header middleware, default "Kuja Marketplace" network seeded, `/api/network/current` endpoint, frontend brand context. | Unblocks everything below. Highest-risk because of the migration; ship first. |
+| **33 — Network membership** | `NetworkMembership`, member-application flow with mandatory capacity gate, document upload pipeline (reuses existing Document model), Oversight Body review dashboard, audit-chain anchors on transitions. `assessment_next_refresh_due_at` for periodic due diligence. Rename "Kuja" framework display label per network. | Lets NEAR start onboarding members without the rest. Highest user-facing value, soonest. |
+| **34 — Funds + Windows + Rubrics** | `Fund` + `FundWindow` + `WindowEvaluationRubric` + `WindowEvaluationCriterion` entities. Seeds the Change Fund rubric (5 areas, 80%/70% thresholds, MEL gates). Per-window application template config. Fund-manager UI for fund/window/rubric management. Window-scoped grant listing. | Lets NEAR publish a Change Fund window with the full evaluation discipline baked in. Prerequisite to emergency declarations. |
+| **35 — Crisis Monitoring Report** | `CrisisMonitoringReport` + `CrisisMonitoringRow` + `CrisisSignal` entities. Weekly cron job (extends `cron_routes`) that drafts the report via AI from news/ReliefWeb/member alerts. Secretariat publish UI. The OB browses the report when deciding whether to declare. | Pre-cursor to declaration. NEAR can't responsibly declare without an evidence base; we need the report before we ship the declaration workflow. |
+| **36 — Emergency declaration** | `EmergencyDeclaration` + `DeclarationSignature` (with `declared_no_coi` + `recusal_reason`) + `DeclarationDocument`, draft → sign → active state machine, multi-sig UX with TOTP/WebAuthn, **mandatory CrisisMonitoringRow link** as evidence, SLA timestamp fields (72hr/6-day milestones), auto pre-disbursement re-check, auto grant-creation under window. | The big workflow. Replaces NEAR's manual emergency process. Depends on Phase 35's report so declarations cite real evidence. |
+| **37 — Window reporting + Monitoring Visits** | Per-window aggregation service, window report PDF generator (extends existing `bundle_pdf_service`), CSV exports, opt-in public anonymised summary, **SLA-vs-target widget** (declarations hitting 6-day commitment), **`MonitoringVisit` entity** with community-feedback summary, recusal-counts transparency, constituent-voice narrative threading from application → monitoring → report. | The artefact NEAR's stakeholders + IKEA Foundation ask for. Monitoring visits land here because they feed the report. |
+| **38 — Network-specific AI surfaces** | All seven AI surfaces from §6: membership reviewer brief · Crisis Monitoring drafter · declaration draft assist · **rubric scorer** · **direct-to-community ratio classifier** · window narrative generator · cross-window pattern detector. | Polish layer. Everything else works without these but these are what makes the platform "intelligent" for network funders. Two of these (rubric scorer + direct-to-community classifier) materially improve OB decision speed. |
 
-After Phase 37, NEAR can run their entire operation on the platform with auditable + reportable + AI-assisted workflows.
+After Phase 38, NEAR can run their entire operation on the platform with auditable + reportable + AI-assisted workflows that meet their 72-hour / 6-day commitment to members and donors.
 
 ---
 
@@ -414,3 +569,5 @@ After Phase 32 is live + stable, Phase 33 (membership) unlocks NEAR's onboarding
 - [NEAR — Change Fund](https://near.ngo/our-work/solutions/the-change-fund/)
 - [NEAR — Membership](https://near.ngo/membership/)
 - [NEAR — About](https://near.ngo/about/)
+- NEAR — *Change Fund — Concept for IKEA Foundation Investment* (draft, 2026-01-23, provided 2026-05-26). Source of: 4-factor Crisis Monitoring formula · OB process detail · risk-management 4 pillars · $6.2M / 63-grant track record · $150k-$250k / 6-mo grant envelope · 72hr / 6-day SLA.
+- NEAR — *Change Fund application evaluation criteria* (summary, provided 2026-05-26). Source of: 5-area rubric (objectives · region/population · budget · MEL · ranking) and the ≥80%/≥70% direct-to-community thresholds.

@@ -38,6 +38,10 @@ from app.models.tag import Tag, TagAssignment
 from app.models.webauthn_credential import WebAuthnCredential
 from app.models.user_event import UserEvent
 from app.models.user_feedback import UserFeedback
+from app.models.network import Network, DEFAULT_NETWORK_SLUG
+from app.models.network_membership import (
+    NetworkMembership, MEMBERSHIP_STATUSES, MEMBERSHIP_TIERS,
+)
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -53,4 +57,6 @@ __all__ = [
     'WebAuthnCredential',
     'UserEvent',
     'UserFeedback',
+    'Network', 'DEFAULT_NETWORK_SLUG',
+    'NetworkMembership', 'MEMBERSHIP_STATUSES', 'MEMBERSHIP_TIERS',
 ]

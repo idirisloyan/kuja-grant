@@ -261,6 +261,36 @@ def register_middleware(app):
         request_id = request.headers.get('X-Request-ID', str(uuid.uuid4())[:8])
         request.request_id = request_id
 
+    @app.before_request
+    def resolve_network_context():
+        """Phase 32 — resolve the current Network from the host header.
+
+        Routes `near.kuja.org` (or `app.near.ngo` via CNAME) to the NEAR
+        network row; everything else falls back to the default Kuja
+        Marketplace network. The resolved Network is stashed on flask.g
+        so downstream code (services, routes, log formatters) can read
+        it without re-querying.
+
+        This middleware is best-effort: if the networks table doesn't
+        exist yet (very early in app boot, or in a test fixture using
+        db.create_all() before the seed migration ran), we silently
+        skip rather than 500. Routes that explicitly need the network
+        check via get_current_network() in app/utils/network.py.
+        """
+        try:
+            from flask import g
+            from app.models import Network
+            host = request.headers.get('Host', '')
+            net = Network.resolve_from_host(host)
+            g.network = net
+            g.network_id = net.id if net else None
+        except Exception:
+            # First boot before migrations run, or test DB without seed.
+            # Network resolution is non-critical; never block a request.
+            from flask import g
+            g.network = None
+            g.network_id = None
+
     @app.after_request
     def add_request_id_header(response):
         """Include request ID in response for client-side correlation."""

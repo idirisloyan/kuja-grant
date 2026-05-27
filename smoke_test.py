@@ -133,6 +133,19 @@ def make_tests(base):
         assert r.status_code == 200, f"Health check returned {r.status_code}"
     tests.append(("Health check", test_health))
 
+    # --- Network context (Phase 32) ---
+    def test_network_current():
+        r = requests.get(f"{base}/api/network/current", timeout=5)
+        assert r.status_code == 200, f"/api/network/current = {r.status_code}"
+        data = r.json()
+        assert data.get("success") is True, f"success != True: {data}"
+        net = data.get("network") or {}
+        assert net.get("slug") == "kuja", f"slug != 'kuja': {net.get('slug')}"
+        assert net.get("name"), "network name is empty"
+        assert net.get("brand_color_hex"), "brand_color_hex is empty"
+        assert net.get("is_active") is True, "default network not active"
+    tests.append(("Network /current returns default Kuja brand", test_network_current))
+
     # --- Login all roles ---
     for role, email in USERS.items():
         def _make(e=email, rl=role):
