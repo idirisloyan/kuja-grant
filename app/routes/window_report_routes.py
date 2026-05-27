@@ -188,6 +188,10 @@ def api_update_visit(visit_id):
         "visit_mode", "observations_md", "community_feedback_summary",
         "issues_identified", "action_items_md", "attendance_estimate",
         "status",
+        # Phase 37b — declaration_id is editable so a visit recorded on
+        # a grant can be linked to its parent declaration after the fact
+        # (the window report aggregates monitoring visits via this FK).
+        "declaration_id",
     ):
         if fld in body:
             setattr(v, fld, body[fld])

@@ -503,12 +503,30 @@ def _seed_rich(s, base, H, *, network_slug, admin_id, report_id, decl_id, window
     # Use the admin-create endpoint so memberships land under the *current*
     # tenant (the X-Network-Override header is admin-only; an NGO user
     # logging in directly would always hit the default tenant).
-    ngo_targets = [
-        # (org_id, country)
-        (1, "KEN"),  # Amani Community Development
-        (2, "SOM"),  # Salam Relief Foundation
-        (3, "ZAF"),  # Ubuntu Education Trust
-    ]
+    #
+    # Look up NGO org IDs by name — local SQLite has them at 1/2/3 but
+    # prod assigns higher IDs based on seed.py ordering. Country mapping
+    # by name keeps the seed deterministic across environments.
+    org_name_to_country = {
+        "Amani Community Development": "KEN",
+        "Salam Relief Foundation": "SOM",
+        "Ubuntu Education Trust": "ZAF",
+    }
+    ro = s.get(f"{base}/api/organizations/?type=ngo&page=1", headers=H, timeout=10)
+    ngo_targets = []
+    if ro.status_code == 200:
+        for o in ro.json().get("organizations", []):
+            name = o.get("name", "")
+            if name in org_name_to_country:
+                ngo_targets.append((o["id"], org_name_to_country[name]))
+            if len(ngo_targets) >= 3:
+                break
+    if not ngo_targets:
+        # Fallback: take the first 3 NGO orgs with a placeholder country
+        if ro.status_code == 200:
+            for o in ro.json().get("organizations", [])[:3]:
+                ngo_targets.append((o["id"], "—"))
+        print(f"   - falling back to first 3 NGO orgs (couldn't match by name)")
     pending_count = 0
     for (org_id, country) in ngo_targets:
         ra = s.post(f"{base}/api/network/membership/admin-create", json={
@@ -599,6 +617,7 @@ def _seed_rich(s, base, H, *, network_slug, admin_id, report_id, decl_id, window
         if not had_visit:
             rv = s.post(f"{base}/api/grants/{target_grant_id}/monitoring-visits",
                         json={
+                            "declaration_id": decl_id,  # link so window report finds it
                             "visit_mode": "virtual",
                             "visit_date": date.today().isoformat(),
                             "observations_md": (
