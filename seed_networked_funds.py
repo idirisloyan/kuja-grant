@@ -500,26 +500,22 @@ def _seed_rich(s, base, H, *, network_slug, admin_id, report_id, decl_id, window
     from datetime import date
 
     # --- 11.1 Three pending NetworkMembership applications -----------
-    # Log in as 3 different NGO users and apply for membership.
-    ngo_emails = [
-        "fatima@amani.org",
-        "ahmed@salamrelief.org",
-        "thandi@ubuntu.org",
+    # Use the admin-create endpoint so memberships land under the *current*
+    # tenant (the X-Network-Override header is admin-only; an NGO user
+    # logging in directly would always hit the default tenant).
+    ngo_targets = [
+        # (org_id, country)
+        (1, "KEN"),  # Amani Community Development
+        (2, "SOM"),  # Salam Relief Foundation
+        (3, "ZAF"),  # Ubuntu Education Trust
     ]
     pending_count = 0
-    for email in ngo_emails:
-        sub = requests.Session()
-        sub.headers.update({"X-Requested-With": "XMLHttpRequest"})
-        if network_slug:
-            sub.headers["X-Network-Override"] = network_slug
-        rl = sub.post(f"{base}/api/auth/login",
-                      json={"email": email, "password": "pass123"},
-                      timeout=15)
-        if rl.status_code != 200:
-            print(f"   - {email}: login failed (skipping)")
-            continue
-        # Use the apply endpoint (idempotent: returns existing membership if any)
-        ra = sub.post(f"{base}/api/network/membership/apply", json={
+    for (org_id, country) in ngo_targets:
+        ra = s.post(f"{base}/api/network/membership/admin-create", json={
+            "org_id": org_id,
+            "country": country,
+            "region": "Eastern + Southern Africa",
+            "member_tier": "member",
             "eligibility_answers": {
                 "registered_nonprofit": "yes",
                 "global_south_hq": "yes",
@@ -527,20 +523,17 @@ def _seed_rich(s, base, H, *, network_slug, admin_id, report_id, decl_id, window
                 "governance_docs": "yes",
                 "code_of_conduct": "yes",
             },
-            "country": {"fatima@amani.org": "KEN",
-                        "ahmed@salamrelief.org": "SOM",
-                        "thandi@ubuntu.org": "ZAF"}.get(email),
-            "region": "Eastern + Southern Africa",
-            "member_tier": "member",
-        }, timeout=10)
+        }, headers=H, timeout=10)
         if ra.status_code == 200:
             mem = ra.json().get("membership", {})
+            already = ra.json().get("already_existed", False)
             pending_count += 1
-            status = mem.get("status")
-            print(f"   - {email}: membership #{mem.get('id')} status={status}")
+            print(f"   - org #{org_id} ({country}): membership #{mem.get('id')} "
+                  f"status={mem.get('status')}"
+                  f"{' (already existed)' if already else ''}")
         else:
-            print(f"   - {email}: apply failed ({ra.status_code})")
-    print(f"   pending memberships: {pending_count}")
+            print(f"   - org #{org_id}: admin-create failed ({ra.status_code}): {ra.text[:120]}")
+    print(f"   memberships: {pending_count}")
 
     # --- 11.2 Second crisis monitoring row (Sahel displacement) -----
     # Add to the same report; demonstrates per-report variety.

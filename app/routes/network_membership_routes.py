@@ -79,6 +79,82 @@ def api_membership_config():
 # NGO-facing — apply / submit / me
 # =============================================================================
 
+@network_membership_bp.route("/admin-create", methods=["POST"])
+@role_required("admin")
+def api_admin_create_membership():
+    """Admin creates a NetworkMembership on behalf of an Organization.
+
+    Use cases:
+      - NGO has SLA/technical issue submitting; admin creates the record
+      - Demo/seed data that needs to live under a specific tenant via
+        the X-Network-Override header (which non-admins can't use)
+      - Migrating in-flight applications during NEAR spin-off
+
+    Body: { org_id, member_tier?, country?, region?, eligibility_answers? }
+
+    Idempotent: returns existing membership if (network_id, org_id) already
+    has any non-terminal row. Status starts at 'pending'.
+    """
+    network_id = get_current_network_id()
+    if not network_id:
+        return jsonify({"success": False, "error": "Network not resolved"}), 400
+
+    body = get_request_json() or {}
+    org_id = body.get("org_id")
+    if not org_id:
+        return jsonify({"success": False, "error": "org_id required"}), 400
+
+    org = Organization.query.get(org_id)
+    if not org:
+        return jsonify({"success": False, "error": "Organization not found"}), 404
+
+    tier = (body.get("member_tier") or "member").strip().lower()
+    if tier not in MEMBERSHIP_TIERS:
+        return jsonify({"success": False, "error": f"Invalid tier '{tier}'"}), 400
+
+    # Idempotency: return existing non-terminal membership.
+    existing = NetworkMembership.query.filter_by(
+        network_id=network_id, org_id=org_id,
+    ).first()
+    if existing and existing.status in ("pending", "under_review", "active", "suspended"):
+        return jsonify({
+            "success": True,
+            "membership": existing.to_dict(),
+            "already_existed": True,
+        })
+
+    m = existing or NetworkMembership(
+        network_id=network_id, org_id=org_id, status="pending",
+    )
+    m.member_tier = tier
+    m.status = "pending"
+    m.status_reason = None
+    m.country = (body.get("country") or "").strip() or m.country
+    m.region = (body.get("region") or "").strip() or m.region
+    m.set_eligibility_answers(body.get("eligibility_answers") or {})
+    m.applied_at = datetime.now(timezone.utc)
+    if not existing:
+        db.session.add(m)
+    db.session.commit()
+
+    try:
+        from app.models import AuditChainEntry
+        AuditChainEntry.append(
+            action="network.membership.admin_created",
+            actor_email=current_user.email,
+            subject_kind="network_membership",
+            subject_id=m.id,
+            details={
+                "network_id": network_id, "org_id": org_id, "tier": tier,
+                "on_behalf": True,
+            },
+        )
+    except Exception:
+        pass
+
+    return jsonify({"success": True, "membership": m.to_dict()})
+
+
 @network_membership_bp.route("/apply", methods=["POST"])
 @login_required
 def api_apply_for_membership():
