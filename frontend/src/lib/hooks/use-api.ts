@@ -255,3 +255,88 @@ export function usePendingMemberships(status: string = 'under_review') {
     fetcher,
   );
 }
+
+// ---------------------------------------------------------------------------
+// Funds + Windows + Rubrics (Phase 34)
+// ---------------------------------------------------------------------------
+
+export interface Fund {
+  id: number;
+  network_id: number;
+  slug: string;
+  name: string;
+  short_description: string | null;
+  currency: string;
+  total_pool_amount: number | null;
+  disbursed_to_date: number | null;
+  year_launched: number | null;
+  oversight_role_key: string | null;
+  status: string;
+  is_default_for_emergency: boolean;
+  created_at: string | null;
+  window_count: number;
+  windows?: FundWindow[];
+}
+
+export interface FundWindow {
+  id: number;
+  fund_id: number;
+  slug: string;
+  name: string;
+  description: string | null;
+  crisis_type: string | null;
+  min_grant_amount: number | null;
+  max_grant_amount: number | null;
+  default_grant_duration_months: number | null;
+  application_window_hours: number | null;
+  decision_sla_days: number | null;
+  expected_completion_minutes: number | null;
+  direct_to_community_single_min_pct: number | null;
+  direct_to_community_consortium_min_pct: number | null;
+  status: string;
+  is_public: boolean;
+  application_template: unknown[];
+  default_rubric?: WindowRubric | null;
+}
+
+export interface WindowRubric {
+  id: number;
+  window_id: number;
+  name: string;
+  description: string | null;
+  is_default: boolean;
+  criterion_count: number;
+  criteria?: WindowCriterion[];
+}
+
+export interface WindowCriterion {
+  id: number;
+  rubric_id: number;
+  area: string;
+  name: string;
+  description: string | null;
+  weight: number;
+  threshold_kind: 'hard_gate' | 'soft_score';
+  threshold_value: number | null;
+  threshold_meaning: string | null;
+  ai_evaluator_key: string | null;
+  display_order: number;
+}
+
+export function useFunds() {
+  return useSWR<{ success: boolean; funds: Fund[] }>('/funds', fetcher);
+}
+
+export function useFund(id: number | null) {
+  return useSWR<{ success: boolean; fund: Fund }>(
+    id ? `/funds/${id}` : null,
+    fetcher,
+  );
+}
+
+export function useWindowRubric(windowId: number | null) {
+  return useSWR<{ success: boolean; rubric: WindowRubric | null }>(
+    windowId ? `/windows/${windowId}/rubric` : null,
+    fetcher,
+  );
+}
