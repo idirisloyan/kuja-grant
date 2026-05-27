@@ -24,7 +24,7 @@ import { useDeclaration, type EmergencyDeclaration } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import {
   CheckCircle2, XCircle, AlertCircle, Loader2, ChevronLeft,
-  Shield, Lock, Clock, FileText,
+  Shield, Lock, Clock, FileText, Sparkles,
 } from 'lucide-react';
 
 const STATUS_COLOUR: Record<EmergencyDeclaration['status'], string> = {
@@ -110,12 +110,19 @@ export default function DeclarationDetailClient() {
       </div>
 
       {/* Summary */}
-      {d.summary_md && (
-        <div className="border border-border rounded-lg bg-card p-5">
-          <h2 className="font-semibold text-sm mb-2">Summary</h2>
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{d.summary_md}</p>
+      <div className="border border-border rounded-lg bg-card p-5 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-semibold text-sm">Summary</h2>
+          {d.status === 'draft' && (
+            <AIDraftAssistButton declarationId={d.id} onUpdate={mutate} />
+          )}
         </div>
-      )}
+        {d.summary_md ? (
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">{d.summary_md}</p>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">No summary yet.</p>
+        )}
+      </div>
 
       {/* Evidence anchor */}
       {d.evidence_row_id && (
@@ -555,5 +562,89 @@ function SignerRow({
         </div>
       )}
     </li>
+  );
+}
+
+function AIDraftAssistButton({ declarationId, onUpdate }: {
+  declarationId: number; onUpdate: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{
+    ok?: boolean;
+    summary_md?: string;
+    shortlist_suggestions?: Array<{ org_name: string; rationale: string; amount?: number }>;
+  } | null>(null);
+
+  async function run(apply: boolean) {
+    setBusy(true);
+    try {
+      const r = await api.post<typeof result>(
+        `/declarations/${declarationId}/ai-draft-assist`,
+        { apply },
+      );
+      setResult(r);
+      if (apply && r?.ok) {
+        toast.success('Summary applied to draft.');
+        onUpdate();
+      } else if (r?.ok) {
+        toast.success('AI draft ready — review below.');
+      } else {
+        toast.message('AI unavailable — using fallback.');
+      }
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => run(false)}
+        disabled={busy}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[hsl(var(--kuja-spark))] text-white text-xs font-semibold disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+        AI draft assist
+      </button>
+      {result && (
+        <div className="border border-[hsl(var(--kuja-spark))]/30 rounded-md bg-[hsl(var(--kuja-spark-soft))] p-3 mt-2 space-y-2">
+          {result.summary_md && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1 flex items-center justify-between">
+                <span>AI-drafted summary</span>
+                <button
+                  type="button"
+                  onClick={() => run(true)}
+                  disabled={busy}
+                  className="text-[10px] underline hover:no-underline"
+                >
+                  Apply to draft
+                </button>
+              </div>
+              <p className="text-xs whitespace-pre-wrap leading-relaxed">{result.summary_md}</p>
+            </div>
+          )}
+          {result.shortlist_suggestions && result.shortlist_suggestions.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                Shortlist suggestions
+              </div>
+              <ul className="text-xs space-y-1">
+                {result.shortlist_suggestions.map((s, i) => (
+                  <li key={i}>
+                    <strong>{s.org_name}</strong>
+                    {s.amount && <> · {s.amount.toLocaleString()}</>}
+                    <div className="text-muted-foreground">{s.rationale}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

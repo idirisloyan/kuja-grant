@@ -15,7 +15,7 @@ import { api, ApiError } from '@/lib/api';
 import { usePendingMemberships, type Membership } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
-import { CheckCircle2, XCircle, Loader2, Inbox, Filter } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Inbox, Filter, Sparkles } from 'lucide-react';
 
 const STATUS_OPTIONS = [
   { value: 'under_review', label: 'Under review' },
@@ -113,6 +113,21 @@ function MembershipRow({ m, onChange }: { m: Membership; onChange: () => void })
   const [busy, setBusy] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [aiBrief, setAiBrief] = useState<{ paragraph?: string; red_flags?: string[]; ok?: boolean } | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+
+  async function fetchBrief() {
+    setAiBusy(true);
+    try {
+      const r = await api.post<typeof aiBrief>(`/network/membership/${m.id}/ai-brief`);
+      setAiBrief(r);
+      if (!r?.ok) toast.message('AI unavailable — fallback shown.');
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'AI brief failed.');
+    } finally {
+      setAiBusy(false);
+    }
+  }
 
   async function approve() {
     setBusy(true);
@@ -180,6 +195,16 @@ function MembershipRow({ m, onChange }: { m: Membership; onChange: () => void })
             <div className="inline-flex gap-1">
               <button
                 type="button"
+                onClick={fetchBrief}
+                disabled={aiBusy}
+                title="Generate AI reviewer brief"
+                className="px-2 py-1 rounded-md text-xs font-semibold bg-[hsl(var(--kuja-spark))] text-white hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1"
+              >
+                {aiBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                AI brief
+              </button>
+              <button
+                type="button"
                 onClick={approve}
                 disabled={busy}
                 className="px-2 py-1 rounded-md text-xs font-semibold bg-[hsl(var(--kuja-grow))] text-white hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1"
@@ -202,6 +227,42 @@ function MembershipRow({ m, onChange }: { m: Membership; onChange: () => void })
           )}
         </td>
       </tr>
+      {aiBrief && (
+        <tr className="border-t border-border bg-[hsl(var(--kuja-spark-soft))]">
+          <td colSpan={7} className="px-3 py-3">
+            <div className="flex items-start gap-2">
+              <Sparkles className="w-4 h-4 text-[hsl(var(--kuja-spark))] shrink-0 mt-0.5" />
+              <div className="flex-1 text-xs space-y-1.5">
+                {!aiBrief.ok && (
+                  <div className="italic text-muted-foreground">
+                    Fallback shown — AI service unavailable.
+                  </div>
+                )}
+                {aiBrief.paragraph && (
+                  <p className="leading-relaxed">{aiBrief.paragraph}</p>
+                )}
+                {aiBrief.red_flags && aiBrief.red_flags.length > 0 && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-destructive mb-0.5">
+                      Red flags
+                    </div>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {aiBrief.red_flags.map((f, i) => <li key={i}>{f}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setAiBrief(null)}
+                className="text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                Dismiss
+              </button>
+            </div>
+          </td>
+        </tr>
+      )}
       {showReject && (
         <tr className="border-t border-border bg-muted/30">
           <td colSpan={7} className="px-3 py-3">

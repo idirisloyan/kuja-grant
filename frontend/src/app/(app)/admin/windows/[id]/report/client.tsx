@@ -10,12 +10,16 @@
  * and CSV / ZIP download links.
  */
 
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { api, ApiError } from '@/lib/api';
 import { useWindowReport, type WindowReportDeclaration } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import {
   ChevronLeft, FileSpreadsheet, Archive, Clock, ShieldCheck,
-  ShieldAlert, MapPin, Users, Coins, AlertCircle,
+  ShieldAlert, MapPin, Users, Coins, AlertCircle, Sparkles, Loader2,
+  Lightbulb,
 } from 'lucide-react';
 
 const SLA_GOOD = 'bg-[hsl(var(--kuja-grow))]/15 text-[hsl(var(--kuja-grow))]';
@@ -162,7 +166,163 @@ export default function WindowReportClient() {
           </ul>
         )}
       </section>
+
+      {/* AI panels (Phase 38) */}
+      <AINarrativePanel windowId={windowId} />
+      <CrossWindowPatternsPanel />
     </div>
+  );
+}
+
+function AINarrativePanel({ windowId }: { windowId: number }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{
+    ok?: boolean;
+    overview_md?: string;
+    sla_commentary_md?: string;
+    governance_md?: string;
+    closing_md?: string;
+  } | null>(null);
+
+  async function run() {
+    setBusy(true);
+    try {
+      const r = await api.post<typeof result>(
+        `/windows/${windowId}/report/ai-narrative`,
+      );
+      setResult(r);
+      if (r?.ok) toast.success('Narrative drafted.');
+      else toast.message('AI unavailable — using fallback.');
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-semibold text-sm flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-[hsl(var(--kuja-spark))]" />
+          AI narrative
+        </h2>
+        <button
+          type="button"
+          onClick={run}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[hsl(var(--kuja-spark))] text-white text-xs font-semibold disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+          {result ? 'Re-draft' : 'Draft narrative'}
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        AI-drafted prose sections from the structured stats above. Edit before publishing the report PDF.
+      </p>
+      {result && (
+        <div className="space-y-3 text-sm">
+          {!result.ok && (
+            <div className="text-xs italic text-muted-foreground">
+              Fallback shown — AI service unavailable in this environment.
+            </div>
+          )}
+          {result.overview_md && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Overview</div>
+              <p className="whitespace-pre-wrap leading-relaxed">{result.overview_md}</p>
+            </div>
+          )}
+          {result.sla_commentary_md && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">SLA commentary</div>
+              <p className="whitespace-pre-wrap leading-relaxed">{result.sla_commentary_md}</p>
+            </div>
+          )}
+          {result.governance_md && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Governance</div>
+              <p className="whitespace-pre-wrap leading-relaxed">{result.governance_md}</p>
+            </div>
+          )}
+          {result.closing_md && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Closing</div>
+              <p className="whitespace-pre-wrap leading-relaxed">{result.closing_md}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CrossWindowPatternsPanel() {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{
+    ok?: boolean;
+    patterns?: Array<{ title: string; observation: string; evidence_windows?: string[] }>;
+    note?: string;
+  } | null>(null);
+
+  async function run() {
+    setBusy(true);
+    try {
+      const r = await api.post<typeof result>('/networks/patterns/ai-detect');
+      setResult(r);
+      if (r?.ok) {
+        const count = r.patterns?.length || 0;
+        toast.success(`${count} pattern${count === 1 ? '' : 's'} detected.`);
+      } else {
+        toast.message('AI unavailable — using fallback.');
+      }
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-semibold text-sm flex items-center gap-2">
+          <Lightbulb className="w-4 h-4 text-[hsl(var(--kuja-sun))]" />
+          Cross-window patterns
+        </h2>
+        <button
+          type="button"
+          onClick={run}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[hsl(var(--kuja-spark))] text-white text-xs font-semibold disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+          Detect patterns
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Scans across every window in the network for emergent patterns
+        (SLA drift, sector concentration, response-speed shifts).
+      </p>
+      {result?.note && (
+        <div className="text-xs italic text-muted-foreground">{result.note}</div>
+      )}
+      {result?.patterns && result.patterns.length > 0 && (
+        <ul className="space-y-2 text-sm">
+          {result.patterns.map((p, i) => (
+            <li key={i} className="border-l-2 border-[hsl(var(--kuja-spark))] pl-3 py-1">
+              <div className="font-semibold text-sm">{p.title}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{p.observation}</div>
+              {p.evidence_windows && p.evidence_windows.length > 0 && (
+                <div className="text-[10px] text-muted-foreground mt-0.5">
+                  Evidence: {p.evidence_windows.join(' · ')}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
