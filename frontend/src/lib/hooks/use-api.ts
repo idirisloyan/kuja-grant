@@ -383,6 +383,21 @@ export function useLatestCrisisReport() {
   );
 }
 
+export function useCrisisReports(status?: string) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return useSWR<{ success: boolean; reports: CrisisReport[] }>(
+    `/crisis/reports${qs}`,
+    fetcher,
+  );
+}
+
+export function useCrisisReport(id: number | null) {
+  return useSWR<{ success: boolean; report: CrisisReport & { rows: CrisisRow[] } }>(
+    id ? `/crisis/reports/${id}` : null,
+    fetcher,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Emergency Declarations (Phase 36)
 // ---------------------------------------------------------------------------
