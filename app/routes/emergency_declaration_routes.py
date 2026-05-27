@@ -287,6 +287,90 @@ def api_close_declaration(declaration_id):
 
 
 # =============================================================================
+# Release applications — declaration-to-grant handoff (governed)
+# =============================================================================
+
+@emergency_bp.route("/<int:declaration_id>/release-applications", methods=["POST"])
+@role_required("admin")
+def api_release_applications(declaration_id):
+    """One-click governed handoff. After the declaration activates,
+    auto-created grant drafts sit in 'draft' status until the
+    secretariat is ready (NGOs need to be invited, agreement docs
+    uploaded, etc.). This endpoint flips them to 'open' atomically,
+    sets the published_at timestamp on each grant, advances the
+    declaration's applicants_notified_at SLA milestone, and writes a
+    single audit-chain anchor.
+
+    Only valid on declarations in 'signed_active' status with at least
+    one draft grant linked to the same fund_window. Idempotent: if all
+    grants are already 'open' or beyond, returns success with
+    released_count=0 and the existing applicants_notified_at.
+    """
+    d = EmergencyDeclaration.query.get_or_404(declaration_id)
+    if not _scope(d):
+        return jsonify({"success": False, "error": "Wrong network context"}), 403
+    if d.status != "signed_active":
+        return jsonify({
+            "success": False,
+            "error": f"Can only release from signed_active (current: '{d.status}')",
+        }), 400
+
+    # Find grants linked to this declaration via the shortlist heuristic
+    # (same approach as WindowReportService._grant_under_declaration).
+    org_ids = d.get_shortlisted_org_ids()
+    if not org_ids:
+        return jsonify({
+            "success": False,
+            "error": "Declaration has no shortlisted orgs; nothing to release",
+        }), 400
+
+    from datetime import datetime, timezone
+    grants = Grant.query.filter_by(fund_window_id=d.window_id).all()
+    released = []
+    skipped = []
+    now = datetime.now(timezone.utc)
+
+    for g in grants:
+        # Match the auto-created grant's title pattern.
+        is_linked = any(f"— Org #{oid}" in (g.title or "") for oid in org_ids)
+        if not is_linked:
+            continue
+        if g.status != "draft":
+            skipped.append({"grant_id": g.id, "status": g.status})
+            continue
+        g.status = "open"
+        g.published_at = now
+        released.append({"grant_id": g.id, "title": g.title})
+
+    # Advance the declaration SLA milestone (only set if not already set)
+    if released and not d.applicants_notified_at:
+        d.applicants_notified_at = now
+
+    # Single audit-chain anchor capturing the whole release
+    if released:
+        d._anchor(
+            action="emergency.declaration.applications_released",
+            actor_email=current_user.email,
+            details={
+                "declaration_id": d.id,
+                "window_id": d.window_id,
+                "released_grant_ids": [r["grant_id"] for r in released],
+                "released_count": len(released),
+                "applicants_notified_at": now.isoformat(),
+            },
+        )
+
+    db.session.commit()
+    return jsonify({
+        "success": True,
+        "released": released,
+        "released_count": len(released),
+        "skipped": skipped,
+        "declaration": d.to_dict(),
+    })
+
+
+# =============================================================================
 # Signer slots
 # =============================================================================
 

@@ -24,7 +24,7 @@ import { useDeclaration, type EmergencyDeclaration } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import {
   CheckCircle2, XCircle, AlertCircle, Loader2, ChevronLeft,
-  Shield, Lock, Clock, FileText, Sparkles,
+  Shield, Lock, Clock, FileText, Sparkles, Send, Rocket,
 } from 'lucide-react';
 
 const STATUS_COLOUR: Record<EmergencyDeclaration['status'], string> = {
@@ -92,6 +92,11 @@ export default function DeclarationDetailClient() {
           </div>
           <DrafterActions d={d} onChange={mutate} />
         </div>
+
+        {/* Release applications — declaration-to-grant handoff (Phase 32-38 follow-up) */}
+        {d.status === 'signed_active' && (
+          <ReleaseApplicationsPanel d={d} onChange={mutate} />
+        )}
 
         {/* Signature counter */}
         <div className="mt-4 flex items-center gap-3 text-xs">
@@ -562,6 +567,102 @@ function SignerRow({
         </div>
       )}
     </li>
+  );
+}
+
+function ReleaseApplicationsPanel({ d, onChange }: {
+  d: EmergencyDeclaration; onChange: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [lastResult, setLastResult] = useState<{
+    released_count?: number;
+    released?: Array<{ grant_id: number; title: string }>;
+    skipped?: Array<{ grant_id: number; status: string }>;
+  } | null>(null);
+
+  const alreadyReleased = !!d.applicants_notified_at;
+
+  async function release() {
+    setBusy(true);
+    try {
+      const r = await api.post<{
+        success: boolean;
+        released_count: number;
+        released: Array<{ grant_id: number; title: string }>;
+        skipped: Array<{ grant_id: number; status: string }>;
+      }>(`/declarations/${d.id}/release-applications`);
+      setLastResult(r);
+      if (r.released_count > 0) {
+        toast.success(`Released ${r.released_count} grant${r.released_count === 1 ? '' : 's'} — NGOs notified.`);
+      } else {
+        toast.message('All grants already released.');
+      }
+      onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Release failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (alreadyReleased) {
+    return (
+      <div className="mt-4 border border-[hsl(var(--kuja-grow))]/30 bg-[hsl(var(--kuja-grow))]/10 rounded-md p-3">
+        <div className="flex items-start gap-2">
+          <Send className="w-4 h-4 text-[hsl(var(--kuja-grow))] shrink-0 mt-0.5" />
+          <div className="flex-1 text-xs">
+            <div className="font-semibold text-[hsl(var(--kuja-grow))]">
+              Applications released
+            </div>
+            <div className="text-muted-foreground mt-0.5">
+              Shortlisted NGOs were notified on{' '}
+              {new Date(d.applicants_notified_at!).toLocaleString()}.
+              Grant drafts are now open for NGO application.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 border border-[hsl(var(--kuja-sun))]/30 bg-[hsl(var(--kuja-sun))]/10 rounded-md p-3">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          <Rocket className="w-4 h-4 text-[hsl(var(--kuja-sun))] shrink-0 mt-0.5" />
+          <div className="text-xs flex-1">
+            <div className="font-semibold text-[hsl(var(--kuja-sun))]">
+              Ready to release — final governed step
+            </div>
+            <div className="text-muted-foreground mt-0.5">
+              Declaration is signed_active. Grant drafts have been auto-created
+              under the window for each shortlisted org. Click to flip them to
+              <code className="font-mono mx-1 px-1 py-0.5 bg-muted rounded text-[10px]">open</code>
+              status and notify the NGOs. This action is audit-anchored and
+              advances the <code className="font-mono mx-1 px-1 py-0.5 bg-muted rounded text-[10px]">applicants_notified_at</code> SLA milestone.
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={release}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[hsl(var(--kuja-sun))] text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 shrink-0"
+        >
+          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+          Release applications now
+        </button>
+      </div>
+      {lastResult && lastResult.released && lastResult.released.length > 0 && (
+        <ul className="mt-2 pt-2 border-t border-[hsl(var(--kuja-sun))]/20 text-[11px] space-y-0.5">
+          {lastResult.released.map((g) => (
+            <li key={g.grant_id} className="text-muted-foreground">
+              · grant #{g.grant_id} — {g.title.slice(0, 60)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

@@ -50,6 +50,20 @@ def main():
              "via manual_admin so the declaration auto-activates. Adds a "
              "shortlist of 3 NGO orgs so auto grant drafts get created.",
     )
+    parser.add_argument(
+        "--release-applications", action="store_true",
+        help="After activation, also flip the auto-created grant drafts to "
+             "'open' and set applicants_notified_at. Use --activate-declaration "
+             "together. Demonstrates the full handoff from declaration to "
+             "operational grant.",
+    )
+    parser.add_argument(
+        "--rich", action="store_true",
+        help="Seed the richer demo story on top of the baseline: 3 pending "
+             "NetworkMembership applications, a MonitoringVisit with community "
+             "feedback narrative, and a second CrisisMonitoringRow (Sahel "
+             "displacement) for variety in the report.",
+    )
     args = parser.parse_args()
 
     base = args.base.rstrip("/")
@@ -437,6 +451,38 @@ def main():
                 except Exception as e:
                     print(f"   - retroactive grants: error {e}")
 
+    # ----------------------------------------------------------------
+    # 10. Optional: release applications (the governed handoff)
+    # ----------------------------------------------------------------
+    if args.release_applications:
+        print()
+        print("[10] Releasing applications (the governed declaration-to-grant handoff)...")
+        rrel = s.post(f"{base}/api/declarations/{decl_id}/release-applications",
+                      headers=H, timeout=10)
+        if rrel.status_code == 200:
+            data = rrel.json()
+            count = data.get("released_count", 0)
+            if count > 0:
+                print(f"   ok - released {count} grant(s) to 'open' status")
+                for g in data.get("released", [])[:5]:
+                    print(f"     - grant #{g['grant_id']}")
+            else:
+                already = data.get("declaration", {}).get("applicants_notified_at")
+                print(f"   already released (applicants_notified_at: {already})")
+        elif rrel.status_code == 400 and "signed_active" in rrel.text:
+            print(f"   skipped - declaration is not signed_active yet")
+        else:
+            print(f"   failed ({rrel.status_code}): {rrel.text[:150]}")
+
+    # ----------------------------------------------------------------
+    # 11. Optional: richer demo story (--rich)
+    # ----------------------------------------------------------------
+    if args.rich:
+        print()
+        print("[11] Seeding the richer demo story (memberships + visit + 2nd crisis row)...")
+        _seed_rich(s, base, H, network_slug=args.network_slug, admin_id=admin_id,
+                   report_id=report_id, decl_id=decl_id, window_id=window_id)
+
     print()
     print("=" * 60)
     print("Seed complete. Walk through the demo at:")
@@ -448,6 +494,153 @@ def main():
 
 
 # -------------------------------------------------------------------------
+
+def _seed_rich(s, base, H, *, network_slug, admin_id, report_id, decl_id, window_id):
+    """Seed the richer demo story: pending memberships + monitoring visit + 2nd crisis row."""
+    from datetime import date
+
+    # --- 11.1 Three pending NetworkMembership applications -----------
+    # Log in as 3 different NGO users and apply for membership.
+    ngo_emails = [
+        "fatima@amani.org",
+        "ahmed@salamrelief.org",
+        "thandi@ubuntu.org",
+    ]
+    pending_count = 0
+    for email in ngo_emails:
+        sub = requests.Session()
+        sub.headers.update({"X-Requested-With": "XMLHttpRequest"})
+        if network_slug:
+            sub.headers["X-Network-Override"] = network_slug
+        rl = sub.post(f"{base}/api/auth/login",
+                      json={"email": email, "password": "pass123"},
+                      timeout=15)
+        if rl.status_code != 200:
+            print(f"   - {email}: login failed (skipping)")
+            continue
+        # Use the apply endpoint (idempotent: returns existing membership if any)
+        ra = sub.post(f"{base}/api/network/membership/apply", json={
+            "eligibility_answers": {
+                "registered_nonprofit": "yes",
+                "global_south_hq": "yes",
+                "locally_rooted": "yes",
+                "governance_docs": "yes",
+                "code_of_conduct": "yes",
+            },
+            "country": {"fatima@amani.org": "KEN",
+                        "ahmed@salamrelief.org": "SOM",
+                        "thandi@ubuntu.org": "ZAF"}.get(email),
+            "region": "Eastern + Southern Africa",
+            "member_tier": "member",
+        }, timeout=10)
+        if ra.status_code == 200:
+            mem = ra.json().get("membership", {})
+            pending_count += 1
+            status = mem.get("status")
+            print(f"   - {email}: membership #{mem.get('id')} status={status}")
+        else:
+            print(f"   - {email}: apply failed ({ra.status_code})")
+    print(f"   pending memberships: {pending_count}")
+
+    # --- 11.2 Second crisis monitoring row (Sahel displacement) -----
+    # Add to the same report; demonstrates per-report variety.
+    rrows = s.get(f"{base}/api/crisis/reports/{report_id}", headers=H, timeout=10)
+    existing_countries = set()
+    if rrows.status_code == 200:
+        for row in rrows.json().get("report", {}).get("rows", []):
+            existing_countries.add(row.get("country"))
+    if "BFA" not in existing_countries:
+        rsahel = s.post(f"{base}/api/crisis/reports/{report_id}/rows", json={
+            "country": "BFA",  # Burkina Faso
+            "region": "Sahel",
+            "event_type": "conflict_displacement",
+            "event_title": "Sahel displacement spike — Centre-Nord, Boucle du Mouhoun",
+            "hdi_band": "low_hdi",
+            "gov_capacity_band": "low",
+            "people_impacted_estimate": 80000,
+            "attention_band": "low",  # forgotten crisis
+            "narrative": (
+                "Continued armed conflict in Burkina Faso's Centre-Nord and "
+                "Boucle du Mouhoun regions has displaced an estimated 80,000 "
+                "people in the past month. State response capacity is "
+                "overstretched; international attention has shifted elsewhere. "
+                "NEAR member orgs in adjacent regions report increasing "
+                "household pressure. Suggested OB action: review whether "
+                "the existing Sahel response cluster needs reinforcement."
+            ),
+            "flagged_for_ob": True,
+        }, headers=H, timeout=10)
+        if rsahel.status_code == 200:
+            score = rsahel.json()["row"]["composite_score"]
+            print(f"   crisis row: Sahel displacement (BFA), composite_score={score}")
+        else:
+            print(f"   crisis row: failed ({rsahel.status_code})")
+    else:
+        print(f"   crisis row: BFA already exists")
+
+    # Re-publish if the report is no longer current
+    rcheck = s.get(f"{base}/api/crisis/reports/{report_id}", headers=H, timeout=10)
+    if rcheck.status_code == 200:
+        if rcheck.json().get("report", {}).get("status") != "published":
+            s.post(f"{base}/api/crisis/reports/{report_id}/publish",
+                   headers=H, timeout=10)
+
+    # --- 11.3 Monitoring visit on one of the declaration's grants ----
+    # Find an open grant under this declaration.
+    rwin = s.get(f"{base}/api/windows/{window_id}/report", headers=H, timeout=10)
+    target_grant_id = None
+    if rwin.status_code == 200:
+        for d in rwin.json().get("declarations", []):
+            if d.get("id") == decl_id:
+                grants = d.get("grants", [])
+                if grants:
+                    target_grant_id = grants[0]["id"]
+                    break
+    if target_grant_id:
+        # Check existing visits to stay idempotent
+        rv_list = s.get(f"{base}/api/grants/{target_grant_id}/monitoring-visits",
+                        headers=H, timeout=10)
+        had_visit = False
+        if rv_list.status_code == 200:
+            had_visit = len(rv_list.json().get("visits", [])) > 0
+        if not had_visit:
+            rv = s.post(f"{base}/api/grants/{target_grant_id}/monitoring-visits",
+                        json={
+                            "visit_mode": "virtual",
+                            "visit_date": date.today().isoformat(),
+                            "observations_md": (
+                                "Joint secretariat + OB virtual check-in with the "
+                                "implementing team. Three water trucks deployed to "
+                                "the affected districts; cash transfers to 1,200 "
+                                "households in week 2. Field team reports access "
+                                "constraints in two villages and is coordinating "
+                                "with local authorities to resolve."
+                            ),
+                            "community_feedback_summary": (
+                                "Community committee reports that the cash transfer "
+                                "amount is well-matched to local food prices. They "
+                                "raised one concern: pregnant women in two villages "
+                                "have not received additional nutrition support yet — "
+                                "the team committed to a follow-up in week 4."
+                            ),
+                            "issues_identified": "Access constraints in 2 villages; pregnant-women nutrition gap.",
+                            "action_items_md": (
+                                "1. Coordinate with district authorities on access "
+                                "(due: 2 weeks).\n"
+                                "2. Add pregnant-women nutrition module for next "
+                                "distribution cycle (due: week 4)."
+                            ),
+                            "attendance_estimate": 18,
+                        }, headers=H, timeout=10)
+            if rv.status_code == 200:
+                print(f"   monitoring visit: recorded on grant #{target_grant_id}")
+            else:
+                print(f"   monitoring visit: failed ({rv.status_code}) {rv.text[:120]}")
+        else:
+            print(f"   monitoring visit: grant #{target_grant_id} already has a visit")
+    else:
+        print(f"   monitoring visit: no eligible grant found (skipping)")
+
 
 def find_or_create(s, base, H, *, list_url, list_key, find_by, create_url, create_payload, out_key):
     """Idempotent: return the id of the matching entity, creating if absent."""

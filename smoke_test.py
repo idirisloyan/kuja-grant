@@ -656,6 +656,115 @@ def make_tests(base):
         assert "patterns" in body  # may be [] if no windows
     tests.append(("Phase 38 AI surfaces reachable + fallback shape", test_phase38_ai_surfaces_reachable))
 
+    # --- Release applications (declaration-to-grant handoff) ---
+    def test_release_applications_handoff():
+        """Verifies that after a declaration is signed_active and has draft
+        grants linked, the /release-applications endpoint flips them to
+        'open', sets applicants_notified_at, and audit-anchors the action.
+        Re-running is a no-op (idempotent)."""
+        s = login_ok(base, USERS["admin"])
+        H = {"X-Requested-With": "XMLHttpRequest"}
+
+        # Build a complete activate-able scenario for this test only
+        import time
+        suffix = int(time.time())
+
+        rf = s.post(f"{base}/api/funds", json={
+            "slug": f"smoke-release-{suffix}", "name": "Smoke Release Fund",
+        }, headers=H, timeout=10)
+        assert rf.status_code == 200
+        fund_id = rf.json()["fund"]["id"]
+        rw = s.post(f"{base}/api/funds/{fund_id}/windows", json={
+            "slug": "w-release", "name": "Release window", "status": "open",
+        }, headers=H, timeout=10)
+        window_id = rw.json()["window"]["id"]
+
+        # Publish a crisis report so we have evidence
+        rr = s.post(f"{base}/api/crisis/reports", json={}, headers=H, timeout=10)
+        report_id = rr.json()["report"]["id"]
+        rrow = s.post(f"{base}/api/crisis/reports/{report_id}/rows", json={
+            "country": "KEN", "hdi_band": "low_hdi",
+        }, headers=H, timeout=10)
+        evidence_row_id = rrow.json()["row"]["id"]
+        s.post(f"{base}/api/crisis/reports/{report_id}/publish",
+               headers=H, timeout=10)
+
+        # Find 2 NGO orgs to shortlist
+        ro = s.get(f"{base}/api/organizations/?type=ngo&page=1",
+                   headers=H, timeout=10)
+        org_ids = []
+        if ro.status_code == 200:
+            org_ids = [o["id"] for o in ro.json().get("organizations", [])[:2]]
+        assert len(org_ids) >= 2, f"need >=2 NGO orgs for this test (got {len(org_ids)})"
+
+        # Create + activate declaration
+        rd = s.post(f"{base}/api/declarations", json={
+            "fund_id": fund_id, "window_id": window_id,
+            "title": f"Release test {suffix}",
+            "evidence_row_id": evidence_row_id,
+            "proposed_total_amount": 200000,
+            "shortlisted_org_ids": org_ids,
+        }, headers=H, timeout=10)
+        decl_id = rd.json()["declaration"]["id"]
+
+        # Add 2 signer slots (donor + ngo so admin can manual_admin-attest both)
+        s_donor = login_ok(base, USERS["donor"])
+        donor_id = s_donor.get(f"{base}/api/auth/me", headers=H, timeout=5).json()["user"]["id"]
+        s_ngo = login_ok(base, USERS["ngo"])
+        ngo_id = s_ngo.get(f"{base}/api/auth/me", headers=H, timeout=5).json()["user"]["id"]
+        s.post(f"{base}/api/declarations/{decl_id}/signers",
+               json={"user_id": donor_id}, headers=H, timeout=10)
+        s.post(f"{base}/api/declarations/{decl_id}/signers",
+               json={"user_id": ngo_id}, headers=H, timeout=10)
+        s.post(f"{base}/api/declarations/{decl_id}/submit", headers=H, timeout=10)
+
+        # Sign both via manual_admin
+        rdet = s.get(f"{base}/api/declarations/{decl_id}", headers=H, timeout=10)
+        for sig in rdet.json()["declaration"]["signatures"]:
+            s.post(f"{base}/api/declarations/{decl_id}/signatures/{sig['id']}/sign",
+                   json={"signature_method": "manual_admin", "declared_no_coi": True},
+                   headers=H, timeout=10)
+
+        # Confirm declaration is signed_active + has linked draft grants
+        rcheck = s.get(f"{base}/api/declarations/{decl_id}", headers=H, timeout=10)
+        decl = rcheck.json()["declaration"]
+        assert decl["status"] == "signed_active", f"expected signed_active, got {decl['status']}"
+
+        # === The actual test: release applications ===
+        rrel = s.post(f"{base}/api/declarations/{decl_id}/release-applications",
+                      headers=H, timeout=10)
+        assert rrel.status_code == 200, f"release: {rrel.status_code} {rrel.text[:200]}"
+        rel = rrel.json()
+        assert rel["success"] is True
+        # Should have released 2 grants (one per shortlisted org)
+        assert rel["released_count"] >= 2, \
+            f"expected >=2 grants released, got {rel['released_count']}"
+        # Declaration should now have applicants_notified_at set
+        assert rel["declaration"]["applicants_notified_at"], \
+            "applicants_notified_at not set after release"
+
+        # === Idempotency: re-running returns 0 released ===
+        rrel2 = s.post(f"{base}/api/declarations/{decl_id}/release-applications",
+                       headers=H, timeout=10)
+        assert rrel2.status_code == 200
+        assert rrel2.json()["released_count"] == 0, \
+            "second release should be a no-op"
+
+        # === Gate: can't release from non-signed_active ===
+        # Create a draft declaration and try to release — should 400
+        rd2 = s.post(f"{base}/api/declarations", json={
+            "fund_id": fund_id, "window_id": window_id,
+            "title": f"Release test draft {suffix}",
+            "evidence_row_id": evidence_row_id,
+            "shortlisted_org_ids": org_ids,
+        }, headers=H, timeout=10)
+        draft_id = rd2.json()["declaration"]["id"]
+        rfail = s.post(f"{base}/api/declarations/{draft_id}/release-applications",
+                       headers=H, timeout=10)
+        assert rfail.status_code == 400, \
+            f"release from draft should fail with 400: got {rfail.status_code}"
+    tests.append(("Release applications handoff (governed)", test_release_applications_handoff))
+
     # --- Login all roles ---
     for role, email in USERS.items():
         def _make(e=email, rl=role):
