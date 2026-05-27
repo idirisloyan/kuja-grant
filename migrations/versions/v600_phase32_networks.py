@@ -125,6 +125,10 @@ def upgrade():
         )
 
     # ── seed default Kuja Marketplace network ────────────────────
+    # NB: use :is_default / :is_active parameter binds rather than `1`/`0`
+    # literals so this works on Postgres (strict boolean typing) as well
+    # as SQLite (which would auto-coerce). Same for the SELECT 1 in the
+    # WHERE NOT EXISTS — that's an integer-context literal, fine in both.
     now = datetime.now(timezone.utc)
     bind.execute(
         sa.text(
@@ -151,14 +155,14 @@ def upgrade():
                    'Kuja Capacity Assessment',
                    'USD',
                    '{}',
-                   1,
-                   1,
+                   :is_default,
+                   :is_active,
                    :now,
                    :now
             WHERE NOT EXISTS (SELECT 1 FROM networks WHERE slug = 'kuja')
             """
         ),
-        {"now": now},
+        {"now": now, "is_default": True, "is_active": True},
     )
 
 
