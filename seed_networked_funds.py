@@ -44,6 +44,12 @@ def main():
         help="Target a specific network via X-Network-Override header (e.g. 'near'). "
              "Default: route via host header (kuja default).",
     )
+    parser.add_argument(
+        "--activate-declaration", action="store_true",
+        help="After creating the draft declaration, submit + sign both slots "
+             "via manual_admin so the declaration auto-activates. Adds a "
+             "shortlist of 3 NGO orgs so auto grant drafts get created.",
+    )
     args = parser.parse_args()
 
     base = args.base.rstrip("/")
@@ -277,42 +283,159 @@ def main():
         decl_id = r.json()["declaration"]["id"]
         print(f"   ok — declaration_id={decl_id}")
 
-    # Add 2 signer slots (admin + donor user) so submission can proceed.
-    # Look up donor user id first.
-    rdonor = s.post(
-        f"{base}/api/auth/login",
-        json={"email": "sarah@globalhealth.org", "password": args.password},
-        headers=H, timeout=15,
-    )
-    if rdonor.status_code == 200:
-        donor_id = rdonor.json()["user"]["id"]
-        # Re-login as admin
+    # Add 2 signer slots — donor + NGO. We DON'T add admin as a signer
+    # because admin can't manual_admin-attest for themselves (the
+    # activate-declaration path would skip it), and the platform's default
+    # oversight_body_min_signers=2 means we need both slots to sign.
+    # Both donor + NGO are valid third-party signers for the manual_admin
+    # paper-signature ceremony path.
+    sarah_id = None
+    fatima_id = None
+    try:
+        rsarah = s.post(f"{base}/api/auth/login",
+                        json={"email": "sarah@globalhealth.org", "password": args.password},
+                        headers=H, timeout=15)
+        if rsarah.status_code == 200:
+            sarah_id = rsarah.json()["user"]["id"]
+        rfatima = s.post(f"{base}/api/auth/login",
+                         json={"email": "fatima@amani.org", "password": args.password},
+                         headers=H, timeout=15)
+        if rfatima.status_code == 200:
+            fatima_id = rfatima.json()["user"]["id"]
+        # Re-login as admin for the rest
         s.post(f"{base}/api/auth/login",
                json={"email": args.email, "password": args.password},
                headers=H, timeout=15)
+    except Exception as e:
+        print(f"   warning: signer user lookup failed: {e}")
 
-        # Get current signers
+    rdet = s.get(f"{base}/api/declarations/{decl_id}", headers=H, timeout=10)
+    sigs = rdet.json().get("declaration", {}).get("signatures", []) if rdet.status_code == 200 else []
+    existing_signer_ids = {s["signer_user_id"] for s in sigs}
+
+    if sarah_id and sarah_id not in existing_signer_ids:
+        ra = s.post(f"{base}/api/declarations/{decl_id}/signers",
+                    json={"user_id": sarah_id, "required_order": 0},
+                    headers=H, timeout=10)
+        print(f"   - donor (sarah) signer slot: {'added' if ra.status_code == 200 else 'failed'}")
+    elif sarah_id:
+        print(f"   - donor (sarah) signer slot already exists")
+
+    if fatima_id and fatima_id not in existing_signer_ids:
+        rd = s.post(f"{base}/api/declarations/{decl_id}/signers",
+                    json={"user_id": fatima_id, "required_order": 1},
+                    headers=H, timeout=10)
+        print(f"   - NGO (fatima) signer slot: {'added' if rd.status_code == 200 else 'failed'}")
+    elif fatima_id:
+        print(f"   - NGO (fatima) signer slot already exists")
+
+    # ----------------------------------------------------------------
+    # 9. Optional: submit + sign the declaration so it activates
+    # ----------------------------------------------------------------
+    if args.activate_declaration:
+        print()
+        print("[9/9] Activating the declaration (submit + sign both slots)...")
+        # Re-fetch detail
         rdet = s.get(f"{base}/api/declarations/{decl_id}", headers=H, timeout=10)
-        sigs = rdet.json().get("declaration", {}).get("signatures", []) if rdet.status_code == 200 else []
-        existing_signer_ids = {s["signer_user_id"] for s in sigs}
+        decl = rdet.json().get("declaration", {})
+        cur_status = decl.get("status")
 
-        if admin_id not in existing_signer_ids:
-            ra = s.post(f"{base}/api/declarations/{decl_id}/signers",
-                        json={"user_id": admin_id, "required_order": 0},
-                        headers=H, timeout=10)
-            print(f"   - admin signer slot: {'added' if ra.status_code == 200 else 'failed'}")
-        else:
-            print(f"   - admin signer slot already exists")
+        # If still in draft, add a small shortlist (3 NGO orgs) so auto-
+        # grant creation has something to do on activation.
+        if cur_status == "draft" and not decl.get("shortlisted_org_ids"):
+            # Pull NGO orgs the admin can see — there are seeded NGO test
+            # orgs from seed.py. We'll grab the first 3.
+            ngo_orgs = []
+            try:
+                ro = s.get(f"{base}/api/organizations/", headers=H, timeout=10)
+                if ro.status_code == 200:
+                    all_orgs = ro.json().get("organizations", [])
+                    ngo_orgs = [
+                        o["id"] for o in all_orgs
+                        if (o.get("org_type") or "").lower() == "ngo"
+                    ][:3]
+            except Exception:
+                pass
+            if ngo_orgs:
+                ru = s.put(f"{base}/api/declarations/{decl_id}",
+                           json={"shortlisted_org_ids": ngo_orgs},
+                           headers=H, timeout=10)
+                if ru.status_code == 200:
+                    print(f"   - shortlist: added {ngo_orgs}")
+                else:
+                    print(f"   - shortlist: skipped ({ru.status_code})")
+            else:
+                print(f"   - shortlist: no NGO orgs found")
 
-        if donor_id not in existing_signer_ids:
-            rd = s.post(f"{base}/api/declarations/{decl_id}/signers",
-                        json={"user_id": donor_id, "required_order": 1},
-                        headers=H, timeout=10)
-            print(f"   - donor signer slot: {'added' if rd.status_code == 200 else 'failed'}")
-        else:
-            print(f"   - donor signer slot already exists")
-    else:
-        print("   warning: donor user lookup failed; signer slots not added")
+            # Submit for signature: draft → in_review
+            rsub = s.post(f"{base}/api/declarations/{decl_id}/submit",
+                          headers=H, timeout=10)
+            if rsub.status_code == 200:
+                print(f"   - submitted for signature")
+                cur_status = "in_review"
+            else:
+                print(f"   - submit failed ({rsub.status_code}): {rsub.text[:150]}")
+
+        # Sign every pending slot via manual_admin (admin must be distinct
+        # from each signer, which we ensure by adding donor+ngo, not admin).
+        if cur_status == "in_review":
+            rdet = s.get(f"{base}/api/declarations/{decl_id}", headers=H, timeout=10)
+            sigs = rdet.json().get("declaration", {}).get("signatures", [])
+            for sig in sigs:
+                if sig.get("status") != "pending":
+                    continue
+                if sig.get("signer_user_id") == admin_id:
+                    # Can't manual_admin-attest for self; skip. (Smoke
+                    # uses donor+ngo for both slots to avoid this.)
+                    print(f"   - sig #{sig['id']}: skipped (admin self)")
+                    continue
+                rsign = s.post(
+                    f"{base}/api/declarations/{decl_id}/signatures/{sig['id']}/sign",
+                    json={"signature_method": "manual_admin", "declared_no_coi": True},
+                    headers=H, timeout=10,
+                )
+                if rsign.status_code == 200:
+                    new_status = rsign.json().get("declaration", {}).get("status")
+                    print(f"   - sig #{sig['id']}: signed (declaration: {new_status})")
+                else:
+                    print(f"   - sig #{sig['id']}: failed ({rsign.status_code}) {rsign.text[:150]}")
+
+        # Final state
+        rfin = s.get(f"{base}/api/declarations/{decl_id}", headers=H, timeout=10)
+        final = rfin.json().get("declaration", {})
+        print(f"   final status: {final.get('status')} "
+              f"({final.get('signed_count')}/{final.get('required_signer_count')} signed)"
+              f"{', audit anchor #' + str(final.get('signed_active_audit_id')) if final.get('signed_active_audit_id') else ''}")
+
+        # Retroactive shortlist + grant creation if the declaration is
+        # active but has no grants under it yet (happens when activated
+        # with an empty shortlist).
+        if final.get("status") == "signed_active":
+            # Count grants associated with this declaration
+            org_ids_now = final.get("shortlisted_org_ids") or []
+            if not org_ids_now:
+                # Pull NGO orgs
+                try:
+                    ro = s.get(f"{base}/api/organizations/", headers=H, timeout=10)
+                    if ro.status_code == 200:
+                        all_orgs = ro.json().get("organizations", [])
+                        ngo_ids = [
+                            o["id"] for o in all_orgs
+                            if (o.get("org_type") or "").lower() == "ngo"
+                        ][:3]
+                        if ngo_ids:
+                            rg = s.post(
+                                f"{base}/api/declarations/{decl_id}/create-shortlist-grants",
+                                json={"org_ids": ngo_ids},
+                                headers=H, timeout=15,
+                            )
+                            if rg.status_code == 200:
+                                grants_count = rg.json().get("declaration", {}).get("shortlisted_org_ids", [])
+                                print(f"   - retroactive grants: created for orgs {ngo_ids}")
+                            else:
+                                print(f"   - retroactive grants: failed ({rg.status_code}) {rg.text[:200]}")
+                except Exception as e:
+                    print(f"   - retroactive grants: error {e}")
 
     print()
     print("=" * 60)

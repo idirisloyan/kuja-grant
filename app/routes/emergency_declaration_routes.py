@@ -221,6 +221,56 @@ def api_cancel_declaration(declaration_id):
     return jsonify({"success": True, "declaration": d.to_dict()})
 
 
+@emergency_bp.route("/<int:declaration_id>/create-shortlist-grants", methods=["POST"])
+@role_required("admin")
+def api_create_shortlist_grants(declaration_id):
+    """Retroactively create grant drafts for a signed-active declaration.
+
+    Use case: the secretariat activated a declaration without setting a
+    shortlist (or needs to add more orgs after activation). This endpoint
+    accepts a list of org_ids and creates one Grant draft per org under
+    the parent FundWindow.
+
+    Idempotent: skips orgs that already have a grant for this declaration
+    (matched by title pattern from auto-creation: '<decl title> — Org #<id>').
+    Audit-anchored as 'emergency.declaration.grants_added_retroactively'.
+    """
+    d = EmergencyDeclaration.query.get_or_404(declaration_id)
+    if not _scope(d):
+        return jsonify({"success": False, "error": "Wrong network context"}), 403
+    if d.status != "signed_active":
+        return jsonify({
+            "success": False,
+            "error": f"Only signed_active declarations can receive retroactive grants; status='{d.status}'",
+        }), 409
+
+    body = get_request_json() or {}
+    org_ids = body.get("org_ids") or []
+    if not isinstance(org_ids, list) or not org_ids:
+        return jsonify({"success": False, "error": "org_ids is a required non-empty list"}), 400
+
+    # Update the declaration's shortlist (idempotent merge — preserves
+    # existing entries; deduplicates).
+    existing = d.get_shortlisted_org_ids()
+    merged = list({*existing, *(int(o) for o in org_ids if str(o).isdigit() or isinstance(o, int))})
+    d.set_shortlisted_org_ids(merged)
+    db.session.commit()
+
+    # Re-run grant creation. The helper is idempotent (title-keyed).
+    _create_grant_drafts_for_declaration(d)
+    db.session.commit()
+
+    d._anchor(
+        action="emergency.declaration.grants_added_retroactively",
+        actor_email=current_user.email,
+        details={"declaration_id": d.id, "added_org_ids": org_ids, "merged_shortlist": merged},
+    )
+    db.session.commit()
+
+    # Return the updated detail
+    return jsonify({"success": True, "declaration": d.to_dict(include_children=True)})
+
+
 @emergency_bp.route("/<int:declaration_id>/close", methods=["POST"])
 @role_required("admin")
 def api_close_declaration(declaration_id):
