@@ -156,3 +156,114 @@ def api_cron_uat_fixtures():
     except Exception as e:
         logger.exception(f'UAT fixture cron failed: {e}')
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/crisis-monitoring-draft', methods=['POST'])
+def api_cron_crisis_monitoring_draft():
+    """Phase 35 — weekly auto-draft of a Crisis Monitoring Report for
+    every active network. Idempotent: only creates a draft if none
+    already exists for this week's period.
+
+    Real news/ReliefWeb pull + AI narrative drafting land in Phase 38;
+    for now this just creates the empty draft + rolls pending CrisisSignals
+    into it as preliminary rows. Secretariat fills + publishes manually.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    try:
+        from datetime import date, timedelta
+        from app.extensions import db
+        from app.models import (
+            Network, CrisisMonitoringReport, CrisisMonitoringRow,
+            CrisisSignal,
+        )
+
+        today = date.today()
+        # Week ending today; covers the previous 7 days.
+        period_end = today
+        period_start = period_end - timedelta(days=7)
+
+        drafted = []
+        skipped = []
+        rolled_signals = 0
+
+        for net in Network.query.filter_by(is_active=True).all():
+            existing = CrisisMonitoringReport.query.filter_by(
+                network_id=net.id,
+                period_start=period_start,
+                period_end=period_end,
+            ).first()
+            if existing:
+                skipped.append({"network_id": net.id, "report_id": existing.id})
+                continue
+            r = CrisisMonitoringReport(
+                network_id=net.id,
+                period_start=period_start,
+                period_end=period_end,
+                generated_by='cron',
+                status='draft',
+                summary_md=(
+                    f"Auto-drafted by weekly cron for {net.name}. "
+                    "Secretariat: review + edit + publish."
+                ),
+            )
+            db.session.add(r)
+            db.session.flush()  # need r.id for the FK
+
+            # Pull pending signals for this network, group by country,
+            # create one row per (country, event_type) bucket.
+            pending = CrisisSignal.query.filter_by(
+                network_id=net.id, status='pending',
+            ).all()
+            buckets: dict[tuple[str, str | None], list[CrisisSignal]] = {}
+            for s in pending:
+                key = (s.country, s.event_type)
+                buckets.setdefault(key, []).append(s)
+
+            for (country, event_type), sigs in buckets.items():
+                narrative_lines = [
+                    f"- {s.description[:200]}" for s in sigs[:5]
+                ]
+                row = CrisisMonitoringRow(
+                    report_id=r.id,
+                    country=country,
+                    event_type=event_type,
+                    event_title=f"Member-reported {(event_type or 'event').replace('_', ' ')}",
+                    narrative=(
+                        f"{len(sigs)} member signal(s) reported this period:\n"
+                        + "\n".join(narrative_lines)
+                    ),
+                    flagged_for_ob=False,
+                )
+                # Score with whatever defaults we have; secretariat sets
+                # bands manually during review. Composite stays low so
+                # nothing accidentally surfaces to the OB as urgent.
+                row.composite_score = CrisisMonitoringRow.compute_composite_score(
+                    hdi_band=None,
+                    gov_capacity_band=None,
+                    people_impacted_estimate=None,
+                    attention_band=None,
+                )
+                db.session.add(row)
+                for s in sigs:
+                    s.status = 'rolled_in'
+                    s.rolled_into_report_id = r.id
+                    rolled_signals += 1
+
+            drafted.append({"network_id": net.id, "report_id": r.id})
+
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'result': {
+                'drafted': drafted,
+                'skipped_existing': skipped,
+                'rolled_signals': rolled_signals,
+                'period_start': period_start.isoformat(),
+                'period_end': period_end.isoformat(),
+            },
+        })
+    except Exception as e:
+        logger.exception(f'crisis monitoring draft cron failed: {e}')
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

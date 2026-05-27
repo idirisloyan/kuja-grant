@@ -46,6 +46,10 @@ from app.models.fund import (
     Fund, FundWindow, WindowEvaluationRubric, WindowEvaluationCriterion,
     FUND_STATUSES, WINDOW_STATUSES, EVALUATION_AREAS, THRESHOLD_KINDS,
 )
+from app.models.crisis_monitoring import (
+    CrisisMonitoringReport, CrisisMonitoringRow, CrisisSignal,
+    REPORT_STATUSES, SIGNAL_STATUSES, BAND_VALUES, HDI_BANDS,
+)
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -65,4 +69,6 @@ __all__ = [
     'NetworkMembership', 'MEMBERSHIP_STATUSES', 'MEMBERSHIP_TIERS',
     'Fund', 'FundWindow', 'WindowEvaluationRubric', 'WindowEvaluationCriterion',
     'FUND_STATUSES', 'WINDOW_STATUSES', 'EVALUATION_AREAS', 'THRESHOLD_KINDS',
+    'CrisisMonitoringReport', 'CrisisMonitoringRow', 'CrisisSignal',
+    'REPORT_STATUSES', 'SIGNAL_STATUSES', 'BAND_VALUES', 'HDI_BANDS',
 ]

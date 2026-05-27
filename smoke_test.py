@@ -286,6 +286,73 @@ def make_tests(base):
                 pass
     tests.append(("Fund + Window + Rubric end-to-end", test_fund_window_rubric_flow))
 
+    # --- Crisis Monitoring (Phase 35) ---
+    def test_crisis_monitoring_flow():
+        s = login_ok(base, USERS["admin"])
+        H = {"X-Requested-With": "XMLHttpRequest"}
+
+        # 1. Create a report
+        r = s.post(f"{base}/api/crisis/reports", json={}, headers=H, timeout=10)
+        assert r.status_code == 200, f"create report: {r.status_code} {r.text[:200]}"
+        report_id = r.json()["report"]["id"]
+
+        # 2. Add a high-urgency row (Somalia drought, low HDI, 200k impacted, low attention)
+        r2 = s.post(f"{base}/api/crisis/reports/{report_id}/rows", json={
+            "country": "SOM",
+            "region": "Horn of Africa",
+            "event_type": "drought",
+            "event_title": "Somalia drought escalation",
+            "hdi_band": "low_hdi",
+            "gov_capacity_band": "low",
+            "people_impacted_estimate": 200000,
+            "attention_band": "low",
+            "narrative": "Severe drought; member alerts indicate accelerating displacement.",
+            "flagged_for_ob": True,
+        }, headers=H, timeout=10)
+        assert r2.status_code == 200, f"add row: {r2.status_code} {r2.text[:200]}"
+        row = r2.json()["row"]
+        # 4-factor scorer should produce a high score (low HDI + low gov + 100k+ + low attention)
+        # = 30 + 25 + 22 + 15 = 92
+        assert row["composite_score"] is not None
+        assert row["composite_score"] >= 80, \
+            f"expected high score for Somalia case, got {row['composite_score']}"
+        assert row["flagged_for_ob"] is True
+
+        # 3. Publish
+        r3 = s.post(f"{base}/api/crisis/reports/{report_id}/publish", headers=H, timeout=10)
+        assert r3.status_code == 200, f"publish: {r3.status_code} {r3.text[:200]}"
+        published = r3.json()["report"]
+        assert published["status"] == "published"
+        assert published["published_at"]
+        # Audit-anchor id must be set after publish
+        assert published.get("cron_anchor_audit_id"), "audit anchor not set"
+
+        # 4. /latest/published returns this report
+        r4 = s.get(f"{base}/api/crisis/reports/latest/published",
+                   headers=H, timeout=10)
+        assert r4.status_code == 200
+        latest = r4.json()["report"]
+        assert latest and latest["id"] == report_id
+
+        # 5. NGO can submit a signal
+        s_ngo = login_ok(base, USERS["ngo"])
+        r5 = s_ngo.post(f"{base}/api/crisis/signals", json={
+            "country": "KEN",
+            "event_type": "flood",
+            "description": "Heavy rains flooding refugee settlement.",
+        }, headers=H, timeout=10)
+        assert r5.status_code == 200, f"signal submit: {r5.status_code} {r5.text[:200]}"
+        signal_id = r5.json()["signal"]["id"]
+
+        # 6. NGO cannot list signals; admin can
+        r6 = s_ngo.get(f"{base}/api/crisis/signals", headers=H, timeout=10)
+        assert r6.status_code == 403
+        r7 = s.get(f"{base}/api/crisis/signals", headers=H, timeout=10)
+        assert r7.status_code == 200
+        sigs = r7.json()["signals"]
+        assert any(x["id"] == signal_id for x in sigs)
+    tests.append(("Crisis monitoring report end-to-end", test_crisis_monitoring_flow))
+
     # --- Login all roles ---
     for role, email in USERS.items():
         def _make(e=email, rl=role):
