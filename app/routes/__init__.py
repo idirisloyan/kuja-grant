@@ -57,6 +57,7 @@ def register_blueprints(app):
     from app.routes.network_membership_routes import network_membership_bp  # Phase 33: membership flow
     from app.routes.fund_routes import fund_bp  # Phase 34: funds + windows + rubrics
     from app.routes.crisis_monitoring_routes import crisis_bp  # Phase 35: weekly crisis monitoring
+    from app.routes.emergency_declaration_routes import emergency_bp  # Phase 36: multi-sig declarations
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -70,5 +71,6 @@ def register_blueprints(app):
                notif_pref_bp, notif_pref_alias_bp, preflight_bp, audit_chain_bp, report_bundle_bp,
                doc_search_bp, search_alias_bp, digest_bp, ai_compare_bp, phase11_bp,
                portfolio_bp, cron_bp, tags_bp, exports_bp, webauthn_bp,
-               feedback_bp, network_bp, network_membership_bp, fund_bp, crisis_bp]:
+               feedback_bp, network_bp, network_membership_bp, fund_bp, crisis_bp,
+               emergency_bp]:
         app.register_blueprint(bp)

@@ -50,6 +50,10 @@ from app.models.crisis_monitoring import (
     CrisisMonitoringReport, CrisisMonitoringRow, CrisisSignal,
     REPORT_STATUSES, SIGNAL_STATUSES, BAND_VALUES, HDI_BANDS,
 )
+from app.models.emergency_declaration import (
+    EmergencyDeclaration, DeclarationSignature, DeclarationDocument,
+    DECLARATION_STATUSES, SIGNATURE_STATUSES, SIGNATURE_METHODS, DOCUMENT_KINDS,
+)
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -71,4 +75,6 @@ __all__ = [
     'FUND_STATUSES', 'WINDOW_STATUSES', 'EVALUATION_AREAS', 'THRESHOLD_KINDS',
     'CrisisMonitoringReport', 'CrisisMonitoringRow', 'CrisisSignal',
     'REPORT_STATUSES', 'SIGNAL_STATUSES', 'BAND_VALUES', 'HDI_BANDS',
+    'EmergencyDeclaration', 'DeclarationSignature', 'DeclarationDocument',
+    'DECLARATION_STATUSES', 'SIGNATURE_STATUSES', 'SIGNATURE_METHODS', 'DOCUMENT_KINDS',
 ]

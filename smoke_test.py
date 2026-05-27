@@ -353,6 +353,115 @@ def make_tests(base):
         assert any(x["id"] == signal_id for x in sigs)
     tests.append(("Crisis monitoring report end-to-end", test_crisis_monitoring_flow))
 
+    # --- Emergency Declaration multi-sig (Phase 36) ---
+    def test_emergency_declaration_flow():
+        s = login_ok(base, USERS["admin"])
+        H = {"X-Requested-With": "XMLHttpRequest"}
+
+        import time
+        # 1. Set up a fund + window for the declaration
+        fund_slug = f"smoke-emergency-{int(time.time())}"
+        rf = s.post(f"{base}/api/funds", json={
+            "slug": fund_slug, "name": "Smoke Emergency Fund",
+        }, headers=H, timeout=10)
+        assert rf.status_code == 200, f"fund create: {rf.text[:200]}"
+        fund_id = rf.json()["fund"]["id"]
+        rw = s.post(f"{base}/api/funds/{fund_id}/windows", json={
+            "slug": "emergency-response", "name": "Emergency Response",
+            "status": "open",
+        }, headers=H, timeout=10)
+        assert rw.status_code == 200, f"window create: {rw.text[:200]}"
+        window_id = rw.json()["window"]["id"]
+
+        # 2. Create a published crisis monitoring report + row (evidence anchor)
+        rr = s.post(f"{base}/api/crisis/reports", json={}, headers=H, timeout=10)
+        assert rr.status_code == 200
+        report_id = rr.json()["report"]["id"]
+        rrow = s.post(f"{base}/api/crisis/reports/{report_id}/rows", json={
+            "country": "SOM", "hdi_band": "low_hdi", "gov_capacity_band": "low",
+            "people_impacted_estimate": 200000, "attention_band": "low",
+            "flagged_for_ob": True,
+        }, headers=H, timeout=10)
+        evidence_row_id = rrow.json()["row"]["id"]
+        rp = s.post(f"{base}/api/crisis/reports/{report_id}/publish",
+                    headers=H, timeout=10)
+        assert rp.status_code == 200
+
+        # 3. Create the emergency declaration (DRAFT)
+        rd = s.post(f"{base}/api/declarations", json={
+            "fund_id": fund_id, "window_id": window_id,
+            "title": "Somalia drought escalation — emergency response",
+            "crisis_type": "drought", "country": "SOM",
+            "severity": "high",
+            "summary_md": "Severe drought triggering displacement. Need rapid response.",
+            "proposed_total_amount": 1500000,
+            "evidence_row_id": evidence_row_id,
+            "shortlisted_org_ids": [],
+        }, headers=H, timeout=10)
+        assert rd.status_code == 200, f"declaration create: {rd.text[:200]}"
+        decl_id = rd.json()["declaration"]["id"]
+
+        # 4. Add 2 signer slots (admin + ngo user just for testing the flow)
+        admin_me = s.get(f"{base}/api/auth/me", headers=H, timeout=5).json()["user"]
+        s_ngo = login_ok(base, USERS["ngo"])
+        ngo_me = s_ngo.get(f"{base}/api/auth/me", headers=H, timeout=5).json()["user"]
+
+        rs1 = s.post(f"{base}/api/declarations/{decl_id}/signers", json={
+            "user_id": admin_me["id"], "required_order": 0,
+        }, headers=H, timeout=10)
+        assert rs1.status_code == 200, f"add signer 1: {rs1.text[:200]}"
+        sig1_id = rs1.json()["signature"]["id"]
+
+        rs2 = s.post(f"{base}/api/declarations/{decl_id}/signers", json={
+            "user_id": ngo_me["id"], "required_order": 1,
+        }, headers=H, timeout=10)
+        assert rs2.status_code == 200, f"add signer 2: {rs2.text[:200]}"
+        sig2_id = rs2.json()["signature"]["id"]
+
+        # 5. Submit for signature (draft → in_review)
+        rsub = s.post(f"{base}/api/declarations/{decl_id}/submit",
+                      headers=H, timeout=10)
+        assert rsub.status_code == 200, f"submit: {rsub.text[:200]}"
+        assert rsub.json()["declaration"]["status"] == "in_review"
+
+        # 6. Try to sign WITHOUT declared_no_coi → must fail with 400
+        rfail = s.post(
+            f"{base}/api/declarations/{decl_id}/signatures/{sig1_id}/sign",
+            json={"signature_method": "totp", "declared_no_coi": False},
+            headers=H, timeout=10,
+        )
+        assert rfail.status_code == 400, \
+            f"sign without COI affirmation should fail: got {rfail.status_code}"
+
+        # 7. Admin signs (with COI affirmation)
+        r_sign = s.post(
+            f"{base}/api/declarations/{decl_id}/signatures/{sig1_id}/sign",
+            json={"signature_method": "totp", "declared_no_coi": True,
+                  "token_hint": "test-totp"},
+            headers=H, timeout=10,
+        )
+        assert r_sign.status_code == 200, f"admin sign: {r_sign.text[:200]}"
+        # Still in_review (need 2 signers)
+        assert r_sign.json()["declaration"]["status"] == "in_review"
+
+        # 8. NGO user signs (network min_signers default = 2 → should activate)
+        r_sign2 = s_ngo.post(
+            f"{base}/api/declarations/{decl_id}/signatures/{sig2_id}/sign",
+            json={"signature_method": "totp", "declared_no_coi": True},
+            headers=H, timeout=10,
+        )
+        assert r_sign2.status_code == 200, f"ngo sign: {r_sign2.text[:200]}"
+        result = r_sign2.json()["declaration"]
+        # Now should be signed_active
+        assert result["status"] == "signed_active", \
+            f"expected signed_active, got '{result['status']}'"
+        assert result["signed_count"] >= 2
+        assert result["signed_active_audit_id"], "audit anchor missing"
+        # SLA timestamps now set
+        assert result["applications_open_at"]
+        assert result["applications_close_at"]
+    tests.append(("Emergency Declaration multi-sig end-to-end", test_emergency_declaration_flow))
+
     # --- Login all roles ---
     for role, email in USERS.items():
         def _make(e=email, rl=role):

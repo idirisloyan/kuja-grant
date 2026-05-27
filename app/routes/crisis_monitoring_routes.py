@@ -208,7 +208,13 @@ def api_latest_published_report():
     r = (
         CrisisMonitoringReport.query
         .filter_by(network_id=network_id, status="published")
-        .order_by(CrisisMonitoringReport.period_end.desc())
+        # Tie-break on published_at then id so callers get a deterministic
+        # result when multiple reports cover the same period_end.
+        .order_by(
+            CrisisMonitoringReport.period_end.desc(),
+            CrisisMonitoringReport.published_at.desc().nullslast(),
+            CrisisMonitoringReport.id.desc(),
+        )
         .first()
     )
     if not r:
