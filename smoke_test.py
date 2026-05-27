@@ -214,6 +214,78 @@ def make_tests(base):
         assert isinstance(data.get("memberships"), list)
     tests.append(("Membership /pending gated to admin", test_membership_pending_admin_only))
 
+    # --- Funds + Windows + Rubrics (Phase 34) ---
+    def test_fund_window_rubric_flow():
+        s = login_ok(base, USERS["admin"])
+        H = {"X-Requested-With": "XMLHttpRequest"}
+
+        # 1. Create a fund (idempotent on slug via 409 catch)
+        import time
+        slug = f"smoke-fund-{int(time.time())}"
+        r = s.post(f"{base}/api/funds", json={
+            "slug": slug,
+            "name": "Smoke Test Fund",
+            "short_description": "Smoke",
+            "currency": "USD",
+        }, headers=H, timeout=10)
+        assert r.status_code == 200, f"fund create: {r.status_code} {r.text[:200]}"
+        fund_id = r.json()["fund"]["id"]
+
+        try:
+            # 2. Create a window under the fund
+            r2 = s.post(f"{base}/api/funds/{fund_id}/windows", json={
+                "slug": "emergency-response",
+                "name": "Emergency Response",
+                "crisis_type": "humanitarian",
+                "max_grant_amount": 250000,
+                "default_grant_duration_months": 6,
+                "application_window_hours": 72,
+                "decision_sla_days": 6,
+                "direct_to_community_single_min_pct": 80.0,
+                "direct_to_community_consortium_min_pct": 70.0,
+            }, headers=H, timeout=10)
+            assert r2.status_code == 200, f"window create: {r2.status_code} {r2.text[:200]}"
+            window_id = r2.json()["window"]["id"]
+
+            # 3. Seed the Change Fund rubric on the window
+            r3 = s.post(
+                f"{base}/api/windows/{window_id}/rubric/seed-change-fund",
+                headers=H, timeout=10,
+            )
+            assert r3.status_code == 200, f"rubric seed: {r3.status_code} {r3.text[:200]}"
+            rubric = r3.json()["rubric"]
+            assert rubric["criterion_count"] >= 15, \
+                f"expected ≥15 criteria, got {rubric['criterion_count']}"
+
+            # Sanity: the 80% direct-to-community hard gate is in there
+            criteria = rubric["criteria"]
+            hard_gates = [c for c in criteria if c["threshold_kind"] == "hard_gate"]
+            assert len(hard_gates) >= 3, f"too few hard gates: {len(hard_gates)}"
+            dtc_80 = [c for c in hard_gates if c["threshold_value"] == 0.8]
+            assert len(dtc_80) >= 1, "80% direct-to-community gate missing"
+
+            # 4. Idempotency: re-seeding returns the existing rubric.
+            r4 = s.post(
+                f"{base}/api/windows/{window_id}/rubric/seed-change-fund",
+                headers=H, timeout=10,
+            )
+            assert r4.status_code == 200
+            assert r4.json().get("already_existed") is True
+
+            # 5. NGOs cannot create funds
+            s_ngo = login_ok(base, USERS["ngo"])
+            r5 = s_ngo.post(f"{base}/api/funds", json={
+                "slug": "ngo-attempt", "name": "x",
+            }, headers=H, timeout=10)
+            assert r5.status_code == 403, f"NGO fund create should 403: got {r5.status_code}"
+        finally:
+            # Best-effort cleanup
+            try:
+                s.delete(f"{base}/api/funds/{fund_id}", headers=H, timeout=5)
+            except Exception:
+                pass
+    tests.append(("Fund + Window + Rubric end-to-end", test_fund_window_rubric_flow))
+
     # --- Login all roles ---
     for role, email in USERS.items():
         def _make(e=email, rl=role):

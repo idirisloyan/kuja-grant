@@ -171,9 +171,17 @@ def create_app(config_name=None):
                     cols = {c["name"] for c in inspector.get_columns("documents")}
                     if "network_membership_id" not in cols:
                         conn.execute(text("ALTER TABLE documents ADD COLUMN network_membership_id INTEGER"))
+                # Phase 34 — grants.fund_window_id (FK + index).
+                # Tables created by db.create_all() from the new fund.py
+                # models are handled automatically; only the existing
+                # `grants` table needs the column added in place.
+                if "grants" in tables:
+                    cols = {c["name"] for c in inspector.get_columns("grants")}
+                    if "fund_window_id" not in cols:
+                        conn.execute(text("ALTER TABLE grants ADD COLUMN fund_window_id INTEGER"))
                 conn.commit()
         except Exception as e:
-            app.logger.warning(f"Phase 33 column back-fill skipped: {e}")
+            app.logger.warning(f"Phase 33/34 column back-fill skipped: {e}")
 
         # Phase 32 — guarantee the default Network row exists. The
         # migration seeds it on a fresh Postgres deploy, but local SQLite

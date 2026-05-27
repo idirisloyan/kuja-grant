@@ -42,6 +42,10 @@ from app.models.network import Network, DEFAULT_NETWORK_SLUG
 from app.models.network_membership import (
     NetworkMembership, MEMBERSHIP_STATUSES, MEMBERSHIP_TIERS,
 )
+from app.models.fund import (
+    Fund, FundWindow, WindowEvaluationRubric, WindowEvaluationCriterion,
+    FUND_STATUSES, WINDOW_STATUSES, EVALUATION_AREAS, THRESHOLD_KINDS,
+)
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -59,4 +63,6 @@ __all__ = [
     'UserFeedback',
     'Network', 'DEFAULT_NETWORK_SLUG',
     'NetworkMembership', 'MEMBERSHIP_STATUSES', 'MEMBERSHIP_TIERS',
+    'Fund', 'FundWindow', 'WindowEvaluationRubric', 'WindowEvaluationCriterion',
+    'FUND_STATUSES', 'WINDOW_STATUSES', 'EVALUATION_AREAS', 'THRESHOLD_KINDS',
 ]

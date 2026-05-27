@@ -30,6 +30,11 @@ class Grant(db.Model):
     grant_document = db.Column(db.String(500), nullable=True)  # stored filename of the actual grant document
     report_template = db.Column(db.Text, nullable=True)  # JSON - template structure for NGO reports
     reporting_frequency = db.Column(db.String(50), nullable=True)  # monthly, quarterly, semi-annual, annual, final_only
+    # Phase 34 — optional link to the FundWindow this grant was issued
+    # under (NEAR Change Fund / Emergency Response, etc.). Nullable so
+    # marketplace grants (which don't belong to a fund window) keep
+    # working unchanged.
+    fund_window_id = db.Column(db.Integer, db.ForeignKey('fund_windows.id'), nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))

@@ -55,6 +55,7 @@ def register_blueprints(app):
     from app.routes.feedback_routes import feedback_bp  # Phase 31A: micro-survey ingest
     from app.routes.network_routes import network_bp  # Phase 32: multi-tenant network context
     from app.routes.network_membership_routes import network_membership_bp  # Phase 33: membership flow
+    from app.routes.fund_routes import fund_bp  # Phase 34: funds + windows + rubrics
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -68,5 +69,5 @@ def register_blueprints(app):
                notif_pref_bp, notif_pref_alias_bp, preflight_bp, audit_chain_bp, report_bundle_bp,
                doc_search_bp, search_alias_bp, digest_bp, ai_compare_bp, phase11_bp,
                portfolio_bp, cron_bp, tags_bp, exports_bp, webauthn_bp,
-               feedback_bp, network_bp, network_membership_bp]:
+               feedback_bp, network_bp, network_membership_bp, fund_bp]:
         app.register_blueprint(bp)
