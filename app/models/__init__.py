@@ -54,6 +54,9 @@ from app.models.emergency_declaration import (
     EmergencyDeclaration, DeclarationSignature, DeclarationDocument,
     DECLARATION_STATUSES, SIGNATURE_STATUSES, SIGNATURE_METHODS, DOCUMENT_KINDS,
 )
+from app.models.monitoring_visit import (
+    MonitoringVisit, VISIT_MODES, VISIT_STATUSES,
+)
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -77,4 +80,5 @@ __all__ = [
     'REPORT_STATUSES', 'SIGNAL_STATUSES', 'BAND_VALUES', 'HDI_BANDS',
     'EmergencyDeclaration', 'DeclarationSignature', 'DeclarationDocument',
     'DECLARATION_STATUSES', 'SIGNATURE_STATUSES', 'SIGNATURE_METHODS', 'DOCUMENT_KINDS',
+    'MonitoringVisit', 'VISIT_MODES', 'VISIT_STATUSES',
 ]

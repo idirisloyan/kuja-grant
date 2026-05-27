@@ -525,6 +525,120 @@ def make_tests(base):
             f"admin self-attest via manual_admin should fail: got {r_self.status_code}"
     tests.append(("manual_admin cannot self-sign", test_manual_admin_no_self_sign))
 
+    # --- Phase 37: Window report + Monitoring Visit ---
+    def test_window_report_and_visit():
+        s = login_ok(base, USERS["admin"])
+        H = {"X-Requested-With": "XMLHttpRequest"}
+
+        import time
+        # Set up fund + window
+        rf = s.post(f"{base}/api/funds", json={
+            "slug": f"smoke-rep-{int(time.time())}", "name": "Smoke Report Fund",
+        }, headers=H, timeout=10)
+        fund_id = rf.json()["fund"]["id"]
+        rw = s.post(f"{base}/api/funds/{fund_id}/windows", json={
+            "slug": "w-rep", "name": "Report Window",
+            "max_grant_amount": 100000, "status": "open",
+            "application_window_hours": 72, "decision_sla_days": 6,
+        }, headers=H, timeout=10)
+        window_id = rw.json()["window"]["id"]
+
+        # 1. Empty report still works
+        r = s.get(f"{base}/api/windows/{window_id}/report", headers=H, timeout=10)
+        assert r.status_code == 200, f"empty report: {r.status_code}"
+        rep = r.json()
+        assert rep.get("success") is True
+        assert rep["stats"]["declarations_total"] == 0
+        assert rep["stats"]["grants_total"] == 0
+        assert rep["sla"]["target_app_window_hours"] == 72
+        assert rep["sla"]["target_decision_days"] == 6
+
+        # 2. CSV export works
+        r2 = s.get(f"{base}/api/windows/{window_id}/report.csv", headers=H, timeout=10)
+        assert r2.status_code == 200, f"csv: {r2.status_code}"
+        assert "Content-Disposition" in r2.headers
+        assert r2.headers.get("Content-Type", "").startswith("text/csv")
+        # Even with zero declarations the header row should be present
+        assert "title" in r2.text and "status" in r2.text
+
+        # 3. ZIP bundle works
+        r3 = s.get(f"{base}/api/windows/{window_id}/report.zip", headers=H, timeout=10)
+        assert r3.status_code == 200, f"zip: {r3.status_code}"
+        assert r3.headers.get("Content-Type") == "application/zip"
+        # Verify it's actually a valid ZIP
+        import zipfile, io
+        with zipfile.ZipFile(io.BytesIO(r3.content)) as z:
+            names = z.namelist()
+            assert "report.json" in names
+            assert "declarations.csv" in names
+            assert "grants.csv" in names
+
+        # 4. Public summary works + omits NGO names
+        r4 = s.get(f"{base}/api/windows/{window_id}/report/public",
+                   headers=H, timeout=10)
+        assert r4.status_code == 200, f"public: {r4.status_code}"
+        pub = r4.json()
+        assert pub["success"] is True
+        assert "headline" in pub
+        assert "ngos_reached" in pub["headline"]
+        # public summary must NOT include the declarations roster
+        assert "declarations" not in pub
+
+        # 5. Monitoring visit on a real grant
+        # Need a Grant — use an existing one if available, or create one.
+        rg = s.post(f"{base}/api/grants/", json={
+            "title": "Smoke visit grant",
+            "description": "smoke", "total_funding": 10000,
+            "currency": "USD", "status": "draft",
+        }, headers=H, timeout=10)
+        # NB: admin user has no org_id by default → may 400; donors create grants.
+        if rg.status_code not in (200, 201):
+            s_donor = login_ok(base, USERS["donor"])
+            rg = s_donor.post(f"{base}/api/grants/", json={
+                "title": "Smoke visit grant",
+                "description": "smoke", "total_funding": 10000,
+                "currency": "USD", "status": "draft",
+            }, headers=H, timeout=10)
+        assert rg.status_code in (200, 201), f"grant create: {rg.text[:200]}"
+        grant_id = rg.json()["grant"]["id"]
+
+        try:
+            # Record a visit
+            from datetime import date
+            rv = s.post(f"{base}/api/grants/{grant_id}/monitoring-visits", json={
+                "visit_mode": "virtual",
+                "visit_date": date.today().isoformat(),
+                "observations_md": "Field observation summary",
+                "community_feedback_summary": "Community reports rapid uptake",
+                "attendance_estimate": 35,
+            }, headers=H, timeout=10)
+            assert rv.status_code == 200, f"record visit: {rv.text[:200]}"
+            visit = rv.json()["visit"]
+            assert visit["visit_mode"] == "virtual"
+            assert visit["community_feedback_summary"]
+
+            # List visits for grant
+            rl = s.get(f"{base}/api/grants/{grant_id}/monitoring-visits",
+                       headers=H, timeout=10)
+            assert rl.status_code == 200
+            assert len(rl.json()["visits"]) >= 1
+
+            # NGO can list (read-only) but cannot record
+            s_ngo = login_ok(base, USERS["ngo"])
+            rfail = s_ngo.post(f"{base}/api/grants/{grant_id}/monitoring-visits",
+                               json={"visit_mode": "virtual",
+                                     "visit_date": date.today().isoformat()},
+                               headers=H, timeout=10)
+            assert rfail.status_code == 403, \
+                f"NGO record visit should 403: got {rfail.status_code}"
+        finally:
+            try:
+                s_donor = login_ok(base, USERS["donor"])
+                s_donor.delete(f"{base}/api/grants/{grant_id}", headers=H, timeout=5)
+            except Exception:
+                pass
+    tests.append(("Window report + monitoring visit", test_window_report_and_visit))
+
     # --- Login all roles ---
     for role, email in USERS.items():
         def _make(e=email, rl=role):
