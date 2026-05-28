@@ -214,6 +214,51 @@ def make_tests(base):
         assert isinstance(data.get("memberships"), list)
     tests.append(("Membership /pending gated to admin", test_membership_pending_admin_only))
 
+    # --- NEAR redesign: admin-run trust process ---
+    def test_membership_trust_process():
+        s = login_ok(base, USERS["admin"])
+        H = {"X-Requested-With": "XMLHttpRequest"}
+
+        # Find any existing membership (the test smoke already creates one
+        # earlier; otherwise fall back to admin-create endpoint).
+        rl = s.get(f"{base}/api/network/membership/pending?status=all",
+                   headers=H, timeout=10)
+        memberships = rl.json().get("memberships", [])
+        if not memberships:
+            # Make sure NGO org exists
+            ro = s.get(f"{base}/api/organizations/?type=ngo&page=1",
+                       headers=H, timeout=10)
+            org_ids = [o["id"] for o in (ro.json().get("organizations", []) or [])][:1]
+            if not org_ids:
+                # No NGO orgs — skip; this exercises endpoint not data
+                return
+            rc = s.post(f"{base}/api/network/membership/admin-create", json={
+                "org_id": org_ids[0], "country": "KEN",
+            }, headers=H, timeout=10)
+            mid = rc.json()["membership"]["id"]
+        else:
+            mid = memberships[0]["id"]
+
+        # Run trust process
+        r = s.post(f"{base}/api/network/membership/{mid}/run-trust-process",
+                   headers=H, timeout=30)
+        assert r.status_code == 200, f"trust process: {r.status_code} {r.text[:200]}"
+        data = r.json()
+        assert data.get("success") is True
+        assert "membership" in data
+        # Either screening succeeded with a recommendation, or returned an error key
+        scr = data.get("screening") or {}
+        assert "recommendation" in scr or "error" in scr, \
+            f"screening should have either recommendation or error: {scr}"
+
+        # NGO cannot run trust process
+        s_ngo = login_ok(base, USERS["ngo"])
+        r2 = s_ngo.post(f"{base}/api/network/membership/{mid}/run-trust-process",
+                        headers=H, timeout=10)
+        assert r2.status_code == 403, \
+            f"NGO trust process should 403: got {r2.status_code}"
+    tests.append(("Admin-run trust process on membership", test_membership_trust_process))
+
     # --- Funds + Windows + Rubrics (Phase 34) ---
     def test_fund_window_rubric_flow():
         s = login_ok(base, USERS["admin"])

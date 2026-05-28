@@ -256,6 +256,13 @@ export function usePendingMemberships(status: string = 'under_review') {
   );
 }
 
+export function useMembership(id: number | null) {
+  return useSWR<{ success: boolean; membership: Membership }>(
+    id ? `/network/membership/${id}` : null,
+    fetcher,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Funds + Windows + Rubrics (Phase 34)
 // ---------------------------------------------------------------------------

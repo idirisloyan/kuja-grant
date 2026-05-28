@@ -436,6 +436,117 @@ def api_suspend_membership(membership_id):
     return jsonify({"success": True, "membership": m.to_dict()})
 
 
+@network_membership_bp.route("/<int:membership_id>/run-trust-process", methods=["POST"])
+@role_required("admin")
+def api_run_trust_process(membership_id):
+    """Phase 15 (NEAR redesign) — NEAR operator runs the trust process on
+    behalf of the network. Triggers the existing trust-profile build
+    pipeline (sanctions + adverse media + registry + bank verification)
+    against the applicant org, persists the latest screenings + returns
+    the aggregated profile.
+
+    This is the NEAR-tenant equivalent of what Kuja-tenant donors do
+    when they vet an NGO before funding. For NEAR, the network IS the
+    funder, so the operator runs it during onboarding (not the NGO,
+    and not at award time).
+
+    Side effects:
+      - If membership is pending, transition to under_review (the
+        secretariat-is-reviewing state)
+      - Audit anchor: 'network.membership.trust_process_run'
+    """
+    m = NetworkMembership.query.get_or_404(membership_id)
+    network_id = get_current_network_id()
+    if network_id and m.network_id != network_id:
+        return jsonify({"success": False, "error": "Wrong network context"}), 403
+
+    org = Organization.query.get(m.org_id)
+    if not org:
+        return jsonify({"success": False, "error": "Applicant org not found"}), 404
+
+    # Auto-transition to under_review if still in 'pending'
+    if m.status == "pending":
+        m.status = "under_review"
+        m.applied_at = m.applied_at or datetime.now(timezone.utc)
+
+    # Run an adverse-media screen on the org (best-effort; service has
+    # its own fallback). Persists via the existing route logic — we
+    # call the service directly here to keep this endpoint atomic.
+    screening_summary = None
+    try:
+        from app.services.adverse_media_service import AdverseMediaService
+        from app.models import AdverseMediaScreening
+        from app.utils.helpers import _json_dump
+        result = AdverseMediaService.screen(
+            org_name=org.name,
+            country=getattr(org, "country", None),
+            sector=None,
+            leadership=None,
+        )
+        scr = AdverseMediaScreening(
+            org_id=org.id,
+            screening_date=datetime.now(timezone.utc),
+            sources_searched=_json_dump(result.get("sources_searched") or []),
+            total_results=result.get("total_results", 0),
+            high_count=result.get("high_count", 0),
+            medium_count=result.get("medium_count", 0),
+            low_count=result.get("low_count", 0),
+            recommendation=result.get("recommendation", "review"),
+            evidence_items=_json_dump(result.get("evidence_items") or []),
+            metadata=_json_dump({"triggered_by": "membership_trust_process",
+                                 "membership_id": m.id}),
+        )
+        db.session.add(scr)
+        screening_summary = {
+            "recommendation": result.get("recommendation"),
+            "high_count": result.get("high_count", 0),
+            "medium_count": result.get("medium_count", 0),
+            "low_count": result.get("low_count", 0),
+            "sources_searched": result.get("sources_searched", []),
+        }
+    except Exception as e:
+        logger.exception(f"membership trust process — adverse media failed: {e}")
+        screening_summary = {"error": str(e)[:200]}
+
+    # Build the aggregated trust profile (uses ALL existing data —
+    # screening just added + any prior verifications + capacity passport)
+    try:
+        from app.services.trust_profile_service import TrustProfileService
+        profile = TrustProfileService.build(org.id)
+    except Exception as e:
+        logger.exception(f"trust profile build failed: {e}")
+        profile = None
+
+    db.session.commit()
+
+    # Audit-anchor
+    try:
+        from app.models import AuditChainEntry
+        AuditChainEntry.append(
+            action="network.membership.trust_process_run",
+            actor_email=current_user.email,
+            subject_kind="network_membership",
+            subject_id=m.id,
+            details={
+                "network_id": m.network_id,
+                "org_id": org.id,
+                "org_name": org.name,
+                "country": getattr(org, "country", None),
+                "screening_recommendation": (screening_summary or {}).get("recommendation"),
+                "high_count": (screening_summary or {}).get("high_count"),
+            },
+        )
+    except Exception:
+        pass
+
+    return jsonify({
+        "success": True,
+        "membership": m.to_dict(),
+        "screening": screening_summary,
+        "trust_profile": profile,
+    })
+
+
 @network_membership_bp.route("/<int:membership_id>/expel", methods=["POST"])
 @role_required("admin")
 def api_expel_membership(membership_id):

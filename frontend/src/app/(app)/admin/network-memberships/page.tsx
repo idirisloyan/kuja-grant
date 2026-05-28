@@ -10,6 +10,7 @@
  */
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { usePendingMemberships, type Membership } from '@/lib/hooks/use-api';
@@ -169,7 +170,12 @@ function MembershipRow({ m, onChange }: { m: Membership; onChange: () => void })
     <>
       <tr className="border-t border-border align-top">
         <td className="px-3 py-2">
-          <div className="font-medium">{m.org_name ?? m.org?.name ?? `Org #${m.org_id}`}</div>
+          <Link
+            href={`/admin/network-memberships/${m.id}`}
+            className="font-medium hover:underline"
+          >
+            {m.org_name ?? m.org?.name ?? `Org #${m.org_id}`}
+          </Link>
           <div className="text-xs text-muted-foreground">#{m.id}</div>
         </td>
         <td className="px-3 py-2 text-xs">{m.country ?? '—'}</td>
