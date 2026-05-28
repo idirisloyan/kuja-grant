@@ -17,6 +17,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { NearNgoConsole } from '@/components/dashboards/near-ngo-console';
+import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { DonorCommandCenter } from '@/components/dashboards/donor-command-center';
 import { NgoReadinessConsole } from '@/components/dashboards/ngo-readiness-console';
 import { ReviewerQueue } from '@/components/dashboards/reviewer-queue';
@@ -86,9 +87,9 @@ export default function DashboardPage() {
 
       {/* Phase 2 (category-defining UX): Today briefing — top of every
           Kuja-marketplace dashboard. Hidden on the NEAR tenant where the
-          simplified NgoConsole renders the equivalent "what's due"
-          surface inline. */}
-      {!(user.role === 'ngo' && isNetworkTenant) && <TodayBriefing />}
+          simplified NgoConsole + OperatorConsole render the equivalent
+          "what's important" surface inline. */}
+      {!isNetworkTenant && <TodayBriefing />}
 
       {user.role === 'donor' && (
         <>
@@ -163,7 +164,13 @@ export default function DashboardPage() {
           <ReviewerQueue />
         </>
       )}
-      {user.role === 'admin' && (
+      {user.role === 'admin' && isNetworkTenant && (
+        // NEAR operator (admin) dashboard: membership pipeline + funds
+        // + declarations + crisis monitoring + audit chain. Replaces the
+        // generic Kuja admin ops panel for the NEAR tenant.
+        <NearOperatorConsole />
+      )}
+      {user.role === 'admin' && !isNetworkTenant && (
         <>
           {/* Phase 5 — per-org AI budget gate + skipped rollup */}
           <AIBudgetAdminCard />
