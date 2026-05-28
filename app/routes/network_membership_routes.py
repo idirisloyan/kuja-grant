@@ -36,11 +36,65 @@ from app.models import (
     Organization,
     User,
 )
+from app.services.email_service import EmailService
 from app.utils.network import get_current_network, get_current_network_id
 from app.utils.helpers import get_request_json
 from app.utils.decorators import role_required
 
 logger = logging.getLogger("kuja")
+
+
+def _notify_membership_decision(membership, *, decision: str, reason: str | None = None):
+    """Send email to all NGO admins at the applicant org when the OB makes
+    a final decision. Best-effort; swallows transport errors so the API
+    response isn't held up by mail problems.
+
+    decision: 'approved' or 'rejected'.
+    """
+    try:
+        net = Network.query.get(membership.network_id)
+        net_name = net.name if net else "the network"
+        recipients = (
+            User.query
+            .filter_by(org_id=membership.org_id, role="ngo")
+            .all()
+        )
+        if not recipients:
+            logger.info(
+                "membership.notify: no ngo users at org=%s (skipping)",
+                membership.org_id,
+            )
+            return
+        if decision == "approved":
+            subject = f"Welcome — {net_name} membership approved"
+            body = (
+                f"Your application to join {net_name} has been approved by "
+                f"the Oversight Body.\n\n"
+                f"Sign in to see your dashboard, capacity score, and the "
+                f"declarations and grants you're now eligible to participate "
+                f"in.\n\n"
+                f"— {net_name} secretariat"
+            )
+        else:
+            reason_block = f"\n\nReason:\n  {reason}\n" if reason else ""
+            subject = f"{net_name} membership decision"
+            body = (
+                f"Your application to join {net_name} was not approved at "
+                f"this time."
+                f"{reason_block}\n"
+                f"You may re-apply after the cooldown period set by the "
+                f"Oversight Body. Reach out to the secretariat if you have "
+                f"questions about the decision.\n\n"
+                f"— {net_name} secretariat"
+            )
+        for u in recipients:
+            r = EmailService.send(to=u.email, subject=subject, body=body)
+            logger.info(
+                "membership.notify decision=%s to=%s transport=%s success=%s",
+                decision, u.email, r.get("transport"), r.get("success"),
+            )
+    except Exception as e:
+        logger.warning("membership.notify failed: %s", e)
 
 network_membership_bp = Blueprint(
     "network_membership",
@@ -383,6 +437,7 @@ def api_approve_membership(membership_id):
             "error": f"Cannot approve from status '{m.status}'",
         }), 400
     db.session.commit()
+    _notify_membership_decision(m, decision="approved")
     return jsonify({"success": True, "membership": m.to_dict()})
 
 
@@ -411,6 +466,7 @@ def api_reject_membership(membership_id):
             "error": f"Cannot reject from status '{m.status}'",
         }), 400
     db.session.commit()
+    _notify_membership_decision(m, decision="rejected", reason=reason)
     return jsonify({"success": True, "membership": m.to_dict()})
 
 

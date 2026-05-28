@@ -303,6 +303,24 @@ export default function LoginPage() {
                 Password: <code className="font-mono bg-muted px-1.5 py-0.5 rounded">pass123</code> for all demos
               </p>
             </div>
+
+            {isNetworkTenant && (
+              <div className="mt-5 pt-5 border-t border-border text-center">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Not a member yet?
+                </p>
+                <a
+                  href="/network/join/"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium hover:underline"
+                  style={{ color: tenantBrand }}
+                >
+                  Apply to join {tenantName} <ArrowRight className="h-3.5 w-3.5" />
+                </a>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Membership is reviewed by the {tenantName} Oversight Body.
+                </p>
+              </div>
+            )}
           </div>
 
           {isDev && (

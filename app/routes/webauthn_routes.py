@@ -115,6 +115,36 @@ def api_webauthn_auth_finish():
         return jsonify({'success': False, 'error': 'server.unexpected'}), 500
 
 
+def verify_assertion_for_user(user, assertion: dict) -> bool:
+    """Verify a WebAuthn assertion for the given user.
+
+    Used by reauth_service._verify_webauthn() to gate sensitive
+    operations like emergency-declaration signing. Wraps
+    WebAuthnService.finish_authentication so the reauth helper doesn't
+    need to know the WebAuthn library's call shape.
+
+    The assertion is the full credential dict returned by the browser's
+    navigator.credentials.get() — the same shape /authenticate/finish
+    expects in its body.
+
+    Returns True if the assertion verifies AND the challenge stored in
+    Flask session matches; False otherwise. Caller is expected to
+    invoke /authenticate/begin before requesting the sensitive op so a
+    challenge is in the session.
+    """
+    if not user or not isinstance(assertion, dict):
+        return False
+    try:
+        from app.services.webauthn_service import WebAuthnService
+        result = WebAuthnService.finish_authentication(
+            user=user, assertion_response=assertion,
+        )
+        return bool(result and result.get('success'))
+    except Exception as e:
+        logger.warning(f'verify_assertion_for_user failed: {e}')
+        return False
+
+
 def require_reauth():
     """Gate decorator/helper for sensitive routes.
 

@@ -20,6 +20,7 @@ import { ReviewerFollowupsPanel } from '@/components/reviews/reviewer-followups-
 import { ReviewerBriefingCard } from '@/components/reviews/reviewer-briefing-card';
 import { PanelCalibrationCard } from '@/components/reviews/panel-calibration-card';
 import { ScoreBreakdownCard } from '@/components/applications/score-breakdown-card';
+import { NetworkAiPanel } from '@/components/applications/network-ai-panel';
 import { ApplicationMessageThread } from '@/components/applications/application-message-thread';
 import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
@@ -244,6 +245,15 @@ export default function ApplicationDetailClient() {
       {/* Phase 22A — per-criterion score breakdown. NGOs see WHY they
           got the score they did; donors/reviewers see full comments. */}
       <ScoreBreakdownCard applicationId={application.id} />
+
+      {/* Phase 38 — Network AI surfaces (rubric scorer + direct-to-community
+          classifier). Only shows for network-window grants and only to
+          reviewers/donors/admins; NGOs don't drive these decisions. */}
+      {(application as { grant_fund_window_id?: number | null }).grant_fund_window_id != null
+        && viewer
+        && (viewer.role === 'donor' || viewer.role === 'reviewer' || viewer.role === 'admin') && (
+        <NetworkAiPanel applicationId={application.id} />
+      )}
 
       {/* Phase 20C — donor ↔ NGO threaded conversation. Visible to all
           parties on the application (server-side gates enforce). */}

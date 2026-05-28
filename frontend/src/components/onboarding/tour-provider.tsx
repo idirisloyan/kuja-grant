@@ -24,8 +24,11 @@ import { Sparkles, X, ArrowRight } from 'lucide-react';
 // --------------------------------------------------------------------------
 
 interface TourStep {
-  titleKey: string;
-  bodyKey: string;
+  titleKey?: string;
+  bodyKey?: string;
+  /** Literal text (NEAR tour). When set, takes precedence over the i18n keys. */
+  title?: string;
+  body?: string;
   /** Optional DOM selector; tooltip points at this element if found. */
   anchor?: string;
 }
@@ -58,6 +61,59 @@ const TOURS: Record<string, TourStep[]> = {
   ],
 };
 
+// NEAR-specific tours (closed network model). Hand-written copy rather
+// than i18n keys because NEAR UAT runs in English only; can be moved to
+// i18n if/when localised.
+function nearTours(networkName: string): Record<string, TourStep[]> {
+  return {
+    ngo: [
+      {
+        title: `Welcome to ${networkName}`,
+        body: `You're a NEAR member. This dashboard surfaces your active grants, what's due, and where the network needs you.`,
+      },
+      {
+        title: 'Capacity assessment',
+        body: 'The NEAR capacity framework drives your eligibility. Take it during onboarding and refresh annually — the Oversight Body sees your score.',
+      },
+      {
+        title: 'Compliance & reporting',
+        body: 'Reports are grouped by grant. Submit progress, financial, and final reports straight from each grant card; deadlines are colour-coded.',
+      },
+      {
+        title: 'Co-pilot',
+        body: 'Ask anything about your obligations, declarations you can apply to, or how to read your scores.',
+        anchor: '[aria-label="Open co-pilot"]',
+      },
+    ],
+    admin: [
+      {
+        title: `${networkName} operator console`,
+        body: 'This is your control panel: membership pipeline, active declarations, the Change Fund pulse, and the Crisis Monitoring Report at a glance.',
+      },
+      {
+        title: 'Crisis monitoring',
+        body: 'The OB reviews active crises weekly. Rows with a high composite score (HDI + government capacity + people impacted + attention level) become declaration candidates.',
+      },
+      {
+        title: 'Membership reviews',
+        body: 'New applications need OB review. Run the trust process (sanctions, registry, adverse media) and check the capacity assessment before approving.',
+      },
+      {
+        title: 'Emergency declarations',
+        body: 'Multi-signature with COI recusal — every signature is audit-anchored. Activated declarations auto-create shortlisted grants ready for release.',
+      },
+    ],
+    // Reviewer + donor roles aren't part of the NEAR closed-network model;
+    // fall back to a single welcome step if they somehow appear.
+    reviewer: [
+      { title: `Welcome to ${networkName}`, body: `${networkName} is a closed network — reviewers operate through the OB workflow rather than independent panels.` },
+    ],
+    donor: [
+      { title: `Welcome to ${networkName}`, body: `${networkName} is its own donor: there's no separate donor role here. Use the operator console to manage funds.` },
+    ],
+  };
+}
+
 // --------------------------------------------------------------------------
 // Context
 // --------------------------------------------------------------------------
@@ -84,26 +140,29 @@ export function OnboardingTourProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const network = useNetworkStore((s) => s.network);
-  // Tours hardcode anchors like "readiness score" + "browse grants" that
-  // don't exist on the NEAR tenant — skip the tour entirely for non-kuja
-  // tenants. A NEAR-specific tour can be authored later if needed.
   const isNetworkTenant = !!network?.slug && network.slug !== 'kuja';
+  const tenantName = network?.name || 'NEAR Network';
   const { t } = useTranslation();
   const [active, setActive] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const storageKeyRef = useRef<string | null>(null);
 
-  const stepDefs = isNetworkTenant ? [] : (user ? (TOURS[user.role] ?? TOURS.ngo) : []);
-  // Resolve the keyed steps to translated strings via the user's language.
+  const tourSet = isNetworkTenant ? nearTours(tenantName) : TOURS;
+  const stepDefs = user ? (tourSet[user.role] ?? tourSet.ngo) : [];
+  // Resolve to displayable strings — NEAR tour ships literal copy, Kuja
+  // tour ships i18n keys.
   const steps = useMemo(
-    () => stepDefs.map((s) => ({ title: t(s.titleKey), body: t(s.bodyKey), anchor: s.anchor })),
+    () => stepDefs.map((s) => ({
+      title: s.title ?? (s.titleKey ? t(s.titleKey) : ''),
+      body: s.body ?? (s.bodyKey ? t(s.bodyKey) : ''),
+      anchor: s.anchor,
+    })),
     [stepDefs, t],
   );
 
   useEffect(() => {
     if (!user) return;
-    if (isNetworkTenant) return;  // Skip tour for network tenants
-    storageKeyRef.current = `kuja_onboarded_${user.role}_${user.id}`;
+    storageKeyRef.current = `kuja_onboarded_${user.role}_${user.id}${isNetworkTenant ? `_${network?.slug ?? 'net'}` : ''}`;
     if (pathname?.startsWith('/dashboard')) {
       try {
         const done = localStorage.getItem(storageKeyRef.current);
@@ -114,7 +173,7 @@ export function OnboardingTourProvider({ children }: { children: ReactNode }) {
         }
       } catch {}
     }
-  }, [user, pathname]);
+  }, [user, pathname, isNetworkTenant, network?.slug]);
 
   // Replay via custom event
   useEffect(() => {

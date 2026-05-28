@@ -91,6 +91,10 @@ def api_get_application(app_id):
     if application.grant:
         data['grant_criteria'] = application.grant.get_criteria()
         data['grant_eligibility'] = application.grant.get_eligibility()
+        # Network-window flag so the frontend can show the Phase 38 AI
+        # panel (rubric scorer + direct-to-community classifier) only on
+        # network grants.
+        data['grant_fund_window_id'] = getattr(application.grant, 'fund_window_id', None)
 
     return jsonify({'application': data})
 
