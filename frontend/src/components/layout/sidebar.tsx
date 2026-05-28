@@ -49,6 +49,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   } = useUIStore();
   const user = useAuthStore((s) => s.user);
   const network = useNetworkStore((s) => s.network);
+  const isNetworkTenant = !!network?.slug && network.slug !== 'kuja';
   const role: UserRole = (user?.role as UserRole) ?? 'ngo';
 
   // Close mobile sidebar on route change
@@ -57,18 +58,30 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   }, [pathname, setMobileSidebarOpen]);
 
   const navItems: Record<UserRole, NavItem[]> = {
-    ngo: [
-      { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
-      { icon: Calendar, label: t('nav.calendar') || 'Calendar', href: '/calendar' },
-      { icon: MessageSquare, label: t('nav.chat') || 'Chat with Kuja', href: '/chat' },
-      { icon: ClipboardCheck, label: t('nav.assessment_hub'), href: '/assessments' },
-      { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
-      { icon: Search, label: t('nav.browse_grants'), href: '/grants' },
-      { icon: FileText, label: t('nav.my_applications'), href: '/applications' },
-      { icon: BarChart3, label: t('nav.reports'), href: '/reports' },
-      { icon: Building2, label: t('nav.org_profile'), href: '/organizations/profile' },
-      { icon: Brain, label: t('nav.org_memory'), href: '/organizations/memory' },
-    ],
+    ngo: isNetworkTenant
+      ? [
+          // NEAR-tenant NGOs see a simplified set. No browse_grants
+          // (closed network — grants come from declarations), no trust
+          // profile (NEAR operator runs that during onboarding), no
+          // marketplace cues. Just their work.
+          { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
+          { icon: ClipboardCheck, label: t('nav.assessment_hub'), href: '/assessments' },
+          { icon: FileText, label: t('nav.my_applications'), href: '/applications' },
+          { icon: BarChart3, label: 'Compliance & reporting', href: '/reports' },
+          { icon: Building2, label: t('nav.org_profile'), href: '/organizations/profile' },
+        ]
+      : [
+          { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
+          { icon: Calendar, label: t('nav.calendar') || 'Calendar', href: '/calendar' },
+          { icon: MessageSquare, label: t('nav.chat') || 'Chat with Kuja', href: '/chat' },
+          { icon: ClipboardCheck, label: t('nav.assessment_hub'), href: '/assessments' },
+          { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
+          { icon: Search, label: t('nav.browse_grants'), href: '/grants' },
+          { icon: FileText, label: t('nav.my_applications'), href: '/applications' },
+          { icon: BarChart3, label: 'Compliance & reporting', href: '/reports' },
+          { icon: Building2, label: t('nav.org_profile'), href: '/organizations/profile' },
+          { icon: Brain, label: t('nav.org_memory'), href: '/organizations/memory' },
+        ],
     donor: [
       { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
       { icon: Calendar, label: t('nav.calendar') || 'Calendar', href: '/calendar' },
@@ -76,7 +89,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
       { icon: PlusCircle, label: t('nav.create_grant'), href: '/grants/new' },
       { icon: Briefcase, label: t('nav.my_grants'), href: '/grants' },
       { icon: Star, label: t('nav.review_applications'), href: '/reviews' },
-      { icon: BarChart3, label: t('nav.grant_reports'), href: '/reports' },
+      { icon: BarChart3, label: 'Compliance & reporting', href: '/reports' },
       { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
       { icon: Shield, label: t('nav.compliance'), href: '/compliance' },
       { icon: Search, label: t('nav.org_search'), href: '/organizations/search' },

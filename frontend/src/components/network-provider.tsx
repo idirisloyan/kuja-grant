@@ -60,13 +60,23 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   // Phase 32 demo override: on mount, read ?network=<slug> from the URL
   // and persist it to localStorage so every subsequent API call carries
   // X-Network-Override. Empty `?network=` clears the override.
-  // Server enforces admin-only honour.
+  //
+  // If the slug *changed* (vs what was previously stored), clear any
+  // stale auth session and redirect to /login. UAT lesson: people
+  // bookmark the URL with ?network=near, click it, and find themselves
+  // already logged in as some user from a previous Kuja session — they
+  // see the wrong tenant's experience pre-rendered with the right
+  // tenant's brand. Forcing a logout when the tenant changes makes the
+  // bookmark a true "enter this tenant" link.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       const params = new URLSearchParams(window.location.search);
       if (params.has('network')) {
         const slug = (params.get('network') || '').trim().toLowerCase();
+        const prev = (window.localStorage.getItem('kuja_network_override') || '').toLowerCase();
+        const isTenantSwitch = slug !== prev;
+
         if (slug) {
           window.localStorage.setItem('kuja_network_override', slug);
         } else {
@@ -82,6 +92,24 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
         window.history.replaceState({}, '', newUrl);
         // Force a network re-fetch so brand context updates immediately.
         useNetworkStore.setState({ network: null, loading: true });
+
+        // On tenant switch, force re-auth so the user explicitly chooses
+        // identity within the new tenant. POST /api/auth/logout is
+        // tolerant of being called without an active session.
+        if (isTenantSwitch && window.location.pathname !== '/login') {
+          (async () => {
+            try {
+              await fetch('/api/auth/logout', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+              });
+            } catch {
+              // ignore — proceed to login anyway
+            }
+            window.location.replace('/login');
+          })();
+        }
       }
     } catch {
       // localStorage / URL parsing failed — silently skip.
