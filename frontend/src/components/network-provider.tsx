@@ -121,6 +121,15 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     if (network?.default_language) {
       root.setAttribute('lang', network.default_language);
     }
+
+    // Update the document.title so the browser tab shows the tenant
+    // name — important for visual confirmation during multi-tenant UAT.
+    if (network?.name) {
+      const suffix = network.slug === 'kuja'
+        ? ' — Grant intelligence'
+        : ' — Network fund operations';
+      document.title = network.name + suffix;
+    }
   }, [network]);
 
   return <>{children}</>;

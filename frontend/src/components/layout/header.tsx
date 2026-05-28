@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUIStore } from '@/stores/ui-store';
+import { useNetworkStore } from '@/stores/network-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { supportedLanguages } from '@/i18n';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ export function Header() {
   const language = user?.language ?? 'en';
   const { setMobileSidebarOpen, lowBandwidth, toggleLowBandwidth } = useUIStore();
   const { t } = useTranslation();
+  const network = useNetworkStore((s) => s.network);
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
@@ -71,6 +73,28 @@ export function Header() {
       >
         <Menu className="h-5 w-5" />
       </button>
+
+      {/* Tenant identity pill — visible to make multi-tenant obvious */}
+      {network && (
+        <div
+          className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm"
+          style={{
+            backgroundColor: network.brand_color_hex
+              ? `${network.brand_color_hex}15`
+              : 'hsl(var(--muted))',
+            color: network.brand_color_hex || 'hsl(var(--foreground))',
+            border: `1px solid ${network.brand_color_hex || 'hsl(var(--border))'}40`,
+          }}
+          title={`Tenant: ${network.name}`}
+        >
+          <span
+            className="inline-block w-2 h-2 rounded-full"
+            style={{ backgroundColor: network.brand_color_hex || 'currentColor' }}
+            aria-hidden="true"
+          />
+          {network.name}
+        </div>
+      )}
 
       <div className="flex-1" />
 
