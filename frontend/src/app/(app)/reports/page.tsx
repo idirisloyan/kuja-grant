@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
+import { useNetworkStore } from '@/stores/network-store';
+import { NearComplianceReporting } from '@/components/reports/near-compliance-reporting';
 import { ReportDraftCoAuthor } from '@/components/reports/ReportDraftCoAuthor';
 import { ReportReadiness } from '@/components/reports/ReportReadiness';
 import { ReportBundlePanel } from '@/components/reports/report-bundle-panel';
@@ -761,6 +763,35 @@ function AIReportGuidancePanel({ report }: { report: Report }) {
 // ---------------------------------------------------------------------------
 
 export default function ReportsPage() {
+  // NEAR tenant uses a simplified, grant-grouped layout. Skip the full
+  // Kuja marketplace reports surface (tabs / cohort cards / readiness
+  // co-author panel / bundle panel — all of which assume a donor/NGO
+  // marketplace dynamic that doesn't apply to NEAR). Branch into a
+  // SEPARATE COMPONENT so the marketplace hooks below are never called
+  // in the NEAR path (React Hooks rules require stable call order).
+  const network = useNetworkStore((s) => s.network);
+  const isNetworkTenant = !!network?.slug && network.slug !== 'kuja';
+  if (isNetworkTenant) {
+    return <NearReportsPage />;
+  }
+  return <KujaReportsPage />;
+}
+
+function NearReportsPage() {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="kuja-display text-3xl">Compliance &amp; reporting</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Your reporting activities, grouped by grant.
+        </p>
+      </div>
+      <NearComplianceReporting />
+    </div>
+  );
+}
+
+function KujaReportsPage() {
   const { data: reportData, isLoading: reportsLoading, mutate: mutateReports } = useReports();
   const { data: upcomingData, isLoading: upcomingLoading } = useUpcomingReports();
   const { t, formatDate } = useTranslation();
