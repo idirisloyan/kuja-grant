@@ -14,6 +14,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
+import { useNetworkStore } from '@/stores/network-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
 import { Loader2, Mail, Lock, Building2, Wallet, Star, Sparkles, ArrowRight } from 'lucide-react';
@@ -36,6 +37,11 @@ export default function LoginPage() {
   const [isDev, setIsDev] = useState(false);
   const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({});
   const { t } = useTranslation();
+  const network = useNetworkStore((s) => s.network);
+  const isNetworkTenant = network?.slug && network.slug !== 'kuja';
+  const tenantName = network?.name || 'Kuja';
+  const tenantBrand = network?.brand_color_hex || '#C2410C';
+  const tenantBrandDark = network?.brand_color_hex || '#7C2D12';
 
   useEffect(() => {
     setIsDev(
@@ -151,25 +157,48 @@ export default function LoginPage() {
       />
 
       <div className="relative z-10 w-full max-w-5xl grid grid-cols-1 lg:grid-cols-5 gap-8 items-center">
-        {/* LEFT — Brand + tagline */}
+        {/* LEFT — Brand + tagline (network-aware) */}
         <div className="lg:col-span-2 text-white space-y-5">
           <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-[#C2410C] to-[#7C2D12] shadow-lg">
-              <span className="kuja-display text-2xl text-white">K</span>
+            <div
+              className="grid h-12 w-12 place-items-center rounded-xl shadow-lg"
+              style={{ background: `linear-gradient(135deg, ${tenantBrand}, ${tenantBrandDark})` }}
+            >
+              <span className="kuja-display text-2xl text-white">
+                {tenantName.charAt(0).toUpperCase()}
+              </span>
             </div>
             <div>
-              <div className="kuja-display text-2xl">Kuja</div>
-              <div className="text-xs text-orange-200 uppercase tracking-widest">Grant intelligence</div>
+              <div className="kuja-display text-2xl">{tenantName}</div>
+              <div className="text-xs text-orange-200 uppercase tracking-widest">
+                {isNetworkTenant ? 'Network fund operations' : 'Grant intelligence'}
+              </div>
             </div>
           </div>
-          <h1 className="kuja-display text-4xl lg:text-5xl text-white text-balance">
-            Grants done with the
-            <span className="block text-orange-300">Global South</span>
-            in mind.
-          </h1>
-          <p className="text-orange-100/90 text-base max-w-md leading-relaxed">
-            Kuja unifies donor grant design, NGO readiness coaching, reviewer intelligence, and ongoing compliance — with AI that grounds every recommendation in your own documents.
-          </p>
+          {isNetworkTenant ? (
+            <>
+              <h1 className="kuja-display text-4xl lg:text-5xl text-white text-balance">
+                Locally-led
+                <span className="block text-orange-300">humanitarian response</span>
+                at network speed.
+              </h1>
+              <p className="text-orange-100/90 text-base max-w-md leading-relaxed">
+                {tenantName} runs on Kuja: capacity-assessed members, fund + window governance,
+                multi-signature emergency declarations, and end-to-end audit-anchored reporting.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="kuja-display text-4xl lg:text-5xl text-white text-balance">
+                Grants done with the
+                <span className="block text-orange-300">Global South</span>
+                in mind.
+              </h1>
+              <p className="text-orange-100/90 text-base max-w-md leading-relaxed">
+                Kuja unifies donor grant design, NGO readiness coaching, reviewer intelligence, and ongoing compliance — with AI that grounds every recommendation in your own documents.
+              </p>
+            </>
+          )}
           <div className="pt-2 flex items-center gap-2 text-xs text-orange-100/70">
             <Sparkles className="h-3.5 w-3.5" />
             AI co-pilot embedded in every surface

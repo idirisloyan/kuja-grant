@@ -56,8 +56,23 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
 
     inflight = (async () => {
       try {
+        // Read the localStorage tenant override (set by NetworkProvider
+        // when ?network=<slug> is present in the URL). The centralized
+        // api.ts client injects this header automatically, but this
+        // store uses raw fetch() for its bootstrap call, so we mirror
+        // the logic here.
+        const headers: Record<string, string> = {};
+        if (typeof window !== 'undefined') {
+          try {
+            const override = window.localStorage.getItem('kuja_network_override');
+            if (override) headers['X-Network-Override'] = override;
+          } catch {
+            // localStorage unavailable — skip silently.
+          }
+        }
         const res = await fetch(`${API_BASE}/network/current`, {
           credentials: 'include',
+          headers,
           // No CSRF header needed for a public GET.
         });
         if (!res.ok) {
