@@ -526,43 +526,55 @@ def api_run_trust_process(membership_id):
         m.applied_at = m.applied_at or datetime.now(timezone.utc)
 
     # Run an adverse-media screen on the org (best-effort; service has
-    # its own fallback). Persists via the existing route logic — we
-    # call the service directly here to keep this endpoint atomic.
+    # its own fallback). Persists via the canonical AdverseMediaScreening
+    # shape — matches the same write pattern used by /trust/adverse-media.
     screening_summary = None
     try:
         from app.services.adverse_media_service import AdverseMediaService
         from app.models import AdverseMediaScreening
-        from app.utils.helpers import _json_dump
         result = AdverseMediaService.screen(
             org_name=org.name,
             country=getattr(org, "country", None),
             sector=None,
             leadership=None,
         )
+        summary = result.get("summary") or {}
         scr = AdverseMediaScreening(
             org_id=org.id,
-            screening_date=datetime.now(timezone.utc),
-            sources_searched=_json_dump(result.get("sources_searched") or []),
-            total_results=result.get("total_results", 0),
-            high_count=result.get("high_count", 0),
-            medium_count=result.get("medium_count", 0),
-            low_count=result.get("low_count", 0),
-            recommendation=result.get("recommendation", "review"),
-            evidence_items=_json_dump(result.get("evidence_items") or []),
-            metadata=_json_dump({"triggered_by": "membership_trust_process",
-                                 "membership_id": m.id}),
+            lookback_months=result.get("lookback_months", 24),
+            status=summary.get("overall_status", "pending"),
+            source=result.get("source", "unknown"),
+            ai_confidence=result.get("ai_confidence", 0),
+            ai_notes=(result.get("ai_notes") or "")[:8000],
+            screened_by_user_id=getattr(current_user, "id", None),
         )
+        scr.set_subjects(result.get("subjects", []))
+        scr.set_findings(result.get("findings", []))
+        # Stash trust-process provenance + counts inside summary so we
+        # don't lose the triggered-by attribution.
+        merged_summary = {
+            **summary,
+            "triggered_by": "membership_trust_process",
+            "membership_id": m.id,
+        }
+        scr.set_summary(merged_summary)
         db.session.add(scr)
         screening_summary = {
-            "recommendation": result.get("recommendation"),
-            "high_count": result.get("high_count", 0),
-            "medium_count": result.get("medium_count", 0),
-            "low_count": result.get("low_count", 0),
-            "sources_searched": result.get("sources_searched", []),
+            "recommendation": summary.get("recommendation"),
+            "high_count": summary.get("high_count", 0),
+            "medium_count": summary.get("medium_count", 0),
+            "low_count": summary.get("low_count", 0),
+            "sources_searched": summary.get("sources_searched", []),
+            "overall_status": summary.get("overall_status"),
         }
     except Exception as e:
+        # NOTE: previously this except swallowed silently and the route
+        # still returned 200, which let real defects (like the
+        # screening_date=… invalid kwarg) hide for weeks. We now
+        # surface the error inside the response payload so callers
+        # see the failure even when the surrounding flow succeeds.
         logger.exception(f"membership trust process — adverse media failed: {e}")
-        screening_summary = {"error": str(e)[:200]}
+        screening_summary = {"error": str(e)[:200], "ok": False}
 
     # Build the aggregated trust profile (uses ALL existing data —
     # screening just added + any prior verifications + capacity passport)

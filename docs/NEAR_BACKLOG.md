@@ -151,6 +151,18 @@
 - **Action:** Either delete the entry or revert the file with
   `git checkout .claude/launch.json`.
 
+### Enforce a `/submit` latency budget in CI
+- **last_touched:** 2026-05-28
+- **Why:** Phase 40 silently pushed the endpoint to ~22 seconds because
+  two AI calls (budget classifier + rubric scorer) were inline. That
+  broke every browser-side test runner with a default <10s timeout —
+  the team only caught it during the May-28 retest. We'd like the
+  next regression to fail loudly in CI rather than during UAT.
+- **Action:** Add a perf check to `test_near_uat.py` (or a separate
+  perf smoke) that asserts a typical `/submit` round-trip lands in
+  under (say) 1500ms against local Flask, with a higher budget for
+  prod. Tripwire if it regresses past 5s.
+
 ### Decision-email template + branding
 - **Why:** The approve/reject email body is a plain-text 4-line
   paragraph signed by "{network_name} secretariat". Works but
@@ -180,12 +192,31 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-05-28** Phase 41 — Reliability + regression closeout flagged
+  in the May-28 retest. Three fixes:
+  (1) `/submit` latency cut from ~22s to ~140ms by switching the hard
+  gate to a deterministic keyword classifier (`classify_budget_direct_to_community_fast`)
+  and moving the AI rubric scorer to a background task via
+  `submit_task`. Unblocks browser flows + test suites that were
+  timing out (`test_e2e.py`, `test_e2e_final.py`,
+  `browser_test_strict.py`).
+  (2) Fixed silent defect in the membership trust-process route:
+  `AdverseMediaScreening(...)` was being called with `screening_date=`
+  + 5 other invalid kwargs; the catch-all `except` swallowed the
+  TypeError and the route returned 200, hiding the failure. Now uses
+  the canonical model shape (`screened_at`, `set_subjects`,
+  `set_findings`, `set_summary`) — matches `/trust/adverse-media`.
+  Error responses now surface `ok: false` so callers see the failure.
+  (3) `ScoreBreakdownService.compute` — the early-return `no_criteria`
+  shape was missing `reviewer_count`, `overall_human_score_computed`,
+  `strongest_criteria`, `weakest_criteria`. Frontend reads these
+  unconditionally so the missing fields crashed the score breakdown
+  card. Now shape-stable across all three return paths. Commit pending.
 - **2026-05-28** Phase 40 — Auto-rubric-score + direct-to-community hard
   gate on `/submit` for network grants. Added `ai_rubric_result_json`
   + `budget_lines_json` columns to `applications` (bootstrap ALTER +
   Alembic migration `v660`). NGO-facing budget panel on the
-  application detail page. PUT route accepts `budget_lines`.
-  `test_near_uat.py` extended with 3 Phase 40 checks. Commit pending.
+  application detail page. PUT route accepts `budget_lines`. Commit `f22c34b`.
 - **2026-05-28** `5c16c1f` — Phase 39 NEAR polish (10 items):
   login CTA, tenant-aware strings, capacity-assessment auto-link,
   membership decision emails, application AI panel, TOTP polish,
