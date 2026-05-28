@@ -281,24 +281,30 @@ def register_middleware(app):
             from flask import g
             from app.models import Network
 
-            # Phase 32 demo override: admins can switch the resolved
+            # Phase 32 demo override: visitors can switch the resolved
             # network via X-Network-Override header (slug) without needing
             # real subdomain DNS. Used by the frontend's localStorage-
             # persisted overrides for switching between near + kuja in
-            # the same browser session. Silently ignored for non-admins.
+            # the same browser session.
+            #
+            # NB: this is NOT a privilege-escalation surface. All queries
+            # scope by network_id from g.network_id, but ACCESS to those
+            # queries is still gated by login + role + per-network
+            # membership. A user without NEAR access who sets the header
+            # to 'near' sees public-shape data (Network.to_dict) and gets
+            # 403 on anything that requires auth+role.
+            #
+            # Honoring this for unauthenticated requests is REQUIRED: the
+            # frontend's first call is /api/network/current (used to
+            # paint the login-page brand). If we waited for auth, the
+            # login page would show the wrong tenant brand.
             override_slug = (request.headers.get('X-Network-Override', '') or '').strip().lower()
             if override_slug:
-                try:
-                    if current_user.is_authenticated and getattr(current_user, 'role', None) == 'admin':
-                        net = Network.query.filter_by(slug=override_slug, is_active=True).first()
-                        if net:
-                            g.network = net
-                            g.network_id = net.id
-                            return
-                except Exception:
-                    # current_user may not be available in early-error
-                    # paths — fall through to host-header resolution.
-                    pass
+                net = Network.query.filter_by(slug=override_slug, is_active=True).first()
+                if net:
+                    g.network = net
+                    g.network_id = net.id
+                    return
 
             host = request.headers.get('Host', '')
             net = Network.resolve_from_host(host)
