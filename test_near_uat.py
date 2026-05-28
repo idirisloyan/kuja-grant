@@ -214,6 +214,44 @@ def test_membership_decision_email_helper(s):
         "_notify_membership_decision not found"
 
 
+def test_application_has_phase40_columns(s):
+    """Phase 40 — applications table has ai_rubric_result_json + budget_lines_json."""
+    from app.models import Application  # type: ignore
+    cols = {c.name for c in Application.__table__.columns}
+    assert "ai_rubric_result_json" in cols, \
+        "ai_rubric_result_json column missing from Application model"
+    assert "budget_lines_json" in cols, \
+        "budget_lines_json column missing from Application model"
+
+
+def test_application_budget_helpers(s):
+    """Phase 40 — get/set budget_lines + ai_rubric_result helpers exist."""
+    from app.models import Application  # type: ignore
+    a = Application()
+    assert hasattr(a, "get_budget_lines") and hasattr(a, "set_budget_lines"), \
+        "budget helpers missing on Application"
+    assert hasattr(a, "get_ai_rubric_result") and hasattr(a, "set_ai_rubric_result"), \
+        "rubric-result helpers missing on Application"
+    # Round-trip a budget
+    a.set_budget_lines([{"item": "Cash transfers", "amount": 1500}])
+    out = a.get_budget_lines()
+    assert isinstance(out, list) and len(out) == 1 and out[0]["amount"] == 1500, \
+        f"budget round-trip broke: {out}"
+
+
+def test_submit_hard_gate_response_shape(s):
+    """Phase 40 — the submit endpoint returns the hard-gate response
+    shape (gate code + threshold + direct_pct) when budget is below the
+    window threshold. We don't have a live application to fail-trigger
+    on, so this just probes the response shape via a known-bad app id
+    (returns 404) confirming the route is mounted."""
+    base = s._base
+    r = s.post(f"{base}/api/applications/999999/submit", timeout=10)
+    # Either 404 (app not found) or 403 (not your app). Never 5xx.
+    assert r.status_code in (400, 403, 404), \
+        f"/submit returned unexpected {r.status_code}"
+
+
 # ---------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------
@@ -253,6 +291,14 @@ def main():
     run("verify_assertion_for_user exported (WebAuthn wrapper)", lambda: test_webauthn_routes_mounted(s))
     run("Capacity-assessment auto-link helper present", lambda: test_assessment_autolink_present(s))
     run("Membership decision email helper present", lambda: test_membership_decision_email_helper(s))
+
+    print("\nPhase 40 auto-rubric-score + hard-gate")
+    run("Application has ai_rubric_result_json + budget_lines_json columns",
+        lambda: test_application_has_phase40_columns(s))
+    run("Budget + rubric helpers round-trip on the model",
+        lambda: test_application_budget_helpers(s))
+    run("/submit endpoint reachable (hard-gate route mounted)",
+        lambda: test_submit_hard_gate_response_shape(s))
 
     print("\nNGO viewer")
     run("NGO login (NEAR scope)", lambda: test_login_as_ngo(s))

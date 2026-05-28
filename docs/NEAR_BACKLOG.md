@@ -24,6 +24,7 @@
   `host_aliases` (admin can do this via `PUT /api/network/<id>/host-aliases`).
 
 ### Configure email transport on Railway
+- **last_touched:** 2026-05-28
 - **Why:** `_notify_membership_decision` in
   `app/routes/network_membership_routes.py` is wired but Railway has no
   `SENDGRID_API_KEY` or `SMTP_HOST` set (confirmed in memory). Approve
@@ -32,7 +33,31 @@
 - **Action:** Pick a transport (SendGrid free tier ≤ 100/day or any
   SMTP relay), set the env var on Railway, redeploy. No code change.
 
+### Schedule the weekly Crisis Monitoring Report draft cron
+- **last_touched:** 2026-05-28
+- **Why:** The endpoint exists at `POST /api/cron/crisis-monitoring-draft`
+  but no external scheduler invokes it on Railway. NEAR's design calls
+  for a weekly OB cadence — currently a human has to remember to
+  create + publish each Monday.
+- **Action:** Add a Railway Cron Job (or a GitHub Actions workflow on
+  a `0 6 * * 1` cron) that POSTs to that endpoint with a shared
+  `CRON_SECRET` bearer token. Then `_seed_rich` no longer has to be
+  the substitute.
+
+### Send shortlisted NGOs an invitation email on release-applications
+- **last_touched:** 2026-05-28
+- **Why:** `POST /api/declarations/<id>/release-applications` flips the
+  auto-created grants from `draft` → `open` and sets
+  `applicants_notified_at`, but doesn't actually email the shortlisted
+  NGOs. They learn about the opportunity only when they next sign in.
+  Same blocker as the membership-decision email (no transport set).
+- **Action:** After flipping grants, iterate the shortlisted org IDs,
+  resolve their NGO-role users, and `EmailService.send()` an
+  invitation pointing at the grant URL. Mark each grant's
+  `published_at` so the timestamp doesn't drift if release is re-run.
+
 ### Make seeded memberships land in `under_review`
+- **last_touched:** 2026-05-28
 - **Why:** Demo memberships from `seed_networked_funds.py --rich` are
   created via `admin-create` in status `pending`. That's "draft" — the
   OB never sees them in the review queue. Demo only shows "0 awaiting
@@ -155,6 +180,12 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-05-28** Phase 40 — Auto-rubric-score + direct-to-community hard
+  gate on `/submit` for network grants. Added `ai_rubric_result_json`
+  + `budget_lines_json` columns to `applications` (bootstrap ALTER +
+  Alembic migration `v660`). NGO-facing budget panel on the
+  application detail page. PUT route accepts `budget_lines`.
+  `test_near_uat.py` extended with 3 Phase 40 checks. Commit pending.
 - **2026-05-28** `5c16c1f` — Phase 39 NEAR polish (10 items):
   login CTA, tenant-aware strings, capacity-assessment auto-link,
   membership decision emails, application AI panel, TOTP polish,

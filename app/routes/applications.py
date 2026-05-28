@@ -187,6 +187,11 @@ def api_update_application(app_id):
     elig_data = data.get('eligibility_responses') or data.get('eligibility')
     if elig_data:
         application.set_eligibility_responses(elig_data)
+    # Phase 40 — applicant records the structured budget the hard-gate
+    # classifier needs. Accept on every PUT so the NGO can iterate
+    # before /submit fires the gate.
+    if 'budget_lines' in data:
+        application.set_budget_lines(data['budget_lines'])
     new_status = None
     if 'status' in data and current_user.role in ('donor', 'admin'):
         new_status = data['status']
@@ -255,16 +260,126 @@ def api_submit_application(app_id):
     if grant and grant.deadline and grant.deadline < date.today():
         return jsonify({'error': 'The application deadline has passed', 'success': False}), 400
 
-    application.status = 'submitted'
-    application.submitted_at = datetime.now(timezone.utc)
+    # Phase 40 — Hard gate on network grants: budget must meet the
+    # window's direct-to-community threshold (80% single-org / 70%
+    # consortium, configurable per window). Runs BEFORE we mark the
+    # application submitted so a failing app stays in 'draft' for
+    # revision. Graceful degradation: if the applicant hasn't recorded
+    # structured budget yet, we log a warning and allow submission so
+    # the rollout doesn't trap legacy applications.
+    if grant and grant.fund_window_id:
+        budget_lines = application.get_budget_lines()
+        if budget_lines:
+            try:
+                from app.models import FundWindow
+                from app.services.network_ai_service import NetworkAIService
+                window = db.session.get(FundWindow, grant.fund_window_id)
+                # Pull thresholds from the window; fall back to NEAR defaults.
+                single_min = (
+                    float(window.direct_to_community_single_min_pct)
+                    if window and window.direct_to_community_single_min_pct is not None
+                    else 80.0
+                )
+                consortium_min = (
+                    float(window.direct_to_community_consortium_min_pct)
+                    if window and window.direct_to_community_consortium_min_pct is not None
+                    else 70.0
+                )
+                # is_consortium is currently inferred from the eligibility
+                # response (Phase 33 schema doesn't surface it as a top-
+                # level field). Default to false.
+                elig = application.get_eligibility_responses() or {}
+                is_consortium = str(elig.get('is_consortium', '')).lower() in ('yes', 'true', '1')
+                gate = NetworkAIService.classify_budget_direct_to_community(
+                    budget_lines=budget_lines,
+                    is_consortium=is_consortium,
+                    threshold_single_pct=single_min,
+                    threshold_consortium_pct=consortium_min,
+                )
+                if gate and gate.get('meets_threshold') is False:
+                    threshold = (
+                        gate.get('threshold_pct')
+                        or (consortium_min if is_consortium else single_min)
+                    )
+                    return jsonify({
+                        'error': 'Budget does not meet the direct-to-community threshold',
+                        'gate': 'direct_to_community',
+                        'threshold_pct': threshold,
+                        'direct_pct': gate.get('direct_pct'),
+                        'classifications': gate.get('classifications', []),
+                        'summary': gate.get('summary'),
+                        'success': False,
+                    }), 400
+            except Exception as e:
+                # Soft fail: don't block submission on a transient AI/DB error.
+                logger.warning(
+                    f"hard-gate skipped for app {app_id} (network grant): {e}"
+                )
+        else:
+            logger.info(
+                f"hard-gate: app {app_id} on network grant has no budget_lines "
+                "— allowing submission with a soft warning"
+            )
 
-    # Auto-score with AI
+    # Auto-score with AI (legacy ScoringEngine — runs on every grant).
+    # Run BEFORE the status flip so auto-flushes during scoring don't
+    # see a dirty status; commit at the very end is the single
+    # persistence point.
+    ai_score = None
     try:
         score_result = ScoringEngine.score_application(application)
-        application.ai_score = score_result.get('overall_score')
-        application.final_score = score_result.get('overall_score')
+        ai_score = score_result.get('overall_score')
     except Exception as e:
         logger.error(f"Auto-scoring failed for application {app_id}: {e}")
+
+    # Phase 40 — Network-grant rubric scorer. For network grants we
+    # override the legacy ai_score with the NEAR rubric overall (the
+    # rubric is 5-area, 16-criterion — far more relevant for OB review
+    # than the generic ScoringEngine).
+    rubric_result = None
+    if grant and grant.fund_window_id:
+        try:
+            from app.models import FundWindow, Organization
+            from app.services.network_ai_service import NetworkAIService
+            window = db.session.get(FundWindow, grant.fund_window_id)
+            rubric = window.default_rubric() if window else None
+            if rubric and rubric.criteria:
+                submission_text = ''
+                responses = application.get_responses() or {}
+                if responses:
+                    submission_text = '\n\n'.join(
+                        f"{k}: {v}" for k, v in responses.items() if v
+                    )
+                org = db.session.get(Organization, application.ngo_org_id)
+                rubric_result = NetworkAIService.score_application_against_rubric(
+                    application_text=submission_text,
+                    rubric_criteria=[c.to_dict() for c in rubric.criteria],
+                    org_name=org.name if org else None,
+                    window_name=window.name if window else None,
+                )
+                if rubric_result:
+                    # Accept either 'overall_score' (Phase 38 v2) or
+                    # 'total_score' (Phase 38 v1) for the headline number.
+                    overall = rubric_result.get('overall_score')
+                    if overall is None:
+                        overall = rubric_result.get('total_score')
+                    if isinstance(overall, (int, float)):
+                        ai_score = float(overall)
+        except Exception as e:
+            logger.warning(
+                f"network rubric scorer skipped for app {app_id}: {e}"
+            )
+
+    # All mutations land in a single window right before commit so no
+    # autoflush triggered by the AI blocks above can clobber the status
+    # transition.
+    application.status = 'submitted'
+    application.submitted_at = datetime.now(timezone.utc)
+    if ai_score is not None:
+        application.ai_score = ai_score
+        application.final_score = ai_score
+    if rubric_result is not None:
+        application.set_ai_rubric_result(rubric_result)
 
     db.session.commit()
 

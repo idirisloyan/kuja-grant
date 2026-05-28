@@ -21,6 +21,7 @@ import { ReviewerBriefingCard } from '@/components/reviews/reviewer-briefing-car
 import { PanelCalibrationCard } from '@/components/reviews/panel-calibration-card';
 import { ScoreBreakdownCard } from '@/components/applications/score-breakdown-card';
 import { NetworkAiPanel } from '@/components/applications/network-ai-panel';
+import { NgoBudgetPanel } from '@/components/applications/ngo-budget-panel';
 import { ApplicationMessageThread } from '@/components/applications/application-message-thread';
 import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
@@ -253,6 +254,19 @@ export default function ApplicationDetailClient() {
         && viewer
         && (viewer.role === 'donor' || viewer.role === 'reviewer' || viewer.role === 'admin') && (
         <NetworkAiPanel applicationId={application.id} />
+      )}
+
+      {/* Phase 40 — NGO budget input for network grants. Required for the
+          /submit hard gate (direct-to-community threshold). Only shows
+          for the applicant's NGO + network grants. */}
+      {(application as { grant_fund_window_id?: number | null }).grant_fund_window_id != null
+        && viewer?.role === 'ngo'
+        && application.ngo_org_id === viewer?.org_id && (
+        <NgoBudgetPanel
+          applicationId={application.id}
+          initial={(application as { budget_lines?: Array<{ item?: string; amount?: number }> }).budget_lines}
+          status={application.status}
+        />
       )}
 
       {/* Phase 20C — donor ↔ NGO threaded conversation. Visible to all

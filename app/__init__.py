@@ -179,9 +179,16 @@ def create_app(config_name=None):
                     cols = {c["name"] for c in inspector.get_columns("grants")}
                     if "fund_window_id" not in cols:
                         conn.execute(text("ALTER TABLE grants ADD COLUMN fund_window_id INTEGER"))
+                # Phase 40 — Application AI rubric persistence + budget for hard gate
+                if "applications" in tables:
+                    cols = {c["name"] for c in inspector.get_columns("applications")}
+                    if "ai_rubric_result_json" not in cols:
+                        conn.execute(text("ALTER TABLE applications ADD COLUMN ai_rubric_result_json TEXT"))
+                    if "budget_lines_json" not in cols:
+                        conn.execute(text("ALTER TABLE applications ADD COLUMN budget_lines_json TEXT"))
                 conn.commit()
         except Exception as e:
-            app.logger.warning(f"Phase 33/34 column back-fill skipped: {e}")
+            app.logger.warning(f"Phase 33/34/40 column back-fill skipped: {e}")
 
         # Phase 32 — guarantee the default Network row exists. The
         # migration seeds it on a fresh Postgres deploy, but local SQLite
