@@ -11,6 +11,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useNetworkStore } from '@/stores/network-store';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -82,12 +83,17 @@ export function useOnboarding() {
 export function OnboardingTourProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
+  const network = useNetworkStore((s) => s.network);
+  // Tours hardcode anchors like "readiness score" + "browse grants" that
+  // don't exist on the NEAR tenant — skip the tour entirely for non-kuja
+  // tenants. A NEAR-specific tour can be authored later if needed.
+  const isNetworkTenant = !!network?.slug && network.slug !== 'kuja';
   const { t } = useTranslation();
   const [active, setActive] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const storageKeyRef = useRef<string | null>(null);
 
-  const stepDefs = user ? (TOURS[user.role] ?? TOURS.ngo) : [];
+  const stepDefs = isNetworkTenant ? [] : (user ? (TOURS[user.role] ?? TOURS.ngo) : []);
   // Resolve the keyed steps to translated strings via the user's language.
   const steps = useMemo(
     () => stepDefs.map((s) => ({ title: t(s.titleKey), body: t(s.bodyKey), anchor: s.anchor })),
@@ -96,6 +102,7 @@ export function OnboardingTourProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) return;
+    if (isNetworkTenant) return;  // Skip tour for network tenants
     storageKeyRef.current = `kuja_onboarded_${user.role}_${user.id}`;
     if (pathname?.startsWith('/dashboard')) {
       try {

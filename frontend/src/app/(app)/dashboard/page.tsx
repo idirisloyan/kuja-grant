@@ -14,7 +14,9 @@
  */
 
 import { useAuthStore } from '@/stores/auth-store';
+import { useNetworkStore } from '@/stores/network-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import { NearNgoConsole } from '@/components/dashboards/near-ngo-console';
 import { DonorCommandCenter } from '@/components/dashboards/donor-command-center';
 import { NgoReadinessConsole } from '@/components/dashboards/ngo-readiness-console';
 import { ReviewerQueue } from '@/components/dashboards/reviewer-queue';
@@ -40,6 +42,8 @@ import { PortfolioRiskHeatmap } from '@/components/dashboards/portfolio-risk-hea
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
+  const network = useNetworkStore((s) => s.network);
+  const isNetworkTenant = !!network?.slug && network.slug !== 'kuja';
   const { t } = useTranslation();
 
   if (!user) {
@@ -81,8 +85,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Phase 2 (category-defining UX): Today briefing — top of every
-          dashboard. Deterministic role-aware prioritised action list. */}
-      <TodayBriefing />
+          Kuja-marketplace dashboard. Hidden on the NEAR tenant where the
+          simplified NgoConsole renders the equivalent "what's due"
+          surface inline. */}
+      {!(user.role === 'ngo' && isNetworkTenant) && <TodayBriefing />}
 
       {user.role === 'donor' && (
         <>
@@ -112,7 +118,14 @@ export default function DashboardPage() {
           <PortfolioAuditTimeline />
         </>
       )}
-      {user.role === 'ngo' && (
+      {user.role === 'ngo' && isNetworkTenant && (
+        // NEAR tenant: simplified NGO console. No browse_grants, no
+        // peer benchmarks, no portfolio-PDF download (NEAR runs the
+        // reporting bundle on its side). Just status, score, and
+        // what's due.
+        <NearNgoConsole />
+      )}
+      {user.role === 'ngo' && !isNetworkTenant && (
         <>
           {/* Phase 17B — first-run checklist (auto-hides once activated). */}
           <OnboardingChecklist />
