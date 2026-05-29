@@ -58,27 +58,20 @@
   invitation pointing at the grant URL. Mark each grant's
   `published_at` so the timestamp doesn't drift if release is re-run.
 
-### Wire OB-only gates on the OB action endpoints
+### Retire the platform-admin shortcut in `is_oversight_body_member()`
 - **last_touched:** 2026-05-28
-- **Why:** Phase 44 added the `is_oversight_body` flag, the
-  `@ob_required` decorator, and the seat-management UI. What's not
-  yet done: applying `@ob_required` to the specific endpoints the
-  Concept Note says only the OB does. Today they still use
-  `@role_required('admin')` so platform admins can sign / approve /
-  run trust process even when no OB seat exists. The helper short-
-  circuits for `role == 'admin'` so behaviour is unchanged during
-  rollout — but once every actual OB member is flagged via the new
-  panel, the legacy admin shortcut should retire and the gates
-  should switch to `@ob_required`.
-- **Action:** Once the secretariat has flagged the OB roster, swap
-  `@role_required('admin')` → `@ob_required` on:
-  - `POST /api/declarations/<id>/submit`
-  - `POST /api/declarations/<id>/signers`
-  - `POST /api/declarations/<id>/signatures/<sid>/{sign,recuse,reject}`
-  - `POST /api/declarations/<id>/release-applications`
-  - `POST /api/network/membership/<id>/{approve,reject,run-trust-process}`
-  Drop the admin shortcut from `is_oversight_body_member()` once all
-  actual OB members are flagged.
+- **Why:** Phase 44C swapped every governance endpoint to
+  `@ob_required`. The decorator currently allows platform admin
+  through as a legacy shortcut so existing flows kept working during
+  rollout. Once the secretariat has flagged the actual OB roster
+  via the new `<OversightBodyPanel>`, that shortcut is doing more
+  harm than good — a compromised platform-admin account would still
+  bypass every OB gate.
+- **Action:** Drop the `if user.role == 'admin': return True` block
+  in `app/utils/network.py::is_oversight_body_member`. Verify the
+  same flows still work (admin who *also* holds an OB seat will
+  still pass; admin who doesn't will start getting 403s, which is
+  the desired behaviour).
 
 ### ~~Per-network Oversight Body role (separate from platform admin)~~ — DONE Phase 44
 ### Per-network Oversight Body role (separate from platform admin)
@@ -238,6 +231,23 @@
 ---
 
 ## Completed (rolling log, newest first)
+
+- **2026-05-28** Phase 44C — Enforcement swap complete. Every
+  governance endpoint the IKEA Concept Note attributes to the OB
+  now uses `@ob_required` instead of `@role_required('admin')` —
+  declaration create / submit / cancel / release / signers (×9
+  total), membership pending / approve / reject / suspend /
+  run-trust-process / expel (×6 total). Plus a defence-in-depth
+  check on signer-slot creation: the user being assigned a slot
+  must hold an OB seat in this network (or the admin must pass
+  `allow_admin_override=true` for the paper-ceremony fallback).
+  Sign / recuse / reject endpoints inherit the constraint via
+  `_load_my_signature`. Platform admin keeps a legacy shortcut in
+  `is_oversight_body_member` during rollout — flagged as a
+  high-priority follow-up to retire once the OB roster is
+  populated. Verified all four scenarios locally (admin OK,
+  OB-flagged NGO OK, non-OB NGO 403 with err.ob_required, non-OB
+  signer 400 with err.signer_not_ob). 19/19 smoke still green.
 
 - **2026-05-28** Phase 44 — Per-network OB role + weekly Crisis
   Monitoring cron (commit `c7e6f56`).
