@@ -122,6 +122,25 @@ class NetworkMembership(db.Model):
     # date passes the org cannot re-apply to this network.
     cooldown_until = db.Column(db.DateTime, nullable=True)
 
+    # Phase 44 — Per-network Oversight Body role.
+    #
+    # The Concept Note (IKEA, 2026) is explicit that the OB is
+    # "composed of peer-elected leaders from NEAR member organizations"
+    # — they're NGO members of the network, not platform super-users.
+    # Today every OB action goes through the platform `admin` role,
+    # which conflates "Adeso staff who run Kuja" with "NEAR member
+    # serving a term on the OB."
+    #
+    # `is_oversight_body=True` on an *active* membership means every
+    # user belonging to that org gains OB permissions inside this
+    # network (sign declarations, approve memberships, run trust
+    # process, approve grants) on top of their NGO-member role.
+    # Platform admin remains a separate orthogonal role for Adeso
+    # staff.
+    is_oversight_body = db.Column(db.Boolean, nullable=False, default=False)
+    ob_role_started_at = db.Column(db.DateTime, nullable=True)
+    ob_role_ended_at = db.Column(db.DateTime, nullable=True)
+
     created_at = db.Column(
         db.DateTime,
         nullable=False,
@@ -331,5 +350,13 @@ class NetworkMembership(db.Model):
                 self.cooldown_until.isoformat() if self.cooldown_until else None
             ),
             "is_assessment_fresh": self.is_assessment_fresh(),
+            # Phase 44 — OB role visibility
+            "is_oversight_body": bool(self.is_oversight_body),
+            "ob_role_started_at": (
+                self.ob_role_started_at.isoformat() if self.ob_role_started_at else None
+            ),
+            "ob_role_ended_at": (
+                self.ob_role_ended_at.isoformat() if self.ob_role_ended_at else None
+            ),
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

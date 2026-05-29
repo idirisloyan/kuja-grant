@@ -82,6 +82,11 @@ export default function MembershipReviewClient() {
               <span className={`px-2 py-0.5 rounded-full font-semibold capitalize ${STATUS_COLOUR[m.status] || STATUS_COLOUR.pending}`}>
                 {m.status.replace('_', ' ')}
               </span>
+              {(m as { is_oversight_body?: boolean }).is_oversight_body && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold bg-[hsl(var(--kuja-clay))]/15 text-[hsl(var(--kuja-clay))]">
+                  <ShieldCheck className="w-3 h-3" /> Oversight Body
+                </span>
+              )}
               {m.country && (
                 <span className="inline-flex items-center gap-1">
                   <MapPin className="w-3 h-3" /> {m.country}
@@ -96,6 +101,14 @@ export default function MembershipReviewClient() {
           </div>
         </div>
       </div>
+
+      {/* Phase 44 — Oversight Body seat management. Only visible for
+          active members; the IKEA Concept Note describes the OB as
+          peer-elected from member orgs, so the seat lives on the
+          membership row, not on the user. */}
+      {m.status === 'active' && (
+        <OversightBodyPanel membership={m} onChange={mutate} />
+      )}
 
       {/* Eligibility answers */}
       {Object.keys(m.eligibility_answers || {}).length > 0 && (
@@ -365,3 +378,112 @@ function DecisionPanel({ m, onUpdate }: { m: MembershipForDecision; onUpdate: ()
     </section>
   );
 }
+
+function OversightBodyPanel({
+  membership: m,
+  onChange,
+}: {
+  membership: { id: number; is_oversight_body?: boolean; ob_role_started_at?: string | null; ob_role_ended_at?: string | null };
+  onChange: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const isOB = m.is_oversight_body === true;
+
+  async function grant() {
+    setBusy(true);
+    try {
+      await api.post(`/network/membership/${m.id}/ob-seat`, { note: note.trim() || null });
+      toast.success('OB seat granted. The member can now act on declarations.');
+      setNote('');
+      onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Grant failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revoke() {
+    if (!confirm('Revoke this Oversight Body seat? The member keeps their NGO-member access; they lose OB permissions.')) return;
+    setBusy(true);
+    try {
+      const reason = note.trim();
+      const url = `/network/membership/${m.id}/ob-seat${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`;
+      await api.delete(url);
+      toast.success('OB seat revoked.');
+      setNote('');
+      onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Revoke failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-start gap-3">
+          <div className={`grid h-10 w-10 place-items-center rounded-md ${isOB ? 'bg-[hsl(var(--kuja-clay))]/15 text-[hsl(var(--kuja-clay))]' : 'bg-muted text-muted-foreground'} shrink-0`}>
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="kuja-eyebrow text-[10px]">Per-network OB role · Phase 44</h2>
+            <h3 className="font-semibold text-base">
+              {isOB ? 'Active Oversight Body seat' : 'No Oversight Body seat'}
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5 max-w-2xl">
+              Per the IKEA Concept Note, the OB is composed of peer-elected leaders
+              from member organisations. Granting this seat gives every user at the org
+              OB permissions (sign declarations, approve membership, run trust process)
+              on top of their NGO-member access.
+            </p>
+            {isOB && m.ob_role_started_at && (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Seat started {new Date(m.ob_role_started_at).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="border-t border-border pt-3 space-y-2">
+        <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          {isOB ? 'Reason for revocation (optional)' : 'Note (optional — election cycle, term, etc.)'}
+        </label>
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={500}
+          className="w-full px-2 py-1.5 rounded-md border border-border bg-background text-sm"
+          placeholder={isOB ? 'e.g. End of 2-year term' : 'e.g. Elected by the Eastern Africa caucus, 2026 term'}
+        />
+        <div className="flex items-center gap-2">
+          {!isOB ? (
+            <button
+              type="button"
+              onClick={grant}
+              disabled={busy}
+              className="px-3 py-1.5 rounded-md text-xs font-semibold bg-[hsl(var(--kuja-clay))] text-white hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1"
+            >
+              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+              Grant OB seat
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={revoke}
+              disabled={busy}
+              className="px-3 py-1.5 rounded-md text-xs font-semibold border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50 inline-flex items-center gap-1"
+            >
+              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+              Revoke OB seat
+            </button>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+

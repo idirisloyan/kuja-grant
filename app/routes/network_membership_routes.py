@@ -635,3 +635,132 @@ def api_expel_membership(membership_id):
         }), 400
     db.session.commit()
     return jsonify({"success": True, "membership": m.to_dict()})
+
+
+# ---------------------------------------------------------------------------
+# Phase 44 — Oversight Body seat management
+# ---------------------------------------------------------------------------
+
+@network_membership_bp.route("/<int:membership_id>/ob-seat", methods=["POST"])
+@role_required("admin")
+def api_grant_ob_seat(membership_id):
+    """Grant an active member an Oversight Body seat in this network.
+
+    Per the IKEA Concept Note, OB members are peer-elected from NEAR
+    member orgs. The platform admin (Adeso staff) flags the seat
+    here; once flagged, every user at that org gains OB permissions
+    in the network on top of their NGO-member role.
+
+    Body (optional): { effective_at: ISO datetime, note?: str }
+    """
+    from datetime import datetime, timezone
+    m = NetworkMembership.query.get_or_404(membership_id)
+    network_id = get_current_network_id()
+    if network_id and m.network_id != network_id:
+        return jsonify({"success": False, "error": "Wrong network context"}), 403
+    if m.status != "active":
+        return jsonify({
+            "success": False,
+            "error": f"Member must be active to hold an OB seat (status: {m.status})",
+        }), 400
+    if m.is_oversight_body:
+        return jsonify({
+            "success": False,
+            "error": "Member already holds an OB seat",
+            "membership": m.to_dict(),
+        }), 409
+
+    body = get_request_json() or {}
+    m.is_oversight_body = True
+    m.ob_role_started_at = datetime.now(timezone.utc)
+    m.ob_role_ended_at = None
+    db.session.flush()
+
+    # Audit anchor so the OB roster has the same provenance as
+    # declarations + signatures + grants.
+    try:
+        from app.models import AuditChainEntry
+        AuditChainEntry.append(
+            action="network.ob.seat_granted",
+            actor_email=current_user.email,
+            subject_kind="network_membership",
+            subject_id=m.id,
+            details={
+                "network_id": m.network_id,
+                "org_id": m.org_id,
+                "note": (body.get("note") or "")[:500],
+            },
+        )
+    except Exception:
+        pass
+
+    db.session.commit()
+    return jsonify({"success": True, "membership": m.to_dict()})
+
+
+@network_membership_bp.route("/<int:membership_id>/ob-seat", methods=["DELETE"])
+@role_required("admin")
+def api_revoke_ob_seat(membership_id):
+    """Revoke an OB seat (e.g. term ended, member elected off the OB)."""
+    from datetime import datetime, timezone
+    m = NetworkMembership.query.get_or_404(membership_id)
+    network_id = get_current_network_id()
+    if network_id and m.network_id != network_id:
+        return jsonify({"success": False, "error": "Wrong network context"}), 403
+    if not m.is_oversight_body:
+        return jsonify({
+            "success": False,
+            "error": "Member does not hold an OB seat",
+        }), 409
+
+    body = get_request_json() or {}
+    m.is_oversight_body = False
+    m.ob_role_ended_at = datetime.now(timezone.utc)
+    db.session.flush()
+
+    try:
+        from app.models import AuditChainEntry
+        AuditChainEntry.append(
+            action="network.ob.seat_revoked",
+            actor_email=current_user.email,
+            subject_kind="network_membership",
+            subject_id=m.id,
+            details={
+                "network_id": m.network_id,
+                "org_id": m.org_id,
+                "reason": (body.get("reason") or "")[:500],
+            },
+        )
+    except Exception:
+        pass
+
+    db.session.commit()
+    return jsonify({"success": True, "membership": m.to_dict()})
+
+
+@network_membership_bp.route("/ob-roster", methods=["GET"])
+@login_required
+def api_ob_roster():
+    """List active OB members in the current network.
+
+    Used by the declaration signer-picker and the operator console
+    so the team can see (and audit) who currently holds OB seats.
+    """
+    network_id = get_current_network_id()
+    if not network_id:
+        return jsonify({"success": True, "members": []})
+    rows = (
+        NetworkMembership.query
+        .filter_by(
+            network_id=network_id,
+            status="active",
+            is_oversight_body=True,
+        )
+        .all()
+    )
+    return jsonify({
+        "success": True,
+        "network_id": network_id,
+        "members": [m.to_dict() for m in rows],
+        "count": len(rows),
+    })

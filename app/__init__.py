@@ -167,6 +167,13 @@ def create_app(config_name=None):
                         conn.execute(text("ALTER TABLE network_memberships ADD COLUMN assessment_next_refresh_due_at TIMESTAMP"))
                     if "cooldown_until" not in cols:
                         conn.execute(text("ALTER TABLE network_memberships ADD COLUMN cooldown_until TIMESTAMP"))
+                    # Phase 44 — per-network OB role columns
+                    if "is_oversight_body" not in cols:
+                        conn.execute(text("ALTER TABLE network_memberships ADD COLUMN is_oversight_body BOOLEAN DEFAULT 0"))
+                    if "ob_role_started_at" not in cols:
+                        conn.execute(text("ALTER TABLE network_memberships ADD COLUMN ob_role_started_at TIMESTAMP"))
+                    if "ob_role_ended_at" not in cols:
+                        conn.execute(text("ALTER TABLE network_memberships ADD COLUMN ob_role_ended_at TIMESTAMP"))
                 if "documents" in tables:
                     cols = {c["name"] for c in inspector.get_columns("documents")}
                     if "network_membership_id" not in cols:
