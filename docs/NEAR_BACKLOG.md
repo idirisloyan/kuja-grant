@@ -56,6 +56,28 @@
   invitation pointing at the grant URL. Mark each grant's
   `published_at` so the timestamp doesn't drift if release is re-run.
 
+### Per-network Oversight Body role (separate from platform admin)
+- **last_touched:** 2026-05-28
+- **Why:** Today the OB's actions (declaration signing, grant approval,
+  trust process, membership review) are gated on the `admin` role —
+  which conflates two distinct concepts: platform super-user (Adeso
+  staff who run Kuja) and OB member (peer-elected NEAR member who
+  governs the Change Fund). The IKEA Concept Note is explicit that
+  the OB is "composed of peer-elected leaders from NEAR member
+  organizations" — they're NGO members of the network, not platform
+  admins. The Phase 43C ledger now makes this gap visible (every
+  audit row reads "by admin@kuja.org" instead of the actual OB
+  member's name).
+- **Action:** Add `is_oversight_body: bool` (or `ob_role: enum`) on
+  `NetworkMembership`. Users at OB-member orgs gain OB permissions
+  in that network (sign declarations, approve memberships, run trust
+  process, approve grants) on top of their NGO-member role. Backend
+  permission check in a new `@ob_required` decorator that walks
+  user → org → NetworkMembership → is_oversight_body in the active
+  network. Frontend: signer-picker on declarations only shows OB
+  members; sign / approve buttons gate on it; declaration ledger
+  shows actual OB member names.
+
 ### Make seeded memberships land in `under_review`
 - **last_touched:** 2026-05-28
 - **Why:** Demo memberships from `seed_networked_funds.py --rich` are
@@ -191,6 +213,35 @@
 ---
 
 ## Completed (rolling log, newest first)
+
+- **2026-05-28** Phase 43 — Closed-network operations (3 features
+  from the design conversation):
+  **A. In-app messaging** (commit `ac09493`) — TenantMessage +
+  TenantMessageRead models. Scopes: network / country / org /
+  declaration. Secretariat composes at /messages, members read in
+  inbox (unread badge + audit anchor). Every send writes an
+  AuditChainEntry so secretariat comms live in the same tamper-
+  evident chain as declarations. Interim channel until email
+  transport is wired.
+  **B. NGO feedback** (same commit) — MemberFeedback model with
+  categories (process / system / decision / support / suggestion /
+  other) and statuses (open / in_review / addressed / closed).
+  /feedback page: NGOs file + see own, secretariat sees inbox +
+  responds inline. Closes the Concept Note's risk pillar 4 gap.
+  Note: URL collision — new routes mounted at /api/member-feedback
+  because /api/feedback was already the Phase 31A micro-survey
+  ingest blueprint.
+  **C. Declaration process timeline** (same commit) — new GET
+  /api/declarations/<id>/ledger transforms the existing
+  AuditChainEntry rows into a human-readable narrative
+  (drafted → submitted → signed by X declaring no COI via TOTP →
+  recused by Y for reason Z → activated, 2/2 signed, 72h opened →
+  3 grants auto-created → applications released). DeclarationLedgerPanel
+  at the top of /admin/declarations/[id]. Surfaces the audit trail
+  the team was asking to see "in human form."
+
+  Sidebar (NEAR tenant only): NGO sidebar gains Messages + Feedback
+  items; admin sidebar gains Messages + Member feedback (inbox).
 
 - **2026-05-28** Phase 42 — Team UX feedback closeout:
   (1) Dashboard tile drill-in hangs fixed — `useRouteId` helper
