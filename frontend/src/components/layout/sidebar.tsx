@@ -90,10 +90,14 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
       { icon: Briefcase, label: t('nav.my_grants'), href: '/grants' },
       { icon: Star, label: t('nav.review_applications'), href: '/reviews' },
       { icon: BarChart3, label: 'Compliance & reporting', href: '/reports' },
+      // Trust Profile is the single canonical trust surface — sanctions,
+      // adverse media, registration, bank, COI, capacity all under /trust.
+      // The standalone /verification link was removed because it's now a
+      // section inside Trust Profile (with a "Full registry workflow"
+      // drill-in to the original page).
       { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
       { icon: Shield, label: t('nav.compliance'), href: '/compliance' },
       { icon: Search, label: t('nav.org_search'), href: '/organizations/search' },
-      { icon: CheckCircle2, label: t('nav.registration_checks'), href: '/verification' },
     ],
     reviewer: [
       { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
@@ -105,8 +109,10 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
       { icon: Briefcase, label: t('nav.all_grants'), href: '/grants' },
       { icon: FileText, label: t('nav.all_applications'), href: '/applications' },
       { icon: Search, label: t('nav.org_search'), href: '/organizations/search' },
+      // Registration checks consolidated into Trust Profile (the standalone
+      // /verification page is still reachable from the Identity & registration
+      // panel inside /trust).
       { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
-      { icon: CheckCircle2, label: t('nav.registration_checks'), href: '/verification' },
       { icon: Shield, label: t('nav.compliance'), href: '/compliance' },
       { icon: Activity, label: t('nav.observability'), href: '/observability' },
       { icon: BarChart3, label: t('nav.metrics') || 'Real-user metrics', href: '/admin/metrics' },
