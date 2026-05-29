@@ -33,16 +33,18 @@
 - **Action:** Pick a transport (SendGrid free tier ≤ 100/day or any
   SMTP relay), set the env var on Railway, redeploy. No code change.
 
-### Schedule the weekly Crisis Monitoring Report draft cron
+### Set the CRON_SECRET GitHub repo secret (closes Crisis Monitoring cron)
 - **last_touched:** 2026-05-28
-- **Why:** The endpoint exists at `POST /api/cron/crisis-monitoring-draft`
-  but no external scheduler invokes it on Railway. NEAR's design calls
-  for a weekly OB cadence — currently a human has to remember to
-  create + publish each Monday.
-- **Action:** Add a Railway Cron Job (or a GitHub Actions workflow on
-  a `0 6 * * 1` cron) that POSTs to that endpoint with a shared
-  `CRON_SECRET` bearer token. Then `_seed_rich` no longer has to be
-  the substitute.
+- **Why:** Phase 44B added `.github/workflows/cron-crisis-monitoring.yml`
+  on a `0 6 * * 1` schedule (Mondays 06:00 UTC). The workflow needs
+  the `CRON_SECRET` repo secret to match the Railway env var. Until
+  that secret is set, the workflow runs but fails authentication with
+  a 403 from the cron endpoint.
+- **Action:** GitHub → Settings → Secrets and variables → Actions →
+  New repository secret → `CRON_SECRET` = value matching the
+  Railway env var. (Optional `PROD_BASE` if the URL changes.) After
+  setting, trigger the workflow manually (Actions tab → "Weekly
+  Crisis Monitoring Report draft cron" → Run workflow) to verify.
 
 ### Send shortlisted NGOs an invitation email on release-applications
 - **last_touched:** 2026-05-28
@@ -56,6 +58,29 @@
   invitation pointing at the grant URL. Mark each grant's
   `published_at` so the timestamp doesn't drift if release is re-run.
 
+### Wire OB-only gates on the OB action endpoints
+- **last_touched:** 2026-05-28
+- **Why:** Phase 44 added the `is_oversight_body` flag, the
+  `@ob_required` decorator, and the seat-management UI. What's not
+  yet done: applying `@ob_required` to the specific endpoints the
+  Concept Note says only the OB does. Today they still use
+  `@role_required('admin')` so platform admins can sign / approve /
+  run trust process even when no OB seat exists. The helper short-
+  circuits for `role == 'admin'` so behaviour is unchanged during
+  rollout — but once every actual OB member is flagged via the new
+  panel, the legacy admin shortcut should retire and the gates
+  should switch to `@ob_required`.
+- **Action:** Once the secretariat has flagged the OB roster, swap
+  `@role_required('admin')` → `@ob_required` on:
+  - `POST /api/declarations/<id>/submit`
+  - `POST /api/declarations/<id>/signers`
+  - `POST /api/declarations/<id>/signatures/<sid>/{sign,recuse,reject}`
+  - `POST /api/declarations/<id>/release-applications`
+  - `POST /api/network/membership/<id>/{approve,reject,run-trust-process}`
+  Drop the admin shortcut from `is_oversight_body_member()` once all
+  actual OB members are flagged.
+
+### ~~Per-network Oversight Body role (separate from platform admin)~~ — DONE Phase 44
 ### Per-network Oversight Body role (separate from platform admin)
 - **last_touched:** 2026-05-28
 - **Why:** Today the OB's actions (declaration signing, grant approval,
@@ -213,6 +238,27 @@
 ---
 
 ## Completed (rolling log, newest first)
+
+- **2026-05-28** Phase 44 — Per-network OB role + weekly Crisis
+  Monitoring cron (commit `c7e6f56`).
+  **A. OB role**: schema adds `is_oversight_body` + `ob_role_started_at`
+  + `ob_role_ended_at` to `network_memberships`. Helper
+  `is_oversight_body_member()` walks user → org → membership;
+  `@ob_required` decorator returns 403 on non-OB callers. Endpoints
+  to grant/revoke seats with audit anchors
+  (`network.ob.seat_{granted,revoked}`). New `/ob-roster` lists
+  active seats. `<OversightBodyPanel>` on
+  `/admin/network-memberships/[id]` with header chip. Platform
+  admin keeps the legacy shortcut so existing flows stay unbroken
+  during rollout; once every actual OB member is flagged the
+  shortcut retires and the existing `@role_required('admin')`
+  gates can be swapped to `@ob_required` on declaration sign /
+  membership approve / run-trust-process.
+  **B. Weekly Crisis Monitoring cron**: GitHub Actions workflow at
+  `.github/workflows/cron-crisis-monitoring.yml` on `0 6 * * 1`
+  (Mondays 06:00 UTC). Reuses the cron-uat-fixtures pattern. Needs
+  the `CRON_SECRET` repo secret set to match the Railway env var —
+  documented as an operational TODO in the high-priority backlog.
 
 - **2026-05-28** Phase 43 — Closed-network operations (3 features
   from the design conversation):
