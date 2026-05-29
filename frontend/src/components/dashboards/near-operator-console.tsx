@@ -21,6 +21,7 @@ import {
   useDeclarations,
   useLatestCrisisReport,
 } from '@/lib/hooks/use-api';
+import { FundTree } from '@/components/dashboards/fund-tree';
 import {
   Users, Coins, Siren, AlertOctagon, ShieldCheck, Clock,
   ChevronRight, BarChart3, Flag, Sparkles,
@@ -59,55 +60,51 @@ export function NearOperatorConsole() {
   // Total windows across all funds
   const totalWindows = funds.reduce((acc, f) => acc + (f.window_count || 0), 0);
 
+  // Pending review counts for the cross-cutting strip
+  const pendingMembers = (counts.pending || 0) + (counts.under_review || 0);
+
   return (
     <div className="space-y-5">
-      {/* Headline metric row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <MetricCard
+      {/* Cross-cutting attention strip — items that need OB action, not
+          tied to a single fund/window. Members + Crisis Monitoring sit
+          across all funds; the tree below organises the rest. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <AttentionTile
           icon={<Users className="w-4 h-4" />}
-          label="Members"
-          value={counts.active || 0}
-          sub={
-            (counts.pending || 0) + (counts.under_review || 0) > 0
-              ? `${(counts.pending || 0) + (counts.under_review || 0)} awaiting review`
-              : 'no pending applications'
-          }
-          href="/admin/network-memberships"
+          label="Pending member review"
+          value={pendingMembers}
+          sub={pendingMembers > 0 ? 'awaiting OB decision' : 'no applications waiting'}
+          tone={pendingMembers > 0 ? 'warn' : 'muted'}
+          href="/admin/network-memberships/"
         />
-        <MetricCard
-          icon={<Coins className="w-4 h-4" />}
-          label="Funds / windows"
-          value={`${funds.length} / ${totalWindows}`}
-          sub={
-            funds.length > 0 ? `${funds[0].name}` : 'no funds yet'
-          }
-          href="/admin/funds"
-        />
-        <MetricCard
-          icon={<Siren className="w-4 h-4" />}
-          label="Declarations"
-          value={declCounts.signed_active || 0}
-          sub={
-            (declCounts.in_review || 0) > 0
-              ? `${declCounts.in_review} in signature flow`
-              : (declCounts.draft || 0) > 0
-              ? `${declCounts.draft} draft`
-              : 'no active declarations'
-          }
-          href="/admin/declarations"
-        />
-        <MetricCard
+        <AttentionTile
           icon={<AlertOctagon className="w-4 h-4" />}
-          label="Crisis Monitoring"
+          label="Crisis monitoring (latest)"
           value={crisis?.flagged_row_count ?? 0}
           sub={
             crisis
               ? `flagged · week of ${new Date(crisis.period_start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
               : 'no published report'
           }
-          href="/admin/crisis-monitoring"
+          tone={(crisis?.flagged_row_count ?? 0) > 0 ? 'warn' : 'muted'}
+          href="/admin/crisis-monitoring/"
         />
       </div>
+
+      {/* Fund → Window tree — the actual organising structure of the
+          network. Scales from 1 fund to N without restructure. */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="kuja-eyebrow text-[10px]">Funds, windows, grants</h2>
+          <Link
+            href="/admin/funds/"
+            className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+          >
+            Manage <ChevronRight className="w-3 h-3" />
+          </Link>
+        </div>
+        <FundTree />
+      </section>
 
       {/* Pending members + recent declarations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -256,6 +253,38 @@ function MetricCard({
         {icon} {label}
       </div>
       <div className="text-2xl font-bold">{value}</div>
+      <div className="text-[10px] text-muted-foreground truncate">{sub}</div>
+    </Link>
+  );
+}
+
+function AttentionTile({
+  icon, label, value, sub, tone, href,
+}: {
+  icon: React.ReactNode; label: string; value: number; sub: string;
+  tone: 'warn' | 'good' | 'muted'; href: string;
+}) {
+  const accent =
+    tone === 'warn'
+      ? 'border-[hsl(var(--kuja-sun))]/40 bg-[hsl(var(--kuja-sun))]/5'
+      : tone === 'good'
+      ? 'border-[hsl(var(--kuja-grow))]/40 bg-[hsl(var(--kuja-grow))]/5'
+      : 'border-border bg-card';
+  const valueCls =
+    tone === 'warn'
+      ? 'text-[hsl(var(--kuja-sun))]'
+      : tone === 'good'
+      ? 'text-[hsl(var(--kuja-grow))]'
+      : 'text-foreground';
+  return (
+    <Link
+      href={href}
+      className={`block border rounded-lg p-3 hover:bg-muted/30 transition-colors ${accent}`}
+    >
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1">
+        {icon} {label}
+      </div>
+      <div className={`text-2xl font-bold mt-0.5 ${valueCls}`}>{value}</div>
       <div className="text-[10px] text-muted-foreground truncate">{sub}</div>
     </Link>
   );
