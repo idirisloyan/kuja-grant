@@ -192,6 +192,23 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-05-28** Phase 42 — Team UX feedback closeout:
+  (1) Dashboard tile drill-in hangs fixed — `useRouteId` helper
+  rescues the dynamic id segment from the static-export fallback for
+  /admin/{declarations,crisis-monitoring,network-memberships}/[id] +
+  /admin/windows/[id]/report (commit `dbe96c6`).
+  (2) NEAR operator dashboard reorganised as Fund → Window tree. Flat
+  4-tile layout replaced with: a cross-cutting attention strip
+  (pending members + crisis monitoring), then a collapsible FundTree
+  showing each Fund and its Windows with live stats (declarations
+  active/draft, grants total, NGOs reached, countries, 72h hit rate
+  per window). Scales to N funds without restructure (commit `ebf875c`).
+  (3) Registration checks consolidated into Trust Profile. New
+  `<RegistrationPanel>` at the top of /trust shows identity basics +
+  latest verification + AI confidence + finding count + drill-in to
+  the full registry workflow. Sidebar 'Registration checks' link
+  removed (donor + admin); banner added to /verification pointing
+  users to /trust as the canonical view (commit `1119416`).
 - **2026-05-28** Phase 41 — Reliability + regression closeout flagged
   in the May-28 retest. Three fixes:
   (1) `/submit` latency cut from ~22s to ~140ms by switching the hard
