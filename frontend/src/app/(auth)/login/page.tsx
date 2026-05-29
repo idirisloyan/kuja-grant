@@ -52,29 +52,51 @@ export default function LoginPage() {
     );
   }, []);
 
-  const demoAccounts = [
-    {
-      label: t('auth.role_ngo'),
-      email: 'fatima@amani.org',
-      icon: Building2,
-      accent: 'hsl(var(--kuja-grow))',
-      description: 'Amani Foundation',
-    },
-    {
-      label: t('auth.role_donor'),
-      email: 'sarah@globalhealth.org',
-      icon: Wallet,
-      accent: 'hsl(var(--kuja-clay-dark))',
-      description: 'Global Health Fund',
-    },
-    {
-      label: t('auth.role_reviewer'),
-      email: 'james@reviewer.org',
-      icon: Star,
-      accent: 'hsl(var(--kuja-sun))',
-      description: 'Independent Reviewer',
-    },
-  ];
+  // NEAR is a closed network: a single Oversight Body runs the fund,
+  // members are NGOs. There is no separate donor role (NEAR is the
+  // donor) and no independent reviewer role (the OB does review).
+  // Showing the Kuja demo trio (NGO / Donor / Reviewer) for the NEAR
+  // tenant is misleading — only two personas exist in NEAR's model.
+  const demoAccounts = isNetworkTenant
+    ? [
+        {
+          label: `${tenantName} operator`,
+          email: 'admin@kuja.org',
+          icon: Star,
+          accent: tenantBrandDark,
+          description: 'Oversight Body — sees all funds, declarations, members',
+        },
+        {
+          label: `${tenantName} member (NGO)`,
+          email: 'fatima@amani.org',
+          icon: Building2,
+          accent: 'hsl(var(--kuja-grow))',
+          description: 'Amani Foundation — own assessments, grants, reports',
+        },
+      ]
+    : [
+        {
+          label: t('auth.role_ngo'),
+          email: 'fatima@amani.org',
+          icon: Building2,
+          accent: 'hsl(var(--kuja-grow))',
+          description: 'Amani Foundation',
+        },
+        {
+          label: t('auth.role_donor'),
+          email: 'sarah@globalhealth.org',
+          icon: Wallet,
+          accent: 'hsl(var(--kuja-clay-dark))',
+          description: 'Global Health Fund',
+        },
+        {
+          label: t('auth.role_reviewer'),
+          email: 'james@reviewer.org',
+          icon: Star,
+          accent: 'hsl(var(--kuja-sun))',
+          description: 'Independent Reviewer',
+        },
+      ];
 
   const attemptLogin = async (submittedEmail: string, submittedPassword: string) => {
     setIsLoading(true);
@@ -273,8 +295,16 @@ export default function LoginPage() {
 
             {/* Demo login cards */}
             <div className="mt-6 pt-6 border-t border-border">
-              <p className="kuja-eyebrow text-[10px] mb-3">Try a demo account</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <p className="kuja-eyebrow text-[10px] mb-3">
+                {isNetworkTenant ? `Sign in as a ${tenantName} role` : 'Try a demo account'}
+              </p>
+              <div
+                className={
+                  isNetworkTenant
+                    ? 'grid grid-cols-1 sm:grid-cols-2 gap-2'
+                    : 'grid grid-cols-1 sm:grid-cols-3 gap-2'
+                }
+              >
                 {demoAccounts.map((a) => {
                   const Icon = a.icon;
                   return (
