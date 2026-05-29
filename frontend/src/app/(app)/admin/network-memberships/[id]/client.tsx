@@ -16,10 +16,11 @@
  */
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { useMembership } from '@/lib/hooks/use-api';
+import { useRouteId } from '@/lib/hooks/use-route-id';
 import { useAuthStore } from '@/stores/auth-store';
 import {
   ChevronLeft, ShieldCheck, ShieldAlert, AlertCircle, Loader2,
@@ -36,11 +37,10 @@ const STATUS_COLOUR: Record<string, string> = {
 };
 
 export default function MembershipReviewClient() {
-  const params = useParams();
-  const id = Number(params?.id ?? '0');
+  const id = useRouteId('network-memberships');
   const router = useRouter();
   const viewer = useAuthStore((s) => s.user);
-  const { data, isLoading, mutate } = useMembership(id || null);
+  const { data, isLoading, mutate } = useMembership(id);
 
   if (viewer && viewer.role !== 'admin') {
     return (

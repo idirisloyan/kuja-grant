@@ -12,10 +12,11 @@
  */
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { useCrisisReport, type CrisisRow } from '@/lib/hooks/use-api';
+import { useRouteId } from '@/lib/hooks/use-route-id';
 import { useAuthStore } from '@/stores/auth-store';
 import {
   ChevronLeft, Flag, Sparkles, Loader2, ShieldCheck, AlertOctagon,
@@ -33,11 +34,10 @@ const STATUS_COLOUR: Record<string, string> = {
 };
 
 export default function CrisisMonitoringDetailClient() {
-  const params = useParams();
-  const reportId = Number(params?.id ?? '0');
+  const reportId = useRouteId('crisis-monitoring');
   const router = useRouter();
   const viewer = useAuthStore((s) => s.user);
-  const { data, isLoading, mutate } = useCrisisReport(reportId || null);
+  const { data, isLoading, mutate } = useCrisisReport(reportId);
 
   if (viewer && viewer.role !== 'admin') {
     return (
@@ -46,7 +46,7 @@ export default function CrisisMonitoringDetailClient() {
       </div>
     );
   }
-  if (isLoading || !data) {
+  if (reportId == null || isLoading || !data) {
     return (
       <div className="space-y-3">
         <div className="kuja-shimmer h-10 w-72 rounded" />

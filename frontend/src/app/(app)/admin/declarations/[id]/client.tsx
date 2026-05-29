@@ -17,10 +17,11 @@
  */
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { useDeclaration, type EmergencyDeclaration } from '@/lib/hooks/use-api';
+import { useRouteId } from '@/lib/hooks/use-route-id';
 import { useAuthStore } from '@/stores/auth-store';
 import {
   CheckCircle2, XCircle, AlertCircle, Loader2, ChevronLeft,
@@ -36,9 +37,7 @@ const STATUS_COLOUR: Record<EmergencyDeclaration['status'], string> = {
 };
 
 export default function DeclarationDetailClient() {
-  const params = useParams();
-  const idParam = String(params?.id ?? '0');
-  const id = Number(idParam);
+  const id = useRouteId('declarations');
   const router = useRouter();
   const viewer = useAuthStore((s) => s.user);
   const { data, isLoading, mutate } = useDeclaration(id);
@@ -52,7 +51,7 @@ export default function DeclarationDetailClient() {
     );
   }
 
-  if (isLoading || !d) {
+  if (id == null || isLoading || !d) {
     return (
       <div className="space-y-3">
         <div className="kuja-shimmer h-10 w-72 rounded" />

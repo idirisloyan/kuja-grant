@@ -11,10 +11,11 @@
  */
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { useWindowReport, type WindowReportDeclaration } from '@/lib/hooks/use-api';
+import { useRouteId } from '@/lib/hooks/use-route-id';
 import { useAuthStore } from '@/stores/auth-store';
 import {
   ChevronLeft, FileSpreadsheet, Archive, Clock, ShieldCheck,
@@ -27,11 +28,10 @@ const SLA_BAD = 'bg-destructive/15 text-destructive';
 const SLA_NEUTRAL = 'bg-muted text-muted-foreground';
 
 export default function WindowReportClient() {
-  const params = useParams();
-  const windowId = Number(params?.id ?? '0');
+  const windowId = useRouteId('windows');
   const router = useRouter();
   const viewer = useAuthStore((s) => s.user);
-  const { data, isLoading } = useWindowReport(windowId || null);
+  const { data, isLoading } = useWindowReport(windowId);
 
   if (viewer && viewer.role !== 'admin') {
     return (
@@ -40,7 +40,7 @@ export default function WindowReportClient() {
       </div>
     );
   }
-  if (isLoading || !data) {
+  if (windowId == null || isLoading || !data) {
     return (
       <div className="space-y-3">
         <div className="kuja-shimmer h-10 w-72 rounded" />
