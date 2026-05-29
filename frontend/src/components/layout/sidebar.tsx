@@ -25,7 +25,7 @@ import {
   LayoutDashboard, ClipboardCheck, Search, FileText, BarChart3, Building2,
   PlusCircle, Briefcase, Star, Shield, CheckCircle2, ClipboardList,
   ChevronLeft, ChevronRight, X, Activity, Brain, ShieldCheck, Calendar,
-  MessageSquare,
+  MessageSquare, MessageCircle, Inbox,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
@@ -63,11 +63,14 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
           // NEAR-tenant NGOs see a simplified set. No browse_grants
           // (closed network — grants come from declarations), no trust
           // profile (NEAR operator runs that during onboarding), no
-          // marketplace cues. Just their work.
+          // marketplace cues. Just their work + the new (Phase 43)
+          // messaging + feedback channels.
           { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
           { icon: ClipboardCheck, label: t('nav.assessment_hub'), href: '/assessments' },
           { icon: FileText, label: t('nav.my_applications'), href: '/applications' },
           { icon: BarChart3, label: 'Compliance & reporting', href: '/reports' },
+          { icon: MessageSquare, label: 'Messages', href: '/messages' },
+          { icon: MessageCircle, label: 'Feedback', href: '/feedback' },
           { icon: Building2, label: t('nav.org_profile'), href: '/organizations/profile' },
         ]
       : [
@@ -113,6 +116,12 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
       // /verification page is still reachable from the Identity & registration
       // panel inside /trust).
       { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
+      // Phase 43 — closed-network operational surfaces. NEAR secretariat
+      // composes broadcasts here + sees member feedback inbox.
+      ...(isNetworkTenant ? [
+        { icon: MessageSquare, label: 'Messages', href: '/messages' },
+        { icon: Inbox, label: 'Member feedback', href: '/feedback' },
+      ] : []),
       { icon: Shield, label: t('nav.compliance'), href: '/compliance' },
       { icon: Activity, label: t('nav.observability'), href: '/observability' },
       { icon: BarChart3, label: t('nav.metrics') || 'Real-user metrics', href: '/admin/metrics' },

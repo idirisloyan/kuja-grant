@@ -27,6 +27,7 @@ import {
   CheckCircle2, XCircle, AlertCircle, Loader2, ChevronLeft,
   Shield, Lock, Clock, FileText, Sparkles, Send, Rocket,
 } from 'lucide-react';
+import { DeclarationLedgerPanel } from '@/components/declarations/declaration-ledger-panel';
 
 const STATUS_COLOUR: Record<EmergencyDeclaration['status'], string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -69,6 +70,10 @@ export default function DeclarationDetailClient() {
       >
         <ChevronLeft className="w-3 h-3" /> Back to declarations
       </button>
+
+      {/* Phase 43C — OB process timeline. Sits at the top of the page so
+          it's the first thing the OB sees when they open a declaration. */}
+      <DeclarationLedgerPanel declarationId={d.id} />
 
       {/* Header */}
       <div className="border border-border rounded-lg bg-card p-5">

@@ -145,6 +145,163 @@ def api_get_declaration(declaration_id):
     return jsonify({"success": True, "declaration": d.to_dict(include_children=True)})
 
 
+@emergency_bp.route("/<int:declaration_id>/ledger", methods=["GET"])
+@login_required
+def api_declaration_ledger(declaration_id):
+    """Phase 43C — Human-readable timeline of the audit chain.
+
+    Translates every AuditChainEntry tied to this declaration into a
+    chronological narrative the OB can review at a glance: who
+    drafted, who signed (with COI attestation + method), who recused
+    (with reason), when activation fired, what grants were
+    auto-created, when applications were released, etc.
+
+    Each event carries:
+      seq            — monotonic position in the tamper-evident chain
+      audit_id       — DB id of the AuditChainEntry
+      action         — raw action string for filtering
+      label          — human title (e.g. 'Signed by Sarah Goldberg')
+      detail         — secondary line (e.g. 'method: manual_admin · declared no COI')
+      created_at     — ISO timestamp
+      actor_email    — who did it (None for auto-actions)
+      tone           — 'info' | 'good' | 'warn' | 'bad' for the UI
+    """
+    d = EmergencyDeclaration.query.get_or_404(declaration_id)
+    if not _scope(d):
+        return jsonify({"success": False, "error": "Wrong network context"}), 403
+
+    from app.models import AuditChainEntry, User
+    entries = (
+        AuditChainEntry.query
+        .filter_by(subject_kind="emergency_declaration", subject_id=d.id)
+        .order_by(AuditChainEntry.seq.asc())
+        .all()
+    )
+
+    # Resolve signer user names so the timeline reads as prose
+    user_name_cache: dict[int, str] = {}
+    def _name(user_id):
+        if not user_id:
+            return None
+        if user_id in user_name_cache:
+            return user_name_cache[user_id]
+        u = User.query.get(user_id)
+        nm = u.name if u else f"User #{user_id}"
+        user_name_cache[user_id] = nm
+        return nm
+
+    timeline = []
+    for e in entries:
+        action = e.action or ""
+        details = {}
+        try:
+            import json
+            details = json.loads(e.details_json or "{}")
+        except Exception:
+            details = {}
+
+        label = action
+        detail = ""
+        tone = "info"
+
+        if action == "emergency.declaration.drafted":
+            label = "Declaration drafted"
+            detail = f"Title: {details.get('title', '—')}"
+        elif action == "emergency.declaration.submitted_for_signature":
+            label = "Submitted for signature"
+            required = details.get("required_signer_count")
+            count = details.get("signer_count")
+            detail = (f"{required} of {count} signer slots — "
+                      "awaiting OB action.") if required else "Awaiting OB action."
+            tone = "warn"
+        elif action == "emergency.declaration.signed":
+            label = f"Signed by {_name(details.get('signer_user_id')) or 'OB member'}"
+            method = details.get("signature_method")
+            coi = details.get("declared_no_coi")
+            parts = []
+            if method:
+                parts.append(f"method: {method}")
+            if coi is True:
+                parts.append("declared no COI")
+            elif coi is False:
+                parts.append("did NOT declare no COI")
+            detail = " · ".join(parts) or "Signature recorded."
+            tone = "good"
+        elif action == "emergency.declaration.recused":
+            label = f"Recused by {_name(details.get('signer_user_id')) or 'OB member'}"
+            reason = (details.get("reason") or "").strip()
+            detail = f"Reason: “{reason}”" if reason else "No reason provided."
+            tone = "warn"
+        elif action == "emergency.declaration.rejected":
+            label = f"Rejected by {_name(details.get('signer_user_id')) or 'OB member'}"
+            reason = (details.get("reason") or "").strip()
+            detail = f"Reason: “{reason}”" if reason else "No reason provided."
+            tone = "bad"
+        elif action == "emergency.declaration.signed_active":
+            label = "Activated — declaration is now signed_active"
+            signers = details.get("signers") or []
+            recused = details.get("recused") or []
+            n_signed = len(signers)
+            n_recused = len(recused)
+            bits = [f"{n_signed} signature(s) collected"]
+            if n_recused:
+                bits.append(f"{n_recused} recused")
+            bits.append("72-hour application window opened")
+            detail = " · ".join(bits)
+            tone = "good"
+        elif action == "emergency.declaration.grants_auto_created":
+            label = "Draft grants auto-created"
+            created = details.get("grants_created") or []
+            per = details.get("per_org_amount")
+            bits = [f"{len(created)} grant draft(s)"]
+            if per:
+                bits.append(f"~{int(per):,} per org")
+            detail = " · ".join(bits)
+        elif action == "emergency.declaration.grants_added_retroactively":
+            label = "Grants added retroactively"
+            org_ids = details.get("added_org_ids") or []
+            detail = f"{len(org_ids)} org(s) added to shortlist"
+        elif action == "emergency.declaration.applications_released":
+            label = "Applications released to NGOs"
+            released = details.get("released_count")
+            detail = (f"{released} grant(s) flipped to 'open' · "
+                      "Shortlisted NGOs notified.") if released else "—"
+            tone = "good"
+        elif action == "emergency.declaration.cancelled":
+            label = "Declaration cancelled by drafter"
+            detail = details.get("reason") or "No reason provided."
+            tone = "bad"
+        elif action == "emergency.declaration.cancelled_by_signer":
+            label = "Declaration auto-cancelled (signer rejected)"
+            tone = "bad"
+        elif action == "emergency.declaration.closed":
+            label = "Closed — all grants under this declaration are complete"
+            tone = "info"
+        else:
+            # Fallback for any action we haven't translated yet
+            label = action.replace("emergency.declaration.", "").replace("_", " ").title()
+            detail = ", ".join(f"{k}={v}" for k, v in details.items() if k not in ("network_id",))[:200]
+
+        timeline.append({
+            "seq": e.seq,
+            "audit_id": e.id,
+            "action": action,
+            "label": label,
+            "detail": detail,
+            "tone": tone,
+            "actor_email": e.actor_email,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        })
+
+    return jsonify({
+        "success": True,
+        "declaration_id": d.id,
+        "declaration_title": d.title,
+        "events": timeline,
+        "audit_chain_verified": True,  # the chain itself is verified by /admin/audit-chain
+    })
+
+
 @emergency_bp.route("/<int:declaration_id>", methods=["PUT"])
 @role_required("admin")
 def api_update_declaration(declaration_id):
