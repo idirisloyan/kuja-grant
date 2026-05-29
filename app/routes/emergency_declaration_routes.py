@@ -41,7 +41,7 @@ from app.models import (
     CrisisMonitoringReport, CrisisMonitoringRow,
     SIGNATURE_METHODS, DOCUMENT_KINDS,
 )
-from app.utils.network import get_current_network_id
+from app.utils.network import get_current_network_id, ob_required, is_oversight_body_member
 from app.utils.helpers import get_request_json
 from app.utils.decorators import role_required
 from app.services.reauth_service import verify_reauth
@@ -78,7 +78,7 @@ def api_list_declarations():
 
 
 @emergency_bp.route("", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_create_declaration():
     network_id = get_current_network_id()
     if not network_id:
@@ -303,7 +303,7 @@ def api_declaration_ledger(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>", methods=["PUT"])
-@role_required("admin")
+@ob_required
 def api_update_declaration(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -326,7 +326,7 @@ def api_update_declaration(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/submit", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_submit_declaration(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -360,7 +360,7 @@ def api_submit_declaration(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/cancel", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_cancel_declaration(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -379,7 +379,7 @@ def api_cancel_declaration(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/create-shortlist-grants", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_create_shortlist_grants(declaration_id):
     """Retroactively create grant drafts for a signed-active declaration.
 
@@ -429,7 +429,7 @@ def api_create_shortlist_grants(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/close", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_close_declaration(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -448,7 +448,7 @@ def api_close_declaration(declaration_id):
 # =============================================================================
 
 @emergency_bp.route("/<int:declaration_id>/release-applications", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_release_applications(declaration_id):
     """One-click governed handoff. After the declaration activates,
     auto-created grant drafts sit in 'draft' status until the
@@ -532,7 +532,7 @@ def api_release_applications(declaration_id):
 # =============================================================================
 
 @emergency_bp.route("/<int:declaration_id>/signers", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_add_signer(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -546,6 +546,24 @@ def api_add_signer(declaration_id):
     u = User.query.get(user_id)
     if not u:
         return jsonify({"success": False, "error": "User not found"}), 404
+    # Phase 44C — Only OB members can be assigned as signers. Platform
+    # admins still pass via the legacy is_oversight_body_member shortcut.
+    # `allow_admin_override` flag in the body lets a platform admin add a
+    # non-OB signer for the manual_admin paper-ceremony fallback that
+    # NEAR uses while the OB seats are being populated.
+    allow_admin_override = bool(body.get("allow_admin_override"))
+    if not is_oversight_body_member(u, network_id=d.network_id):
+        if not (allow_admin_override and getattr(current_user, "role", None) == "admin"):
+            return jsonify({
+                "success": False,
+                "error": (
+                    f"User {u.email} is not an OB member of this network. "
+                    "Grant them an OB seat from /admin/network-memberships/<id>, "
+                    "or pass allow_admin_override=true (admin only) for the "
+                    "paper-ceremony fallback."
+                ),
+                "code": "err.signer_not_ob",
+            }), 400
     if DeclarationSignature.query.filter_by(
         declaration_id=declaration_id, signer_user_id=user_id,
     ).first():
@@ -562,7 +580,7 @@ def api_add_signer(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/signers/<int:sig_id>", methods=["DELETE"])
-@role_required("admin")
+@ob_required
 def api_remove_signer(declaration_id, sig_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):

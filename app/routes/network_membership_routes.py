@@ -37,7 +37,7 @@ from app.models import (
     User,
 )
 from app.services.email_service import EmailService
-from app.utils.network import get_current_network, get_current_network_id
+from app.utils.network import get_current_network, get_current_network_id, ob_required
 from app.utils.helpers import get_request_json
 from app.utils.decorators import role_required
 
@@ -368,7 +368,7 @@ def _is_ob_or_admin() -> bool:
 
 
 @network_membership_bp.route("/pending", methods=["GET"])
-@role_required("admin")  # tightened in Phase 38 to OB members per network
+@ob_required  # Phase 44C — was admin; OB members of this network see the queue
 def api_list_pending_memberships():
     """List memberships awaiting OB decision in the current network.
 
@@ -423,7 +423,7 @@ def api_get_membership(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/approve", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_approve_membership(membership_id):
     m = NetworkMembership.query.get_or_404(membership_id)
     # Scope-check: admin must be acting within the network that owns this row.
@@ -442,7 +442,7 @@ def api_approve_membership(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/reject", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_reject_membership(membership_id):
     m = NetworkMembership.query.get_or_404(membership_id)
     body = get_request_json() or {}
@@ -471,7 +471,7 @@ def api_reject_membership(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/suspend", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_suspend_membership(membership_id):
     m = NetworkMembership.query.get_or_404(membership_id)
     body = get_request_json() or {}
@@ -493,7 +493,7 @@ def api_suspend_membership(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/run-trust-process", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_run_trust_process(membership_id):
     """Phase 15 (NEAR redesign) — NEAR operator runs the trust process on
     behalf of the network. Triggers the existing trust-profile build
@@ -616,7 +616,7 @@ def api_run_trust_process(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/expel", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_expel_membership(membership_id):
     m = NetworkMembership.query.get_or_404(membership_id)
     body = get_request_json() or {}
