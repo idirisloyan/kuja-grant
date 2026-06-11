@@ -232,6 +232,45 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 46 — Design principles doc + nav split by flavor
+  × role. Team feedback was that Kuja and NEAR should *not* share IA
+  even though they share the codebase, and that the current sidebar
+  exposes too much of the system's taxonomy instead of the user's
+  workflow. Two deliverables:
+  **(a) `docs/DESIGN_PRINCIPLES.md`** — captures the brief as the
+  single referenceable source of truth (8 principles, full IA table
+  for both flavors × all roles, shared page anatomy
+  Header/Attention strip/Main/Detail, page-by-page direction for
+  dashboards, membership review, declarations, funds & windows,
+  crisis monitoring, applications, reports, messages, removal/reduce
+  list, and the 7-step priority order from the brief). Every later
+  phase checks against this doc.
+  **(b) Sidebar refactor** — `pickNavProfile(role, isNearFlavor)`
+  returns a `{ primary, secondary }` profile per flavor × role. Each
+  group renders as its own `<NavGroup>` with a subtle divider between
+  them; secondary group uses a lighter tone. Browser-verified end-to-
+  end against the running app:
+    • Kuja donor: Dashboard · Grants · Review apps · Reports · Orgs ·
+      Insights | Messages · Settings  ✓
+    • Kuja NGO: Dashboard · Opportunities · My Applications · Reports ·
+      Organization Profile | Messages · Help & Chat · Settings  ✓
+    • NEAR operator: Dashboard · Members · Declarations · Funds &
+      Windows · Crisis Monitoring · Reports · Governance | Messages ·
+      Feedback · Audit · Settings  ✓
+    • NEAR member: Dashboard · Membership · My Applications · Reports
+      | Messages · Feedback · Settings  ✓
+  NEAR member nav matches the brief's hardest constraint — "they
+  should not feel like they're inside a giant system: my status / my
+  applications / my reports / my messages". A few hrefs point at the
+  best current home until later phases ship dedicated routes:
+  Insights → /dashboard?view=insights (Phase 48 will produce the real
+  insights surface), Membership → /trust, Governance → /admin/audit-
+  chain. Audit + Governance currently collide on the same route; they
+  diverge once Phase 49 ships /governance with policy controls.
+  Phases 47-50 queued in the backlog with explicit scope (PageShell
+  primitive, dashboard rebuild, funds/windows + crisis-monitoring
+  redesign, status-copy sweep). Frontend build green.
+
 - **2026-06-11** Phase 45 — Declaration UX overhaul. The team's
   feedback was that declarations "don't feel completed" — no clear
   way to start one, no visible stage indicator, signer slots showed

@@ -1,13 +1,35 @@
 'use client';
 
 /**
- * Kuja sidebar — full shadcn + Tailwind rewrite of the MUI original.
+ * Kuja sidebar — Phase 46 IA split.
+ *
+ * The brief is that the two product flavors should NOT share IA, even
+ * though they share the codebase. Kuja = open marketplace; NEAR = closed
+ * network fund operating system. Each flavor has its own role-keyed nav,
+ * and every role has a *Primary* section (the daily workflow) and a
+ * *Secondary* section (utility / supporting surfaces) rendered below a
+ * divider.
+ *
+ * Mapping (see docs/DESIGN_PRINCIPLES.md for the source brief):
+ *
+ *   Kuja  · Donor    → Dashboard · Grants · Applications · Reports · Orgs · Insights
+ *                       Messages · Settings
+ *   Kuja  · NGO      → Dashboard · Opportunities · Applications · Reports · Org Profile
+ *                       Messages · Chat · Settings
+ *   NEAR  · Operator → Dashboard · Members · Declarations · Funds & Windows
+ *                       · Crisis Monitoring · Reports · Governance
+ *                       Messages · Feedback · Audit · Settings
+ *   NEAR  · Member   → Dashboard · Membership · Applications · Reports
+ *                       Messages · Feedback · Settings
+ *
+ * Reviewer role keeps its existing nav (the brief is Kuja+NEAR focused;
+ * reviewer-specific IA is queued for a later phase).
  *
  * Design language:
  *   - Warm dark palette (#1A1410 base, clay accents) — Kuja Studio's
  *     "Global South editorial" feel, not generic corporate-dark
  *   - Fraunces wordmark in the brand row
- *   - Sticky nav-group labels for scannability
+ *   - Primary group on top; subtle divider; Secondary group below
  *   - Collapses to 72px icon rail; collapse button at the base
  *   - Mobile: slides in as an overlay driven by useUIStore
  */
@@ -23,9 +45,10 @@ import { cn } from '@/lib/utils';
 
 import {
   LayoutDashboard, ClipboardCheck, Search, FileText, BarChart3, Building2,
-  PlusCircle, Briefcase, Star, Shield, CheckCircle2, ClipboardList,
-  ChevronLeft, ChevronRight, X, Activity, Brain, ShieldCheck, Calendar,
-  MessageSquare, MessageCircle, Inbox,
+  Briefcase, Star, ShieldCheck, ClipboardList,
+  ChevronLeft, ChevronRight, X, MessageSquare, Inbox,
+  Users, Siren, Wallet, Activity, Award, Lightbulb, Settings as SettingsIcon,
+  HelpCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
@@ -34,6 +57,16 @@ interface NavItem {
   icon: LucideIcon;
   label: string;
   href: string;
+}
+
+/**
+ * A nav profile = the primary section (daily workflow) + a secondary
+ * section (utility) for a single (flavor, role) pair. Rendered as two
+ * groups separated by a divider in the sidebar.
+ */
+interface NavProfile {
+  primary: NavItem[];
+  secondary: NavItem[];
 }
 
 interface SidebarProps {
@@ -49,7 +82,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   } = useUIStore();
   const user = useAuthStore((s) => s.user);
   const network = useNetworkStore((s) => s.network);
-  const isNetworkTenant = !!network?.slug && network.slug !== 'kuja';
+  const isNearFlavor = !!network?.slug && network.slug !== 'kuja';
   const role: UserRole = (user?.role as UserRole) ?? 'ngo';
 
   // Close mobile sidebar on route change
@@ -57,79 +90,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
     setMobileSidebarOpen(false);
   }, [pathname, setMobileSidebarOpen]);
 
-  const navItems: Record<UserRole, NavItem[]> = {
-    ngo: isNetworkTenant
-      ? [
-          // NEAR-tenant NGOs see a simplified set. No browse_grants
-          // (closed network — grants come from declarations), no trust
-          // profile (NEAR operator runs that during onboarding), no
-          // marketplace cues. Just their work + the new (Phase 43)
-          // messaging + feedback channels.
-          { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
-          { icon: ClipboardCheck, label: t('nav.assessment_hub'), href: '/assessments' },
-          { icon: FileText, label: t('nav.my_applications'), href: '/applications' },
-          { icon: BarChart3, label: 'Compliance & reporting', href: '/reports' },
-          { icon: MessageSquare, label: 'Messages', href: '/messages' },
-          { icon: MessageCircle, label: 'Feedback', href: '/feedback' },
-          { icon: Building2, label: t('nav.org_profile'), href: '/organizations/profile' },
-        ]
-      : [
-          { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
-          { icon: Calendar, label: t('nav.calendar') || 'Calendar', href: '/calendar' },
-          { icon: MessageSquare, label: t('nav.chat') || 'Chat with Kuja', href: '/chat' },
-          { icon: ClipboardCheck, label: t('nav.assessment_hub'), href: '/assessments' },
-          { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
-          { icon: Search, label: t('nav.browse_grants'), href: '/grants' },
-          { icon: FileText, label: t('nav.my_applications'), href: '/applications' },
-          { icon: BarChart3, label: 'Compliance & reporting', href: '/reports' },
-          { icon: Building2, label: t('nav.org_profile'), href: '/organizations/profile' },
-          { icon: Brain, label: t('nav.org_memory'), href: '/organizations/memory' },
-        ],
-    donor: [
-      { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
-      { icon: Calendar, label: t('nav.calendar') || 'Calendar', href: '/calendar' },
-      { icon: MessageSquare, label: t('nav.chat') || 'Chat with Kuja', href: '/chat' },
-      { icon: PlusCircle, label: t('nav.create_grant'), href: '/grants/new' },
-      { icon: Briefcase, label: t('nav.my_grants'), href: '/grants' },
-      { icon: Star, label: t('nav.review_applications'), href: '/reviews' },
-      { icon: BarChart3, label: 'Compliance & reporting', href: '/reports' },
-      // Trust Profile is the single canonical trust surface — sanctions,
-      // adverse media, registration, bank, COI, capacity all under /trust.
-      // The standalone /verification link was removed because it's now a
-      // section inside Trust Profile (with a "Full registry workflow"
-      // drill-in to the original page).
-      { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
-      { icon: Shield, label: t('nav.compliance'), href: '/compliance' },
-      { icon: Search, label: t('nav.org_search'), href: '/organizations/search' },
-    ],
-    reviewer: [
-      { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
-      { icon: ClipboardList, label: t('nav.my_assignments'), href: '/reviews' },
-      { icon: CheckCircle2, label: t('nav.completed_reviews'), href: '/reviews/completed' },
-    ],
-    admin: [
-      { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
-      { icon: Briefcase, label: t('nav.all_grants'), href: '/grants' },
-      { icon: FileText, label: t('nav.all_applications'), href: '/applications' },
-      { icon: Search, label: t('nav.org_search'), href: '/organizations/search' },
-      // Registration checks consolidated into Trust Profile (the standalone
-      // /verification page is still reachable from the Identity & registration
-      // panel inside /trust).
-      { icon: ShieldCheck, label: t('nav.trust_profile') || 'Trust Profile', href: '/trust' },
-      // Phase 43 — closed-network operational surfaces. NEAR secretariat
-      // composes broadcasts here + sees member feedback inbox.
-      ...(isNetworkTenant ? [
-        { icon: MessageSquare, label: 'Messages', href: '/messages' },
-        { icon: Inbox, label: 'Member feedback', href: '/feedback' },
-      ] : []),
-      { icon: Shield, label: t('nav.compliance'), href: '/compliance' },
-      { icon: Activity, label: t('nav.observability'), href: '/observability' },
-      { icon: BarChart3, label: t('nav.metrics') || 'Real-user metrics', href: '/admin/metrics' },
-      { icon: ShieldCheck, label: t('nav.audit_chain') || 'Audit chain', href: '/admin/audit-chain' },
-    ],
-  };
-
-  const items = navItems[role] ?? navItems.ngo;
+  const profile = pickNavProfile(role, isNearFlavor, t);
   const currentWidth = sidebarCollapsed ? collapsedWidth : width;
 
   const body = (
@@ -159,38 +120,36 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
               {network?.name || 'Kuja'}
             </div>
             <div className="text-[9px] uppercase tracking-[0.14em] text-orange-200/70">
-              {network?.slug && network.slug !== 'kuja' ? 'Network fund' : 'Grant intelligence'}
+              {isNearFlavor ? 'Network fund' : 'Grant intelligence'}
             </div>
           </div>
         )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3">
-        <ul className="space-y-0.5">
-          {items.map((item) => {
-            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-            const Icon = item.icon;
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  title={sidebarCollapsed ? item.label : undefined}
-                  className={cn(
-                    'group flex items-center rounded-md text-sm font-medium transition-colors',
-                    sidebarCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2',
-                    isActive
-                      ? 'bg-gradient-to-r from-[#C2410C] to-[#9A3412] text-white shadow-md shadow-orange-950/40'
-                      : 'text-[#E8D9CC] hover:bg-white/5 hover:text-white',
-                  )}
-                >
-                  <Icon className={cn('h-4 w-4 flex-shrink-0', !isActive && 'text-[#B5816C]')} />
-                  {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+      {/* Nav: primary + secondary in two groups */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-3">
+        <NavGroup
+          items={profile.primary}
+          pathname={pathname}
+          collapsed={sidebarCollapsed}
+        />
+        {profile.secondary.length > 0 && (
+          <>
+            <div
+              className={cn(
+                'mx-2 border-t border-white/5',
+                sidebarCollapsed && 'mx-3',
+              )}
+              aria-hidden
+            />
+            <NavGroup
+              items={profile.secondary}
+              pathname={pathname}
+              collapsed={sidebarCollapsed}
+              tone="secondary"
+            />
+          </>
+        )}
       </nav>
 
       {/* Collapse toggle */}
@@ -258,3 +217,220 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
     </>
   );
 }
+
+// ---------------------------------------------------------------------------
+// NavGroup — primary or secondary group renderer
+// ---------------------------------------------------------------------------
+
+function NavGroup({
+  items, pathname, collapsed, tone = 'primary',
+}: {
+  items: NavItem[];
+  pathname: string | null;
+  collapsed: boolean;
+  tone?: 'primary' | 'secondary';
+}) {
+  return (
+    <ul className="space-y-0.5">
+      {items.map((item) => {
+        const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+        const Icon = item.icon;
+        return (
+          <li key={item.href}>
+            <Link
+              href={item.href}
+              title={collapsed ? item.label : undefined}
+              className={cn(
+                'group flex items-center rounded-md text-sm font-medium transition-colors',
+                collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2',
+                isActive
+                  ? 'bg-gradient-to-r from-[#C2410C] to-[#9A3412] text-white shadow-md shadow-orange-950/40'
+                  : tone === 'secondary'
+                    ? 'text-[#B5816C] hover:bg-white/5 hover:text-[#E8D9CC]'
+                    : 'text-[#E8D9CC] hover:bg-white/5 hover:text-white',
+              )}
+            >
+              <Icon className={cn(
+                'h-4 w-4 flex-shrink-0',
+                !isActive && (tone === 'secondary' ? 'text-[#8C6450]' : 'text-[#B5816C]'),
+              )} />
+              {!collapsed && <span className="truncate">{item.label}</span>}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// pickNavProfile — flavor × role → NavProfile
+// ---------------------------------------------------------------------------
+
+type T = (k: string) => string;
+
+function pickNavProfile(role: UserRole, isNearFlavor: boolean, t: T): NavProfile {
+  if (isNearFlavor) {
+    return nearProfile(role, t);
+  }
+  return kujaProfile(role, t);
+}
+
+/* ----------------------------- Kuja flavor ----------------------------- */
+
+function kujaProfile(role: UserRole, t: T): NavProfile {
+  switch (role) {
+    case 'donor':
+      return {
+        primary: [
+          { icon: LayoutDashboard, label: t('nav.dashboard'),          href: '/dashboard' },
+          { icon: Briefcase,       label: t('nav.my_grants'),          href: '/grants' },
+          { icon: Star,            label: t('nav.review_applications'),href: '/reviews' },
+          { icon: FileText,        label: 'Reports',                   href: '/reports' },
+          { icon: Building2,       label: 'Organizations',             href: '/organizations/search' },
+          // Insights = portfolio-level intelligence. Routes to /dashboard
+          // until Phase 48 adds the dedicated "Insights" surface.
+          { icon: Lightbulb,       label: 'Insights',                  href: '/dashboard?view=insights' },
+        ],
+        secondary: [
+          { icon: MessageSquare,   label: 'Messages',                  href: '/messages' },
+          { icon: SettingsIcon,    label: 'Settings',                  href: '/settings/notifications' },
+        ],
+      };
+
+    case 'ngo':
+      return {
+        primary: [
+          { icon: LayoutDashboard, label: t('nav.dashboard'),          href: '/dashboard' },
+          // Opportunities (renamed from "Browse grants") = the marketplace
+          // catalog of grant openings the NGO can apply to.
+          { icon: Search,          label: 'Opportunities',             href: '/grants' },
+          { icon: FileText,        label: t('nav.my_applications'),    href: '/applications' },
+          { icon: BarChart3,       label: 'Reports',                   href: '/reports' },
+          { icon: Building2,       label: t('nav.org_profile'),        href: '/organizations/profile' },
+        ],
+        secondary: [
+          { icon: MessageSquare,   label: 'Messages',                  href: '/messages' },
+          { icon: HelpCircle,      label: 'Help & Chat',               href: '/chat' },
+          { icon: SettingsIcon,    label: 'Settings',                  href: '/settings/notifications' },
+        ],
+      };
+
+    case 'reviewer':
+      // Reviewer IA isn't addressed in the brief (which is Kuja+NEAR
+      // workflow focused). Preserve the existing minimal nav.
+      return {
+        primary: [
+          { icon: LayoutDashboard, label: t('nav.dashboard'),          href: '/dashboard' },
+          { icon: ClipboardList,   label: t('nav.my_assignments'),     href: '/reviews' },
+          { icon: ClipboardCheck,  label: t('nav.completed_reviews'),  href: '/reviews/completed' },
+        ],
+        secondary: [
+          { icon: SettingsIcon,    label: 'Settings',                  href: '/settings/notifications' },
+        ],
+      };
+
+    case 'admin':
+      // Kuja platform admin — keeps the operator-style nav. Brief doesn't
+      // remove admin surfaces from Kuja; it just keeps them out of donor
+      // and NGO primary.
+      return {
+        primary: [
+          { icon: LayoutDashboard, label: t('nav.dashboard'),          href: '/dashboard' },
+          { icon: Briefcase,       label: t('nav.all_grants'),         href: '/grants' },
+          { icon: FileText,        label: t('nav.all_applications'),   href: '/applications' },
+          { icon: Building2,       label: t('nav.org_search'),         href: '/organizations/search' },
+          { icon: ShieldCheck,     label: t('nav.trust_profile'),      href: '/trust' },
+        ],
+        secondary: [
+          { icon: MessageSquare,   label: 'Messages',                  href: '/messages' },
+          { icon: Activity,        label: t('nav.observability'),      href: '/observability' },
+          { icon: BarChart3,       label: t('nav.metrics'),            href: '/admin/metrics' },
+          { icon: ShieldCheck,     label: t('nav.audit_chain'),        href: '/admin/audit-chain' },
+          { icon: SettingsIcon,    label: 'Settings',                  href: '/settings/notifications' },
+        ],
+      };
+  }
+}
+
+/* ----------------------------- NEAR flavor ----------------------------- */
+
+function nearProfile(role: UserRole, t: T): NavProfile {
+  switch (role) {
+    case 'admin':
+      // NEAR operator / secretariat / OB. Fund operations console — every
+      // primary entry is something they actually do in a typical week.
+      return {
+        primary: [
+          { icon: LayoutDashboard, label: t('nav.dashboard'),    href: '/dashboard' },
+          { icon: Users,           label: 'Members',             href: '/admin/network-memberships' },
+          { icon: Siren,           label: 'Declarations',        href: '/admin/declarations' },
+          { icon: Wallet,          label: 'Funds & Windows',     href: '/admin/funds' },
+          { icon: Activity,        label: 'Crisis Monitoring',   href: '/admin/crisis-monitoring' },
+          { icon: FileText,        label: 'Reports',             href: '/reports' },
+          // Governance = committee + approvals + audit + policy controls.
+          // Audit chain is the visible governance surface today; Phase 49
+          // may add a dedicated policy-controls page.
+          { icon: ShieldCheck,     label: 'Governance',          href: '/admin/audit-chain' },
+        ],
+        secondary: [
+          { icon: MessageSquare,   label: 'Messages',            href: '/messages' },
+          { icon: Inbox,           label: 'Feedback',            href: '/feedback' },
+          // Audit = direct link to the same chain as Governance, kept here
+          // as a known utility shortcut. The two will diverge once Phase 49
+          // ships /governance with a wider scope.
+          { icon: ClipboardList,   label: 'Audit',               href: '/admin/audit-chain' },
+          { icon: SettingsIcon,    label: 'Settings',            href: '/settings/notifications' },
+        ],
+      };
+
+    case 'ngo':
+      // NEAR member NGO. The brief's most important rule for this role:
+      // they should not feel like they're inside a giant system. Just
+      // "my status / my applications / my reports / my messages".
+      return {
+        primary: [
+          { icon: LayoutDashboard, label: t('nav.dashboard'),       href: '/dashboard' },
+          // Membership = the member's own status surface. /trust hosts
+          // capacity + due diligence + registration state today and is
+          // the closest fit until Phase 47 ships a dedicated page.
+          { icon: Award,           label: 'Membership',             href: '/trust' },
+          { icon: FileText,        label: t('nav.my_applications'), href: '/applications' },
+          { icon: BarChart3,       label: 'Reports',                href: '/reports' },
+        ],
+        secondary: [
+          { icon: MessageSquare,   label: 'Messages',               href: '/messages' },
+          { icon: Inbox,           label: 'Feedback',               href: '/feedback' },
+          { icon: SettingsIcon,    label: 'Settings',               href: '/settings/notifications' },
+        ],
+      };
+
+    case 'donor':
+      // Network-tenant donor is unusual; show a minimal read-only nav
+      // until the role's IA is defined.
+      return {
+        primary: [
+          { icon: LayoutDashboard, label: t('nav.dashboard'),    href: '/dashboard' },
+          { icon: FileText,        label: 'Reports',             href: '/reports' },
+        ],
+        secondary: [
+          { icon: MessageSquare,   label: 'Messages',            href: '/messages' },
+          { icon: SettingsIcon,    label: 'Settings',            href: '/settings/notifications' },
+        ],
+      };
+
+    case 'reviewer':
+      // Network-tenant reviewer — keep minimal.
+      return {
+        primary: [
+          { icon: LayoutDashboard, label: t('nav.dashboard'),         href: '/dashboard' },
+          { icon: ClipboardList,   label: t('nav.my_assignments'),    href: '/reviews' },
+          { icon: ClipboardCheck,  label: t('nav.completed_reviews'), href: '/reviews/completed' },
+        ],
+        secondary: [
+          { icon: SettingsIcon,    label: 'Settings',                 href: '/settings/notifications' },
+        ],
+      };
+  }
+}
+
