@@ -1,9 +1,10 @@
 'use client';
 
 /**
- * /admin/declarations — Phase 36 (May 2026).
+ * /admin/declarations — Phase 36 (May 2026), refreshed Phase 45.
  *
- * Emergency declaration list view. Click a row to drill into
+ * Emergency declaration list view + "New declaration" CTA that opens
+ * the Phase 45 wizard. Click a row to drill into
  * /admin/declarations/<id> for the full multi-sig workflow.
  */
 
@@ -12,7 +13,8 @@ import Link from 'next/link';
 import { useDeclarations, type EmergencyDeclaration } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
-import { Siren, Inbox, Filter, ChevronRight } from 'lucide-react';
+import { Siren, Inbox, Filter, ChevronRight, Plus, Sparkles } from 'lucide-react';
+import { DeclarationWizard } from '@/components/declarations/declaration-wizard';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
@@ -35,7 +37,8 @@ export default function DeclarationsListPage() {
   const viewer = useAuthStore((s) => s.user);
   const network = useNetworkStore((s) => s.network);
   const [statusFilter, setStatusFilter] = useState('');
-  const { data, isLoading } = useDeclarations(statusFilter || undefined);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const { data, isLoading, mutate } = useDeclarations(statusFilter || undefined);
 
   if (viewer && viewer.role !== 'admin') {
     return (
@@ -61,18 +64,27 @@ export default function DeclarationsListPage() {
             {rows.length} declaration{rows.length === 1 ? '' : 's'}
           </p>
         </div>
-        <label className="inline-flex items-center gap-2 text-xs">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2 py-1 rounded-md border border-border bg-background text-xs"
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="inline-flex items-center gap-2 text-xs">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2 py-1 rounded-md border border-border bg-background text-xs"
+            >
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[hsl(var(--kuja-clay))] text-white text-xs font-semibold hover:opacity-90"
           >
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </label>
+            <Plus className="w-3.5 h-3.5" /> New declaration
+          </button>
+        </div>
       </div>
 
       {isLoading && (
@@ -82,9 +94,22 @@ export default function DeclarationsListPage() {
       )}
 
       {!isLoading && rows.length === 0 && (
-        <div className="border border-border rounded-lg bg-card p-10 text-center text-sm text-muted-foreground">
-          <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          No declarations in this state. Create one from a fund window via the API.
+        <div className="border border-border rounded-lg bg-card p-10 text-center space-y-3">
+          <Inbox className="w-8 h-8 mx-auto text-muted-foreground opacity-50" />
+          <p className="text-sm text-muted-foreground">
+            No declarations {statusFilter ? `in '${statusFilter.replace('_', ' ')}' state` : 'yet'}.
+          </p>
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[hsl(var(--kuja-clay))] text-white text-xs font-semibold hover:opacity-90"
+          >
+            <Sparkles className="w-3.5 h-3.5" /> Start a guided declaration
+          </button>
+          <p className="text-[11px] text-muted-foreground max-w-md mx-auto">
+            4 steps: pick the crisis row from your latest Monitoring Report, fill the
+            details, choose the OB committee, confirm. ~3 minutes.
+          </p>
         </div>
       )}
 
@@ -122,6 +147,13 @@ export default function DeclarationsListPage() {
           </Link>
         ))}
       </div>
+
+      {wizardOpen && (
+        <DeclarationWizard
+          onClose={() => setWizardOpen(false)}
+          onCreated={() => { setWizardOpen(false); mutate(); }}
+        />
+      )}
     </div>
   );
 }

@@ -413,6 +413,9 @@ export interface DeclarationSignature {
   id: number;
   declaration_id: number;
   signer_user_id: number;
+  signer_name: string | null;
+  signer_email: string | null;
+  signer_org_name: string | null;
   required_order: number;
   status: 'pending' | 'signed' | 'recused' | 'rejected';
   signature_method: string | null;
@@ -420,6 +423,26 @@ export interface DeclarationSignature {
   recusal_reason: string | null;
   rejection_reason: string | null;
   signed_at: string | null;
+}
+
+// Phase 45 — Oversight Body roster (used by declaration signer-picker).
+export interface ObRosterMember {
+  membership_id: number;
+  org_id: number;
+  org_name: string;
+  country: string | null;
+  user_id: number;
+  user_name: string | null;
+  user_email: string | null;
+  user_role: string | null;
+  ob_role_started_at: string | null;
+}
+
+export function useObRoster() {
+  return useSWR<{ success: boolean; members: ObRosterMember[]; count: number }>(
+    '/network/membership/ob-roster',
+    fetcher,
+  );
 }
 
 export interface DeclarationDocument {

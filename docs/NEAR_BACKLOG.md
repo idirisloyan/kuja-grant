@@ -232,6 +232,45 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 45 — Declaration UX overhaul. The team's
+  feedback was that declarations "don't feel completed" — no clear
+  way to start one, no visible stage indicator, signer slots showed
+  raw `User #N`, and the page was cluttered. Five-part fix:
+  **(1) Guided creation wizard**: new `<DeclarationWizard>`
+  4-step modal — pick crisis row from latest Crisis Monitoring
+  report (pre-fills country/crisis_type/region), declaration
+  details (fund + window + amount + severity + summary), committee
+  pick from OB roster, confirm with optional submit-now. "New
+  declaration" CTA on the list page header AND in the empty state
+  (replaced the obscure "create from a fund window via the API"
+  copy). **(2) Visual lifecycle stepper**: new
+  `<DeclarationStepper>` 6-stage chevron strip (Draft → Committee
+  → In review → Active → Released → Closed) with current stage
+  highlighted in clay, past stages in grow-green, bad/cancelled
+  in destructive red. Action-oriented "Next:" hint adapts to slot
+  count and signing progress; live counter with progress bar.
+  **(3) Identity-resolved signer rows**: backend
+  `DeclarationSignature.to_dict()` now resolves `signer_name`,
+  `signer_email`, `signer_org_name` via User + Organization
+  lookups; frontend renders the name + org sub-line. No more
+  `User #1`. **(4) Inline OB picker on the detail page**: new
+  `<AddSignerPanel>` consumes `/api/network/membership/ob-roster`
+  (one row per user at every OB-flagged org) with free-text
+  filter on name/email/org/country. Filters out already-assigned
+  members; shows helpful empty states. Trash-icon remove on
+  pending draft slots. **(5) Simplification pass**: header trimmed
+  to title + status + action button (stepper carries the counter);
+  Summary + Evidence anchor merged into one Context card; Documents
+  card hidden when empty; SLA card hidden until a timestamp lands;
+  Signers section relabeled "Committee (Oversight Body signers)"
+  with IKEA-Concept-Note context line. Browser-verified
+  end-to-end against a fresh draft on the NEAR network: stepper
+  visible, picker lists Fatima Hassan at Amani Community Development,
+  Add → row renders "Fatima Hassan / Amani Community Development /
+  pending", Fatima vanishes from the picker, "Next:" updates from
+  "Add 2 more" → "Add 1 more". Frontend build green
+  (`/admin/declarations/[id]` 12.4 kB).
+
 - **2026-05-28** Phase 44C — Enforcement swap complete. Every
   governance endpoint the IKEA Concept Note attributes to the OB
   now uses `@ob_required` instead of `@role_required('admin')` —

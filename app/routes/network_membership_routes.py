@@ -745,11 +745,18 @@ def api_ob_roster():
 
     Used by the declaration signer-picker and the operator console
     so the team can see (and audit) who currently holds OB seats.
+
+    Returns one entry per USER at an OB-flagged organisation —
+    declaration signer slots identify a specific user_id, so the
+    picker needs to surface user-level rows, not just org-level.
+    Each row carries the membership context (org name, country)
+    so the picker can group + label.
     """
     network_id = get_current_network_id()
     if not network_id:
-        return jsonify({"success": True, "members": []})
-    rows = (
+        return jsonify({"success": True, "members": [], "count": 0})
+
+    memberships = (
         NetworkMembership.query
         .filter_by(
             network_id=network_id,
@@ -758,9 +765,32 @@ def api_ob_roster():
         )
         .all()
     )
+
+    from app.models import User, Organization
+    rows = []
+    for m in memberships:
+        org = Organization.query.get(m.org_id)
+        users = User.query.filter_by(org_id=m.org_id).all()
+        for u in users:
+            rows.append({
+                "membership_id": m.id,
+                "org_id": m.org_id,
+                "org_name": org.name if org else f"Org #{m.org_id}",
+                "country": m.country or (org.country if org else None),
+                "user_id": u.id,
+                "user_name": u.name,
+                "user_email": u.email,
+                "user_role": u.role,
+                "ob_role_started_at": (
+                    m.ob_role_started_at.isoformat() if m.ob_role_started_at else None
+                ),
+            })
+    # Sort by org name, then user name — stable picker order
+    rows.sort(key=lambda r: ((r["org_name"] or "").lower(),
+                              (r["user_name"] or "").lower()))
     return jsonify({
         "success": True,
         "network_id": network_id,
-        "members": [m.to_dict() for m in rows],
+        "members": rows,
         "count": len(rows),
     })
