@@ -14,6 +14,7 @@ import { SmartDraftBanner } from '@/components/apply/SmartDraftBanner';
 import { TrustPortableBadge } from '@/components/shared/trust-portable-badge';
 import { AIToolsAccordion } from '@/components/shared/ai-tools-accordion';
 import { useAutosave } from '@/lib/hooks/use-autosave';
+import { getQuestionForLabel, getPlaceholderForLabel } from '@/lib/guided-questions';
 import { SubmissionVelocityBar } from '@/components/apply/submission-velocity-bar';
 import { PastWinsPopover } from '@/components/apply/past-wins-popover';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
@@ -1218,7 +1219,12 @@ function ProposalStep({
           <Card className="p-5">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="flex-1">
-                <div className="text-sm font-semibold text-foreground">{c.label}</div>
+                {/* Phase 87 — present the field as a question, not a noun.
+                    Falls back to the original label for fields without a
+                    catalogued question. */}
+                <div className="text-sm font-semibold text-foreground">
+                  {getQuestionForLabel(c.key, c.label)}
+                </div>
                 {c.description && (
                   <div className="mt-1 text-sm text-muted-foreground">{c.description}</div>
                 )}
@@ -1231,7 +1237,10 @@ function ProposalStep({
 
             <textarea
               rows={8}
-              placeholder={c.example || `Write your response for "${c.label}"...`}
+              /* Phase 88 — example-style placeholders. Use catalogued
+                 example first, then the donor-supplied example if any,
+                 then a generic placeholder as final fallback. */
+              placeholder={getPlaceholderForLabel(c.key) || c.example || `Write your response for "${c.label}"...`}
               value={text}
               onChange={(e) => onResponseChange(c.key, e.target.value)}
               className={TA_CLS}

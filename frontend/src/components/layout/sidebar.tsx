@@ -299,17 +299,21 @@ function kujaProfile(role: UserRole, t: T): NavProfile {
       };
 
     case 'ngo':
+      // Phase 90 — primary nav reduced from 5 to 4 per team review.
+      // "Opportunities" demoted to secondary (and surfaced contextually
+      // on the dashboard via the matches card + "Find a grant" CTA).
+      // The 4 primaries are the ones non-technical NGOs hit every visit:
+      // Dashboard → Applications → Reports → Profile (where the Trust
+      // Profile lives).
       return {
         primary: [
           { icon: LayoutDashboard, label: t('nav.dashboard'),          href: '/dashboard' },
-          // Opportunities (renamed from "Browse grants") = the marketplace
-          // catalog of grant openings the NGO can apply to.
-          { icon: Search,          label: 'Opportunities',             href: '/grants' },
           { icon: FileText,        label: t('nav.my_applications'),    href: '/applications' },
           { icon: BarChart3,       label: 'Reports',                   href: '/reports' },
           { icon: Building2,       label: t('nav.org_profile'),        href: '/organizations/profile' },
         ],
         secondary: [
+          { icon: Search,          label: 'Find a grant',              href: '/grants' },
           { icon: MessageSquare,   label: 'Messages',                  href: '/messages' },
           { icon: HelpCircle,      label: 'Help & Chat',               href: '/chat' },
           { icon: SettingsIcon,    label: 'Settings',                  href: '/settings/notifications' },

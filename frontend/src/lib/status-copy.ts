@@ -118,6 +118,60 @@ export function describeDeclarationStatus(d: DeclarationStatusInput): StatusCopy
 }
 
 // ---------------------------------------------------------------------------
+// Phase 89 — Simplified state buckets for NGO-facing surfaces.
+// ---------------------------------------------------------------------------
+// The full status enums (7 report states, 6+ application states) are
+// donor-side and reviewer-side concerns. For the NGO, all that matters
+// is one of three buckets:
+//   - "You owe a response"  (draft, pending, revision_requested, overdue)
+//   - "Donor has it"        (submitted, in_review, under_review)
+//   - "Done"                (accepted, approved, awarded, rejected, declined)
+// Use these on dashboards and list rows; use the full describeXStatus
+// on detail pages where the precise donor state is informative.
+
+export type SimpleNgoState = 'on_you' | 'on_donor' | 'done';
+
+export function describeReportStatusForNgo(status: string): { bucket: SimpleNgoState; label: string; tone: StatusTone } {
+  switch (status) {
+    case 'draft':
+    case 'pending':
+    case 'overdue':
+    case 'revision_requested':
+    case 'rejected':
+      return { bucket: 'on_you', label: 'Your turn', tone: 'warn' };
+    case 'submitted':
+    case 'in_review':
+    case 'under_review':
+      return { bucket: 'on_donor', label: 'With the donor', tone: 'info' };
+    case 'accepted':
+    case 'approved':
+      return { bucket: 'done', label: 'Done', tone: 'good' };
+    default:
+      return { bucket: 'on_you', label: 'Your turn', tone: 'muted' };
+  }
+}
+
+export function describeApplicationStatusForNgo(status: string): { bucket: SimpleNgoState; label: string; tone: StatusTone } {
+  switch (status) {
+    case 'draft':
+    case 'declined':
+    case 'rejected':
+    case 'revision_requested':
+      return { bucket: 'on_you', label: 'Your turn', tone: 'warn' };
+    case 'submitted':
+    case 'in_review':
+    case 'under_review':
+      return { bucket: 'on_donor', label: 'With the donor', tone: 'info' };
+    case 'awarded':
+    case 'accepted':
+    case 'approved':
+      return { bucket: 'done', label: 'Done', tone: 'good' };
+    default:
+      return { bucket: 'on_you', label: 'Your turn', tone: 'muted' };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Tone -> Tailwind pill class — for places that don't use <PageHeader>
 // but still want the same vocabulary.
 // ---------------------------------------------------------------------------
