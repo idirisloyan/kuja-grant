@@ -10,6 +10,7 @@ import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
+import { SmartDraftBanner } from '@/components/apply/SmartDraftBanner';
 import { SubmissionVelocityBar } from '@/components/apply/submission-velocity-bar';
 import { PastWinsPopover } from '@/components/apply/past-wins-popover';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
@@ -1127,6 +1128,18 @@ function ProposalStep({
         <Alert tone="success">
           Organization data imported into relevant criteria. Edit to strengthen your responses.
         </Alert>
+      )}
+
+      {/* Phase 75 — bulk-prefill from assessment + history. Sits above
+          DraftCoAuthor because it's the "do it for me" path; coAuthor is
+          the "guide me through it" path. Only renders when every
+          response is empty — once the NGO types, it gets out of the way. */}
+      {applicationId != null && (
+        <SmartDraftBanner
+          applicationId={applicationId}
+          currentResponses={responses}
+          onMerged={(merged) => onDraftApplied(merged)}
+        />
       )}
 
       {coAuthorEnabled && grantId != null && (

@@ -4536,6 +4536,154 @@ RETURN ONLY valid JSON in this exact shape (no commentary, no markdown fences):
             }
 
     # ------------------------------------------------------------------
+    # Phase 75 — AI-drafts-application v0
+    # ------------------------------------------------------------------
+    # NGOs in the Global South face a blank-page problem: every grant
+    # asks 8-15 free-text questions that take hours to write well. We
+    # have everything we need to pre-fill: their capacity assessment,
+    # their prior submissions, the grant's rubric. The NGO becomes
+    # editor, not author. This typically cuts authoring time 70-85%.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def draft_application_responses(grant_title: str, grant_description: str,
+                                     criteria: list, eligibility: list,
+                                     org_profile: dict,
+                                     org_assessment: dict | None,
+                                     prior_applications: list,
+                                     existing_responses: dict) -> dict:
+        """Generate a first-draft response for each criterion / eligibility item.
+
+        Returns: { responses: {key: text}, rationale: {key: why},
+                   gaps: [labels of items we couldn't draft], confidence,
+                   ai_used }
+        """
+        if not (HAS_ANTHROPIC and ANTHROPIC_API_KEY):
+            return {
+                'responses': existing_responses or {},
+                'rationale': {},
+                'gaps': [c.get('label') or c.get('key') for c in (criteria or [])],
+                'confidence': 0,
+                'ai_used': False,
+            }
+
+        # Build the prompt — every criterion/question gets a slot.
+        questions = []
+        for c in (criteria or []):
+            key = c.get('key') or c.get('id') or (c.get('label', 'q')[:40])
+            label = c.get('label') or c.get('title') or key
+            desc = c.get('description') or ''
+            weight = c.get('weight')
+            questions.append({'key': key, 'label': label, 'description': desc[:300], 'weight': weight})
+        for e in (eligibility or []):
+            key = e.get('key') or 'elig_' + (e.get('label', 'q')[:30].replace(' ', '_'))
+            label = e.get('label') or key
+            questions.append({'key': key, 'label': label, 'description': (e.get('description') or '')[:300], 'kind': 'eligibility'})
+
+        if not questions:
+            return {'responses': existing_responses, 'rationale': {}, 'gaps': [],
+                    'confidence': 100, 'ai_used': False}
+
+        # Trim assessment + prior apps to fit token budget.
+        assessment_snip = ''
+        if org_assessment:
+            framework = org_assessment.get('framework') or '?'
+            score = org_assessment.get('overall_score')
+            resps = org_assessment.get('responses') or {}
+            keys = list(resps.keys())[:30]
+            assessment_snip = f"Framework: {framework} · Overall score: {score}\n"
+            for k in keys:
+                v = resps.get(k)
+                if isinstance(v, str) and v.strip():
+                    assessment_snip += f"  • {k}: {v[:300]}\n"
+
+        prior_snip = ''
+        for i, p in enumerate(prior_applications or [], 1):
+            g = p.get('grant_title') or 'unknown grant'
+            resps = p.get('responses') or {}
+            prior_snip += f"\nPrior application #{i} (to {g}):\n"
+            for k, v in list(resps.items())[:6]:
+                if isinstance(v, str) and v.strip():
+                    prior_snip += f"  • {k}: {v[:400]}\n"
+
+        existing_snip = ''
+        if existing_responses:
+            existing_snip = "\nNGO has already started these questions — keep their wording:\n"
+            for k, v in existing_responses.items():
+                if isinstance(v, str) and v.strip():
+                    existing_snip += f"  • {k}: {v[:200]}\n"
+
+        try:
+            client = AIService._get_client()
+            if not client:
+                raise Exception("AI client not available")
+
+            prompt = f"""You are drafting a grant application FOR an NGO in the Global South. The NGO is non-technical and is relying on you to produce a first draft they will edit. Use ONLY information present in their assessment, prior applications, or profile. NEVER invent dates, beneficiary counts, locations, or organisational facts.
+
+GRANT TITLE: {grant_title}
+GRANT DESCRIPTION: {(grant_description or '')[:1200]}
+
+ORGANISATION PROFILE:
+{json.dumps(org_profile, indent=2, default=str)[:1500]}
+
+ORGANISATION'S LATEST CAPACITY ASSESSMENT (excerpt):
+{assessment_snip or '(no assessment on file)'}
+
+ORGANISATION'S RECENT PRIOR APPLICATIONS (excerpts):
+{prior_snip or '(no prior applications on file)'}
+{existing_snip}
+
+QUESTIONS TO DRAFT (one response per key):
+{json.dumps(questions, indent=2)[:4000]}
+
+YOUR JOB:
+1. Draft a 60-180 word response for each question key, grounded in the NGO's actual context above.
+2. If you genuinely have no basis to answer a question (no context, no prior, no profile clue), put the key in "gaps" and leave its response as an empty string. Do NOT invent.
+3. Provide a brief 'rationale' for each draft — one sentence on which source you drew from (e.g. "Drawn from your 2025 capacity assessment, section IV.").
+4. Provide an overall confidence (0-100) — high when most answers were grounded in real context.
+
+Return ONLY valid JSON in this shape (no markdown):
+{{
+  "responses": {{ "<key>": "<draft text>" }},
+  "rationale": {{ "<key>": "one-sentence source attribution" }},
+  "gaps": ["<keys with no basis to answer>"],
+  "confidence": 0-100
+}}"""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text.strip()
+            if text.startswith('```'):
+                text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text, flags=re.MULTILINE).strip()
+            if text.startswith('{'):
+                parsed = json.loads(text)
+            else:
+                m = re.search(r'\{[\s\S]*\}', text)
+                parsed = json.loads(m.group()) if m else None
+            if not parsed:
+                raise Exception("AI returned no parseable JSON")
+
+            return {
+                'responses': parsed.get('responses', {}) or {},
+                'rationale': parsed.get('rationale', {}) or {},
+                'gaps':      parsed.get('gaps', []) or [],
+                'confidence': int(parsed.get('confidence', 0) or 0),
+                'ai_used':   True,
+            }
+        except Exception as e:
+            logger.error(f"draft_application_responses failed: {e}")
+            return {
+                'responses': existing_responses or {},
+                'rationale': {},
+                'gaps': [q['label'] for q in questions],
+                'confidence': 0,
+                'ai_used': False,
+                'error': str(e)[:200],
+            }
+
+    # ------------------------------------------------------------------
     # Phase 72 — Photo-as-evidence
     # ------------------------------------------------------------------
     # NGOs in the Global South typically only have a smartphone as their

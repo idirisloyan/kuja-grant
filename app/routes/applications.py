@@ -226,6 +226,128 @@ def api_create_application():
     return jsonify({'success': True, 'application': application.to_dict()}), 201
 
 
+@applications_bp.route('/<int:app_id>/ai-draft', methods=['POST'])
+@login_required
+@role_required('ngo')
+def api_ai_draft_application(app_id):
+    """Phase 75 — AI-drafts-application v0.
+
+    NGO opens a draft application. Claude pre-fills every question using:
+      - The grant's criteria, eligibility, doc_requirements
+      - The org's latest completed capacity assessment
+      - The org's last 2 submitted applications (to similar or different
+        grants — donors won't see this leak)
+      - The org's profile (sector, country, size hints)
+
+    NGO becomes editor, not author. Returns suggested responses +
+    a per-question rationale + a 'gaps' list (questions the AI was
+    unable to draft because it had no context).
+
+    Body: { merge?: bool (default false — preview only) }
+    Returns: { responses: {key: text}, rationale: {key: why},
+              gaps: [keys], confidence: 0-100 }
+    """
+    from app.models import Application, Grant, Assessment
+    from app.services.ai_service import AIService
+
+    application = db.session.get(Application, app_id)
+    if not application:
+        return jsonify({'error': 'Application not found', 'success': False}), 404
+    if application.ngo_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied', 'success': False}), 403
+    if application.status not in ('draft',):
+        return jsonify({'error': 'AI draft is only available for draft applications.',
+                        'success': False}), 400
+
+    grant = db.session.get(Grant, application.grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found', 'success': False}), 404
+
+    # Build context.
+    criteria = grant.get_criteria() if hasattr(grant, 'get_criteria') else []
+    eligibility = grant.get_eligibility() if hasattr(grant, 'get_eligibility') else []
+
+    # Latest completed assessment for this org.
+    org_assessment = None
+    try:
+        assess = Assessment.query.filter_by(org_id=current_user.org_id).order_by(
+            Assessment.updated_at.desc()).first()
+        if assess:
+            org_assessment = {
+                'framework': getattr(assess, 'framework', None),
+                'overall_score': getattr(assess, 'overall_score', None),
+                'responses': assess.get_responses() if hasattr(assess, 'get_responses') else None,
+            }
+    except Exception:
+        pass
+
+    # Last 2 submitted applications for this org.
+    prior_apps = Application.query.filter(
+        Application.ngo_org_id == current_user.org_id,
+        Application.id != app_id,
+        Application.status.in_(['submitted', 'in_review', 'awarded', 'declined']),
+    ).order_by(Application.id.desc()).limit(2).all()
+    prior_payloads = []
+    for a in prior_apps:
+        prior_payloads.append({
+            'grant_title': (db.session.get(Grant, a.grant_id).title
+                            if db.session.get(Grant, a.grant_id) else None),
+            'responses': a.get_responses() if hasattr(a, 'get_responses') else None,
+        })
+
+    org = None
+    try:
+        from app.models import Organization
+        org = db.session.get(Organization, current_user.org_id)
+    except Exception:
+        pass
+    org_profile = {}
+    if org:
+        for f in ('name', 'sector', 'sectors', 'country', 'size', 'mission_statement', 'year_founded'):
+            v = getattr(org, f, None)
+            if v is not None:
+                org_profile[f] = v
+
+    try:
+        result = AIService.draft_application_responses(
+            grant_title=grant.title,
+            grant_description=grant.description or '',
+            criteria=criteria, eligibility=eligibility,
+            org_profile=org_profile,
+            org_assessment=org_assessment,
+            prior_applications=prior_payloads,
+            existing_responses=application.get_responses() or {},
+        )
+    except Exception as e:
+        logger.error(f"ai-draft-application failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'AI drafting is temporarily unavailable. Please try again or fill the application by hand.',
+        }), 502
+
+    data = get_request_json() or {}
+    merged = result.get('responses') or {}
+    if data.get('merge'):
+        existing = application.get_responses() or {}
+        # Only fill EMPTY responses — never overwrite NGO text.
+        out = dict(existing)
+        for k, v in merged.items():
+            if v and not (out.get(k) or '').strip():
+                out[k] = v
+        application.set_responses(out)
+        db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'responses': result.get('responses', {}),
+        'rationale': result.get('rationale', {}),
+        'gaps':      result.get('gaps', []),
+        'confidence': result.get('confidence', 0),
+        'ai_used':   result.get('ai_used', False),
+        'merged':    bool(data.get('merge')),
+    })
+
+
 @applications_bp.route('/<int:app_id>', methods=['PUT'])
 @login_required
 def api_update_application(app_id):
