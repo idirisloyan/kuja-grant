@@ -7,7 +7,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { StatusBadge } from '@/components/shared/status-badge';
 import {
   DollarSign, Calendar, MapPin, FileText, Target, ClipboardList,
-  Upload, Users, ArrowLeft, CheckCircle, AlertCircle,
+  Upload, Users, ArrowLeft, CheckCircle, AlertCircle, Sparkles, Briefcase,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { EligibilityRequirement, Criterion, DocRequirement } from '@/lib/types';
@@ -18,6 +18,11 @@ import { TagsEditor } from '@/components/shared/tags-editor';
 import { GrantBroadcastDialog } from '@/components/grants/grant-broadcast-dialog';
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
 import { Megaphone } from 'lucide-react';
+import {
+  PageShell, PageBack, PageHeader, PageMain,
+  PageDetail, PageDetailSection,
+} from '@/components/layout/page-shell';
+import { describeGrantStatus } from '@/lib/status-copy';
 
 function formatFunding(amount: number | null, currency: string): string {
   if (!amount) return 'TBD';
@@ -103,111 +108,118 @@ export default function GrantDetailClient() {
   }
 
   const visibleTabs = TAB_KEYS.filter((tk) => tk.id !== 'applications' || isDonor);
+  const statusPill = describeGrantStatus(grant.status);
+
+  // Primary action — apply / broadcast / "your application" depending on role.
+  const primaryAction = (
+    <div className="flex items-center gap-2 flex-wrap">
+      {isDonor && (
+        <button
+          type="button"
+          onClick={() => setBroadcastOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand))]/40 text-sm font-medium px-4 py-2"
+          title="Send a clarification to every NGO with an app on this grant"
+        >
+          <Megaphone className="h-4 w-4" /> Broadcast
+        </button>
+      )}
+      {isNgo && grant.status === 'open' && !grant.user_application_status && (
+        <button
+          type="button"
+          onClick={() => router.push(`/apply/${grant.id}`)}
+          className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
+        >
+          <FileText className="h-4 w-4" /> {t('grant.detail.apply')}
+        </button>
+      )}
+      {isNgo && grant.user_application_status && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">{t('grant.detail.your_app')}:</span>
+          <StatusBadge status={grant.user_application_status} kind="app" />
+        </div>
+      )}
+      {isDonor && <LiveDraftersPill grantId={grant.id} />}
+    </div>
+  );
 
   return (
-    <div className="space-y-5">
-      <button
-        type="button"
-        onClick={() => router.push('/grants')}
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> {t('grant.detail.back')}
-      </button>
+    <PageShell>
+      <PageBack href="/grants" label={t('grant.detail.back')} />
 
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <h1 className="kuja-display text-3xl">{grant.title}</h1>
-            <StatusBadge status={grant.status} kind="grant" />
-            {isDonor && <LiveDraftersPill grantId={grant.id} />}
-          </div>
-          {grant.donor_org_name && <p className="text-sm text-muted-foreground">{grant.donor_org_name}</p>}
-          {/* Phase 15E — tags. Donor edits; NGO sees read-only. */}
-          <div className="mt-2">
-            <TagsEditor
-              targetKind="grant"
-              targetId={grant.id}
-              editable={isDonor}
-            />
-          </div>
-          <div className="mt-2 flex flex-wrap gap-4 text-sm">
-            <span className="inline-flex items-center gap-1.5 font-semibold text-[hsl(var(--kuja-grow))]">
-              <DollarSign className="h-4 w-4" /> {formatFunding(grant.total_funding, grant.currency)}
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-              <Calendar className="h-4 w-4" /> {formatDeadline(grant.deadline)}
-            </span>
-            {grant.countries && grant.countries.length > 0 && (
-              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                <MapPin className="h-4 w-4" /> {grant.countries.join(', ')}
-              </span>
-            )}
-          </div>
-        </div>
-        {isDonor && (
-          <button
-            type="button"
-            onClick={() => setBroadcastOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand))]/40 text-sm font-medium px-4 py-2"
-            title="Send a clarification to every NGO with an app on this grant"
-          >
-            <Megaphone className="h-4 w-4" /> Broadcast
-          </button>
-        )}
-        {isNgo && grant.status === 'open' && !grant.user_application_status && (
-          <button
-            type="button"
-            onClick={() => router.push(`/apply/${grant.id}`)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
-          >
-            <FileText className="h-4 w-4" /> {t('grant.detail.apply')}
-          </button>
-        )}
-        {isNgo && grant.user_application_status && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">{t('grant.detail.your_app')}:</span>
-            <StatusBadge status={grant.user_application_status} kind="app" />
-          </div>
-        )}
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-border overflow-x-auto">
-        {visibleTabs.map((tk) => (
-          <button
-            key={tk.id}
-            type="button"
-            onClick={() => setTab(tk.id)}
-            className={cn(
-              'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
-              tab === tk.id
-                ? 'text-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]'
-                : 'text-muted-foreground border-transparent hover:text-foreground',
-            )}
-          >
-            {t(tk.key)}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'overview' && <OverviewTab grant={grant} t={t} formatDeadline={formatDeadline} />}
-      {tab === 'eligibility' && <EligibilityTab requirements={grant.eligibility ?? []} t={t} />}
-      {tab === 'criteria' && <CriteriaTab criteria={grant.criteria ?? []} t={t} />}
-      {tab === 'documents' && <DocumentsTab requirements={grant.doc_requirements ?? []} t={t} />}
-      {tab === 'qa' && <GrantQAPanel grantId={grant.id} />}
-      {tab === 'applications' && <ApplicationsTab grantId={grant.id} t={t} />}
-
-      {/* Phase 12 — Agreement smart-unpack with apply-to-calendar action.
-          Visible whenever the user has read access to the grant; "Apply"
-          button gated to NGO + admin (the backend enforces too). */}
-      <GrantAgreementUnpackPanel
-        grantId={grant.id}
-        canApply={user?.role === 'ngo' || user?.role === 'admin'}
+      <PageHeader
+        title={grant.title}
+        subtitle={grant.donor_org_name || undefined}
+        icon={Briefcase}
+        status={statusPill}
+        meta={[
+          { label: formatFunding(grant.total_funding, grant.currency), icon: DollarSign },
+          { label: formatDeadline(grant.deadline), icon: Calendar },
+          ...(grant.countries && grant.countries.length > 0
+            ? [{ label: grant.countries.join(', '), icon: MapPin }]
+            : []),
+        ]}
+        primaryAction={primaryAction}
       />
 
-      {/* Phase 21B — donor broadcast dialog (mounted but only visible
-          when toggled by the header button). */}
+      <PageMain>
+        {/* Tags row — kept near the top because they're identity / filter signals */}
+        <div>
+          <TagsEditor
+            targetKind="grant"
+            targetId={grant.id}
+            editable={isDonor}
+          />
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 border-b border-border overflow-x-auto">
+          {visibleTabs.map((tk) => (
+            <button
+              key={tk.id}
+              type="button"
+              onClick={() => setTab(tk.id)}
+              className={cn(
+                'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
+                tab === tk.id
+                  ? 'text-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]'
+                  : 'text-muted-foreground border-transparent hover:text-foreground',
+              )}
+            >
+              {t(tk.key)}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'overview' && <OverviewTab grant={grant} t={t} formatDeadline={formatDeadline} />}
+        {tab === 'eligibility' && <EligibilityTab requirements={grant.eligibility ?? []} t={t} />}
+        {tab === 'criteria' && <CriteriaTab criteria={grant.criteria ?? []} t={t} />}
+        {tab === 'documents' && <DocumentsTab requirements={grant.doc_requirements ?? []} t={t} />}
+        {tab === 'qa' && <GrantQAPanel grantId={grant.id} />}
+        {tab === 'applications' && <ApplicationsTab grantId={grant.id} t={t} />}
+      </PageMain>
+
+      {/* Supporting detail — agreement smart-unpack + AI chat */}
+      <PageDetail>
+        <PageDetailSection
+          title="Grant agreement smart-unpack"
+          icon={FileText}
+          defaultOpen={false}
+        >
+          <GrantAgreementUnpackPanel
+            grantId={grant.id}
+            canApply={user?.role === 'ngo' || user?.role === 'admin'}
+          />
+        </PageDetailSection>
+        <PageDetailSection
+          title="Ask Kuja about this grant"
+          icon={Sparkles}
+          defaultOpen={false}
+        >
+          <AIChatPanel scope={{ kind: 'grant', id: grant.id }} />
+        </PageDetailSection>
+      </PageDetail>
+
+      {/* Broadcast dialog stays mounted regardless of where it sits visually. */}
       {isDonor && (
         <GrantBroadcastDialog
           open={broadcastOpen}
@@ -215,10 +227,7 @@ export default function GrantDetailClient() {
           grantId={grant.id}
         />
       )}
-
-      {/* Phase 25B — scoped AI chat: ask Kuja about THIS grant. */}
-      <AIChatPanel scope={{ kind: 'grant', id: grant.id }} />
-    </div>
+    </PageShell>
   );
 }
 

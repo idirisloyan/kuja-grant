@@ -56,6 +56,21 @@ export function describeReportStatus(status: string): StatusCopy {
 }
 
 // ---------------------------------------------------------------------------
+// Grants
+// ---------------------------------------------------------------------------
+
+export function describeGrantStatus(status: string): StatusCopy {
+  switch (status) {
+    case 'draft':    return { label: 'Draft',                 tone: 'muted' };
+    case 'open':     return { label: 'Open for applications', tone: 'good' };
+    case 'review':   return { label: 'In review',             tone: 'warn' };
+    case 'closed':   return { label: 'Closed',                tone: 'muted' };
+    case 'awarded':  return { label: 'Awarded',               tone: 'accent' };
+    default:         return { label: status.replace(/_/g, ' '), tone: 'muted' };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Memberships (NEAR)
 // ---------------------------------------------------------------------------
 

@@ -26,7 +26,7 @@ import {
   CheckCircle2,
   BarChart3,
 } from 'lucide-react';
-import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
+import { PageShell, PageHeader, PageMain, PageAttention } from '@/components/layout/page-shell';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -869,27 +869,38 @@ function KujaReportsPage() {
         ? 'bg-amber-500'
         : 'bg-red-500';
 
-  return (
-    <div className="max-w-[960px] space-y-7">
-      <div>
-        <h1 className="kuja-display text-[2.25rem] font-semibold leading-[1.1] text-foreground">
-          {t('report.reports_compliance')}
-        </h1>
-        <div className="mt-1 flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
-            {overallCompliance > 0
-              ? t('report.compliant', { score: overallCompliance })
-              : t('report.reports_total', { count: reports.length })}
-          </span>
-          {overdueCount > 0 && (
-            <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">
-              {overdueCount} {String(t('common.overdue')).toLowerCase()}
-            </span>
-          )}
-        </div>
-      </div>
+  // Phase 55 — attention strip surfaces overdue + due-soon counts.
+  const dueSoon = timelineItems.filter((i) => i.daysLeft >= 0 && i.daysLeft <= 7).length;
+  const attentionStrip: import('@/components/layout/page-shell').AttentionItem[] = [];
+  if (overdueCount > 0) {
+    attentionStrip.push({
+      tone: 'bad',
+      label: `${overdueCount} report${overdueCount === 1 ? '' : 's'} overdue`,
+      hint: 'Submit or request a deadline extension.',
+    });
+  }
+  if (dueSoon > 0) {
+    attentionStrip.push({
+      tone: 'warn',
+      label: `${dueSoon} report${dueSoon === 1 ? '' : 's'} due in the next 7 days`,
+    });
+  }
 
-      <ComplianceCalendar reportsByGrant={reportsByGrant} />
+  return (
+    <div className="max-w-[960px]">
+      <PageShell>
+        <PageHeader
+          title={t('report.reports_compliance')}
+          icon={BarChart3}
+          subtitle={overallCompliance > 0
+            ? t('report.compliant', { score: overallCompliance })
+            : t('report.reports_total', { count: reports.length })}
+        />
+
+        <PageAttention items={attentionStrip} />
+
+        <PageMain>
+        <ComplianceCalendar reportsByGrant={reportsByGrant} />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card className="p-5">
@@ -1009,6 +1020,8 @@ function KujaReportsPage() {
           </div>
         )}
       </div>
+        </PageMain>
+      </PageShell>
     </div>
   );
 }
