@@ -54,37 +54,83 @@ export function AttentionOperatorDashboard() {
     (d) => !d.applicants_notified_at,
   );
 
+  // Phase 62 — name the entities. The attention strip used to say
+  // "2 members awaiting review" — fine, but operators want to know
+  // WHICH orgs. Lightweight deterministic enrichment: pull the first 2
+  // org names from each list and surface them in the hint.
+  const memberOrgs = [
+    ...(pendingMems?.memberships ?? []),
+    ...(underReview?.memberships ?? []),
+  ];
+  const memberSample = memberOrgs
+    .map((m) => m.org_name || m.org?.name || `Org #${m.org_id}`)
+    .slice(0, 2);
+
+  const readyReleaseSample = readyRelease
+    .map((d) => d.title)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  const draftSample = (drafts?.declarations ?? [])
+    .map((d) => d.title)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  const inReviewSample = (inReview?.declarations ?? [])
+    .map((d) => d.title)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  // Format helper: "Foo, Bar" or "Foo, Bar +1 more"
+  const fmtList = (sample: string[], total: number) => {
+    if (sample.length === 0) return '';
+    const more = total - sample.length;
+    return more > 0 ? `${sample.join(', ')} +${more} more` : sample.join(', ');
+  };
+
   const attention: AttentionItem[] = useMemo(() => {
     const items: AttentionItem[] = [];
     if (memCount > 0) {
+      const list = fmtList(memberSample, memCount);
       items.push({
         tone: 'warn',
         label: `${memCount} member${memCount === 1 ? '' : 's'} awaiting review`,
-        hint: 'Run trust process, review capacity assessment, decide.',
+        hint: list
+          ? `${list}. Run trust process, review capacity assessment, decide.`
+          : 'Run trust process, review capacity assessment, decide.',
         action: <JumpLink href="/admin/network-memberships" label="Review" />,
       });
     }
     if (readyRelease.length > 0) {
+      const list = fmtList(readyReleaseSample, readyRelease.length);
       items.push({
         tone: 'accent',
         label: `${readyRelease.length} declaration${readyRelease.length === 1 ? '' : 's'} ready to release`,
-        hint: 'Signatures complete; flip the auto-created grant drafts to open and notify shortlisted NGOs.',
+        hint: list
+          ? `${list}. Flip the auto-created grant drafts to open and notify shortlisted NGOs.`
+          : 'Signatures complete; flip the auto-created grant drafts to open and notify shortlisted NGOs.',
         action: <JumpLink href={`/admin/declarations/${readyRelease[0].id}`} label="Open" />,
       });
     }
     if (inReviewCount > 0) {
+      const list = fmtList(inReviewSample, inReviewCount);
       items.push({
         tone: 'info',
         label: `${inReviewCount} declaration${inReviewCount === 1 ? '' : 's'} waiting on committee signatures`,
-        hint: 'No action required from you unless you also hold an OB seat.',
+        hint: list
+          ? `${list}. No action required from you unless you also hold an OB seat.`
+          : 'No action required from you unless you also hold an OB seat.',
         action: <JumpLink href="/admin/declarations" label="Watch" />,
       });
     }
     if (draftCount > 0) {
+      const list = fmtList(draftSample, draftCount);
       items.push({
         tone: 'muted',
         label: `${draftCount} draft declaration${draftCount === 1 ? '' : 's'}`,
-        hint: 'Add committee members and submit for signature.',
+        hint: list
+          ? `${list}. Add committee members and submit for signature.`
+          : 'Add committee members and submit for signature.',
         action: <JumpLink href="/admin/declarations" label="Open drafts" />,
       });
     }
@@ -96,7 +142,18 @@ export function AttentionOperatorDashboard() {
       });
     }
     return items;
-  }, [memCount, draftCount, inReviewCount, readyRelease]);
+    // memberSample / readyReleaseSample / draftSample / inReviewSample
+    // are derived deterministically from the SWR hook data. Including
+    // their joined string fingerprints in the dep array keeps the memo
+    // stable without re-running on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    memCount, draftCount, inReviewCount, readyRelease,
+    memberSample.join('|'),
+    readyReleaseSample.join('|'),
+    draftSample.join('|'),
+    inReviewSample.join('|'),
+  ]);
 
   if (!user) return null;
   const firstName = user.name?.split(' ')[0] ?? 'there';

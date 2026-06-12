@@ -232,6 +232,20 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 62 — Name entities in operator dashboard
+  attention. The Phase 48 strip showed counts (`2 members awaiting
+  review`) but operators wanted to know WHICH orgs / declarations.
+  Lightweight deterministic enrichment (zero AI tokens): pull the
+  first 2 entity names from each list and surface them in the hint
+  with "+N more" when there are extras. Now reads:
+    "Salam Relief Foundation, Ubuntu Education Trust. Run trust
+     process, review capacity assessment, decide."
+    "Drought response — Turkana basin. Add committee members and
+     submit for signature."
+  Applied to all 4 dashboard attention paths: members awaiting review,
+  ready-to-release declarations, in-review declarations, draft
+  declarations. Browser-verified live.
+
 - **2026-06-11** Phase 61 — Audit chain entity drill-in. Subject
   badges on /admin/audit-chain rows are now Links to the matching
   entity detail page so the operator can click from an audit event
