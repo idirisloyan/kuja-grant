@@ -29,6 +29,8 @@ import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patt
 import { ComplianceCoachCard } from '@/components/dashboards/compliance-coach-card';
 // Phase 82 — Today's focus banner. Single bold action above PageAttention.
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
+// Phase 84 — Resume banner reads autosaved work from localStorage.
+import { ResumeBanner } from '@/components/dashboards/resume-banner';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -112,6 +114,8 @@ export function AttentionNgoDashboard() {
           headline with a single CTA. Page-attention list still renders
           below for the full picture. */}
       <TodayFocusBanner items={attention} />
+      {/* Phase 84 — Resume where you left off. Reads from localStorage. */}
+      <ResumeBanner />
       <PageAttention items={attention} />
 
       <PageMain>

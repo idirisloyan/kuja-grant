@@ -7,6 +7,7 @@ import { NearComplianceReporting } from '@/components/reports/near-compliance-re
 import { ReportDraftCoAuthor } from '@/components/reports/ReportDraftCoAuthor';
 import { VoiceReportComposer } from '@/components/reports/VoiceReportComposer';
 import { PhotoEvidenceUploader } from '@/components/reports/PhotoEvidenceUploader';
+import { AIToolsAccordion } from '@/components/shared/ai-tools-accordion';
 import { ReportReadiness } from '@/components/reports/ReportReadiness';
 import { ReportBundlePanel } from '@/components/reports/report-bundle-panel';
 import { useAuthStore } from '@/stores/auth-store';
@@ -1244,21 +1245,30 @@ function ReportRow({ report, mutateReports }: { report: Report; mutateReports: (
                 to miss next to the existing precheck panel. The banner
                 variant makes the donor-perspective AI scan unmistakably
                 visible the moment a draft row opens. */}
+            {/* Primary actions — readiness check is the most important
+                'is this report good?' signal; voice + photo are the two
+                fastest ways to populate the report. */}
             <ReportReadiness reportId={report.id} variant="banner" />
-            {/* Phase 71 — voice-to-report. Sits before the typed
-                co-author so NGO field staff land on the friendliest
-                option first. Both are non-destructive: voice merges
-                with whatever co-author has produced. */}
+            {/* Phase 71 — voice-to-report. */}
             <VoiceReportComposer reportId={report.id} onApplied={() => mutateReports()} />
-            {/* Phase 72 — photo-evidence. Phone camera → Claude vision →
-                structured fields attached to the report. */}
+            {/* Phase 72 — photo-evidence. */}
             <PhotoEvidenceUploader reportId={report.id} onApplied={() => mutateReports()} />
-            <ReportDraftCoAuthor reportId={report.id} onApplied={() => mutateReports()} />
-            {/* Phase 8 — donor review bundle. NGO assembles + publishes;
-                donors/admin assemble (read-only) to see what they'll review. */}
-            <BundleWrap report={report} />
-            <PreSubmitReviewPanel report={report} mutateReports={mutateReports} />
-            <AIReportGuidancePanel report={report} />
+
+            {/* Phase 83 — AI consolidation. Team review: report drafts
+                stacked 7 AI surfaces. The three above are the primary
+                ones; the four below get collapsed behind a single
+                disclosure so non-technical NGOs see less, power users
+                still get one click to expand. */}
+            <AIToolsAccordion
+              label="More AI tools"
+              hint="Typed co-author, donor review bundle, pre-submit checks, AI guidance"
+              toolCount={4}
+            >
+              <ReportDraftCoAuthor reportId={report.id} onApplied={() => mutateReports()} />
+              <BundleWrap report={report} />
+              <PreSubmitReviewPanel report={report} mutateReports={mutateReports} />
+              <AIReportGuidancePanel report={report} />
+            </AIToolsAccordion>
           </td>
         </tr>
       )}

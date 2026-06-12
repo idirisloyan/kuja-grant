@@ -12,6 +12,8 @@ import { AiBadge } from '@/components/shared/ai-badge';
 import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
 import { SmartDraftBanner } from '@/components/apply/SmartDraftBanner';
 import { TrustPortableBadge } from '@/components/shared/trust-portable-badge';
+import { AIToolsAccordion } from '@/components/shared/ai-tools-accordion';
+import { useAutosave } from '@/lib/hooks/use-autosave';
 import { SubmissionVelocityBar } from '@/components/apply/submission-velocity-bar';
 import { PastWinsPopover } from '@/components/apply/past-wins-popover';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
@@ -1096,6 +1098,21 @@ function ProposalStep({
 }) {
   const { t } = useTranslation();
   const { enabled: coAuthorEnabled } = useFlag('ai.draft_application');
+  // Phase 84 — autosave the in-progress proposal to localStorage with a
+  // debounce. The whole responses object is captured under a single
+  // key per application; resume-banner groups by entity so the NGO sees
+  // one entry on dashboard regardless of how many sections they touched.
+  useAutosave({
+    value: JSON.stringify(responses ?? {}),
+    meta: {
+      kind: 'application',
+      id: applicationId ?? 0,
+      title: criteria[0]?.label ? null : null, // grant title set on parent
+      href: `/apply/${grantId ?? 0}`,
+    },
+    disabled: applicationId == null || Object.values(responses ?? {}).every(v => !v || !v.trim()),
+  });
+
   if (criteria.length === 0) {
     return (
       <Card className="py-10 text-center">
@@ -1154,27 +1171,38 @@ function ProposalStep({
         />
       )}
 
-      {coAuthorEnabled && grantId != null && (
-        <DraftCoAuthor
-          grantId={grantId}
-          applicationId={applicationId}
-          onApplied={(d) => onDraftApplied(d.responses || {})}
-        />
+      {/* Phase 83 — AI consolidation. Team review: apply page had 6
+          stacked AI buttons (Smart Draft + DraftCoAuthor + Autofill +
+          per-criterion Strengthen + per-criterion Draft + Co-pilot).
+          We keep the SmartDraftBanner above as the primary 'do it for
+          me' action, and collapse the rest into one disclosure so the
+          power-user tools are still available but not in the way of
+          non-technical users. */}
+      {(coAuthorEnabled || grantId != null) && (
+        <AIToolsAccordion
+          label="More AI tools"
+          hint="Guided drafting, section-by-section auto-fill, and Q&A with the donor"
+          toolCount={(coAuthorEnabled ? 1 : 0)
+            + (grantId != null && Object.keys(responses).filter(k => (responses[k] || '').trim()).length === 0 ? 1 : 0)
+            + (grantId != null ? 1 : 0)}
+        >
+          {coAuthorEnabled && grantId != null && (
+            <DraftCoAuthor
+              grantId={grantId}
+              applicationId={applicationId}
+              onApplied={(d) => onDraftApplied(d.responses || {})}
+            />
+          )}
+          {grantId != null && Object.keys(responses).filter(k => (responses[k] || '').trim()).length === 0 && (
+            <AutofillPanel
+              grantId={grantId}
+              alreadyFilledKeys={Object.keys(responses).filter(k => (responses[k] || '').trim())}
+              onAccept={(key, draft) => onResponseChange(key, draft)}
+            />
+          )}
+          {grantId != null && <GrantQAPanel grantId={grantId} variant="compact" />}
+        </AIToolsAccordion>
       )}
-
-      {/* Phase 10 — AI application auto-fill. Pre-fills drafts from
-          the NGO's org profile + assessments + prior apps. Accept per
-          criterion or accept-all. Renders only if there's nothing typed
-          yet (so it doesn't overwrite work in progress). */}
-      {grantId != null && Object.keys(responses).filter(k => (responses[k] || '').trim()).length === 0 && (
-        <AutofillPanel
-          grantId={grantId}
-          alreadyFilledKeys={Object.keys(responses).filter(k => (responses[k] || '').trim())}
-          onAccept={(key, draft) => onResponseChange(key, draft)}
-        />
-      )}
-
-      {grantId != null && <GrantQAPanel grantId={grantId} variant="compact" />}
 
       {criteria.map((c) => {
         const text = responses[c.key] ?? '';
