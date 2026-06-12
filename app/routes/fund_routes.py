@@ -199,6 +199,102 @@ def api_get_window(window_id):
     return jsonify({"success": True, "window": w.to_dict(include_rubric=True)})
 
 
+@fund_bp.route("/windows/<int:window_id>/operational", methods=["GET"])
+@login_required
+def api_window_operational_rollup(window_id):
+    """Phase 52 — operational state rollup for a window.
+
+    Returns the live count of declarations / grants / due reports tied
+    to this window so the funds page can lead with operational state
+    instead of configuration (see docs/DESIGN_PRINCIPLES.md, brief for
+    Funds & Windows).
+
+    Shape:
+      {
+        "success": True,
+        "window_id": <int>,
+        "available_budget": <int|null>,    # fund pool — disbursed (best-effort)
+        "currency": <str>,
+        "active_declaration_count": <int>, # in_review + signed_active
+        "open_grant_count": <int>,         # status='open' under this window
+        "due_report_count": <int>,         # tied grants, due in next 30 days
+        "overdue_report_count": <int>,     # tied grants, due_date < today
+        "top_risks": []                    # placeholder; populated by a
+                                           # later AI surface
+      }
+    """
+    from datetime import date, timedelta
+    from app.models import EmergencyDeclaration, Grant, Report
+
+    w = FundWindow.query.get_or_404(window_id)
+    network_id = get_current_network_id()
+    if network_id and w.fund.network_id != network_id:
+        return jsonify({"success": False, "error": "Wrong network context"}), 403
+
+    today = date.today()
+    in_30 = today + timedelta(days=30)
+
+    active_decl = (
+        EmergencyDeclaration.query
+        .filter(EmergencyDeclaration.window_id == window_id)
+        .filter(EmergencyDeclaration.status.in_(["in_review", "signed_active"]))
+        .count()
+    )
+    open_grants = (
+        Grant.query
+        .filter(Grant.fund_window_id == window_id)
+        .filter(Grant.status == "open")
+        .count()
+    )
+    # Reports are tied to grants, not directly to windows; join by grant.
+    due_reports = (
+        db.session.query(Report.id)
+        .join(Grant, Report.grant_id == Grant.id)
+        .filter(Grant.fund_window_id == window_id)
+        .filter(Report.status.in_(["draft", "pending"]))
+        .filter(Report.due_date.isnot(None))
+        .filter(Report.due_date >= today)
+        .filter(Report.due_date <= in_30)
+        .count()
+    )
+    overdue_reports = (
+        db.session.query(Report.id)
+        .join(Grant, Report.grant_id == Grant.id)
+        .filter(Grant.fund_window_id == window_id)
+        .filter(Report.status.in_(["draft", "pending"]))
+        .filter(Report.due_date.isnot(None))
+        .filter(Report.due_date < today)
+        .count()
+    )
+
+    # Best-effort budget: fund.total_pool_amount minus disbursed_to_date if
+    # tracked. Per-window slicing requires a separate accounting endpoint
+    # and isn't in scope for Phase 52.
+    fund = w.fund
+    pool = getattr(fund, "total_pool_amount", None)
+    disbursed = getattr(fund, "disbursed_to_date", None) or 0
+    available_budget = None
+    if pool is not None:
+        try:
+            available_budget = max(0, int(pool) - int(disbursed))
+        except (TypeError, ValueError):
+            available_budget = pool
+
+    return jsonify({
+        "success": True,
+        "window_id": window_id,
+        "available_budget": available_budget,
+        "currency": getattr(fund, "currency", None),
+        "active_declaration_count": active_decl,
+        "open_grant_count": open_grants,
+        "due_report_count": due_reports,
+        "overdue_report_count": overdue_reports,
+        # top_risks is a placeholder. Populated by a later AI surface that
+        # synthesises risk signals from declarations + grants + reports.
+        "top_risks": [],
+    })
+
+
 @fund_bp.route("/windows/<int:window_id>", methods=["PUT"])
 @role_required("admin")
 def api_update_window(window_id):

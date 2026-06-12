@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import {
-  useFunds, useFund, useWindowRubric, useDeclarations,
+  useFunds, useFund, useWindowRubric, useDeclarations, useWindowOperational,
   type Fund, type FundWindow, type WindowCriterion,
 } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
@@ -324,9 +324,32 @@ function NewWindowForm({ fundId, onCreate, onCancel }: {
   );
 }
 
+// Phase 52 — small operational stat tile rendered in WindowCard
+function OpStat({
+  label, value, tone = 'muted',
+}: {
+  label: string;
+  value: string;
+  tone?: 'muted' | 'good' | 'warn' | 'bad' | 'accent';
+}) {
+  const cls =
+    tone === 'good'   ? 'border-[hsl(var(--kuja-grow))]/30 bg-[hsl(var(--kuja-grow))]/10 text-[hsl(var(--kuja-grow))]'
+    : tone === 'warn' ? 'border-[hsl(var(--kuja-sun))]/30 bg-[hsl(var(--kuja-sun))]/10 text-[hsl(var(--kuja-sun))]'
+    : tone === 'bad'  ? 'border-destructive/30 bg-destructive/10 text-destructive'
+    : tone === 'accent' ? 'border-[hsl(var(--kuja-clay))]/30 bg-[hsl(var(--kuja-clay))]/10 text-[hsl(var(--kuja-clay))]'
+    : 'border-border bg-muted/30 text-muted-foreground';
+  return (
+    <div className={`border rounded-md p-2 ${cls}`}>
+      <div className="uppercase tracking-wide opacity-80 text-[9px]">{label}</div>
+      <div className="font-semibold text-xs mt-0.5">{value}</div>
+    </div>
+  );
+}
+
 function WindowCard({ window: w, onUpdate }: { window: FundWindow; onUpdate: () => void }) {
   const [seeding, setSeeding] = useState(false);
   const { data: rubricData, mutate: refetchRubric } = useWindowRubric(w.id);
+  const { data: ops } = useWindowOperational(w.id);
   const rubric = rubricData?.rubric;
 
   async function seedRubric() {
@@ -379,6 +402,44 @@ function WindowCard({ window: w, onUpdate }: { window: FundWindow; onUpdate: () 
           </Link>
         </div>
       </div>
+
+      {/* Phase 52 — operational state strip. Leads the card with what the
+          window is DOING right now, not what it's configured to allow. */}
+      {ops && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
+          <OpStat
+            label="Available"
+            value={
+              ops.available_budget != null
+                ? `${ops.available_budget.toLocaleString()} ${ops.currency ?? ''}`.trim()
+                : '—'
+            }
+          />
+          <OpStat
+            label="Active declarations"
+            value={String(ops.active_declaration_count)}
+            tone={ops.active_declaration_count > 0 ? 'accent' : 'muted'}
+          />
+          <OpStat
+            label="Open grants"
+            value={String(ops.open_grant_count)}
+            tone={ops.open_grant_count > 0 ? 'good' : 'muted'}
+          />
+          <OpStat
+            label="Reports due / overdue"
+            value={
+              ops.overdue_report_count > 0
+                ? `${ops.due_report_count} (${ops.overdue_report_count} overdue)`
+                : String(ops.due_report_count)
+            }
+            tone={
+              ops.overdue_report_count > 0 ? 'bad'
+              : ops.due_report_count > 0 ? 'warn'
+              : 'muted'
+            }
+          />
+        </div>
+      )}
 
       {/* Tiny SLA chip strip */}
       <div className="flex flex-wrap gap-1.5 text-[10px]">

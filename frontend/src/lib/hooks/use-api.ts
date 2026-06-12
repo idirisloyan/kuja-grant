@@ -348,6 +348,26 @@ export function useWindowRubric(windowId: number | null) {
   );
 }
 
+// Phase 52 — per-window operational rollup. Leads with state, not config.
+export interface WindowOperational {
+  success: boolean;
+  window_id: number;
+  available_budget: number | null;
+  currency: string | null;
+  active_declaration_count: number;
+  open_grant_count: number;
+  due_report_count: number;
+  overdue_report_count: number;
+  top_risks: string[];
+}
+
+export function useWindowOperational(windowId: number | null) {
+  return useSWR<WindowOperational>(
+    windowId ? `/windows/${windowId}/operational` : null,
+    fetcher,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Crisis Monitoring (Phase 35)
 // ---------------------------------------------------------------------------
