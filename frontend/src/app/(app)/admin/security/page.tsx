@@ -25,6 +25,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 interface StatusResponse {
   enabled: boolean;
@@ -170,15 +171,14 @@ export default function SecurityPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-5">
-      <header>
-        <h1 className="kuja-display text-2xl flex items-center gap-2">
-          <Shield className="h-6 w-6 text-[hsl(var(--kuja-clay))]" />
-          {t('security.title')}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t('security.subtitle')}</p>
-      </header>
-
+    <div className="max-w-2xl">
+      <PageShell>
+        <PageHeader
+          title={t('security.title')}
+          icon={Shield}
+          subtitle={t('security.subtitle')}
+        />
+        <PageMain>
       {view === 'loading' && (
         <div className="rounded-md border border-border bg-background p-6 flex items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -388,6 +388,8 @@ export default function SecurityPage() {
           </details>
         </div>
       )}
+        </PageMain>
+      </PageShell>
     </div>
   );
 }

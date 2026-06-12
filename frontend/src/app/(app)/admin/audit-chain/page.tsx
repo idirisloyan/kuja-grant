@@ -23,6 +23,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 interface VerifyResult {
   success: boolean;
@@ -112,17 +113,14 @@ export default function AuditChainPage() {
   const integrityOk = verify?.ok === true;
 
   return (
-    <div className="space-y-4 max-w-6xl mx-auto">
-      <div>
-        <div className="kuja-eyebrow">Compliance evidence</div>
-        <h1 className="kuja-display text-3xl mt-1">Hash-chained audit log</h1>
-        <p className="text-sm text-[hsl(var(--kuja-ink-soft))] mt-1 max-w-2xl">
-          Every critical event (capacity passport publish/verify/revoke, plus future
-          high-trust actions) writes a hash-chained row. Any retroactive edit breaks
-          the chain — this page proves the chain is intact and shows the live timeline.
-        </p>
-      </div>
-
+    <div className="max-w-6xl mx-auto">
+      <PageShell>
+        <PageHeader
+          title="Hash-chained audit log"
+          icon={ShieldCheck}
+          subtitle="Every critical event writes a hash-chained row. Any retroactive edit breaks the chain — this page proves it's intact."
+        />
+        <PageMain>
       {/* Integrity card */}
       <Card className={cn(
         'p-4 sm:p-5 border-l-4',
@@ -288,6 +286,8 @@ export default function AuditChainPage() {
           <p className="text-xs text-[hsl(var(--kuja-flag))]">Error: {error}</p>
         </Card>
       )}
+        </PageMain>
+      </PageShell>
     </div>
   );
 }

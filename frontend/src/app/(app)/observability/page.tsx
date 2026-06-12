@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { AIHelpfulnessPanel } from '@/components/observability/AIHelpfulnessPanel';
 import { AIBudgetCard } from '@/components/observability/AIBudgetCard';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 interface EndpointStats {
   total: number;
@@ -147,22 +148,23 @@ export default function ObservabilityPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="kuja-display text-3xl">{t('observability.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{t('observability.subtitle')}</p>
-        </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-          {t('observability.refresh')}
-        </button>
-      </div>
-
+    <PageShell>
+      <PageHeader
+        title={t('observability.title')}
+        icon={Activity}
+        subtitle={t('observability.subtitle')}
+        primaryAction={
+          <button
+            onClick={load}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+            {t('observability.refresh')}
+          </button>
+        }
+      />
+      <PageMain>
       {loading && !data && (
         <div className="space-y-3">
           <div className="kuja-shimmer h-24 rounded-xl" />
@@ -362,7 +364,8 @@ export default function ObservabilityPage() {
           </Section>
         </>
       )}
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }
 

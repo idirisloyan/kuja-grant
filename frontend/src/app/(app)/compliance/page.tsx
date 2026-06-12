@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Grant, Report } from '@/lib/types';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 function getRiskLevel(score: number | null, status: string, dueDate?: string | null): 'green' | 'amber' | 'red' {
   const isOverdue = dueDate ? new Date(dueDate) < new Date() : false;
@@ -199,17 +200,13 @@ export default function CompliancePage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="kuja-display text-3xl inline-flex items-center gap-2">
-          {t('compliance.dashboard_title') || 'Compliance'}
-          <InfoTip>{t('glossary.compliance')}</InfoTip>
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {t('compliance.dashboard_subtitle') || 'Track grant compliance, deliverables, and risk.'}
-        </p>
-      </div>
-
+    <PageShell>
+      <PageHeader
+        title={t('compliance.dashboard_title') || 'Compliance'}
+        icon={ShieldCheck}
+        subtitle={t('compliance.dashboard_subtitle') || 'Track grant compliance, deliverables, and risk.'}
+      />
+      <PageMain>
       {(summary.overdueItems > 0 || summary.atRisk > 0) && (
         <div className="kuja-verdict kuja-verdict-danger flex items-center gap-3 flex-wrap">
           <AlertTriangle className="h-5 w-5 text-[hsl(var(--kuja-flag))] flex-shrink-0" />
@@ -266,7 +263,8 @@ export default function CompliancePage() {
           ))
         )}
       </div>
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }
 

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { RegistrationVerification } from '@/lib/types';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 function confidenceCls(c: number | null | undefined): string {
   if (c == null) return 'text-muted-foreground';
@@ -387,14 +388,13 @@ export default function VerificationPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="kuja-display text-3xl">{t('verification.title')}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {t('verification.subtitle', { n: Object.keys(registriesData?.registries ?? {}).length })}
-        </p>
-      </div>
-
+    <PageShell>
+      <PageHeader
+        title={t('verification.title')}
+        icon={ShieldCheck}
+        subtitle={t('verification.subtitle', { n: Object.keys(registriesData?.registries ?? {}).length })}
+      />
+      <PageMain>
       {/* This page is now the deep-workflow surface for registration
           checks. The single-org summary lives inside Trust Profile —
           guide users there so they understand where the canonical view
@@ -553,7 +553,8 @@ export default function VerificationPage() {
           </div>
         </div>
       )}
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }
 

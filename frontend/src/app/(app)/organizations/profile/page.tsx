@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Organization } from '@/lib/types';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 const SECTOR_OPTIONS = [
   'Health', 'Education', 'WASH', 'Food Security', 'Livelihoods',
@@ -128,32 +129,31 @@ export default function OrgProfilePage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="kuja-display text-3xl">{t('org.profile_title')}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {t('org.profile_subtitle')}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {saved && (
-            <span className="inline-flex items-center gap-1 text-sm text-[hsl(var(--kuja-grow))]">
-              <CheckCircle className="h-4 w-4" /> {t('common.saved')}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? t('org.saving') : t('common.save_changes')}
-          </button>
-        </div>
-      </div>
-
+    <PageShell>
+      <PageHeader
+        title={t('org.profile_title')}
+        icon={Building2}
+        subtitle={t('org.profile_subtitle')}
+        primaryAction={
+          <div className="flex items-center gap-3">
+            {saved && (
+              <span className="inline-flex items-center gap-1 text-sm text-[hsl(var(--kuja-grow))]">
+                <CheckCircle className="h-4 w-4" /> {t('common.saved')}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? t('org.saving') : t('common.save_changes')}
+            </button>
+          </div>
+        }
+      />
+      <PageMain>
       {/* Phase 6 — own-org AI usage transparency. Renders nothing if the
           /api/ai-budget/me call fails or the user isn't in an org. */}
       <MyAIUsageCard />
@@ -327,6 +327,7 @@ export default function OrgProfilePage() {
           </p>
         )}
       </div>
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }

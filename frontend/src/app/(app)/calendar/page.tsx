@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 import {
   Calendar as CalendarIcon, Clock, Briefcase, ShieldCheck, Award,
   ArrowRight, ChevronLeft, ChevronRight, Download,
@@ -260,59 +261,58 @@ export default function CalendarPage() {
   const highCount = events.filter(e => e.severity === 'high').length;
 
   return (
-    <div className="space-y-4 max-w-6xl mx-auto">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <div className="kuja-eyebrow">Cross-entity calendar</div>
-          <h1 className="kuja-display text-3xl mt-1">All your deadlines</h1>
-          <p className="text-sm text-[hsl(var(--kuja-ink-soft))] mt-1 max-w-2xl">
-            Grant deadlines, report due dates, registration expiries, passport renewals —
-            everything across every donor and grantee, in one view.
-          </p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          {highCount > 0 && (
-            <Badge variant="outline" className="border-[hsl(var(--kuja-flag))] text-[hsl(var(--kuja-flag))]">
-              {highCount} urgent
-            </Badge>
+    <div className="max-w-6xl mx-auto">
+      <PageShell>
+        <PageHeader
+          title="All your deadlines"
+          icon={CalendarIcon}
+          subtitle="Grant deadlines, reports, registration expiries, passport renewals — every donor and grantee, one view."
+          primaryAction={
+            <div className="flex items-center gap-3 flex-wrap">
+              {highCount > 0 && (
+                <Badge variant="outline" className="border-[hsl(var(--kuja-flag))] text-[hsl(var(--kuja-flag))]">
+                  {highCount} urgent
+                </Badge>
+              )}
+              <a
+                href="/api/calendar/deadlines.pdf?days=120&past=7"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--kuja-ink))] hover:bg-[hsl(var(--kuja-sand-50))]"
+              >
+                <Download className="w-3.5 h-3.5" /> Download PDF
+              </a>
+              <div className="inline-flex rounded-md border border-[hsl(var(--border))] overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setView('upcoming')}
+                  className={cn(
+                    'px-3 py-1.5 text-sm font-semibold',
+                    view === 'upcoming' ? 'bg-[hsl(var(--kuja-clay))] text-white' : 'hover:bg-[hsl(var(--kuja-sand-50))]',
+                  )}
+                  aria-pressed={view === 'upcoming'}
+                >Upcoming</button>
+                <button
+                  type="button"
+                  onClick={() => setView('month')}
+                  className={cn(
+                    'px-3 py-1.5 text-sm font-semibold border-l border-[hsl(var(--border))]',
+                    view === 'month' ? 'bg-[hsl(var(--kuja-clay))] text-white' : 'hover:bg-[hsl(var(--kuja-sand-50))]',
+                  )}
+                  aria-pressed={view === 'month'}
+                >Month</button>
+              </div>
+            </div>
+          }
+        />
+        <PageMain>
+          {view === 'upcoming' ? (
+            <UpcomingView events={events} />
+          ) : (
+            <MonthView events={events} monthOffset={monthOffset} onShift={(d) => setMonthOffset(d === 0 ? 0 : monthOffset + d)} />
           )}
-          {/* Phase 13 — print/email-friendly PDF of the calendar window */}
-          <a
-            href="/api/calendar/deadlines.pdf?days=120&past=7"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--kuja-ink))] hover:bg-[hsl(var(--kuja-sand-50))]"
-          >
-            <Download className="w-3.5 h-3.5" /> Download PDF
-          </a>
-          <div className="inline-flex rounded-md border border-[hsl(var(--border))] overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setView('upcoming')}
-              className={cn(
-                'px-3 py-1.5 text-sm font-semibold',
-                view === 'upcoming' ? 'bg-[hsl(var(--kuja-clay))] text-white' : 'hover:bg-[hsl(var(--kuja-sand-50))]',
-              )}
-              aria-pressed={view === 'upcoming'}
-            >Upcoming</button>
-            <button
-              type="button"
-              onClick={() => setView('month')}
-              className={cn(
-                'px-3 py-1.5 text-sm font-semibold border-l border-[hsl(var(--border))]',
-                view === 'month' ? 'bg-[hsl(var(--kuja-clay))] text-white' : 'hover:bg-[hsl(var(--kuja-sand-50))]',
-              )}
-              aria-pressed={view === 'month'}
-            >Month</button>
-          </div>
-        </div>
-      </div>
-
-      {view === 'upcoming' ? (
-        <UpcomingView events={events} />
-      ) : (
-        <MonthView events={events} monthOffset={monthOffset} onShift={(d) => setMonthOffset(d === 0 ? 0 : monthOffset + d)} />
-      )}
+        </PageMain>
+      </PageShell>
     </div>
   );
 }

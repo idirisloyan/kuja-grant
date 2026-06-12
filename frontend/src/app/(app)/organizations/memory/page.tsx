@@ -26,6 +26,7 @@ import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { useFlag } from '@/lib/hooks/use-feature-flags';
 import { cn } from '@/lib/utils';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 type MemoryKind = 'fact' | 'narrative' | 'evidence' | 'document' | 'metric' | 'partner';
 
@@ -171,24 +172,23 @@ export default function OrgMemoryPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="min-w-0">
-          <h1 className="kuja-display text-2xl flex items-center gap-2">
-            <Brain className="h-6 w-6 text-[hsl(var(--kuja-clay))]" />
-            {t('org_memory.title')}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t('org_memory.subtitle')}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          <Plus className="h-4 w-4" />
-          {t('org_memory.add')}
-        </button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title={t('org_memory.title')}
+        icon={Brain}
+        subtitle={t('org_memory.subtitle')}
+        primaryAction={
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" />
+            {t('org_memory.add')}
+          </button>
+        }
+      />
+      <PageMain>
 
       {/* Filter row */}
       <div className="flex items-center gap-1.5 flex-wrap border-b border-border pb-2">
@@ -405,6 +405,7 @@ export default function OrgMemoryPage() {
           })}
         </div>
       )}
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }
