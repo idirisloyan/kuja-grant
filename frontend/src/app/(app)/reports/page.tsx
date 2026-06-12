@@ -6,6 +6,7 @@ import { useNetworkStore } from '@/stores/network-store';
 import { NearComplianceReporting } from '@/components/reports/near-compliance-reporting';
 import { ReportDraftCoAuthor } from '@/components/reports/ReportDraftCoAuthor';
 import { VoiceReportComposer } from '@/components/reports/VoiceReportComposer';
+import { PhotoEvidenceUploader } from '@/components/reports/PhotoEvidenceUploader';
 import { ReportReadiness } from '@/components/reports/ReportReadiness';
 import { ReportBundlePanel } from '@/components/reports/report-bundle-panel';
 import { useAuthStore } from '@/stores/auth-store';
@@ -1249,6 +1250,9 @@ function ReportRow({ report, mutateReports }: { report: Report; mutateReports: (
                 option first. Both are non-destructive: voice merges
                 with whatever co-author has produced. */}
             <VoiceReportComposer reportId={report.id} onApplied={() => mutateReports()} />
+            {/* Phase 72 — photo-evidence. Phone camera → Claude vision →
+                structured fields attached to the report. */}
+            <PhotoEvidenceUploader reportId={report.id} onApplied={() => mutateReports()} />
             <ReportDraftCoAuthor reportId={report.id} onApplied={() => mutateReports()} />
             {/* Phase 8 — donor review bundle. NGO assembles + publishes;
                 donors/admin assemble (read-only) to see what they'll review. */}

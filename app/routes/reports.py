@@ -216,6 +216,151 @@ def api_update_report(report_id):
     return jsonify({'success': True, 'report': report.to_dict()})
 
 
+@reports_bp.route('/<int:report_id>/photo-evidence', methods=['POST'])
+@login_required
+@role_required('ngo')
+def api_photo_evidence(report_id):
+    """Phase 72 — Photo-as-evidence.
+
+    NGO uploads a phone photo of an attendance sheet, receipt, training
+    session, or site visit. Claude vision extracts structured data
+    (attendees, totals, observations, etc.) appropriate to the chosen
+    photo type, and the file + extracted fields are attached to the
+    report.
+
+    Form: file (image), photo_type (attendance|receipt|training|
+                                    site_visit|other)
+    Returns: {file_id, attachment_id, extraction:{...}, narrative,
+             warnings[]}
+    """
+    import os, uuid
+    from werkzeug.utils import secure_filename
+    from flask import current_app
+    from app.models import Document
+
+    report = db.session.get(Report, report_id)
+    if not report:
+        return jsonify({'error': 'Report not found', 'success': False}), 404
+    if report.submitted_by_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied', 'success': False}), 403
+    if report.status not in ('draft', 'revision_requested'):
+        return jsonify({
+            'error': 'Photo evidence can only be attached while the report is a draft.',
+            'success': False,
+        }), 400
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided', 'success': False}), 400
+    upl = request.files['file']
+    if not upl.filename:
+        return jsonify({'error': 'No file selected', 'success': False}), 400
+
+    fname = secure_filename(upl.filename)
+    ext = (fname.rsplit('.', 1)[-1] or '').lower() if '.' in fname else ''
+    if ext not in {'jpg', 'jpeg', 'png', 'webp', 'gif'}:
+        return jsonify({
+            'error': 'Only photos are accepted here (jpg, png, webp). Use the "Upload document" button for PDFs/Word.',
+            'success': False,
+        }), 400
+
+    stored = f"{uuid.uuid4().hex}.{ext}"
+    fpath = os.path.join(current_app.config['UPLOAD_FOLDER'], stored)
+    upl.save(fpath)
+    size = os.path.getsize(fpath)
+    if size < 500:
+        try: os.remove(fpath)
+        except Exception: pass
+        return jsonify({'error': 'Photo is too small to be valid. Please retake it.', 'success': False}), 400
+
+    photo_type = (request.form.get('photo_type') or 'other').lower().strip()
+    grant = db.session.get(Grant, report.grant_id)
+
+    try:
+        extraction = AIService.extract_photo_evidence(
+            image_path=fpath,
+            photo_type=photo_type,
+            grant_title=(grant.title if grant else None),
+            report_type=report.report_type,
+        )
+    except Exception as e:
+        logger.error(f"photo-evidence extraction failed: {e}")
+        extraction = {
+            'kind': photo_type, 'extracted': {}, 'narrative': '',
+            'confidence': 0, 'warnings': ['AI extraction was unavailable.'],
+            'ai_used': False,
+        }
+
+    # Save as a Document so it integrates with existing attachment UI.
+    # Document model fields: original_filename, stored_filename, mime_type,
+    # file_size, doc_type, ai_analysis (JSON). No org_id/uploaded_by_user_id.
+    # Scope is implicit via report.submitted_by_org_id.
+    try:
+        doc = Document(
+            original_filename=fname,
+            stored_filename=stored,
+            mime_type=f'image/{"jpeg" if ext == "jpg" else ext}',
+            file_size=size,
+            doc_type='report_evidence',
+        )
+        # Stash extraction in the ai_analysis JSON column so the existing
+        # document-viewer UI can surface it alongside the photo.
+        doc.set_ai_analysis({
+            'photo_evidence': True,
+            'photo_type': extraction.get('kind'),
+            'extracted': extraction.get('extracted'),
+            'narrative': extraction.get('narrative'),
+            'confidence': extraction.get('confidence'),
+            'report_id': report.id,
+            'ai_used': extraction.get('ai_used', False),
+        })
+        db.session.add(doc)
+        db.session.flush()
+
+        # Append to the report's attachments list and stamp the narrative
+        # into ai_analysis so the donor can see it was photo-evidenced.
+        atts = report.get_attachments() or []
+        atts.append({
+            'document_id': doc.id, 'filename': fname,
+            'kind': 'photo_evidence',
+            'photo_type': extraction.get('kind'),
+            'narrative': extraction.get('narrative'),
+            'confidence': extraction.get('confidence'),
+        })
+        report.set_attachments(atts)
+
+        ai = report.get_ai_analysis() or {}
+        ai_evi = ai.get('photo_evidence', [])
+        ai_evi.append({
+            'document_id': doc.id, 'kind': extraction.get('kind'),
+            'narrative': extraction.get('narrative'),
+            'confidence': extraction.get('confidence'),
+        })
+        ai['photo_evidence'] = ai_evi[-20:]
+        report.set_ai_analysis(ai)
+
+        db.session.commit()
+    except Exception as e:
+        logger.error(f"photo-evidence persistence failed: {e}")
+        db.session.rollback()
+        return jsonify({
+            'success': True,
+            'persisted': False,
+            'extraction': extraction,
+            'note': 'Photo extracted but could not be saved to the report. Please re-upload.',
+        }), 200
+
+    return jsonify({
+        'success': True,
+        'persisted': True,
+        'document_id': doc.id,
+        'extraction': extraction,
+        'narrative': extraction.get('narrative'),
+        'confidence': extraction.get('confidence'),
+        'warnings': extraction.get('warnings', []),
+        'ai_used': extraction.get('ai_used'),
+    })
+
+
 @reports_bp.route('/<int:report_id>/structure-from-voice', methods=['POST'])
 @login_required
 @role_required('ngo')

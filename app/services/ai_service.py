@@ -4535,6 +4535,191 @@ RETURN ONLY valid JSON in this exact shape (no commentary, no markdown fences):
                 "error": str(e)[:200],
             }
 
+    # ------------------------------------------------------------------
+    # Phase 72 — Photo-as-evidence
+    # ------------------------------------------------------------------
+    # NGOs in the Global South typically only have a smartphone as their
+    # camera/scanner/OCR/data-entry tool. A photo of an attendance sheet,
+    # receipt, training session, or field visit is the source artefact
+    # they're working from. Today they "scan + OCR + manually retype +
+    # reformat" — hours of work per report.
+    #
+    # Photo-as-evidence skips that pipeline entirely: phone photo in,
+    # structured data out, attached to the report. The extraction
+    # adapts to the photo type the NGO picked (attendance / receipt /
+    # training / site_visit / other) so the prompt asks for the right
+    # fields.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def extract_photo_evidence(image_path: str, photo_type: str = 'other',
+                                grant_title: str | None = None,
+                                report_type: str | None = None) -> dict:
+        """Use Claude vision to extract structured data from a photo.
+
+        Returns: {
+          "kind": "<canonical type>",
+          "extracted": {
+            # attendance: list of attendees w/ names + signatures present
+            # receipt:    vendor, total, currency, date, line_items
+            # training:   topic, location, date, instructor, attendee_count
+            # site_visit: location, date, observations[], people_met[]
+            # other:      free-form summary + key_facts list
+          },
+          "narrative": "1-2 sentence summary the NGO can paste",
+          "confidence": 0-100,
+          "warnings": [strings],
+          "ai_used": bool,
+        }
+        """
+        result = {
+            "kind": photo_type,
+            "extracted": {},
+            "narrative": "",
+            "confidence": 0,
+            "warnings": [],
+            "ai_used": False,
+        }
+
+        if not (HAS_ANTHROPIC and ANTHROPIC_API_KEY):
+            result["warnings"].append(
+                "AI vision is not configured. The photo is saved but data extraction was skipped."
+            )
+            return result
+
+        # Read + base64 the image. Bail early if too large for vision API.
+        try:
+            import base64, os as _os
+            size = _os.path.getsize(image_path)
+            if size > 5 * 1024 * 1024:
+                result["warnings"].append(
+                    "Photo is larger than 5 MB. Try a smaller photo or the device's "
+                    "lower-resolution camera setting."
+                )
+                return result
+            with open(image_path, 'rb') as f:
+                img_b64 = base64.standard_b64encode(f.read()).decode('ascii')
+        except Exception as e:
+            result["warnings"].append(f"Could not read photo: {e}")
+            return result
+
+        # Sniff media type from file extension. Default to jpeg.
+        ext = (image_path.rsplit('.', 1)[-1] or 'jpg').lower()
+        media_map = {'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
+                     'webp': 'image/webp', 'gif': 'image/gif'}
+        media_type = media_map.get(ext, 'image/jpeg')
+
+        # Per-type prompt — gives Claude an explicit JSON schema to fill,
+        # so the result lands directly in the report's content fields
+        # without parsing acrobatics.
+        kind_norm = (photo_type or 'other').lower().strip()
+        if kind_norm not in {'attendance', 'receipt', 'training', 'site_visit', 'other'}:
+            kind_norm = 'other'
+
+        type_prompt = {
+            'attendance': '''This is a photo of an attendance sheet from a training, meeting, or event run by an NGO. Extract:
+- event_title (if visible)
+- event_date (YYYY-MM-DD if a date is shown)
+- location
+- attendees: list of {name, signature_present (bool), other_notes (e.g. role, age, sex)}
+- attendee_count (the number of distinct people)
+- legibility_warnings (entries that are too smudged or partial to confirm)''',
+            'receipt': '''This is a photo of a receipt, invoice, or expense voucher from an NGO's field work. Extract:
+- vendor (the seller or supplier)
+- date (YYYY-MM-DD)
+- currency (3-letter code; infer from country if implicit)
+- total_amount (number, no thousand separators)
+- line_items: list of {description, quantity, unit_price, line_total}
+- tax_or_vat (if present, separately)
+- payment_method (cash, mobile money, bank — only if shown)
+- legibility_warnings''',
+            'training': '''This is a photo from an NGO training session, workshop, or field activity. Identify what is visible. Extract:
+- activity_type (e.g. classroom training, demonstration, group discussion)
+- topic_visible_on_board_or_materials (if any)
+- estimated_attendee_count (range is fine; explain reasoning)
+- location_clues (indoor/outdoor, urban/rural, country if visible)
+- visible_materials (handouts, posters, equipment)
+- observations (3-5 short factual observations the NGO could quote in a report)''',
+            'site_visit': '''This is a photo from an NGO field site visit. Extract:
+- location_clues
+- subject (what is being photographed — a borehole, classroom, distribution point, etc.)
+- condition_observations (positive: what looks good; negative: what looks like a concern)
+- people_visible_count
+- environmental_context (weather, terrain, time-of-day clues)
+- factual_observations the NGO can quote''',
+            'other': '''Identify what is in this photo. Extract:
+- subject (one short noun phrase)
+- visible_text (anything legible)
+- key_facts (3-5 factual observations the NGO could use in a report)''',
+        }
+
+        try:
+            client = AIService._get_client()
+            if not client:
+                raise Exception("AI client not available")
+
+            context_line = []
+            if grant_title:    context_line.append(f"Grant: {grant_title}")
+            if report_type:    context_line.append(f"Report type: {report_type}")
+            context = (' | '.join(context_line) + '\n\n') if context_line else ''
+
+            prompt = f"""{context}You are helping a non-technical NGO program officer turn a phone photo into structured evidence for their donor report. Be conservative: extract ONLY what is clearly visible. Do not guess. If something is illegible or ambiguous, add it to legibility_warnings instead of inventing.
+
+PHOTO TYPE the NGO selected: {kind_norm}
+
+{type_prompt[kind_norm]}
+
+ALSO produce:
+- narrative: a 1-2 sentence factual summary the NGO can paste into a report ('A training was held on 12 March 2026 with 47 attendees in Garissa County.')
+- confidence: 0-100. 100 means everything is clear and unambiguous; lower means partial extraction.
+
+Return ONLY valid JSON in this shape (no markdown fences, no preamble):
+{{
+  "extracted": {{ ...the fields above... }},
+  "narrative": "1-2 sentences",
+  "confidence": 0-100
+}}"""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2500,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img_b64}},
+                        {"type": "text", "text": prompt},
+                    ],
+                }],
+            )
+            text = response.content[0].text.strip()
+            if text.startswith('```'):
+                text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text, flags=re.MULTILINE).strip()
+            if text.startswith('{'):
+                parsed = json.loads(text)
+            else:
+                m = re.search(r'\{[\s\S]*\}', text)
+                parsed = json.loads(m.group()) if m else None
+            if not parsed:
+                raise Exception("AI returned no parseable JSON")
+
+            result["kind"] = kind_norm
+            result["extracted"] = parsed.get("extracted", {}) or {}
+            result["narrative"] = parsed.get("narrative", "") or ""
+            result["confidence"] = int(parsed.get("confidence", 0) or 0)
+            result["ai_used"] = True
+
+            # Surface any AI-side legibility flags as user-facing warnings.
+            ext_warns = result["extracted"].get("legibility_warnings")
+            if isinstance(ext_warns, list) and ext_warns:
+                result["warnings"].extend([str(w)[:200] for w in ext_warns[:10]])
+        except Exception as e:
+            logger.error(f"extract_photo_evidence AI failed: {e}")
+            result["warnings"].append(
+                "AI extraction failed for this photo, but the file is saved and attached. "
+                "You can still describe it in the report by hand."
+            )
+
+        return result
+
     @staticmethod
     def analyze_report(content, requirements, report_type):
         """Analyze a submitted report against grant reporting requirements with per-requirement scoring.
