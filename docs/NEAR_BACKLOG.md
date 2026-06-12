@@ -232,6 +232,18 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 57 — Long-tail surface sweep (PageShell wrap).
+  Standardised 13 secondary pages on the PageShell + PageHeader
+  pattern: /reviews, /reviews/completed, /trust, /compliance,
+  /calendar, /verification, /organizations/{search,profile,memory},
+  /observability, /admin/{audit-chain,security,metrics}. Each leads
+  with title + icon + subtitle + (optional) primaryAction. No deep
+  redesign -- just consistent page anatomy. Browser-verified
+  /calendar h1 "All your deadlines", /admin/audit-chain h1
+  "Hash-chained audit log", /admin/metrics h1 "Real-user metrics",
+  /trust (NGO viewer) h1 "Trust Profile". The codebase now has a
+  single canonical page anatomy on every major user-visible page.
+
 - **2026-06-11** Phase 56 — top_risks populated on the operational
   rollup. Closes the Phase 52 placeholder. Pure SQL rules, no AI
   tokens, instant. Four rule families per window
