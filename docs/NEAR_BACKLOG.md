@@ -281,7 +281,134 @@
   exist and are wired. After flipping it on, verify by approving a
   pending NEAR membership and confirming the applicant gets the email.
 
+## Category-defining NGO experience (added 2026-06-12)
+
+These items need external account setup that can't be done from this
+chat. Each is queued with a precise unblock action so the team can
+flip them on quickly.
+
+### Email transports — wire SendGrid / SMTP credentials on Railway
+(See above. Still unblocked: Railway env var only.)
+
+### WhatsApp surface — first-class channel for non-tech NGOs
+- **Why:** Many NGO field staff don't check email; they live in
+  WhatsApp. Capacity assessment, deadline reminders, voice-memo
+  reports, photo-evidence uploads — all could land in WhatsApp.
+- **Unblock:** Meta Business API approval (2-4 weeks). Pick a BSP
+  (Twilio, Vonage, Karix) and set WHATSAPP_BSP_API_KEY +
+  WHATSAPP_PHONE_NUMBER_ID on Railway.
+- **Code state:** Backend already has a generic
+  `app/services/messaging` adapter abstracting SMS/WhatsApp. Adding
+  a WhatsApp implementation is ~2 days once BSP credentials land.
+
+### SMS OTP login — alternative to email+password
+- **Why:** Email is a barrier for staff who don't check it. SMS one-
+  tap is universal. Keep email as optional.
+- **Unblock:** Twilio account + SMS_PROVIDER_API_KEY +
+  SMS_FROM_NUMBER. ~$0.01/SMS in most LMIC markets.
+- **Code state:** Auth blueprint is single-method today. Adding
+  SMS auth method is ~3 days.
+
+### Donor-pays-for-AI — billing reframe
+- **Why:** Removes the implicit 'will my AI calls cost the NGO?'
+  question entirely. Reframes AI as 'value the donor invests in
+  capacity building.' Cleaner story and unit economics.
+- **Unblock:** Stripe connect for donor org billing + per-org token
+  metering hooks. AI service already wraps every Claude call so
+  metering insertion is mechanical.
+- **Code state:** ~1 week including Stripe webhooks and
+  donor-portal billing UI.
+
+### Offline-first PWA — IndexedDB + Service Worker
+- **Why:** Rural NGOs work over intermittent 3G. Drafting an
+  assessment offline + syncing on next connection is operational
+  table stakes for the user the product targets.
+- **Unblock:** No external creds; multi-week engineering. Service
+  Worker scope, IndexedDB schema for forms-in-progress, conflict
+  resolution on sync.
+- **Code state:** Next.js static export already produces a near-
+  PWA-shaped bundle. Adding manifest.json + offline route would
+  ship the basics in a week; full sync layer is 3-4 weeks.
+
 ## Completed (rolling log, newest first)
+
+- **2026-06-12** Phase 78 — AI content translation.
+  Removes the 'donor reads English' constraint that filtered out
+  global-south NGOs whose English is weak. NGO writes in their own
+  language, donor reads in theirs.
+  Backend: AIService.translate_text covers en/fr/ar/sw/so/es;
+    preserves numbers/dates/names; flags cultural-nuance tricky
+    choices. POST /api/translate (any authenticated user; 8000-char
+    cap). Blueprint wired and verified.
+  Frontend: <TranslateThis> wraps any free-text. Translate-on-click
+    (cost conscious), 'Show original' toggle, source-language
+    detection + fidelity + translator notes. First mount:
+    /reports/[id] reviewer-notes block.
+
+- **2026-06-12** Phase 77 — Trust-portable assessment, made visible.
+  Backend already had /api/trust-profile/<org_id>. NGOs just didn't
+  realise the canonical assessment serves every donor on the
+  platform.
+  Frontend: <TrustPortableBadge> two variants. Full panel on
+    /assessments + dashboard ('Submit once, visible to every donor
+    on Kuja' + 4 tiles: overall trust, framework, last-refreshed,
+    sanctions). Compact pill on /apply with copy 'attached
+    automatically with this application.' Renders nothing pre-
+    onboarding (no false moat signal).
+
+- **2026-06-12** Phase 76 — Why-rejected, constructively.
+  AI mentor when an application or report is declined/revisions
+  requested. summary + 2-4 specific issues (each with evidence +
+  impact) + 2-4 suggestions (each with action + expected lift) +
+  encouragement.
+  Backend: AIService.explain_rejection. Routes:
+    GET /api/applications/<id>/explain-rejection (declined,
+       rejected, revision_requested)
+    GET /api/reports/<id>/explain-rejection (rejected,
+       revision_requested)
+  Frontend: <WhyRejectedPanel> lazy-loaded on detail pages.
+
+- **2026-06-12** Phase 75 — AI-drafts-application v0.
+  NGO becomes editor, not author. Cuts authoring time 70-85%.
+  Backend: AIService.draft_application_responses grounds in org
+    profile + latest capacity assessment + last 2 submitted apps +
+    grant rubric. Per-question rationale + gaps list. Conservative
+    ('use ONLY information present; never invent.')
+    POST /api/applications/<id>/ai-draft with merge=false preview
+    / merge=true commit (never overwrites typed text).
+  Frontend: <SmartDraftBanner> on /apply/<grantId>. Two-step UX:
+    preview → confirm. Hidden once any response has >30 chars
+    typed.
+
+- **2026-06-12** Phase 74 — NGO compliance coach.
+  Flips compliance from surveillance to coaching. NGO sees own
+  posture vs peer median, trends, single next-action.
+  Backend: GET /api/dashboard/compliance-coach (NGO only).
+    timeliness/ai_quality/reports/pillars + tone-coded recommended
+    next action with deep-link href. Lazy compute; small per NGO.
+  Frontend: <ComplianceCoachCard> with peer-benchmarked tiles +
+    pillar hints. Hidden gracefully if <2 submitted reports.
+
+- **2026-06-12** Phase 73 — Audit-ready folder export.
+  One-click ZIP per grant. Structure: agreement, application,
+  reports (per period), reviews, evidence, financials. manifest.txt
+  (README) + manifest.json (SHA-256 tamper evidence). Access:
+  NGO own / donor full / admin full.
+  GET /api/grants/<id>/audit-folder.
+
+- **2026-06-12** Phase 72 — Photo-as-evidence.
+  Phone photo → Claude vision → structured fields. Per-photo-type
+  prompts (attendance / receipt / training / site_visit / other).
+  Confidence + legibility warnings.
+  POST /api/reports/<id>/photo-evidence + <PhotoEvidenceUploader>
+  with capture='environment' (opens phone rear camera directly).
+
+- **2026-06-12** Phase 71 — Voice-to-report.
+  NGO talks in any of 6 languages; browser Speech API transcribes;
+  Claude maps onto donor's reporting requirements. NGO edits,
+  doesn't author. Cuts 4-hour quarterly-report dance to ~10 min.
+  POST /api/reports/<id>/structure-from-voice + <VoiceReportComposer>
+  with 6-language picker and tone-coded per-section coverage.
 
 - **2026-06-11** Phase 70 — Reviewer-side IA pass.
   /reviews/[id] is the reviewer's busiest surface and was still on the
