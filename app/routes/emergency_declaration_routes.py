@@ -67,9 +67,23 @@ def api_list_declarations():
     if not network_id:
         return jsonify({"success": False, "error": "Network not resolved"}), 400
     status = request.args.get("status")
+    # Phase 65 — optional window_id filter so per-window drill-ins
+    # (the funds page, /admin/windows/[id]) can deep-link into a
+    # scoped declarations list. Network gate is still enforced via
+    # filter_by(network_id=...) so this can't leak across tenants.
+    window_id_param = request.args.get("window_id")
+    window_id = None
+    if window_id_param:
+        try:
+            window_id = int(window_id_param)
+        except ValueError:
+            window_id = None
+
     q = EmergencyDeclaration.query.filter_by(network_id=network_id)
     if status:
         q = q.filter_by(status=status)
+    if window_id is not None:
+        q = q.filter_by(window_id=window_id)
     rows = q.order_by(EmergencyDeclaration.created_at.desc()).limit(100).all()
     return jsonify({
         "success": True,

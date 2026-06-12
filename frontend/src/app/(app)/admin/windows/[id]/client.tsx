@@ -193,11 +193,13 @@ export default function WindowOperationalClient() {
               <Siren className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
               Active declarations
             </h2>
+            {/* Phase 65 — scope the deep-link to this window so the user
+                lands on a filtered list, not the full declarations log. */}
             <Link
-              href="/admin/declarations"
+              href={`/admin/declarations?window_id=${windowId}`}
               className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
-              Open Declarations <ChevronRight className="w-3 h-3" />
+              See all in this window <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
           {activeDecls.length === 0 ? (

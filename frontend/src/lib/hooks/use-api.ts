@@ -523,8 +523,13 @@ export interface EmergencyDeclaration {
   documents?: DeclarationDocument[];
 }
 
-export function useDeclarations(status?: string) {
-  const url = status ? `/declarations?status=${encodeURIComponent(status)}` : '/declarations';
+export function useDeclarations(status?: string, opts?: { windowId?: number | null }) {
+  // Phase 65 — optional window_id filter.
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (opts?.windowId != null) params.set('window_id', String(opts.windowId));
+  const qs = params.toString();
+  const url = qs ? `/declarations?${qs}` : '/declarations';
   return useSWR<{ success: boolean; declarations: EmergencyDeclaration[] }>(url, fetcher);
 }
 

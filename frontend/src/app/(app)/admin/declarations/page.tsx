@@ -9,11 +9,12 @@
  */
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDeclarations, type EmergencyDeclaration } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
-import { Siren, Inbox, Filter, ChevronRight, Plus, Sparkles } from 'lucide-react';
+import { Siren, Inbox, Filter, ChevronRight, Plus, Sparkles, X, Wallet } from 'lucide-react';
 import { DeclarationWizard } from '@/components/declarations/declaration-wizard';
 import { describeDeclarationStatus, TONE_PILL_CLASS } from '@/lib/status-copy';
 
@@ -32,7 +33,15 @@ export default function DeclarationsListPage() {
   const network = useNetworkStore((s) => s.network);
   const [statusFilter, setStatusFilter] = useState('');
   const [wizardOpen, setWizardOpen] = useState(false);
-  const { data, isLoading, mutate } = useDeclarations(statusFilter || undefined);
+  // Phase 65 — optional ?window_id=N filter. Set when the user came
+  // from /admin/windows/<id> ("See all in this window" link).
+  const searchParams = useSearchParams();
+  const windowIdParam = searchParams.get('window_id');
+  const windowId = windowIdParam ? Number(windowIdParam) : null;
+  const { data, isLoading, mutate } = useDeclarations(
+    statusFilter || undefined,
+    windowId ? { windowId } : undefined,
+  );
 
   if (viewer && viewer.role !== 'admin') {
     return (
@@ -56,6 +65,7 @@ export default function DeclarationsListPage() {
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {rows.length} declaration{rows.length === 1 ? '' : 's'}
+            {windowId && <> · filtered to window #{windowId}</>}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -80,6 +90,30 @@ export default function DeclarationsListPage() {
           </button>
         </div>
       </div>
+
+      {/* Phase 65 — active window filter chip. The user landed here from
+          /admin/windows/<id> "See all"; let them clear the scope. */}
+      {windowId && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-[hsl(var(--kuja-clay))]/15 text-[hsl(var(--kuja-clay))] font-semibold">
+            <Wallet className="w-3 h-3" />
+            Window #{windowId}
+            <Link
+              href="/admin/declarations"
+              className="inline-flex items-center hover:bg-[hsl(var(--kuja-clay))]/20 rounded-full p-0.5 ml-0.5"
+              title="Clear window filter"
+            >
+              <X className="w-3 h-3" />
+            </Link>
+          </span>
+          <Link
+            href={`/admin/windows/${windowId}`}
+            className="text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            Open window operations
+          </Link>
+        </div>
+      )}
 
       {isLoading && (
         <div className="space-y-2">

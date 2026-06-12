@@ -232,6 +232,30 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 65 — Declarations list window_id filter +
+  cross-page links. Closes the navigation loop between /admin/funds
+  -> /admin/windows/[id] -> /admin/declarations. Operator can now
+  drill from a fund tile straight into the per-window operations
+  page and from there into a window-scoped declarations list.
+  **Backend (app/routes/emergency_declaration_routes.py)**:
+    GET /api/declarations accepts optional `window_id` query param.
+    Network gate preserved via filter_by(network_id=...), so the
+    filter can't leak cross-tenant. Backward-compatible.
+  **Frontend**:
+    - useDeclarations hook takes optional { windowId }.
+    - /admin/declarations reads ?window_id=N from URL via
+      useSearchParams; subtitle reads "N declarations · filtered to
+      window #N"; chip shows "Window #N" + X-clear (-> full list) +
+      "Open window operations" link (-> per-window drill-in).
+    - /admin/windows/[id] "Active declarations" sidebar link now
+      reads "See all in this window" and points at
+      /admin/declarations?window_id=<id>.
+  Browser-verified live on window 160 (2 NEAR declarations):
+    /admin/declarations?window_id=160
+      subtitle: "2 declarations · filtered to window #160"
+      chip:     "Window #160" + clear -> /admin/declarations/
+      side:     "Open window operations" -> /admin/windows/160/
+
 - **2026-06-11** Phase 64 — Membership review Audit + Messages tabs go
   live. The two placeholder tabs from Phase 47 are now real:
   **Backend (app/routes/audit_chain_routes.py)**:
