@@ -24,6 +24,9 @@ import {
 import { NgoReadinessConsole } from '@/components/dashboards/ngo-readiness-console';
 import { MatchesCard } from '@/components/dashboards/matches-card';
 import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
+// Phase 74 — compliance coach. Flips the dashboard from "what's wrong"
+// to "what your posture looks like and how to improve it next."
+import { ComplianceCoachCard } from '@/components/dashboards/compliance-coach-card';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -213,6 +216,11 @@ export function AttentionNgoDashboard() {
             </ul>
           </section>
         )}
+        {/* Phase 74 — compliance coach lives in PageMain because it's
+            action-driving. Hidden gracefully if the NGO has fewer than
+            2 submitted reports (the card itself handles that). */}
+        <ComplianceCoachCard />
+
       </PageMain>
 
       {/* Readiness + cross-grant patterns collapsed under "More insight" */}
