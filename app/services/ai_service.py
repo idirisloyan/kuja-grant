@@ -4536,6 +4536,108 @@ RETURN ONLY valid JSON in this exact shape (no commentary, no markdown fences):
             }
 
     # ------------------------------------------------------------------
+    # Phase 78 — AI content translation
+    # ------------------------------------------------------------------
+    # Today, reporting in the Global South is implicitly English/French
+    # because 'the donor reads that.' This forces program officers to
+    # operate in their second/third language, which both reduces
+    # writing quality AND filters out otherwise-capable NGOs whose
+    # English is weak. With AI translation, the NGO writes in their
+    # own language, the donor reads in theirs, both sides see what
+    # feels native, originals are always preserved.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def translate_text(text: str, target_language: str,
+                        source_language: str | None = None,
+                        domain: str = 'grant') -> dict:
+        """Translate free-text content between platform languages.
+
+        Supported targets: en, fr, ar, sw, so, es (matches UI locales).
+        Domain primes the translator on jargon (grant / declaration / report).
+
+        Returns: {translated, source_language (detected or supplied),
+                  target_language, fidelity (0-100), notes, ai_used}
+        Original is preserved by the caller (this method is read-only).
+        """
+        text = (text or '').strip()
+        if not text:
+            return {'translated': '', 'source_language': source_language,
+                    'target_language': target_language, 'fidelity': 0,
+                    'notes': '', 'ai_used': False}
+
+        # Skip if source==target.
+        if source_language and source_language[:2].lower() == target_language[:2].lower():
+            return {'translated': text, 'source_language': source_language,
+                    'target_language': target_language, 'fidelity': 100,
+                    'notes': 'No translation needed — same language.', 'ai_used': False}
+
+        if not (HAS_ANTHROPIC and ANTHROPIC_API_KEY):
+            return {'translated': text, 'source_language': source_language,
+                    'target_language': target_language, 'fidelity': 0,
+                    'notes': 'Translation unavailable — showing original.',
+                    'ai_used': False}
+
+        lang_names = {
+            'en': 'English', 'fr': 'French', 'ar': 'Arabic',
+            'sw': 'Swahili', 'so': 'Somali', 'es': 'Spanish',
+        }
+        tgt = lang_names.get(target_language[:2].lower(), target_language)
+        src_hint = (
+            f" The source language appears to be {lang_names.get(source_language[:2].lower(), source_language)}."
+            if source_language else ' Detect the source language yourself.'
+        )
+
+        try:
+            client = AIService._get_client()
+            if not client:
+                raise Exception("AI client not available")
+
+            prompt = f"""Translate the following NGO {domain} text to {tgt}.{src_hint}
+
+Rules:
+- Preserve factual content exactly: numbers, dates, names, locations, currency amounts.
+- Use natural, professional {tgt} a grant officer would write — not literal word-for-word.
+- Preserve any domain-specific terms (e.g. KPI codes, donor framework codes) by leaving them as-is.
+- If a phrase has cultural nuance that doesn't translate cleanly, choose the closest professional equivalent and note it in 'notes'.
+
+Text to translate (between triple backticks):
+\"\"\"
+{text[:6000]}
+\"\"\"
+
+Return ONLY JSON in this exact shape (no markdown fences):
+{{
+  "translated": "<the translation>",
+  "source_language": "<ISO 639-1 code you detected: en|fr|ar|sw|so|es|other>",
+  "fidelity": 0-100,
+  "notes": "<empty string or 1-2 sentences flagging tricky choices>"
+}}"""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            t = response.content[0].text.strip()
+            if t.startswith('```'):
+                t = re.sub(r'^```(?:json)?\s*|\s*```$', '', t, flags=re.MULTILINE).strip()
+            parsed = json.loads(t) if t.startswith('{') else json.loads(re.search(r'\{[\s\S]*\}', t).group())
+            return {
+                'translated': parsed.get('translated', text),
+                'source_language': parsed.get('source_language', source_language),
+                'target_language': target_language,
+                'fidelity': int(parsed.get('fidelity', 0) or 0),
+                'notes': parsed.get('notes', ''),
+                'ai_used': True,
+            }
+        except Exception as e:
+            logger.error(f"translate_text failed: {e}")
+            return {'translated': text, 'source_language': source_language,
+                    'target_language': target_language, 'fidelity': 0,
+                    'notes': f'Translation failed; showing original. ({type(e).__name__})',
+                    'ai_used': False}
+
+    # ------------------------------------------------------------------
     # Phase 76 — Why-rejected: constructive AI feedback
     # ------------------------------------------------------------------
     # Most donors give cursory feedback when they decline an application

@@ -31,6 +31,7 @@ import {
 } from '@/components/layout/page-shell';
 import { describeReportStatus, TONE_PILL_CLASS } from '@/lib/status-copy';
 import { WhyRejectedPanel } from '@/components/shared/why-rejected-panel';
+import { TranslateThis } from '@/components/shared/translate-this';
 
 interface ReportDetail {
   id: number;
@@ -233,9 +234,14 @@ export default function ReportDetailClient() {
           {data.reviewer_notes && status !== 'revision_requested' && status !== 'rejected' && (
             <section className="border border-border rounded-lg bg-card p-5">
               <h2 className="font-semibold text-sm mb-2">Reviewer notes</h2>
-              <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                {data.reviewer_notes}
-              </p>
+              {/* Phase 78 — translate this. NGO who works in Somali or
+                  Arabic can read the donor's English/French note in their
+                  own language with one click. Original preserved. */}
+              <TranslateThis
+                text={data.reviewer_notes}
+                domain="report"
+                className="text-sm"
+              />
             </section>
           )}
 
