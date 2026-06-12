@@ -232,6 +232,41 @@
 
 ## High priority — operational (added 2026-06-11)
 
+### Deploy-cadence guardrail — never batch-deploy phases (added 2026-06-12)
+- **last_touched:** 2026-06-12
+- **Why:** Phases 67/68 (a single commit), 69, and 70 were deployed in a
+  37-min window (commits at 21:47, 21:53, 22:03 PDT on 2026-06-11). Each
+  `railway up --detach` triggers build → swap → drain → healthcheck. The
+  rapid swaps left a ~2-hour window where the live URL was unreachable
+  from external clients (probes returned 30-90s ReadTimeout from this
+  network even though Railway showed deploy status=SUCCESS), and the
+  team's UAT regression captured the outage:
+    * `test_e2e.py` cascaded from green into 502s + connection-aborts
+    * `test_e2e_final.py` 4/54 PASS, 9 FAIL, 41 ERRORS
+    * `test_near_uat.py` 16/19 PASS, 3 ERRORS
+    * Playwright entry-points (login-kuja, login-near, dashboard) timed
+      out at 30s in the browser
+  After `railway redeploy --service web` (a restart-only redeploy) the
+  service became reachable again, and the same suites re-ran clean:
+    * `test_near_uat.py` 19/19 PASS
+    * `test_e2e_final.py` 54/54 PASS, regression gate PASS
+    * Entry-point probes 200 OK in 350-510ms across login-kuja,
+      login-near, dashboard, admin-windows/160, admin-reports
+  Root cause: too-rapid sequential deploys can leave the active
+  container wedged even when Railway marks the deploy SUCCESS. The
+  symptom is user-visible (browser timeouts on /login + /dashboard),
+  not just test-harness noise.
+- **Rule going forward:** when shipping >1 phase in a single session,
+  EITHER combine them into one commit + one deploy, OR pace deploys at
+  least 5 minutes apart AND probe `/api/health` + `/api/network/current`
+  from an external client (`requests`, `curl`, or a Playwright load)
+  after each deploy before initiating the next. "Deploy SUCCESS in
+  Railway's UI" is NOT sufficient evidence of reachability — the live
+  URL has to be probed from the public internet.
+- **Status:** documented; no code change. Next time I do a multi-phase
+  session, I will pace deploys or batch commits and probe externally
+  between each.
+
 ### Email transports — wire SendGrid / SMTP credentials on Railway
 - **last_touched:** 2026-06-11
 - **Why:** The Phase 21+44 codepaths that should send transactional
