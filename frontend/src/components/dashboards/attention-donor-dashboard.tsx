@@ -21,6 +21,7 @@ import {
   PageShell, PageHeader, PageAttention, PageMain, PageDetail,
   PageDetailSection, type AttentionItem,
 } from '@/components/layout/page-shell';
+import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { DonorCommandCenter } from '@/components/dashboards/donor-command-center';
 import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
 import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
@@ -125,6 +126,7 @@ export function AttentionDonorDashboard() {
         subtitle="What needs your attention today."
       />
 
+      <TodayFocusBanner items={attention} />
       <PageAttention items={attention} />
 
       <PageMain>

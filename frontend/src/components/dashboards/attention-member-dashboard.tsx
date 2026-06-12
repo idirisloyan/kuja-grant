@@ -26,6 +26,7 @@ import {
 } from '@/components/layout/page-shell';
 import { NearNgoConsole } from '@/components/dashboards/near-ngo-console';
 import { Award, FileText, BarChart3, ArrowRight, Sparkles } from 'lucide-react';
+import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 
 export function AttentionMemberDashboard() {
   const user = useAuthStore((s) => s.user);
@@ -121,6 +122,7 @@ export function AttentionMemberDashboard() {
         icon={Award}
       />
 
+      <TodayFocusBanner items={attention} />
       <PageAttention items={attention} />
 
       <PageMain>

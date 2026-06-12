@@ -29,6 +29,7 @@ import {
   PageDetailSection, type AttentionItem,
 } from '@/components/layout/page-shell';
 import { SignerCoachCard } from '@/components/dashboards/signer-coach-card';
+import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
 
@@ -168,6 +169,8 @@ export function AttentionOperatorDashboard() {
           : 'Fund operations console.'}
       />
 
+      {/* Phase 82 — Today's focus banner. */}
+      <TodayFocusBanner items={attention} />
       <PageAttention items={attention} />
 
       <PageMain>

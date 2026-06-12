@@ -27,6 +27,8 @@ import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patt
 // Phase 74 — compliance coach. Flips the dashboard from "what's wrong"
 // to "what your posture looks like and how to improve it next."
 import { ComplianceCoachCard } from '@/components/dashboards/compliance-coach-card';
+// Phase 82 — Today's focus banner. Single bold action above PageAttention.
+import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -105,6 +107,11 @@ export function AttentionNgoDashboard() {
         subtitle="Your workbench. Continue where you left off."
       />
 
+      {/* Phase 82 — sharpest possible 'what to do today' line. Picks
+          the top-priority attention item and surfaces it as one bold
+          headline with a single CTA. Page-attention list still renders
+          below for the full picture. */}
+      <TodayFocusBanner items={attention} />
       <PageAttention items={attention} />
 
       <PageMain>
