@@ -216,6 +216,93 @@ def api_update_report(report_id):
     return jsonify({'success': True, 'report': report.to_dict()})
 
 
+@reports_bp.route('/<int:report_id>/structure-from-voice', methods=['POST'])
+@login_required
+@role_required('ngo')
+def api_structure_report_from_voice(report_id):
+    """Phase 71 — Voice-to-report.
+
+    NGO records a voice memo in the browser, the browser transcribes it
+    via Web Speech API (or pastes a written transcript), and POSTs the
+    text here. We map it onto the donor's reporting requirements using
+    Claude, merge with any existing draft content, and return a structured
+    draft + coverage report for the NGO to review.
+
+    The NGO never authors from a blank page — they edit a draft.
+
+    Body: {transcript: str, language?: str}
+    Returns: {content, coverage, summary, missing, ai_used}
+    """
+    report = db.session.get(Report, report_id)
+    if not report:
+        return jsonify({'error': 'Report not found', 'success': False}), 404
+    if report.submitted_by_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied', 'success': False}), 403
+    if report.status not in ('draft', 'revision_requested'):
+        return jsonify({
+            'error': 'Voice-to-report is only available while the report is a draft.',
+            'success': False,
+        }), 400
+
+    data = get_request_json() or {}
+    transcript = (data.get('transcript') or '').strip()
+    language = (data.get('language') or '').strip() or None
+    if not transcript:
+        return jsonify({'error': 'transcript is required', 'success': False}), 400
+    if len(transcript) > 12000:
+        # Defensive cap so a misbehaving recorder can't burn through a
+        # 100k-token budget. Real voice memos are well under this.
+        transcript = transcript[:12000]
+
+    grant = db.session.get(Grant, report.grant_id)
+    requirements = grant.get_reporting_requirements() if grant else []
+    existing = report.get_content()
+
+    try:
+        result = AIService.structure_voice_report(
+            transcript=transcript,
+            requirements=requirements,
+            report_type=report.report_type,
+            grant_title=(grant.title if grant else None),
+            reporting_period=report.reporting_period,
+            language=language,
+            existing_content=existing,
+        )
+    except Exception as e:
+        logger.error(f"voice-to-report structuring failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'AI structuring is temporarily unavailable. Your transcript is not lost — please copy it into the report fields manually.',
+        }), 502
+
+    # Persist the structured draft so the NGO doesn't lose it if their
+    # browser crashes. Status stays draft. Critical for low-bandwidth /
+    # shared-device contexts.
+    try:
+        report.set_content(result.get('content') or {})
+        # Save the last transcript snippet on ai_analysis so the donor can
+        # see this was voice-drafted (for trust + transparency) — but only
+        # the metadata, not the full transcript itself.
+        ai = report.get_ai_analysis() or {}
+        ai['voice_draft_used'] = True
+        ai['voice_draft_summary'] = result.get('summary', '')[:500]
+        ai['voice_draft_coverage'] = result.get('coverage', [])[:30]
+        report.set_ai_analysis(ai)
+        db.session.commit()
+    except Exception as e:
+        logger.error(f"voice-to-report persistence failed: {e}")
+        db.session.rollback()
+
+    return jsonify({
+        'success': True,
+        'content': result.get('content', {}),
+        'coverage': result.get('coverage', []),
+        'summary': result.get('summary', ''),
+        'missing': result.get('missing', []),
+        'ai_used': result.get('ai_used', False),
+    })
+
+
 @reports_bp.route('/<int:report_id>/precheck', methods=['POST'])
 @login_required
 @role_required('ngo')

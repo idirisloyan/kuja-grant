@@ -4365,6 +4365,176 @@ Analyze this registration document and extract the following information. Return
 
         return min(score, 100)
 
+    # ------------------------------------------------------------------
+    # Phase 71 — Voice-to-report
+    # ------------------------------------------------------------------
+    # NGO field staff in the Global South often work primarily in voice +
+    # local language. The 4-hour Excel-and-PDF dance to write a quarterly
+    # report is the single biggest reason reports are late or skipped.
+    # Voice-to-report lets the program officer talk for 5 minutes about
+    # what happened — in Somali, Swahili, French, Arabic, Spanish, or
+    # English — and Claude maps the freeform transcript onto the donor's
+    # specific reporting requirements. The NGO then edits, doesn't author.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def structure_voice_report(transcript: str, requirements: list, report_type: str,
+                                grant_title: str | None = None,
+                                reporting_period: str | None = None,
+                                language: str | None = None,
+                                existing_content: dict | None = None) -> dict:
+        """Map a free-form voice-memo transcript onto a donor's reporting
+        requirements.
+
+        Returns: { "content": {req_key: answer_str}, "coverage": [
+                    {key, label, status, hint}], "summary": str,
+                    "missing": [labels] }
+        where coverage.status ∈ {"covered", "partial", "missing"} and
+        hint is a short, NGO-friendly question to fill the gap.
+        """
+        if not transcript or len(transcript.strip()) < 5:
+            return {
+                "content": existing_content or {},
+                "coverage": [],
+                "summary": "",
+                "missing": [],
+                "ai_used": False,
+                "error": "transcript_too_short",
+            }
+
+        # Build the requirement context. Each requirement has a key+label
+        # +description. The AI's job is to find the relevant snippet from
+        # the transcript for each one, OR mark it as missing.
+        matching = [
+            r for r in (requirements or [])
+            if r.get('type', '').lower() == (report_type or '').lower() or r.get('type') == 'all'
+        ] or list(requirements or [])
+
+        req_lines = []
+        for r in matching:
+            key = r.get('key') or r.get('id') or (r.get('label', 'untitled')[:40])
+            label = r.get('label') or r.get('title') or key
+            desc = r.get('description') or ''
+            req_lines.append(f"- KEY={key} | LABEL={label} | EXPECTS={desc[:200]}")
+        req_block = '\n'.join(req_lines) if req_lines else '(donor specified no structured requirements — produce a single key called "narrative")'
+
+        # Conservative fallback: deterministic mapping if AI is unavailable.
+        if not (HAS_ANTHROPIC and ANTHROPIC_API_KEY):
+            content = dict(existing_content or {})
+            if matching:
+                content[matching[0].get('key', 'narrative')] = transcript.strip()
+            else:
+                content['narrative'] = transcript.strip()
+            return {
+                "content": content,
+                "coverage": [{"key": (r.get('key') or 'narrative'),
+                              "label": (r.get('label') or 'Narrative'),
+                              "status": ("covered" if i == 0 else "missing"),
+                              "hint": ""}
+                             for i, r in enumerate(matching or [{'key': 'narrative', 'label': 'Narrative'}])],
+                "summary": transcript[:200].strip() + ("…" if len(transcript) > 200 else ""),
+                "missing": [r.get('label', 'untitled') for r in matching[1:]] if matching else [],
+                "ai_used": False,
+            }
+
+        try:
+            client = AIService._get_client()
+            if not client:
+                raise Exception("AI client not available")
+            lang_hint = (
+                f"\nThe NGO is speaking in {language}. Preserve their phrasing and "
+                "vocabulary; do NOT translate to English unless the donor requirement "
+                "expects English-only text."
+            ) if language and language.lower() not in ('en', 'english') else ''
+
+            existing_hint = ''
+            if existing_content:
+                existing_hint = (
+                    "\n\nThe NGO already drafted some content earlier. Do not overwrite "
+                    "non-empty fields unless the voice transcript clearly updates them. "
+                    "Existing content:\n" + json.dumps(existing_content, ensure_ascii=False)[:1500]
+                )
+
+            prompt = f"""You are helping an NGO program officer convert a 5-minute voice memo into the structured report their donor expects. The NGO worker is non-technical, may be working in their second or third language, and is relying on you to be the "structuring scribe" they don't have on staff.
+
+DONOR REPORT TYPE: {report_type}
+GRANT: {grant_title or '(not specified)'}
+REPORTING PERIOD: {reporting_period or '(not specified)'}
+
+DONOR'S REPORTING REQUIREMENTS (each line is one required field):
+{req_block}
+
+VOICE TRANSCRIPT (from the NGO program officer):
+\"\"\"
+{transcript[:6000]}
+\"\"\"
+{lang_hint}{existing_hint}
+
+YOUR JOB:
+1. For each requirement KEY above, find the part of the transcript that addresses it. Quote or paraphrase the NGO's own words — do NOT invent numbers, dates, locations, or beneficiary counts the NGO did not mention.
+2. If a requirement is not addressed at all in the transcript, leave its value as an empty string AND add it to "missing".
+3. For each requirement, classify coverage as "covered" (clear and complete), "partial" (mentioned but thin — needs a follow-up sentence), or "missing".
+4. Provide a 1-2 sentence "summary" for the NGO: what you captured + what's still needed.
+5. For each "partial" or "missing" item, supply a "hint" — a short, friendly, plain-language question the NGO can answer in one sentence to close the gap. Examples: "How many people attended?" / "Which villages did you visit?" / "What was the total spent?"
+
+RETURN ONLY valid JSON in this exact shape (no commentary, no markdown fences):
+{{
+  "content": {{ "<requirement_key>": "<answer text — NGO's own words preserved>" }},
+  "coverage": [
+    {{ "key": "<requirement_key>", "label": "<human label>",
+       "status": "covered|partial|missing", "hint": "<plain-language follow-up or empty string>" }}
+  ],
+  "summary": "<one or two sentences for the NGO>",
+  "missing": ["<human labels of requirements not addressed at all>"]
+}}"""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text.strip()
+            if text.startswith('```'):
+                # Strip markdown fences defensively.
+                text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text, flags=re.MULTILINE).strip()
+            if text.startswith('{'):
+                parsed = json.loads(text)
+            else:
+                m = re.search(r'\{[\s\S]*\}', text)
+                parsed = json.loads(m.group()) if m else None
+
+            if not parsed or 'content' not in parsed:
+                raise Exception("AI returned unparseable structure")
+
+            # Merge with existing content (don't lose prior draft).
+            merged = dict(existing_content or {})
+            for k, v in (parsed.get('content') or {}).items():
+                if v and v.strip():
+                    merged[k] = v.strip()
+
+            return {
+                "content": merged,
+                "coverage": parsed.get('coverage', []),
+                "summary": parsed.get('summary', ''),
+                "missing": parsed.get('missing', []),
+                "ai_used": True,
+            }
+        except Exception as e:
+            logger.error(f"structure_voice_report AI failed: {e}")
+            # Fall back to deterministic mapping rather than blocking the NGO.
+            content = dict(existing_content or {})
+            if matching:
+                content[matching[0].get('key', 'narrative')] = transcript.strip()
+            else:
+                content['narrative'] = transcript.strip()
+            return {
+                "content": content,
+                "coverage": [],
+                "summary": "AI structuring was unavailable; your transcript is saved under the first requirement. Please copy and paste into the right sections.",
+                "missing": [],
+                "ai_used": False,
+                "error": str(e)[:200],
+            }
+
     @staticmethod
     def analyze_report(content, requirements, report_type):
         """Analyze a submitted report against grant reporting requirements with per-requirement scoring.

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useNetworkStore } from '@/stores/network-store';
 import { NearComplianceReporting } from '@/components/reports/near-compliance-reporting';
 import { ReportDraftCoAuthor } from '@/components/reports/ReportDraftCoAuthor';
+import { VoiceReportComposer } from '@/components/reports/VoiceReportComposer';
 import { ReportReadiness } from '@/components/reports/ReportReadiness';
 import { ReportBundlePanel } from '@/components/reports/report-bundle-panel';
 import { useAuthStore } from '@/stores/auth-store';
@@ -1243,6 +1244,11 @@ function ReportRow({ report, mutateReports }: { report: Report; mutateReports: (
                 variant makes the donor-perspective AI scan unmistakably
                 visible the moment a draft row opens. */}
             <ReportReadiness reportId={report.id} variant="banner" />
+            {/* Phase 71 — voice-to-report. Sits before the typed
+                co-author so NGO field staff land on the friendliest
+                option first. Both are non-destructive: voice merges
+                with whatever co-author has produced. */}
+            <VoiceReportComposer reportId={report.id} onApplied={() => mutateReports()} />
             <ReportDraftCoAuthor reportId={report.id} onApplied={() => mutateReports()} />
             {/* Phase 8 — donor review bundle. NGO assembles + publishes;
                 donors/admin assemble (read-only) to see what they'll review. */}
