@@ -30,7 +30,11 @@ import {
   X,
   Eye,
   Loader2,
+  Briefcase,
 } from 'lucide-react';
+import {
+  PageShell, PageBack, PageHeader, PageMain,
+} from '@/components/layout/page-shell';
 
 import type {
   EligibilityRequirement,
@@ -739,21 +743,15 @@ export default function ApplyWizardClient() {
   const hasMissingItems = !requiredEligMet || !allCriteriaAnswered || !requiredDocsUploaded;
 
   return (
-    <div className="max-w-[960px] space-y-5">
-      <button
-        onClick={() => router.push(`/grants/${grantId}`)}
-        className="inline-flex items-center gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> {t('apply.back_to_grant')}
-      </button>
-
-      <div>
-        <h1 className="kuja-display text-[2rem] font-semibold leading-[1.1] text-foreground">
-          Apply: {grant.title}
-        </h1>
-        <div className="mt-1 text-sm text-muted-foreground">{grant.donor_org_name}</div>
-      </div>
-
+    <div className="max-w-[960px]">
+      <PageShell>
+        <PageBack href={`/grants/${grantId}`} label={t('apply.back_to_grant')} />
+        <PageHeader
+          title={`Apply: ${grant.title}`}
+          icon={Briefcase}
+          subtitle={grant.donor_org_name}
+        />
+        <PageMain>
       {/* Phase 21D — existing application banner */}
       {resumedDraft && (
         <div
@@ -944,6 +942,8 @@ export default function ApplyWizardClient() {
           </div>
         )}
       </div>
+        </PageMain>
+      </PageShell>
     </div>
   );
 }

@@ -14,6 +14,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssessmentFramework, FrameworkInfo } from '@/lib/types';
+import {
+  PageShell, PageBack, PageHeader, PageMain,
+} from '@/components/layout/page-shell';
 
 interface OrgProfile {
   name: string; country: string; year_established: string;
@@ -204,20 +207,14 @@ export default function AssessmentWizardPage() {
   // Framework selection
   if (!selectedFramework) {
     return (
-      <div className="space-y-5">
-        <button
-          type="button"
-          onClick={() => router.push('/assessments')}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" /> {t('assessment.back_to_assessments')}
-        </button>
-        <div>
-          <h1 className="kuja-display text-3xl">{t('assessment.select_framework_title')}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {t('assessment.select_framework_subtitle')}
-          </p>
-        </div>
+      <PageShell>
+        <PageBack href="/assessments" label={t('assessment.back_to_assessments')} />
+        <PageHeader
+          title={t('assessment.select_framework_title')}
+          icon={ClipboardList}
+          subtitle={t('assessment.select_framework_subtitle')}
+        />
+        <PageMain>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {FRAMEWORK_OPTIONS.map((opt) => {
             const info = frameworks[opt.key] as FrameworkInfo | undefined;
@@ -249,7 +246,8 @@ export default function AssessmentWizardPage() {
             );
           })}
         </div>
-      </div>
+        </PageMain>
+      </PageShell>
     );
   }
 

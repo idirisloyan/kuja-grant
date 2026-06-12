@@ -232,6 +232,14 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 58 — Final long-tail sweep. Last 7 surfaces
+  wrapped in PageShell: /apply/[grantId], /assessments,
+  /assessments/wizard (framework-select entry), /admin/windows/[id]/
+  report, /ngo/[id], /donors/[id], /network/join. Every major
+  user-visible page in the app now uses the canonical page anatomy.
+  Browser-verified /assessments h1 "Assessment hub", /apply/5 h1
+  "Apply: World Bank Youth Employment & Digital Skills".
+
 - **2026-06-11** Phase 57 — Long-tail surface sweep (PageShell wrap).
   Standardised 13 secondary pages on the PageShell + PageHeader
   pattern: /reviews, /reviews/completed, /trust, /compliance,
