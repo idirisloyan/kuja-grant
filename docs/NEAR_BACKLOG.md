@@ -230,7 +230,48 @@
 
 ---
 
+## High priority — operational (added 2026-06-11)
+
+### Email transports — wire SendGrid / SMTP credentials on Railway
+- **last_touched:** 2026-06-11
+- **Why:** The Phase 21+44 codepaths that should send transactional
+  email (membership approve/reject, declaration release-applications
+  notifications) call `EmailService.send()`, but Railway has no
+  `SENDGRID_API_KEY` or `SMTP_HOST` env var set. The handlers log + no-op
+  silently. The shortlisted NGOs find out about a declaration release
+  only when they next sign in. Same for membership decisions.
+- **Action:** Pick a transport (SendGrid free tier ≤ 100/day is enough
+  for current volume; any SMTP relay also works), set the env var on
+  Railway, redeploy. No code change required — the handlers already
+  exist and are wired. After flipping it on, verify by approving a
+  pending NEAR membership and confirming the applicant gets the email.
+
 ## Completed (rolling log, newest first)
+
+- **2026-06-11** Phase 68 — Signature-pace sparkline on /admin/windows/[id].
+  Computes from already-fetched declarations — no new endpoint.
+    - sigDays = (declared_at - created_at) per signed_active declaration.
+    - sigStats = count + median + p90, tone-coded green if ≤ slaDays (6)
+      or sun/destructive if over.
+    - inFlight = draft + in_review decls, sorted by age, per-row progress
+      bar of ageDays / (slaDays * 2), destructive when overSla.
+    - Section gated on `(sigStats || inFlight.length > 0)` so it only
+      renders when there's something to show.
+  Browser-verified on window 160:
+    Past signed: 1 · Median 0.0d (green) · p90 0.0d (green)
+    In flight (1): "Drought response — Turkana basin · draft" at 9.8d
+      in destructive tone, progress bar 81% bg-destructive.
+
+- **2026-06-11** Phase 67 — Window audit events + activate the
+  Phase 61 drill-in.
+  api_create_window now appends AuditChainEntry(action="window.created",
+  subject_kind="window", subject_id=w.id). api_update_window snapshots
+  changes, emits "window.status_changed" if status changed else
+  "window.updated", details = {fund_id, changed:[...]}. Phase 61's
+  subjectDrillHref already maps window → /admin/windows/<id>, so the
+  chain entries are now drillable. Verified via preview_eval: an
+  entry shows `window_links: [{ href: "/admin/windows/160/", txt:
+  "window #160" }]`.
 
 - **2026-06-11** Phase 66 — Grants + Reports list window_id filter.
   Extends Phase 65's pattern to /grants and /reports.

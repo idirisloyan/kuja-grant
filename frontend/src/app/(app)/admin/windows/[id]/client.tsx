@@ -131,6 +131,43 @@ export default function WindowOperationalClient() {
     });
   }
 
+  // Phase 68 — signature pace. Days from created_at to declared_at for
+  // past signed (declared_at != null) declarations. Operators see the
+  // SLA-vs-actual gap at a glance.
+  const sigDays = decls
+    .filter((d) => d.declared_at && d.created_at)
+    .map((d) => {
+      const t1 = new Date(d.declared_at!).getTime();
+      const t0 = new Date(d.created_at!).getTime();
+      return Math.max(0, (t1 - t0) / (1000 * 60 * 60 * 24));
+    })
+    .filter((n) => Number.isFinite(n));
+  const sigStats = sigDays.length
+    ? (() => {
+        const sorted = [...sigDays].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        const p90 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))];
+        return { count: sigDays.length, median, p90 };
+      })()
+    : null;
+
+  // In-flight: still in_review or draft, with ages
+  const inFlight = decls
+    .filter((d) => ['draft', 'in_review'].includes(d.status) && d.created_at)
+    .map((d) => ({
+      id: d.id,
+      title: d.title,
+      status: d.status,
+      ageDays: Math.max(
+        0,
+        (Date.now() - new Date(d.created_at!).getTime()) / (1000 * 60 * 60 * 24),
+      ),
+    }))
+    .sort((a, b) => b.ageDays - a.ageDays);
+
+  // SLA target from rule synthesis is decision_sla_days (default 6)
+  const slaDays = 6;
+
   return (
     <PageShell>
       <PageBack href="/admin/funds" label="Back to Funds &amp; Windows" />
@@ -186,6 +223,104 @@ export default function WindowOperationalClient() {
       <PageAttention items={attention} />
 
       <PageMain>
+        {/* Phase 68 — signature pace. Median + p90 days-to-signed
+            across past declarations, plus a stack-bar of in-flight
+            ages so operators see at a glance whether the window's
+            committee is meeting the SLA. Only renders if there's
+            anything to show. */}
+        {(sigStats || inFlight.length > 0) && (
+          <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+            <h2 className="font-semibold text-sm flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+              Signature pace
+              <span className="text-[10px] text-muted-foreground font-normal ml-2">
+                Target: {slaDays}-day decision SLA
+              </span>
+            </h2>
+            {sigStats && (
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="border border-border rounded-md p-2.5">
+                  <div className="uppercase tracking-wide opacity-70 text-[9px]">
+                    Past signed
+                  </div>
+                  <div className="font-semibold text-sm mt-0.5">
+                    {sigStats.count}
+                  </div>
+                </div>
+                <div
+                  className={
+                    `border rounded-md p-2.5 ` +
+                    (sigStats.median <= slaDays
+                      ? 'border-[hsl(var(--kuja-grow))]/30 bg-[hsl(var(--kuja-grow))]/10 text-[hsl(var(--kuja-grow))]'
+                      : 'border-[hsl(var(--kuja-sun))]/30 bg-[hsl(var(--kuja-sun))]/10 text-[hsl(var(--kuja-sun))]')
+                  }
+                  title="Median days from declaration creation to signed_active"
+                >
+                  <div className="uppercase tracking-wide opacity-70 text-[9px]">
+                    Median time to sign
+                  </div>
+                  <div className="font-semibold text-sm mt-0.5">
+                    {sigStats.median.toFixed(1)} days
+                  </div>
+                </div>
+                <div
+                  className={
+                    `border rounded-md p-2.5 ` +
+                    (sigStats.p90 <= slaDays
+                      ? 'border-[hsl(var(--kuja-grow))]/30 bg-[hsl(var(--kuja-grow))]/10 text-[hsl(var(--kuja-grow))]'
+                      : 'border-destructive/30 bg-destructive/10 text-destructive')
+                  }
+                  title="90th percentile days from creation to signed_active"
+                >
+                  <div className="uppercase tracking-wide opacity-70 text-[9px]">
+                    p90 time to sign
+                  </div>
+                  <div className="font-semibold text-sm mt-0.5">
+                    {sigStats.p90.toFixed(1)} days
+                  </div>
+                </div>
+              </div>
+            )}
+            {inFlight.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="uppercase tracking-wide text-[9px] text-muted-foreground">
+                  In flight ({inFlight.length})
+                </div>
+                <ul className="space-y-1">
+                  {inFlight.slice(0, 5).map((d) => {
+                    const overSla = d.ageDays > slaDays;
+                    const pctOfTwoSla = Math.min(100, (d.ageDays / (slaDays * 2)) * 100);
+                    return (
+                      <li key={d.id} className="space-y-0.5">
+                        <Link
+                          href={`/admin/declarations/${d.id}`}
+                          className="flex items-center justify-between gap-2 text-[11px] hover:text-foreground text-muted-foreground"
+                        >
+                          <span className="min-w-0 truncate flex-1">
+                            <span className="font-medium text-foreground">{d.title}</span>
+                            <span className="ml-2 capitalize">· {d.status.replace('_', ' ')}</span>
+                          </span>
+                          <span
+                            className={`shrink-0 font-mono ${overSla ? 'text-destructive font-semibold' : ''}`}
+                          >
+                            {d.ageDays.toFixed(1)}d
+                          </span>
+                        </Link>
+                        <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${overSla ? 'bg-destructive' : 'bg-[hsl(var(--kuja-grow))]'}`}
+                            style={{ width: `${pctOfTwoSla}%` }}
+                          />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Active declarations */}
         <section className="border border-border rounded-lg bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">

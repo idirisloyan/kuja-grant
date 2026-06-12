@@ -186,6 +186,29 @@ def api_create_window(fund_id):
         w.set_application_template(body["application_template"])
     db.session.add(w)
     db.session.commit()
+
+    # Phase 67 — audit the window create so it shows up in the chain
+    # with subject_kind='window'. Activates the Phase 61 drill-in for
+    # this kind, and makes window lifecycle events visible to
+    # compliance reviewers.
+    try:
+        from app.models import AuditChainEntry
+        AuditChainEntry.append(
+            action="window.created",
+            actor_email=current_user.email,
+            subject_kind="window",
+            subject_id=w.id,
+            details={
+                "fund_id": fund_id,
+                "slug": slug,
+                "name": name,
+                "status": w.status,
+                "network_id": f.network_id,
+            },
+        )
+    except Exception as e:
+        logger.warning("window.created audit append failed: %s", e)
+
     return jsonify({"success": True, "window": w.to_dict()})
 
 
@@ -443,6 +466,12 @@ def api_update_window(window_id):
         return jsonify({"success": False, "error": "Wrong network context"}), 403
 
     body = get_request_json() or {}
+
+    # Phase 67 — snapshot pre-update state so the audit row shows
+    # what actually changed, not just "something was updated".
+    prev_status = w.status
+    changed: dict = {}
+
     for fld in (
         "name", "description", "crisis_type",
         "min_grant_amount", "max_grant_amount",
@@ -454,14 +483,46 @@ def api_update_window(window_id):
         "status",
     ):
         if fld in body:
-            setattr(w, fld, body[fld])
+            old_val = getattr(w, fld, None)
+            new_val = body[fld]
+            if old_val != new_val:
+                changed[fld] = {"from": old_val, "to": new_val}
+            setattr(w, fld, new_val)
     if "is_public" in body:
-        w.is_public = bool(body["is_public"])
+        new_pub = bool(body["is_public"])
+        if w.is_public != new_pub:
+            changed["is_public"] = {"from": w.is_public, "to": new_pub}
+        w.is_public = new_pub
     if isinstance(body.get("application_template"), list):
         w.set_application_template(body["application_template"])
+        changed["application_template"] = {"changed": True}
     if w.status not in WINDOW_STATUSES:
         return jsonify({"success": False, "error": f"invalid status '{w.status}'"}), 400
     db.session.commit()
+
+    # Phase 67 — audit the update. Status changes get their own action
+    # so they're trivially filterable in the chain.
+    try:
+        from app.models import AuditChainEntry
+        if changed:
+            action = (
+                "window.status_changed"
+                if "status" in changed and prev_status != w.status
+                else "window.updated"
+            )
+            AuditChainEntry.append(
+                action=action,
+                actor_email=current_user.email,
+                subject_kind="window",
+                subject_id=w.id,
+                details={
+                    "fund_id": w.fund_id,
+                    "changed": changed,
+                },
+            )
+    except Exception as e:
+        logger.warning("window.updated audit append failed: %s", e)
+
     return jsonify({"success": True, "window": w.to_dict()})
 
 
