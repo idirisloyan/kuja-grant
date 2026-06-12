@@ -431,10 +431,10 @@ export default function WindowOperationalClient() {
                 Reports due in the next 30 days
               </h2>
               <Link
-                href="/reports"
+                href={`/admin/reports?window_id=${windowId}`}
                 className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
               >
-                Open Reports <ChevronRight className="w-3 h-3" />
+                See all in this window <ChevronRight className="w-3 h-3" />
               </Link>
             </div>
             <ul className="space-y-2">

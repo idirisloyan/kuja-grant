@@ -248,6 +248,23 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 69 — NEAR admin reports view at /admin/reports.
+  Mirror of /admin/declarations: status filter, optional window_id
+  chip, deadline-urgency tone-coding, link to existing /reports/<id>
+  detail. Orders overdue first, then due-soon. Empty state under a
+  window_id explains "reports are generated when grants under this
+  window submit periodic reporting." Reports chip on
+  /admin/windows/[id] now points at /admin/reports?window_id=<id>
+  with the same "See all in this window" copy as Phase 66's grants
+  link, so the window detail's three primary chips (declarations,
+  grants, reports) now all land on admin-flavored list views with
+  the active scope chip.
+  Browser-verified:
+    /admin/reports/ → "NEAR Network — reports", 20 rows, filter ok.
+    /admin/reports/?window_id=160 → "0 reports · filtered to window
+    #160", chip + "Open window operations" backlink + helpful empty
+    state.
+
 - **2026-06-11** Phase 68 — Signature-pace sparkline on /admin/windows/[id].
   Computes from already-fetched declarations — no new endpoint.
     - sigDays = (declared_at - created_at) per signed_active declaration.
