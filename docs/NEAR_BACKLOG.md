@@ -230,7 +230,86 @@
 
 ---
 
+## High priority (added 2026-06-11 by Phase 49)
+
+### Per-window operational rollup endpoint
+- **last_touched:** 2026-06-11
+- **Why:** The Phase 49 funds redesign brief asks each window card to lead
+  with `available budget · active declarations · open grants · due reports
+  · top risks`. Today there's no single endpoint that returns this rollup
+  for a given window — every view that wants the data has to call
+  declarations, grants, and reports endpoints and merge client-side.
+- **Action:** Add `GET /api/funds/<fund_id>/windows/<window_id>/operational`
+  returning `{ available_budget, active_declaration_count,
+  open_grant_count, due_report_count, top_risks }`. Wire into
+  `/admin/funds` so each window renders the brief's full operational
+  card. Phase 49 currently has only the network-level attention strip
+  surfacing this state; per-window cards still lead with config.
+
+---
+
 ## Completed (rolling log, newest first)
+
+- **2026-06-11** Phase 50 — Status copy + sweep cleanup. Shared
+  `lib/status-copy.ts` helper with `describeApplicationStatus`,
+  `describeReportStatus`, `describeMembershipStatus`,
+  `describeDeclarationStatus` → `{ label, tone }`. Pure functions,
+  trivial to unit-test. Applied to the declarations list (status pills
+  read "Draft" / "Waiting for N signatures" / "Ready to release" /
+  "Applications open" — no internal state codes; status filter labels
+  match the human pills). Messages + Feedback pages retrofitted with
+  PageShell + PageHeader. Browser-verified: pills on the declarations
+  list show ["Draft", "Applications open"], `raw_state_leaks: []`.
+  Applications + Reports + their detail pages can adopt the helper
+  incrementally — the deeper Reports detail rewrite (1209 lines) is
+  flagged for a future phase rather than rushed.
+
+- **2026-06-11** Phase 49 — Funds & Windows + Crisis Monitoring
+  redesign. **Crisis Monitoring (full rewrite):** PageShell + tabs
+  Current report / Signals / History per the brief's decision-support
+  shape. Current report leads with summary + top 5 flagged signals;
+  long narrative hidden behind an expander. Signals tab = OB-flagged
+  rows only. History = the existing list with status filter. Attention
+  strip surfaces drafts/in_review reports owed a publish decision +
+  flagged signals in the latest published edition. **Funds & windows
+  (surgical):** PageShell + PageHeader; "New fund" moved into header
+  primaryAction slot. Attention strip leads with operational state
+  ("N declarations ready to release / in committee review / drafts").
+  Per-window operational-state cards (budget · active · open · due ·
+  risks) need a backend rollup endpoint that doesn't exist yet —
+  queued as a high-priority operational TODO above. Browser-verified
+  both pages.
+
+- **2026-06-11** Phase 48 — Dashboards rebuilt around "what needs
+  attention now". Four new PageShell-based role × flavor dashboards
+  (Kuja donor / Kuja NGO / NEAR operator / NEAR member), each leading
+  with an attention strip backed by live data + 2-4 focused work
+  sections + a "More detail" collapsible that wraps the existing rich
+  consoles (no functionality lost). Attention items are concrete
+  counts with jump-link chips: "2 members awaiting review", "N draft
+  declarations", "N reports due soon", "Continue where you left off",
+  "Ready to release", etc. NEAR member dashboard specifically matches
+  the brief's hardest constraint — feels like "my status / my apps /
+  my reports / my messages", not "inside a giant system".
+  `dashboard/page.tsx` becomes a thin router. Browser-verified both
+  operator + member.
+
+- **2026-06-11** Phase 47 — `<PageShell>` primitive + retrofit
+  declarations + memberships. New
+  `components/layout/page-shell.tsx` encodes the standard page
+  anatomy: PageShell + PageBack + PageHeader + PageAttention +
+  PageMain + PageDetail + PageDetailSection. Shared Tone vocabulary
+  (muted/info/good/warn/bad/accent) drives status pills, attention
+  banners, and detail icons. PageDetailSection uses native `<details>`
+  for accessibility + zero JS. Declarations detail retrofitted: status
+  pill now uses HUMAN copy ("Waiting for N signatures" / "Ready to
+  release" / "Applications open"); ledger + SLA + audit anchor moved
+  into PageDetail collapsibles; stepper stays as the live attention
+  surface. Memberships detail rewritten with the brief's tabs
+  (Overview / Capacity / Due diligence / Messages / Audit) + Approve /
+  Reject in the header primary-action slot + attention strip for
+  blockers like "Capacity assessment not yet linked". Status pill
+  "Awaiting review" (not "pending"). Browser-verified both pages.
 
 - **2026-06-11** Phase 46 — Design principles doc + nav split by flavor
   × role. Team feedback was that Kuja and NEAR should *not* share IA
