@@ -17,7 +17,6 @@
  */
 
 import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import {
@@ -29,23 +28,38 @@ import {
 import { useRouteId } from '@/lib/hooks/use-route-id';
 import { useAuthStore } from '@/stores/auth-store';
 import {
-  CheckCircle2, XCircle, AlertCircle, Loader2, ChevronLeft,
+  CheckCircle2, XCircle, AlertCircle, Loader2,
   Lock, Clock, FileText, Sparkles, Send, Rocket, UserPlus, Search, Trash2,
+  Siren, ShieldCheck,
 } from 'lucide-react';
 import { DeclarationLedgerPanel } from '@/components/declarations/declaration-ledger-panel';
 import { DeclarationStepper } from '@/components/declarations/declaration-stepper';
+import {
+  PageShell, PageBack, PageHeader, PageMain, PageDetail, PageDetailSection,
+} from '@/components/layout/page-shell';
 
-const STATUS_COLOUR: Record<EmergencyDeclaration['status'], string> = {
-  draft: 'bg-muted text-muted-foreground',
-  in_review: 'bg-[hsl(var(--kuja-sun))]/15 text-[hsl(var(--kuja-sun))]',
-  signed_active: 'bg-[hsl(var(--kuja-grow))]/15 text-[hsl(var(--kuja-grow))]',
-  cancelled: 'bg-destructive/15 text-destructive',
-  closed: 'bg-muted text-muted-foreground',
-};
+// Human-readable status label + tone for the page header pill.
+// Maps internal state to workflow language per design principles.
+function describeStatus(d: EmergencyDeclaration): { label: string; tone: 'muted' | 'warn' | 'good' | 'bad' | 'accent' } {
+  if (d.status === 'cancelled') return { label: 'Cancelled', tone: 'bad' };
+  if (d.status === 'closed')    return { label: 'Closed', tone: 'muted' };
+  if (d.status === 'signed_active') {
+    return d.applicants_notified_at
+      ? { label: 'Applications open', tone: 'good' }
+      : { label: 'Ready to release', tone: 'accent' };
+  }
+  if (d.status === 'in_review') {
+    const remaining = Math.max(0, d.required_signer_count - d.signed_count);
+    return remaining === 0
+      ? { label: 'Signatures complete', tone: 'good' }
+      : { label: `Waiting for ${remaining} signature${remaining === 1 ? '' : 's'}`, tone: 'warn' };
+  }
+  // draft
+  return { label: 'Draft', tone: 'muted' };
+}
 
 export default function DeclarationDetailClient() {
   const id = useRouteId('declarations');
-  const router = useRouter();
   const viewer = useAuthStore((s) => s.user);
   const { data, isLoading, mutate } = useDeclaration(id);
   const d = data?.declaration;
@@ -67,142 +81,156 @@ export default function DeclarationDetailClient() {
     );
   }
 
+  const statusPill = describeStatus(d);
+  const hasSla = !!(
+    d.declared_at || d.applications_open_at || d.applications_close_at ||
+    d.decision_at || d.applicants_notified_at
+  );
+
   return (
-    <div className="space-y-5">
-      <button
-        type="button"
-        onClick={() => router.push('/admin/declarations')}
-        className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-      >
-        <ChevronLeft className="w-3 h-3" /> Back to declarations
-      </button>
+    <PageShell>
+      <PageBack href="/admin/declarations" label="Back to declarations" />
 
-      {/* Phase 45 — Header: title + status, action-oriented (no counter clutter,
-          the stepper carries the live counter + next-step hint). */}
-      <div className="border border-border rounded-lg bg-card p-5">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <h1 className="kuja-display text-2xl">{d.title}</h1>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold capitalize ${STATUS_COLOUR[d.status]}`}>
-                {d.status.replace('_', ' ')}
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
-              {d.country && <span>{d.country}</span>}
-              {d.crisis_type && <span>{d.crisis_type}</span>}
-              {d.severity && <span>severity: {d.severity}</span>}
-              {d.proposed_total_amount && (
-                <span>proposed: {d.proposed_total_amount.toLocaleString()}</span>
-              )}
-            </div>
-          </div>
-          <DrafterActions d={d} onChange={mutate} />
-        </div>
+      <PageHeader
+        title={d.title}
+        icon={Siren}
+        status={statusPill}
+        meta={[
+          ...(d.country      ? [{ label: d.country }]                                  : []),
+          ...(d.crisis_type  ? [{ label: d.crisis_type }]                              : []),
+          ...(d.severity     ? [{ label: `severity: ${d.severity}` }]                  : []),
+          ...(d.proposed_total_amount
+            ? [{ label: `proposed: ${d.proposed_total_amount.toLocaleString()}` }]
+            : []),
+        ]}
+        primaryAction={<DrafterActions d={d} onChange={mutate} />}
+      />
 
-        {/* Release applications — declaration-to-grant handoff (Phase 32-38 follow-up) */}
-        {d.status === 'signed_active' && (
-          <ReleaseApplicationsPanel d={d} onChange={mutate} />
-        )}
-      </div>
+      {/* Release applications — the highest-priority action when active and
+          NGOs not yet notified. Rendered as its own attention-tier banner. */}
+      {d.status === 'signed_active' && (
+        <ReleaseApplicationsPanel d={d} onChange={mutate} />
+      )}
 
-      {/* Phase 45 — Visual lifecycle stepper. Replaces the inline counter +
-          the "read the timeline to know where we are" friction. */}
+      {/* Phase 45 stepper carries the live counter + count-aware "Next:" hint.
+          This IS the page's attention surface for declarations. */}
       <DeclarationStepper d={d} />
 
-      {/* SLA milestones, compact strip below the stepper */}
-      <SlaPanel d={d} />
-
-      {/* Phase 43C — OB process timeline. Detail/audit lives below the stepper
-          so the page leads with the action surface, not the ledger. */}
-      <DeclarationLedgerPanel declarationId={d.id} />
-
-      {/* Summary + evidence anchor — Phase 45: merged into one Context card */}
-      <div className="border border-border rounded-lg bg-card p-5 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-semibold text-sm">Context</h2>
-          {d.status === 'draft' && (
-            <AIDraftAssistButton declarationId={d.id} onUpdate={mutate} />
+      <PageMain>
+        {/* Context: summary + evidence anchor */}
+        <div className="border border-border rounded-lg bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-semibold text-sm">Context</h2>
+            {d.status === 'draft' && (
+              <AIDraftAssistButton declarationId={d.id} onUpdate={mutate} />
+            )}
+          </div>
+          {d.summary_md ? (
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{d.summary_md}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">No summary yet.</p>
           )}
-        </div>
-        {d.summary_md ? (
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{d.summary_md}</p>
-        ) : (
-          <p className="text-xs text-muted-foreground italic">No summary yet.</p>
-        )}
-        {d.evidence_row_id && (
-          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-2 border-t border-border">
-            <FileText className="w-3 h-3" />
-            Evidence: Crisis Monitoring row #{d.evidence_row_id}
-            {d.evidence_report_id && <> · Report #{d.evidence_report_id}</>}
-          </div>
-        )}
-      </div>
-
-      {/* Signers — Phase 45: identity-resolved rows + inline OB picker */}
-      <section className="border border-border rounded-lg bg-card p-5 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h2 className="font-semibold text-sm">Committee (Oversight Body signers)</h2>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Per IKEA Concept Note procedure — OB members sign with COI affirmation
-              before the declaration goes active.
-            </p>
-          </div>
-          {d.status === 'draft' && (
-            <div className="text-[11px] text-muted-foreground">
-              <strong className="text-foreground">{(d.signatures ?? []).length}</strong>{' '}
-              of {d.required_signer_count} slots filled
+          {d.evidence_row_id && (
+            <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-2 border-t border-border">
+              <FileText className="w-3 h-3" />
+              Evidence: Crisis Monitoring row #{d.evidence_row_id}
+              {d.evidence_report_id && <> · Report #{d.evidence_report_id}</>}
             </div>
           )}
         </div>
 
-        {(d.signatures ?? []).length === 0 && (
-          <div className="text-xs text-muted-foreground italic">
-            No committee members assigned yet. Pick from the Oversight Body roster below.
-          </div>
-        )}
-        <ul className="space-y-2">
-          {(d.signatures ?? []).map((s) => (
-            <SignerRow
-              key={s.id}
-              declarationId={d.id}
-              decl={d}
-              sig={s}
-              onChange={mutate}
-            />
-          ))}
-        </ul>
-
-        {/* Inline OB picker — only while still draftable */}
-        {d.status === 'draft' && (
-          <AddSignerPanel d={d} onChange={mutate} />
-        )}
-      </section>
-
-      {/* Documents — Phase 45: hide the card entirely when empty */}
-      {(d.documents ?? []).length > 0 && (
+        {/* Committee — identity-resolved rows + inline OB picker */}
         <section className="border border-border rounded-lg bg-card p-5 space-y-3">
-          <h2 className="font-semibold text-sm">Supporting documents</h2>
-          <ul className="space-y-1.5 text-xs">
-            {(d.documents ?? []).map((doc) => (
-              <li key={doc.id} className="flex items-center gap-2">
-                <FileText className="w-3 h-3 text-muted-foreground" />
-                <span className="capitalize">{doc.kind.replace('_', ' ')}</span>
-                {doc.note && <span className="text-muted-foreground italic">— {doc.note}</span>}
-              </li>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="font-semibold text-sm">Committee (Oversight Body signers)</h2>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Per IKEA Concept Note procedure — OB members sign with COI affirmation
+                before the declaration goes active.
+              </p>
+            </div>
+            {d.status === 'draft' && (
+              <div className="text-[11px] text-muted-foreground">
+                <strong className="text-foreground">{(d.signatures ?? []).length}</strong>{' '}
+                of {d.required_signer_count} slots filled
+              </div>
+            )}
+          </div>
+
+          {(d.signatures ?? []).length === 0 && (
+            <div className="text-xs text-muted-foreground italic">
+              No committee members assigned yet. Pick from the Oversight Body roster below.
+            </div>
+          )}
+          <ul className="space-y-2">
+            {(d.signatures ?? []).map((s) => (
+              <SignerRow
+                key={s.id}
+                declarationId={d.id}
+                decl={d}
+                sig={s}
+                onChange={mutate}
+              />
             ))}
           </ul>
-        </section>
-      )}
 
-      {/* Audit anchor chip */}
-      {d.signed_active_audit_id && (
-        <div className="text-[10px] text-muted-foreground">
-          Activation audit-chain anchor: #{d.signed_active_audit_id}
-        </div>
-      )}
-    </div>
+          {/* Inline OB picker — only while still draftable */}
+          {d.status === 'draft' && (
+            <AddSignerPanel d={d} onChange={mutate} />
+          )}
+        </section>
+
+        {/* Documents — render only if any are attached */}
+        {(d.documents ?? []).length > 0 && (
+          <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+            <h2 className="font-semibold text-sm">Supporting documents</h2>
+            <ul className="space-y-1.5 text-xs">
+              {(d.documents ?? []).map((doc) => (
+                <li key={doc.id} className="flex items-center gap-2">
+                  <FileText className="w-3 h-3 text-muted-foreground" />
+                  <span className="capitalize">{doc.kind.replace('_', ' ')}</span>
+                  {doc.note && <span className="text-muted-foreground italic">— {doc.note}</span>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </PageMain>
+
+      {/* Supporting detail — collapsible by default. Audit trail, SLA
+          timestamps, and the activation anchor live here so the page leads
+          with action, not records. */}
+      <PageDetail>
+        <PageDetailSection
+          title="Process timeline"
+          icon={Clock}
+          defaultOpen={false}
+        >
+          <DeclarationLedgerPanel declarationId={d.id} />
+        </PageDetailSection>
+        {hasSla && (
+          <PageDetailSection
+            title="SLA milestones"
+            icon={Clock}
+            defaultOpen={false}
+          >
+            <SlaPanel d={d} />
+          </PageDetailSection>
+        )}
+        {d.signed_active_audit_id && (
+          <PageDetailSection
+            title="Audit anchor"
+            icon={ShieldCheck}
+            defaultOpen={false}
+          >
+            <div className="text-xs text-muted-foreground">
+              Activation audit-chain anchor:{' '}
+              <span className="font-mono">#{d.signed_active_audit_id}</span>
+            </div>
+          </PageDetailSection>
+        )}
+      </PageDetail>
+    </PageShell>
   );
 }
 
@@ -216,25 +244,24 @@ function SlaPanel({ d }: { d: EmergencyDeclaration }) {
   ];
   const hasAny = items.some((i) => i.value);
   if (!hasAny) return null;
+  // Renders inside <PageDetailSection> which already provides the card chrome.
   return (
-    <div className="border border-border rounded-lg bg-card p-3">
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[10px]">
-        {items.map((i) => (
-          <div key={i.label} className="space-y-0.5">
-            <div className="uppercase tracking-wide text-muted-foreground">{i.label}</div>
-            <div className="font-medium">
-              {i.value ? (
-                <span className="text-foreground">
-                  <Clock className="w-3 h-3 inline mr-1" />
-                  {new Date(i.value).toLocaleString()}
-                </span>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              )}
-            </div>
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[10px]">
+      {items.map((i) => (
+        <div key={i.label} className="space-y-0.5">
+          <div className="uppercase tracking-wide text-muted-foreground">{i.label}</div>
+          <div className="font-medium">
+            {i.value ? (
+              <span className="text-foreground">
+                <Clock className="w-3 h-3 inline mr-1" />
+                {new Date(i.value).toLocaleString()}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }
