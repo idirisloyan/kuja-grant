@@ -319,6 +319,54 @@ flip them on quickly.
 - **Code state:** ~1 week including Stripe webhooks and
   donor-portal billing UI.
 
+### Peer reference snippets — "orgs like yours wrote this"
+- **last_touched:** 2026-06-12 (deferred during Phase 71-82 push)
+- **Why:** Non-technical NGOs don't know what "good" looks like for a
+  given section of a grant application. Showing them anonymized peer
+  snippets of how similar-sized orgs in their region wrote the same
+  section is a strong learning signal donors won't provide on their
+  own.
+- **Unblock:** Build an anonymization pipeline. Per-section extract,
+  scrub identifying detail (org names, specific locations, named
+  individuals, distinctive numbers), opt-in consent gate on the source
+  NGO ('Allow your application snippets to be shown anonymized to
+  peers?'), and a similar-org recommender (by sector, size, region).
+- **Engineering effort:** ~1 week including the anonymizer, consent
+  gate, and similarity index.
+- **Code state:** Application response field schema already exists;
+  the anonymizer + recommender are net-new.
+
+### NEAR cohort onboarding — 6-week guided curriculum for new members
+- **last_touched:** 2026-06-12 (deferred during Phase 71-82 push)
+- **Why:** New NEAR members today land in the platform and have no
+  guided path. A 6-week curriculum with weekly micro-tasks
+  (complete profile → upload 3 docs → run first internal review → run
+  first MV → attend first OB call observer → graduate to signer) gives
+  them a path and builds trust score gradually. Higher completion →
+  higher trust → fairer share of declared funds.
+- **Unblock:** The NEAR secretariat must author the curriculum content
+  (titles, micro-task descriptions, success criteria per week). This
+  is product/content work, not engineering. Once content lands,
+  engineering ships the scheduler + UI in ~2 weeks.
+- **Engineering effort:** ~2 weeks for the scheduler + weekly-task
+  dashboard widget + completion-tracking columns.
+
+### Side-by-side rubric preview — live scoring as the NGO writes
+- **last_touched:** 2026-06-12 (deferred during Phase 71-82 push;
+  Phase 75 covered ~70% of the value via `confidence` + `gaps`)
+- **Why:** Donors hide their scoring rubric today. Showing it to
+  applicants — with a live score estimate that updates as they type —
+  turns 'guess what the donor wants' into 'I know exactly what they
+  want.' Transparency favours prepared NGOs.
+- **Unblock:** None — engineering only. Phase 40 already has an
+  auto-rubric-scorer that runs at /submit. Phase 75's preview shows
+  static confidence + gaps. Live preview needs the scorer wired to
+  fire on textarea-blur with a 200ms debounce.
+- **Engineering effort:** ~1 week including UI for the live scoreboard
+  + debounce + caching.
+- **Code state:** AutoRubricScorer service exists. The new work is
+  exposing it as a live endpoint + a sidebar panel on /apply.
+
 ### Offline-first PWA — IndexedDB + Service Worker
 - **Why:** Rural NGOs work over intermittent 3G. Drafting an
   assessment offline + syncing on next connection is operational
@@ -331,6 +379,59 @@ flip them on quickly.
   ship the basics in a week; full sync layer is 3-4 weeks.
 
 ## Completed (rolling log, newest first)
+
+- **2026-06-12** Phase 82 — "Today's focus" single-sentence banner.
+  Pushes Phase 48's principle further. Picks the highest-priority
+  attention item, renders as kuja-display headline + plain-language
+  hint + single CTA deep-linked to the right surface. Priority logic
+  blends tone (bad +1000 / warn +500), severity (critical +800), and
+  due-in-days (overdue +600 + |days|×10). Mounted at the top of all 4
+  attention-* dashboards (NGO, operator, donor, member). PageAttention
+  still renders below for the full picture. Empty state is rewarding
+  ('You're all caught up. Take the win.').
+
+- **2026-06-12** Phase 81 — Smart deadline negotiation.
+  Platform mediates instead of forcing back-channel email.
+  Backend reports.py:
+    POST /api/reports/<id>/extension-request — NGO posts {extra_days
+      1-30, reason}. Persists on ai_analysis.extension_requests with
+      status='pending'.
+    POST /api/reports/<id>/extension-decision — donor (or admin) sends
+      {decision: approved|counter|declined, counter_days?, note?}.
+      On 'approved', moves due_date by extra_days.
+  Frontend deadline-negotiator.tsx — single component handles both
+  sides by role. NGO + draft → 'Request extension' → days picker +
+  reason. Donor + pending → Approve/Counter/Decline with optional note.
+  Either side + decided → outcome banner. Mounted on /reports/[id].
+
+- **2026-06-12** Phase 80 — Signature-pace gentle coaching.
+  Phase 68 ships network-level pace data; Phase 80 personalises it for
+  the signer.
+  Backend GET /api/dashboard/signer-coach: last 6 signatures' median +
+  p90 days vs 6-day network target. Tone-coded: good if ≤ target, warn
+  if ≤1.5×, bad otherwise. Lists pending declarations awaiting this
+  user's signature with age + over-target flag. Copy is coaching, not
+  surveillance ('no judgement, but the network depends on quick OB
+  decisions in a crisis').
+  Frontend signer-coach-card.tsx mounted on operator dashboard.
+  Auto-hides when there's nothing to coach on. 3-tile stats + pending-
+  declaration list with deep-links.
+
+- **2026-06-12** Phase 79 — NEAR declaration-as-conversation.
+  Alternative to Phase 45's 4-step wizard. OB member describes the
+  situation in their own words (typed or voice-transcribed via Web
+  Speech API). Claude parses out title, crisis_type, severity, country,
+  proposed amount + currency, summary, suggested OB committee
+  (user_ids from active roster), rationale, confidence, warnings.
+  Backend:
+    AIService.parse_declaration_from_narrative — conservative parser;
+      does NOT invent locations, counts, or dates.
+    POST /api/declarations/parse-narrative — preview-only.
+  Frontend declaration-conversation.tsx + mode toggle in
+  declaration-wizard.tsx. Conversation default; wizard fallback. On
+  'Use this draft', wizard jumps to step 2 pre-filled so OB member
+  still picks fund + window (the only slots AI cannot infer) before
+  confirming.
 
 - **2026-06-12** Phase 78 — AI content translation.
   Removes the 'donor reads English' constraint that filtered out
