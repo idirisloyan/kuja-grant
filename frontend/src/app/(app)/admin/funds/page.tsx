@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import {
-  useFunds, useFund, useWindowRubric,
+  useFunds, useFund, useWindowRubric, useDeclarations,
   type Fund, type FundWindow, type WindowCriterion,
 } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
@@ -24,13 +24,22 @@ import { useNetworkStore } from '@/stores/network-store';
 import Link from 'next/link';
 import {
   Plus, Coins, Inbox, ChevronDown, ChevronRight, Sparkles,
-  Lock, Gauge, Loader2, BarChart3,
+  Lock, Gauge, Loader2, BarChart3, Wallet,
 } from 'lucide-react';
+import {
+  PageShell, PageHeader, PageAttention, PageMain, type AttentionItem,
+} from '@/components/layout/page-shell';
 
 export default function FundsAdminPage() {
   const viewer = useAuthStore((s) => s.user);
   const network = useNetworkStore((s) => s.network);
   const { data, isLoading, mutate: refetchFunds } = useFunds();
+  // Phase 49 — lead with operational state across the network. Per-window
+  // rollups (open grants, due reports, top risks) still need a backend
+  // endpoint; queued as an operational TODO in NEAR_BACKLOG.md.
+  const { data: drafts } = useDeclarations('draft');
+  const { data: inRev }  = useDeclarations('in_review');
+  const { data: active } = useDeclarations('signed_active');
   const [showNewFund, setShowNewFund] = useState(false);
   const [openFundId, setOpenFundId] = useState<number | null>(null);
 
@@ -46,57 +55,84 @@ export default function FundsAdminPage() {
 
   const funds = data?.funds ?? [];
 
+  // Attention items derived from operational state, not configuration.
+  const attention: AttentionItem[] = [];
+  const readyRelease = (active?.declarations ?? []).filter((d) => !d.applicants_notified_at);
+  if (readyRelease.length > 0) {
+    attention.push({
+      tone: 'accent',
+      label: `${readyRelease.length} declaration${readyRelease.length === 1 ? '' : 's'} ready to release`,
+      hint: 'Signed_active — flip the auto-created grant drafts to open and notify shortlisted NGOs.',
+    });
+  }
+  const inReviewCount = inRev?.declarations?.length ?? 0;
+  if (inReviewCount > 0) {
+    attention.push({
+      tone: 'info',
+      label: `${inReviewCount} declaration${inReviewCount === 1 ? '' : 's'} in committee review`,
+    });
+  }
+  const draftCount = drafts?.declarations?.length ?? 0;
+  if (draftCount > 0) {
+    attention.push({
+      tone: 'muted',
+      label: `${draftCount} draft declaration${draftCount === 1 ? '' : 's'}`,
+    });
+  }
+
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="kuja-display text-3xl">{network?.name ?? 'Network'} — funds</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {funds.length} {funds.length === 1 ? 'fund' : 'funds'}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowNewFund((v) => !v)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90"
-        >
-          <Plus className="w-4 h-4" />
-          New fund
-        </button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title={network?.name ? `${network.name} — Funds & windows` : 'Funds & windows'}
+        subtitle={`${funds.length} fund${funds.length === 1 ? '' : 's'} configured.`}
+        icon={Wallet}
+        primaryAction={
+          <button
+            type="button"
+            onClick={() => setShowNewFund((v) => !v)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90"
+          >
+            <Plus className="w-4 h-4" /> New fund
+          </button>
+        }
+      />
 
-      {showNewFund && (
-        <NewFundForm
-          onCreate={async () => { await refetchFunds(); setShowNewFund(false); }}
-          onCancel={() => setShowNewFund(false)}
-        />
-      )}
+      <PageAttention items={attention} />
 
-      {isLoading && (
-        <div className="space-y-2">
-          {[1, 2].map((i) => <div key={i} className="kuja-shimmer h-20 rounded" />)}
-        </div>
-      )}
-
-      {!isLoading && funds.length === 0 && (
-        <div className="border border-border rounded-lg bg-card p-10 text-center text-sm text-muted-foreground">
-          <Coins className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          No funds yet. Create one to get started.
-        </div>
-      )}
-
-      <div className="space-y-3">
-        {funds.map((f) => (
-          <FundCard
-            key={f.id}
-            fund={f}
-            isOpen={openFundId === f.id}
-            onToggle={() => setOpenFundId(openFundId === f.id ? null : f.id)}
-            onUpdate={refetchFunds}
+      <PageMain>
+        {showNewFund && (
+          <NewFundForm
+            onCreate={async () => { await refetchFunds(); setShowNewFund(false); }}
+            onCancel={() => setShowNewFund(false)}
           />
-        ))}
-      </div>
-    </div>
+        )}
+
+        {isLoading && (
+          <div className="space-y-2">
+            {[1, 2].map((i) => <div key={i} className="kuja-shimmer h-20 rounded" />)}
+          </div>
+        )}
+
+        {!isLoading && funds.length === 0 && (
+          <div className="border border-border rounded-lg bg-card p-10 text-center text-sm text-muted-foreground">
+            <Coins className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            No funds yet. Create one to get started.
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {funds.map((f) => (
+            <FundCard
+              key={f.id}
+              fund={f}
+              isOpen={openFundId === f.id}
+              onToggle={() => setOpenFundId(openFundId === f.id ? null : f.id)}
+              onUpdate={refetchFunds}
+            />
+          ))}
+        </div>
+      </PageMain>
+    </PageShell>
   );
 }
 
