@@ -1,0 +1,213 @@
+'use client';
+
+/**
+ * NEAR operator (admin) dashboard — Phase 48.
+ *
+ * The brief: this should feel "operational and decisive".
+ *
+ *   Top action strip: memberships needing review · declarations
+ *                     awaiting action · grants ready to release ·
+ *                     trust/recheck issues
+ *   Middle: Fund → Window operational tree · current crisis activity
+ *   Lower:  reporting / governance health (existing NearOperatorConsole)
+ *
+ * The dashboard surfaces *counts* in the attention strip and offers a
+ * one-click jump to the right list page. The rich existing operator
+ * console moves into a collapsible "More detail" so power users keep
+ * everything they had, just out of the default view.
+ */
+
+import Link from 'next/link';
+import { useMemo } from 'react';
+import { useAuthStore } from '@/stores/auth-store';
+import { useNetworkStore } from '@/stores/network-store';
+import {
+  useDeclarations, useFunds, useLatestCrisisReport, usePendingMemberships,
+} from '@/lib/hooks/use-api';
+import {
+  PageShell, PageHeader, PageAttention, PageMain, PageDetail,
+  PageDetailSection, type AttentionItem,
+} from '@/components/layout/page-shell';
+import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
+import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
+
+export function AttentionOperatorDashboard() {
+  const user = useAuthStore((s) => s.user);
+  const network = useNetworkStore((s) => s.network);
+
+  // Pull lean data hooks. Each is independent; SWR dedupes on the page.
+  const { data: pendingMems } = usePendingMemberships('pending');
+  const { data: underReview } = usePendingMemberships('under_review');
+  const { data: drafts }      = useDeclarations('draft');
+  const { data: inReview }    = useDeclarations('in_review');
+  const { data: active }      = useDeclarations('signed_active');
+  const { data: funds }       = useFunds();
+  const { data: crisis }      = useLatestCrisisReport();
+
+  const memCount      = (pendingMems?.memberships?.length ?? 0)
+                      + (underReview?.memberships?.length ?? 0);
+  const draftCount    = drafts?.declarations?.length ?? 0;
+  const inReviewCount = inReview?.declarations?.length ?? 0;
+  // "Ready to release" = signed_active declarations whose applicants
+  // haven't been notified yet.
+  const readyRelease  = (active?.declarations ?? []).filter(
+    (d) => !d.applicants_notified_at,
+  );
+
+  const attention: AttentionItem[] = useMemo(() => {
+    const items: AttentionItem[] = [];
+    if (memCount > 0) {
+      items.push({
+        tone: 'warn',
+        label: `${memCount} member${memCount === 1 ? '' : 's'} awaiting review`,
+        hint: 'Run trust process, review capacity assessment, decide.',
+        action: <JumpLink href="/admin/network-memberships" label="Review" />,
+      });
+    }
+    if (readyRelease.length > 0) {
+      items.push({
+        tone: 'accent',
+        label: `${readyRelease.length} declaration${readyRelease.length === 1 ? '' : 's'} ready to release`,
+        hint: 'Signatures complete; flip the auto-created grant drafts to open and notify shortlisted NGOs.',
+        action: <JumpLink href={`/admin/declarations/${readyRelease[0].id}`} label="Open" />,
+      });
+    }
+    if (inReviewCount > 0) {
+      items.push({
+        tone: 'info',
+        label: `${inReviewCount} declaration${inReviewCount === 1 ? '' : 's'} waiting on committee signatures`,
+        hint: 'No action required from you unless you also hold an OB seat.',
+        action: <JumpLink href="/admin/declarations" label="Watch" />,
+      });
+    }
+    if (draftCount > 0) {
+      items.push({
+        tone: 'muted',
+        label: `${draftCount} draft declaration${draftCount === 1 ? '' : 's'}`,
+        hint: 'Add committee members and submit for signature.',
+        action: <JumpLink href="/admin/declarations" label="Open drafts" />,
+      });
+    }
+    if (items.length === 0) {
+      items.push({
+        tone: 'good',
+        label: 'Nothing needs your attention right now',
+        hint: 'No pending memberships, no draft or in-review declarations, nothing waiting to release. Quiet.',
+      });
+    }
+    return items;
+  }, [memCount, draftCount, inReviewCount, readyRelease]);
+
+  if (!user) return null;
+  const firstName = user.name?.split(' ')[0] ?? 'there';
+
+  return (
+    <PageShell>
+      <PageHeader
+        title={`Good morning, ${firstName}.`}
+        subtitle={network?.name
+          ? `${network.name} — fund operations console.`
+          : 'Fund operations console.'}
+      />
+
+      <PageAttention items={attention} />
+
+      <PageMain>
+        {/* Fund → Window operational tree — lean version */}
+        <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-sm flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+              Fund operations
+            </h2>
+            <Link
+              href="/admin/funds"
+              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              Open Funds &amp; Windows <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          {(funds?.funds ?? []).length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">No funds yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {(funds?.funds ?? []).slice(0, 3).map((f) => (
+                <li key={f.id} className="text-xs flex items-center justify-between gap-3 border border-border rounded-md p-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm truncate">{f.name}</div>
+                    <div className="text-muted-foreground mt-0.5">
+                      {f.window_count ?? 0} window{(f.window_count ?? 0) === 1 ? '' : 's'}
+                      {f.total_pool_amount ? <> · {f.total_pool_amount.toLocaleString()} {f.currency || ''}</> : null}
+                    </div>
+                  </div>
+                  <Link href={`/admin/funds`} className="text-xs underline hover:no-underline text-muted-foreground">
+                    Open
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Current crisis activity */}
+        <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-sm flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+              Crisis monitoring
+            </h2>
+            <Link
+              href="/admin/crisis-monitoring"
+              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              Open Crisis Monitoring <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          {crisis?.report ? (
+            <div className="text-xs space-y-1">
+              <div className="font-medium text-sm">
+                Edition #{crisis.report.id} ·{' '}
+                {new Date(crisis.report.period_start).toLocaleDateString()} →{' '}
+                {new Date(crisis.report.period_end).toLocaleDateString()}
+              </div>
+              <div className="text-muted-foreground">
+                {crisis.report.published_at && (
+                  <>published {new Date(crisis.report.published_at).toLocaleDateString()} · </>
+                )}
+                {crisis.report.row_count} signal{crisis.report.row_count === 1 ? '' : 's'}
+                {crisis.report.flagged_row_count > 0 && (
+                  <> · <span className="text-[hsl(var(--kuja-sun))] font-semibold">{crisis.report.flagged_row_count} flagged</span></>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">No published crisis monitoring report yet.</p>
+          )}
+        </section>
+      </PageMain>
+
+      {/* Full operator console as a collapsible — power users still have it */}
+      <PageDetail>
+        <PageDetailSection
+          title="Full operator console (charts + governance health)"
+          icon={ShieldAlert}
+          defaultOpen={false}
+        >
+          <NearOperatorConsole />
+        </PageDetailSection>
+      </PageDetail>
+    </PageShell>
+  );
+}
+
+function JumpLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-background border border-border text-xs font-semibold hover:bg-muted shrink-0"
+    >
+      {label} <ArrowRight className="w-3 h-3" />
+    </Link>
+  );
+}
+

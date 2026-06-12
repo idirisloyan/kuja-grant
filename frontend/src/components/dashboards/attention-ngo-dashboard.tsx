@@ -1,0 +1,217 @@
+'use client';
+
+/**
+ * Kuja NGO dashboard — Phase 48.
+ *
+ * The brief: should feel like a workbench, not a dashboard.
+ *
+ *   Top: Continue where you left off (draft applications)
+ *   Sections: applications in progress · reports due soon ·
+ *             best-fit opportunities · org readiness / profile gaps
+ *   Detail: the existing rich NGO console as a collapsible
+ */
+
+import Link from 'next/link';
+import { useMemo } from 'react';
+import { useAuthStore } from '@/stores/auth-store';
+import {
+  useApplications, useUpcomingReports,
+} from '@/lib/hooks/use-api';
+import {
+  PageShell, PageHeader, PageAttention, PageMain, PageDetail,
+  PageDetailSection, type AttentionItem,
+} from '@/components/layout/page-shell';
+import { NgoReadinessConsole } from '@/components/dashboards/ngo-readiness-console';
+import { MatchesCard } from '@/components/dashboards/matches-card';
+import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
+import {
+  FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
+} from 'lucide-react';
+
+export function AttentionNgoDashboard() {
+  const user = useAuthStore((s) => s.user);
+
+  const { data: myApps }       = useApplications();
+  const { data: upcomingReps } = useUpcomingReports();
+
+  const draftApps   = (myApps?.applications ?? []).filter((a) => a.status === 'draft');
+  const submitted   = (myApps?.applications ?? []).filter((a) =>
+    ['submitted', 'in_review'].includes(a.status),
+  );
+  // upcoming_reports is typed `unknown[]` at the hook; narrow it here.
+  type Upcoming = { id: number; grant_title?: string; due_date?: string };
+  const upcoming = ((upcomingReps?.upcoming_reports ?? []) as Upcoming[]).slice(0, 3);
+
+  const attention: AttentionItem[] = useMemo(() => {
+    const items: AttentionItem[] = [];
+    if (draftApps.length > 0) {
+      items.push({
+        tone: 'accent',
+        label: `Continue where you left off — ${draftApps.length} draft${draftApps.length === 1 ? '' : 's'}`,
+        hint: 'Pick up your work-in-progress applications.',
+        action: <JumpLink href="/applications" label="Continue" />,
+      });
+    }
+    if (upcoming.length > 0) {
+      items.push({
+        tone: 'warn',
+        label: `${upcoming.length} report${upcoming.length === 1 ? '' : 's'} due soon`,
+        action: <JumpLink href="/reports" label="Open Reports" />,
+      });
+    }
+    if (items.length === 0) {
+      items.push({
+        tone: 'good',
+        label: 'You\'re all caught up',
+        hint: 'No drafts, no reports due. Browse opportunities below.',
+      });
+    }
+    return items;
+  }, [draftApps, upcoming]);
+
+  if (!user) return null;
+  const firstName = user.name?.split(' ')[0] ?? 'there';
+
+  return (
+    <PageShell>
+      <PageHeader
+        title={`Hi ${firstName}.`}
+        subtitle="Your workbench. Continue where you left off."
+      />
+
+      <PageAttention items={attention} />
+
+      <PageMain>
+        {/* Applications in progress (drafts) */}
+        {draftApps.length > 0 && (
+          <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-sm flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+                Applications in progress
+              </h2>
+              <Link
+                href="/applications"
+                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              >
+                See all <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <ul className="space-y-2">
+              {draftApps.slice(0, 4).map((a) => (
+                <li key={a.id} className="text-xs flex items-center justify-between gap-3 border border-border rounded-md p-3 hover:bg-muted/30">
+                  <Link href={`/applications/${a.id}`} className="min-w-0 flex-1">
+                    <div className="font-medium text-sm truncate">
+                      {a.grant_title || `Application #${a.id}`}
+                    </div>
+                    <div className="text-muted-foreground mt-0.5">draft</div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Reports due soon */}
+        {upcoming.length > 0 && (
+          <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-sm flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+                Reports due soon
+              </h2>
+              <Link
+                href="/reports"
+                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              >
+                See all <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <ul className="space-y-2">
+              {upcoming.map((r) => (
+                <li key={r.id} className="text-xs flex items-center justify-between gap-3 border border-border rounded-md p-3">
+                  <Link href={`/reports/${r.id}`} className="min-w-0 flex-1">
+                    <div className="font-medium text-sm truncate">
+                      {r.grant_title || `Report #${r.id}`}
+                    </div>
+                    <div className="text-muted-foreground mt-0.5">
+                      {r.due_date && <>Due {new Date(r.due_date).toLocaleDateString()}</>}
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Best-fit opportunities — the existing matches card stays. */}
+        <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-sm flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+              Best-fit opportunities
+            </h2>
+            <Link
+              href="/grants"
+              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              Open Opportunities <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <MatchesCard limit={3} />
+        </section>
+
+        {/* Submitted — only when there are any */}
+        {submitted.length > 0 && (
+          <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-sm flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+                Awaiting decision
+              </h2>
+              <Link
+                href="/applications"
+                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              >
+                See all <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <ul className="space-y-2">
+              {submitted.slice(0, 3).map((a) => (
+                <li key={a.id} className="text-xs flex items-center justify-between gap-3 border border-border rounded-md p-3">
+                  <Link href={`/applications/${a.id}`} className="min-w-0 flex-1">
+                    <div className="font-medium text-sm truncate">
+                      {a.grant_title || `Application #${a.id}`}
+                    </div>
+                    <div className="text-muted-foreground capitalize mt-0.5">{a.status.replace('_', ' ')}</div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </PageMain>
+
+      {/* Readiness + cross-grant patterns collapsed under "More insight" */}
+      <PageDetail>
+        <PageDetailSection title="Readiness & patterns" icon={Lightbulb} defaultOpen={false}>
+          <div className="space-y-4">
+            <NgoReadinessConsole />
+            <CrossGrantPatternsCard />
+          </div>
+        </PageDetailSection>
+      </PageDetail>
+    </PageShell>
+  );
+}
+
+function JumpLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-background border border-border text-xs font-semibold hover:bg-muted shrink-0"
+    >
+      {label} <ArrowRight className="w-3 h-3" />
+    </Link>
+  );
+}

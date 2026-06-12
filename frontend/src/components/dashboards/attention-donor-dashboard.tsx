@@ -1,0 +1,227 @@
+'use client';
+
+/**
+ * Kuja donor dashboard — Phase 48.
+ *
+ * The brief:
+ *   Top: What needs your attention today
+ *   Middle: Applications awaiting action · Reports awaiting review · Deadlines coming
+ *   Lower: Portfolio insights (the existing rich cards as a collapsible)
+ *
+ * Cut: too many small metric cards, secondary charts above actionable items.
+ */
+
+import Link from 'next/link';
+import { useMemo } from 'react';
+import { useAuthStore } from '@/stores/auth-store';
+import {
+  useApplications, useReports, useGrants,
+} from '@/lib/hooks/use-api';
+import {
+  PageShell, PageHeader, PageAttention, PageMain, PageDetail,
+  PageDetailSection, type AttentionItem,
+} from '@/components/layout/page-shell';
+import { DonorCommandCenter } from '@/components/dashboards/donor-command-center';
+import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
+import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
+import { PortfolioRiskHeatmap } from '@/components/dashboards/portfolio-risk-heatmap';
+import {
+  FileText, BarChart3, Clock, ArrowRight, Briefcase, Lightbulb,
+} from 'lucide-react';
+
+export function AttentionDonorDashboard() {
+  const user = useAuthStore((s) => s.user);
+
+  const { data: pendingApps } = useApplications({ status: 'submitted' });
+  const { data: pendingReps } = useReports({ status: 'submitted' });
+  const { data: openGrants }  = useGrants({ status: 'open' });
+
+  const submittedApps = pendingApps?.applications ?? [];
+  const submittedReps = pendingReps?.reports ?? [];
+
+  // "Closing soon" = grants with deadline in the next 14 days.
+  const closingSoon = useMemo(() => {
+    const now = Date.now();
+    const twoWeeks = 14 * 24 * 60 * 60 * 1000;
+    return (openGrants?.grants ?? []).filter((g) => {
+      if (!g.deadline) return false;
+      const t = new Date(g.deadline).getTime();
+      return t > now && t - now < twoWeeks;
+    });
+  }, [openGrants]);
+
+  const attention: AttentionItem[] = useMemo(() => {
+    const items: AttentionItem[] = [];
+    if (submittedApps.length > 0) {
+      items.push({
+        tone: 'warn',
+        label: `${submittedApps.length} application${submittedApps.length === 1 ? '' : 's'} awaiting your review`,
+        action: <JumpLink href="/reviews" label="Review" />,
+      });
+    }
+    if (submittedReps.length > 0) {
+      items.push({
+        tone: 'warn',
+        label: `${submittedReps.length} report${submittedReps.length === 1 ? '' : 's'} awaiting review`,
+        action: <JumpLink href="/reports" label="Open" />,
+      });
+    }
+    if (closingSoon.length > 0) {
+      items.push({
+        tone: 'info',
+        label: `${closingSoon.length} grant${closingSoon.length === 1 ? '' : 's'} closing in the next 2 weeks`,
+        hint: 'Check application volume; consider extending or promoting.',
+        action: <JumpLink href="/grants" label="Open Grants" />,
+      });
+    }
+    if (items.length === 0) {
+      items.push({
+        tone: 'good',
+        label: 'Nothing needs your attention right now',
+        hint: 'No pending applications or reports, no deadlines closing imminently.',
+      });
+    }
+    return items;
+  }, [submittedApps, submittedReps, closingSoon]);
+
+  if (!user) return null;
+  const firstName = user.name?.split(' ')[0] ?? 'there';
+
+  return (
+    <PageShell>
+      <PageHeader
+        title={`Welcome back, ${firstName}.`}
+        subtitle="What needs your attention today."
+      />
+
+      <PageAttention items={attention} />
+
+      <PageMain>
+        {/* My grants — quick portfolio look without a chart */}
+        <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-sm flex items-center gap-2">
+              <Briefcase className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+              My open grants
+            </h2>
+            <Link
+              href="/grants"
+              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              Open Grants <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          {(openGrants?.grants ?? []).length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">No open grants right now.</p>
+          ) : (
+            <ul className="space-y-2">
+              {(openGrants?.grants ?? []).slice(0, 4).map((g) => (
+                <li key={g.id} className="text-xs flex items-center justify-between gap-3 border border-border rounded-md p-3">
+                  <Link href={`/grants/${g.id}`} className="min-w-0 flex-1">
+                    <div className="font-medium text-sm truncate">{g.title}</div>
+                    <div className="text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
+                      {g.total_funding && <span>{g.total_funding.toLocaleString()} {g.currency || ''}</span>}
+                      {g.deadline && (
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          closes {new Date(g.deadline).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Reports awaiting review */}
+        {submittedReps.length > 0 && (
+          <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-sm flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+                Reports awaiting review
+              </h2>
+              <Link
+                href="/reports"
+                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              >
+                Open Reports <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <ul className="space-y-2">
+              {submittedReps.slice(0, 4).map((r) => (
+                <li key={r.id} className="text-xs flex items-center justify-between gap-3 border border-border rounded-md p-3">
+                  <Link href={`/reports/${r.id}`} className="min-w-0 flex-1">
+                    <div className="font-medium text-sm truncate">
+                      {r.grant_title || `Report #${r.id}`}
+                    </div>
+                    <div className="text-muted-foreground mt-0.5">
+                      submitted {r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : ''}
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Apps awaiting action */}
+        {submittedApps.length > 0 && (
+          <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-sm flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+                Applications awaiting action
+              </h2>
+              <Link
+                href="/reviews"
+                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              >
+                Open Reviews <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <ul className="space-y-2">
+              {submittedApps.slice(0, 4).map((a) => (
+                <li key={a.id} className="text-xs flex items-center justify-between gap-3 border border-border rounded-md p-3">
+                  <Link href={`/applications/${a.id}`} className="min-w-0 flex-1">
+                    <div className="font-medium text-sm truncate">
+                      {a.grant_title || `Application #${a.id}`}
+                    </div>
+                    <div className="text-muted-foreground mt-0.5">
+                      {a.org_name && <>by {a.org_name}</>}
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </PageMain>
+
+      {/* Portfolio insights — collapsible. The existing rich cards live here. */}
+      <PageDetail>
+        <PageDetailSection title="Portfolio insights" icon={Lightbulb} defaultOpen={false}>
+          <div className="space-y-4">
+            <PreemptionWatchCard scope="me" />
+            <CrossGrantPatternsCard />
+            <PortfolioRiskHeatmap />
+            <DonorCommandCenter />
+          </div>
+        </PageDetailSection>
+      </PageDetail>
+    </PageShell>
+  );
+}
+
+function JumpLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-background border border-border text-xs font-semibold hover:bg-muted shrink-0"
+    >
+      {label} <ArrowRight className="w-3 h-3" />
+    </Link>
+  );
+}
