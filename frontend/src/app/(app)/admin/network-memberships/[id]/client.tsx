@@ -16,7 +16,9 @@
  * leaving.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import useSWR from 'swr';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { useMembership } from '@/lib/hooks/use-api';
@@ -25,7 +27,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import {
   ShieldCheck, ShieldAlert, Loader2,
   CheckCircle2, XCircle, ClipboardCheck, Sparkles, MapPin, Building2,
-  Inbox, History,
+  Inbox, History, ArrowUpRight, ExternalLink,
 } from 'lucide-react';
 import {
   PageShell, PageBack, PageHeader, PageAttention, PageMain,
@@ -154,23 +156,11 @@ export default function MembershipReviewClient() {
           </TabsContent>
 
           <TabsContent value="messages" className="mt-3">
-            <PlaceholderTab
-              icon={Inbox}
-              title="Messages with this member"
-              body="Per-member message thread lands in Phase 50. Until then, use the global Messages surface."
-              ctaLabel="Open Messages"
-              ctaHref="/messages"
-            />
+            <MembershipMessagesTab orgId={m.org_id} orgName={m.org?.name} />
           </TabsContent>
 
           <TabsContent value="audit" className="mt-3">
-            <PlaceholderTab
-              icon={History}
-              title="Decision audit trail"
-              body="Approve / reject / suspend / OB seat grant + revoke events are recorded on the chain. A per-membership audit slice lands in Phase 50."
-              ctaLabel="Open audit chain"
-              ctaHref="/admin/audit-chain"
-            />
+            <MembershipAuditTab membershipId={m.id} orgId={m.org_id} />
           </TabsContent>
         </Tabs>
       </PageMain>
@@ -261,6 +251,228 @@ function CapacityTab({ m }: { m: Membership }) {
 // ---------------------------------------------------------------------------
 // Placeholder tab — generic future-feature panel
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Membership Audit tab — chain entries scoped to this membership + the org.
+// ---------------------------------------------------------------------------
+
+interface AuditEntry {
+  id: number;
+  seq: number;
+  action: string;
+  actor_email: string | null;
+  subject_kind: string | null;
+  subject_id: number | null;
+  prev_hash: string;
+  payload_hash: string;
+  created_at: string | null;
+}
+
+interface AuditResp {
+  success: boolean;
+  total: number;
+  entries: AuditEntry[];
+}
+
+function MembershipAuditTab({
+  membershipId, orgId,
+}: { membershipId: number; orgId: number }) {
+  // Pull entries for BOTH the membership row and the underlying org.
+  // The chain tags each event with the most specific subject, so events
+  // on the org (e.g. trust process runs, passport publish) are separate
+  // from events on the membership (approve/reject, OB seat).
+  const { data: memData, isLoading: memLoading } = useSWR<AuditResp>(
+    `/audit-chain/recent?subject_kind=network_membership&subject_id=${membershipId}&limit=50`,
+    (url: string) => api.get<AuditResp>(url),
+  );
+  const { data: orgData, isLoading: orgLoading } = useSWR<AuditResp>(
+    `/audit-chain/recent?subject_kind=org&subject_id=${orgId}&limit=50`,
+    (url: string) => api.get<AuditResp>(url),
+  );
+  const loading = memLoading || orgLoading;
+
+  const merged: AuditEntry[] = [
+    ...(memData?.entries ?? []),
+    ...(orgData?.entries ?? []),
+  ].sort((a, b) => b.seq - a.seq);
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="kuja-shimmer h-10 rounded" />
+        ))}
+      </div>
+    );
+  }
+
+  if (merged.length === 0) {
+    return (
+      <section className="border border-dashed border-border rounded-lg bg-card p-8 text-center space-y-2">
+        <History className="w-8 h-8 mx-auto text-muted-foreground opacity-50" />
+        <h3 className="font-semibold text-sm">No audit entries yet</h3>
+        <p className="text-xs text-muted-foreground max-w-md mx-auto">
+          Events touching this membership or its organisation will appear here
+          (approve, reject, OB seat grant/revoke, trust process runs, passport
+          publish, etc.).
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-sm flex items-center gap-2">
+          <History className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+          Decision audit trail
+        </h2>
+        <Link
+          href={`/admin/audit-chain`}
+          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        >
+          Open full chain <ExternalLink className="w-3 h-3" />
+        </Link>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {merged.length} hash-chained event{merged.length === 1 ? '' : 's'} on
+        this membership or its organisation. Newest first.
+      </p>
+      <ul className="space-y-1.5">
+        {merged.map((e) => (
+          <li
+            key={e.id}
+            className="flex items-start justify-between gap-3 text-xs border border-border rounded-md p-2.5"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold capitalize">
+                {e.action.replace(/_/g, ' ').replace(/\./g, ' · ')}
+              </div>
+              <div className="text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap text-[11px]">
+                {e.actor_email && <span>by {e.actor_email}</span>}
+                <span>· {e.subject_kind} #{e.subject_id}</span>
+                {e.created_at && (
+                  <span>· {new Date(e.created_at).toLocaleString()}</span>
+                )}
+              </div>
+            </div>
+            <span
+              className="font-mono text-[10px] text-muted-foreground shrink-0"
+              title={`payload hash: ${e.payload_hash}`}
+            >
+              #{e.seq}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Membership Messages tab — broadcasts scoped to this org from /messages.
+// ---------------------------------------------------------------------------
+
+interface MessageRow {
+  id: number;
+  sender_name: string | null;
+  sender_email: string | null;
+  scope: 'network' | 'country' | 'org' | 'declaration';
+  scope_value: string | null;
+  subject: string;
+  body_md: string;
+  sent_at: string | null;
+}
+
+interface MessagesResp {
+  success: boolean;
+  messages: MessageRow[];
+}
+
+function MembershipMessagesTab({
+  orgId, orgName,
+}: { orgId: number; orgName?: string }) {
+  // Filter the global broadcast log to ones that resolve to this org —
+  // either scope='org' with this org's id, or scope='network' (all
+  // members), or scope='country' matching this org's country. For an
+  // MVP, just fetch all and filter client-side to scope='org' for this
+  // id; broader-scope messages live on the global Messages page.
+  const { data, isLoading } = useSWR<MessagesResp>(
+    `/messages/`,
+    (url: string) => api.get<MessagesResp>(url),
+  );
+  // Local read-state mark would be nice but isn't on the schema; the
+  // global Messages page handles unread state per-user.
+  useEffect(() => { /* noop */ }, [orgId]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="kuja-shimmer h-14 rounded" />
+        ))}
+      </div>
+    );
+  }
+
+  const orgMsgs = (data?.messages ?? []).filter((m) =>
+    m.scope === 'org' && String(orgId) === m.scope_value,
+  );
+
+  if (orgMsgs.length === 0) {
+    return (
+      <section className="border border-dashed border-border rounded-lg bg-card p-8 text-center space-y-3">
+        <Inbox className="w-8 h-8 mx-auto text-muted-foreground opacity-50" />
+        <h3 className="font-semibold text-sm">
+          No direct messages with {orgName || 'this organisation'} yet
+        </h3>
+        <p className="text-xs text-muted-foreground max-w-md mx-auto">
+          Direct (scope=org) broadcasts from the secretariat to this org will
+          appear here. Network-wide and country-wide messages live on the
+          global Messages surface.
+        </p>
+        <Link
+          href="/messages"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
+        >
+          Open global Messages <ArrowUpRight className="w-3 h-3" />
+        </Link>
+      </section>
+    );
+  }
+
+  return (
+    <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-sm flex items-center gap-2">
+          <Inbox className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+          Direct messages with {orgName || 'this organisation'}
+        </h2>
+        <Link
+          href="/messages"
+          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        >
+          Open global Messages <ExternalLink className="w-3 h-3" />
+        </Link>
+      </div>
+      <ul className="space-y-2">
+        {orgMsgs.slice(0, 20).map((m) => (
+          <li
+            key={m.id}
+            className="border border-border rounded-md p-3 text-xs space-y-1"
+          >
+            <div className="font-semibold text-sm">{m.subject}</div>
+            <div className="text-[11px] text-muted-foreground">
+              {m.sender_name || m.sender_email || 'Unknown sender'}
+              {m.sent_at && <> · {new Date(m.sent_at).toLocaleString()}</>}
+            </div>
+            <p className="whitespace-pre-wrap leading-relaxed">{m.body_md}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 function PlaceholderTab({
   icon: Icon, title, body, ctaLabel, ctaHref,

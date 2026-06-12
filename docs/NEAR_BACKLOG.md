@@ -232,6 +232,34 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 64 — Membership review Audit + Messages tabs go
+  live. The two placeholder tabs from Phase 47 are now real:
+  **Backend (app/routes/audit_chain_routes.py)**:
+    GET /api/audit-chain/recent now accepts optional
+    `subject_kind` + `subject_id` query params so a per-entity
+    drill-in can request only the chain entries for one subject.
+    Backward-compatible: omit the params for the full chain view.
+  **Frontend (admin/network-memberships/[id]/client.tsx)**:
+    New <MembershipAuditTab> merges two parallel SWR calls:
+    chain entries with subject_kind=network_membership&id=<m.id>
+    plus subject_kind=org&id=<m.org_id>. Sorted by seq desc.
+    Each row shows the action humanised (e.g.
+    "network · ob · seat granted"), actor email, subject ref,
+    timestamp, seq number. Empty state explains what would land
+    here.
+    New <MembershipMessagesTab> filters /messages/ to
+    scope='org' messages whose scope_value matches this org id.
+    Empty state cites the org by name + CTAs to the global
+    Messages surface (where network-wide and country-wide
+    broadcasts live). Has a 20-message cap.
+  Browser-verified on membership #2 (Amani Community Development):
+    Audit tab: 6 entries rendered, mix of network_membership +
+      org subjects, including "network · ob · seat granted" by
+      admin@kuja.org and "csv export · run" + "ngo portfolio ·
+      download pdf" by fatima@amani.org.
+    Messages tab: "No direct messages with Amani Community
+      Development yet" empty state + CTA href="/messages/".
+
 - **2026-06-11** Phase 63 — Name entities across the donor / NGO /
   member dashboards. Extends the Phase 62 pattern from the NEAR
   operator dashboard to the other three attention-first dashboards.
