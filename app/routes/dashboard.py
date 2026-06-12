@@ -43,6 +43,124 @@ def api_dashboard_today():
     return jsonify(brief)
 
 
+@dashboard_bp.route('/signer-coach', methods=['GET'])
+@login_required
+def api_signer_coach():
+    """Phase 80 — Signature-pace gentle coaching.
+
+    For a committee member, compute their personal recent signing pace
+    (last 6 signatures, time from declaration assignment to actually
+    signing/recusing) and compare to the network's 6-day target.
+
+    Returns: {role, sample_size, my_median_days, my_p90_days,
+              target_days, tone, headline, hint, pending_count,
+              pending[]}
+
+    Tone is 'good' if median ≤ target, 'warn' if 1.5× target, 'bad'
+    otherwise. The phrasing is coaching, not surveillance: 'You're
+    averaging 8 days; the network target is 6. Anything we can help
+    with?' — never accusatory.
+    """
+    from datetime import datetime as _dt, timezone as _tz
+    try:
+        from app.models import EmergencyDeclaration, DeclarationSigner
+    except Exception:
+        return jsonify({'success': False, 'error': 'NEAR module not available'}), 404
+
+    TARGET_DAYS = 6
+
+    role = getattr(current_user, 'role', None)
+    if role not in ('admin', 'ob_member', 'donor', 'reviewer'):
+        return jsonify({'success': True, 'role': role, 'show': False})
+
+    # Last 6 completed signing events for this user.
+    completed = []
+    try:
+        rows = DeclarationSigner.query.filter(
+            DeclarationSigner.user_id == current_user.id,
+            DeclarationSigner.signed_at.isnot(None),
+        ).order_by(DeclarationSigner.signed_at.desc()).limit(6).all()
+        for s in rows:
+            assigned = getattr(s, 'assigned_at', None) or getattr(s, 'created_at', None)
+            signed = s.signed_at
+            if assigned and signed:
+                try:
+                    a = assigned.date() if hasattr(assigned, 'date') else assigned
+                    b = signed.date() if hasattr(signed, 'date') else signed
+                    days = max(0, (b - a).days)
+                    completed.append({'declaration_id': s.declaration_id, 'days': days})
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # Pending — declarations currently waiting on this user's signature.
+    pending = []
+    try:
+        prows = DeclarationSigner.query.filter(
+            DeclarationSigner.user_id == current_user.id,
+            DeclarationSigner.signed_at.is_(None),
+        ).limit(10).all()
+        for s in prows:
+            assigned = getattr(s, 'assigned_at', None) or getattr(s, 'created_at', None)
+            if not assigned: continue
+            try:
+                a = assigned.date() if hasattr(assigned, 'date') else assigned
+                age = max(0, (_dt.now(_tz.utc).date() - a).days)
+            except Exception:
+                age = None
+            d = db.session.get(EmergencyDeclaration, s.declaration_id)
+            if not d or d.status not in ('in_review', 'draft'):
+                continue
+            pending.append({
+                'declaration_id': s.declaration_id,
+                'title': getattr(d, 'title', None),
+                'age_days': age,
+                'over_target': (age is not None and age > TARGET_DAYS),
+            })
+    except Exception:
+        pass
+
+    if not completed and not pending:
+        return jsonify({'success': True, 'show': False})
+
+    days = sorted([c['days'] for c in completed])
+    median = days[len(days) // 2] if days else None
+    p90 = days[min(len(days) - 1, int(len(days) * 0.9))] if days else None
+
+    if median is None:
+        tone = 'good' if not any(p['over_target'] for p in pending) else 'warn'
+        headline = ('You haven\'t signed any declarations yet.' if not pending
+                    else f'You have {len(pending)} declaration{"s" if len(pending) != 1 else ""} waiting on your signature.')
+        hint = 'When a declaration lands, the network target is to sign within 6 days.'
+    elif median <= TARGET_DAYS:
+        tone = 'good'
+        headline = f'Your median is {median} day{"s" if median != 1 else ""} — ahead of the {TARGET_DAYS}-day target.'
+        hint = 'Thank you for the steady pace. Networks where signers move fast also see faster crisis response.'
+    elif median <= TARGET_DAYS * 1.5:
+        tone = 'warn'
+        headline = f'Your last {len(days)} signatures took a median of {median} days — over the {TARGET_DAYS}-day network target.'
+        hint = 'Anything we can help with? You can ask the secretariat to assign a co-signer if your week gets busy.'
+    else:
+        tone = 'bad'
+        headline = f'Your last {len(days)} signatures averaged {median} days — the network target is {TARGET_DAYS}.'
+        hint = 'No judgement — but the network depends on quick OB decisions in a crisis. If your workload is heavy, talk to the secretariat about temporary co-signers.'
+
+    return jsonify({
+        'success': True, 'show': True,
+        'role': role,
+        'sample_size': len(days),
+        'my_median_days': median,
+        'my_p90_days': p90,
+        'target_days': TARGET_DAYS,
+        'tone': tone,
+        'headline': headline,
+        'hint': hint,
+        'pending_count': len(pending),
+        'pending': pending[:5],
+    })
+
+
 @dashboard_bp.route('/compliance-coach', methods=['GET'])
 @login_required
 def api_compliance_coach():

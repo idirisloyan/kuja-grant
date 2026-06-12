@@ -28,6 +28,7 @@ import {
   PageShell, PageHeader, PageAttention, PageMain, PageDetail,
   PageDetailSection, type AttentionItem,
 } from '@/components/layout/page-shell';
+import { SignerCoachCard } from '@/components/dashboards/signer-coach-card';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
 
@@ -241,6 +242,12 @@ export function AttentionOperatorDashboard() {
             <p className="text-xs text-muted-foreground italic">No published crisis monitoring report yet.</p>
           )}
         </section>
+
+        {/* Phase 80 — personal signing-pace coach card. Visible if the
+            operator is an OB committee member (has signing assignments).
+            Card auto-hides via the show flag when there's nothing to
+            coach on. */}
+        <SignerCoachCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

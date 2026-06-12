@@ -216,6 +216,113 @@ def api_update_report(report_id):
     return jsonify({'success': True, 'report': report.to_dict()})
 
 
+@reports_bp.route('/<int:report_id>/extension-request', methods=['POST'])
+@login_required
+@role_required('ngo')
+def api_request_extension(report_id):
+    """Phase 81 — Smart deadline negotiation.
+
+    NGO requests an extension on a report due_date. The platform
+    mediates: surfaces the request to the donor, who approves or
+    counters, all in-app. No back-channel email.
+
+    Body: { extra_days: int (1-30), reason: str }
+    """
+    from datetime import timedelta as _td
+    data = get_request_json() or {}
+    extra_days = int(data.get('extra_days') or 0)
+    reason = (data.get('reason') or '').strip()
+    if extra_days < 1 or extra_days > 30:
+        return jsonify({'success': False, 'error': 'extra_days must be between 1 and 30.'}), 400
+    if not reason or len(reason) < 5:
+        return jsonify({'success': False, 'error': 'A reason is required (at least one sentence).'}), 400
+
+    report = db.session.get(Report, report_id)
+    if not report:
+        return jsonify({'success': False, 'error': 'Report not found'}), 404
+    if report.submitted_by_org_id != current_user.org_id:
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    if report.status not in ('draft', 'revision_requested'):
+        return jsonify({'success': False, 'error': 'Extensions only apply while the report is a draft.'}), 400
+    if not report.due_date:
+        return jsonify({'success': False, 'error': 'This report has no due date.'}), 400
+
+    ai = report.get_ai_analysis() or {}
+    history = ai.get('extension_requests', [])
+    history.append({
+        'requested_at': datetime.now(timezone.utc).isoformat(),
+        'requested_by_user_id': current_user.id,
+        'extra_days': extra_days,
+        'reason': reason[:1000],
+        'original_due_date': report.due_date.isoformat(),
+        'status': 'pending',
+    })
+    ai['extension_requests'] = history[-10:]
+    ai['has_pending_extension'] = True
+    report.set_ai_analysis(ai)
+    db.session.commit()
+    return jsonify({'success': True, 'request': history[-1]})
+
+
+@reports_bp.route('/<int:report_id>/extension-decision', methods=['POST'])
+@login_required
+def api_decide_extension(report_id):
+    """Phase 81 — Donor approves / counters / declines an extension request."""
+    from datetime import timedelta as _td
+    from app.models import Grant as _Grant
+    data = get_request_json() or {}
+    decision = (data.get('decision') or '').lower().strip()
+    counter_days = data.get('counter_days')
+    note = (data.get('note') or '').strip()[:500]
+    if decision not in ('approved', 'declined', 'counter'):
+        return jsonify({'success': False, 'error': 'decision must be approved/declined/counter'}), 400
+
+    report = db.session.get(Report, report_id)
+    if not report:
+        return jsonify({'success': False, 'error': 'Report not found'}), 404
+    grant = db.session.get(_Grant, report.grant_id)
+    if not grant:
+        return jsonify({'success': False, 'error': 'Grant not found'}), 404
+    if current_user.role not in ('donor', 'admin') or (current_user.role == 'donor' and grant.donor_org_id != current_user.org_id):
+        return jsonify({'success': False, 'error': 'Only the funding donor can decide on this request.'}), 403
+
+    ai = report.get_ai_analysis() or {}
+    history = ai.get('extension_requests', [])
+    if not history:
+        return jsonify({'success': False, 'error': 'No pending extension request.'}), 400
+    last = history[-1]
+    if last.get('status') != 'pending':
+        return jsonify({'success': False, 'error': 'No pending request to decide.'}), 400
+
+    last['decided_at'] = datetime.now(timezone.utc).isoformat()
+    last['decided_by_user_id'] = current_user.id
+    last['note'] = note
+    if decision == 'approved':
+        days = last.get('extra_days', 0)
+        last['status'] = 'approved'
+        report.due_date = report.due_date + _td(days=days)
+    elif decision == 'counter':
+        try:
+            cd = int(counter_days)
+        except Exception:
+            return jsonify({'success': False, 'error': 'counter_days must be an integer.'}), 400
+        if cd < 1 or cd > 30:
+            return jsonify({'success': False, 'error': 'counter_days must be 1-30'}), 400
+        last['status'] = 'counter'
+        last['counter_days'] = cd
+        # We don't move the due_date yet — NGO must accept the counter,
+        # which they do by submitting a fresh request matching counter_days.
+    else:
+        last['status'] = 'declined'
+
+    ai['extension_requests'] = history
+    ai['has_pending_extension'] = False
+    report.set_ai_analysis(ai)
+    db.session.commit()
+    return jsonify({'success': True, 'request': last,
+                    'new_due_date': report.due_date.isoformat() if report.due_date else None})
+
+
 @reports_bp.route('/<int:report_id>/explain-rejection', methods=['GET'])
 @login_required
 @role_required('ngo')

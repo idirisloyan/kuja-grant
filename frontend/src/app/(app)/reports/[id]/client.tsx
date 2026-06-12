@@ -32,6 +32,7 @@ import {
 import { describeReportStatus, TONE_PILL_CLASS } from '@/lib/status-copy';
 import { WhyRejectedPanel } from '@/components/shared/why-rejected-panel';
 import { TranslateThis } from '@/components/shared/translate-this';
+import { DeadlineNegotiator } from '@/components/reports/deadline-negotiator';
 
 interface ReportDetail {
   id: number;
@@ -228,6 +229,25 @@ export default function ReportDetailClient() {
           {['rejected', 'revision_requested'].includes(status) && (
             <WhyRejectedPanel kind="report" entityId={data.id} />
           )}
+
+          {/* Phase 81 — Deadline negotiation. Surfaces NGO 'Request
+              extension' CTA + donor decision panel + outcome banner.
+              ai_analysis.extension_requests carries the rolling history. */}
+          {(() => {
+            const ai = (data.ai_analysis ?? {}) as Record<string, unknown>;
+            const reqs = (ai.extension_requests as Array<Record<string, unknown>> | undefined) ?? [];
+            const latest = reqs.length > 0 ? reqs[reqs.length - 1] : null;
+            const pending = latest && latest.status === 'pending' ? latest : null;
+            return (
+              <DeadlineNegotiator
+                reportId={data.id}
+                reportStatus={status}
+                dueDate={data.due_date}
+                pendingRequest={pending}
+                historyLatest={latest}
+              />
+            );
+          })()}
 
           {/* Reviewer notes surfaced prominently when present and the
               attention strip didn't already lead with them. */}
