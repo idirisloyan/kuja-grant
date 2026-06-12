@@ -280,6 +280,105 @@ def api_window_operational_rollup(window_id):
         except (TypeError, ValueError):
             available_budget = pool
 
+    # ------------------------------------------------------------------
+    # Phase 56 — top_risks. Rule-based synthesis from cheap signals.
+    # Each risk has:
+    #   { kind: str, severity: 'low'|'medium'|'high',
+    #     label: str, hint: str|None, count: int|None }
+    # Ordered by severity desc, then count desc.
+    # ------------------------------------------------------------------
+    top_risks: list[dict] = []
+
+    if overdue_reports > 0:
+        top_risks.append({
+            "kind": "overdue_reports",
+            "severity": "high" if overdue_reports >= 3 else "medium",
+            "label": (
+                f"{overdue_reports} overdue report"
+                f"{'s' if overdue_reports != 1 else ''}"
+            ),
+            "hint": "Reporting compliance slipping under this window.",
+            "count": overdue_reports,
+        })
+
+    # Declarations cancelled in the last 90 days under this window.
+    in_90 = today - timedelta(days=90)
+    cancelled_recent = (
+        EmergencyDeclaration.query
+        .filter(EmergencyDeclaration.window_id == window_id)
+        .filter(EmergencyDeclaration.status == "cancelled")
+        .filter(EmergencyDeclaration.created_at >= in_90)
+        .count()
+    )
+    if cancelled_recent > 0:
+        top_risks.append({
+            "kind": "cancelled_declarations",
+            "severity": "high" if cancelled_recent >= 2 else "medium",
+            "label": (
+                f"{cancelled_recent} declaration"
+                f"{'s' if cancelled_recent != 1 else ''}"
+                " cancelled in last 90 days"
+            ),
+            "hint": "Process friction or COI patterns worth reviewing.",
+            "count": cancelled_recent,
+        })
+
+    # Declarations stuck in_review past their decision SLA. SLA window
+    # is on the FundWindow row (decision_sla_days, default 6).
+    sla_days = getattr(w, "decision_sla_days", None) or 6
+    sla_cutoff = today - timedelta(days=int(sla_days))
+    stuck_in_review = (
+        EmergencyDeclaration.query
+        .filter(EmergencyDeclaration.window_id == window_id)
+        .filter(EmergencyDeclaration.status == "in_review")
+        .filter(EmergencyDeclaration.created_at < sla_cutoff)
+        .count()
+    )
+    if stuck_in_review > 0:
+        top_risks.append({
+            "kind": "stuck_in_review",
+            "severity": "high",
+            "label": (
+                f"{stuck_in_review} declaration"
+                f"{'s' if stuck_in_review != 1 else ''}"
+                f" past {sla_days}-day decision SLA"
+            ),
+            "hint": "Committee response is slow — chase signatures or split work.",
+            "count": stuck_in_review,
+        })
+
+    # Active declarations whose applicants haven't been notified yet (the
+    # post-Phase-9 "ready to release" backlog). Surfaces secretariat work.
+    ready_release = (
+        EmergencyDeclaration.query
+        .filter(EmergencyDeclaration.window_id == window_id)
+        .filter(EmergencyDeclaration.status == "signed_active")
+        .filter(EmergencyDeclaration.applicants_notified_at.is_(None))
+        .count()
+    )
+    if ready_release > 0:
+        top_risks.append({
+            "kind": "ready_to_release",
+            "severity": "medium",
+            "label": (
+                f"{ready_release} declaration"
+                f"{'s' if ready_release != 1 else ''}"
+                " ready to release"
+            ),
+            "hint": "Flip the auto-created grant drafts to open and notify shortlisted NGOs.",
+            "count": ready_release,
+        })
+
+    # Sort by severity desc, then count desc, cap at 5.
+    _SEVERITY_ORDER = {"high": 3, "medium": 2, "low": 1}
+    top_risks.sort(
+        key=lambda r: (
+            -_SEVERITY_ORDER.get(r.get("severity", "low"), 0),
+            -(r.get("count") or 0),
+        ),
+    )
+    top_risks = top_risks[:5]
+
     return jsonify({
         "success": True,
         "window_id": window_id,
@@ -289,9 +388,7 @@ def api_window_operational_rollup(window_id):
         "open_grant_count": open_grants,
         "due_report_count": due_reports,
         "overdue_report_count": overdue_reports,
-        # top_risks is a placeholder. Populated by a later AI surface that
-        # synthesises risk signals from declarations + grants + reports.
-        "top_risks": [],
+        "top_risks": top_risks,
     })
 
 

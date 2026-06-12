@@ -349,6 +349,15 @@ export function useWindowRubric(windowId: number | null) {
 }
 
 // Phase 52 — per-window operational rollup. Leads with state, not config.
+// Phase 56 — top_risks is now structured (rule-based synthesis), not strings.
+export interface WindowRisk {
+  kind: string;
+  severity: 'low' | 'medium' | 'high';
+  label: string;
+  hint: string | null;
+  count: number | null;
+}
+
 export interface WindowOperational {
   success: boolean;
   window_id: number;
@@ -358,7 +367,7 @@ export interface WindowOperational {
   open_grant_count: number;
   due_report_count: number;
   overdue_report_count: number;
-  top_risks: string[];
+  top_risks: WindowRisk[];
 }
 
 export function useWindowOperational(windowId: number | null) {

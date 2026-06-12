@@ -441,6 +441,29 @@ function WindowCard({ window: w, onUpdate }: { window: FundWindow; onUpdate: () 
         </div>
       )}
 
+      {/* Phase 56 — top_risks from the operational rollup endpoint. */}
+      {ops && ops.top_risks && ops.top_risks.length > 0 && (
+        <div className="space-y-1">
+          <div className="uppercase tracking-wide text-[9px] text-muted-foreground">
+            Top risks
+          </div>
+          <ul className="space-y-1">
+            {ops.top_risks.map((r, i) => {
+              const cls =
+                r.severity === 'high'   ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                : r.severity === 'medium' ? 'border-[hsl(var(--kuja-sun))]/40 bg-[hsl(var(--kuja-sun))]/10 text-[hsl(var(--kuja-sun))]'
+                : 'border-border bg-muted/30 text-muted-foreground';
+              return (
+                <li key={i} className={`border rounded-md px-2 py-1 text-[10px] ${cls}`}>
+                  <div className="font-semibold">{r.label}</div>
+                  {r.hint && <div className="opacity-80 mt-0.5">{r.hint}</div>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {/* Tiny SLA chip strip */}
       <div className="flex flex-wrap gap-1.5 text-[10px]">
         {w.application_window_hours && (
