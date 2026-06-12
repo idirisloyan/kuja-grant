@@ -427,6 +427,265 @@ def api_publish_grant(grant_id):
     return jsonify(response)
 
 
+@grants_bp.route('/<int:grant_id>/audit-folder', methods=['GET'])
+@login_required
+def api_audit_folder_export(grant_id):
+    """Phase 73 — Audit-ready folder export.
+
+    NGOs are routinely audited — by their auditors, by the donor's auditors,
+    sometimes by government bodies — on a few days' notice. Reconstructing
+    "everything related to grant X" from email + Drive + folders takes days.
+
+    This endpoint streams a ZIP containing:
+      - manifest.txt  (human-readable contents list)
+      - manifest.json (machine-readable, with timestamps + hashes)
+      - 1-agreement/<grant-doc>            (the signed agreement)
+      - 2-application/                     (NGO's submitted application + docs)
+      - 3-reports/<period>/                (one folder per report period,
+                                            with content.json + attachments)
+      - 4-reviews/                         (donor's reviewer notes per report)
+      - 5-evidence/                        (photo-evidence + other docs)
+      - 6-financials/                      (any docs flagged as financial)
+
+    Access control:
+      - The NGO that owns the application can always download their folder.
+      - The donor for this grant can download (for their own audit needs).
+      - Admins can download (for support / dispute).
+      - Reviewers cannot download — wrong scope.
+
+    Returns: application/zip stream.
+    """
+    import io, json, zipfile, hashlib
+    from datetime import datetime as _dt, timezone as _tz
+    from flask import send_file, abort
+    from app.models import Document, Application
+    try:
+        from app.models import Review as _Review
+    except Exception:
+        _Review = None
+
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found', 'success': False}), 404
+
+    role = getattr(current_user, 'role', None)
+    is_donor = role in ('donor', 'admin') and (role == 'admin' or grant.donor_org_id == current_user.org_id)
+    org_id_for_filter = None
+    if role == 'ngo':
+        # NGO can only export folders for grants they applied to.
+        app = Application.query.filter_by(grant_id=grant_id, ngo_org_id=current_user.org_id).first()
+        if not app:
+            return jsonify({'error': 'You do not have an application on this grant.', 'success': False}), 403
+        org_id_for_filter = current_user.org_id
+    elif not is_donor and role != 'admin':
+        return jsonify({'error': 'Not authorised to export an audit folder for this grant.', 'success': False}), 403
+
+    # Discover all the artefacts.
+    apps_q = Application.query.filter_by(grant_id=grant_id)
+    if org_id_for_filter is not None:
+        apps_q = apps_q.filter_by(ngo_org_id=org_id_for_filter)
+    applications = apps_q.all()
+    app_ids = [a.id for a in applications]
+
+    reports = Report.query.filter(Report.grant_id == grant_id)
+    if org_id_for_filter is not None:
+        reports = reports.filter(Report.submitted_by_org_id == org_id_for_filter)
+    reports = reports.all()
+
+    # Pull documents linked to any of the applications. Reports use a
+    # JSON attachments column rather than a Document FK.
+    documents = []
+    if app_ids:
+        documents = Document.query.filter(Document.application_id.in_(app_ids)).all()
+    # Add documents referenced from report.attachments by document_id.
+    report_doc_ids = set()
+    for r in reports:
+        for att in (r.get_attachments() or []):
+            did = att.get('document_id') if isinstance(att, dict) else None
+            if isinstance(did, int):
+                report_doc_ids.add(did)
+    if report_doc_ids:
+        extra_docs = Document.query.filter(Document.id.in_(report_doc_ids)).all()
+        seen = {d.id for d in documents}
+        for d in extra_docs:
+            if d.id not in seen:
+                documents.append(d)
+
+    upload_dir = current_app.config.get('UPLOAD_FOLDER', '')
+
+    def _file_path(stored_filename):
+        return os.path.join(upload_dir, stored_filename) if stored_filename else None
+
+    def _sha256(path):
+        if not path or not os.path.exists(path):
+            return None
+        h = hashlib.sha256()
+        with open(path, 'rb') as f:
+            for chunk in iter(lambda: f.read(65536), b''):
+                h.update(chunk)
+        return h.hexdigest()
+
+    # Build the ZIP in memory. Audit folders are typically modest (<20 MB);
+    # if a real-world bundle ever exceeds streaming budget we can move to
+    # zipstream-new. For now this keeps the implementation simple.
+    buf = io.BytesIO()
+    manifest = {
+        'generated_at': _dt.now(_tz.utc).isoformat(),
+        'generated_by': {'user_id': current_user.id, 'role': role},
+        'grant': {
+            'id': grant.id, 'title': grant.title, 'donor_org_id': grant.donor_org_id,
+            'total_funding': float(grant.total_funding) if grant.total_funding is not None else None,
+            'currency': getattr(grant, 'currency', None),
+            'status': getattr(grant, 'status', None),
+            'created_at': grant.created_at.isoformat() if getattr(grant, 'created_at', None) else None,
+        },
+        'applications': [], 'reports': [], 'documents': [], 'reviews': [],
+        'evidence_photos': 0,
+    }
+    readme_lines = [
+        'KUJA AUDIT-READY FOLDER',
+        '=======================',
+        f"Generated:  {manifest['generated_at']}",
+        f"Grant:      {grant.title} (#{grant.id})",
+        f"Scope:      " + ('Single NGO (your application only)' if org_id_for_filter else 'All applications under this grant'),
+        '',
+        'Folder layout:',
+        '  1-agreement/      The grant agreement document.',
+        '  2-application/    NGO application(s) + supporting documents.',
+        '  3-reports/        One subfolder per submitted report period.',
+        '  4-reviews/        Donor / reviewer notes for each report.',
+        '  5-evidence/       Photo-evidence + miscellaneous attachments.',
+        '  6-financials/     Documents flagged as financial.',
+        '',
+        'manifest.json contains a full machine-readable inventory with',
+        'SHA-256 hashes of each file for tamper-evidence.',
+        '',
+    ]
+
+    with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+        # ---- 1-agreement -------------------------------------------------
+        agreement_path = None
+        if getattr(grant, 'grant_document', None):
+            agreement_path = _file_path(grant.grant_document)
+            if agreement_path and os.path.exists(agreement_path):
+                arc = f'1-agreement/{os.path.basename(grant.grant_document)}'
+                zf.write(agreement_path, arc)
+                manifest['agreement'] = {'arcname': arc, 'sha256': _sha256(agreement_path)}
+
+        # ---- 2-application ----------------------------------------------
+        for a in applications:
+            adir = f'2-application/app-{a.id}/'
+            payload = {
+                'id': a.id, 'ngo_org_id': a.ngo_org_id,
+                'status': getattr(a, 'status', None),
+                'submitted_at': a.submitted_at.isoformat() if getattr(a, 'submitted_at', None) else None,
+                'responses': a.get_responses() if hasattr(a, 'get_responses') else None,
+                'budget_lines': a.get_budget_lines() if hasattr(a, 'get_budget_lines') else None,
+                'ai_score': getattr(a, 'ai_score', None),
+            }
+            zf.writestr(adir + 'application.json', json.dumps(payload, indent=2, default=str))
+            manifest['applications'].append({'id': a.id, 'status': payload['status'], 'submitted_at': payload['submitted_at']})
+
+        # ---- 3-reports + 5-evidence (split by doc_type) ----------------
+        for r in reports:
+            period_key = (r.reporting_period or f'report-{r.id}').replace('/', '-').replace(' ', '_')
+            rdir = f'3-reports/{period_key}/'
+            content = r.get_content() or {}
+            zf.writestr(rdir + 'content.json', json.dumps(content, indent=2, ensure_ascii=False))
+            zf.writestr(
+                rdir + 'metadata.json',
+                json.dumps({
+                    'id': r.id, 'status': r.status, 'report_type': r.report_type,
+                    'reporting_period': r.reporting_period,
+                    'due_date': r.due_date.isoformat() if r.due_date else None,
+                    'submitted_at': r.submitted_at.isoformat() if r.submitted_at else None,
+                    'reviewed_at': r.reviewed_at.isoformat() if r.reviewed_at else None,
+                    'reviewer_notes': r.reviewer_notes,
+                    'ai_analysis_summary': (r.get_ai_analysis() or {}).get('summary'),
+                    'revision_number': r.revision_number,
+                }, indent=2, default=str),
+            )
+            # Revision snapshots if any.
+            revs = r.get_revision_history() or []
+            if revs:
+                zf.writestr(rdir + 'revisions.json', json.dumps(revs, indent=2, default=str))
+            manifest['reports'].append({
+                'id': r.id, 'period': r.reporting_period, 'status': r.status,
+                'submitted_at': r.submitted_at.isoformat() if r.submitted_at else None,
+            })
+            # Reviewer record for 4-reviews
+            if r.reviewer_notes or r.reviewed_at:
+                zf.writestr(
+                    f'4-reviews/report-{r.id}-review.json',
+                    json.dumps({
+                        'report_id': r.id, 'status': r.status,
+                        'reviewed_at': r.reviewed_at.isoformat() if r.reviewed_at else None,
+                        'reviewer_notes': r.reviewer_notes,
+                    }, indent=2),
+                )
+                manifest['reviews'].append({'report_id': r.id, 'reviewed_at': r.reviewed_at.isoformat() if r.reviewed_at else None})
+
+        # ---- documents bucketed by doc_type ----------------------------
+        for d in documents:
+            src = _file_path(d.stored_filename)
+            if not src or not os.path.exists(src):
+                continue
+            dtype = (d.doc_type or '').lower()
+            if dtype in ('financial', 'audit', 'budget', 'receipt'):
+                bucket = '6-financials/'
+            elif dtype == 'report_evidence' or (d.mime_type or '').startswith('image/'):
+                bucket = '5-evidence/'
+            else:
+                bucket = '2-application/docs/'
+            arc = bucket + (d.original_filename or d.stored_filename)
+            try:
+                zf.write(src, arc)
+                doc_entry = {
+                    'arcname': arc, 'doc_type': d.doc_type,
+                    'original_filename': d.original_filename,
+                    'file_size': d.file_size,
+                    'uploaded_at': d.uploaded_at.isoformat() if d.uploaded_at else None,
+                    'sha256': _sha256(src),
+                }
+                manifest['documents'].append(doc_entry)
+                if bucket == '5-evidence/':
+                    manifest['evidence_photos'] += 1
+            except Exception as e:
+                logger.warning(f"audit folder: could not zip doc {d.id}: {e}")
+
+        # ---- 4-reviews: pull formal Reviews if model is present -------
+        if _Review is not None and app_ids:
+            for rev in _Review.query.filter(_Review.application_id.in_(app_ids)).all():
+                payload = {
+                    'id': rev.id,
+                    'application_id': rev.application_id,
+                    'reviewer_id': getattr(rev, 'reviewer_id', None),
+                    'status': getattr(rev, 'status', None),
+                    'overall_score': getattr(rev, 'overall_score', None),
+                    'comments': getattr(rev, 'comments', None),
+                    'completed_at': rev.completed_at.isoformat() if getattr(rev, 'completed_at', None) else None,
+                }
+                zf.writestr(f'4-reviews/application-review-{rev.id}.json', json.dumps(payload, indent=2, default=str))
+                manifest['reviews'].append({'application_review_id': rev.id, 'completed_at': payload['completed_at']})
+
+        # ---- manifests (last so they capture everything) ---------------
+        zf.writestr('manifest.json', json.dumps(manifest, indent=2, default=str))
+        readme_lines.append(f"Documents included: {len(manifest['documents'])}")
+        readme_lines.append(f"Reports included:   {len(manifest['reports'])}")
+        readme_lines.append(f"Applications:       {len(manifest['applications'])}")
+        readme_lines.append(f"Reviews:            {len(manifest['reviews'])}")
+        zf.writestr('manifest.txt', '\n'.join(readme_lines))
+
+    buf.seek(0)
+    ts = _dt.now(_tz.utc).strftime('%Y%m%d-%H%M')
+    org_token = f"-org{org_id_for_filter}" if org_id_for_filter else ''
+    fname = f'kuja-audit-folder-grant{grant.id}{org_token}-{ts}.zip'
+    return send_file(
+        buf, mimetype='application/zip',
+        as_attachment=True, download_name=fname,
+    )
+
+
 @grants_bp.route('/<int:grant_id>/upload-grant-doc', methods=['POST'])
 @login_required
 def api_upload_grant_doc(grant_id):

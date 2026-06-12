@@ -17,7 +17,7 @@ import { GrantAgreementUnpackPanel } from '@/components/grants/grant-agreement-u
 import { TagsEditor } from '@/components/shared/tags-editor';
 import { GrantBroadcastDialog } from '@/components/grants/grant-broadcast-dialog';
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
-import { Megaphone } from 'lucide-react';
+import { Megaphone, Download } from 'lucide-react';
 import {
   PageShell, PageBack, PageHeader, PageMain,
   PageDetail, PageDetailSection,
@@ -111,8 +111,22 @@ export default function GrantDetailClient() {
   const statusPill = describeGrantStatus(grant.status);
 
   // Primary action — apply / broadcast / "your application" depending on role.
+  // Phase 73 — audit-folder export. Available to NGO (their own), donor
+  // (full grant), admin (full grant). One click → ZIP with manifest +
+  // SHA-256 hashes. Eliminates the days-of-Drive-archaeology audit dread.
+  const showAuditExport = (isNgo && !!grant.user_application_status) || isDonor || user?.role === 'admin';
+  const auditHref = `/api/grants/${grant.id}/audit-folder`;
   const primaryAction = (
     <div className="flex items-center gap-2 flex-wrap">
+      {showAuditExport && (
+        <a
+          href={auditHref}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-grow))]/40 hover:bg-[hsl(var(--kuja-grow))]/10 text-[hsl(var(--kuja-grow))] text-sm font-medium px-4 py-2"
+          title="Download a ZIP with the agreement, every report, every attachment, every reviewer note, and a tamper-evident manifest. Audit-ready in one click."
+        >
+          <Download className="h-4 w-4" /> Audit folder
+        </a>
+      )}
       {isDonor && (
         <button
           type="button"
