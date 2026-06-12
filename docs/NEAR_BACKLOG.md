@@ -232,6 +232,29 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 59 — Per-window operational drill-in. New page
+  /admin/windows/[id] that complements the historical /report page
+  with the LIVE operational view (the brief's "decisive operational"
+  pattern). Sections render conditionally so the page only shows what
+  matters right now:
+    - PageHeader with the OpStat summary inline in the subtitle
+    - PageAttention from top_risks + draft declarations
+    - Active declarations list (in_review + signed_active)
+    - Open grants list
+    - Reports due in the next 30 days (overdue highlighted)
+    - PageDetail collapsible linking out to the historical report
+  Each row uses describeXxxStatus + TONE_PILL_CLASS for the
+  human-language pill (the same vocabulary as the rest of the app).
+  Linked from /admin/funds — every OpStat tile is now a click-through
+  to the per-window drill-in (Phase 52's tiles are no longer dead-end
+  visuals). The OpStat component took an optional href prop.
+  Browser-verified:
+    /admin/windows/160 h1 "Window #160 — operations"
+    attention strip: "1 draft declaration not yet submitted"
+    sections: Active declarations + Quick actions
+    Full report link in header + PageDetail
+    /admin/funds tiles -> /admin/windows/160 click-through
+
 - **2026-06-11** Phase 58 — Final long-tail sweep. Last 7 surfaces
   wrapped in PageShell: /apply/[grantId], /assessments,
   /assessments/wizard (framework-select entry), /admin/windows/[id]/

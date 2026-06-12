@@ -324,13 +324,15 @@ function NewWindowForm({ fundId, onCreate, onCancel }: {
   );
 }
 
-// Phase 52 — small operational stat tile rendered in WindowCard
+// Phase 52 — small operational stat tile rendered in WindowCard.
+// Phase 59 — optional href turns it into a click-through Link.
 function OpStat({
-  label, value, tone = 'muted',
+  label, value, tone = 'muted', href,
 }: {
   label: string;
   value: string;
   tone?: 'muted' | 'good' | 'warn' | 'bad' | 'accent';
+  href?: string;
 }) {
   const cls =
     tone === 'good'   ? 'border-[hsl(var(--kuja-grow))]/30 bg-[hsl(var(--kuja-grow))]/10 text-[hsl(var(--kuja-grow))]'
@@ -338,10 +340,22 @@ function OpStat({
     : tone === 'bad'  ? 'border-destructive/30 bg-destructive/10 text-destructive'
     : tone === 'accent' ? 'border-[hsl(var(--kuja-clay))]/30 bg-[hsl(var(--kuja-clay))]/10 text-[hsl(var(--kuja-clay))]'
     : 'border-border bg-muted/30 text-muted-foreground';
-  return (
-    <div className={`border rounded-md p-2 ${cls}`}>
+  const inner = (
+    <>
       <div className="uppercase tracking-wide opacity-80 text-[9px]">{label}</div>
       <div className="font-semibold text-xs mt-0.5">{value}</div>
+    </>
+  );
+  if (href) {
+    return (
+      <Link href={href} className={`border rounded-md p-2 ${cls} hover:opacity-80 transition-opacity block`}>
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <div className={`border rounded-md p-2 ${cls}`}>
+      {inner}
     </div>
   );
 }
@@ -404,10 +418,14 @@ function WindowCard({ window: w, onUpdate }: { window: FundWindow; onUpdate: () 
       </div>
 
       {/* Phase 52 — operational state strip. Leads the card with what the
-          window is DOING right now, not what it's configured to allow. */}
+          window is DOING right now, not what it's configured to allow.
+          Phase 59 — every tile is a Link to the per-window operational
+          drill-in page (/admin/windows/<id>) so the operator can act
+          on what they see in one click. */}
       {ops && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
           <OpStat
+            href={`/admin/windows/${w.id}`}
             label="Available"
             value={
               ops.available_budget != null
@@ -416,16 +434,19 @@ function WindowCard({ window: w, onUpdate }: { window: FundWindow; onUpdate: () 
             }
           />
           <OpStat
+            href={`/admin/windows/${w.id}`}
             label="Active declarations"
             value={String(ops.active_declaration_count)}
             tone={ops.active_declaration_count > 0 ? 'accent' : 'muted'}
           />
           <OpStat
+            href={`/admin/windows/${w.id}`}
             label="Open grants"
             value={String(ops.open_grant_count)}
             tone={ops.open_grant_count > 0 ? 'good' : 'muted'}
           />
           <OpStat
+            href={`/admin/windows/${w.id}`}
             label="Reports due / overdue"
             value={
               ops.overdue_report_count > 0
