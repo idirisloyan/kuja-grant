@@ -367,6 +367,50 @@ flip them on quickly.
 - **Code state:** AutoRubricScorer service exists. The new work is
   exposing it as a live endpoint + a sidebar panel on /apply.
 
+### Native-language user testing (added 2026-06-12 — team review)
+- **last_touched:** 2026-06-12
+- **Why:** The team's design review named this the "most important
+  validation step." Translation parity (UI strings in EN/FR/AR/SW/SO/
+  ES) is not enough. The redesigned flows need testing for
+  comprehension, tone, layout, and cultural clarity in each language,
+  on mobile devices, over weak connectivity. Critical for closing the
+  "visually simpler but cognitively the same" risk the team named.
+- **Action:** Run moderated 45-min sessions with at least one program
+  officer per language (Arabic, Somali, Swahili, French, Spanish, plus
+  one English-as-second-language). Each session should cover: dashboard
+  scan + apply (Voice Draft → review) + a report submission (Photo
+  Evidence + Voice Draft) + a compliance flag walkthrough + journey
+  tracker scan. Capture verbatim quotes; record screen + audio with
+  consent.
+- **Engineering effort:** None — this is product research.
+- **Why we need to run this BEFORE building more:** It's the only way
+  to learn whether the cognitive simplicity work (Phases 86-90) actually
+  lands for non-English-first users, and it informs the design of
+  beginner/expert progressive disclosure (next item).
+
+### Beginner/expert progressive disclosure (added 2026-06-12 — team review)
+- **last_touched:** 2026-06-12
+- **Why:** The team review explicitly recommended "avoid a manual
+  simple/expert mode toggle initially. A better design is progressive
+  disclosure: new users receive explanations, examples, and guided
+  steps; returning users naturally gain shortcuts, compact views, and
+  bulk actions; complexity appears when behaviour demonstrates
+  readiness."
+- **Why deferred:** Designing this without behavioural data risks
+  building disclosure rules that don't match how users actually
+  progress. The native-language user testing item above should run
+  first so we have real evidence of which surfaces non-technical
+  users get stuck on and which experienced users already skip past.
+- **Engineering scope** (once research is in):
+  * A per-user "experience signal" computed from completed actions
+    (submitted N applications, accepted reports, profile completeness,
+    days since first login).
+  * Conditional rendering in components — full explainers + examples
+    by default; compact views once the user has demonstrated readiness.
+  * Hard guarantee: no silent removal of options. Anything hidden by
+    progression is reachable via "Show all options" / "Expand."
+- **Engineering effort:** ~2-3 weeks after research lands.
+
 ### Offline-first PWA — IndexedDB + Service Worker
 - **Why:** Rural NGOs work over intermittent 3G. Drafting an
   assessment offline + syncing on next connection is operational
@@ -379,6 +423,90 @@ flip them on quickly.
   ship the basics in a week; full sync layer is 3-4 weeks.
 
 ## Completed (rolling log, newest first)
+
+- **2026-06-12** Phase 92 — Continuous NGO journey tracker.
+  Highest-value product gap the team named. New
+  GET /api/journey/me computes per-NGO stage state across 6 stages
+  (profile → readiness → apply → funded → compliant → impact)
+  against real data (Organization, Assessment, Document,
+  Application, Report). Returns 'current' (first unfinished),
+  'next_action' with href + what completing it unlocks, and
+  completion_pct. Frontend <JourneyTracker> mounted at the very top
+  of NGO dashboard above TodayFocusBanner — the through-line
+  connecting every other surface. Verified: 'Your funding journey'
+  heading + 6 stage labels + 'YOUR NEXT STEP' card + 'This unlocks'
+  copy render for a new test NGO at 0% complete.
+
+- **2026-06-12** Phase 91 — Backend wiring for plain-language compliance.
+  Closes the gap the team flagged as "most important unfinished
+  engineering item." Adds 5th field 'who_can_help' to the
+  ComplianceExplain schema and populates it on all 10 catalogued NGO
+  flags. New backend module mirrors the frontend catalogue so
+  server-side compliance code can attach the same shape:
+    app/services/compliance_explainer_service.py
+    GET  /api/compliance/explain/<key>     — single lookup
+    POST /api/compliance/explain           — bulk
+    GET  /api/compliance/explain-keys      — catalogue introspection
+  Uncatalogued keys fall through to a minimal 'ask for help' shape
+  so the NGO never sees an empty explainer card.
+
+- **2026-06-12** Phase 88-90 — Examples + concept simplification + NGO nav tighten.
+  Phase 88: example placeholders in apply textareas via
+    getPlaceholderForLabel — concrete in-context examples replace
+    generic 'Write your response' fallback.
+  Phase 89: describeReportStatusForNgo + describeApplicationStatusForNgo
+    bucket the 7 report states / 6 application states into 3 NGO
+    buckets — 'Your turn' / 'With the donor' / 'Done'. Donor-side
+    surfaces keep the full vocabulary.
+  Phase 90: NGO primary nav 5→4. Opportunities demoted from primary
+    to secondary as 'Find a grant.' Primaries: Dashboard, My
+    Applications, Reports, Organization Profile. Verified live.
+
+- **2026-06-12** Phase 87 — Guided questions instead of fields.
+  lib/guided-questions.ts maps field keys to natural questions.
+  'beneficiaries_reached' → 'How many people did you reach this
+  period — and who were they?'. Coverage for reporting, capacity-
+  assessment, application, and declaration fields. Heuristic
+  fallback for uncatalogued keys. Applied to apply criterion
+  headings.
+
+- **2026-06-12** Phase 86 — Inline concept education.
+  <ConceptHelper> inline term wrapper — click pops a 2-4 sentence
+  plain-language explainer with optional example. lib/concepts.ts
+  catalogues 13 hard concepts non-technical NGOs don't know in
+  advance (grant_window, capacity_assessment, due_diligence,
+  reporting_evidence, budget_line, declaration, ob_committee,
+  crisis_monitoring_report, severity, trust_profile,
+  compliance_score, sanctions_screening). Used inline in sentences:
+  'This grant is in its <grant_window> phase.'
+
+- **2026-06-12** Phase 85 — Plain-language compliance flags (frontend).
+  <ComplianceFlag> renders any compliance issue with the universal
+  4-part explainer (what / why / example / how) — tone-coded with
+  'What is this and how do I fix it?' default-collapsed disclosure.
+  lib/compliance-explainers.ts catalogues 10 most-common NGO flags.
+  Backend wiring extended in Phase 91 to add the 5th 'who_can_help'
+  field.
+
+- **2026-06-12** Phase 84 — Textarea autosave + resume.
+  lib/hooks/use-autosave.ts: generic useAutosave hook persists keyed
+  work-in-progress to localStorage with 800ms debounce.
+  components/dashboards/resume-banner.tsx: 'Resume where you left
+  off' on NGO dashboard with title + preview + time-ago + deep-link.
+  Storage key: kuja_autosave:<kind>:<id>[:<field>]. Registry key:
+  kuja_autosave_registry_v1. Wired into ProposalStep on /apply.
+
+- **2026-06-12** Phase 83 — Consolidate AI surfaces.
+  Apply page had 6 stacked AI surfaces; reports page had 7. Team
+  review flagged this as cognitive overload. New
+  <AIToolsAccordion> wraps the legacy helpers in one collapsed
+  'More AI tools' disclosure. Primary AI action stays visible:
+    /apply: SmartDraftBanner stays at top; DraftCoAuthor +
+      AutofillPanel + GrantQAPanel move into the accordion.
+    /reports draft row: ReportReadiness + VoiceReportComposer +
+      PhotoEvidenceUploader stay primary; ReportDraftCoAuthor +
+      Bundle + PreSubmitReview + AIReportGuidance move into the
+      accordion.
 
 - **2026-06-12** Phase 82 — "Today's focus" single-sentence banner.
   Pushes Phase 48's principle further. Picks the highest-priority
