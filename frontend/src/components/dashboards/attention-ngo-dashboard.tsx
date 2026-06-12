@@ -31,6 +31,8 @@ import { ComplianceCoachCard } from '@/components/dashboards/compliance-coach-ca
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 // Phase 84 — Resume banner reads autosaved work from localStorage.
 import { ResumeBanner } from '@/components/dashboards/resume-banner';
+// Phase 92 — Continuous NGO journey tracker.
+import { JourneyTracker } from '@/components/dashboards/journey-tracker';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -109,6 +111,11 @@ export function AttentionNgoDashboard() {
         subtitle="Your workbench. Continue where you left off."
       />
 
+      {/* Phase 92 — Continuous journey thread. Sits ABOVE today's-focus
+          because it gives the through-line: the NGO sees not just what
+          to do today but where this fits in the broader path from
+          profile to funded to compliant to reporting impact. */}
+      <JourneyTracker />
       {/* Phase 82 — sharpest possible 'what to do today' line. Picks
           the top-priority attention item and surfaces it as one bold
           headline with a single CTA. Page-attention list still renders

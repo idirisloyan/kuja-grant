@@ -22,7 +22,7 @@
 import { useState, type ReactNode } from 'react';
 import {
   AlertTriangle, AlertCircle, Info, CheckCircle2, ChevronDown, ChevronUp,
-  HelpCircle, Lightbulb, Wrench,
+  HelpCircle, Lightbulb, Wrench, LifeBuoy,
 } from 'lucide-react';
 
 export type ComplianceTone = 'bad' | 'warn' | 'info' | 'good';
@@ -36,6 +36,8 @@ export interface ComplianceExplain {
   example?: string;
   /** How to resolve — step-by-step instructions */
   how?: string;
+  /** Who the NGO can ask if they can't resolve it themselves */
+  who_can_help?: string;
 }
 
 interface Props {
@@ -112,6 +114,11 @@ export function ComplianceFlag({
           {explain!.how && (
             <ExplainSection icon={Wrench} label="How to resolve">
               {explain!.how}
+            </ExplainSection>
+          )}
+          {explain!.who_can_help && (
+            <ExplainSection icon={LifeBuoy} label="Who can help">
+              {explain!.who_can_help}
             </ExplainSection>
           )}
         </div>

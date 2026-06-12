@@ -63,6 +63,8 @@ def register_blueprints(app):
     from app.routes.tenant_message_routes import tenant_message_bp  # Phase 43A: in-app messaging
     from app.routes.member_feedback_routes import member_feedback_bp  # Phase 43B: NGO feedback
     from app.routes.translate_routes import translate_bp  # Phase 78: AI content translation
+    from app.routes.compliance_explainer_routes import compliance_explainer_bp  # Phase 91: plain-language compliance explainers
+    from app.routes.journey_routes import journey_bp  # Phase 92: continuous NGO journey
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -78,5 +80,6 @@ def register_blueprints(app):
                portfolio_bp, cron_bp, tags_bp, exports_bp, webauthn_bp,
                feedback_bp, network_bp, network_membership_bp, fund_bp, crisis_bp,
                emergency_bp, window_report_bp, network_ai_bp,
-               tenant_message_bp, member_feedback_bp, translate_bp]:
+               tenant_message_bp, member_feedback_bp, translate_bp,
+               compliance_explainer_bp, journey_bp]:
         app.register_blueprint(bp)
