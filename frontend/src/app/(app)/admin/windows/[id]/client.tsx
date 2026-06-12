@@ -22,7 +22,7 @@
  */
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useState } from 'react';
 import {
   useDeclarations, useGrants, useReports, useWindowOperational,
 } from '@/lib/hooks/use-api';
@@ -35,7 +35,7 @@ import {
 } from '@/components/layout/page-shell';
 import {
   Wallet, Siren, Briefcase, BarChart3, FileSpreadsheet, Archive,
-  ChevronRight, Clock,
+  ChevronRight, Clock, Sparkles,
 } from 'lucide-react';
 import {
   describeDeclarationStatus, describeGrantStatus, describeReportStatus,
@@ -72,7 +72,10 @@ function daysUntil(iso?: string | null): number | null {
 export default function WindowOperationalClient() {
   const windowId = useRouteId('windows');
   const viewer = useAuthStore((s) => s.user);
-  const { data: ops, isLoading: opsLoading } = useWindowOperational(windowId);
+  // Phase 60 — operator can toggle AI-narrated risks. Default off so the
+  // first paint is instant + free; flipping it on swaps to specifics.
+  const [narrate, setNarrate] = useState(false);
+  const { data: ops, isLoading: opsLoading } = useWindowOperational(windowId, { narrate });
   const { data: declsAll } = useDeclarations();
   const { data: grantsAll } = useGrants();
   const { data: reportsAll } = useReports();
@@ -149,6 +152,36 @@ export default function WindowOperationalClient() {
           </Link>
         }
       />
+
+      {/* Phase 60 — optional AI narration of the risks. Opt-in so the
+          first paint is the deterministic rule-based view; flipping the
+          toggle re-fetches with ?narrate=true and AI rewrites each
+          risk's label + hint to cite the specific declarations involved. */}
+      {attention.length > 0 && (
+        <div className="flex items-center justify-between gap-3 -mb-2">
+          <div className="text-[11px] text-muted-foreground uppercase tracking-wide">
+            What needs your attention
+          </div>
+          <button
+            type="button"
+            onClick={() => setNarrate((v) => !v)}
+            className={
+              `inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold transition-colors ` +
+              (narrate
+                ? 'border-[hsl(var(--kuja-spark))] bg-[hsl(var(--kuja-spark))]/10 text-[hsl(var(--kuja-spark))]'
+                : 'border-border text-muted-foreground hover:bg-muted')
+            }
+            title={narrate
+              ? 'AI is rewriting each risk to cite specific declarations. Click to switch back to deterministic labels.'
+              : 'Ask Claude to rewrite each risk with specific declaration names. ~2s.'}
+          >
+            <Sparkles className="w-3 h-3" />
+            {narrate
+              ? (ops?.narration_ok === false ? 'AI offline — rule labels' : 'AI-narrated')
+              : 'Plain risks'}
+          </button>
+        </div>
+      )}
 
       <PageAttention items={attention} />
 

@@ -379,7 +379,46 @@ def api_window_operational_rollup(window_id):
     )
     top_risks = top_risks[:5]
 
-    return jsonify({
+    # Phase 60 — optional AI narration. Opt-in via ?narrate=true so the
+    # default call path stays cheap and deterministic. If narration fails
+    # (AI down, no API key, schema error) we silently keep the rule-based
+    # labels.
+    narration_ok: bool | None = None
+    if top_risks and request.args.get("narrate", "").lower() in ("true", "1", "yes"):
+        try:
+            from app.services.network_ai_service import NetworkAIService
+
+            # Grab the most recent declarations on this window so the AI
+            # has concrete entities to cite, not the window aggregate.
+            recent_decls = (
+                EmergencyDeclaration.query
+                .filter(EmergencyDeclaration.window_id == window_id)
+                .order_by(EmergencyDeclaration.created_at.desc())
+                .limit(8)
+                .all()
+            )
+            ai_result = NetworkAIService.narrate_top_risks(
+                rule_based_risks=top_risks,
+                window_ctx={
+                    "name": w.name,
+                    "fund_name": fund.name if fund else None,
+                    "currency": getattr(fund, "currency", None),
+                    "available_budget": available_budget,
+                },
+                recent_declarations=[d.to_dict() for d in recent_decls],
+            )
+            if ai_result.get("ok") and ai_result.get("risks"):
+                top_risks = ai_result["risks"]
+                narration_ok = True
+            else:
+                narration_ok = False
+        except Exception as e:
+            logger.warning(
+                "narrate_top_risks failed for window %s: %s", window_id, e,
+            )
+            narration_ok = False
+
+    response = {
         "success": True,
         "window_id": window_id,
         "available_budget": available_budget,
@@ -389,7 +428,10 @@ def api_window_operational_rollup(window_id):
         "due_report_count": due_reports,
         "overdue_report_count": overdue_reports,
         "top_risks": top_risks,
-    })
+    }
+    if narration_ok is not None:
+        response["narration_ok"] = narration_ok
+    return jsonify(response)
 
 
 @fund_bp.route("/windows/<int:window_id>", methods=["PUT"])

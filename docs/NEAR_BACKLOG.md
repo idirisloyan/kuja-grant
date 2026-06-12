@@ -232,6 +232,30 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 60 — AI-narrated top_risks. The rule-based risk
+  labels from Phase 56 are now optionally enriched with window-specific
+  narrative. Backend extends GET /api/windows/<id>/operational with
+  ?narrate=true; on opt-in, the rule-based risks pass through
+  NetworkAIService.narrate_top_risks which rewrites label+hint to cite
+  specific declarations, countries, signature counts, and the next
+  action. Always falls back to rule-based on AI failure (narration_ok
+  in the response). System prompt explicitly bans invented specifics.
+  Frontend: useWindowOperational hook takes {narrate} option;
+  /admin/windows/[id] has a "Plain risks" / "AI-narrated" toggle next
+  to the attention strip. Browser-verified end-to-end on the NEAR
+  Change Fund / Emergency Response window with seeded conditions
+  (decl 120 in_review backdated + decl 111 applicants_notified_at
+  cleared):
+    Default (plain):
+      "1 declaration past 6-day decision SLA"
+      "1 declaration ready to release"
+    AI-narrated (translated from Arabic per admin's locale):
+      "Kenya declaration stuck in review with no signatures" +
+      hint citing 'Drought response — Turkana basin' + 0/2 sigs
+      "Somalia declaration ready to release" +
+      hint citing 'Somalia Drought Emergency — Q2 2026 Response'
+    Toggle round-trip works. narration_ok=true on both calls.
+
 - **2026-06-11** Phase 59 — Per-window operational drill-in. New page
   /admin/windows/[id] that complements the historical /report page
   with the LIVE operational view (the brief's "decisive operational"

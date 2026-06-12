@@ -765,3 +765,144 @@ class NetworkAIService:
         if not parsed:
             return {"ok": False, "patterns": []}
         return {"ok": True, "patterns": parsed.get("patterns", [])}
+
+    # ==================================================================
+    # 8. Top Risks Narrator (Phase 60)
+    # ==================================================================
+
+    @classmethod
+    def narrate_top_risks(
+        cls,
+        *,
+        rule_based_risks: list[dict],
+        window_ctx: dict,
+        recent_declarations: list[dict] | None = None,
+    ) -> dict:
+        """Enrich rule-based top_risks with window-specific narrative.
+
+        Caller passes the list of rule-based risk dicts produced by the
+        operational-rollup endpoint (each {kind, severity, label, hint,
+        count}) plus window context (name, fund, country focus) and a
+        small slice of recent declarations for grounding.
+
+        AI rewrites the label and hint so they cite the specific
+        declarations / countries / committee members involved, instead
+        of the generic "1 declaration past 6-day decision SLA".
+
+        Returns:
+          { ok: bool,
+            risks: [{ kind, severity, label, hint, count, narrative }] }
+
+        On failure, returns the rule-based list unchanged with ok=False
+        — every caller MUST be able to fall back gracefully.
+        """
+        from app.services.ai_service import AIService
+
+        if not rule_based_risks:
+            return {"ok": True, "risks": []}
+
+        # Brief AI on the rule-based skeleton + grounded entities. Pass
+        # only the kind+severity+count from the rule layer (NOT the
+        # label/hint) so the model writes fresh language, not paraphrase.
+        risk_skeleton = [
+            {
+                "kind": r.get("kind"),
+                "severity": r.get("severity"),
+                "count": r.get("count"),
+            }
+            for r in rule_based_risks
+        ]
+
+        decls_brief = []
+        for d in (recent_declarations or [])[:8]:
+            decls_brief.append({
+                "id": d.get("id"),
+                "title": (d.get("title") or "").strip()[:120],
+                "country": d.get("country"),
+                "status": d.get("status"),
+                "signed_count": d.get("signed_count"),
+                "required_signer_count": d.get("required_signer_count"),
+                "created_at": d.get("created_at"),
+                "applicants_notified_at": d.get("applicants_notified_at"),
+            })
+
+        system = (
+            "You are NEAR's operations narrator. You are given a list of "
+            "operational risks for a single funding window, plus context "
+            "about the window and its recent declarations. Rewrite each "
+            "risk's label and hint so they cite the SPECIFIC declarations, "
+            "countries, or signature gaps involved.\n"
+            "\n"
+            "Rules:\n"
+            "1. NEVER invent declaration titles, countries, or names. "
+            "Cite only what's in the context provided.\n"
+            "2. Keep the structure: short label (under 80 chars), specific "
+            "hint with the next action (under 200 chars).\n"
+            "3. Don't change kind, severity, or count.\n"
+            "4. Tone: confident, factual, no hyperbole. Imperative voice "
+            "in the hint where helpful ('Chase Fatima Hassan's signature' "
+            "rather than 'Consider chasing the signature')."
+        )
+
+        user = (
+            f"Window: {window_ctx.get('name', '?')}"
+            f" (fund: {window_ctx.get('fund_name', '?')},"
+            f" currency: {window_ctx.get('currency', '?')})\n"
+            f"Available budget: {window_ctx.get('available_budget', '?')}\n"
+            f"\n"
+            f"Risk skeleton (rewrite label + hint per risk):\n"
+            f"{risk_skeleton}\n"
+            f"\n"
+            f"Recent declarations under this window (for grounding):\n"
+            f"{decls_brief}"
+        )
+
+        schema = {
+            "type": "object",
+            "required": ["risks"],
+            "properties": {
+                "risks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["kind", "label", "hint"],
+                        "properties": {
+                            "kind": {"type": "string"},
+                            "label": {"type": "string"},
+                            "hint": {"type": "string"},
+                        },
+                    },
+                },
+            },
+        }
+
+        parsed = AIService._call_claude_tool(
+            system, user,
+            tool_name="narrate_top_risks",
+            tool_description="Enrich rule-based top_risks with window-specific narrative.",
+            tool_schema=schema,
+            max_tokens=900,
+            endpoint="network.narrate_top_risks",
+        )
+
+        if not parsed:
+            # AI failed — return rule-based unchanged so the caller can
+            # still surface the structural risks to the operator.
+            return {"ok": False, "risks": rule_based_risks}
+
+        # Splice AI-narrated label+hint back into the rule-based skeleton.
+        # Match by `kind`, preserve severity + count from the rule layer
+        # (those are authoritative).
+        ai_by_kind = {r.get("kind"): r for r in parsed.get("risks") or []}
+        enriched: list[dict] = []
+        for rule_r in rule_based_risks:
+            ai_r = ai_by_kind.get(rule_r.get("kind"))
+            if ai_r and ai_r.get("label") and ai_r.get("hint"):
+                enriched.append({
+                    **rule_r,
+                    "label": ai_r["label"].strip()[:200],
+                    "hint": ai_r["hint"].strip()[:400],
+                })
+            else:
+                enriched.append(rule_r)
+        return {"ok": True, "risks": enriched}

@@ -350,6 +350,7 @@ export function useWindowRubric(windowId: number | null) {
 
 // Phase 52 — per-window operational rollup. Leads with state, not config.
 // Phase 56 — top_risks is now structured (rule-based synthesis), not strings.
+// Phase 60 — optional AI narration via ?narrate=true.
 export interface WindowRisk {
   kind: string;
   severity: 'low' | 'medium' | 'high';
@@ -368,11 +369,17 @@ export interface WindowOperational {
   due_report_count: number;
   overdue_report_count: number;
   top_risks: WindowRisk[];
+  /** Present only when ?narrate=true was passed. True if AI narration succeeded. */
+  narration_ok?: boolean;
 }
 
-export function useWindowOperational(windowId: number | null) {
+export function useWindowOperational(
+  windowId: number | null,
+  opts?: { narrate?: boolean },
+) {
+  const narrate = opts?.narrate ? '?narrate=true' : '';
   return useSWR<WindowOperational>(
-    windowId ? `/windows/${windowId}/operational` : null,
+    windowId ? `/windows/${windowId}/operational${narrate}` : null,
     fetcher,
   );
 }
