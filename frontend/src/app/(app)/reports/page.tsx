@@ -11,6 +11,8 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useApiError } from '@/lib/hooks/use-api-error';
 import { useReports, useUpcomingReports } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { AiBadge } from '@/components/shared/ai-badge';
@@ -25,6 +27,7 @@ import {
   Loader2,
   CheckCircle2,
   BarChart3,
+  X,
 } from 'lucide-react';
 import { PageShell, PageHeader, PageMain, PageAttention } from '@/components/layout/page-shell';
 
@@ -795,7 +798,14 @@ function NearReportsPage() {
 }
 
 function KujaReportsPage() {
-  const { data: reportData, isLoading: reportsLoading, mutate: mutateReports } = useReports();
+  // Phase 66 — optional ?window_id=N filter, deep-linkable from
+  // /admin/windows/[id] for the operator scoping reports to a window.
+  const searchParams = useSearchParams();
+  const windowIdParam = searchParams.get('window_id');
+  const windowId = windowIdParam ? Number(windowIdParam) : null;
+  const { data: reportData, isLoading: reportsLoading, mutate: mutateReports } = useReports(
+    windowId ? { window_id: String(windowId) } : undefined,
+  );
   const { data: upcomingData, isLoading: upcomingLoading } = useUpcomingReports();
   const { t, formatDate } = useTranslation();
   const [tabValue, setTabValue] = useState(0);
@@ -900,6 +910,28 @@ function KujaReportsPage() {
         <PageAttention items={attentionStrip} />
 
         <PageMain>
+        {/* Phase 66 — active window filter chip. The user came from
+            /admin/windows/<id> "See all"; let them clear the scope. */}
+        {windowId && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-[hsl(var(--kuja-clay))]/15 text-[hsl(var(--kuja-clay))] font-semibold">
+              Window #{windowId}
+              <Link
+                href="/reports"
+                className="inline-flex items-center hover:bg-[hsl(var(--kuja-clay))]/20 rounded-full p-0.5 ml-0.5"
+                title="Clear window filter"
+              >
+                <X className="w-3 h-3" />
+              </Link>
+            </span>
+            <Link
+              href={`/admin/windows/${windowId}`}
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Open window operations
+            </Link>
+          </div>
+        )}
         <ComplianceCalendar reportsByGrant={reportsByGrant} />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

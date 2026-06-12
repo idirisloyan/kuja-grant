@@ -63,6 +63,17 @@ def api_list_reports():
     if status:
         query = query.filter(Report.status == status)
 
+    # Phase 66 — optional window_id filter (joins through grant.fund_window_id).
+    # Used by the per-window operations page to deep-link into a scoped
+    # reports list. The role-gated base_query is already applied, so this
+    # only narrows what the user could already see.
+    window_id_param = request.args.get('window_id', type=int)
+    if window_id_param is not None:
+        # Avoid duplicate Report.grant join from the donor branch.
+        if role != 'donor':
+            query = query.join(Grant, Report.grant_id == Grant.id)
+        query = query.filter(Grant.fund_window_id == window_id_param)
+
     query = query.order_by(Report.created_at.desc())
     pagination = paginate_query(query)
 

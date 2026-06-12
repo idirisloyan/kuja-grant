@@ -232,6 +232,29 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 66 — Grants + Reports list window_id filter.
+  Extends Phase 65's pattern to /grants and /reports.
+  **Backend**:
+    - GET /api/grants/ accepts fund_window_id (canonical) or
+      window_id (alias for ergonomic deep-linking from window pages).
+    - GET /api/reports/ accepts window_id; joins through
+      grant.fund_window_id; respects existing role-gated base_query.
+      Avoids double-join on the donor branch.
+  **Frontend**:
+    - /grants reads ?window_id=N from URL, shows the same chip +
+      clear-X + "Open window operations" link as Phase 65.
+    - /reports (KujaReportsPage) does the same.
+    - /admin/windows/[id] "Open grants" link now reads
+      "See all in this window" -> /grants?window_id=<id>.
+  Browser-verified live:
+    /grants?window_id=160 (NEAR admin viewer):
+      subtitle: "3 grants found · filtered to window #160"
+      chip:     "Window #160" + clear -> /grants/
+      side:     "Open window operations" -> /admin/windows/160/
+  Backend probe-verified for both endpoints (grants returns 3 rows,
+  reports returns 0 — reports under network grants haven't been
+  generated yet, but the filter joins correctly).
+
 - **2026-06-11** Phase 65 — Declarations list window_id filter +
   cross-page links. Closes the navigation loop between /admin/funds
   -> /admin/windows/[id] -> /admin/declarations. Operator can now

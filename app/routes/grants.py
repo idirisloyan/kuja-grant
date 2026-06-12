@@ -82,6 +82,21 @@ def api_list_grants():
             )
         )
 
+    # Phase 66 — optional fund_window_id filter for the per-window
+    # drill-in (/admin/windows/<id> "See all grants in this window").
+    # Accepts either `fund_window_id` (canonical) or `window_id` (alias)
+    # for ergonomic deep-linking from window pages.
+    window_id_param = (
+        request.args.get('fund_window_id')
+        or request.args.get('window_id')
+    )
+    if window_id_param:
+        try:
+            wid = int(window_id_param)
+            query = query.filter(Grant.fund_window_id == wid)
+        except ValueError:
+            pass
+
     query = query.order_by(Grant.created_at.desc())
     pagination = paginate_query(query)
 

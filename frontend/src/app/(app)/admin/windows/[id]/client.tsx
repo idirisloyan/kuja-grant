@@ -245,11 +245,12 @@ export default function WindowOperationalClient() {
                 <Briefcase className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
                 Open grants
               </h2>
+              {/* Phase 66 — scope the deep-link to this window. */}
               <Link
-                href="/grants"
+                href={`/grants?window_id=${windowId}`}
                 className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
               >
-                Open Grants <ChevronRight className="w-3 h-3" />
+                See all in this window <ChevronRight className="w-3 h-3" />
               </Link>
             </div>
             <ul className="space-y-2">
