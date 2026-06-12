@@ -34,6 +34,7 @@ import {
   useLatestCrisisReport, useCrisisReport, useFunds, useFund,
   useObRoster, type FundWindow, type CrisisRow, type ObRosterMember,
 } from '@/lib/hooks/use-api';
+import { DeclarationConversation } from './declaration-conversation';
 
 interface WizardProps {
   onClose: () => void;
@@ -77,6 +78,35 @@ export function DeclarationWizard({ onClose, onCreated }: WizardProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
+  // Phase 79 — Conversation mode. Lives alongside the wizard. When
+  // selected, the OB member describes the situation in plain language;
+  // we parse + pre-fill the form + jump to step 4 (Confirm).
+  const [mode, setMode] = useState<'conversation' | 'wizard'>('conversation');
+
+  function applyParsedDeclaration(p: {
+    title?: string; crisis_type?: string; severity?: 'low' | 'medium' | 'high' | 'critical';
+    country?: string; proposed_total_amount?: number | null; currency?: string;
+    summary?: string; suggested_committee?: number[];
+  }) {
+    setForm((prev) => ({
+      ...prev,
+      title: p.title || prev.title,
+      crisis_type: p.crisis_type || prev.crisis_type,
+      severity: p.severity ?? prev.severity,
+      country: p.country || prev.country,
+      proposed_total_amount: p.proposed_total_amount != null
+        ? String(p.proposed_total_amount) : prev.proposed_total_amount,
+      summary_md: p.summary || prev.summary_md,
+      signer_user_ids: (p.suggested_committee && p.suggested_committee.length > 0)
+        ? p.suggested_committee : prev.signer_user_ids,
+    }));
+    setMode('wizard');
+    // Jump to the Declaration step (step 2). User still needs to pick fund/
+    // window since conversation mode cannot infer them. From step 2 the
+    // wizard guides them through committee + confirm.
+    setStep(2);
+    toast.success('Parsed. Pick the fund + window, then confirm.');
+  }
 
   function next() {
     setStep((s) => (s < 4 ? ((s + 1) as 1 | 2 | 3 | 4) : s));
@@ -155,11 +185,40 @@ export function DeclarationWizard({ onClose, onCreated }: WizardProps) {
       >
         {/* Header */}
         <header className="flex items-center justify-between gap-3 p-4 border-b border-border bg-card">
-          <div>
+          <div className="min-w-0 flex-1">
             <h2 className="kuja-display text-xl">New emergency declaration</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Guided creation — 4 steps, ~3 minutes. Aligns with NEAR&apos;s OB process.
+              {mode === 'conversation'
+                ? 'Describe what is happening in your own words. We will structure it for you.'
+                : 'Guided creation — 4 steps, ~3 minutes. Aligns with NEAR’s OB process.'}
             </p>
+          </div>
+          {/* Phase 79 — mode toggle. Conversation default; wizard fallback. */}
+          <div className="inline-flex rounded-md border border-border text-[11px] overflow-hidden mr-2">
+            <button
+              type="button"
+              onClick={() => setMode('conversation')}
+              className={
+                'px-2.5 py-1 font-semibold ' +
+                (mode === 'conversation'
+                  ? 'bg-[hsl(var(--kuja-clay))] text-white'
+                  : 'bg-background text-muted-foreground hover:text-foreground')
+              }
+            >
+              Conversation
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('wizard'); setStep(1); }}
+              className={
+                'px-2.5 py-1 font-semibold border-l border-border ' +
+                (mode === 'wizard'
+                  ? 'bg-[hsl(var(--kuja-clay))] text-white'
+                  : 'bg-background text-muted-foreground hover:text-foreground')
+              }
+            >
+              Wizard
+            </button>
           </div>
           <button
             type="button"
@@ -171,7 +230,8 @@ export function DeclarationWizard({ onClose, onCreated }: WizardProps) {
           </button>
         </header>
 
-        {/* Stepper rail */}
+        {/* Stepper rail — hidden in conversation mode (no steps yet). */}
+        {mode === 'wizard' && (
         <div className="px-4 pt-3 pb-1 border-b border-border bg-muted/20">
           <ol className="flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold">
             {(['Evidence', 'Declaration', 'Committee', 'Confirm'] as const).map((label, idx) => {
@@ -191,16 +251,28 @@ export function DeclarationWizard({ onClose, onCreated }: WizardProps) {
             })}
           </ol>
         </div>
+        )}
 
-        {/* Step content */}
+        {/* Step content / Conversation mode */}
         <div className="flex-1 overflow-y-auto p-5">
-          {step === 1 && <Step1Evidence form={form} setForm={setForm} />}
-          {step === 2 && <Step2Declaration form={form} setForm={setForm} />}
-          {step === 3 && <Step3Committee form={form} setForm={setForm} />}
-          {step === 4 && <Step4Confirm form={form} setForm={setForm} />}
+          {mode === 'conversation' ? (
+            <DeclarationConversation
+              onParsed={applyParsedDeclaration}
+              onCancel={onClose}
+            />
+          ) : (
+            <>
+              {step === 1 && <Step1Evidence form={form} setForm={setForm} />}
+              {step === 2 && <Step2Declaration form={form} setForm={setForm} />}
+              {step === 3 && <Step3Committee form={form} setForm={setForm} />}
+              {step === 4 && <Step4Confirm form={form} setForm={setForm} />}
+            </>
+          )}
         </div>
 
-        {/* Footer */}
+        {/* Footer — only in wizard mode. Conversation has its own primary
+            action ('Use this draft') inside the parsed-preview panel. */}
+        {mode === 'wizard' && (
         <footer className="flex items-center justify-between gap-3 p-4 border-t border-border bg-card">
           <button
             type="button"
@@ -231,6 +303,7 @@ export function DeclarationWizard({ onClose, onCreated }: WizardProps) {
             </button>
           )}
         </footer>
+        )}
       </div>
     </div>
   );

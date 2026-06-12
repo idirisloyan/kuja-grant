@@ -91,6 +91,80 @@ def api_list_declarations():
     })
 
 
+@emergency_bp.route("/parse-narrative", methods=["POST"])
+@login_required
+def api_parse_declaration_narrative():
+    """Phase 79 — Declaration-as-conversation.
+
+    OB member writes (or voice-transcribes) what's happening on the
+    ground. Claude parses into the structured declaration shape and
+    suggests an OB committee. Preview only — does NOT create a
+    declaration; the caller uses the returned fields to pre-fill the
+    wizard / confirm before POSTing to the create endpoint.
+    """
+    from app.services.ai_service import AIService
+    from app.models import NetworkMembership, User
+    try:
+        from app.models import CrisisMonitoringRow
+    except Exception:
+        CrisisMonitoringRow = None
+
+    data = get_request_json() or {}
+    narrative = (data.get('narrative') or '').strip()
+    if not narrative:
+        return jsonify({'success': False, 'error': 'narrative is required'}), 400
+    if len(narrative) > 6000:
+        narrative = narrative[:6000]
+
+    network_id = get_current_network_id()
+    network_name = None
+    roster = []
+    crisis_rows = []
+
+    try:
+        if network_id:
+            from app.models import Network
+            net = db.session.get(Network, network_id)
+            if net:
+                network_name = getattr(net, 'name', None)
+            roster_rows = NetworkMembership.query.filter_by(
+                network_id=network_id, status='active',
+            ).limit(50).all()
+            for m in roster_rows:
+                uid = getattr(m, 'user_id', None) or getattr(m, 'primary_contact_user_id', None)
+                u = db.session.get(User, uid) if uid else None
+                if u:
+                    roster.append({
+                        'id': u.id,
+                        'name': getattr(u, 'name', None) or getattr(u, 'email', None),
+                        'role': getattr(u, 'role', None),
+                        'country': getattr(u, 'country', None),
+                    })
+    except Exception:
+        pass
+
+    try:
+        if CrisisMonitoringRow is not None:
+            rows = CrisisMonitoringRow.query.order_by(
+                CrisisMonitoringRow.id.desc()).limit(20).all()
+            crisis_rows = [{
+                'country': getattr(r, 'country', None),
+                'severity': getattr(r, 'severity', None),
+                'crisis_type': getattr(r, 'crisis_type', None),
+                'headline': getattr(r, 'headline', None) or getattr(r, 'summary', None) or '',
+            } for r in rows]
+    except Exception:
+        pass
+
+    result = AIService.parse_declaration_from_narrative(
+        narrative=narrative,
+        network_name=network_name,
+        available_committee=roster,
+        recent_crisis_rows=crisis_rows,
+    )
+    return jsonify({'success': True, **result})
+
+
 @emergency_bp.route("", methods=["POST"])
 @ob_required
 def api_create_declaration():

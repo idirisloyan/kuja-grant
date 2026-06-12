@@ -4536,6 +4536,143 @@ RETURN ONLY valid JSON in this exact shape (no commentary, no markdown fences):
             }
 
     # ------------------------------------------------------------------
+    # Phase 79 — NEAR declaration-as-conversation
+    # ------------------------------------------------------------------
+    # OB members in crisis-response networks are not form-fillers; they
+    # are operators reacting to a real situation. Phase 45's wizard
+    # works but starts from a structured form. Conversation mode lets
+    # them speak/write naturally — 'a drought is unfolding in Turkana
+    # and we need to declare ~$500k' — and the AI parses out the
+    # structured slots a declaration needs. The OB member confirms.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def parse_declaration_from_narrative(narrative: str,
+                                          network_name: str | None = None,
+                                          available_committee: list | None = None,
+                                          recent_crisis_rows: list | None = None) -> dict:
+        """Turn a free-text or voice-transcribed description into a
+        structured declaration draft.
+
+        narrative: NGO operator's own words about the situation
+        network_name: the OB network name (for context)
+        available_committee: list of {id, name, role, country} for the
+                              roster — used to suggest a committee
+        recent_crisis_rows: latest Crisis Monitoring Report rows so the
+                            AI can connect the narrative to an existing
+                            tracked crisis
+
+        Returns: {
+          title, crisis_type, severity, country, proposed_total_amount,
+          currency, summary, suggested_committee[user_id], rationale,
+          confidence (0-100), warnings[], ai_used
+        }
+        """
+        result = {
+            'title': '', 'crisis_type': '', 'severity': '',
+            'country': '', 'proposed_total_amount': None, 'currency': 'USD',
+            'summary': '', 'suggested_committee': [],
+            'rationale': '', 'confidence': 0, 'warnings': [],
+            'ai_used': False,
+        }
+
+        if not narrative or len(narrative.strip()) < 10:
+            result['warnings'].append('Tell us more about the situation — at least one full sentence.')
+            return result
+
+        if not (HAS_ANTHROPIC and ANTHROPIC_API_KEY):
+            result['title'] = narrative.strip().split('.')[0][:100]
+            result['summary'] = narrative.strip()[:500]
+            result['warnings'].append('AI parsing unavailable; you will need to fill the structured fields by hand.')
+            return result
+
+        try:
+            client = AIService._get_client()
+            if not client:
+                raise Exception("AI client not available")
+
+            committee_snip = ''
+            if available_committee:
+                committee_snip = '\nAvailable OB committee roster:\n' + json.dumps(
+                    [{'id': c.get('id'), 'name': c.get('name'), 'role': c.get('role'),
+                      'country': c.get('country')} for c in available_committee[:30]],
+                    indent=2,
+                )
+
+            crisis_snip = ''
+            if recent_crisis_rows:
+                crisis_snip = '\nLatest Crisis Monitoring Report rows:\n' + json.dumps(
+                    [{'country': r.get('country'), 'severity': r.get('severity'),
+                      'crisis_type': r.get('crisis_type'),
+                      'headline': r.get('headline', '')[:120]}
+                     for r in recent_crisis_rows[:8]],
+                    indent=2,
+                )
+
+            prompt = f"""You are parsing an OB committee member's natural-language description of a humanitarian crisis into the structured fields a NEAR emergency declaration requires. The operator is non-technical; they want to describe the situation, not fill a form.
+
+NETWORK: {network_name or '(unnamed network)'}
+
+OB MEMBER'S NARRATIVE:
+\"\"\"
+{narrative[:4000]}
+\"\"\"
+{committee_snip}{crisis_snip}
+
+YOUR JOB:
+1. Extract: title (short, action-oriented, ≤80 chars), crisis_type (one of: drought / flood / conflict / displacement / outbreak / earthquake / cyclone / food_insecurity / other), severity (low/medium/high/critical), country (3-letter ISO if clear, else best human label), proposed_total_amount (number from the narrative if mentioned), currency (3-letter ISO; default to USD if unclear).
+2. summary: 2-3 sentence operator-friendly description grounded ONLY in the narrative.
+3. suggested_committee: pick 3-5 user ids from the roster that fit the country/role. Prefer OB members from or specialising in the affected country. Return user_id integers, not names.
+4. rationale: 1-2 sentences on why these committee members + this severity.
+5. confidence (0-100): how cleanly the narrative mapped to these fields.
+6. warnings: anything ambiguous you had to guess (e.g. 'No amount mentioned; left blank for you to fill.')
+
+DO NOT invent details (locations, beneficiary counts, dates) the operator did not state.
+
+Return ONLY JSON in this exact shape (no markdown):
+{{
+  "title": "<≤80 chars>",
+  "crisis_type": "drought|flood|conflict|displacement|outbreak|earthquake|cyclone|food_insecurity|other",
+  "severity": "low|medium|high|critical",
+  "country": "<ISO3 or human label>",
+  "proposed_total_amount": <number or null>,
+  "currency": "<ISO3>",
+  "summary": "<2-3 sentences>",
+  "suggested_committee": [<user_id>, ...],
+  "rationale": "<1-2 sentences>",
+  "confidence": 0-100,
+  "warnings": ["..."]
+}}"""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            t = response.content[0].text.strip()
+            if t.startswith('```'):
+                t = re.sub(r'^```(?:json)?\s*|\s*```$', '', t, flags=re.MULTILINE).strip()
+            parsed = json.loads(t) if t.startswith('{') else json.loads(re.search(r'\{[\s\S]*\}', t).group())
+
+            result.update({
+                'title': parsed.get('title', '')[:200],
+                'crisis_type': parsed.get('crisis_type', ''),
+                'severity': parsed.get('severity', ''),
+                'country': parsed.get('country', ''),
+                'proposed_total_amount': parsed.get('proposed_total_amount'),
+                'currency': parsed.get('currency', 'USD'),
+                'summary': parsed.get('summary', ''),
+                'suggested_committee': [int(x) for x in (parsed.get('suggested_committee') or []) if isinstance(x, (int, str)) and str(x).lstrip('-').isdigit()],
+                'rationale': parsed.get('rationale', ''),
+                'confidence': int(parsed.get('confidence', 0) or 0),
+                'warnings': parsed.get('warnings', []) or [],
+                'ai_used': True,
+            })
+        except Exception as e:
+            logger.error(f"parse_declaration_from_narrative failed: {e}")
+            result['warnings'].append('AI parsing failed; please use the structured wizard instead.')
+        return result
+
+    # ------------------------------------------------------------------
     # Phase 78 — AI content translation
     # ------------------------------------------------------------------
     # Today, reporting in the Global South is implicitly English/French
