@@ -30,6 +30,7 @@ import {
   PageDetail, PageDetailSection, type AttentionItem,
 } from '@/components/layout/page-shell';
 import { describeReportStatus, TONE_PILL_CLASS } from '@/lib/status-copy';
+import { WhyRejectedPanel } from '@/components/shared/why-rejected-panel';
 
 interface ReportDetail {
   id: number;
@@ -221,6 +222,12 @@ export default function ReportDetailClient() {
         <PageAttention items={attention} />
 
         <PageMain>
+          {/* Phase 76 — Why-rejected, constructively. Only when the
+              report is rejected or revision-requested. Lazy-loaded AI. */}
+          {['rejected', 'revision_requested'].includes(status) && (
+            <WhyRejectedPanel kind="report" entityId={data.id} />
+          )}
+
           {/* Reviewer notes surfaced prominently when present and the
               attention strip didn't already lead with them. */}
           {data.reviewer_notes && status !== 'revision_requested' && status !== 'rejected' && (

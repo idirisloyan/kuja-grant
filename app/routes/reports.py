@@ -216,6 +216,39 @@ def api_update_report(report_id):
     return jsonify({'success': True, 'report': report.to_dict()})
 
 
+@reports_bp.route('/<int:report_id>/explain-rejection', methods=['GET'])
+@login_required
+@role_required('ngo')
+def api_explain_report_rejection(report_id):
+    """Phase 76 — Why-rejected, constructively. Reports side."""
+    report = db.session.get(Report, report_id)
+    if not report:
+        return jsonify({'error': 'Report not found', 'success': False}), 404
+    if report.submitted_by_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied', 'success': False}), 403
+    if report.status not in ('rejected', 'revision_requested'):
+        return jsonify({
+            'error': 'Explanation is only available for rejected or revision-requested reports.',
+            'success': False,
+        }), 400
+
+    grant = db.session.get(Grant, report.grant_id)
+    rubric = grant.get_reporting_requirements() if grant else []
+    payload = {
+        'report_type': report.report_type,
+        'reporting_period': report.reporting_period,
+        'content': report.get_content() or {},
+        'ai_analysis': report.get_ai_analysis() or {},
+        'revision_number': report.revision_number,
+    }
+    donor_notes = report.reviewer_notes
+
+    result = AIService.explain_rejection(
+        'report', payload=payload, donor_notes=donor_notes, rubric=rubric,
+    )
+    return jsonify({'success': True, **result})
+
+
 @reports_bp.route('/<int:report_id>/photo-evidence', methods=['POST'])
 @login_required
 @role_required('ngo')

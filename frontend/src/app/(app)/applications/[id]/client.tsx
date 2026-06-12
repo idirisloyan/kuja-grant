@@ -20,6 +20,7 @@ import { describeApplicationStatus } from '@/lib/status-copy';
 import { ActivityTimeline } from '@/components/applications/ActivityTimeline';
 import { ApplicationTimeline } from '@/components/applications/application-timeline';
 import { StatusSignalsRail } from '@/components/shared/status-signals-rail';
+import { WhyRejectedPanel } from '@/components/shared/why-rejected-panel';
 import { PreflightPanel } from '@/components/shared/preflight-panel';
 import { ReviewerFollowupsPanel } from '@/components/reviews/reviewer-followups-panel';
 import { ReviewerBriefingCard } from '@/components/reviews/reviewer-briefing-card';
@@ -144,6 +145,13 @@ export default function ApplicationDetailClient() {
       />
 
       <PageMain>
+        {/* Phase 76 — Why-rejected, constructively. Surfaces only when
+            the application is declined / rejected / revision_requested.
+            On-demand AI explanation; lazy-loaded when opened. */}
+        {['declined', 'rejected', 'revision_requested'].includes(application.status) && (
+          <WhyRejectedPanel kind="application" entityId={application.id} />
+        )}
+
         {/* 1. Summary first — "Where this stands" */}
         <div className="rounded-xl border border-border bg-gradient-to-br from-background to-[hsl(var(--kuja-sand-50))] p-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">

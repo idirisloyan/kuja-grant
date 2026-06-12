@@ -4536,6 +4536,106 @@ RETURN ONLY valid JSON in this exact shape (no commentary, no markdown fences):
             }
 
     # ------------------------------------------------------------------
+    # Phase 76 — Why-rejected: constructive AI feedback
+    # ------------------------------------------------------------------
+    # Most donors give cursory feedback when they decline an application
+    # or request report revisions: 'not competitive', 'see notes', or
+    # nothing at all. This is demoralising for NGOs and hides what
+    # would actually improve their next attempt. We turn the platform
+    # into the empathetic mentor — specific, kind, action-oriented.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def explain_rejection(kind: str, *, payload: dict, donor_notes: str | None = None,
+                           rubric: list | None = None) -> dict:
+        """Generate a constructive explanation of why an application or report
+        was declined / had revisions requested.
+
+        kind: 'application' | 'report'
+        payload: a sanitised snapshot of the relevant content
+        donor_notes: any donor-supplied feedback (used as grounding)
+        rubric: optional criteria/scoring rubric (for applications)
+
+        Returns: {
+          summary: friendly 2-sentence overall takeaway,
+          specific_issues: [{title, evidence, impact}],
+          suggestions:     [{title, action, expected_lift}],
+          encouragement:   single sentence reinforcing what was strong,
+          ai_used: bool,
+        }
+        """
+        result = {
+            'summary': '', 'specific_issues': [], 'suggestions': [],
+            'encouragement': '', 'ai_used': False,
+        }
+        if not (HAS_ANTHROPIC and ANTHROPIC_API_KEY):
+            # Without AI, surface donor notes as-is so the NGO at least
+            # sees something other than 'declined' with no context.
+            result['summary'] = (donor_notes or 'The donor declined this without detailed notes. Reach out to the donor for clarification.')[:600]
+            return result
+
+        try:
+            client = AIService._get_client()
+            if not client:
+                raise Exception("AI client not available")
+
+            kind_label = 'grant application' if kind == 'application' else 'grant report'
+            rubric_snip = ''
+            if rubric:
+                rubric_snip = '\nDonor rubric:\n' + json.dumps(rubric, indent=2)[:1500]
+
+            prompt = f"""You are an empathetic grants mentor talking to an NGO program officer whose {kind_label} was declined or had revisions requested. The NGO is non-technical and the donor's notes are often cursory. Your job is to translate the donor's signals into specific, kind, action-oriented advice the NGO can use NEXT time.
+
+Tone: warm, never patronising. Specific, never generic ('improve clarity' is not specific). Action-oriented — every issue must have a concrete suggested fix.
+
+CONTENT THAT WAS DECLINED:
+{json.dumps(payload, indent=2, default=str)[:4000]}
+
+DONOR NOTES (may be sparse or empty):
+{(donor_notes or '(no notes supplied)')[:1500]}
+{rubric_snip}
+
+OUTPUT — return ONLY JSON in this shape (no markdown):
+{{
+  "summary": "2-sentence empathetic takeaway — 'Your application was strong on X. The two areas that likely hurt you were Y and Z. The good news: both are fixable.'",
+  "specific_issues": [
+    {{
+      "title": "Short 4-7 word label (e.g. 'Budget concentrated in operations')",
+      "evidence": "What in the submitted content + donor notes points to this issue",
+      "impact": "Why this likely reduced the score / led to the decline"
+    }}
+  ],
+  "suggestions": [
+    {{
+      "title": "What to change next time",
+      "action": "Concrete instruction the NGO can act on — '<exact step>' not '<vague guidance>'",
+      "expected_lift": "What this typically does (e.g. '+10-15 score points on budget realism' / 'aligns with donor preference for capacity-building under their Pillar 3')"
+    }}
+  ],
+  "encouragement": "Single sentence reinforcing one thing this submission did genuinely well."
+}}
+
+Aim for 2-4 specific issues and 2-4 suggestions. Do NOT invent reasons that aren't supported by the content or donor notes — if the donor gave no useful feedback, say so transparently in the summary."""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text.strip()
+            if text.startswith('```'):
+                text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text, flags=re.MULTILINE).strip()
+            parsed = json.loads(text) if text.startswith('{') else json.loads(re.search(r'\{[\s\S]*\}', text).group())
+            result['summary'] = parsed.get('summary', '')
+            result['specific_issues'] = parsed.get('specific_issues', [])
+            result['suggestions']     = parsed.get('suggestions', [])
+            result['encouragement']   = parsed.get('encouragement', '')
+            result['ai_used'] = True
+        except Exception as e:
+            logger.error(f"explain_rejection failed: {e}")
+            result['summary'] = (donor_notes or 'The donor declined this submission. AI explanation is temporarily unavailable. Please reach out for clarification.')[:600]
+        return result
+
+    # ------------------------------------------------------------------
     # Phase 75 — AI-drafts-application v0
     # ------------------------------------------------------------------
     # NGOs in the Global South face a blank-page problem: every grant

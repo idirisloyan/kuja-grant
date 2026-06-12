@@ -226,6 +226,45 @@ def api_create_application():
     return jsonify({'success': True, 'application': application.to_dict()}), 201
 
 
+@applications_bp.route('/<int:app_id>/explain-rejection', methods=['GET'])
+@login_required
+@role_required('ngo')
+def api_explain_application_rejection(app_id):
+    """Phase 76 — Why-rejected, constructively. Applications side."""
+    from app.services.ai_service import AIService
+    application = db.session.get(Application, app_id)
+    if not application:
+        return jsonify({'error': 'Application not found', 'success': False}), 404
+    if application.ngo_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied', 'success': False}), 403
+    if application.status not in ('declined', 'rejected', 'revision_requested'):
+        return jsonify({
+            'error': 'Explanation is only available for declined or revision-requested applications.',
+            'success': False,
+        }), 400
+
+    grant = db.session.get(Grant, application.grant_id)
+    rubric = grant.get_criteria() if grant and hasattr(grant, 'get_criteria') else []
+    payload = {
+        'grant_title': grant.title if grant else None,
+        'responses': application.get_responses() or {},
+        'budget_lines': application.get_budget_lines() if hasattr(application, 'get_budget_lines') else None,
+        'ai_score': getattr(application, 'ai_score', None),
+        'human_score': getattr(application, 'human_score', None),
+        'final_score': getattr(application, 'final_score', None),
+    }
+    donor_notes = (
+        getattr(application, 'reviewer_notes', None)
+        or getattr(application, 'donor_notes', None)
+        or getattr(application, 'feedback', None)
+    )
+
+    result = AIService.explain_rejection(
+        'application', payload=payload, donor_notes=donor_notes, rubric=rubric,
+    )
+    return jsonify({'success': True, **result})
+
+
 @applications_bp.route('/<int:app_id>/ai-draft', methods=['POST'])
 @login_required
 @role_required('ngo')
