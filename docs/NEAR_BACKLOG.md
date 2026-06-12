@@ -232,6 +232,39 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 56 — top_risks populated on the operational
+  rollup. Closes the Phase 52 placeholder. Pure SQL rules, no AI
+  tokens, instant. Four rule families per window
+  (overdue_reports / cancelled_declarations / stuck_in_review /
+  ready_to_release), each tagged with severity (low/medium/high),
+  sorted desc, capped at 5. WindowCard renders a tone-coded "Top
+  risks" list below the OpStat strip. Browser-verified live with
+  seeded conditions: "1 declaration past 6-day decision SLA" (high)
+  and "1 declaration ready to release" (medium) render with the
+  expected destructive + kuja-sun backgrounds and the right hints.
+
+- **2026-06-11** Phase 55 — Grants detail retrofit +
+  KujaReportsPage attention strip. Grants detail wrapped in
+  PageShell with new describeGrantStatus helper (human pills:
+  "Open for applications" / "In review" / "Closed" / "Awarded"),
+  header with funding + deadline + countries meta, primary action
+  carries Apply/Broadcast/your-app status. GrantAgreementUnpackPanel
+  and AIChatPanel pushed into PageDetail collapsibles. Kuja Reports
+  list (the donor + marketplace NGO path) wrapped in PageShell with
+  an attention strip ("5 reports overdue" / "N due in next 7 days").
+  Browser-verified.
+
+- **2026-06-11** Phase 54 — Applications detail anatomy retrofit.
+  Brief: summary first, BUDGET SECOND, AI assist in collapsible,
+  audit/history below. NgoBudgetPanel promoted from the very bottom
+  of the page to position 2 (immediately after the "Where this
+  stands" summary). NetworkAiPanel + AIChatPanel + ReviewerFollowups
+  + PanelCalibration + MicroSurvey all moved into PageDetail
+  collapsibles -- supporting, not dominant. Status pill uses
+  describeApplicationStatus: "Submitted -- awaiting review" not
+  raw "submitted". Browser-verified live on USAID East Africa WASH
+  Program (application #1, fatima@amani.org viewer).
+
 - **2026-06-11** Phase 53 — Reports detail page anatomy retrofit. Per
   brief: top = due date · status · score · next action; sections;
   collapsibles below. New shape:
