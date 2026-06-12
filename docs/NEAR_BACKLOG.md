@@ -248,6 +248,23 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 70 — Reviewer-side IA pass.
+  /reviews/[id] is the reviewer's busiest surface and was still on the
+  pre-Phase-47 layout (max-w-5xl wrapper + custom flex back-button
+  header). Retrofitted to PageShell + PageBack + PageHeader + PageMain,
+  matching the rest of the audit. Title-status moves into the header as
+  a human pill via describeApplicationStatus, so reviewers see the
+  same vocabulary as donors and admins (e.g. "Submitted — awaiting
+  review", not "submitted"). DecisionAuditDrawer trigger is now a
+  primaryAction on the header. The summary card drops the duplicated
+  org/grant/status (which the header now carries) and focuses on the
+  three score tiles (AI / Reviewer / Dual). The /reviews list also
+  switches its rows from StatusBadge to the status-copy pill for
+  consistency. Loading + not-found + success states all wrapped in
+  PageShell. Browser-verified as reviewer james@reviewer.org on
+  /reviews/11/ — h1 "Score application", "Draft" pill, subtitle
+  "Amani Community Development · Somalia drought emergency...".
+
 - **2026-06-11** Phase 69 — NEAR admin reports view at /admin/reports.
   Mirror of /admin/declarations: status filter, optional window_id
   chip, deadline-urgency tone-coding, link to existing /reports/<id>

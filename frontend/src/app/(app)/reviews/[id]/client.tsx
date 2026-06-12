@@ -6,14 +6,16 @@ import { useApplication, useGrant } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import { StatusBadge } from '@/components/shared/status-badge';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { ReviewerSummary } from '@/components/reviews/ReviewerSummary';
 import { DecisionAuditDrawer } from '@/components/applications/DecisionAuditDrawer';
+// Phase 70 — page-shell primitive to match the rest of the design audit.
+import { PageShell, PageBack, PageHeader, PageMain } from '@/components/layout/page-shell';
+import { describeApplicationStatus } from '@/lib/status-copy';
 import {
-  ArrowLeft, Send, Cpu, Loader2, FileText, Star, MessageSquare, CheckCircle,
+  Send, Cpu, Loader2, FileText, Star, MessageSquare, CheckCircle, ClipboardCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Criterion, Document as DocType } from '@/lib/types';
@@ -253,49 +255,50 @@ export default function ReviewDetailClient() {
   // pre-resolution gap briefly fires the not-found UI.
   if (urlId == null || resolvingId || appId == null || appLoading || grantLoading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-3">
-        <div className="kuja-shimmer h-8 w-64 rounded" />
-        <div className="kuja-shimmer h-32 rounded-xl" />
-        <div className="kuja-shimmer h-10 w-48 rounded" />
-        <div className="kuja-shimmer h-96 rounded-xl" />
-      </div>
+      <PageShell>
+        <PageBack href="/reviews" label={t('common.back')} />
+        <div className="space-y-3">
+          <div className="kuja-shimmer h-8 w-64 rounded" />
+          <div className="kuja-shimmer h-32 rounded-xl" />
+          <div className="kuja-shimmer h-10 w-48 rounded" />
+          <div className="kuja-shimmer h-96 rounded-xl" />
+        </div>
+      </PageShell>
     );
   }
 
   if (!application) {
     return (
-      <div className="max-w-5xl mx-auto space-y-3">
-        <button
-          type="button"
-          onClick={() => router.push('/reviews')}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" /> {t('common.back')}
-        </button>
-        <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
-          <FileText className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="kuja-display text-xl">{t('application.not_found')}</p>
-        </div>
-      </div>
+      <PageShell>
+        <PageBack href="/reviews" label={t('common.back')} />
+        <PageMain>
+          <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
+            <FileText className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+            <p className="kuja-display text-xl">{t('application.not_found')}</p>
+          </div>
+        </PageMain>
+      </PageShell>
     );
   }
 
   if (success) {
     return (
-      <div className="max-w-5xl mx-auto">
-        <div className="rounded-xl border border-border bg-background px-6 py-16 text-center">
-          <CheckCircle className="h-16 w-16 mx-auto text-[hsl(var(--kuja-grow))] mb-3" />
-          <p className="kuja-display text-2xl">{t('review.detail.scores_submitted')}</p>
-          <p className="text-sm text-muted-foreground mt-1">{t('review.detail.scores_recorded')}</p>
-          <button
-            type="button"
-            onClick={() => router.push('/reviews')}
-            className="mt-5 inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
-          >
-            {t('review.detail.back')}
-          </button>
-        </div>
-      </div>
+      <PageShell>
+        <PageMain>
+          <div className="rounded-xl border border-border bg-background px-6 py-16 text-center">
+            <CheckCircle className="h-16 w-16 mx-auto text-[hsl(var(--kuja-grow))] mb-3" />
+            <p className="kuja-display text-2xl">{t('review.detail.scores_submitted')}</p>
+            <p className="text-sm text-muted-foreground mt-1">{t('review.detail.scores_recorded')}</p>
+            <button
+              type="button"
+              onClick={() => router.push('/reviews')}
+              className="mt-5 inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
+            >
+              {t('review.detail.back')}
+            </button>
+          </div>
+        </PageMain>
+      </PageShell>
     );
   }
 
@@ -306,43 +309,34 @@ export default function ReviewDetailClient() {
   const toneBy = (s: number) =>
     s >= 70 ? 'text-[hsl(var(--kuja-grow))]' : s >= 50 ? 'text-[hsl(var(--kuja-sun))]' : 'text-[hsl(var(--kuja-flag))]';
 
+  // Phase 70 — replaces ad-hoc StatusBadge with the status-copy library's
+  // human pill so review detail uses the same tone vocabulary as the rest
+  // of the app.
+  const appSc = describeApplicationStatus(application.status);
+
   return (
-    <div className="max-w-5xl mx-auto space-y-5">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => router.push('/reviews')}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" /> {t('common.back')}
-        </button>
-        <div className="flex-1">
-          <h1 className="kuja-display text-2xl">{t('review.detail.score_app')}</h1>
-          <p className="text-sm text-muted-foreground">Application #{appId}</p>
-        </div>
-        {/* Phase 10.8 — decision audit drawer for reviewers/donors/admins.
-            Renders the timeline of AI calls + lifecycle events that led
-            to the current state of this application. Hidden behind the
-            ui.decision_audit flag. */}
-        <DecisionAuditDrawer applicationId={appId} />
-      </div>
+    <PageShell>
+      <PageBack href="/reviews" label={t('common.back')} />
+      <PageHeader
+        title={t('review.detail.score_app')}
+        icon={ClipboardCheck}
+        subtitle={
+          (application.ngo_org_name || application.org_name || `Org #${application.ngo_org_id}`)
+          + ' · ' + (grant?.title || `Grant #${application.grant_id}`)
+        }
+        status={{ label: appSc.label, tone: appSc.tone }}
+        /* Phase 10.8 — decision audit drawer for reviewers/donors/admins.
+           Renders the timeline of AI calls + lifecycle events that led
+           to the current state of this application. Hidden behind the
+           ui.decision_audit flag. */
+        primaryAction={<DecisionAuditDrawer applicationId={appId} />}
+      />
+      <PageMain>
 
-      {/* Summary card */}
+      {/* Score summary card — org/grant/status are surfaced in PageHeader
+          (Phase 70), so this card focuses on the three score tiles. */}
       <div className="rounded-xl border border-border bg-background p-5 border-l-4 border-l-[hsl(var(--kuja-spark))]">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <div className="font-semibold text-foreground">
-              {application.ngo_org_name || application.org_name || `Org #${application.ngo_org_id}`}
-            </div>
-            <div className="text-sm text-muted-foreground mt-0.5">
-              {grant?.title || `Grant #${application.grant_id}`}
-            </div>
-          </div>
-          <StatusBadge status={application.status} kind="app" />
-        </div>
-
-        <div className="flex gap-2 mt-4 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
           {application.ai_score != null && (
             <ScoreBox
               tone="spark"
@@ -924,7 +918,8 @@ export default function ReviewDetailClient() {
           </div>
         </div>
       )}
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }
 

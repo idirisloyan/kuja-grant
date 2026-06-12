@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useReviews, useApplications, useGrants } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { StatusBadge } from '@/components/shared/status-badge';
+import { describeApplicationStatus, TONE_PILL_CLASS } from '@/lib/status-copy';
 import { cn } from '@/lib/utils';
 import { ClipboardCheck, FileText, Star, Filter, ChevronDown, GitCompare, Sparkles, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { Review } from '@/lib/types';
@@ -180,7 +180,14 @@ function ReviewerView() {
                     {r.ngo_org_name || t('applications.label_fallback', { n: r.application_id })}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{r.grant_title || '—'}</td>
-                  <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
+                  <td className="px-4 py-3">{(() => {
+                    const sc = describeApplicationStatus(r.status);
+                    return (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${TONE_PILL_CLASS[sc.tone]}`}>
+                        {sc.label}
+                      </span>
+                    );
+                  })()}</td>
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"
@@ -439,7 +446,14 @@ function DonorView() {
             >
               <td className="px-4 py-3 font-medium text-foreground">{a.org_name || '—'}</td>
               <td className="px-4 py-3 text-muted-foreground">{a.grant_title || '—'}</td>
-              <td className="px-4 py-3"><StatusBadge status={a.status} kind="app" /></td>
+              <td className="px-4 py-3">{(() => {
+                const sc = describeApplicationStatus(a.status);
+                return (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${TONE_PILL_CLASS[sc.tone]}`}>
+                    {sc.label}
+                  </span>
+                );
+              })()}</td>
               <td className="px-4 py-3 text-right text-muted-foreground">{formatDate(a.submitted_at)}</td>
             </tr>
           ))}
