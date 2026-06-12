@@ -21,6 +21,7 @@ import {
   MessageCircle, Send, Loader2, AlertCircle, Inbox,
   Cog, Shield, ThumbsUp, Lightbulb, MoreHorizontal,
 } from 'lucide-react';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 const fetcher = <T,>(url: string): Promise<T> => api.get<T>(url);
 
@@ -76,39 +77,40 @@ export default function FeedbackPage() {
   const rows = data?.feedback ?? [];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
-      <div>
-        <h1 className="kuja-display text-3xl">Feedback</h1>
-        <p className="text-sm text-muted-foreground mt-0.5 max-w-2xl">
-          {isAdmin
-            ? `Inbox of member feedback for ${tenantName}. NEAR risk pillar 4 — review, respond, address.`
-            : `Tell the ${tenantName} secretariat what's working and what isn't. Every submission is logged in the audit chain so it isn't lost.`}
-        </p>
-      </div>
+    <div className="max-w-4xl mx-auto">
+      <PageShell>
+        <PageHeader
+          title="Feedback"
+          icon={MessageCircle}
+          subtitle={isAdmin
+            ? `Inbox of member feedback for ${tenantName}. Review, respond, address.`
+            : `Tell the ${tenantName} secretariat what's working and what isn't. Every submission is logged.`}
+        />
 
-      {!isAdmin && <SubmitForm onSubmitted={mutate} />}
+        {!isAdmin && <SubmitForm onSubmitted={mutate} />}
 
-      {isAdmin && (
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          <span className="text-muted-foreground">Filter:</span>
-          {['all', 'open', 'in_review', 'addressed', 'closed'].map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setStatusFilter(s)}
-              className={`px-2 py-1 rounded-md border capitalize ${
-                statusFilter === s
-                  ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-clay))]/10 text-[hsl(var(--kuja-clay))]'
-                  : 'border-border hover:bg-muted'
-              }`}
-            >
-              {s.replace('_', ' ')}
-            </button>
-          ))}
-        </div>
-      )}
+        {isAdmin && (
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            <span className="text-muted-foreground">Filter:</span>
+            {['all', 'open', 'in_review', 'addressed', 'closed'].map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setStatusFilter(s)}
+                className={`px-2 py-1 rounded-md border capitalize ${
+                  statusFilter === s
+                    ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-clay))]/10 text-[hsl(var(--kuja-clay))]'
+                    : 'border-border hover:bg-muted'
+                }`}
+              >
+                {s.replace('_', ' ')}
+              </button>
+            ))}
+          </div>
+        )}
 
-      <div className="space-y-2">
+        <PageMain>
+        <div className="space-y-2">
         {rows.length === 0 ? (
           <div className="border border-border rounded-lg bg-card p-10 text-center text-sm text-muted-foreground">
             <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -124,7 +126,9 @@ export default function FeedbackPage() {
             />
           ))
         )}
-      </div>
+        </div>
+        </PageMain>
+      </PageShell>
     </div>
   );
 }

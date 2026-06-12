@@ -24,6 +24,7 @@ import {
   MessageSquare, Send, Loader2, Eye, EyeOff, Globe, MapPin,
   Building2, Siren, ChevronRight,
 } from 'lucide-react';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 const fetcher = <T,>(url: string): Promise<T> => api.get<T>(url);
 
@@ -59,34 +60,34 @@ export default function MessagesPage() {
   const unread = data?.unread ?? 0;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="kuja-display text-3xl">Messages</h1>
-          <p className="text-sm text-muted-foreground mt-0.5 max-w-2xl">
-            {isAdmin
-              ? `Send and review communications with ${tenantName} members. Every message is audit-anchored in the same chain as declarations and grants.`
-              : `Communications from ${tenantName} secretariat. ${unread > 0 ? `${unread} unread.` : 'All read.'}`}
-          </p>
-        </div>
-      </div>
+    <div className="max-w-4xl mx-auto">
+      <PageShell>
+        <PageHeader
+          title="Messages"
+          icon={MessageSquare}
+          subtitle={isAdmin
+            ? `Send and review communications with ${tenantName} members. Audit-anchored.`
+            : `Communications from ${tenantName} secretariat.${unread > 0 ? ` ${unread} unread.` : ''}`}
+        />
+        {isAdmin && <ComposeForm onSent={mutate} />}
+        <PageMain>
 
-      {isAdmin && <ComposeForm onSent={mutate} />}
-
-      <div className="space-y-2">
-        {messages.length === 0 ? (
-          <div className="border border-border rounded-lg bg-card p-10 text-center text-sm text-muted-foreground">
-            <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            {isAdmin
-              ? 'No messages sent yet.'
-              : 'No messages from the secretariat yet.'}
+          <div className="space-y-2">
+            {messages.length === 0 ? (
+              <div className="border border-border rounded-lg bg-card p-10 text-center text-sm text-muted-foreground">
+                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                {isAdmin
+                  ? 'No messages sent yet.'
+                  : 'No messages from the secretariat yet.'}
+              </div>
+            ) : (
+              messages.map((m) => (
+                <MessageRow key={m.id} message={m} isAdmin={isAdmin} onChange={mutate} />
+              ))
+            )}
           </div>
-        ) : (
-          messages.map((m) => (
-            <MessageRow key={m.id} message={m} isAdmin={isAdmin} onChange={mutate} />
-          ))
-        )}
-      </div>
+        </PageMain>
+      </PageShell>
     </div>
   );
 }

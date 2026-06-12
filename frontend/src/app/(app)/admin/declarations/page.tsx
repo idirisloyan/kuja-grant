@@ -15,23 +15,17 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
 import { Siren, Inbox, Filter, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import { DeclarationWizard } from '@/components/declarations/declaration-wizard';
+import { describeDeclarationStatus, TONE_PILL_CLASS } from '@/lib/status-copy';
 
+// Phase 50 — filter labels match the human pill copy on the rows themselves.
 const STATUS_OPTIONS = [
-  { value: '', label: 'All' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'in_review', label: 'In review' },
-  { value: 'signed_active', label: 'Active' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'closed', label: 'Closed' },
+  { value: '',              label: 'All' },
+  { value: 'draft',         label: 'Draft' },
+  { value: 'in_review',     label: 'Waiting for signatures' },
+  { value: 'signed_active', label: 'Active or ready to release' },
+  { value: 'cancelled',     label: 'Cancelled' },
+  { value: 'closed',        label: 'Closed' },
 ];
-
-const STATUS_COLOUR: Record<EmergencyDeclaration['status'], string> = {
-  draft: 'bg-muted text-muted-foreground',
-  in_review: 'bg-[hsl(var(--kuja-sun))]/15 text-[hsl(var(--kuja-sun))]',
-  signed_active: 'bg-[hsl(var(--kuja-grow))]/15 text-[hsl(var(--kuja-grow))]',
-  cancelled: 'bg-destructive/15 text-destructive',
-  closed: 'bg-muted text-muted-foreground',
-};
 
 export default function DeclarationsListPage() {
   const viewer = useAuthStore((s) => s.user);
@@ -124,9 +118,14 @@ export default function DeclarationsListPage() {
               <div className="min-w-0">
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <h3 className="font-semibold text-base truncate">{d.title}</h3>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold capitalize ${STATUS_COLOUR[d.status]}`}>
-                    {d.status.replace('_', ' ')}
-                  </span>
+                  {(() => {
+                    const sc = describeDeclarationStatus(d);
+                    return (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${TONE_PILL_CLASS[sc.tone]}`}>
+                        {sc.label}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
                   {d.country && <span>{d.country}</span>}
