@@ -17,6 +17,10 @@ import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
 
 import { FileText, Eye, ArrowRight, Inbox } from 'lucide-react';
+import {
+  PageShell, PageHeader, PageAttention, PageMain, type AttentionItem,
+} from '@/components/layout/page-shell';
+import { describeApplicationStatus } from '@/lib/status-copy';
 
 interface AppRow {
   id: number;
@@ -62,58 +66,78 @@ export default function ApplicationsPage() {
     );
   }
 
-  return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="kuja-display text-3xl">{t('application.list_title')}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {applications.length} application{applications.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {canSeeKanban && (
-            <div className="inline-flex rounded-md border border-border overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setView('table')}
-                aria-pressed={view === 'table'}
-                className={cn(
-                  'px-3 py-1.5 text-xs font-semibold',
-                  view === 'table' ? 'bg-[hsl(var(--kuja-clay))] text-white' : 'hover:bg-muted',
-                )}
-              >Table</button>
-              <button
-                type="button"
-                onClick={() => setView('kanban')}
-                aria-pressed={view === 'kanban'}
-                className={cn(
-                  'px-3 py-1.5 text-xs font-semibold border-l border-border',
-                  view === 'kanban' ? 'bg-[hsl(var(--kuja-clay))] text-white' : 'hover:bg-muted',
-                )}
-              >Pipeline</button>
-            </div>
-          )}
-          {/* Phase 21C — CSV export (any role; server scopes by role) */}
-          <a
-            href="/api/exports/applications.csv"
-            className="inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand))]/40 text-sm font-medium px-3 py-2"
-            title="Export visible applications as CSV"
-          >
-            <FileText className="h-4 w-4" /> Export CSV
-          </a>
-          <button
-            type="button"
-            onClick={() => router.push('/grants')}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
-          >
-            <FileText className="h-4 w-4" />
-            {t('application.browse_grants')}
-          </button>
-        </div>
-      </div>
+  // Phase 51 — attention items derived from the user's pipeline.
+  // For NGO viewers only: drafts to continue, submitted awaiting decision.
+  const attention: AttentionItem[] = [];
+  if (viewer?.role === 'ngo') {
+    const drafts = all.filter((a) => a.status === 'draft').length;
+    const inFlight = all.filter((a) => ['submitted', 'in_review', 'under_review'].includes(a.status)).length;
+    if (drafts > 0) {
+      attention.push({
+        tone: 'accent',
+        label: `Continue ${drafts} draft application${drafts === 1 ? '' : 's'}`,
+        hint: 'Pick up where you left off — submit once you\'re ready.',
+      });
+    }
+    if (inFlight > 0) {
+      attention.push({
+        tone: 'info',
+        label: `${inFlight} application${inFlight === 1 ? '' : 's'} awaiting decision`,
+      });
+    }
+  }
 
+  return (
+    <PageShell>
+      <PageHeader
+        title={t('application.list_title')}
+        subtitle={`${applications.length} application${applications.length !== 1 ? 's' : ''}`}
+        primaryAction={
+          <div className="flex items-center gap-2 flex-wrap">
+            {canSeeKanban && (
+              <div className="inline-flex rounded-md border border-border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setView('table')}
+                  aria-pressed={view === 'table'}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-semibold',
+                    view === 'table' ? 'bg-[hsl(var(--kuja-clay))] text-white' : 'hover:bg-muted',
+                  )}
+                >Table</button>
+                <button
+                  type="button"
+                  onClick={() => setView('kanban')}
+                  aria-pressed={view === 'kanban'}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-semibold border-l border-border',
+                    view === 'kanban' ? 'bg-[hsl(var(--kuja-clay))] text-white' : 'hover:bg-muted',
+                  )}
+                >Pipeline</button>
+              </div>
+            )}
+            <a
+              href="/api/exports/applications.csv"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand))]/40 text-sm font-medium px-3 py-2"
+              title="Export visible applications as CSV"
+            >
+              <FileText className="h-4 w-4" /> Export CSV
+            </a>
+            <button
+              type="button"
+              onClick={() => router.push('/grants')}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
+            >
+              <FileText className="h-4 w-4" />
+              {t('application.browse_grants')}
+            </button>
+          </div>
+        }
+      />
+
+      <PageAttention items={attention} />
+
+      <PageMain>
       {/* Saved searches + status filter chips */}
       <SavedSearchesBar
         scope="applications"
@@ -137,7 +161,9 @@ export default function ApplicationsPage() {
                 : 'border-border text-foreground hover:bg-muted',
             )}
           >
-            {s === 'all' ? t('common.all') || 'All' : s.replace('_', ' ')}
+            {/* Phase 51 — use the shared status-copy helper so the chip
+                labels match the StatusBadge labels on the rows. */}
+            {s === 'all' ? t('common.all') || 'All' : describeApplicationStatus(s).label}
           </button>
         ))}
       </div>
@@ -218,6 +244,7 @@ export default function ApplicationsPage() {
           </div>
         </div>
       )}
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }

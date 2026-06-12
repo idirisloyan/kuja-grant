@@ -16,15 +16,22 @@ import { api, ApiError } from '@/lib/api';
 import { usePendingMemberships, type Membership } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
-import { CheckCircle2, XCircle, Loader2, Inbox, Filter, Sparkles } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Inbox, Filter, Sparkles, Users } from 'lucide-react';
+import {
+  PageShell, PageHeader, PageAttention, PageMain, type AttentionItem,
+} from '@/components/layout/page-shell';
+import {
+  describeMembershipStatus, TONE_PILL_CLASS,
+} from '@/lib/status-copy';
 
+// Phase 51 — filter labels match the human pill copy on the rows themselves.
 const STATUS_OPTIONS = [
   { value: 'under_review', label: 'Under review' },
-  { value: 'pending', label: 'Pending (draft)' },
-  { value: 'active', label: 'Active members' },
-  { value: 'rejected', label: 'Rejected' },
-  { value: 'suspended', label: 'Suspended' },
-  { value: 'all', label: 'All' },
+  { value: 'pending',      label: 'Awaiting review' },
+  { value: 'active',       label: 'Active members' },
+  { value: 'rejected',     label: 'Rejected' },
+  { value: 'suspended',    label: 'Suspended' },
+  { value: 'all',          label: 'All' },
 ];
 
 export default function NetworkMembershipsAdminPage() {
@@ -44,69 +51,92 @@ export default function NetworkMembershipsAdminPage() {
   }
 
   const rows = data?.memberships ?? [];
+  const decidable = rows.filter(
+    (m) => m.status === 'pending' || m.status === 'under_review',
+  ).length;
+  const missingCapacity = rows.filter(
+    (m) => !m.capacity_assessment_id && (m.status === 'pending' || m.status === 'under_review'),
+  ).length;
+
+  // Phase 51 — attention strip surfaces decision load + readiness gaps.
+  const attention: AttentionItem[] = [];
+  if (decidable > 0) {
+    attention.push({
+      tone: 'warn',
+      label: `${decidable} membership${decidable === 1 ? '' : 's'} awaiting your review`,
+      hint: 'Open a row to run the trust process and approve or reject.',
+    });
+  }
+  if (missingCapacity > 0) {
+    attention.push({
+      tone: 'info',
+      label: `${missingCapacity} applicant${missingCapacity === 1 ? '' : 's'} missing capacity assessment`,
+      hint: 'Typically required before approval.',
+    });
+  }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="kuja-display text-3xl">
-            {network?.name ?? 'Network'} — memberships
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {rows.length} {rows.length === 1 ? 'application' : 'applications'} ·{' '}
-            {STATUS_OPTIONS.find((s) => s.value === statusFilter)?.label.toLowerCase()}
-          </p>
-        </div>
-        <label className="inline-flex items-center gap-2 text-xs">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2 py-1 rounded-md border border-border bg-background text-xs"
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {isLoading && (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => <div key={i} className="kuja-shimmer h-16 rounded" />)}
-        </div>
-      )}
-
-      {!isLoading && rows.length === 0 && (
-        <div className="border border-border rounded-lg bg-card p-10 text-center text-sm text-muted-foreground">
-          <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          No memberships in this state.
-        </div>
-      )}
-
-      {!isLoading && rows.length > 0 && (
-        <div className="border border-border rounded-lg bg-card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="text-left px-3 py-2">Org</th>
-                <th className="text-left px-3 py-2">Country</th>
-                <th className="text-left px-3 py-2">Tier</th>
-                <th className="text-left px-3 py-2">Applied</th>
-                <th className="text-left px-3 py-2">Status</th>
-                <th className="text-left px-3 py-2">Capacity</th>
-                <th className="text-right px-3 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((m) => (
-                <MembershipRow key={m.id} m={m} onChange={mutate} />
+    <PageShell>
+      <PageHeader
+        title={network?.name ? `${network.name} — Members` : 'Members'}
+        icon={Users}
+        subtitle={`${rows.length} ${rows.length === 1 ? 'membership' : 'memberships'} · ${STATUS_OPTIONS.find((s) => s.value === statusFilter)?.label.toLowerCase()}`}
+        primaryAction={
+          <label className="inline-flex items-center gap-2 text-xs">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2 py-1 rounded-md border border-border bg-background text-xs"
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+            </select>
+          </label>
+        }
+      />
+
+      <PageAttention items={attention} />
+
+      <PageMain>
+        {isLoading && (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => <div key={i} className="kuja-shimmer h-16 rounded" />)}
+          </div>
+        )}
+
+        {!isLoading && rows.length === 0 && (
+          <div className="border border-border rounded-lg bg-card p-10 text-center text-sm text-muted-foreground">
+            <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            No memberships in this state.
+          </div>
+        )}
+
+        {!isLoading && rows.length > 0 && (
+          <div className="border border-border rounded-lg bg-card overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="text-left px-3 py-2">Org</th>
+                  <th className="text-left px-3 py-2">Country</th>
+                  <th className="text-left px-3 py-2">Tier</th>
+                  <th className="text-left px-3 py-2">Applied</th>
+                  <th className="text-left px-3 py-2">Status</th>
+                  <th className="text-left px-3 py-2">Capacity</th>
+                  <th className="text-right px-3 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((m) => (
+                  <MembershipRow key={m.id} m={m} onChange={mutate} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </PageMain>
+    </PageShell>
   );
 }
 
@@ -183,10 +213,17 @@ function MembershipRow({ m, onChange }: { m: Membership; onChange: () => void })
         <td className="px-3 py-2 text-xs">
           {m.applied_at ? new Date(m.applied_at).toLocaleDateString() : '—'}
         </td>
-        <td className="px-3 py-2 text-xs capitalize">
-          {m.status.replace('_', ' ')}
+        <td className="px-3 py-2 text-xs">
+          {(() => {
+            const sc = describeMembershipStatus(m.status);
+            return (
+              <span className={`px-2 py-0.5 rounded-full font-semibold ${TONE_PILL_CLASS[sc.tone]}`}>
+                {sc.label}
+              </span>
+            );
+          })()}
           {m.status === 'rejected' && m.status_reason && (
-            <div className="text-muted-foreground italic">&ldquo;{m.status_reason}&rdquo;</div>
+            <div className="text-muted-foreground italic mt-1">&ldquo;{m.status_reason}&rdquo;</div>
           )}
         </td>
         <td className="px-3 py-2 text-xs">

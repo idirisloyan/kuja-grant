@@ -24,7 +24,9 @@ import {
   Upload,
   Loader2,
   CheckCircle2,
+  BarChart3,
 } from 'lucide-react';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -779,15 +781,16 @@ export default function ReportsPage() {
 
 function NearReportsPage() {
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="kuja-display text-3xl">Compliance &amp; reporting</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Your reporting activities, grouped by grant.
-        </p>
-      </div>
-      <NearComplianceReporting />
-    </div>
+    <PageShell>
+      <PageHeader
+        title="Reports"
+        icon={BarChart3}
+        subtitle="Your reporting activities, grouped by grant."
+      />
+      <PageMain>
+        <NearComplianceReporting />
+      </PageMain>
+    </PageShell>
   );
 }
 
