@@ -232,6 +232,31 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 63 — Name entities across the donor / NGO /
+  member dashboards. Extends the Phase 62 pattern from the NEAR
+  operator dashboard to the other three attention-first dashboards.
+  Same deterministic templating: first 2 entity names + "+N more"
+  in the hint. Coverage:
+    AttentionDonorDashboard:
+      "N applications awaiting your review"  -> grant_title list
+      "N reports awaiting review"            -> grant_title list
+      "N grants closing in the next 2 weeks" -> grant title list
+    AttentionNgoDashboard:
+      "Continue where you left off — N drafts" -> grant_title list
+      "N reports due soon"                   -> grant_title list
+    AttentionMemberDashboard:
+      "N draft application waiting to submit" -> grant_title list
+      "N reports due soon"                   -> grant_title list
+  Browser-verified live:
+    Donor dashboard:
+      "4 applications awaiting your review"
+        hint = "Global Fund Maternal & Newborn Health Initiative",
+               "USAID East Africa WASH Program 2026-2028" +2 more
+    NGO dashboard:
+      "Continue where you left off — 2 drafts"
+        hint = "Somalia drought emergency — Q2 2026 response — Org #1",
+               "Schema Report Test". Pick up your work-in-progress...
+
 - **2026-06-11** Phase 62 — Name entities in operator dashboard
   attention. The Phase 48 strip showed counts (`2 members awaiting
   review`) but operators wanted to know WHICH orgs / declarations.

@@ -50,27 +50,52 @@ export function AttentionDonorDashboard() {
     });
   }, [openGrants]);
 
+  // Phase 63 — name the entities (same pattern as Phase 62). First 2
+  // names + "+N more". Pulls from grant_title / org_name (apps),
+  // grant_title (reports), grant title (closing-soon).
+  const appNames = submittedApps
+    .map((a) => a.grant_title ? `"${a.grant_title}"` : (a.org_name || `App #${a.id}`))
+    .slice(0, 2);
+  const repNames = submittedReps
+    .map((r) => r.grant_title ? `"${r.grant_title}"` : (r.org_name || `Report #${r.id}`))
+    .slice(0, 2);
+  const closingNames = closingSoon
+    .map((g) => `"${g.title}"`)
+    .slice(0, 2);
+  const fmtList = (sample: string[], total: number) => {
+    if (sample.length === 0) return '';
+    const more = total - sample.length;
+    return more > 0 ? `${sample.join(', ')} +${more} more` : sample.join(', ');
+  };
+
   const attention: AttentionItem[] = useMemo(() => {
     const items: AttentionItem[] = [];
     if (submittedApps.length > 0) {
+      const list = fmtList(appNames, submittedApps.length);
       items.push({
         tone: 'warn',
         label: `${submittedApps.length} application${submittedApps.length === 1 ? '' : 's'} awaiting your review`,
+        hint: list || undefined,
         action: <JumpLink href="/reviews" label="Review" />,
       });
     }
     if (submittedReps.length > 0) {
+      const list = fmtList(repNames, submittedReps.length);
       items.push({
         tone: 'warn',
         label: `${submittedReps.length} report${submittedReps.length === 1 ? '' : 's'} awaiting review`,
+        hint: list || undefined,
         action: <JumpLink href="/reports" label="Open" />,
       });
     }
     if (closingSoon.length > 0) {
+      const list = fmtList(closingNames, closingSoon.length);
       items.push({
         tone: 'info',
         label: `${closingSoon.length} grant${closingSoon.length === 1 ? '' : 's'} closing in the next 2 weeks`,
-        hint: 'Check application volume; consider extending or promoting.',
+        hint: list
+          ? `${list}. Check application volume; consider extending or promoting.`
+          : 'Check application volume; consider extending or promoting.',
         action: <JumpLink href="/grants" label="Open Grants" />,
       });
     }
@@ -82,7 +107,13 @@ export function AttentionDonorDashboard() {
       });
     }
     return items;
-  }, [submittedApps, submittedReps, closingSoon]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    submittedApps, submittedReps, closingSoon,
+    appNames.join('|'),
+    repNames.join('|'),
+    closingNames.join('|'),
+  ]);
 
   if (!user) return null;
   const firstName = user.name?.split(' ')[0] ?? 'there';

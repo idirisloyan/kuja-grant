@@ -50,6 +50,19 @@ export function AttentionMemberDashboard() {
   type Upcoming = { id: number; grant_title?: string; due_date?: string };
   const upcoming = ((upcomingReps?.upcoming_reports ?? []) as Upcoming[]).slice(0, 3);
 
+  // Phase 63 — name the entities (same pattern as Phase 62).
+  const draftNames = draftApps
+    .map((a) => a.grant_title ? `"${a.grant_title}"` : `App #${a.id}`)
+    .slice(0, 2);
+  const upcomingNames = upcoming
+    .map((r) => r.grant_title ? `"${r.grant_title}"` : `Report #${r.id}`)
+    .slice(0, 2);
+  const fmtList = (sample: string[], total: number) => {
+    if (sample.length === 0) return '';
+    const more = total - sample.length;
+    return more > 0 ? `${sample.join(', ')} +${more} more` : sample.join(', ');
+  };
+
   const attention: AttentionItem[] = useMemo(() => {
     const items: AttentionItem[] = [];
     if (!currentMem || currentMem.status === 'pending' || currentMem.status === 'under_review') {
@@ -61,18 +74,24 @@ export function AttentionMemberDashboard() {
       });
     }
     if (draftApps.length > 0) {
+      const list = fmtList(draftNames, draftApps.length);
       items.push({
         tone: 'accent',
         label: `${draftApps.length} draft application${draftApps.length === 1 ? '' : 's'} waiting to submit`,
-        hint: 'Pick up where you left off.',
+        hint: list
+          ? `${list}. Pick up where you left off.`
+          : 'Pick up where you left off.',
         action: <JumpLink href="/applications" label="Continue" />,
       });
     }
     if (upcoming.length > 0) {
+      const list = fmtList(upcomingNames, upcoming.length);
       items.push({
         tone: 'warn',
         label: `${upcoming.length} report${upcoming.length === 1 ? '' : 's'} due soon`,
-        hint: 'Upload deliverables and answer the AI-evaluated questions.',
+        hint: list
+          ? `${list}. Upload deliverables and answer the AI-evaluated questions.`
+          : 'Upload deliverables and answer the AI-evaluated questions.',
         action: <JumpLink href="/reports" label="Open Reports" />,
       });
     }
@@ -84,7 +103,12 @@ export function AttentionMemberDashboard() {
       });
     }
     return items;
-  }, [currentMem, draftApps, upcoming]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currentMem, draftApps, upcoming,
+    draftNames.join('|'),
+    upcomingNames.join('|'),
+  ]);
 
   if (!user) return null;
   const firstName = user.name?.split(' ')[0] ?? 'there';

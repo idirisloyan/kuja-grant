@@ -42,20 +42,38 @@ export function AttentionNgoDashboard() {
   type Upcoming = { id: number; grant_title?: string; due_date?: string };
   const upcoming = ((upcomingReps?.upcoming_reports ?? []) as Upcoming[]).slice(0, 3);
 
+  // Phase 63 — name the entities (same pattern as Phase 62).
+  const draftNames = draftApps
+    .map((a) => a.grant_title ? `"${a.grant_title}"` : `App #${a.id}`)
+    .slice(0, 2);
+  const upcomingNames = upcoming
+    .map((r) => r.grant_title ? `"${r.grant_title}"` : `Report #${r.id}`)
+    .slice(0, 2);
+  const fmtList = (sample: string[], total: number) => {
+    if (sample.length === 0) return '';
+    const more = total - sample.length;
+    return more > 0 ? `${sample.join(', ')} +${more} more` : sample.join(', ');
+  };
+
   const attention: AttentionItem[] = useMemo(() => {
     const items: AttentionItem[] = [];
     if (draftApps.length > 0) {
+      const list = fmtList(draftNames, draftApps.length);
       items.push({
         tone: 'accent',
         label: `Continue where you left off — ${draftApps.length} draft${draftApps.length === 1 ? '' : 's'}`,
-        hint: 'Pick up your work-in-progress applications.',
+        hint: list
+          ? `${list}. Pick up your work-in-progress applications.`
+          : 'Pick up your work-in-progress applications.',
         action: <JumpLink href="/applications" label="Continue" />,
       });
     }
     if (upcoming.length > 0) {
+      const list = fmtList(upcomingNames, upcoming.length);
       items.push({
         tone: 'warn',
         label: `${upcoming.length} report${upcoming.length === 1 ? '' : 's'} due soon`,
+        hint: list || undefined,
         action: <JumpLink href="/reports" label="Open Reports" />,
       });
     }
@@ -67,7 +85,12 @@ export function AttentionNgoDashboard() {
       });
     }
     return items;
-  }, [draftApps, upcoming]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    draftApps, upcoming,
+    draftNames.join('|'),
+    upcomingNames.join('|'),
+  ]);
 
   if (!user) return null;
   const firstName = user.name?.split(' ')[0] ?? 'there';
