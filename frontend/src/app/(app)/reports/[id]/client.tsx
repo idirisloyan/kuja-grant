@@ -1,29 +1,35 @@
 'use client';
 
 /**
- * /reports/[id] — Phase 26A (May 2026).
+ * /reports/[id] — Phase 53 retrofit (June 2026).
  *
- * Focused detail view for a single report: title, status, due/submitted
- * dates, content snapshot, AI analysis summary if present, attachments
- * count, plus a per-scope <AIChatPanel> so the user can ask Kuja about
- * THIS report ("what evidence is missing?", "rephrase the activities
- * section", etc.).
+ * Per docs/DESIGN_PRINCIPLES.md:
+ *   Top: due date · status · score / readiness · next action
+ *   Then: report sections · attachments · follow-ups
+ *   Below: history (in collapsibles)
  *
- * Intentionally lightweight — heavy editing happens on the /reports
- * list page; this is a deep-link surface for messaging, audit, and chat.
+ * Previously a single-card surface that buried the next action inside
+ * the header. Now leads with an attention strip whose item is computed
+ * from the report's status (so the user always knows what to do next),
+ * and tucks AI chat / survey into PageDetail collapsibles so they're
+ * supporting, not dominant.
  */
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import {
-  ArrowLeft, FileText, Calendar, CheckCircle2, Loader2,
-  AlertTriangle, Paperclip,
+  FileText, Calendar, CheckCircle2, Loader2, AlertTriangle,
+  Paperclip, Sparkles, MessageCircle,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
 import { MicroSurvey } from '@/components/shared/micro-survey';
+import {
+  PageShell, PageBack, PageHeader, PageAttention, PageMain,
+  PageDetail, PageDetailSection, type AttentionItem,
+} from '@/components/layout/page-shell';
+import { describeReportStatus, TONE_PILL_CLASS } from '@/lib/status-copy';
 
 interface ReportDetail {
   id: number;
@@ -57,23 +63,71 @@ function fmtDate(d?: string | null): string {
   }
 }
 
-function statusTone(status?: string): string {
-  switch (status) {
-    case 'accepted':
-      return 'text-[hsl(var(--kuja-grow))] border-[hsl(var(--kuja-grow))]';
-    case 'submitted':
-    case 'under_review':
-      return 'text-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]';
-    case 'revision_requested':
-      return 'text-[hsl(var(--kuja-flag))] border-[hsl(var(--kuja-flag))]';
-    default:
-      return 'text-muted-foreground';
+function daysUntil(iso?: string | null): number | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.ceil((t - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+/** Compute the attention strip from the report's state. */
+function buildAttention(r: ReportDetail): AttentionItem[] {
+  const items: AttentionItem[] = [];
+  const days = daysUntil(r.due_date);
+  const status = r.status ?? 'draft';
+
+  if (status === 'revision_requested') {
+    items.push({
+      tone: 'bad',
+      label: 'Revisions requested',
+      hint: r.reviewer_notes
+        ? `Reviewer note: ${r.reviewer_notes}`
+        : 'Open the report below to see what to change, then resubmit.',
+    });
+  } else if (status === 'draft') {
+    if (days !== null && days < 0) {
+      items.push({
+        tone: 'bad',
+        label: `Overdue by ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'}`,
+        hint: 'Continue drafting and submit as soon as you can.',
+      });
+    } else if (days !== null && days <= 7) {
+      items.push({
+        tone: 'warn',
+        label: days === 0 ? 'Due today' : `Due in ${days} day${days === 1 ? '' : 's'}`,
+        hint: 'Continue drafting and submit before the deadline.',
+      });
+    } else {
+      items.push({
+        tone: 'accent',
+        label: 'Continue drafting',
+        hint: 'Pick up where you left off — submit when ready.',
+      });
+    }
+  } else if (status === 'submitted' || status === 'under_review' || status === 'in_review') {
+    items.push({
+      tone: 'info',
+      label: 'Submitted — awaiting reviewer decision',
+      hint: r.submitted_at ? `Submitted ${fmtDate(r.submitted_at)}.` : undefined,
+    });
+  } else if (status === 'accepted' || status === 'approved') {
+    items.push({
+      tone: 'good',
+      label: 'Accepted',
+      hint: r.reviewed_at ? `Reviewed ${fmtDate(r.reviewed_at)}.` : undefined,
+    });
+  } else if (status === 'rejected') {
+    items.push({
+      tone: 'bad',
+      label: 'Rejected',
+      hint: r.reviewer_notes ?? 'Open the reviewer feedback below to see why.',
+    });
   }
+  return items;
 }
 
 export default function ReportDetailClient() {
   const params = useParams();
-  const router = useRouter();
   const [id, setId] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
       const m = window.location.pathname.match(/\/reports\/(\d+)/);
@@ -127,100 +181,105 @@ export default function ReportDetailClient() {
           <AlertTriangle className="h-5 w-5 text-[hsl(var(--kuja-flag))] mt-0.5" />
           <div>
             <div className="text-sm font-semibold">{err ?? 'Report not found'}</div>
-            <button
-              type="button"
-              onClick={() => router.push('/reports')}
-              className="mt-3 inline-flex items-center gap-1.5 text-sm underline"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back to reports
-            </button>
+            <PageBack href="/reports" label="Back to reports" />
           </div>
         </div>
       </Card>
     );
   }
 
+  const status = data.status ?? 'draft';
   const compliance = data.ai_analysis?.compliance_score;
   const attachmentsCount = Array.isArray(data.attachments) ? data.attachments.length : 0;
+  const statusPill = describeReportStatus(status);
+  const attention = buildAttention(data);
+  const title = data.title || data.reporting_period || `Report #${data.id}`;
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto">
-      <button
-        type="button"
-        onClick={() => router.push('/reports')}
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back to reports
-      </button>
+    <div className="max-w-4xl mx-auto">
+      <PageShell>
+        <PageBack href="/reports" label="Back to reports" />
 
-      <Card className="p-5 sm:p-6">
-        <div className="flex items-start gap-3 flex-wrap">
-          <div className="p-2 rounded-md bg-[hsl(var(--kuja-sand))]/40">
-            <FileText className="h-7 w-7 text-[hsl(var(--kuja-clay))]" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="kuja-display text-2xl sm:text-3xl">
-                {data.title || data.reporting_period || `Report #${data.id}`}
-              </h1>
-              <Badge variant="outline" className={`text-[10px] ${statusTone(data.status)}`}>
-                {(data.status ?? 'draft').replace(/_/g, ' ')}
-              </Badge>
-              {compliance != null && (
-                <Badge variant="outline" className="text-[10px]">
-                  <CheckCircle2 className="h-3 w-3 mr-1" /> AI compliance {compliance}/100
-                </Badge>
-              )}
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              {data.grant_title && (
-                <span>Grant: <strong>{data.grant_title}</strong></span>
-              )}
-              {data.reporting_period && (
-                <span>Period: {data.reporting_period}</span>
-              )}
-              <span className="inline-flex items-center gap-1">
-                <Calendar className="h-3 w-3" /> Due {fmtDate(data.due_date)}
-              </span>
-              {data.submitted_at && (
-                <span>Submitted {fmtDate(data.submitted_at)}</span>
-              )}
-              {attachmentsCount > 0 && (
-                <span className="inline-flex items-center gap-1">
-                  <Paperclip className="h-3 w-3" /> {attachmentsCount} attachment{attachmentsCount === 1 ? '' : 's'}
-                </span>
-              )}
-            </div>
-            {data.reviewer_notes && (
-              <p className="mt-3 text-sm leading-relaxed border-l-2 border-[hsl(var(--kuja-clay))] pl-3">
-                <strong>Reviewer notes:</strong> {data.reviewer_notes}
-              </p>
-            )}
-          </div>
-        </div>
-      </Card>
-
-      {data.ai_analysis?.summary && (
-        <Card className="p-4">
-          <div className="text-xs uppercase tracking-wide font-semibold text-[hsl(var(--kuja-clay))] mb-1">
-            AI analysis
-          </div>
-          <p className="text-sm whitespace-pre-wrap">{data.ai_analysis.summary}</p>
-        </Card>
-      )}
-
-      {/* Phase 26A — scoped AI chat: ask Kuja about THIS report. */}
-      <AIChatPanel scope={{ kind: 'report', id: data.id }} />
-
-      {/* Phase 31B — micro-survey on submitted reports. */}
-      {data.status && data.status !== 'draft' && (
-        <MicroSurvey
-          surface="report_submit"
-          relatedKind="report"
-          relatedId={data.id}
-          question="How helpful was Kuja in preparing this report?"
+        <PageHeader
+          title={title}
+          icon={FileText}
+          status={statusPill}
+          meta={[
+            ...(data.grant_title    ? [{ label: `Grant: ${data.grant_title}` }] : []),
+            ...(data.reporting_period ? [{ label: `Period: ${data.reporting_period}` }] : []),
+            { label: `Due ${fmtDate(data.due_date)}`, icon: Calendar },
+            ...(data.submitted_at   ? [{ label: `Submitted ${fmtDate(data.submitted_at)}` }] : []),
+            ...(attachmentsCount > 0
+              ? [{ label: `${attachmentsCount} attachment${attachmentsCount === 1 ? '' : 's'}`, icon: Paperclip }]
+              : []),
+            ...(compliance != null
+              ? [{ label: `AI compliance ${compliance}/100`, icon: CheckCircle2 }]
+              : []),
+          ]}
         />
-      )}
+
+        <PageAttention items={attention} />
+
+        <PageMain>
+          {/* Reviewer notes surfaced prominently when present and the
+              attention strip didn't already lead with them. */}
+          {data.reviewer_notes && status !== 'revision_requested' && status !== 'rejected' && (
+            <section className="border border-border rounded-lg bg-card p-5">
+              <h2 className="font-semibold text-sm mb-2">Reviewer notes</h2>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                {data.reviewer_notes}
+              </p>
+            </section>
+          )}
+
+          {data.ai_analysis?.summary && (
+            <section className="border border-border rounded-lg bg-card p-5">
+              <h2 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[hsl(var(--kuja-spark))]" />
+                AI analysis
+              </h2>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                {data.ai_analysis.summary}
+              </p>
+            </section>
+          )}
+
+          {/* Status pill duplicated inline for quick scan even when meta
+              overflows. Uses the same TONE_PILL_CLASS so visuals match. */}
+          <div className="text-xs text-muted-foreground">
+            Status:{' '}
+            <span className={`px-2 py-0.5 rounded-full font-semibold ${TONE_PILL_CLASS[statusPill.tone]}`}>
+              {statusPill.label}
+            </span>
+          </div>
+        </PageMain>
+
+        {/* Supporting detail — collapsibles for AI chat + micro-survey */}
+        <PageDetail>
+          <PageDetailSection
+            title="Ask Kuja about this report"
+            icon={Sparkles}
+            defaultOpen={false}
+          >
+            <AIChatPanel scope={{ kind: 'report', id: data.id }} />
+          </PageDetailSection>
+
+          {status !== 'draft' && (
+            <PageDetailSection
+              title="Was Kuja helpful here?"
+              icon={MessageCircle}
+              defaultOpen={false}
+            >
+              <MicroSurvey
+                surface="report_submit"
+                relatedKind="report"
+                relatedId={data.id}
+                question="How helpful was Kuja in preparing this report?"
+              />
+            </PageDetailSection>
+          )}
+        </PageDetail>
+      </PageShell>
     </div>
   );
 }

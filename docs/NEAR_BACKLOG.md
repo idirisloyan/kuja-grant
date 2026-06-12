@@ -230,25 +230,62 @@
 
 ---
 
-## High priority (added 2026-06-11 by Phase 49)
-
-### Per-window operational rollup endpoint
-- **last_touched:** 2026-06-11
-- **Why:** The Phase 49 funds redesign brief asks each window card to lead
-  with `available budget · active declarations · open grants · due reports
-  · top risks`. Today there's no single endpoint that returns this rollup
-  for a given window — every view that wants the data has to call
-  declarations, grants, and reports endpoints and merge client-side.
-- **Action:** Add `GET /api/funds/<fund_id>/windows/<window_id>/operational`
-  returning `{ available_budget, active_declaration_count,
-  open_grant_count, due_report_count, top_risks }`. Wire into
-  `/admin/funds` so each window renders the brief's full operational
-  card. Phase 49 currently has only the network-level attention strip
-  surfacing this state; per-window cards still lead with config.
-
----
-
 ## Completed (rolling log, newest first)
+
+- **2026-06-11** Phase 53 — Reports detail page anatomy retrofit. Per
+  brief: top = due date · status · score · next action; sections;
+  collapsibles below. New shape:
+  - PageShell + PageHeader with the title, FileText icon, human-language
+    status pill (Draft / Submitted -- awaiting review / Accepted /
+    Rejected -- revise / Overdue), meta strip (grant · period · due ·
+    submitted · attachments · AI compliance score).
+  - PageAttention computes the next action from the report's status:
+    revision_requested -> "Revisions requested" (bad) with reviewer
+    notes inline; draft + overdue -> "Overdue by N days" (bad); draft
+    + due in <=7 days -> "Due today / in N days" (warn); draft otherwise
+    -> "Continue drafting" (accent); submitted/in_review -> "Submitted
+    -- awaiting reviewer decision" (info); accepted -> "Accepted"
+    (good); rejected -> "Rejected" (bad) with reviewer notes.
+  - Reviewer notes surface as their own section when not already in the
+    attention strip.
+  - AI chat + micro-survey moved into PageDetail collapsibles --
+    supporting, not dominant.
+  Browser-verified on Q3 2026 Financial Report (draft, due 2026-10-30):
+  H1 + status pill "Draft" + attention "Continue drafting / Pick up
+  where you left off — submit when ready" + AI chat collapsed +
+  MicroSurvey hidden (correct: draft).
+
+- **2026-06-11** Phase 52 — Per-window operational rollup endpoint +
+  cards. Closes Phase 49's deferred gap. **Backend**: new
+  `GET /api/windows/<id>/operational` returns
+  `{available_budget, currency, active_declaration_count,
+   open_grant_count, due_report_count, overdue_report_count, top_risks}`
+  -- network-scoped, login_required. `top_risks` is a documented
+  placeholder for a future AI surface. **Frontend**: new
+  `useWindowOperational` hook + tone-coded `<OpStat>` tiles rendered
+  at the TOP of every WindowCard so the card leads with state, not
+  config. Tones: bad on overdue reports, warn on due-soon, good on
+  open grants, accent on active declarations, muted on quiet.
+  Browser-verified live against Change Fund / Emergency Response
+  (window 160): Available 6,700,000 USD · Active declarations 1 ·
+  Open grants 3 · Reports due 0.
+
+- **2026-06-11** Phase 51 — Sweep status copy + PageShell across
+  remaining list pages. Applications list: PageShell + attention strip
+  for NGO viewers ("Continue N drafts", "N awaiting decision"), filter
+  chips use `describeApplicationStatus.label`. Memberships list:
+  PageShell + PageHeader title "NEAR Network -- Members" + attention
+  strip ("N memberships awaiting your review", "N applicants missing
+  capacity assessment") + row status pill via
+  `describeMembershipStatus` + `TONE_PILL_CLASS`. Reports list:
+  NearReportsPage retrofitted with PageShell (Kuja path deferred to
+  the next reports rewrite). Crisis Monitoring detail: PageShell +
+  PageBack + PageHeader with period title, human-language status pill
+  (Draft / Awaiting review / Published / Archived), meta strip (rows +
+  flagged + audit anchor), Publish button moves into header primary
+  action slot. Browser-verified: membership list attention strip + 2
+  human pills + raw_state_leaks=[].
+
 
 - **2026-06-11** Phase 50 — Status copy + sweep cleanup. Shared
   `lib/status-copy.ts` helper with `describeApplicationStatus`,
