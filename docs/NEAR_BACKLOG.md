@@ -232,6 +232,21 @@
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-11** Phase 61 — Audit chain entity drill-in. Subject
+  badges on /admin/audit-chain rows are now Links to the matching
+  entity detail page so the operator can click from an audit event
+  to the entity that triggered it. Coverage: emergency_declaration ->
+  /admin/declarations/<id>, network_membership ->
+  /admin/network-memberships/<id>, crisis_monitoring_report ->
+  /admin/crisis-monitoring/<id>, application -> /applications/<id>,
+  grant -> /grants/<id>, report -> /reports/<id>, org ->
+  /trust?org=<id>, window -> /admin/windows/<id>. member_feedback +
+  tenant_message fall back to their list pages until detail surfaces
+  ship. Helper `subjectDrillHref` is a pure function. Visual: arrow-
+  up-right glyph appears on linked badges so it's obvious they're
+  click-through. Browser-verified: rows with subject_kind='org'
+  render as href="/trust?org=N".
+
 - **2026-06-11** Phase 60 — AI-narrated top_risks. The rule-based risk
   labels from Phase 56 are now optionally enriched with window-specific
   narrative. Backend extends GET /api/windows/<id>/operational with

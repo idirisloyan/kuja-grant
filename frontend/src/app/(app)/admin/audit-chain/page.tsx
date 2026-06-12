@@ -15,15 +15,42 @@
  */
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronRight,
-  Award, User as UserIcon, ExternalLink,
+  Award, User as UserIcon, ExternalLink, ArrowUpRight,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
+
+/**
+ * Phase 61 — map an audit chain row's subject_kind to its detail page
+ * URL so operators can drill in from the chain to the entity that
+ * triggered the event. Returns null when there's no useful drill-in
+ * (e.g. lists without detail pages).
+ */
+function subjectDrillHref(kind: string | null, id: number | null | undefined): string | null {
+  if (!kind || id == null) return null;
+  switch (kind) {
+    case 'application':              return `/applications/${id}`;
+    case 'emergency_declaration':    return `/admin/declarations/${id}`;
+    case 'grant':                    return `/grants/${id}`;
+    case 'network_membership':       return `/admin/network-memberships/${id}`;
+    case 'report':                   return `/reports/${id}`;
+    case 'crisis_monitoring_report': return `/admin/crisis-monitoring/${id}`;
+    case 'org':                      return `/trust?org=${id}`;
+    case 'window':                   return `/admin/windows/${id}`;
+    case 'fund':                     return `/admin/funds`;
+    // member_feedback + tenant_message land on their list pages until
+    // detail surfaces ship; intentional fallback.
+    case 'member_feedback':          return '/feedback';
+    case 'tenant_message':           return '/messages';
+    default:                         return null;
+  }
+}
 
 interface VerifyResult {
   success: boolean;
@@ -253,11 +280,34 @@ export default function AuditChainPage() {
                       ) : <span className="text-[hsl(var(--kuja-ink-soft))]">—</span>}
                     </td>
                     <td className="py-2">
-                      {e.subject_kind ? (
-                        <Badge variant="outline" className="text-[10px]">
-                          {e.subject_kind} #{e.subject_id}
-                        </Badge>
-                      ) : <span className="text-[hsl(var(--kuja-ink-soft))]">—</span>}
+                      {(() => {
+                        if (!e.subject_kind) {
+                          return <span className="text-[hsl(var(--kuja-ink-soft))]">—</span>;
+                        }
+                        const href = subjectDrillHref(e.subject_kind, e.subject_id ?? null);
+                        const inner = (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              'text-[10px] inline-flex items-center gap-1',
+                              href && 'hover:bg-[hsl(var(--kuja-sand-50))] hover:border-[hsl(var(--kuja-clay))] cursor-pointer transition-colors',
+                            )}
+                          >
+                            {e.subject_kind} #{e.subject_id}
+                            {href && <ArrowUpRight className="w-2.5 h-2.5" />}
+                          </Badge>
+                        );
+                        if (!href) return inner;
+                        return (
+                          <Link
+                            href={href}
+                            title={`Open ${e.subject_kind} #${e.subject_id}`}
+                            className="inline-block"
+                          >
+                            {inner}
+                          </Link>
+                        );
+                      })()}
                     </td>
                     <td className="py-2 font-mono text-[10px] text-[hsl(var(--kuja-ink-soft))]">
                       {e.prev_hash || '(genesis)'}
