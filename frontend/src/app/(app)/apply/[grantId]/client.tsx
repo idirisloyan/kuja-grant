@@ -11,6 +11,7 @@ import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
 import { SmartDraftBanner } from '@/components/apply/SmartDraftBanner';
+import { TrustPortableBadge } from '@/components/shared/trust-portable-badge';
 import { SubmissionVelocityBar } from '@/components/apply/submission-velocity-bar';
 import { PastWinsPopover } from '@/components/apply/past-wins-popover';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
@@ -1129,6 +1130,17 @@ function ProposalStep({
           Organization data imported into relevant criteria. Edit to strengthen your responses.
         </Alert>
       )}
+
+      {/* Phase 77 — Trust Profile reassurance: NGO sees their portable
+          score before they start composing. Reframes the moment from
+          'I have to convince this donor I'm trustworthy' to 'my Trust
+          Profile already does that.' */}
+      <div className="flex flex-wrap items-center gap-2">
+        <TrustPortableBadge variant="compact" />
+        <span className="text-[11px] text-muted-foreground">
+          attached automatically with this application
+        </span>
+      </div>
 
       {/* Phase 75 — bulk-prefill from assessment + history. Sits above
           DraftCoAuthor because it's the "do it for me" path; coAuthor is

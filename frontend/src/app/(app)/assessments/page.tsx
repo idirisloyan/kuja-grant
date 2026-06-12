@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { FrameworkInfo } from '@/lib/types';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
+import { TrustPortableBadge } from '@/components/shared/trust-portable-badge';
 
 function getLevelKey(score: number): string {
   if (score >= 90) return 'assessments.level.excellent';
@@ -83,6 +84,11 @@ export default function AssessmentsPage() {
         }
       />
       <PageMain>
+      {/* Phase 77 — make the moat visible to NGOs. The canonical Trust
+          Profile exists today but isn't obvious in the UX. This badge
+          says, in plain language: 'one assessment, every donor.' */}
+      <TrustPortableBadge variant="full" />
+
       {/* Score + summary */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="rounded-xl border border-border bg-background p-5 flex flex-col items-center text-center">
