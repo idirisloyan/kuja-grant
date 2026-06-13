@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { AIStatusNotice } from '@/components/shared/ai-status-notice';
 
 type PhotoKind = 'attendance' | 'receipt' | 'training' | 'site_visit' | 'other';
 
@@ -227,6 +228,33 @@ export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: P
       {/* Extracted data preview */}
       {result?.success && ex && (
         <div className="space-y-3 border-t border-border pt-3">
+          {/* Phase 93 — prominent low-confidence callout when extraction
+              is unreliable. Handwritten attendance sheets + low-quality
+              photos typically score < 50; the user must manually verify
+              every field. The photo itself is always attached even if
+              extraction fails entirely. */}
+          {ex.confidence < 50 && (
+            <AIStatusNotice
+              kind="low_confidence"
+              title="AI couldn't read this photo clearly"
+              body={`Confidence is ${ex.confidence}/100 — common for handwritten sheets, photos with glare, or angled shots. The photo IS saved and attached to your report. Type the details by hand into your report sections, or retake the photo with better light.`}
+            />
+          )}
+          {ex.confidence >= 50 && ex.confidence < 70 && (
+            <AIStatusNotice
+              kind="experimental"
+              title={`AI read this with ${ex.confidence}/100 confidence`}
+              body="Some fields may be approximate. Review the extracted fields below and edit anything that looks wrong before adding to your report."
+            />
+          )}
+          {!ex.ai_used && (
+            <AIStatusNotice
+              kind="unavailable"
+              title="AI extraction wasn't available"
+              body="The photo is saved and attached to your report. To get fields extracted, type them by hand or retry when AI is available again."
+            />
+          )}
+
           {ex.narrative && (
             <div className="text-xs leading-relaxed border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] rounded-md px-3 py-2">
               <div className="font-semibold mb-1 flex items-center gap-1">
@@ -234,7 +262,7 @@ export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: P
               </div>
               <div className="whitespace-pre-wrap">{ex.narrative}</div>
               <div className="mt-1.5 text-[10px] text-muted-foreground">
-                Confidence: {ex.confidence}/100 {ex.confidence < 60 ? '· Some fields may be incomplete — double-check the extraction below.' : ''}
+                Confidence: {ex.confidence}/100
               </div>
             </div>
           )}

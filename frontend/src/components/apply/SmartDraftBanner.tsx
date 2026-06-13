@@ -18,6 +18,7 @@ import { useState } from 'react';
 import { Sparkles, Loader2, CheckCircle2, AlertTriangle, ChevronRight, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { AIStatusNotice } from '@/components/shared/ai-status-notice';
 
 interface AiDraftResp {
   success: boolean;
@@ -162,6 +163,18 @@ export function SmartDraftBanner({
             Kuja drafted every question it had context for. You&apos;ll see the
             drafts in each section below — edit, polish, or replace freely.
           </p>
+
+          {/* Phase 93 — limited-context warning. If the AI is reporting
+              <50% confidence OR more than half of sections are gaps,
+              the NGO is a cold-start case and the draft will be generic.
+              Be honest about it. */}
+          {(preview.confidence != null && preview.confidence < 50) || (respCount > 0 && gapCount > respCount) ? (
+            <AIStatusNotice
+              kind="limited_context"
+              title="Limited information about your org — the draft may be generic"
+              body="Kuja drafts best when you have a completed capacity assessment + 1-2 prior applications. Without those, the AI draft is a starting structure, not your application. Plan to edit every section substantially."
+            />
+          ) : null}
 
           {gapCount > 0 && (
             <div className="border border-[hsl(var(--kuja-sun))]/30 bg-[hsl(var(--kuja-sun))]/10 text-[hsl(var(--kuja-sun))] rounded-md px-3 py-2 text-xs">

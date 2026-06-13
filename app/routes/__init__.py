@@ -65,6 +65,7 @@ def register_blueprints(app):
     from app.routes.translate_routes import translate_bp  # Phase 78: AI content translation
     from app.routes.compliance_explainer_routes import compliance_explainer_bp  # Phase 91: plain-language compliance explainers
     from app.routes.journey_routes import journey_bp  # Phase 92: continuous NGO journey
+    from app.routes.ai_health_routes import ai_health_bp  # Phase 93: AI service health probe
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -81,5 +82,5 @@ def register_blueprints(app):
                feedback_bp, network_bp, network_membership_bp, fund_bp, crisis_bp,
                emergency_bp, window_report_bp, network_ai_bp,
                tenant_message_bp, member_feedback_bp, translate_bp,
-               compliance_explainer_bp, journey_bp]:
+               compliance_explainer_bp, journey_bp, ai_health_bp]:
         app.register_blueprint(bp)

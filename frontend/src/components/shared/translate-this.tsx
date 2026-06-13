@@ -23,6 +23,7 @@ import { useState } from 'react';
 import { Languages, Loader2, AlertTriangle } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
+import { AIStatusNotice } from '@/components/shared/ai-status-notice';
 
 interface TranslateResp {
   success: boolean;
@@ -131,6 +132,17 @@ export function TranslateThis({
         <div className="mt-1 text-[10px] text-muted-foreground italic">
           Translator note: {meta.notes}
         </div>
+      )}
+      {/* Phase 93 — prominent low-fidelity callout. Claude is weak on
+          Somali and approximate on Swahili; the user should know before
+          they act on a translated message. */}
+      {!showOriginal && meta?.fidelity != null && meta.fidelity > 0 && meta.fidelity < 65 && (
+        <AIStatusNotice
+          className="mt-2"
+          kind="low_confidence"
+          title="This translation may be approximate"
+          body={`Fidelity is ${meta.fidelity}/100 — Claude has limited coverage of this language pair. For anything important (legal, financial, deadlines), verify against the original (toggle above) or ask a fluent colleague.`}
+        />
       )}
     </div>
   );
