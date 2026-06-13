@@ -23,6 +23,7 @@ import {
   MapPin, BookOpen,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { PageShell, PageBack, PageMain } from '@/components/layout/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { NameChip } from '@/components/shared/name-chip';
@@ -163,16 +164,11 @@ export default function DonorProfileClient() {
     : null;
 
   return (
-    <div className="space-y-5 max-w-5xl mx-auto">
-      <button
-        type="button"
-        onClick={() => router.push('/organizations/search')}
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back to organizations
-      </button>
-
-      {/* Hero */}
+    <div className="max-w-5xl mx-auto">
+      <PageShell>
+        <PageBack href="/organizations/search" label="Back to organizations" />
+        <PageMain>
+      {/* Hero card carries the title + verified badge */}
       <Card className="p-5 sm:p-6">
         <div className="flex items-start gap-3 flex-wrap">
           <div className="p-2 rounded-md bg-[hsl(var(--kuja-sand))]/40">
@@ -405,6 +401,8 @@ export default function DonorProfileClient() {
       {currentUser?.role === 'admin' && data.donor_org_id && (
         <DonorCohortCard donorOrgId={data.donor_org_id} />
       )}
+        </PageMain>
+      </PageShell>
     </div>
   );
 }

@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
+import { useNetworkStore } from '@/stores/network-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import {
   streamChat, fetchSuggestions, fetchDonorPortfolioInsights, fetchNgoReadiness,
@@ -49,6 +50,8 @@ interface CopilotScope {
 
 export function CopilotRail({ scope }: { scope?: CopilotScope }) {
   const user = useAuthStore((s) => s.user);
+  const network = useNetworkStore((s) => s.network);
+  const tenantName = network?.name || 'Kuja';
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('now');
@@ -111,12 +114,12 @@ export function CopilotRail({ scope }: { scope?: CopilotScope }) {
           open ? 'translate-x-0' : 'translate-x-full',
         )}
         style={{ zIndex: 1250 }}
-        aria-label="Kuja Co-pilot"
+        aria-label={`${tenantName} Co-pilot`}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
-            <div className="kuja-eyebrow text-[10px]">Kuja Co-pilot</div>
+            <div className="kuja-eyebrow text-[10px]">{tenantName} Co-pilot</div>
             <div className="text-sm font-semibold text-foreground">
               {_humanScope(effectiveScope, t)}
             </div>

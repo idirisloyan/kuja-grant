@@ -15,16 +15,17 @@
  * generation fails.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Shield, ShieldCheck, ShieldOff, Loader2, AlertTriangle, CheckCircle2,
-  Copy, Check, Download, X,
+  Copy, Check, Download, X, ExternalLink,
 } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 interface StatusResponse {
   enabled: boolean;
@@ -57,6 +58,20 @@ export default function SecurityPage() {
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [secretCopied, setSecretCopied] = useState(false);
+  const codeInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto-focus the verify-code input when the enrolling view appears.
+  // Eliminates an extra click between scan-secret and type-code.
+  useEffect(() => {
+    if (view === 'enrolling') {
+      const id = window.setTimeout(() => codeInputRef.current?.focus(), 80);
+      return () => window.clearTimeout(id);
+    }
+  }, [view]);
+
+  // Format an alphanumeric TOTP secret as space-separated 4-char groups
+  // for easier manual entry into an authenticator app.
+  const formattedSecret = (secret.match(/.{1,4}/g) ?? []).join(' ');
 
   const loadStatus = useCallback(async () => {
     try {
@@ -156,15 +171,14 @@ export default function SecurityPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-5">
-      <header>
-        <h1 className="kuja-display text-2xl flex items-center gap-2">
-          <Shield className="h-6 w-6 text-[hsl(var(--kuja-clay))]" />
-          {t('security.title')}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t('security.subtitle')}</p>
-      </header>
-
+    <div className="max-w-2xl">
+      <PageShell>
+        <PageHeader
+          title={t('security.title')}
+          icon={Shield}
+          subtitle={t('security.subtitle')}
+        />
+        <PageMain>
       {view === 'loading' && (
         <div className="rounded-md border border-border bg-background p-6 flex items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -220,8 +234,8 @@ export default function SecurityPage() {
                 {t('security.secret_label')}
               </div>
               <div className="flex items-center gap-2">
-                <code className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm font-mono break-all">
-                  {secret}
+                <code className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm font-mono tracking-wider break-all">
+                  {formattedSecret}
                 </code>
                 <button
                   type="button"
@@ -232,6 +246,9 @@ export default function SecurityPage() {
                   {secretCopied ? t('common.copied') : t('common.copy')}
                 </button>
               </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Spaces are visual aids only — type or paste without them.
+              </p>
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
@@ -239,10 +256,14 @@ export default function SecurityPage() {
               </div>
               <a
                 href={provisioningUri}
-                className="text-xs text-[hsl(var(--kuja-clay))] underline break-all"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-[hsl(var(--kuja-clay))] hover:bg-muted"
               >
-                {provisioningUri}
+                <ExternalLink className="h-3 w-3" />
+                Open in authenticator app
               </a>
+              <p className="mt-1 text-[10px] text-muted-foreground break-all">
+                or paste this URI: <code className="font-mono">{provisioningUri}</code>
+              </p>
             </div>
           </div>
 
@@ -251,9 +272,15 @@ export default function SecurityPage() {
               {t('security.code_label')}
             </label>
             <input
+              ref={codeInputRef}
               type="text"
               value={verifyCode}
               onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && verifyCode.length === 6 && !busy) {
+                  void confirmEnroll();
+                }
+              }}
               maxLength={6}
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -361,6 +388,8 @@ export default function SecurityPage() {
           </details>
         </div>
       )}
+        </PageMain>
+      </PageShell>
     </div>
   );
 }

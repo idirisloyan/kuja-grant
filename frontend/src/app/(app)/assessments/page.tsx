@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FrameworkInfo } from '@/lib/types';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
+import { TrustPortableBadge } from '@/components/shared/trust-portable-badge';
 
 function getLevelKey(score: number): string {
   if (score >= 90) return 'assessments.level.excellent';
@@ -65,27 +67,27 @@ export default function AssessmentsPage() {
   }
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="kuja-display text-3xl inline-flex items-center gap-2">
-            {t('assessment.hub_title')}
-            <InfoTip>{t('glossary.capacity_assessment')}</InfoTip>
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {t('assessment.hub_subtitle')}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => router.push('/assessments/wizard')}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
-        >
-          <Play className="h-4 w-4" />
-          {t('assessment.start')}
+    <PageShell>
+      <PageHeader
+        title={t('assessment.hub_title')}
+        icon={ClipboardCheck}
+        subtitle={t('assessment.hub_subtitle')}
+        primaryAction={
+          <button
+            type="button"
+            onClick={() => router.push('/assessments/wizard')}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
+          >
+            <Play className="h-4 w-4" />
+            {t('assessment.start')}
         </button>
-      </div>
+        }
+      />
+      <PageMain>
+      {/* Phase 77 — make the moat visible to NGOs. The canonical Trust
+          Profile exists today but isn't obvious in the UX. This badge
+          says, in plain language: 'one assessment, every donor.' */}
+      <TrustPortableBadge variant="full" />
 
       {/* Score + summary */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -212,7 +214,8 @@ export default function AssessmentsPage() {
           </div>
         )}
       </div>
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }
 

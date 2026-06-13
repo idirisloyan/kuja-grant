@@ -1,46 +1,74 @@
 'use client';
 
 /**
- * /admin/network-memberships/<id> — NEAR redesign (Phase 15).
+ * /admin/network-memberships/<id> — Phase 47 redesign.
  *
- * Admin's full review screen for a pending membership. Bundles:
- *   - Applicant info (org, country, region, eligibility answers)
- *   - Capacity assessment (score + link)
- *   - Trust process button (admin-run sanctions + adverse media +
- *     registry — NEAR runs this, NOT the NGO)
- *   - Approve / Reject buttons with reason
+ * Guided decision surface. Per design principles:
+ *   - Top: member name + status + country/org/sector + Approve / Reject
+ *   - Attention strip: missing readiness items + recommended next action
+ *   - Tabs: Overview · Capacity · Due diligence · Messages · Audit
+ *   - Default view: summary + readiness flags + missing items + next action
+ *   - Hide raw details unless expanded
  *
- * Replaces the inline expand-rows in the list view. The list still
- * surfaces approve/reject for the simple case; this page is the full
- * review surface where the operator drills in.
+ * Replaces the stacked-sections layout. The Trust Process and Capacity
+ * panels move into tabs; the Overview tab is the operator's home base —
+ * they should be able to make an approve/reject call from it without
+ * leaving.
  */
 
-import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import useSWR from 'swr';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { useMembership } from '@/lib/hooks/use-api';
+import { useRouteId } from '@/lib/hooks/use-route-id';
 import { useAuthStore } from '@/stores/auth-store';
 import {
-  ChevronLeft, ShieldCheck, ShieldAlert, AlertCircle, Loader2,
+  ShieldCheck, ShieldAlert, Loader2,
   CheckCircle2, XCircle, ClipboardCheck, Sparkles, MapPin, Building2,
+  Inbox, History, ArrowUpRight, ExternalLink,
 } from 'lucide-react';
+import {
+  PageShell, PageBack, PageHeader, PageAttention, PageMain,
+  type AttentionItem,
+} from '@/components/layout/page-shell';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
-const STATUS_COLOUR: Record<string, string> = {
-  pending: 'bg-muted text-muted-foreground',
-  under_review: 'bg-[hsl(var(--kuja-sun))]/15 text-[hsl(var(--kuja-sun))]',
-  active: 'bg-[hsl(var(--kuja-grow))]/15 text-[hsl(var(--kuja-grow))]',
-  rejected: 'bg-destructive/15 text-destructive',
-  suspended: 'bg-destructive/15 text-destructive',
-  expelled: 'bg-destructive/15 text-destructive',
+// Local membership shape (mirrors useMembership return) — narrower than the
+// full hook type so this file stays self-contained for the tabs.
+type Membership = {
+  id: number;
+  status: string;
+  member_tier?: string;
+  country?: string;
+  region?: string;
+  applied_at?: string | null;
+  capacity_assessment_id?: number | null;
+  eligibility_answers?: Record<string, unknown>;
+  is_oversight_body?: boolean;
+  ob_role_started_at?: string | null;
+  ob_role_ended_at?: string | null;
+  org_id: number;
+  org?: { name?: string; sector?: string } | null;
 };
 
+function describeMembershipStatus(m: Membership): { label: string; tone: 'muted' | 'warn' | 'good' | 'bad' | 'accent' } {
+  switch (m.status) {
+    case 'pending':       return { label: 'Awaiting review', tone: 'warn' };
+    case 'under_review':  return { label: 'Under review',    tone: 'warn' };
+    case 'active':        return { label: 'Active member',   tone: 'good' };
+    case 'rejected':      return { label: 'Rejected',        tone: 'bad' };
+    case 'suspended':     return { label: 'Suspended',       tone: 'bad' };
+    case 'expelled':      return { label: 'Expelled',        tone: 'bad' };
+    default:              return { label: m.status,          tone: 'muted' };
+  }
+}
+
 export default function MembershipReviewClient() {
-  const params = useParams();
-  const id = Number(params?.id ?? '0');
-  const router = useRouter();
+  const id = useRouteId('network-memberships');
   const viewer = useAuthStore((s) => s.user);
-  const { data, isLoading, mutate } = useMembership(id || null);
+  const { data, isLoading, mutate } = useMembership(id);
 
   if (viewer && viewer.role !== 'admin') {
     return (
@@ -58,51 +86,113 @@ export default function MembershipReviewClient() {
       </div>
     );
   }
-  const m = data.membership;
+  const m = data.membership as unknown as Membership;
+  const decidable = m.status === 'pending' || m.status === 'under_review';
+  const statusPill = describeMembershipStatus(m);
+
+  // Build attention strip — blockers + recommended next action.
+  // Defaults to the page being calm; only surfaces items that ARE issues.
+  const attention: AttentionItem[] = [];
+  if (decidable && !m.capacity_assessment_id) {
+    attention.push({
+      tone: 'warn',
+      label: 'Capacity assessment not yet linked',
+      hint: 'Typically required before approval. Ask the applicant to complete the assessment self-service.',
+    });
+  }
+  if (decidable && m.capacity_assessment_id) {
+    attention.push({
+      tone: 'accent',
+      label: 'Ready to review',
+      hint: 'Run the trust process on the Due diligence tab, then approve or reject from the header.',
+    });
+  }
 
   return (
-    <div className="space-y-5">
-      <button
-        type="button"
-        onClick={() => router.push('/admin/network-memberships')}
-        className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-      >
-        <ChevronLeft className="w-3 h-3" /> Back to memberships
-      </button>
+    <PageShell>
+      <PageBack href="/admin/network-memberships" label="Back to memberships" />
 
-      {/* Header */}
-      <div className="border border-border rounded-lg bg-card p-5 space-y-3">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="kuja-display text-2xl flex items-center gap-2">
-              <Building2 className="w-6 h-6 text-[hsl(var(--kuja-clay))]" />
-              {m.org?.name || `Org #${m.org_id}`}
-            </h1>
-            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
-              <span className={`px-2 py-0.5 rounded-full font-semibold capitalize ${STATUS_COLOUR[m.status] || STATUS_COLOUR.pending}`}>
-                {m.status.replace('_', ' ')}
-              </span>
-              {m.country && (
-                <span className="inline-flex items-center gap-1">
-                  <MapPin className="w-3 h-3" /> {m.country}
-                </span>
-              )}
-              {m.region && <span>{m.region}</span>}
-              <span>tier: {m.member_tier}</span>
-              {m.applied_at && (
-                <span>applied {new Date(m.applied_at).toLocaleDateString()}</span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title={m.org?.name || `Org #${m.org_id}`}
+        icon={Building2}
+        status={statusPill}
+        meta={[
+          ...(m.country ? [{ label: m.country, icon: MapPin }] : []),
+          ...(m.region  ? [{ label: m.region }]                : []),
+          ...(m.org?.sector ? [{ label: m.org.sector }]        : []),
+          ...(m.member_tier ? [{ label: `tier: ${m.member_tier}` }] : []),
+          ...(m.applied_at
+            ? [{ label: `applied ${new Date(m.applied_at).toLocaleDateString()}` }]
+            : []),
+          ...(m.is_oversight_body ? [{ label: 'Oversight Body', icon: ShieldCheck }] : []),
+        ]}
+        primaryAction={
+          decidable ? <DecisionActions m={m} onChange={mutate} /> : null
+        }
+      />
 
-      {/* Eligibility answers */}
+      <PageAttention items={attention} />
+
+      <PageMain>
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="w-full justify-start overflow-x-auto" variant="line">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="capacity">Capacity</TabsTrigger>
+            <TabsTrigger value="due_diligence">Due diligence</TabsTrigger>
+            <TabsTrigger value="messages">Messages</TabsTrigger>
+            <TabsTrigger value="audit">Audit</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="mt-3">
+            <OverviewTab m={m} onChange={mutate} />
+          </TabsContent>
+
+          <TabsContent value="capacity" className="mt-3">
+            <CapacityTab m={m} />
+          </TabsContent>
+
+          <TabsContent value="due_diligence" className="mt-3">
+            <TrustProcessPanel membershipId={m.id} onUpdate={mutate} />
+          </TabsContent>
+
+          <TabsContent value="messages" className="mt-3">
+            <MembershipMessagesTab orgId={m.org_id} orgName={m.org?.name} />
+          </TabsContent>
+
+          <TabsContent value="audit" className="mt-3">
+            <MembershipAuditTab membershipId={m.id} orgId={m.org_id} />
+          </TabsContent>
+        </Tabs>
+      </PageMain>
+    </PageShell>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Overview tab — summary + eligibility + (when active) OB seat management
+// ---------------------------------------------------------------------------
+
+function OverviewTab({ m, onChange }: { m: Membership; onChange: () => void }) {
+  return (
+    <div className="space-y-4">
+      <section className="border border-border rounded-lg bg-card p-5 space-y-2">
+        <h2 className="font-semibold text-sm">Summary</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {m.org?.name || `Org #${m.org_id}`}
+          {m.country && <> in <strong className="text-foreground">{m.country}</strong></>}
+          {m.region && <>, {m.region}</>}
+          . Application status:{' '}
+          <strong className="text-foreground">{describeMembershipStatus(m).label.toLowerCase()}</strong>
+          {m.applied_at && <>, submitted {new Date(m.applied_at).toLocaleDateString()}</>}
+          .
+        </p>
+      </section>
+
       {Object.keys(m.eligibility_answers || {}).length > 0 && (
         <section className="border border-border rounded-lg bg-card p-5 space-y-3">
           <h2 className="font-semibold text-sm">Eligibility self-assessment</h2>
           <ul className="text-xs space-y-1.5">
-            {Object.entries(m.eligibility_answers).map(([k, v]) => (
+            {Object.entries(m.eligibility_answers || {}).map(([k, v]) => (
               <li key={k} className="flex items-center justify-between gap-3 py-1 border-b border-border last:border-b-0">
                 <span className="text-muted-foreground capitalize">{k.replace(/_/g, ' ')}</span>
                 <span className={`font-semibold ${String(v).toLowerCase() === 'yes' ? 'text-[hsl(var(--kuja-grow))]' : 'text-destructive'}`}>
@@ -114,46 +204,401 @@ export default function MembershipReviewClient() {
         </section>
       )}
 
-      {/* Capacity assessment */}
-      <section className="border border-border rounded-lg bg-card p-5 space-y-3">
-        <h2 className="font-semibold text-sm flex items-center gap-2">
-          <ClipboardCheck className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
-          Capacity assessment
-        </h2>
-        {m.capacity_assessment_id ? (
-          <div className="text-xs flex items-center justify-between">
-            <div>
-              <div className="text-[hsl(var(--kuja-grow))] font-semibold">
-                Assessment #{m.capacity_assessment_id} linked
-              </div>
-              <div className="text-muted-foreground mt-0.5">
-                Self-service capacity assessment completed by the applicant.
-              </div>
-            </div>
-            <a
-              href={`/assessments`}
-              className="text-xs underline hover:no-underline text-muted-foreground"
-            >
-              Open assessment
-            </a>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground italic">
-            Applicant has not yet completed the capacity assessment. They must do this before approval.
-          </p>
-        )}
-      </section>
-
-      {/* Trust process (admin-run) */}
-      <TrustProcessPanel membershipId={m.id} onUpdate={mutate} />
-
-      {/* Decision */}
-      {(m.status === 'pending' || m.status === 'under_review') && (
-        <DecisionPanel m={m} onUpdate={mutate} />
+      {m.status === 'active' && (
+        <OversightBodyPanel membership={m} onChange={onChange} />
       )}
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Capacity tab — current capacity panel
+// ---------------------------------------------------------------------------
+
+function CapacityTab({ m }: { m: Membership }) {
+  return (
+    <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+      <h2 className="font-semibold text-sm flex items-center gap-2">
+        <ClipboardCheck className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+        Capacity assessment
+      </h2>
+      {m.capacity_assessment_id ? (
+        <div className="text-xs flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div className="text-[hsl(var(--kuja-grow))] font-semibold">
+              Assessment #{m.capacity_assessment_id} linked
+            </div>
+            <div className="text-muted-foreground mt-0.5">
+              Self-service capacity assessment completed by the applicant.
+            </div>
+          </div>
+          <a
+            href="/assessments"
+            className="text-xs underline hover:no-underline text-muted-foreground"
+          >
+            Open assessment
+          </a>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground italic">
+          Applicant has not yet completed the capacity assessment. They must do this before approval.
+        </p>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Placeholder tab — generic future-feature panel
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Membership Audit tab — chain entries scoped to this membership + the org.
+// ---------------------------------------------------------------------------
+
+interface AuditEntry {
+  id: number;
+  seq: number;
+  action: string;
+  actor_email: string | null;
+  subject_kind: string | null;
+  subject_id: number | null;
+  prev_hash: string;
+  payload_hash: string;
+  created_at: string | null;
+}
+
+interface AuditResp {
+  success: boolean;
+  total: number;
+  entries: AuditEntry[];
+}
+
+function MembershipAuditTab({
+  membershipId, orgId,
+}: { membershipId: number; orgId: number }) {
+  // Pull entries for BOTH the membership row and the underlying org.
+  // The chain tags each event with the most specific subject, so events
+  // on the org (e.g. trust process runs, passport publish) are separate
+  // from events on the membership (approve/reject, OB seat).
+  const { data: memData, isLoading: memLoading } = useSWR<AuditResp>(
+    `/audit-chain/recent?subject_kind=network_membership&subject_id=${membershipId}&limit=50`,
+    (url: string) => api.get<AuditResp>(url),
+  );
+  const { data: orgData, isLoading: orgLoading } = useSWR<AuditResp>(
+    `/audit-chain/recent?subject_kind=org&subject_id=${orgId}&limit=50`,
+    (url: string) => api.get<AuditResp>(url),
+  );
+  const loading = memLoading || orgLoading;
+
+  const merged: AuditEntry[] = [
+    ...(memData?.entries ?? []),
+    ...(orgData?.entries ?? []),
+  ].sort((a, b) => b.seq - a.seq);
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="kuja-shimmer h-10 rounded" />
+        ))}
+      </div>
+    );
+  }
+
+  if (merged.length === 0) {
+    return (
+      <section className="border border-dashed border-border rounded-lg bg-card p-8 text-center space-y-2">
+        <History className="w-8 h-8 mx-auto text-muted-foreground opacity-50" />
+        <h3 className="font-semibold text-sm">No audit entries yet</h3>
+        <p className="text-xs text-muted-foreground max-w-md mx-auto">
+          Events touching this membership or its organisation will appear here
+          (approve, reject, OB seat grant/revoke, trust process runs, passport
+          publish, etc.).
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-sm flex items-center gap-2">
+          <History className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+          Decision audit trail
+        </h2>
+        <Link
+          href={`/admin/audit-chain`}
+          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        >
+          Open full chain <ExternalLink className="w-3 h-3" />
+        </Link>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {merged.length} hash-chained event{merged.length === 1 ? '' : 's'} on
+        this membership or its organisation. Newest first.
+      </p>
+      <ul className="space-y-1.5">
+        {merged.map((e) => (
+          <li
+            key={e.id}
+            className="flex items-start justify-between gap-3 text-xs border border-border rounded-md p-2.5"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold capitalize">
+                {e.action.replace(/_/g, ' ').replace(/\./g, ' · ')}
+              </div>
+              <div className="text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap text-[11px]">
+                {e.actor_email && <span>by {e.actor_email}</span>}
+                <span>· {e.subject_kind} #{e.subject_id}</span>
+                {e.created_at && (
+                  <span>· {new Date(e.created_at).toLocaleString()}</span>
+                )}
+              </div>
+            </div>
+            <span
+              className="font-mono text-[10px] text-muted-foreground shrink-0"
+              title={`payload hash: ${e.payload_hash}`}
+            >
+              #{e.seq}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Membership Messages tab — broadcasts scoped to this org from /messages.
+// ---------------------------------------------------------------------------
+
+interface MessageRow {
+  id: number;
+  sender_name: string | null;
+  sender_email: string | null;
+  scope: 'network' | 'country' | 'org' | 'declaration';
+  scope_value: string | null;
+  subject: string;
+  body_md: string;
+  sent_at: string | null;
+}
+
+interface MessagesResp {
+  success: boolean;
+  messages: MessageRow[];
+}
+
+function MembershipMessagesTab({
+  orgId, orgName,
+}: { orgId: number; orgName?: string }) {
+  // Filter the global broadcast log to ones that resolve to this org —
+  // either scope='org' with this org's id, or scope='network' (all
+  // members), or scope='country' matching this org's country. For an
+  // MVP, just fetch all and filter client-side to scope='org' for this
+  // id; broader-scope messages live on the global Messages page.
+  const { data, isLoading } = useSWR<MessagesResp>(
+    `/messages/`,
+    (url: string) => api.get<MessagesResp>(url),
+  );
+  // Local read-state mark would be nice but isn't on the schema; the
+  // global Messages page handles unread state per-user.
+  useEffect(() => { /* noop */ }, [orgId]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="kuja-shimmer h-14 rounded" />
+        ))}
+      </div>
+    );
+  }
+
+  const orgMsgs = (data?.messages ?? []).filter((m) =>
+    m.scope === 'org' && String(orgId) === m.scope_value,
+  );
+
+  if (orgMsgs.length === 0) {
+    return (
+      <section className="border border-dashed border-border rounded-lg bg-card p-8 text-center space-y-3">
+        <Inbox className="w-8 h-8 mx-auto text-muted-foreground opacity-50" />
+        <h3 className="font-semibold text-sm">
+          No direct messages with {orgName || 'this organisation'} yet
+        </h3>
+        <p className="text-xs text-muted-foreground max-w-md mx-auto">
+          Direct (scope=org) broadcasts from the secretariat to this org will
+          appear here. Network-wide and country-wide messages live on the
+          global Messages surface.
+        </p>
+        <Link
+          href="/messages"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
+        >
+          Open global Messages <ArrowUpRight className="w-3 h-3" />
+        </Link>
+      </section>
+    );
+  }
+
+  return (
+    <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-sm flex items-center gap-2">
+          <Inbox className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+          Direct messages with {orgName || 'this organisation'}
+        </h2>
+        <Link
+          href="/messages"
+          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        >
+          Open global Messages <ExternalLink className="w-3 h-3" />
+        </Link>
+      </div>
+      <ul className="space-y-2">
+        {orgMsgs.slice(0, 20).map((m) => (
+          <li
+            key={m.id}
+            className="border border-border rounded-md p-3 text-xs space-y-1"
+          >
+            <div className="font-semibold text-sm">{m.subject}</div>
+            <div className="text-[11px] text-muted-foreground">
+              {m.sender_name || m.sender_email || 'Unknown sender'}
+              {m.sent_at && <> · {new Date(m.sent_at).toLocaleString()}</>}
+            </div>
+            <p className="whitespace-pre-wrap leading-relaxed">{m.body_md}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function PlaceholderTab({
+  icon: Icon, title, body, ctaLabel, ctaHref,
+}: {
+  icon: typeof Inbox;
+  title: string;
+  body: string;
+  ctaLabel?: string;
+  ctaHref?: string;
+}) {
+  return (
+    <section className="border border-dashed border-border rounded-lg bg-card p-8 text-center space-y-3">
+      <Icon className="w-8 h-8 mx-auto text-muted-foreground opacity-50" />
+      <h3 className="font-semibold text-sm">{title}</h3>
+      <p className="text-xs text-muted-foreground max-w-md mx-auto">{body}</p>
+      {ctaLabel && ctaHref && (
+        <a
+          href={ctaHref}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
+        >
+          {ctaLabel}
+        </a>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DecisionActions — Approve + Reject buttons rendered in the header
+// ---------------------------------------------------------------------------
+
+function DecisionActions({ m, onChange }: { m: { id: number; capacity_assessment_id?: number | null }; onChange: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+
+  async function approve() {
+    setBusy(true);
+    try {
+      await api.post(`/network/membership/${m.id}/approve`);
+      toast.success('Approved — applicant is now an active member.');
+      onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Approve failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reject() {
+    if (!rejectReason.trim()) {
+      toast.error('Reason is required.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/network/membership/${m.id}/reject`, { reason: rejectReason.trim() });
+      toast.success('Rejected.');
+      setRejectOpen(false);
+      setRejectReason('');
+      onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Reject failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setRejectOpen(!rejectOpen)}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
+      >
+        <XCircle className="w-3 h-3" />
+        Reject
+      </button>
+      <button
+        type="button"
+        onClick={approve}
+        disabled={busy}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[hsl(var(--kuja-grow))] text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+        Approve
+      </button>
+      {rejectOpen && (
+        <div className="absolute z-30 mt-2 top-full right-0 bg-popover border border-border rounded-md shadow-lg p-3 w-80 space-y-2">
+          <label className="text-xs space-y-1 block">
+            <span className="text-muted-foreground">
+              Rejection reason (visible to the applicant)
+            </span>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={3}
+              className="w-full px-2 py-1.5 rounded-md border border-border bg-background text-xs"
+            />
+          </label>
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => { setRejectOpen(false); setRejectReason(''); }}
+              className="px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={reject}
+              disabled={busy || !rejectReason.trim()}
+              className="px-3 py-1.5 rounded-md bg-destructive text-destructive-foreground text-xs font-semibold disabled:opacity-50"
+            >
+              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Confirm reject'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TrustProcessPanel — Due diligence tab content
+// ---------------------------------------------------------------------------
 
 function TrustProcessPanel({
   membershipId, onUpdate,
@@ -195,7 +640,7 @@ function TrustProcessPanel({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="font-semibold text-sm flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
-          Trust process
+          Trust process (sanctions · adverse media · registry)
         </h2>
         <button
           type="button"
@@ -230,8 +675,8 @@ function TrustProcessPanel({
           </div>
           <div className="grid grid-cols-3 gap-2 text-xs">
             <CountChip label="High-severity hits" count={result.screening.high_count || 0} tone="bad" />
-            <CountChip label="Medium" count={result.screening.medium_count || 0} tone="warn" />
-            <CountChip label="Low" count={result.screening.low_count || 0} tone="muted" />
+            <CountChip label="Medium"             count={result.screening.medium_count || 0} tone="warn" />
+            <CountChip label="Low"                count={result.screening.low_count || 0} tone="muted" />
           </div>
           {result.screening.sources_searched && result.screening.sources_searched.length > 0 && (
             <div className="text-[10px] text-muted-foreground">
@@ -257,44 +702,47 @@ function CountChip({ label, count, tone }: { label: string; count: number; tone:
   );
 }
 
-interface MembershipForDecision {
-  id: number;
-  status: string;
-  capacity_assessment_id: number | null;
-}
+// ---------------------------------------------------------------------------
+// OversightBodyPanel — grant/revoke OB seat (visible on Overview when active)
+// ---------------------------------------------------------------------------
 
-function DecisionPanel({ m, onUpdate }: { m: MembershipForDecision; onUpdate: () => void }) {
+function OversightBodyPanel({
+  membership: m,
+  onChange,
+}: {
+  membership: { id: number; is_oversight_body?: boolean; ob_role_started_at?: string | null; ob_role_ended_at?: string | null };
+  onChange: () => void;
+}) {
   const [busy, setBusy] = useState(false);
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
+  const [note, setNote] = useState('');
+  const isOB = m.is_oversight_body === true;
 
-  async function approve() {
+  async function grant() {
     setBusy(true);
     try {
-      await api.post(`/network/membership/${m.id}/approve`);
-      toast.success('Approved — applicant is now an active member.');
-      onUpdate();
+      await api.post(`/network/membership/${m.id}/ob-seat`, { note: note.trim() || null });
+      toast.success('OB seat granted. The member can now act on declarations.');
+      setNote('');
+      onChange();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Approve failed.');
+      toast.error(e instanceof ApiError ? e.message : 'Grant failed.');
     } finally {
       setBusy(false);
     }
   }
 
-  async function reject() {
-    if (!rejectReason.trim()) {
-      toast.error('Reason is required.');
-      return;
-    }
+  async function revoke() {
+    if (!confirm('Revoke this Oversight Body seat? The member keeps their NGO-member access; they lose OB permissions.')) return;
     setBusy(true);
     try {
-      await api.post(`/network/membership/${m.id}/reject`, { reason: rejectReason.trim() });
-      toast.success('Rejected.');
-      setRejectOpen(false);
-      setRejectReason('');
-      onUpdate();
+      const reason = note.trim();
+      const url = `/network/membership/${m.id}/ob-seat${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`;
+      await api.delete(url);
+      toast.success('OB seat revoked.');
+      setNote('');
+      onChange();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Reject failed.');
+      toast.error(e instanceof ApiError ? e.message : 'Revoke failed.');
     } finally {
       setBusy(false);
     }
@@ -302,66 +750,64 @@ function DecisionPanel({ m, onUpdate }: { m: MembershipForDecision; onUpdate: ()
 
   return (
     <section className="border border-border rounded-lg bg-card p-5 space-y-3">
-      <h2 className="font-semibold text-sm">Decision</h2>
-      <p className="text-xs text-muted-foreground">
-        After reviewing the capacity assessment + trust process results, approve to activate the
-        member (eligible to receive grants under NEAR declarations) or reject with reason.
-      </p>
-      {!m.capacity_assessment_id && (
-        <div className="text-xs border border-[hsl(var(--kuja-sun))]/30 bg-[hsl(var(--kuja-sun))]/10 rounded-md p-2 text-[hsl(var(--kuja-sun))]">
-          <AlertCircle className="w-3 h-3 inline mr-1" />
-          Capacity assessment not yet linked — typically required before approval.
+      <div className="flex items-start gap-3">
+        <div className={`grid h-10 w-10 place-items-center rounded-md ${isOB ? 'bg-[hsl(var(--kuja-clay))]/15 text-[hsl(var(--kuja-clay))]' : 'bg-muted text-muted-foreground'} shrink-0`}>
+          <ShieldCheck className="w-5 h-5" />
         </div>
-      )}
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={approve}
-          disabled={busy}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[hsl(var(--kuja-grow))] text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50"
-        >
-          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-          Approve membership
-        </button>
-        <button
-          type="button"
-          onClick={() => setRejectOpen(!rejectOpen)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
-        >
-          <XCircle className="w-3 h-3" />
-          Reject
-        </button>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-sm">
+            {isOB ? 'Active Oversight Body seat' : 'No Oversight Body seat'}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5 max-w-2xl">
+            Per the IKEA Concept Note, the OB is peer-elected from member orgs.
+            Granting this seat gives every user at the org OB permissions
+            (sign declarations, approve membership, run trust process) on top
+            of their NGO-member access.
+          </p>
+          {isOB && m.ob_role_started_at && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Seat started {new Date(m.ob_role_started_at).toLocaleDateString()}
+            </p>
+          )}
+        </div>
       </div>
-      {rejectOpen && (
-        <div className="border-t border-border pt-3 space-y-2">
-          <label className="text-xs space-y-1 block">
-            <span className="text-muted-foreground">Rejection reason (visible to the applicant)</span>
-            <textarea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              rows={2}
-              className="w-full px-2 py-1.5 rounded-md border border-border bg-background text-xs"
-            />
-          </label>
-          <div className="flex gap-2">
+      <div className="border-t border-border pt-3 space-y-2">
+        <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          {isOB ? 'Reason for revocation (optional)' : 'Note (optional — election cycle, term, etc.)'}
+        </label>
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={500}
+          className="w-full px-2 py-1.5 rounded-md border border-border bg-background text-sm"
+          placeholder={isOB ? 'e.g. End of 2-year term' : 'e.g. Elected by the Eastern Africa caucus, 2026 term'}
+        />
+        <div className="flex items-center gap-2">
+          {!isOB ? (
             <button
               type="button"
-              onClick={reject}
-              disabled={busy || !rejectReason.trim()}
-              className="px-3 py-1.5 rounded-md bg-destructive text-destructive-foreground text-xs font-semibold disabled:opacity-50"
+              onClick={grant}
+              disabled={busy}
+              className="px-3 py-1.5 rounded-md text-xs font-semibold bg-[hsl(var(--kuja-clay))] text-white hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1"
             >
-              Confirm reject
+              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+              Grant OB seat
             </button>
+          ) : (
             <button
               type="button"
-              onClick={() => { setRejectOpen(false); setRejectReason(''); }}
-              className="px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
+              onClick={revoke}
+              disabled={busy}
+              className="px-3 py-1.5 rounded-md text-xs font-semibold border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50 inline-flex items-center gap-1"
             >
-              Cancel
+              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+              Revoke OB seat
             </button>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </section>
   );
 }
+

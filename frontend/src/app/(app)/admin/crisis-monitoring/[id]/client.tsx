@@ -12,32 +12,39 @@
  */
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { useCrisisReport, type CrisisRow } from '@/lib/hooks/use-api';
+import { useRouteId } from '@/lib/hooks/use-route-id';
 import { useAuthStore } from '@/stores/auth-store';
 import {
-  ChevronLeft, Flag, Sparkles, Loader2, ShieldCheck, AlertOctagon,
+  Flag, Sparkles, Loader2, ShieldCheck, AlertOctagon,
   Plus, Upload,
 } from 'lucide-react';
+import {
+  PageShell, PageBack, PageHeader, PageMain,
+} from '@/components/layout/page-shell';
+import type { StatusTone } from '@/lib/status-copy';
 
 const BAND_OPTIONS = ['low', 'medium', 'high'];
 const HDI_OPTIONS = ['low_hdi', 'medium_hdi', 'high_hdi'];
 
-const STATUS_COLOUR: Record<string, string> = {
-  draft: 'bg-muted text-muted-foreground',
-  in_review: 'bg-[hsl(var(--kuja-sun))]/15 text-[hsl(var(--kuja-sun))]',
-  published: 'bg-[hsl(var(--kuja-grow))]/15 text-[hsl(var(--kuja-grow))]',
-  archived: 'bg-muted text-muted-foreground',
-};
+// Crisis-monitoring-specific status copy. Lives here (not in lib/status-copy)
+// because the lifecycle is internal to this surface.
+function describeReportStatus(status: string): { label: string; tone: StatusTone } {
+  switch (status) {
+    case 'draft':     return { label: 'Draft',         tone: 'muted' };
+    case 'in_review': return { label: 'Awaiting review', tone: 'warn' };
+    case 'published': return { label: 'Published',     tone: 'good' };
+    case 'archived':  return { label: 'Archived',      tone: 'muted' };
+    default:          return { label: status.replace(/_/g, ' '), tone: 'muted' };
+  }
+}
 
 export default function CrisisMonitoringDetailClient() {
-  const params = useParams();
-  const reportId = Number(params?.id ?? '0');
-  const router = useRouter();
+  const reportId = useRouteId('crisis-monitoring');
   const viewer = useAuthStore((s) => s.user);
-  const { data, isLoading, mutate } = useCrisisReport(reportId || null);
+  const { data, isLoading, mutate } = useCrisisReport(reportId);
 
   if (viewer && viewer.role !== 'admin') {
     return (
@@ -46,7 +53,7 @@ export default function CrisisMonitoringDetailClient() {
       </div>
     );
   }
-  if (isLoading || !data) {
+  if (reportId == null || isLoading || !data) {
     return (
       <div className="space-y-3">
         <div className="kuja-shimmer h-10 w-72 rounded" />
@@ -64,55 +71,42 @@ export default function CrisisMonitoringDetailClient() {
   );
   const isDraft = r.status === 'draft' || r.status === 'in_review';
 
+  const periodLabel =
+    `Week of ${new Date(r.period_start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` +
+    ` – ${new Date(r.period_end).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  const statusPill = describeReportStatus(r.status);
+
   return (
-    <div className="space-y-5">
-      <button
-        type="button"
-        onClick={() => router.push('/admin/crisis-monitoring')}
-        className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-      >
-        <ChevronLeft className="w-3 h-3" /> Back to reports
-      </button>
+    <PageShell>
+      <PageBack href="/admin/crisis-monitoring" label="Back to reports" />
 
-      {/* Header */}
-      <div className="border border-border rounded-lg bg-card p-5 space-y-3">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="kuja-display text-2xl flex items-center gap-2">
-              <AlertOctagon className="w-6 h-6 text-[hsl(var(--kuja-clay))]" />
-              Week of {new Date(r.period_start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              {' – '}
-              {new Date(r.period_end).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-            </h1>
-            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
-              <span className={`px-2 py-0.5 rounded-full font-semibold capitalize ${STATUS_COLOUR[r.status] || STATUS_COLOUR.draft}`}>
-                {r.status.replace('_', ' ')}
-              </span>
-              <span>· {rows.length} {rows.length === 1 ? 'row' : 'rows'}</span>
-              {r.flagged_row_count > 0 && (
-                <span className="inline-flex items-center gap-1 text-[hsl(var(--kuja-clay))]">
-                  <Flag className="w-3 h-3" /> {r.flagged_row_count} flagged
-                </span>
-              )}
-              {r.cron_anchor_audit_id && (
-                <span className="inline-flex items-center gap-1 text-[hsl(var(--kuja-grow))]">
-                  <ShieldCheck className="w-3 h-3" /> audit #{r.cron_anchor_audit_id}
-                </span>
-              )}
-            </div>
-          </div>
-          {isDraft && <PublishButton reportId={reportId} onChange={mutate} />}
-        </div>
+      <PageHeader
+        title={periodLabel}
+        icon={AlertOctagon}
+        status={statusPill}
+        meta={[
+          { label: `${rows.length} ${rows.length === 1 ? 'row' : 'rows'}` },
+          ...(r.flagged_row_count > 0
+            ? [{ label: `${r.flagged_row_count} flagged`, icon: Flag }]
+            : []),
+          ...(r.cron_anchor_audit_id
+            ? [{ label: `audit #${r.cron_anchor_audit_id}`, icon: ShieldCheck }]
+            : []),
+        ]}
+        primaryAction={isDraft ? <PublishButton reportId={reportId} onChange={mutate} /> : null}
+      />
 
+      <PageMain>
+        {/* Summary — collapsible if long, full if short */}
         {r.summary_md && (
-          <p className="text-sm whitespace-pre-wrap leading-relaxed border-t border-border pt-3">
-            {r.summary_md}
-          </p>
+          <section className="border border-border rounded-lg bg-card p-5">
+            <h2 className="font-semibold text-sm mb-2">Summary</h2>
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{r.summary_md}</p>
+          </section>
         )}
-      </div>
 
-      {/* Add row form (drafts only) */}
-      {isDraft && <AddRowForm reportId={reportId} onChange={mutate} />}
+        {/* Add row form (drafts only) */}
+        {isDraft && <AddRowForm reportId={reportId} onChange={mutate} />}
 
       {/* Rows table */}
       <section className="border border-border rounded-lg bg-card overflow-x-auto">
@@ -141,7 +135,8 @@ export default function CrisisMonitoringDetailClient() {
           </tbody>
         </table>
       </section>
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }
 

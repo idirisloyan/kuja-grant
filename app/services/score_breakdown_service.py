@@ -39,11 +39,19 @@ class ScoreBreakdownService:
 
         criteria = app.grant.get_criteria() if hasattr(app.grant, 'get_criteria') else []
         if not criteria:
+            # Shape-stable empty response — frontend reads reviewer_count +
+            # the *_criteria lists unconditionally, so dropping them here
+            # crashes the score breakdown card. Mirror the no-reviews
+            # branch below.
             return {
                 'success': True,
                 'application_id': application_id,
                 'criteria_breakdown': [],
                 'overall_human_score': None,
+                'overall_human_score_computed': None,
+                'reviewer_count': 0,
+                'strongest_criteria': [],
+                'weakest_criteria': [],
                 'reason': 'no_criteria',
             }
 

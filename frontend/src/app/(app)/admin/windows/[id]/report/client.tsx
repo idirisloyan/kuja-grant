@@ -11,27 +11,30 @@
  */
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { useWindowReport, type WindowReportDeclaration } from '@/lib/hooks/use-api';
+import { useRouteId } from '@/lib/hooks/use-route-id';
 import { useAuthStore } from '@/stores/auth-store';
 import {
   ChevronLeft, FileSpreadsheet, Archive, Clock, ShieldCheck,
   ShieldAlert, MapPin, Users, Coins, AlertCircle, Sparkles, Loader2,
-  Lightbulb,
+  Lightbulb, BarChart3,
 } from 'lucide-react';
+import {
+  PageShell, PageBack, PageHeader, PageMain,
+} from '@/components/layout/page-shell';
 
 const SLA_GOOD = 'bg-[hsl(var(--kuja-grow))]/15 text-[hsl(var(--kuja-grow))]';
 const SLA_BAD = 'bg-destructive/15 text-destructive';
 const SLA_NEUTRAL = 'bg-muted text-muted-foreground';
 
 export default function WindowReportClient() {
-  const params = useParams();
-  const windowId = Number(params?.id ?? '0');
+  const windowId = useRouteId('windows');
   const router = useRouter();
   const viewer = useAuthStore((s) => s.user);
-  const { data, isLoading } = useWindowReport(windowId || null);
+  const { data, isLoading } = useWindowReport(windowId);
 
   if (viewer && viewer.role !== 'admin') {
     return (
@@ -40,7 +43,7 @@ export default function WindowReportClient() {
       </div>
     );
   }
-  if (isLoading || !data) {
+  if (windowId == null || isLoading || !data) {
     return (
       <div className="space-y-3">
         <div className="kuja-shimmer h-10 w-72 rounded" />
@@ -60,26 +63,14 @@ export default function WindowReportClient() {
   const hitRate6d = slaTotal6d > 0 ? Math.round(100 * sla.decision_hits / slaTotal6d) : null;
 
   return (
-    <div className="space-y-5">
-      <button
-        type="button"
-        onClick={() => router.push('/admin/funds')}
-        className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-      >
-        <ChevronLeft className="w-3 h-3" /> Back to funds
-      </button>
+    <PageShell>
+      <PageBack href="/admin/funds" label="Back to funds" />
 
-      {/* Header */}
-      <div className="border border-border rounded-lg bg-card p-5">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="kuja-display text-2xl">
-              {window.name} <span className="text-muted-foreground text-lg font-normal">— report</span>
-            </h1>
-            <div className="text-xs text-muted-foreground mt-1">
-              {fund?.name} · {fund?.currency} · generated {new Date(generated_at).toLocaleString()}
-            </div>
-          </div>
+      <PageHeader
+        title={`${window.name} — report`}
+        icon={BarChart3}
+        subtitle={`${fund?.name} · ${fund?.currency} · generated ${new Date(generated_at).toLocaleString()}`}
+        primaryAction={
           <div className="flex flex-wrap gap-2">
             <a
               href={`/api/windows/${windowId}/report.csv`}
@@ -100,9 +91,10 @@ export default function WindowReportClient() {
               <Archive className="w-3 h-3" /> Full bundle (ZIP)
             </a>
           </div>
-        </div>
-      </div>
+        }
+      />
 
+      <PageMain>
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard icon={<AlertCircle className="w-4 h-4" />} label="Declarations"
@@ -170,7 +162,8 @@ export default function WindowReportClient() {
       {/* AI panels (Phase 38) */}
       <AINarrativePanel windowId={windowId} />
       <CrossWindowPatternsPanel />
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }
 

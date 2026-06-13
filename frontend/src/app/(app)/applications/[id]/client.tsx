@@ -7,19 +7,27 @@ import { StatusBadge } from '@/components/shared/status-badge';
 import { ScoreRing } from '@/components/shared/score-ring';
 import {
   ArrowLeft, FileText, Upload, BarChart3, MessageSquare,
-  AlertCircle, CheckCircle,
+  AlertCircle, CheckCircle, Sparkles, ClipboardList, Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Application } from '@/lib/types';
 import { InfoTip } from '@/components/shared/info-tip';
+import {
+  PageShell, PageBack, PageHeader, PageMain,
+  PageDetail, PageDetailSection,
+} from '@/components/layout/page-shell';
+import { describeApplicationStatus } from '@/lib/status-copy';
 import { ActivityTimeline } from '@/components/applications/ActivityTimeline';
 import { ApplicationTimeline } from '@/components/applications/application-timeline';
 import { StatusSignalsRail } from '@/components/shared/status-signals-rail';
+import { WhyRejectedPanel } from '@/components/shared/why-rejected-panel';
 import { PreflightPanel } from '@/components/shared/preflight-panel';
 import { ReviewerFollowupsPanel } from '@/components/reviews/reviewer-followups-panel';
 import { ReviewerBriefingCard } from '@/components/reviews/reviewer-briefing-card';
 import { PanelCalibrationCard } from '@/components/reviews/panel-calibration-card';
 import { ScoreBreakdownCard } from '@/components/applications/score-breakdown-card';
+import { NetworkAiPanel } from '@/components/applications/network-ai-panel';
+import { NgoBudgetPanel } from '@/components/applications/ngo-budget-panel';
 import { ApplicationMessageThread } from '@/components/applications/application-message-thread';
 import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
@@ -104,169 +112,208 @@ export default function ApplicationDetailClient() {
     );
   }
 
+  const statusPill = describeApplicationStatus(application.status);
+  const isOwnerNgo = viewer?.role === 'ngo' && application.ngo_org_id === viewer?.org_id;
+  const isReviewerSide = !!viewer && (viewer.role === 'donor' || viewer.role === 'reviewer' || viewer.role === 'admin');
+  const isNetworkGrant = (application as { grant_fund_window_id?: number | null }).grant_fund_window_id != null;
+  const showBudget = isNetworkGrant && isOwnerNgo;
+  const showNetworkAi = isNetworkGrant && isReviewerSide;
+
   return (
-    <div className="space-y-5">
-      <button
-        type="button"
-        onClick={() => router.push('/applications')}
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> {t('application.back')}
-      </button>
+    <PageShell>
+      <PageBack href="/applications" label={t('application.back')} />
 
-      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <h1 className="kuja-display text-3xl">
-              {application.grant_title || t('applications.label_fallback', { n: application.id })}
-            </h1>
-            <StatusBadge status={application.status} kind="app" />
+      <PageHeader
+        title={application.grant_title || t('applications.label_fallback', { n: application.id })}
+        subtitle={application.ngo_org_name || undefined}
+        status={statusPill}
+        primaryAction={
+          <div className="flex items-center gap-3 flex-wrap">
+            {(application.status === 'draft' || application.status === 'submitted') && (
+              <PreflightPanel kind="application" entityId={application.id} />
+            )}
+            {application.ai_score != null && (
+              <>
+                <ScoreRing score={Math.round(application.ai_score)} size={56} label="AI" />
+                {application.human_score != null && (
+                  <ScoreRing score={Math.round(application.human_score)} size={56} label="Human" />
+                )}
+              </>
+            )}
           </div>
-          {application.ngo_org_name && (
-            <p className="text-sm text-muted-foreground">{application.ngo_org_name}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Phase 7 — donor-perspective pre-flight launcher (NGO + admin).
-              Renders for any application, but most useful on drafts. */}
-          {(application.status === 'draft' || application.status === 'submitted') && (
-            <PreflightPanel kind="application" entityId={application.id} />
-          )}
-          {application.ai_score != null && (
-            <>
-              <ScoreRing score={Math.round(application.ai_score)} size={64} label="AI" />
-              {application.human_score != null && (
-                <ScoreRing score={Math.round(application.human_score)} size={64} label="Human" />
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* "Where this stands" summary — replaces the loose meta line so the
-          applicant immediately sees what stage they're at and what's
-          happening next, instead of having to interpret the status badge. */}
-      <div className="rounded-xl border border-border bg-gradient-to-br from-background to-[hsl(var(--kuja-sand-50))] p-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">
-              {t('applications.detail.where_stands')}
-            </div>
-            <InfoTip>{t('glossary.application_status')}</InfoTip>
-          </div>
-        </div>
-        <p className="mt-1 text-sm text-foreground leading-relaxed">
-          {t(`applications.detail.summary_subtitle_${application.status}`)}
-        </p>
-        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('applications.detail.summary_grant')}</div>
-            <div className="font-medium truncate" title={application.grant_title ?? ''}>{application.grant_title || '—'}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('applications.detail.summary_status')}</div>
-            <div className="font-medium"><StatusBadge status={application.status} kind="app" /></div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('applications.detail.summary_submitted')}</div>
-            <div className="font-medium">{formatDate(application.submitted_at, { month: 'long', day: 'numeric', year: 'numeric' })}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('applications.detail.summary_score')}</div>
-            <div className="font-medium kuja-numeric">{application.final_score != null ? `${application.final_score}%` : '—'}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Phase 14 — Win/loss debrief (PMO transfer pattern). Shows only
-          on awarded/rejected. Donor + admin can edit; everyone else
-          read-only. Closes the feedback loop on declined proposals. */}
-      <DecisionDebriefPanel
-        applicationId={application.id}
-        status={application.status}
-        canEdit={!!viewer && (viewer.role === 'donor' || viewer.role === 'admin')}
-        initial={{
-          decision_reason_code: application.decision_reason_code ?? null,
-          decision_notes: application.decision_notes ?? null,
-          decision_recorded_at: application.decision_recorded_at ?? null,
-          decision_recorded_by_user_id: application.decision_recorded_by_user_id ?? null,
-        }}
+        }
       />
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-border">
-        {TAB_KEYS.map((tk) => (
-          <button
-            key={tk.id}
-            type="button"
-            onClick={() => setTab(tk.id)}
-            className={cn(
-              'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
-              tab === tk.id
-                ? 'text-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]'
-                : 'text-muted-foreground border-transparent hover:text-foreground',
-            )}
-          >
-            {t(tk.key)}
-          </button>
-        ))}
-      </div>
+      <PageMain>
+        {/* Phase 76 — Why-rejected, constructively. Surfaces only when
+            the application is declined / rejected / revision_requested.
+            On-demand AI explanation; lazy-loaded when opened. */}
+        {['declined', 'rejected', 'revision_requested'].includes(application.status) && (
+          <WhyRejectedPanel kind="application" entityId={application.id} />
+        )}
 
-      {tab === 'responses' && <ResponsesTab application={application} />}
-      {tab === 'documents' && <EmptyTab icon={Upload} label={t('applications.documents_empty')} />}
-      {tab === 'scores' && <ScoresTab application={application} />}
-      {tab === 'reviews' && <EmptyTab icon={MessageSquare} label={t('applications.reviews_empty')} />}
-      {tab === 'activity' && (
-        <div className="space-y-3">
-          {/* Phase 20A — richer unified timeline (audit chain + comments + reviews + decisions). */}
-          <ApplicationTimeline applicationId={application.id} />
-          {/* Phase 5.3 legacy AI-call timeline kept below as drilldown. */}
-          <ActivityTimeline applicationId={application.id} />
+        {/* 1. Summary first — "Where this stands" */}
+        <div className="rounded-xl border border-border bg-gradient-to-br from-background to-[hsl(var(--kuja-sand-50))] p-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">
+                {t('applications.detail.where_stands')}
+              </div>
+              <InfoTip>{t('glossary.application_status')}</InfoTip>
+            </div>
+          </div>
+          <p className="mt-1 text-sm text-foreground leading-relaxed">
+            {t(`applications.detail.summary_subtitle_${application.status}`)}
+          </p>
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('applications.detail.summary_grant')}</div>
+              <div className="font-medium truncate" title={application.grant_title ?? ''}>{application.grant_title || '—'}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('applications.detail.summary_status')}</div>
+              <div className="font-medium"><StatusBadge status={application.status} kind="app" /></div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('applications.detail.summary_submitted')}</div>
+              <div className="font-medium">{formatDate(application.submitted_at, { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('applications.detail.summary_score')}</div>
+              <div className="font-medium kuja-numeric">{application.final_score != null ? `${application.final_score}%` : '—'}</div>
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Phase 2 — ASK / RISK / DECISION rails. Renders below the tabs so it
-          stays visible regardless of which tab the user is on. */}
-      <div className="pt-2">
-        <h2 className="kuja-eyebrow mb-2">Asks · Risks · Decisions</h2>
-        <StatusSignalsRail entityKind="application" entityId={application.id} />
-      </div>
+        {/* 2. Budget second — promoted from the bottom of the page per brief.
+            Only renders when relevant (network grant + applicant's NGO). */}
+        {showBudget && (
+          <NgoBudgetPanel
+            applicationId={application.id}
+            initial={(application as { budget_lines?: Array<{ item?: string; amount?: number }> }).budget_lines}
+            status={application.status}
+          />
+        )}
 
-      {/* Phase 8 — Reviewer follow-ups (donor + reviewer + admin only).
-          Renders below the rails so it's visible regardless of tab. */}
-      <ReviewerFollowupsGate applicationId={application.id} />
-
-      {/* Phase 21A — panel calibration. Auto-hides when there are <1
-          reviews; shows for everyone with read access (transparent
-          calibration is the point). */}
-      <PanelCalibrationCard applicationId={application.id} />
-
-      {/* Phase 22A — per-criterion score breakdown. NGOs see WHY they
-          got the score they did; donors/reviewers see full comments. */}
-      <ScoreBreakdownCard applicationId={application.id} />
-
-      {/* Phase 20C — donor ↔ NGO threaded conversation. Visible to all
-          parties on the application (server-side gates enforce). */}
-      <div className="pt-2">
-        <ApplicationMessageThread applicationId={application.id} />
-      </div>
-
-      {/* Phase 25B — scoped AI chat: ask Kuja about THIS application. */}
-      <AIChatPanel scope={{ kind: 'application', id: application.id }} />
-
-      {/* Phase 31B — one-question NPS micro-survey for NGO viewing their
-          own submitted application. Skips other roles + drafts. */}
-      {viewer?.role === 'ngo'
-        && application.status !== 'draft'
-        && application.ngo_org_id === viewer?.org_id && (
-        <MicroSurvey
-          surface="application_submit"
-          relatedKind="application"
-          relatedId={application.id}
-          question="How helpful was Kuja in preparing this application?"
+        {/* Win/loss debrief — only on awarded/rejected. Close the feedback loop. */}
+        <DecisionDebriefPanel
+          applicationId={application.id}
+          status={application.status}
+          canEdit={!!viewer && (viewer.role === 'donor' || viewer.role === 'admin')}
+          initial={{
+            decision_reason_code: application.decision_reason_code ?? null,
+            decision_notes: application.decision_notes ?? null,
+            decision_recorded_at: application.decision_recorded_at ?? null,
+            decision_recorded_by_user_id: application.decision_recorded_by_user_id ?? null,
+          }}
         />
-      )}
-    </div>
+
+        {/* 3. Main work — tabs */}
+        <div className="flex gap-1 border-b border-border">
+          {TAB_KEYS.map((tk) => (
+            <button
+              key={tk.id}
+              type="button"
+              onClick={() => setTab(tk.id)}
+              className={cn(
+                'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
+                tab === tk.id
+                  ? 'text-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]'
+                  : 'text-muted-foreground border-transparent hover:text-foreground',
+              )}
+            >
+              {t(tk.key)}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'responses' && <ResponsesTab application={application} />}
+        {tab === 'documents' && <EmptyTab icon={Upload} label={t('applications.documents_empty')} />}
+        {tab === 'scores' && <ScoresTab application={application} />}
+        {tab === 'reviews' && <EmptyTab icon={MessageSquare} label={t('applications.reviews_empty')} />}
+        {tab === 'activity' && (
+          <div className="space-y-3">
+            <ApplicationTimeline applicationId={application.id} />
+            <ActivityTimeline applicationId={application.id} />
+          </div>
+        )}
+
+        {/* Score breakdown — visible to all roles, NGOs see WHY they got the score. */}
+        <ScoreBreakdownCard applicationId={application.id} />
+
+        {/* Asks · Risks · Decisions rail — stays visible across tabs */}
+        <div className="pt-2">
+          <h2 className="kuja-eyebrow mb-2">Asks · Risks · Decisions</h2>
+          <StatusSignalsRail entityKind="application" entityId={application.id} />
+        </div>
+
+        {/* Conversation — primary communication, stays in main */}
+        <div className="pt-2">
+          <ApplicationMessageThread applicationId={application.id} />
+        </div>
+      </PageMain>
+
+      {/* 4. Supporting detail — AI assist + reviewer aids + audit/history
+          collapsibles per the brief ("AI assist in a side panel or
+          collapsible block, audit/history below, not above"). */}
+      <PageDetail>
+        {/* AI: scoped chat — useful but should not dominate */}
+        <PageDetailSection
+          title="Ask Kuja about this application"
+          icon={Sparkles}
+          defaultOpen={false}
+        >
+          <AIChatPanel scope={{ kind: 'application', id: application.id }} />
+        </PageDetailSection>
+
+        {/* AI: NEAR rubric scorer + direct-to-community classifier */}
+        {showNetworkAi && (
+          <PageDetailSection
+            title="NEAR AI assist (rubric scorer · direct-to-community)"
+            icon={Sparkles}
+            defaultOpen={false}
+          >
+            <NetworkAiPanel applicationId={application.id} />
+          </PageDetailSection>
+        )}
+
+        {/* Reviewer aids — collapsed by default, only render for reviewer-side roles */}
+        {isReviewerSide && (
+          <PageDetailSection
+            title="Reviewer aids (decision-unlocking questions · briefing)"
+            icon={ClipboardList}
+            defaultOpen={false}
+          >
+            <ReviewerFollowupsGate applicationId={application.id} />
+          </PageDetailSection>
+        )}
+
+        {/* Panel calibration — auto-hides on its own when <1 reviews; wrap to a section */}
+        <PageDetailSection
+          title="Panel calibration"
+          icon={Activity}
+          defaultOpen={false}
+        >
+          <PanelCalibrationCard applicationId={application.id} />
+        </PageDetailSection>
+
+        {/* NGO micro-survey — only after submit */}
+        {isOwnerNgo && application.status !== 'draft' && (
+          <PageDetailSection
+            title="Was Kuja helpful here?"
+            icon={MessageSquare}
+            defaultOpen={false}
+          >
+            <MicroSurvey
+              surface="application_submit"
+              relatedKind="application"
+              relatedId={application.id}
+              question="How helpful was Kuja in preparing this application?"
+            />
+          </PageDetailSection>
+        )}
+      </PageDetail>
+    </PageShell>
   );
 }
 

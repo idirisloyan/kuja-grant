@@ -60,7 +60,7 @@ class WindowReportService:
         )
 
         # Aggregates
-        ngo_ids = {g.applications.first().org_id for g in grants
+        ngo_ids = {g.applications.first().ngo_org_id for g in grants
                    if g.applications.first() is not None}
         countries: set[str] = set()
         for d in declarations:

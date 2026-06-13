@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import {
-  useFunds, useFund, useWindowRubric,
+  useFunds, useFund, useWindowRubric, useDeclarations, useWindowOperational,
   type Fund, type FundWindow, type WindowCriterion,
 } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
@@ -24,13 +24,22 @@ import { useNetworkStore } from '@/stores/network-store';
 import Link from 'next/link';
 import {
   Plus, Coins, Inbox, ChevronDown, ChevronRight, Sparkles,
-  Lock, Gauge, Loader2, BarChart3,
+  Lock, Gauge, Loader2, BarChart3, Wallet,
 } from 'lucide-react';
+import {
+  PageShell, PageHeader, PageAttention, PageMain, type AttentionItem,
+} from '@/components/layout/page-shell';
 
 export default function FundsAdminPage() {
   const viewer = useAuthStore((s) => s.user);
   const network = useNetworkStore((s) => s.network);
   const { data, isLoading, mutate: refetchFunds } = useFunds();
+  // Phase 49 — lead with operational state across the network. Per-window
+  // rollups (open grants, due reports, top risks) still need a backend
+  // endpoint; queued as an operational TODO in NEAR_BACKLOG.md.
+  const { data: drafts } = useDeclarations('draft');
+  const { data: inRev }  = useDeclarations('in_review');
+  const { data: active } = useDeclarations('signed_active');
   const [showNewFund, setShowNewFund] = useState(false);
   const [openFundId, setOpenFundId] = useState<number | null>(null);
 
@@ -46,57 +55,84 @@ export default function FundsAdminPage() {
 
   const funds = data?.funds ?? [];
 
+  // Attention items derived from operational state, not configuration.
+  const attention: AttentionItem[] = [];
+  const readyRelease = (active?.declarations ?? []).filter((d) => !d.applicants_notified_at);
+  if (readyRelease.length > 0) {
+    attention.push({
+      tone: 'accent',
+      label: `${readyRelease.length} declaration${readyRelease.length === 1 ? '' : 's'} ready to release`,
+      hint: 'Signed_active — flip the auto-created grant drafts to open and notify shortlisted NGOs.',
+    });
+  }
+  const inReviewCount = inRev?.declarations?.length ?? 0;
+  if (inReviewCount > 0) {
+    attention.push({
+      tone: 'info',
+      label: `${inReviewCount} declaration${inReviewCount === 1 ? '' : 's'} in committee review`,
+    });
+  }
+  const draftCount = drafts?.declarations?.length ?? 0;
+  if (draftCount > 0) {
+    attention.push({
+      tone: 'muted',
+      label: `${draftCount} draft declaration${draftCount === 1 ? '' : 's'}`,
+    });
+  }
+
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="kuja-display text-3xl">{network?.name ?? 'Network'} — funds</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {funds.length} {funds.length === 1 ? 'fund' : 'funds'}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowNewFund((v) => !v)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90"
-        >
-          <Plus className="w-4 h-4" />
-          New fund
-        </button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title={network?.name ? `${network.name} — Funds & windows` : 'Funds & windows'}
+        subtitle={`${funds.length} fund${funds.length === 1 ? '' : 's'} configured.`}
+        icon={Wallet}
+        primaryAction={
+          <button
+            type="button"
+            onClick={() => setShowNewFund((v) => !v)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90"
+          >
+            <Plus className="w-4 h-4" /> New fund
+          </button>
+        }
+      />
 
-      {showNewFund && (
-        <NewFundForm
-          onCreate={async () => { await refetchFunds(); setShowNewFund(false); }}
-          onCancel={() => setShowNewFund(false)}
-        />
-      )}
+      <PageAttention items={attention} />
 
-      {isLoading && (
-        <div className="space-y-2">
-          {[1, 2].map((i) => <div key={i} className="kuja-shimmer h-20 rounded" />)}
-        </div>
-      )}
-
-      {!isLoading && funds.length === 0 && (
-        <div className="border border-border rounded-lg bg-card p-10 text-center text-sm text-muted-foreground">
-          <Coins className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          No funds yet. Create one to get started.
-        </div>
-      )}
-
-      <div className="space-y-3">
-        {funds.map((f) => (
-          <FundCard
-            key={f.id}
-            fund={f}
-            isOpen={openFundId === f.id}
-            onToggle={() => setOpenFundId(openFundId === f.id ? null : f.id)}
-            onUpdate={refetchFunds}
+      <PageMain>
+        {showNewFund && (
+          <NewFundForm
+            onCreate={async () => { await refetchFunds(); setShowNewFund(false); }}
+            onCancel={() => setShowNewFund(false)}
           />
-        ))}
-      </div>
-    </div>
+        )}
+
+        {isLoading && (
+          <div className="space-y-2">
+            {[1, 2].map((i) => <div key={i} className="kuja-shimmer h-20 rounded" />)}
+          </div>
+        )}
+
+        {!isLoading && funds.length === 0 && (
+          <div className="border border-border rounded-lg bg-card p-10 text-center text-sm text-muted-foreground">
+            <Coins className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            No funds yet. Create one to get started.
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {funds.map((f) => (
+            <FundCard
+              key={f.id}
+              fund={f}
+              isOpen={openFundId === f.id}
+              onToggle={() => setOpenFundId(openFundId === f.id ? null : f.id)}
+              onUpdate={refetchFunds}
+            />
+          ))}
+        </div>
+      </PageMain>
+    </PageShell>
   );
 }
 
@@ -288,9 +324,46 @@ function NewWindowForm({ fundId, onCreate, onCancel }: {
   );
 }
 
+// Phase 52 — small operational stat tile rendered in WindowCard.
+// Phase 59 — optional href turns it into a click-through Link.
+function OpStat({
+  label, value, tone = 'muted', href,
+}: {
+  label: string;
+  value: string;
+  tone?: 'muted' | 'good' | 'warn' | 'bad' | 'accent';
+  href?: string;
+}) {
+  const cls =
+    tone === 'good'   ? 'border-[hsl(var(--kuja-grow))]/30 bg-[hsl(var(--kuja-grow))]/10 text-[hsl(var(--kuja-grow))]'
+    : tone === 'warn' ? 'border-[hsl(var(--kuja-sun))]/30 bg-[hsl(var(--kuja-sun))]/10 text-[hsl(var(--kuja-sun))]'
+    : tone === 'bad'  ? 'border-destructive/30 bg-destructive/10 text-destructive'
+    : tone === 'accent' ? 'border-[hsl(var(--kuja-clay))]/30 bg-[hsl(var(--kuja-clay))]/10 text-[hsl(var(--kuja-clay))]'
+    : 'border-border bg-muted/30 text-muted-foreground';
+  const inner = (
+    <>
+      <div className="uppercase tracking-wide opacity-80 text-[9px]">{label}</div>
+      <div className="font-semibold text-xs mt-0.5">{value}</div>
+    </>
+  );
+  if (href) {
+    return (
+      <Link href={href} className={`border rounded-md p-2 ${cls} hover:opacity-80 transition-opacity block`}>
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <div className={`border rounded-md p-2 ${cls}`}>
+      {inner}
+    </div>
+  );
+}
+
 function WindowCard({ window: w, onUpdate }: { window: FundWindow; onUpdate: () => void }) {
   const [seeding, setSeeding] = useState(false);
   const { data: rubricData, mutate: refetchRubric } = useWindowRubric(w.id);
+  const { data: ops } = useWindowOperational(w.id);
   const rubric = rubricData?.rubric;
 
   async function seedRubric() {
@@ -343,6 +416,74 @@ function WindowCard({ window: w, onUpdate }: { window: FundWindow; onUpdate: () 
           </Link>
         </div>
       </div>
+
+      {/* Phase 52 — operational state strip. Leads the card with what the
+          window is DOING right now, not what it's configured to allow.
+          Phase 59 — every tile is a Link to the per-window operational
+          drill-in page (/admin/windows/<id>) so the operator can act
+          on what they see in one click. */}
+      {ops && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
+          <OpStat
+            href={`/admin/windows/${w.id}`}
+            label="Available"
+            value={
+              ops.available_budget != null
+                ? `${ops.available_budget.toLocaleString()} ${ops.currency ?? ''}`.trim()
+                : '—'
+            }
+          />
+          <OpStat
+            href={`/admin/windows/${w.id}`}
+            label="Active declarations"
+            value={String(ops.active_declaration_count)}
+            tone={ops.active_declaration_count > 0 ? 'accent' : 'muted'}
+          />
+          <OpStat
+            href={`/admin/windows/${w.id}`}
+            label="Open grants"
+            value={String(ops.open_grant_count)}
+            tone={ops.open_grant_count > 0 ? 'good' : 'muted'}
+          />
+          <OpStat
+            href={`/admin/windows/${w.id}`}
+            label="Reports due / overdue"
+            value={
+              ops.overdue_report_count > 0
+                ? `${ops.due_report_count} (${ops.overdue_report_count} overdue)`
+                : String(ops.due_report_count)
+            }
+            tone={
+              ops.overdue_report_count > 0 ? 'bad'
+              : ops.due_report_count > 0 ? 'warn'
+              : 'muted'
+            }
+          />
+        </div>
+      )}
+
+      {/* Phase 56 — top_risks from the operational rollup endpoint. */}
+      {ops && ops.top_risks && ops.top_risks.length > 0 && (
+        <div className="space-y-1">
+          <div className="uppercase tracking-wide text-[9px] text-muted-foreground">
+            Top risks
+          </div>
+          <ul className="space-y-1">
+            {ops.top_risks.map((r, i) => {
+              const cls =
+                r.severity === 'high'   ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                : r.severity === 'medium' ? 'border-[hsl(var(--kuja-sun))]/40 bg-[hsl(var(--kuja-sun))]/10 text-[hsl(var(--kuja-sun))]'
+                : 'border-border bg-muted/30 text-muted-foreground';
+              return (
+                <li key={i} className={`border rounded-md px-2 py-1 text-[10px] ${cls}`}>
+                  <div className="font-semibold">{r.label}</div>
+                  {r.hint && <div className="opacity-80 mt-0.5">{r.hint}</div>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       {/* Tiny SLA chip strip */}
       <div className="flex flex-wrap gap-1.5 text-[10px]">

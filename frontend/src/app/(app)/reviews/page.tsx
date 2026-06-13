@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useReviews, useApplications, useGrants } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { StatusBadge } from '@/components/shared/status-badge';
+import { describeApplicationStatus, TONE_PILL_CLASS } from '@/lib/status-copy';
 import { cn } from '@/lib/utils';
 import { ClipboardCheck, FileText, Star, Filter, ChevronDown, GitCompare, Sparkles, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { Review } from '@/lib/types';
@@ -19,6 +19,7 @@ import { fetchReviewerRecommendation, type ReviewerRecommendation } from '@/lib/
 import { ApplicationCompareDialog } from '@/components/reviews/application-compare-dialog';
 import { LayoutGrid } from 'lucide-react';
 import { toast } from 'sonner';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 export default function ReviewsPage() {
   const user = useAuthStore((s) => s.user);
@@ -82,13 +83,12 @@ function ReviewerView() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="kuja-display text-3xl">{t('review.title_assignments')}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{t('review.subtitle_queue')}</p>
-        </div>
-        {tab === 'pending' && pending.length >= 2 && (
+    <PageShell>
+      <PageHeader
+        title={t('review.title_assignments')}
+        icon={ClipboardCheck}
+        subtitle={t('review.subtitle_queue')}
+        primaryAction={tab === 'pending' && pending.length >= 2 ? (
           <div className="flex items-center gap-2 flex-wrap">
             {/* Phase 10 — richer per-criterion matrix dialog. Open alongside
                 the existing single-recommendation compare. */}
@@ -114,8 +114,9 @@ function ReviewerView() {
                   : t('review.compare_button_ready', { n: selectedAppIds.size })}
             </button>
           </div>
-        )}
-      </div>
+        ) : null}
+      />
+      <PageMain>
 
       {(compareResult || compareError) && (
         <ReviewerCompareCard
@@ -179,7 +180,14 @@ function ReviewerView() {
                     {r.ngo_org_name || t('applications.label_fallback', { n: r.application_id })}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{r.grant_title || '—'}</td>
-                  <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
+                  <td className="px-4 py-3">{(() => {
+                    const sc = describeApplicationStatus(r.status);
+                    return (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${TONE_PILL_CLASS[sc.tone]}`}>
+                        {sc.label}
+                      </span>
+                    );
+                  })()}</td>
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"
@@ -244,7 +252,8 @@ function ReviewerView() {
             .map(r => [r.application_id, (r as unknown as { ngo_org_name?: string }).ngo_org_name || `App #${r.application_id}`])
         )}
       />
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }
 
@@ -393,12 +402,13 @@ function DonorView() {
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="kuja-display text-3xl">{t('review.donor_title')}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{filtered.length} / {applications.length}</p>
-      </div>
-
+    <PageShell>
+      <PageHeader
+        title={t('review.donor_title')}
+        icon={Star}
+        subtitle={`${filtered.length} / ${applications.length}`}
+      />
+      <PageMain>
       <div className="flex items-center gap-2">
         <Filter className="h-4 w-4 text-muted-foreground" />
         <div className="relative">
@@ -436,13 +446,21 @@ function DonorView() {
             >
               <td className="px-4 py-3 font-medium text-foreground">{a.org_name || '—'}</td>
               <td className="px-4 py-3 text-muted-foreground">{a.grant_title || '—'}</td>
-              <td className="px-4 py-3"><StatusBadge status={a.status} kind="app" /></td>
+              <td className="px-4 py-3">{(() => {
+                const sc = describeApplicationStatus(a.status);
+                return (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${TONE_PILL_CLASS[sc.tone]}`}>
+                    {sc.label}
+                  </span>
+                );
+              })()}</td>
               <td className="px-4 py-3 text-right text-muted-foreground">{formatDate(a.submitted_at)}</td>
             </tr>
           ))}
         </TableWrap>
       )}
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }
 

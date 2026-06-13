@@ -40,6 +40,18 @@ class Application(db.Model):
     decision_recorded_at = db.Column(db.DateTime, nullable=True)
     decision_recorded_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
+    # Phase 40 — NEAR network grants only. Auto-populated on /submit when
+    # grant.fund_window_id is set:
+    #   - ai_rubric_result_json: full breakdown from the Phase 38 rubric
+    #     scorer (per-criterion scores + rationale). Lets the operator
+    #     dashboard show WHY the AI gave the overall score.
+    #   - budget_lines_json: structured budget the NGO declared. Shape:
+    #     [{'item': str, 'amount': float}, ...]. Used by the
+    #     direct-to-community hard-gate at submit time and the operator's
+    #     budget classifier view.
+    ai_rubric_result_json = db.Column(db.Text, nullable=True)
+    budget_lines_json = db.Column(db.Text, nullable=True)
+
     # Relationships
     documents = db.relationship('Document', backref='application', lazy='dynamic', cascade='all, delete-orphan')
     reviews = db.relationship('Review', backref='application', lazy='dynamic', cascade='all, delete-orphan')
@@ -56,6 +68,19 @@ class Application(db.Model):
 
     def set_eligibility_responses(self, value):
         self.eligibility_responses = _json_dump(value)
+
+    def get_ai_rubric_result(self):
+        return _json_load(self.ai_rubric_result_json) or None
+
+    def set_ai_rubric_result(self, value):
+        self.ai_rubric_result_json = _json_dump(value) if value else None
+
+    def get_budget_lines(self):
+        val = _json_load(self.budget_lines_json) or []
+        return val if isinstance(val, list) else []
+
+    def set_budget_lines(self, value):
+        self.budget_lines_json = _json_dump(value or [])
 
     def to_dict(self, summary=False):
         data = {
@@ -77,6 +102,8 @@ class Application(db.Model):
         if not summary:
             data['responses'] = self.get_responses()
             data['eligibility_responses'] = self.get_eligibility_responses()
+            data['ai_rubric_result'] = self.get_ai_rubric_result()
+            data['budget_lines'] = self.get_budget_lines()
         # Include related names
         if self.grant:
             data['grant_title'] = self.grant.title

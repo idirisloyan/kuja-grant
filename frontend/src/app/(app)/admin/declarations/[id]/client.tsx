@@ -16,30 +16,50 @@
  *   - If not enrolled: admin attestation via manual_admin (admin only).
  */
 
-import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
-import { useDeclaration, type EmergencyDeclaration } from '@/lib/hooks/use-api';
+import {
+  useDeclaration,
+  useObRoster,
+  type EmergencyDeclaration,
+  type ObRosterMember,
+} from '@/lib/hooks/use-api';
+import { useRouteId } from '@/lib/hooks/use-route-id';
 import { useAuthStore } from '@/stores/auth-store';
 import {
-  CheckCircle2, XCircle, AlertCircle, Loader2, ChevronLeft,
-  Shield, Lock, Clock, FileText, Sparkles, Send, Rocket,
+  CheckCircle2, XCircle, AlertCircle, Loader2,
+  Lock, Clock, FileText, Sparkles, Send, Rocket, UserPlus, Search, Trash2,
+  Siren, ShieldCheck,
 } from 'lucide-react';
+import { DeclarationLedgerPanel } from '@/components/declarations/declaration-ledger-panel';
+import { DeclarationStepper } from '@/components/declarations/declaration-stepper';
+import {
+  PageShell, PageBack, PageHeader, PageMain, PageDetail, PageDetailSection,
+} from '@/components/layout/page-shell';
 
-const STATUS_COLOUR: Record<EmergencyDeclaration['status'], string> = {
-  draft: 'bg-muted text-muted-foreground',
-  in_review: 'bg-[hsl(var(--kuja-sun))]/15 text-[hsl(var(--kuja-sun))]',
-  signed_active: 'bg-[hsl(var(--kuja-grow))]/15 text-[hsl(var(--kuja-grow))]',
-  cancelled: 'bg-destructive/15 text-destructive',
-  closed: 'bg-muted text-muted-foreground',
-};
+// Human-readable status label + tone for the page header pill.
+// Maps internal state to workflow language per design principles.
+function describeStatus(d: EmergencyDeclaration): { label: string; tone: 'muted' | 'warn' | 'good' | 'bad' | 'accent' } {
+  if (d.status === 'cancelled') return { label: 'Cancelled', tone: 'bad' };
+  if (d.status === 'closed')    return { label: 'Closed', tone: 'muted' };
+  if (d.status === 'signed_active') {
+    return d.applicants_notified_at
+      ? { label: 'Applications open', tone: 'good' }
+      : { label: 'Ready to release', tone: 'accent' };
+  }
+  if (d.status === 'in_review') {
+    const remaining = Math.max(0, d.required_signer_count - d.signed_count);
+    return remaining === 0
+      ? { label: 'Signatures complete', tone: 'good' }
+      : { label: `Waiting for ${remaining} signature${remaining === 1 ? '' : 's'}`, tone: 'warn' };
+  }
+  // draft
+  return { label: 'Draft', tone: 'muted' };
+}
 
 export default function DeclarationDetailClient() {
-  const params = useParams();
-  const idParam = String(params?.id ?? '0');
-  const id = Number(idParam);
-  const router = useRouter();
+  const id = useRouteId('declarations');
   const viewer = useAuthStore((s) => s.user);
   const { data, isLoading, mutate } = useDeclaration(id);
   const d = data?.declaration;
@@ -52,7 +72,7 @@ export default function DeclarationDetailClient() {
     );
   }
 
-  if (isLoading || !d) {
+  if (id == null || isLoading || !d) {
     return (
       <div className="space-y-3">
         <div className="kuja-shimmer h-10 w-72 rounded" />
@@ -61,132 +81,156 @@ export default function DeclarationDetailClient() {
     );
   }
 
+  const statusPill = describeStatus(d);
+  const hasSla = !!(
+    d.declared_at || d.applications_open_at || d.applications_close_at ||
+    d.decision_at || d.applicants_notified_at
+  );
+
   return (
-    <div className="space-y-5">
-      <button
-        type="button"
-        onClick={() => router.push('/admin/declarations')}
-        className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-      >
-        <ChevronLeft className="w-3 h-3" /> Back to declarations
-      </button>
+    <PageShell>
+      <PageBack href="/admin/declarations" label="Back to declarations" />
 
-      {/* Header */}
-      <div className="border border-border rounded-lg bg-card p-5">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <h1 className="kuja-display text-2xl">{d.title}</h1>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold capitalize ${STATUS_COLOUR[d.status]}`}>
-                {d.status.replace('_', ' ')}
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
-              {d.country && <span>{d.country}</span>}
-              {d.crisis_type && <span>{d.crisis_type}</span>}
-              {d.severity && <span>severity: {d.severity}</span>}
-              {d.proposed_total_amount && (
-                <span>proposed: {d.proposed_total_amount.toLocaleString()}</span>
-              )}
-            </div>
-          </div>
-          <DrafterActions d={d} onChange={mutate} />
-        </div>
+      <PageHeader
+        title={d.title}
+        icon={Siren}
+        status={statusPill}
+        meta={[
+          ...(d.country      ? [{ label: d.country }]                                  : []),
+          ...(d.crisis_type  ? [{ label: d.crisis_type }]                              : []),
+          ...(d.severity     ? [{ label: `severity: ${d.severity}` }]                  : []),
+          ...(d.proposed_total_amount
+            ? [{ label: `proposed: ${d.proposed_total_amount.toLocaleString()}` }]
+            : []),
+        ]}
+        primaryAction={<DrafterActions d={d} onChange={mutate} />}
+      />
 
-        {/* Release applications — declaration-to-grant handoff (Phase 32-38 follow-up) */}
-        {d.status === 'signed_active' && (
-          <ReleaseApplicationsPanel d={d} onChange={mutate} />
-        )}
-
-        {/* Signature counter */}
-        <div className="mt-4 flex items-center gap-3 text-xs">
-          <Shield className="w-4 h-4 text-muted-foreground" />
-          <strong>{d.signed_count}</strong> / {d.required_signer_count} signed
-          {d.recused_count > 0 && (
-            <span className="text-muted-foreground">· {d.recused_count} recused</span>
-          )}
-          {d.rejected_count > 0 && (
-            <span className="text-destructive">· {d.rejected_count} rejected</span>
-          )}
-        </div>
-
-        {/* SLA timestamps */}
-        <SlaPanel d={d} />
-      </div>
-
-      {/* Summary */}
-      <div className="border border-border rounded-lg bg-card p-5 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-semibold text-sm">Summary</h2>
-          {d.status === 'draft' && (
-            <AIDraftAssistButton declarationId={d.id} onUpdate={mutate} />
-          )}
-        </div>
-        {d.summary_md ? (
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{d.summary_md}</p>
-        ) : (
-          <p className="text-xs text-muted-foreground italic">No summary yet.</p>
-        )}
-      </div>
-
-      {/* Evidence anchor */}
-      {d.evidence_row_id && (
-        <div className="border border-border rounded-lg bg-card p-5 text-xs">
-          <h2 className="font-semibold text-sm mb-2 flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Evidence anchor
-          </h2>
-          <div className="text-muted-foreground">
-            Crisis Monitoring row #{d.evidence_row_id}
-            {d.evidence_report_id && <> · Report #{d.evidence_report_id}</>}
-          </div>
-        </div>
+      {/* Release applications — the highest-priority action when active and
+          NGOs not yet notified. Rendered as its own attention-tier banner. */}
+      {d.status === 'signed_active' && (
+        <ReleaseApplicationsPanel d={d} onChange={mutate} />
       )}
 
-      {/* Signers */}
-      <section className="border border-border rounded-lg bg-card p-5 space-y-3">
-        <h2 className="font-semibold text-sm">Signers</h2>
-        {(d.signatures ?? []).length === 0 && (
-          <div className="text-xs text-muted-foreground italic">No signer slots yet.</div>
-        )}
-        <ul className="space-y-2">
-          {(d.signatures ?? []).map((s) => (
-            <SignerRow
-              key={s.id}
-              declarationId={d.id}
-              decl={d}
-              sig={s}
-              onChange={mutate}
-            />
-          ))}
-        </ul>
-      </section>
+      {/* Phase 45 stepper carries the live counter + count-aware "Next:" hint.
+          This IS the page's attention surface for declarations. */}
+      <DeclarationStepper d={d} />
 
-      {/* Documents */}
-      <section className="border border-border rounded-lg bg-card p-5 space-y-3">
-        <h2 className="font-semibold text-sm">Supporting documents</h2>
-        {(d.documents ?? []).length === 0 ? (
-          <div className="text-xs text-muted-foreground italic">No documents attached.</div>
-        ) : (
-          <ul className="space-y-1.5 text-xs">
-            {(d.documents ?? []).map((doc) => (
-              <li key={doc.id} className="flex items-center gap-2">
-                <FileText className="w-3 h-3 text-muted-foreground" />
-                <span className="capitalize">{doc.kind.replace('_', ' ')}</span>
-                {doc.note && <span className="text-muted-foreground italic">— {doc.note}</span>}
-              </li>
+      <PageMain>
+        {/* Context: summary + evidence anchor */}
+        <div className="border border-border rounded-lg bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-semibold text-sm">Context</h2>
+            {d.status === 'draft' && (
+              <AIDraftAssistButton declarationId={d.id} onUpdate={mutate} />
+            )}
+          </div>
+          {d.summary_md ? (
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{d.summary_md}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">No summary yet.</p>
+          )}
+          {d.evidence_row_id && (
+            <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-2 border-t border-border">
+              <FileText className="w-3 h-3" />
+              Evidence: Crisis Monitoring row #{d.evidence_row_id}
+              {d.evidence_report_id && <> · Report #{d.evidence_report_id}</>}
+            </div>
+          )}
+        </div>
+
+        {/* Committee — identity-resolved rows + inline OB picker */}
+        <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="font-semibold text-sm">Committee (Oversight Body signers)</h2>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Per IKEA Concept Note procedure — OB members sign with COI affirmation
+                before the declaration goes active.
+              </p>
+            </div>
+            {d.status === 'draft' && (
+              <div className="text-[11px] text-muted-foreground">
+                <strong className="text-foreground">{(d.signatures ?? []).length}</strong>{' '}
+                of {d.required_signer_count} slots filled
+              </div>
+            )}
+          </div>
+
+          {(d.signatures ?? []).length === 0 && (
+            <div className="text-xs text-muted-foreground italic">
+              No committee members assigned yet. Pick from the Oversight Body roster below.
+            </div>
+          )}
+          <ul className="space-y-2">
+            {(d.signatures ?? []).map((s) => (
+              <SignerRow
+                key={s.id}
+                declarationId={d.id}
+                decl={d}
+                sig={s}
+                onChange={mutate}
+              />
             ))}
           </ul>
-        )}
-      </section>
 
-      {/* Audit anchor chip */}
-      {d.signed_active_audit_id && (
-        <div className="text-[10px] text-muted-foreground">
-          Activation audit-chain anchor: #{d.signed_active_audit_id}
-        </div>
-      )}
-    </div>
+          {/* Inline OB picker — only while still draftable */}
+          {d.status === 'draft' && (
+            <AddSignerPanel d={d} onChange={mutate} />
+          )}
+        </section>
+
+        {/* Documents — render only if any are attached */}
+        {(d.documents ?? []).length > 0 && (
+          <section className="border border-border rounded-lg bg-card p-5 space-y-3">
+            <h2 className="font-semibold text-sm">Supporting documents</h2>
+            <ul className="space-y-1.5 text-xs">
+              {(d.documents ?? []).map((doc) => (
+                <li key={doc.id} className="flex items-center gap-2">
+                  <FileText className="w-3 h-3 text-muted-foreground" />
+                  <span className="capitalize">{doc.kind.replace('_', ' ')}</span>
+                  {doc.note && <span className="text-muted-foreground italic">— {doc.note}</span>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </PageMain>
+
+      {/* Supporting detail — collapsible by default. Audit trail, SLA
+          timestamps, and the activation anchor live here so the page leads
+          with action, not records. */}
+      <PageDetail>
+        <PageDetailSection
+          title="Process timeline"
+          icon={Clock}
+          defaultOpen={false}
+        >
+          <DeclarationLedgerPanel declarationId={d.id} />
+        </PageDetailSection>
+        {hasSla && (
+          <PageDetailSection
+            title="SLA milestones"
+            icon={Clock}
+            defaultOpen={false}
+          >
+            <SlaPanel d={d} />
+          </PageDetailSection>
+        )}
+        {d.signed_active_audit_id && (
+          <PageDetailSection
+            title="Audit anchor"
+            icon={ShieldCheck}
+            defaultOpen={false}
+          >
+            <div className="text-xs text-muted-foreground">
+              Activation audit-chain anchor:{' '}
+              <span className="font-mono">#{d.signed_active_audit_id}</span>
+            </div>
+          </PageDetailSection>
+        )}
+      </PageDetail>
+    </PageShell>
   );
 }
 
@@ -200,8 +244,9 @@ function SlaPanel({ d }: { d: EmergencyDeclaration }) {
   ];
   const hasAny = items.some((i) => i.value);
   if (!hasAny) return null;
+  // Renders inside <PageDetailSection> which already provides the card chrome.
   return (
-    <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2 text-[10px]">
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[10px]">
       {items.map((i) => (
         <div key={i.label} className="space-y-0.5">
           <div className="uppercase tracking-wide text-muted-foreground">{i.label}</div>
@@ -433,13 +478,35 @@ function SignerRow({
     ? <AlertCircle className="w-4 h-4 text-muted-foreground" />
     : <Lock className="w-4 h-4 text-muted-foreground" />;
 
+  const displayName = sig.signer_name || sig.signer_email || `User #${sig.signer_user_id}`;
+  const canRemove = decl.status === 'draft' && isAdmin && sig.status === 'pending';
+
+  async function removeSlot() {
+    if (!confirm(`Remove ${displayName} from the committee?`)) return;
+    setBusy(true);
+    try {
+      await api.delete(`/declarations/${declarationId}/signers/${sig.id}`);
+      toast.success('Signer removed.');
+      onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Remove failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <li className="border border-border rounded-md bg-background p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           {statusIcon}
-          <div>
-            <div className="text-sm font-medium">User #{sig.signer_user_id}</div>
+          <div className="min-w-0">
+            <div className="text-sm font-medium truncate">{displayName}</div>
+            {sig.signer_org_name && (
+              <div className="text-[11px] text-muted-foreground truncate">
+                {sig.signer_org_name}
+              </div>
+            )}
             <div className="text-xs text-muted-foreground capitalize">
               {sig.status.replace('_', ' ')}
               {sig.signature_method && <> · via {sig.signature_method}</>}
@@ -457,22 +524,35 @@ function SignerRow({
             )}
           </div>
         </div>
-        {canAct && (
-          <div className="flex gap-1">
-            <button type="button" onClick={() => setShowSign(true)}
-              className="px-2 py-1 rounded-md bg-[hsl(var(--kuja-grow))] text-white text-xs font-semibold hover:opacity-90">
-              Sign
+        <div className="flex gap-1 shrink-0">
+          {canAct && (
+            <>
+              <button type="button" onClick={() => setShowSign(true)}
+                className="px-2 py-1 rounded-md bg-[hsl(var(--kuja-grow))] text-white text-xs font-semibold hover:opacity-90">
+                Sign
+              </button>
+              <button type="button" onClick={() => setShowRecuse(true)}
+                className="px-2 py-1 rounded-md border border-border text-xs font-semibold hover:bg-muted">
+                Recuse
+              </button>
+              <button type="button" onClick={() => setShowReject(true)}
+                className="px-2 py-1 rounded-md border border-border text-xs font-semibold hover:bg-muted">
+                Reject
+              </button>
+            </>
+          )}
+          {canRemove && (
+            <button
+              type="button"
+              onClick={removeSlot}
+              disabled={busy}
+              title="Remove from committee"
+              className="px-2 py-1 rounded-md border border-border text-xs font-semibold hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+            >
+              <Trash2 className="w-3 h-3" />
             </button>
-            <button type="button" onClick={() => setShowRecuse(true)}
-              className="px-2 py-1 rounded-md border border-border text-xs font-semibold hover:bg-muted">
-              Recuse
-            </button>
-            <button type="button" onClick={() => setShowReject(true)}
-              className="px-2 py-1 rounded-md border border-border text-xs font-semibold hover:bg-muted">
-              Reject
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Sign dialog */}
@@ -658,6 +738,162 @@ function ReleaseApplicationsPanel({ d, onChange }: {
           {lastResult.released.map((g) => (
             <li key={g.grant_id} className="text-muted-foreground">
               · grant #{g.grant_id} — {g.title.slice(0, 60)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * AddSignerPanel — Phase 45.
+ *
+ * Inline OB roster picker. Surfaces every user at every Oversight Body-flagged
+ * org so the drafter can pick committee members by NAME (not by raw user_id).
+ *
+ * Lives under the signer list on draft declarations. Filters out anyone already
+ * assigned (signed, recused, rejected — they all sit in d.signatures), filters
+ * by free-text on name/email/org, calls POST /declarations/<id>/signers per pick.
+ */
+function AddSignerPanel({
+  d, onChange,
+}: { d: EmergencyDeclaration; onChange: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [busyUserId, setBusyUserId] = useState<number | null>(null);
+  const { data: rosterData, isLoading } = useObRoster();
+
+  const assignedUserIds = useMemo(
+    () => new Set((d.signatures ?? []).map((s) => s.signer_user_id)),
+    [d.signatures],
+  );
+
+  const candidates = useMemo<ObRosterMember[]>(() => {
+    const all = rosterData?.members ?? [];
+    const free = all.filter((m) => !assignedUserIds.has(m.user_id));
+    if (!query.trim()) return free;
+    const q = query.trim().toLowerCase();
+    return free.filter((m) =>
+      (m.user_name || '').toLowerCase().includes(q) ||
+      (m.user_email || '').toLowerCase().includes(q) ||
+      (m.org_name || '').toLowerCase().includes(q) ||
+      (m.country || '').toLowerCase().includes(q),
+    );
+  }, [rosterData, assignedUserIds, query]);
+
+  async function addSigner(member: ObRosterMember) {
+    setBusyUserId(member.user_id);
+    try {
+      await api.post(`/declarations/${d.id}/signers`, {
+        user_id: member.user_id,
+      });
+      toast.success(`Added ${member.user_name || member.user_email}.`);
+      onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Add signer failed.');
+    } finally {
+      setBusyUserId(null);
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="mt-2 pt-3 border-t border-border">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[hsl(var(--kuja-clay))] text-white text-xs font-semibold hover:opacity-90"
+        >
+          <UserPlus className="w-3.5 h-3.5" />
+          Add committee member
+        </button>
+        <p className="text-[11px] text-muted-foreground mt-1.5">
+          Pick from the Oversight Body roster — only OB-seat-flagged members are
+          eligible to sign.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 pt-3 border-t border-border space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold flex items-center gap-1.5">
+          <UserPlus className="w-3.5 h-3.5 text-[hsl(var(--kuja-clay))]" />
+          Add from Oversight Body roster
+        </h3>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setQuery(''); }}
+          className="text-[11px] text-muted-foreground hover:text-foreground"
+        >
+          Close
+        </button>
+      </div>
+
+      <label className="block">
+        <span className="sr-only">Search OB members</span>
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name, email, org or country…"
+            className="w-full pl-7 pr-2 py-1.5 rounded-md border border-border bg-background text-xs"
+          />
+        </div>
+      </label>
+
+      {isLoading && (
+        <div className="text-xs text-muted-foreground italic">Loading roster…</div>
+      )}
+
+      {!isLoading && (rosterData?.members ?? []).length === 0 && (
+        <div className="border border-dashed border-border rounded-md p-3 text-xs text-muted-foreground">
+          No Oversight Body seats are configured for this network yet. Ask the
+          network admin to grant OB seats from the Membership page first.
+        </div>
+      )}
+
+      {!isLoading && candidates.length === 0 && (rosterData?.members ?? []).length > 0 && (
+        <div className="text-xs text-muted-foreground italic">
+          {query.trim()
+            ? `No matches for "${query}".`
+            : 'All eligible members are already on the committee.'}
+        </div>
+      )}
+
+      {candidates.length > 0 && (
+        <ul className="space-y-1 max-h-64 overflow-y-auto pr-1">
+          {candidates.map((m) => (
+            <li
+              key={m.user_id}
+              className="flex items-center justify-between gap-2 border border-border rounded-md p-2 hover:bg-muted/30 transition-colors"
+            >
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {m.user_name || m.user_email || `User #${m.user_id}`}
+                </div>
+                <div className="text-[11px] text-muted-foreground truncate">
+                  {m.org_name}
+                  {m.country && <> · {m.country}</>}
+                  {m.user_role && <> · {m.user_role}</>}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => addSigner(m)}
+                disabled={busyUserId === m.user_id}
+                className="px-2.5 py-1 rounded-md bg-[hsl(var(--kuja-clay))] text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 shrink-0"
+              >
+                {busyUserId === m.user_id ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  'Add'
+                )}
+              </button>
             </li>
           ))}
         </ul>

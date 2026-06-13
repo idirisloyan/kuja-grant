@@ -22,7 +22,8 @@ import {
   type Membership,
 } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
-import { CheckCircle2, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, ArrowRight, Award } from 'lucide-react';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 export default function JoinNetworkPage() {
   const router = useRouter();
@@ -129,15 +130,14 @@ export default function JoinNetworkPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="kuja-display text-3xl">Join {cfg.network.name}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Apply for membership in the {cfg.network.name} network.
-          Review takes up to {cfg.membership_review_days} days.
-        </p>
-      </div>
-
+    <div className="max-w-3xl">
+      <PageShell>
+        <PageHeader
+          title={`Join ${cfg.network.name}`}
+          icon={Award}
+          subtitle={`Apply for membership. Review takes up to ${cfg.membership_review_days} days.`}
+        />
+        <PageMain>
       {/* Status banner */}
       {existing && (
         <StatusBanner m={existing} />
@@ -314,6 +314,8 @@ export default function JoinNetworkPage() {
           Submit for OB review <ArrowRight className="w-4 h-4" />
         </button>
       </div>
+        </PageMain>
+      </PageShell>
     </div>
   );
 }

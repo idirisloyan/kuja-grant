@@ -21,6 +21,7 @@ import { Loader2, Users, Globe2, BarChart3, ArrowRight, AlertTriangle } from 'lu
 import { Card } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 interface ActiveUsers {
   window_days: number;
@@ -209,15 +210,14 @@ export default function AdminMetricsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5">
-      <div>
-        <h1 className="kuja-display text-2xl">Real-user metrics</h1>
-        <p className="text-sm text-muted-foreground">
-          Behavioural events from the UserEvent table. Backbone for funnel analysis, language
-          parity, and A/B experiments. All counts are distinct users in the window.
-        </p>
-      </div>
-
+    <div className="max-w-6xl mx-auto">
+      <PageShell>
+        <PageHeader
+          title="Real-user metrics"
+          icon={BarChart3}
+          subtitle="Behavioural events from the UserEvent table — funnels, language parity, A/B."
+        />
+        <PageMain>
       {/* Active users */}
       <Card className="p-4 sm:p-5">
         <div className="flex items-start gap-2 mb-3">
@@ -415,6 +415,8 @@ export default function AdminMetricsPage() {
           <BreakdownChips map={data.ab_application_submit.by_arm} />
         )}
       </Card>
+        </PageMain>
+      </PageShell>
     </div>
   );
 }

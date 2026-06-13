@@ -6,11 +6,12 @@
  */
 
 import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useGrants } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Search, X, Plus, ArrowRight, Inbox, Calendar, Briefcase, Compass, FileText } from 'lucide-react';
+import { Search, X, Plus, ArrowRight, Inbox, Calendar, Briefcase, Compass, FileText, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Grant } from '@/lib/types';
 import { SavedSearchesBar } from '@/components/shared/saved-searches-bar';
@@ -86,7 +87,14 @@ export default function GrantsPage() {
       return next;
     });
   };
-  const { data, isLoading } = useGrants();
+  // Phase 66 — optional ?window_id=N filter, deep-linkable from
+  // /admin/windows/[id] "See all grants in this window".
+  const searchParams = useSearchParams();
+  const windowIdParam = searchParams.get('window_id');
+  const windowId = windowIdParam ? Number(windowIdParam) : null;
+  const { data, isLoading } = useGrants(
+    windowId ? { window_id: String(windowId) } : undefined,
+  );
 
   const grants: Grant[] = useMemo(() => data?.grants ?? [], [data]);
 
@@ -144,6 +152,7 @@ export default function GrantsPage() {
           <h1 className="kuja-display text-3xl">{isNgo ? t('grant.browse_title') : t('grant.my_grants')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {filteredGrants.length} grant{filteredGrants.length !== 1 ? 's' : ''} found
+            {windowId && <> · filtered to window #{windowId}</>}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -198,6 +207,30 @@ export default function GrantsPage() {
           )}
         </div>
       </div>
+
+      {/* Phase 66 — active window filter chip. The user landed here from
+          /admin/windows/<id> "See all"; let them clear the scope. */}
+      {windowId && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-[hsl(var(--kuja-clay))]/15 text-[hsl(var(--kuja-clay))] font-semibold">
+            <Wallet className="w-3 h-3" />
+            Window #{windowId}
+            <Link
+              href="/grants"
+              className="inline-flex items-center hover:bg-[hsl(var(--kuja-clay))]/20 rounded-full p-0.5 ml-0.5"
+              title="Clear window filter"
+            >
+              <X className="w-3 h-3" />
+            </Link>
+          </span>
+          <Link
+            href={`/admin/windows/${windowId}`}
+            className="text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            Open window operations
+          </Link>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative max-w-lg">

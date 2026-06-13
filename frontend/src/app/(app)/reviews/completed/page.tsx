@@ -3,9 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { useReviews } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Eye, CheckCircle, Star } from 'lucide-react';
+import { Eye, CheckCircle, Star, ClipboardCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Review } from '@/lib/types';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 export default function CompletedReviewsPage() {
   const router = useRouter();
@@ -23,17 +24,13 @@ export default function CompletedReviewsPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="kuja-display text-3xl">{t('review.completed_title')}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {t('review.completed.subtitle')}
-        </p>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {t('review.tab.completed_count', { n: completed.length })}
-        </p>
-      </div>
-
+    <PageShell>
+      <PageHeader
+        title={t('review.completed_title')}
+        icon={ClipboardCheck}
+        subtitle={`${t('review.completed.subtitle')} · ${t('review.tab.completed_count', { n: completed.length })}`}
+      />
+      <PageMain>
       {completed.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-background px-6 py-14 text-center">
           <CheckCircle className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
@@ -108,6 +105,7 @@ export default function CompletedReviewsPage() {
           </button>
         </div>
       )}
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }

@@ -36,11 +36,65 @@ from app.models import (
     Organization,
     User,
 )
-from app.utils.network import get_current_network, get_current_network_id
+from app.services.email_service import EmailService
+from app.utils.network import get_current_network, get_current_network_id, ob_required
 from app.utils.helpers import get_request_json
 from app.utils.decorators import role_required
 
 logger = logging.getLogger("kuja")
+
+
+def _notify_membership_decision(membership, *, decision: str, reason: str | None = None):
+    """Send email to all NGO admins at the applicant org when the OB makes
+    a final decision. Best-effort; swallows transport errors so the API
+    response isn't held up by mail problems.
+
+    decision: 'approved' or 'rejected'.
+    """
+    try:
+        net = Network.query.get(membership.network_id)
+        net_name = net.name if net else "the network"
+        recipients = (
+            User.query
+            .filter_by(org_id=membership.org_id, role="ngo")
+            .all()
+        )
+        if not recipients:
+            logger.info(
+                "membership.notify: no ngo users at org=%s (skipping)",
+                membership.org_id,
+            )
+            return
+        if decision == "approved":
+            subject = f"Welcome — {net_name} membership approved"
+            body = (
+                f"Your application to join {net_name} has been approved by "
+                f"the Oversight Body.\n\n"
+                f"Sign in to see your dashboard, capacity score, and the "
+                f"declarations and grants you're now eligible to participate "
+                f"in.\n\n"
+                f"— {net_name} secretariat"
+            )
+        else:
+            reason_block = f"\n\nReason:\n  {reason}\n" if reason else ""
+            subject = f"{net_name} membership decision"
+            body = (
+                f"Your application to join {net_name} was not approved at "
+                f"this time."
+                f"{reason_block}\n"
+                f"You may re-apply after the cooldown period set by the "
+                f"Oversight Body. Reach out to the secretariat if you have "
+                f"questions about the decision.\n\n"
+                f"— {net_name} secretariat"
+            )
+        for u in recipients:
+            r = EmailService.send(to=u.email, subject=subject, body=body)
+            logger.info(
+                "membership.notify decision=%s to=%s transport=%s success=%s",
+                decision, u.email, r.get("transport"), r.get("success"),
+            )
+    except Exception as e:
+        logger.warning("membership.notify failed: %s", e)
 
 network_membership_bp = Blueprint(
     "network_membership",
@@ -314,7 +368,7 @@ def _is_ob_or_admin() -> bool:
 
 
 @network_membership_bp.route("/pending", methods=["GET"])
-@role_required("admin")  # tightened in Phase 38 to OB members per network
+@ob_required  # Phase 44C — was admin; OB members of this network see the queue
 def api_list_pending_memberships():
     """List memberships awaiting OB decision in the current network.
 
@@ -369,7 +423,7 @@ def api_get_membership(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/approve", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_approve_membership(membership_id):
     m = NetworkMembership.query.get_or_404(membership_id)
     # Scope-check: admin must be acting within the network that owns this row.
@@ -383,11 +437,12 @@ def api_approve_membership(membership_id):
             "error": f"Cannot approve from status '{m.status}'",
         }), 400
     db.session.commit()
+    _notify_membership_decision(m, decision="approved")
     return jsonify({"success": True, "membership": m.to_dict()})
 
 
 @network_membership_bp.route("/<int:membership_id>/reject", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_reject_membership(membership_id):
     m = NetworkMembership.query.get_or_404(membership_id)
     body = get_request_json() or {}
@@ -411,11 +466,12 @@ def api_reject_membership(membership_id):
             "error": f"Cannot reject from status '{m.status}'",
         }), 400
     db.session.commit()
+    _notify_membership_decision(m, decision="rejected", reason=reason)
     return jsonify({"success": True, "membership": m.to_dict()})
 
 
 @network_membership_bp.route("/<int:membership_id>/suspend", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_suspend_membership(membership_id):
     m = NetworkMembership.query.get_or_404(membership_id)
     body = get_request_json() or {}
@@ -437,7 +493,7 @@ def api_suspend_membership(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/run-trust-process", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_run_trust_process(membership_id):
     """Phase 15 (NEAR redesign) — NEAR operator runs the trust process on
     behalf of the network. Triggers the existing trust-profile build
@@ -470,43 +526,55 @@ def api_run_trust_process(membership_id):
         m.applied_at = m.applied_at or datetime.now(timezone.utc)
 
     # Run an adverse-media screen on the org (best-effort; service has
-    # its own fallback). Persists via the existing route logic — we
-    # call the service directly here to keep this endpoint atomic.
+    # its own fallback). Persists via the canonical AdverseMediaScreening
+    # shape — matches the same write pattern used by /trust/adverse-media.
     screening_summary = None
     try:
         from app.services.adverse_media_service import AdverseMediaService
         from app.models import AdverseMediaScreening
-        from app.utils.helpers import _json_dump
         result = AdverseMediaService.screen(
             org_name=org.name,
             country=getattr(org, "country", None),
             sector=None,
             leadership=None,
         )
+        summary = result.get("summary") or {}
         scr = AdverseMediaScreening(
             org_id=org.id,
-            screening_date=datetime.now(timezone.utc),
-            sources_searched=_json_dump(result.get("sources_searched") or []),
-            total_results=result.get("total_results", 0),
-            high_count=result.get("high_count", 0),
-            medium_count=result.get("medium_count", 0),
-            low_count=result.get("low_count", 0),
-            recommendation=result.get("recommendation", "review"),
-            evidence_items=_json_dump(result.get("evidence_items") or []),
-            metadata=_json_dump({"triggered_by": "membership_trust_process",
-                                 "membership_id": m.id}),
+            lookback_months=result.get("lookback_months", 24),
+            status=summary.get("overall_status", "pending"),
+            source=result.get("source", "unknown"),
+            ai_confidence=result.get("ai_confidence", 0),
+            ai_notes=(result.get("ai_notes") or "")[:8000],
+            screened_by_user_id=getattr(current_user, "id", None),
         )
+        scr.set_subjects(result.get("subjects", []))
+        scr.set_findings(result.get("findings", []))
+        # Stash trust-process provenance + counts inside summary so we
+        # don't lose the triggered-by attribution.
+        merged_summary = {
+            **summary,
+            "triggered_by": "membership_trust_process",
+            "membership_id": m.id,
+        }
+        scr.set_summary(merged_summary)
         db.session.add(scr)
         screening_summary = {
-            "recommendation": result.get("recommendation"),
-            "high_count": result.get("high_count", 0),
-            "medium_count": result.get("medium_count", 0),
-            "low_count": result.get("low_count", 0),
-            "sources_searched": result.get("sources_searched", []),
+            "recommendation": summary.get("recommendation"),
+            "high_count": summary.get("high_count", 0),
+            "medium_count": summary.get("medium_count", 0),
+            "low_count": summary.get("low_count", 0),
+            "sources_searched": summary.get("sources_searched", []),
+            "overall_status": summary.get("overall_status"),
         }
     except Exception as e:
+        # NOTE: previously this except swallowed silently and the route
+        # still returned 200, which let real defects (like the
+        # screening_date=… invalid kwarg) hide for weeks. We now
+        # surface the error inside the response payload so callers
+        # see the failure even when the surrounding flow succeeds.
         logger.exception(f"membership trust process — adverse media failed: {e}")
-        screening_summary = {"error": str(e)[:200]}
+        screening_summary = {"error": str(e)[:200], "ok": False}
 
     # Build the aggregated trust profile (uses ALL existing data —
     # screening just added + any prior verifications + capacity passport)
@@ -548,7 +616,7 @@ def api_run_trust_process(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/expel", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_expel_membership(membership_id):
     m = NetworkMembership.query.get_or_404(membership_id)
     body = get_request_json() or {}
@@ -567,3 +635,162 @@ def api_expel_membership(membership_id):
         }), 400
     db.session.commit()
     return jsonify({"success": True, "membership": m.to_dict()})
+
+
+# ---------------------------------------------------------------------------
+# Phase 44 — Oversight Body seat management
+# ---------------------------------------------------------------------------
+
+@network_membership_bp.route("/<int:membership_id>/ob-seat", methods=["POST"])
+@role_required("admin")
+def api_grant_ob_seat(membership_id):
+    """Grant an active member an Oversight Body seat in this network.
+
+    Per the IKEA Concept Note, OB members are peer-elected from NEAR
+    member orgs. The platform admin (Adeso staff) flags the seat
+    here; once flagged, every user at that org gains OB permissions
+    in the network on top of their NGO-member role.
+
+    Body (optional): { effective_at: ISO datetime, note?: str }
+    """
+    from datetime import datetime, timezone
+    m = NetworkMembership.query.get_or_404(membership_id)
+    network_id = get_current_network_id()
+    if network_id and m.network_id != network_id:
+        return jsonify({"success": False, "error": "Wrong network context"}), 403
+    if m.status != "active":
+        return jsonify({
+            "success": False,
+            "error": f"Member must be active to hold an OB seat (status: {m.status})",
+        }), 400
+    if m.is_oversight_body:
+        return jsonify({
+            "success": False,
+            "error": "Member already holds an OB seat",
+            "membership": m.to_dict(),
+        }), 409
+
+    body = get_request_json() or {}
+    m.is_oversight_body = True
+    m.ob_role_started_at = datetime.now(timezone.utc)
+    m.ob_role_ended_at = None
+    db.session.flush()
+
+    # Audit anchor so the OB roster has the same provenance as
+    # declarations + signatures + grants.
+    try:
+        from app.models import AuditChainEntry
+        AuditChainEntry.append(
+            action="network.ob.seat_granted",
+            actor_email=current_user.email,
+            subject_kind="network_membership",
+            subject_id=m.id,
+            details={
+                "network_id": m.network_id,
+                "org_id": m.org_id,
+                "note": (body.get("note") or "")[:500],
+            },
+        )
+    except Exception:
+        pass
+
+    db.session.commit()
+    return jsonify({"success": True, "membership": m.to_dict()})
+
+
+@network_membership_bp.route("/<int:membership_id>/ob-seat", methods=["DELETE"])
+@role_required("admin")
+def api_revoke_ob_seat(membership_id):
+    """Revoke an OB seat (e.g. term ended, member elected off the OB)."""
+    from datetime import datetime, timezone
+    m = NetworkMembership.query.get_or_404(membership_id)
+    network_id = get_current_network_id()
+    if network_id and m.network_id != network_id:
+        return jsonify({"success": False, "error": "Wrong network context"}), 403
+    if not m.is_oversight_body:
+        return jsonify({
+            "success": False,
+            "error": "Member does not hold an OB seat",
+        }), 409
+
+    body = get_request_json() or {}
+    m.is_oversight_body = False
+    m.ob_role_ended_at = datetime.now(timezone.utc)
+    db.session.flush()
+
+    try:
+        from app.models import AuditChainEntry
+        AuditChainEntry.append(
+            action="network.ob.seat_revoked",
+            actor_email=current_user.email,
+            subject_kind="network_membership",
+            subject_id=m.id,
+            details={
+                "network_id": m.network_id,
+                "org_id": m.org_id,
+                "reason": (body.get("reason") or "")[:500],
+            },
+        )
+    except Exception:
+        pass
+
+    db.session.commit()
+    return jsonify({"success": True, "membership": m.to_dict()})
+
+
+@network_membership_bp.route("/ob-roster", methods=["GET"])
+@login_required
+def api_ob_roster():
+    """List active OB members in the current network.
+
+    Used by the declaration signer-picker and the operator console
+    so the team can see (and audit) who currently holds OB seats.
+
+    Returns one entry per USER at an OB-flagged organisation —
+    declaration signer slots identify a specific user_id, so the
+    picker needs to surface user-level rows, not just org-level.
+    Each row carries the membership context (org name, country)
+    so the picker can group + label.
+    """
+    network_id = get_current_network_id()
+    if not network_id:
+        return jsonify({"success": True, "members": [], "count": 0})
+
+    memberships = (
+        NetworkMembership.query
+        .filter_by(
+            network_id=network_id,
+            status="active",
+            is_oversight_body=True,
+        )
+        .all()
+    )
+
+    from app.models import User, Organization
+    rows = []
+    for m in memberships:
+        org = Organization.query.get(m.org_id)
+        users = User.query.filter_by(org_id=m.org_id).all()
+        for u in users:
+            rows.append({
+                "membership_id": m.id,
+                "org_id": m.org_id,
+                "org_name": org.name if org else f"Org #{m.org_id}",
+                "country": m.country or (org.country if org else None),
+                "user_id": u.id,
+                "user_name": u.name,
+                "user_email": u.email,
+                "user_role": u.role,
+                "ob_role_started_at": (
+                    m.ob_role_started_at.isoformat() if m.ob_role_started_at else None
+                ),
+            })
+    # Sort by org name, then user name — stable picker order
+    rows.sort(key=lambda r: ((r["org_name"] or "").lower(),
+                              (r["user_name"] or "").lower()))
+    return jsonify({
+        "success": True,
+        "network_id": network_id,
+        "members": rows,
+        "count": len(rows),
+    })

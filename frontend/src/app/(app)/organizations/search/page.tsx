@@ -8,6 +8,7 @@ import { Search, Building2, Eye, ShieldCheck, MapPin, Loader2 } from 'lucide-rea
 import { cn } from '@/lib/utils';
 import type { Organization } from '@/lib/types';
 import { SavedSearchesBar } from '@/components/shared/saved-searches-bar';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 export default function OrgSearchPage() {
   const { t } = useTranslation();
@@ -34,14 +35,13 @@ export default function OrgSearchPage() {
   }, [query]);
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="kuja-display text-3xl">{t('org.search_title')}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {t('org.search_subtitle')}
-        </p>
-      </div>
-
+    <PageShell>
+      <PageHeader
+        title={t('org.search_title')}
+        icon={Building2}
+        subtitle={t('org.search_subtitle')}
+      />
+      <PageMain>
       {/* Phase 13.40 — saved searches captures the active query so users
           can stash recurring lookups (e.g. "Kenya health orgs"). */}
       <SavedSearchesBar
@@ -184,6 +184,7 @@ export default function OrgSearchPage() {
           </p>
         </div>
       )}
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }

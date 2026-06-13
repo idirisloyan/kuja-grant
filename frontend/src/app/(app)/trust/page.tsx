@@ -25,7 +25,9 @@ import { TrustGapInsightsCard } from '@/components/trust/trust-gap-insights-card
 import { AdverseMediaPanel } from '@/components/trust/adverse-media-panel';
 import { BankVerificationPanel } from '@/components/trust/bank-verification-panel';
 import { CapacityPassportPanel } from '@/components/trust/capacity-passport-panel';
+import { RegistrationPanel } from '@/components/trust/registration-panel';
 import { trustApi } from '@/lib/trust-api';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 import type {
   TrustProfile, AdverseMediaScreening, BankVerification, CapacityPassport as Passport,
 } from '@/lib/trust-api';
@@ -136,19 +138,16 @@ function TrustProfilePageInner() {
   }
 
   return (
-    <div className="space-y-4 max-w-5xl mx-auto">
-      {/* Page header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <div className="kuja-eyebrow">Two-pillar trust synthesis</div>
-          <h1 className="kuja-display text-3xl mt-1">Trust Profile</h1>
-          <p className="text-sm text-[hsl(var(--kuja-ink-soft))] mt-1 max-w-2xl">
-            Everything a donor needs to fund this organisation safely, in one place.
-            Composite of <strong>Capacity</strong> (what the NGO can do) +
-            <strong> Due Diligence</strong> (whether the NGO is safe to fund).
-          </p>
-        </div>
-      </div>
+    <div className="max-w-5xl mx-auto">
+      <PageShell>
+        <PageHeader
+          title="Trust Profile"
+          icon={ShieldCheck}
+          subtitle="Identity, sanctions, adverse media, bank verification, COI, and capacity — one canonical view."
+        />
+        <PageMain>
+      {/* Identity & Registration — folded in from /verification */}
+      <RegistrationPanel orgId={orgId} />
 
       {/* Trust Profile */}
       {profile && (
@@ -205,6 +204,8 @@ function TrustProfilePageInner() {
           canRevoke={canRevoke}
         />
       </div>
+        </PageMain>
+      </PageShell>
     </div>
   );
 }

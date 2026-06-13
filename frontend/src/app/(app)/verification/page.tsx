@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { RegistrationVerification } from '@/lib/types';
+import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 function confidenceCls(c: number | null | undefined): string {
   if (c == null) return 'text-muted-foreground';
@@ -387,12 +388,28 @@ export default function VerificationPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="kuja-display text-3xl">{t('verification.title')}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {t('verification.subtitle', { n: Object.keys(registriesData?.registries ?? {}).length })}
-        </p>
+    <PageShell>
+      <PageHeader
+        title={t('verification.title')}
+        icon={ShieldCheck}
+        subtitle={t('verification.subtitle', { n: Object.keys(registriesData?.registries ?? {}).length })}
+      />
+      <PageMain>
+      {/* This page is now the deep-workflow surface for registration
+          checks. The single-org summary lives inside Trust Profile —
+          guide users there so they understand where the canonical view
+          is. The sidebar's "Registration checks" link was removed in
+          favour of this organising principle. */}
+      <div className="rounded-md border border-[hsl(var(--kuja-clay))]/30 bg-[hsl(var(--kuja-clay))]/5 p-3 flex items-start gap-2.5">
+        <ShieldCheck className="w-4 h-4 text-[hsl(var(--kuja-clay))] mt-0.5 shrink-0" />
+        <div className="text-xs leading-relaxed">
+          <span className="font-semibold">Now part of Trust Profile.</span>{' '}
+          The Identity &amp; registration section inside each org&rsquo;s{' '}
+          <a href="/trust" className="text-[hsl(var(--kuja-clay))] hover:underline font-medium">Trust Profile</a>{' '}
+          shows the latest registry verification alongside sanctions, adverse media, bank,
+          and capacity in a single canonical view. This page remains the deep workflow
+          for running new checks across all applicants and exploring AI findings.
+        </div>
       </div>
 
       {/* Intro callout — explains what each status means so first-time
@@ -536,7 +553,8 @@ export default function VerificationPage() {
           </div>
         </div>
       )}
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }
 

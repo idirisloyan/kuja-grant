@@ -57,6 +57,10 @@ from app.models.emergency_declaration import (
 from app.models.monitoring_visit import (
     MonitoringVisit, VISIT_MODES, VISIT_STATUSES,
 )
+from app.models.tenant_message import TenantMessage, TenantMessageRead
+from app.models.member_feedback import (
+    MemberFeedback, FEEDBACK_CATEGORIES, FEEDBACK_STATUSES,
+)
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -72,6 +76,8 @@ __all__ = [
     'WebAuthnCredential',
     'UserEvent',
     'UserFeedback',
+    'TenantMessage', 'TenantMessageRead',
+    'MemberFeedback', 'FEEDBACK_CATEGORIES', 'FEEDBACK_STATUSES',
     'Network', 'DEFAULT_NETWORK_SLUG',
     'NetworkMembership', 'MEMBERSHIP_STATUSES', 'MEMBERSHIP_TIERS',
     'Fund', 'FundWindow', 'WindowEvaluationRubric', 'WindowEvaluationCriterion',

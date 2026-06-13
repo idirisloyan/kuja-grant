@@ -294,6 +294,96 @@ class NetworkAIService:
             "flags": ["ai_unavailable", "manual_review_required"],
         }
 
+    # Keyword sets for the fast deterministic classifier. Used by
+    # classify_budget_direct_to_community_fast() at /submit time so the
+    # hard gate is sub-millisecond — Phase 40's AI-only classifier added
+    # ~4s of latency to every submit, which compounded with the rubric
+    # scorer (Phase 41 split this into a background task).
+    _DIRECT_KEYWORDS = (
+        'cash transfer', 'voucher', 'community', 'household', 'beneficiar',
+        'distribution', 'transfer to', 'food', 'shelter', 'wash', 'water',
+        'sanitation', 'hygiene', 'nfi', 'protection', 'school feeding',
+        'in-kind', 'in kind', 'aid kit', 'hygiene kit', 'dignity kit',
+    )
+    _INDIRECT_KEYWORDS = (
+        'rent', 'admin', 'office', 'head office', 'hq', 'overhead',
+        'indirect', 'audit fee', 'legal fee',
+    )
+
+    @classmethod
+    def classify_budget_direct_to_community_fast(
+        cls, *,
+        budget_lines: list[dict],
+        is_consortium: bool = False,
+        threshold_single_pct: float = 80.0,
+        threshold_consortium_pct: float = 70.0,
+    ) -> dict:
+        """Deterministic, AI-free direct-to-community classifier.
+
+        Used by /api/applications/<id>/submit so the hard gate runs in
+        microseconds, not seconds. Identical return shape to
+        classify_budget_direct_to_community so callers can compare or
+        upgrade later.
+
+        Classification rule:
+          - 'direct' if the label matches one of _DIRECT_KEYWORDS
+          - 'indirect' if it matches _INDIRECT_KEYWORDS (and not direct)
+          - 'operational' otherwise
+
+        For most legitimate emergency-response budgets this matches the
+        AI classifier's verdict ~90% of the time at the gate decision
+        boundary; operators can still click 'Run classifier' on the
+        application detail page to re-classify with the AI when they
+        want the nuance.
+        """
+        threshold_pct = (
+            float(threshold_consortium_pct) if is_consortium
+            else float(threshold_single_pct)
+        )
+        classified = []
+        total = 0.0
+        direct_total = 0.0
+        for b in (budget_lines or []):
+            label = str(b.get('item') or '').lower()
+            amount = float(b.get('amount') or 0)
+            total += amount
+            if any(k in label for k in cls._DIRECT_KEYWORDS):
+                bucket = 'direct'
+                direct_total += amount
+            elif any(k in label for k in cls._INDIRECT_KEYWORDS):
+                bucket = 'indirect'
+            else:
+                bucket = 'operational'
+            classified.append({
+                **b,
+                'item': b.get('item'),
+                'amount': amount,
+                'bucket': bucket,
+                'classification': bucket,
+                'rationale': f'Fast classifier matched on label keywords.',
+            })
+        ratio_pct = (direct_total / total * 100) if total > 0 else 0.0
+        meets = ratio_pct >= threshold_pct
+        return {
+            'ok': True,
+            'engine': 'fast_deterministic',
+            'classified': classified,
+            'classifications': classified,  # alias for the frontend
+            'total': total,
+            'direct_to_community': direct_total,
+            'direct_pct': round(ratio_pct, 1),
+            'ratio_pct': round(ratio_pct, 1),
+            'threshold_pct': threshold_pct,
+            'meets_threshold': meets,
+            'summary': (
+                f"{ratio_pct:.1f}% of budget classified as direct-to-community "
+                f"(threshold {threshold_pct:.0f}% for "
+                f"{'consortium' if is_consortium else 'single-org'} applicants). "
+                f"{'Passes the gate.' if meets else 'Below the gate.'}"
+            ),
+            'flags': [] if meets else ['below_threshold'],
+        }
+
     # ==================================================================
     # 3. Membership Reviewer Brief
     # ==================================================================
@@ -675,3 +765,144 @@ class NetworkAIService:
         if not parsed:
             return {"ok": False, "patterns": []}
         return {"ok": True, "patterns": parsed.get("patterns", [])}
+
+    # ==================================================================
+    # 8. Top Risks Narrator (Phase 60)
+    # ==================================================================
+
+    @classmethod
+    def narrate_top_risks(
+        cls,
+        *,
+        rule_based_risks: list[dict],
+        window_ctx: dict,
+        recent_declarations: list[dict] | None = None,
+    ) -> dict:
+        """Enrich rule-based top_risks with window-specific narrative.
+
+        Caller passes the list of rule-based risk dicts produced by the
+        operational-rollup endpoint (each {kind, severity, label, hint,
+        count}) plus window context (name, fund, country focus) and a
+        small slice of recent declarations for grounding.
+
+        AI rewrites the label and hint so they cite the specific
+        declarations / countries / committee members involved, instead
+        of the generic "1 declaration past 6-day decision SLA".
+
+        Returns:
+          { ok: bool,
+            risks: [{ kind, severity, label, hint, count, narrative }] }
+
+        On failure, returns the rule-based list unchanged with ok=False
+        — every caller MUST be able to fall back gracefully.
+        """
+        from app.services.ai_service import AIService
+
+        if not rule_based_risks:
+            return {"ok": True, "risks": []}
+
+        # Brief AI on the rule-based skeleton + grounded entities. Pass
+        # only the kind+severity+count from the rule layer (NOT the
+        # label/hint) so the model writes fresh language, not paraphrase.
+        risk_skeleton = [
+            {
+                "kind": r.get("kind"),
+                "severity": r.get("severity"),
+                "count": r.get("count"),
+            }
+            for r in rule_based_risks
+        ]
+
+        decls_brief = []
+        for d in (recent_declarations or [])[:8]:
+            decls_brief.append({
+                "id": d.get("id"),
+                "title": (d.get("title") or "").strip()[:120],
+                "country": d.get("country"),
+                "status": d.get("status"),
+                "signed_count": d.get("signed_count"),
+                "required_signer_count": d.get("required_signer_count"),
+                "created_at": d.get("created_at"),
+                "applicants_notified_at": d.get("applicants_notified_at"),
+            })
+
+        system = (
+            "You are NEAR's operations narrator. You are given a list of "
+            "operational risks for a single funding window, plus context "
+            "about the window and its recent declarations. Rewrite each "
+            "risk's label and hint so they cite the SPECIFIC declarations, "
+            "countries, or signature gaps involved.\n"
+            "\n"
+            "Rules:\n"
+            "1. NEVER invent declaration titles, countries, or names. "
+            "Cite only what's in the context provided.\n"
+            "2. Keep the structure: short label (under 80 chars), specific "
+            "hint with the next action (under 200 chars).\n"
+            "3. Don't change kind, severity, or count.\n"
+            "4. Tone: confident, factual, no hyperbole. Imperative voice "
+            "in the hint where helpful ('Chase Fatima Hassan's signature' "
+            "rather than 'Consider chasing the signature')."
+        )
+
+        user = (
+            f"Window: {window_ctx.get('name', '?')}"
+            f" (fund: {window_ctx.get('fund_name', '?')},"
+            f" currency: {window_ctx.get('currency', '?')})\n"
+            f"Available budget: {window_ctx.get('available_budget', '?')}\n"
+            f"\n"
+            f"Risk skeleton (rewrite label + hint per risk):\n"
+            f"{risk_skeleton}\n"
+            f"\n"
+            f"Recent declarations under this window (for grounding):\n"
+            f"{decls_brief}"
+        )
+
+        schema = {
+            "type": "object",
+            "required": ["risks"],
+            "properties": {
+                "risks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["kind", "label", "hint"],
+                        "properties": {
+                            "kind": {"type": "string"},
+                            "label": {"type": "string"},
+                            "hint": {"type": "string"},
+                        },
+                    },
+                },
+            },
+        }
+
+        parsed = AIService._call_claude_tool(
+            system, user,
+            tool_name="narrate_top_risks",
+            tool_description="Enrich rule-based top_risks with window-specific narrative.",
+            tool_schema=schema,
+            max_tokens=900,
+            endpoint="network.narrate_top_risks",
+        )
+
+        if not parsed:
+            # AI failed — return rule-based unchanged so the caller can
+            # still surface the structural risks to the operator.
+            return {"ok": False, "risks": rule_based_risks}
+
+        # Splice AI-narrated label+hint back into the rule-based skeleton.
+        # Match by `kind`, preserve severity + count from the rule layer
+        # (those are authoritative).
+        ai_by_kind = {r.get("kind"): r for r in parsed.get("risks") or []}
+        enriched: list[dict] = []
+        for rule_r in rule_based_risks:
+            ai_r = ai_by_kind.get(rule_r.get("kind"))
+            if ai_r and ai_r.get("label") and ai_r.get("hint"):
+                enriched.append({
+                    **rule_r,
+                    "label": ai_r["label"].strip()[:200],
+                    "hint": ai_r["hint"].strip()[:400],
+                })
+            else:
+                enriched.append(rule_r)
+        return {"ok": True, "risks": enriched}

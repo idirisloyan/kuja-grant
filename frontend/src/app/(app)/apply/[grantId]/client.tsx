@@ -10,6 +10,11 @@ import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
+import { SmartDraftBanner } from '@/components/apply/SmartDraftBanner';
+import { TrustPortableBadge } from '@/components/shared/trust-portable-badge';
+import { AIToolsAccordion } from '@/components/shared/ai-tools-accordion';
+import { useAutosave } from '@/lib/hooks/use-autosave';
+import { getQuestionForLabel, getPlaceholderForLabel } from '@/lib/guided-questions';
 import { SubmissionVelocityBar } from '@/components/apply/submission-velocity-bar';
 import { PastWinsPopover } from '@/components/apply/past-wins-popover';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
@@ -30,7 +35,11 @@ import {
   X,
   Eye,
   Loader2,
+  Briefcase,
 } from 'lucide-react';
+import {
+  PageShell, PageBack, PageHeader, PageMain,
+} from '@/components/layout/page-shell';
 
 import type {
   EligibilityRequirement,
@@ -739,21 +748,15 @@ export default function ApplyWizardClient() {
   const hasMissingItems = !requiredEligMet || !allCriteriaAnswered || !requiredDocsUploaded;
 
   return (
-    <div className="max-w-[960px] space-y-5">
-      <button
-        onClick={() => router.push(`/grants/${grantId}`)}
-        className="inline-flex items-center gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> {t('apply.back_to_grant')}
-      </button>
-
-      <div>
-        <h1 className="kuja-display text-[2rem] font-semibold leading-[1.1] text-foreground">
-          Apply: {grant.title}
-        </h1>
-        <div className="mt-1 text-sm text-muted-foreground">{grant.donor_org_name}</div>
-      </div>
-
+    <div className="max-w-[960px]">
+      <PageShell>
+        <PageBack href={`/grants/${grantId}`} label={t('apply.back_to_grant')} />
+        <PageHeader
+          title={`Apply: ${grant.title}`}
+          icon={Briefcase}
+          subtitle={grant.donor_org_name}
+        />
+        <PageMain>
       {/* Phase 21D — existing application banner */}
       {resumedDraft && (
         <div
@@ -944,6 +947,8 @@ export default function ApplyWizardClient() {
           </div>
         )}
       </div>
+        </PageMain>
+      </PageShell>
     </div>
   );
 }
@@ -1094,6 +1099,21 @@ function ProposalStep({
 }) {
   const { t } = useTranslation();
   const { enabled: coAuthorEnabled } = useFlag('ai.draft_application');
+  // Phase 84 — autosave the in-progress proposal to localStorage with a
+  // debounce. The whole responses object is captured under a single
+  // key per application; resume-banner groups by entity so the NGO sees
+  // one entry on dashboard regardless of how many sections they touched.
+  useAutosave({
+    value: JSON.stringify(responses ?? {}),
+    meta: {
+      kind: 'application',
+      id: applicationId ?? 0,
+      title: criteria[0]?.label ? null : null, // grant title set on parent
+      href: `/apply/${grantId ?? 0}`,
+    },
+    disabled: applicationId == null || Object.values(responses ?? {}).every(v => !v || !v.trim()),
+  });
+
   if (criteria.length === 0) {
     return (
       <Card className="py-10 text-center">
@@ -1129,27 +1149,61 @@ function ProposalStep({
         </Alert>
       )}
 
-      {coAuthorEnabled && grantId != null && (
-        <DraftCoAuthor
-          grantId={grantId}
+      {/* Phase 77 — Trust Profile reassurance: NGO sees their portable
+          score before they start composing. Reframes the moment from
+          'I have to convince this donor I'm trustworthy' to 'my Trust
+          Profile already does that.' */}
+      <div className="flex flex-wrap items-center gap-2">
+        <TrustPortableBadge variant="compact" />
+        <span className="text-[11px] text-muted-foreground">
+          attached automatically with this application
+        </span>
+      </div>
+
+      {/* Phase 75 — bulk-prefill from assessment + history. Sits above
+          DraftCoAuthor because it's the "do it for me" path; coAuthor is
+          the "guide me through it" path. Only renders when every
+          response is empty — once the NGO types, it gets out of the way. */}
+      {applicationId != null && (
+        <SmartDraftBanner
           applicationId={applicationId}
-          onApplied={(d) => onDraftApplied(d.responses || {})}
+          currentResponses={responses}
+          onMerged={(merged) => onDraftApplied(merged)}
         />
       )}
 
-      {/* Phase 10 — AI application auto-fill. Pre-fills drafts from
-          the NGO's org profile + assessments + prior apps. Accept per
-          criterion or accept-all. Renders only if there's nothing typed
-          yet (so it doesn't overwrite work in progress). */}
-      {grantId != null && Object.keys(responses).filter(k => (responses[k] || '').trim()).length === 0 && (
-        <AutofillPanel
-          grantId={grantId}
-          alreadyFilledKeys={Object.keys(responses).filter(k => (responses[k] || '').trim())}
-          onAccept={(key, draft) => onResponseChange(key, draft)}
-        />
+      {/* Phase 83 — AI consolidation. Team review: apply page had 6
+          stacked AI buttons (Smart Draft + DraftCoAuthor + Autofill +
+          per-criterion Strengthen + per-criterion Draft + Co-pilot).
+          We keep the SmartDraftBanner above as the primary 'do it for
+          me' action, and collapse the rest into one disclosure so the
+          power-user tools are still available but not in the way of
+          non-technical users. */}
+      {(coAuthorEnabled || grantId != null) && (
+        <AIToolsAccordion
+          label="More AI tools"
+          hint="Guided drafting, section-by-section auto-fill, and Q&A with the donor"
+          toolCount={(coAuthorEnabled ? 1 : 0)
+            + (grantId != null && Object.keys(responses).filter(k => (responses[k] || '').trim()).length === 0 ? 1 : 0)
+            + (grantId != null ? 1 : 0)}
+        >
+          {coAuthorEnabled && grantId != null && (
+            <DraftCoAuthor
+              grantId={grantId}
+              applicationId={applicationId}
+              onApplied={(d) => onDraftApplied(d.responses || {})}
+            />
+          )}
+          {grantId != null && Object.keys(responses).filter(k => (responses[k] || '').trim()).length === 0 && (
+            <AutofillPanel
+              grantId={grantId}
+              alreadyFilledKeys={Object.keys(responses).filter(k => (responses[k] || '').trim())}
+              onAccept={(key, draft) => onResponseChange(key, draft)}
+            />
+          )}
+          {grantId != null && <GrantQAPanel grantId={grantId} variant="compact" />}
+        </AIToolsAccordion>
       )}
-
-      {grantId != null && <GrantQAPanel grantId={grantId} variant="compact" />}
 
       {criteria.map((c) => {
         const text = responses[c.key] ?? '';
@@ -1165,7 +1219,12 @@ function ProposalStep({
           <Card className="p-5">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="flex-1">
-                <div className="text-sm font-semibold text-foreground">{c.label}</div>
+                {/* Phase 87 — present the field as a question, not a noun.
+                    Falls back to the original label for fields without a
+                    catalogued question. */}
+                <div className="text-sm font-semibold text-foreground">
+                  {getQuestionForLabel(c.key, c.label)}
+                </div>
                 {c.description && (
                   <div className="mt-1 text-sm text-muted-foreground">{c.description}</div>
                 )}
@@ -1178,7 +1237,10 @@ function ProposalStep({
 
             <textarea
               rows={8}
-              placeholder={c.example || `Write your response for "${c.label}"...`}
+              /* Phase 88 — example-style placeholders. Use catalogued
+                 example first, then the donor-supplied example if any,
+                 then a generic placeholder as final fallback. */
+              placeholder={getPlaceholderForLabel(c.key) || c.example || `Write your response for "${c.label}"...`}
               value={text}
               onChange={(e) => onResponseChange(c.key, e.target.value)}
               className={TA_CLS}

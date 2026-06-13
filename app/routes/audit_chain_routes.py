@@ -58,10 +58,29 @@ def api_recent_chain():
     except ValueError:
         offset = 0
 
-    total = db.session.query(db.func.count(AuditChainEntry.id)).scalar() or 0
+    # Phase 64 — optional per-subject filter so per-entity drill-ins
+    # (e.g. the membership review page) can show ONLY the chain entries
+    # that touch a specific subject. Backward-compatible: omit the
+    # query params for the full-chain view.
+    subject_kind = request.args.get('subject_kind') or None
+    subject_id_param = request.args.get('subject_id')
+    subject_id = None
+    if subject_id_param:
+        try:
+            subject_id = int(subject_id_param)
+        except ValueError:
+            subject_id = None
+
+    q = AuditChainEntry.query
+    if subject_kind:
+        q = q.filter(AuditChainEntry.subject_kind == subject_kind)
+    if subject_id is not None:
+        q = q.filter(AuditChainEntry.subject_id == subject_id)
+
+    total = q.with_entities(db.func.count(AuditChainEntry.id)).scalar() or 0
 
     rows = (
-        AuditChainEntry.query
+        q
         .order_by(AuditChainEntry.seq.desc())
         .offset(offset)
         .limit(limit)

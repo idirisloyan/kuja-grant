@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
 from datetime import datetime, date, timezone
 from app.extensions import db
@@ -13,6 +13,68 @@ from app.services.audit import log_action
 logger = logging.getLogger('kuja')
 
 applications_bp = Blueprint('applications', __name__, url_prefix='/api/applications')
+
+
+def _run_network_rubric_scorer_background(*, app, application_id: int):
+    """Phase 41 background worker — runs the Phase 38 NEAR rubric scorer
+    asynchronously so /submit responds fast. Persists the result to
+    ai_rubric_result_json + overrides ai_score with the rubric overall.
+
+    The Flask app object must be captured at submit time (in the
+    route handler) and passed in — the worker thread has no Flask
+    request context, so we establish its own application context here.
+    Best-effort: any failure logs but does not raise — the application
+    is already submitted, the rubric just won't be present until an
+    operator clicks "Run scorer".
+    """
+    with app.app_context():
+        try:
+            from app.models import FundWindow, Organization
+            from app.services.network_ai_service import NetworkAIService
+            a = db.session.get(Application, application_id)
+            if not a or not a.grant or not a.grant.fund_window_id:
+                return {'ok': False, 'reason': 'not_network_grant'}
+            window = db.session.get(FundWindow, a.grant.fund_window_id)
+            rubric = window.default_rubric() if window else None
+            if not (rubric and rubric.criteria):
+                return {'ok': False, 'reason': 'no_rubric'}
+            submission_text = ''
+            responses = a.get_responses() or {}
+            if responses:
+                submission_text = '\n\n'.join(
+                    f"{k}: {v}" for k, v in responses.items() if v
+                )
+            org = db.session.get(Organization, a.ngo_org_id)
+            rubric_result = NetworkAIService.score_application_against_rubric(
+                application_text=submission_text,
+                rubric_criteria=[c.to_dict() for c in rubric.criteria],
+                org_name=org.name if org else None,
+                window_name=window.name if window else None,
+            )
+            if rubric_result:
+                a.set_ai_rubric_result(rubric_result)
+                overall = rubric_result.get('overall_score')
+                if overall is None:
+                    overall = rubric_result.get('total_score')
+                if isinstance(overall, (int, float)):
+                    a.ai_score = float(overall)
+                    a.final_score = float(overall)
+                db.session.commit()
+                logger.info(
+                    f"background rubric scored app={application_id} "
+                    f"overall={overall}"
+                )
+                return {'ok': True, 'overall': overall}
+            return {'ok': False, 'reason': 'rubric_returned_none'}
+        except Exception as e:
+            logger.exception(
+                f"background rubric scorer failed for app {application_id}: {e}"
+            )
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return {'ok': False, 'error': str(e)[:200]}
 
 
 @applications_bp.route('/', methods=['GET'])
@@ -91,6 +153,10 @@ def api_get_application(app_id):
     if application.grant:
         data['grant_criteria'] = application.grant.get_criteria()
         data['grant_eligibility'] = application.grant.get_eligibility()
+        # Network-window flag so the frontend can show the Phase 38 AI
+        # panel (rubric scorer + direct-to-community classifier) only on
+        # network grants.
+        data['grant_fund_window_id'] = getattr(application.grant, 'fund_window_id', None)
 
     return jsonify({'application': data})
 
@@ -160,6 +226,167 @@ def api_create_application():
     return jsonify({'success': True, 'application': application.to_dict()}), 201
 
 
+@applications_bp.route('/<int:app_id>/explain-rejection', methods=['GET'])
+@login_required
+@role_required('ngo')
+def api_explain_application_rejection(app_id):
+    """Phase 76 — Why-rejected, constructively. Applications side."""
+    from app.services.ai_service import AIService
+    application = db.session.get(Application, app_id)
+    if not application:
+        return jsonify({'error': 'Application not found', 'success': False}), 404
+    if application.ngo_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied', 'success': False}), 403
+    if application.status not in ('declined', 'rejected', 'revision_requested'):
+        return jsonify({
+            'error': 'Explanation is only available for declined or revision-requested applications.',
+            'success': False,
+        }), 400
+
+    grant = db.session.get(Grant, application.grant_id)
+    rubric = grant.get_criteria() if grant and hasattr(grant, 'get_criteria') else []
+    payload = {
+        'grant_title': grant.title if grant else None,
+        'responses': application.get_responses() or {},
+        'budget_lines': application.get_budget_lines() if hasattr(application, 'get_budget_lines') else None,
+        'ai_score': getattr(application, 'ai_score', None),
+        'human_score': getattr(application, 'human_score', None),
+        'final_score': getattr(application, 'final_score', None),
+    }
+    donor_notes = (
+        getattr(application, 'reviewer_notes', None)
+        or getattr(application, 'donor_notes', None)
+        or getattr(application, 'feedback', None)
+    )
+
+    result = AIService.explain_rejection(
+        'application', payload=payload, donor_notes=donor_notes, rubric=rubric,
+    )
+    return jsonify({'success': True, **result})
+
+
+@applications_bp.route('/<int:app_id>/ai-draft', methods=['POST'])
+@login_required
+@role_required('ngo')
+def api_ai_draft_application(app_id):
+    """Phase 75 — AI-drafts-application v0.
+
+    NGO opens a draft application. Claude pre-fills every question using:
+      - The grant's criteria, eligibility, doc_requirements
+      - The org's latest completed capacity assessment
+      - The org's last 2 submitted applications (to similar or different
+        grants — donors won't see this leak)
+      - The org's profile (sector, country, size hints)
+
+    NGO becomes editor, not author. Returns suggested responses +
+    a per-question rationale + a 'gaps' list (questions the AI was
+    unable to draft because it had no context).
+
+    Body: { merge?: bool (default false — preview only) }
+    Returns: { responses: {key: text}, rationale: {key: why},
+              gaps: [keys], confidence: 0-100 }
+    """
+    from app.models import Application, Grant, Assessment
+    from app.services.ai_service import AIService
+
+    application = db.session.get(Application, app_id)
+    if not application:
+        return jsonify({'error': 'Application not found', 'success': False}), 404
+    if application.ngo_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied', 'success': False}), 403
+    if application.status not in ('draft',):
+        return jsonify({'error': 'AI draft is only available for draft applications.',
+                        'success': False}), 400
+
+    grant = db.session.get(Grant, application.grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found', 'success': False}), 404
+
+    # Build context.
+    criteria = grant.get_criteria() if hasattr(grant, 'get_criteria') else []
+    eligibility = grant.get_eligibility() if hasattr(grant, 'get_eligibility') else []
+
+    # Latest completed assessment for this org.
+    org_assessment = None
+    try:
+        assess = Assessment.query.filter_by(org_id=current_user.org_id).order_by(
+            Assessment.updated_at.desc()).first()
+        if assess:
+            org_assessment = {
+                'framework': getattr(assess, 'framework', None),
+                'overall_score': getattr(assess, 'overall_score', None),
+                'responses': assess.get_responses() if hasattr(assess, 'get_responses') else None,
+            }
+    except Exception:
+        pass
+
+    # Last 2 submitted applications for this org.
+    prior_apps = Application.query.filter(
+        Application.ngo_org_id == current_user.org_id,
+        Application.id != app_id,
+        Application.status.in_(['submitted', 'in_review', 'awarded', 'declined']),
+    ).order_by(Application.id.desc()).limit(2).all()
+    prior_payloads = []
+    for a in prior_apps:
+        prior_payloads.append({
+            'grant_title': (db.session.get(Grant, a.grant_id).title
+                            if db.session.get(Grant, a.grant_id) else None),
+            'responses': a.get_responses() if hasattr(a, 'get_responses') else None,
+        })
+
+    org = None
+    try:
+        from app.models import Organization
+        org = db.session.get(Organization, current_user.org_id)
+    except Exception:
+        pass
+    org_profile = {}
+    if org:
+        for f in ('name', 'sector', 'sectors', 'country', 'size', 'mission_statement', 'year_founded'):
+            v = getattr(org, f, None)
+            if v is not None:
+                org_profile[f] = v
+
+    try:
+        result = AIService.draft_application_responses(
+            grant_title=grant.title,
+            grant_description=grant.description or '',
+            criteria=criteria, eligibility=eligibility,
+            org_profile=org_profile,
+            org_assessment=org_assessment,
+            prior_applications=prior_payloads,
+            existing_responses=application.get_responses() or {},
+        )
+    except Exception as e:
+        logger.error(f"ai-draft-application failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'AI drafting is temporarily unavailable. Please try again or fill the application by hand.',
+        }), 502
+
+    data = get_request_json() or {}
+    merged = result.get('responses') or {}
+    if data.get('merge'):
+        existing = application.get_responses() or {}
+        # Only fill EMPTY responses — never overwrite NGO text.
+        out = dict(existing)
+        for k, v in merged.items():
+            if v and not (out.get(k) or '').strip():
+                out[k] = v
+        application.set_responses(out)
+        db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'responses': result.get('responses', {}),
+        'rationale': result.get('rationale', {}),
+        'gaps':      result.get('gaps', []),
+        'confidence': result.get('confidence', 0),
+        'ai_used':   result.get('ai_used', False),
+        'merged':    bool(data.get('merge')),
+    })
+
+
 @applications_bp.route('/<int:app_id>', methods=['PUT'])
 @login_required
 def api_update_application(app_id):
@@ -183,6 +410,11 @@ def api_update_application(app_id):
     elig_data = data.get('eligibility_responses') or data.get('eligibility')
     if elig_data:
         application.set_eligibility_responses(elig_data)
+    # Phase 40 — applicant records the structured budget the hard-gate
+    # classifier needs. Accept on every PUT so the NGO can iterate
+    # before /submit fires the gate.
+    if 'budget_lines' in data:
+        application.set_budget_lines(data['budget_lines'])
     new_status = None
     if 'status' in data and current_user.role in ('donor', 'admin'):
         new_status = data['status']
@@ -251,16 +483,112 @@ def api_submit_application(app_id):
     if grant and grant.deadline and grant.deadline < date.today():
         return jsonify({'error': 'The application deadline has passed', 'success': False}), 400
 
-    application.status = 'submitted'
-    application.submitted_at = datetime.now(timezone.utc)
+    # Phase 40 / 41 — Hard gate on network grants: budget must meet the
+    # window's direct-to-community threshold (80% single-org / 70%
+    # consortium, configurable per window). Runs BEFORE we mark the
+    # application submitted so a failing app stays in 'draft' for
+    # revision.
+    #
+    # Phase 40 originally called the AI-powered classifier here (~4s
+    # latency) which compounded with the rubric scorer to push /submit
+    # past the 22-second mark — that broke end-to-end tests with short
+    # client timeouts. Phase 41 switched to the deterministic fast
+    # classifier (microseconds) so the gate decision is unblocked from
+    # AI service health. The operator can still click "Run classifier"
+    # on the application detail page to get the AI's verdict.
+    if grant and grant.fund_window_id:
+        budget_lines = application.get_budget_lines()
+        if budget_lines:
+            try:
+                from app.models import FundWindow
+                from app.services.network_ai_service import NetworkAIService
+                window = db.session.get(FundWindow, grant.fund_window_id)
+                single_min = (
+                    float(window.direct_to_community_single_min_pct)
+                    if window and window.direct_to_community_single_min_pct is not None
+                    else 80.0
+                )
+                consortium_min = (
+                    float(window.direct_to_community_consortium_min_pct)
+                    if window and window.direct_to_community_consortium_min_pct is not None
+                    else 70.0
+                )
+                elig = application.get_eligibility_responses() or {}
+                is_consortium = str(elig.get('is_consortium', '')).lower() in ('yes', 'true', '1')
+                gate = NetworkAIService.classify_budget_direct_to_community_fast(
+                    budget_lines=budget_lines,
+                    is_consortium=is_consortium,
+                    threshold_single_pct=single_min,
+                    threshold_consortium_pct=consortium_min,
+                )
+                if gate and gate.get('meets_threshold') is False:
+                    threshold = (
+                        gate.get('threshold_pct')
+                        or (consortium_min if is_consortium else single_min)
+                    )
+                    return jsonify({
+                        'error': 'Budget does not meet the direct-to-community threshold',
+                        'gate': 'direct_to_community',
+                        'gate_engine': 'fast_deterministic',
+                        'threshold_pct': threshold,
+                        'direct_pct': gate.get('direct_pct'),
+                        'classifications': gate.get('classifications', []),
+                        'summary': gate.get('summary'),
+                        'success': False,
+                    }), 400
+            except Exception as e:
+                # Soft fail: don't block submission on a transient error.
+                logger.warning(
+                    f"hard-gate skipped for app {app_id} (network grant): {e}"
+                )
+        else:
+            logger.info(
+                f"hard-gate: app {app_id} on network grant has no budget_lines "
+                "— allowing submission with a soft warning"
+            )
 
-    # Auto-score with AI
+    # Auto-score with the legacy ScoringEngine — fast, deterministic,
+    # no AI call. Runs on every grant.
+    ai_score = None
     try:
         score_result = ScoringEngine.score_application(application)
-        application.ai_score = score_result.get('overall_score')
-        application.final_score = score_result.get('overall_score')
+        ai_score = score_result.get('overall_score')
     except Exception as e:
         logger.error(f"Auto-scoring failed for application {app_id}: {e}")
+
+    # Phase 41 — Queue the NEAR rubric scorer as a background task for
+    # network grants. The Phase 40 inline version added ~18-20s to
+    # /submit (forced tool-use Claude call), which broke browser flows
+    # with short client timeouts and any concurrent test runner. Now we
+    # commit fast, return 200, and let the background worker populate
+    # ai_rubric_result_json + override ai_score when the AI lands.
+    queued_task_id = None
+    if grant and grant.fund_window_id:
+        try:
+            from app.services.task_runner import submit_task
+            # Capture the Flask app object now so the worker thread can
+            # establish its own app_context (Flask globals don't cross
+            # thread boundaries by themselves).
+            _app_obj = current_app._get_current_object()
+            queued_task_id = submit_task(
+                _run_network_rubric_scorer_background,
+                app=_app_obj,
+                application_id=application.id,
+                task_type='network_rubric_scorer',
+            )
+        except Exception as e:
+            logger.warning(
+                f"network rubric scorer queue skipped for app {app_id}: {e}"
+            )
+
+    # All mutations land in a single window right before commit so no
+    # autoflush triggered by the scoring above can clobber the status
+    # transition.
+    application.status = 'submitted'
+    application.submitted_at = datetime.now(timezone.utc)
+    if ai_score is not None:
+        application.ai_score = ai_score
+        application.final_score = ai_score
 
     db.session.commit()
 

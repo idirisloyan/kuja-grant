@@ -4365,6 +4365,848 @@ Analyze this registration document and extract the following information. Return
 
         return min(score, 100)
 
+    # ------------------------------------------------------------------
+    # Phase 71 — Voice-to-report
+    # ------------------------------------------------------------------
+    # NGO field staff in the Global South often work primarily in voice +
+    # local language. The 4-hour Excel-and-PDF dance to write a quarterly
+    # report is the single biggest reason reports are late or skipped.
+    # Voice-to-report lets the program officer talk for 5 minutes about
+    # what happened — in Somali, Swahili, French, Arabic, Spanish, or
+    # English — and Claude maps the freeform transcript onto the donor's
+    # specific reporting requirements. The NGO then edits, doesn't author.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def structure_voice_report(transcript: str, requirements: list, report_type: str,
+                                grant_title: str | None = None,
+                                reporting_period: str | None = None,
+                                language: str | None = None,
+                                existing_content: dict | None = None) -> dict:
+        """Map a free-form voice-memo transcript onto a donor's reporting
+        requirements.
+
+        Returns: { "content": {req_key: answer_str}, "coverage": [
+                    {key, label, status, hint}], "summary": str,
+                    "missing": [labels] }
+        where coverage.status ∈ {"covered", "partial", "missing"} and
+        hint is a short, NGO-friendly question to fill the gap.
+        """
+        if not transcript or len(transcript.strip()) < 5:
+            return {
+                "content": existing_content or {},
+                "coverage": [],
+                "summary": "",
+                "missing": [],
+                "ai_used": False,
+                "error": "transcript_too_short",
+            }
+
+        # Build the requirement context. Each requirement has a key+label
+        # +description. The AI's job is to find the relevant snippet from
+        # the transcript for each one, OR mark it as missing.
+        matching = [
+            r for r in (requirements or [])
+            if r.get('type', '').lower() == (report_type or '').lower() or r.get('type') == 'all'
+        ] or list(requirements or [])
+
+        req_lines = []
+        for r in matching:
+            key = r.get('key') or r.get('id') or (r.get('label', 'untitled')[:40])
+            label = r.get('label') or r.get('title') or key
+            desc = r.get('description') or ''
+            req_lines.append(f"- KEY={key} | LABEL={label} | EXPECTS={desc[:200]}")
+        req_block = '\n'.join(req_lines) if req_lines else '(donor specified no structured requirements — produce a single key called "narrative")'
+
+        # Conservative fallback: deterministic mapping if AI is unavailable.
+        if not (HAS_ANTHROPIC and ANTHROPIC_API_KEY):
+            content = dict(existing_content or {})
+            if matching:
+                content[matching[0].get('key', 'narrative')] = transcript.strip()
+            else:
+                content['narrative'] = transcript.strip()
+            return {
+                "content": content,
+                "coverage": [{"key": (r.get('key') or 'narrative'),
+                              "label": (r.get('label') or 'Narrative'),
+                              "status": ("covered" if i == 0 else "missing"),
+                              "hint": ""}
+                             for i, r in enumerate(matching or [{'key': 'narrative', 'label': 'Narrative'}])],
+                "summary": transcript[:200].strip() + ("…" if len(transcript) > 200 else ""),
+                "missing": [r.get('label', 'untitled') for r in matching[1:]] if matching else [],
+                "ai_used": False,
+            }
+
+        try:
+            client = AIService._get_client()
+            if not client:
+                raise Exception("AI client not available")
+            lang_hint = (
+                f"\nThe NGO is speaking in {language}. Preserve their phrasing and "
+                "vocabulary; do NOT translate to English unless the donor requirement "
+                "expects English-only text."
+            ) if language and language.lower() not in ('en', 'english') else ''
+
+            existing_hint = ''
+            if existing_content:
+                existing_hint = (
+                    "\n\nThe NGO already drafted some content earlier. Do not overwrite "
+                    "non-empty fields unless the voice transcript clearly updates them. "
+                    "Existing content:\n" + json.dumps(existing_content, ensure_ascii=False)[:1500]
+                )
+
+            prompt = f"""You are helping an NGO program officer convert a 5-minute voice memo into the structured report their donor expects. The NGO worker is non-technical, may be working in their second or third language, and is relying on you to be the "structuring scribe" they don't have on staff.
+
+DONOR REPORT TYPE: {report_type}
+GRANT: {grant_title or '(not specified)'}
+REPORTING PERIOD: {reporting_period or '(not specified)'}
+
+DONOR'S REPORTING REQUIREMENTS (each line is one required field):
+{req_block}
+
+VOICE TRANSCRIPT (from the NGO program officer):
+\"\"\"
+{transcript[:6000]}
+\"\"\"
+{lang_hint}{existing_hint}
+
+YOUR JOB:
+1. For each requirement KEY above, find the part of the transcript that addresses it. Quote or paraphrase the NGO's own words — do NOT invent numbers, dates, locations, or beneficiary counts the NGO did not mention.
+2. If a requirement is not addressed at all in the transcript, leave its value as an empty string AND add it to "missing".
+3. For each requirement, classify coverage as "covered" (clear and complete), "partial" (mentioned but thin — needs a follow-up sentence), or "missing".
+4. Provide a 1-2 sentence "summary" for the NGO: what you captured + what's still needed.
+5. For each "partial" or "missing" item, supply a "hint" — a short, friendly, plain-language question the NGO can answer in one sentence to close the gap. Examples: "How many people attended?" / "Which villages did you visit?" / "What was the total spent?"
+
+RETURN ONLY valid JSON in this exact shape (no commentary, no markdown fences):
+{{
+  "content": {{ "<requirement_key>": "<answer text — NGO's own words preserved>" }},
+  "coverage": [
+    {{ "key": "<requirement_key>", "label": "<human label>",
+       "status": "covered|partial|missing", "hint": "<plain-language follow-up or empty string>" }}
+  ],
+  "summary": "<one or two sentences for the NGO>",
+  "missing": ["<human labels of requirements not addressed at all>"]
+}}"""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text.strip()
+            if text.startswith('```'):
+                # Strip markdown fences defensively.
+                text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text, flags=re.MULTILINE).strip()
+            if text.startswith('{'):
+                parsed = json.loads(text)
+            else:
+                m = re.search(r'\{[\s\S]*\}', text)
+                parsed = json.loads(m.group()) if m else None
+
+            if not parsed or 'content' not in parsed:
+                raise Exception("AI returned unparseable structure")
+
+            # Merge with existing content (don't lose prior draft).
+            merged = dict(existing_content or {})
+            for k, v in (parsed.get('content') or {}).items():
+                if v and v.strip():
+                    merged[k] = v.strip()
+
+            return {
+                "content": merged,
+                "coverage": parsed.get('coverage', []),
+                "summary": parsed.get('summary', ''),
+                "missing": parsed.get('missing', []),
+                "ai_used": True,
+            }
+        except Exception as e:
+            logger.error(f"structure_voice_report AI failed: {e}")
+            # Fall back to deterministic mapping rather than blocking the NGO.
+            content = dict(existing_content or {})
+            if matching:
+                content[matching[0].get('key', 'narrative')] = transcript.strip()
+            else:
+                content['narrative'] = transcript.strip()
+            return {
+                "content": content,
+                "coverage": [],
+                "summary": "AI structuring was unavailable; your transcript is saved under the first requirement. Please copy and paste into the right sections.",
+                "missing": [],
+                "ai_used": False,
+                "error": str(e)[:200],
+            }
+
+    # ------------------------------------------------------------------
+    # Phase 79 — NEAR declaration-as-conversation
+    # ------------------------------------------------------------------
+    # OB members in crisis-response networks are not form-fillers; they
+    # are operators reacting to a real situation. Phase 45's wizard
+    # works but starts from a structured form. Conversation mode lets
+    # them speak/write naturally — 'a drought is unfolding in Turkana
+    # and we need to declare ~$500k' — and the AI parses out the
+    # structured slots a declaration needs. The OB member confirms.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def parse_declaration_from_narrative(narrative: str,
+                                          network_name: str | None = None,
+                                          available_committee: list | None = None,
+                                          recent_crisis_rows: list | None = None) -> dict:
+        """Turn a free-text or voice-transcribed description into a
+        structured declaration draft.
+
+        narrative: NGO operator's own words about the situation
+        network_name: the OB network name (for context)
+        available_committee: list of {id, name, role, country} for the
+                              roster — used to suggest a committee
+        recent_crisis_rows: latest Crisis Monitoring Report rows so the
+                            AI can connect the narrative to an existing
+                            tracked crisis
+
+        Returns: {
+          title, crisis_type, severity, country, proposed_total_amount,
+          currency, summary, suggested_committee[user_id], rationale,
+          confidence (0-100), warnings[], ai_used
+        }
+        """
+        result = {
+            'title': '', 'crisis_type': '', 'severity': '',
+            'country': '', 'proposed_total_amount': None, 'currency': 'USD',
+            'summary': '', 'suggested_committee': [],
+            'rationale': '', 'confidence': 0, 'warnings': [],
+            'ai_used': False,
+        }
+
+        if not narrative or len(narrative.strip()) < 10:
+            result['warnings'].append('Tell us more about the situation — at least one full sentence.')
+            return result
+
+        if not (HAS_ANTHROPIC and ANTHROPIC_API_KEY):
+            result['title'] = narrative.strip().split('.')[0][:100]
+            result['summary'] = narrative.strip()[:500]
+            result['warnings'].append('AI parsing unavailable; you will need to fill the structured fields by hand.')
+            return result
+
+        try:
+            client = AIService._get_client()
+            if not client:
+                raise Exception("AI client not available")
+
+            committee_snip = ''
+            if available_committee:
+                committee_snip = '\nAvailable OB committee roster:\n' + json.dumps(
+                    [{'id': c.get('id'), 'name': c.get('name'), 'role': c.get('role'),
+                      'country': c.get('country')} for c in available_committee[:30]],
+                    indent=2,
+                )
+
+            crisis_snip = ''
+            if recent_crisis_rows:
+                crisis_snip = '\nLatest Crisis Monitoring Report rows:\n' + json.dumps(
+                    [{'country': r.get('country'), 'severity': r.get('severity'),
+                      'crisis_type': r.get('crisis_type'),
+                      'headline': r.get('headline', '')[:120]}
+                     for r in recent_crisis_rows[:8]],
+                    indent=2,
+                )
+
+            prompt = f"""You are parsing an OB committee member's natural-language description of a humanitarian crisis into the structured fields a NEAR emergency declaration requires. The operator is non-technical; they want to describe the situation, not fill a form.
+
+NETWORK: {network_name or '(unnamed network)'}
+
+OB MEMBER'S NARRATIVE:
+\"\"\"
+{narrative[:4000]}
+\"\"\"
+{committee_snip}{crisis_snip}
+
+YOUR JOB:
+1. Extract: title (short, action-oriented, ≤80 chars), crisis_type (one of: drought / flood / conflict / displacement / outbreak / earthquake / cyclone / food_insecurity / other), severity (low/medium/high/critical), country (3-letter ISO if clear, else best human label), proposed_total_amount (number from the narrative if mentioned), currency (3-letter ISO; default to USD if unclear).
+2. summary: 2-3 sentence operator-friendly description grounded ONLY in the narrative.
+3. suggested_committee: pick 3-5 user ids from the roster that fit the country/role. Prefer OB members from or specialising in the affected country. Return user_id integers, not names.
+4. rationale: 1-2 sentences on why these committee members + this severity.
+5. confidence (0-100): how cleanly the narrative mapped to these fields.
+6. warnings: anything ambiguous you had to guess (e.g. 'No amount mentioned; left blank for you to fill.')
+
+DO NOT invent details (locations, beneficiary counts, dates) the operator did not state.
+
+Return ONLY JSON in this exact shape (no markdown):
+{{
+  "title": "<≤80 chars>",
+  "crisis_type": "drought|flood|conflict|displacement|outbreak|earthquake|cyclone|food_insecurity|other",
+  "severity": "low|medium|high|critical",
+  "country": "<ISO3 or human label>",
+  "proposed_total_amount": <number or null>,
+  "currency": "<ISO3>",
+  "summary": "<2-3 sentences>",
+  "suggested_committee": [<user_id>, ...],
+  "rationale": "<1-2 sentences>",
+  "confidence": 0-100,
+  "warnings": ["..."]
+}}"""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            t = response.content[0].text.strip()
+            if t.startswith('```'):
+                t = re.sub(r'^```(?:json)?\s*|\s*```$', '', t, flags=re.MULTILINE).strip()
+            parsed = json.loads(t) if t.startswith('{') else json.loads(re.search(r'\{[\s\S]*\}', t).group())
+
+            result.update({
+                'title': parsed.get('title', '')[:200],
+                'crisis_type': parsed.get('crisis_type', ''),
+                'severity': parsed.get('severity', ''),
+                'country': parsed.get('country', ''),
+                'proposed_total_amount': parsed.get('proposed_total_amount'),
+                'currency': parsed.get('currency', 'USD'),
+                'summary': parsed.get('summary', ''),
+                'suggested_committee': [int(x) for x in (parsed.get('suggested_committee') or []) if isinstance(x, (int, str)) and str(x).lstrip('-').isdigit()],
+                'rationale': parsed.get('rationale', ''),
+                'confidence': int(parsed.get('confidence', 0) or 0),
+                'warnings': parsed.get('warnings', []) or [],
+                'ai_used': True,
+            })
+        except Exception as e:
+            logger.error(f"parse_declaration_from_narrative failed: {e}")
+            result['warnings'].append('AI parsing failed; please use the structured wizard instead.')
+        return result
+
+    # ------------------------------------------------------------------
+    # Phase 78 — AI content translation
+    # ------------------------------------------------------------------
+    # Today, reporting in the Global South is implicitly English/French
+    # because 'the donor reads that.' This forces program officers to
+    # operate in their second/third language, which both reduces
+    # writing quality AND filters out otherwise-capable NGOs whose
+    # English is weak. With AI translation, the NGO writes in their
+    # own language, the donor reads in theirs, both sides see what
+    # feels native, originals are always preserved.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def translate_text(text: str, target_language: str,
+                        source_language: str | None = None,
+                        domain: str = 'grant') -> dict:
+        """Translate free-text content between platform languages.
+
+        Supported targets: en, fr, ar, sw, so, es (matches UI locales).
+        Domain primes the translator on jargon (grant / declaration / report).
+
+        Returns: {translated, source_language (detected or supplied),
+                  target_language, fidelity (0-100), notes, ai_used}
+        Original is preserved by the caller (this method is read-only).
+        """
+        text = (text or '').strip()
+        if not text:
+            return {'translated': '', 'source_language': source_language,
+                    'target_language': target_language, 'fidelity': 0,
+                    'notes': '', 'ai_used': False}
+
+        # Skip if source==target.
+        if source_language and source_language[:2].lower() == target_language[:2].lower():
+            return {'translated': text, 'source_language': source_language,
+                    'target_language': target_language, 'fidelity': 100,
+                    'notes': 'No translation needed — same language.', 'ai_used': False}
+
+        if not (HAS_ANTHROPIC and ANTHROPIC_API_KEY):
+            return {'translated': text, 'source_language': source_language,
+                    'target_language': target_language, 'fidelity': 0,
+                    'notes': 'Translation unavailable — showing original.',
+                    'ai_used': False}
+
+        lang_names = {
+            'en': 'English', 'fr': 'French', 'ar': 'Arabic',
+            'sw': 'Swahili', 'so': 'Somali', 'es': 'Spanish',
+        }
+        tgt = lang_names.get(target_language[:2].lower(), target_language)
+        src_hint = (
+            f" The source language appears to be {lang_names.get(source_language[:2].lower(), source_language)}."
+            if source_language else ' Detect the source language yourself.'
+        )
+
+        try:
+            client = AIService._get_client()
+            if not client:
+                raise Exception("AI client not available")
+
+            prompt = f"""Translate the following NGO {domain} text to {tgt}.{src_hint}
+
+Rules:
+- Preserve factual content exactly: numbers, dates, names, locations, currency amounts.
+- Use natural, professional {tgt} a grant officer would write — not literal word-for-word.
+- Preserve any domain-specific terms (e.g. KPI codes, donor framework codes) by leaving them as-is.
+- If a phrase has cultural nuance that doesn't translate cleanly, choose the closest professional equivalent and note it in 'notes'.
+
+Text to translate (between triple backticks):
+\"\"\"
+{text[:6000]}
+\"\"\"
+
+Return ONLY JSON in this exact shape (no markdown fences):
+{{
+  "translated": "<the translation>",
+  "source_language": "<ISO 639-1 code you detected: en|fr|ar|sw|so|es|other>",
+  "fidelity": 0-100,
+  "notes": "<empty string or 1-2 sentences flagging tricky choices>"
+}}"""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            t = response.content[0].text.strip()
+            if t.startswith('```'):
+                t = re.sub(r'^```(?:json)?\s*|\s*```$', '', t, flags=re.MULTILINE).strip()
+            parsed = json.loads(t) if t.startswith('{') else json.loads(re.search(r'\{[\s\S]*\}', t).group())
+            return {
+                'translated': parsed.get('translated', text),
+                'source_language': parsed.get('source_language', source_language),
+                'target_language': target_language,
+                'fidelity': int(parsed.get('fidelity', 0) or 0),
+                'notes': parsed.get('notes', ''),
+                'ai_used': True,
+            }
+        except Exception as e:
+            logger.error(f"translate_text failed: {e}")
+            return {'translated': text, 'source_language': source_language,
+                    'target_language': target_language, 'fidelity': 0,
+                    'notes': f'Translation failed; showing original. ({type(e).__name__})',
+                    'ai_used': False}
+
+    # ------------------------------------------------------------------
+    # Phase 76 — Why-rejected: constructive AI feedback
+    # ------------------------------------------------------------------
+    # Most donors give cursory feedback when they decline an application
+    # or request report revisions: 'not competitive', 'see notes', or
+    # nothing at all. This is demoralising for NGOs and hides what
+    # would actually improve their next attempt. We turn the platform
+    # into the empathetic mentor — specific, kind, action-oriented.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def explain_rejection(kind: str, *, payload: dict, donor_notes: str | None = None,
+                           rubric: list | None = None) -> dict:
+        """Generate a constructive explanation of why an application or report
+        was declined / had revisions requested.
+
+        kind: 'application' | 'report'
+        payload: a sanitised snapshot of the relevant content
+        donor_notes: any donor-supplied feedback (used as grounding)
+        rubric: optional criteria/scoring rubric (for applications)
+
+        Returns: {
+          summary: friendly 2-sentence overall takeaway,
+          specific_issues: [{title, evidence, impact}],
+          suggestions:     [{title, action, expected_lift}],
+          encouragement:   single sentence reinforcing what was strong,
+          ai_used: bool,
+        }
+        """
+        result = {
+            'summary': '', 'specific_issues': [], 'suggestions': [],
+            'encouragement': '', 'ai_used': False,
+        }
+        if not (HAS_ANTHROPIC and ANTHROPIC_API_KEY):
+            # Without AI, surface donor notes as-is so the NGO at least
+            # sees something other than 'declined' with no context.
+            result['summary'] = (donor_notes or 'The donor declined this without detailed notes. Reach out to the donor for clarification.')[:600]
+            return result
+
+        try:
+            client = AIService._get_client()
+            if not client:
+                raise Exception("AI client not available")
+
+            kind_label = 'grant application' if kind == 'application' else 'grant report'
+            rubric_snip = ''
+            if rubric:
+                rubric_snip = '\nDonor rubric:\n' + json.dumps(rubric, indent=2)[:1500]
+
+            prompt = f"""You are an empathetic grants mentor talking to an NGO program officer whose {kind_label} was declined or had revisions requested. The NGO is non-technical and the donor's notes are often cursory. Your job is to translate the donor's signals into specific, kind, action-oriented advice the NGO can use NEXT time.
+
+Tone: warm, never patronising. Specific, never generic ('improve clarity' is not specific). Action-oriented — every issue must have a concrete suggested fix.
+
+CONTENT THAT WAS DECLINED:
+{json.dumps(payload, indent=2, default=str)[:4000]}
+
+DONOR NOTES (may be sparse or empty):
+{(donor_notes or '(no notes supplied)')[:1500]}
+{rubric_snip}
+
+OUTPUT — return ONLY JSON in this shape (no markdown):
+{{
+  "summary": "2-sentence empathetic takeaway — 'Your application was strong on X. The two areas that likely hurt you were Y and Z. The good news: both are fixable.'",
+  "specific_issues": [
+    {{
+      "title": "Short 4-7 word label (e.g. 'Budget concentrated in operations')",
+      "evidence": "What in the submitted content + donor notes points to this issue",
+      "impact": "Why this likely reduced the score / led to the decline"
+    }}
+  ],
+  "suggestions": [
+    {{
+      "title": "What to change next time",
+      "action": "Concrete instruction the NGO can act on — '<exact step>' not '<vague guidance>'",
+      "expected_lift": "What this typically does (e.g. '+10-15 score points on budget realism' / 'aligns with donor preference for capacity-building under their Pillar 3')"
+    }}
+  ],
+  "encouragement": "Single sentence reinforcing one thing this submission did genuinely well."
+}}
+
+Aim for 2-4 specific issues and 2-4 suggestions. Do NOT invent reasons that aren't supported by the content or donor notes — if the donor gave no useful feedback, say so transparently in the summary."""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text.strip()
+            if text.startswith('```'):
+                text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text, flags=re.MULTILINE).strip()
+            parsed = json.loads(text) if text.startswith('{') else json.loads(re.search(r'\{[\s\S]*\}', text).group())
+            result['summary'] = parsed.get('summary', '')
+            result['specific_issues'] = parsed.get('specific_issues', [])
+            result['suggestions']     = parsed.get('suggestions', [])
+            result['encouragement']   = parsed.get('encouragement', '')
+            result['ai_used'] = True
+        except Exception as e:
+            logger.error(f"explain_rejection failed: {e}")
+            result['summary'] = (donor_notes or 'The donor declined this submission. AI explanation is temporarily unavailable. Please reach out for clarification.')[:600]
+        return result
+
+    # ------------------------------------------------------------------
+    # Phase 75 — AI-drafts-application v0
+    # ------------------------------------------------------------------
+    # NGOs in the Global South face a blank-page problem: every grant
+    # asks 8-15 free-text questions that take hours to write well. We
+    # have everything we need to pre-fill: their capacity assessment,
+    # their prior submissions, the grant's rubric. The NGO becomes
+    # editor, not author. This typically cuts authoring time 70-85%.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def draft_application_responses(grant_title: str, grant_description: str,
+                                     criteria: list, eligibility: list,
+                                     org_profile: dict,
+                                     org_assessment: dict | None,
+                                     prior_applications: list,
+                                     existing_responses: dict) -> dict:
+        """Generate a first-draft response for each criterion / eligibility item.
+
+        Returns: { responses: {key: text}, rationale: {key: why},
+                   gaps: [labels of items we couldn't draft], confidence,
+                   ai_used }
+        """
+        if not (HAS_ANTHROPIC and ANTHROPIC_API_KEY):
+            return {
+                'responses': existing_responses or {},
+                'rationale': {},
+                'gaps': [c.get('label') or c.get('key') for c in (criteria or [])],
+                'confidence': 0,
+                'ai_used': False,
+            }
+
+        # Build the prompt — every criterion/question gets a slot.
+        questions = []
+        for c in (criteria or []):
+            key = c.get('key') or c.get('id') or (c.get('label', 'q')[:40])
+            label = c.get('label') or c.get('title') or key
+            desc = c.get('description') or ''
+            weight = c.get('weight')
+            questions.append({'key': key, 'label': label, 'description': desc[:300], 'weight': weight})
+        for e in (eligibility or []):
+            key = e.get('key') or 'elig_' + (e.get('label', 'q')[:30].replace(' ', '_'))
+            label = e.get('label') or key
+            questions.append({'key': key, 'label': label, 'description': (e.get('description') or '')[:300], 'kind': 'eligibility'})
+
+        if not questions:
+            return {'responses': existing_responses, 'rationale': {}, 'gaps': [],
+                    'confidence': 100, 'ai_used': False}
+
+        # Trim assessment + prior apps to fit token budget.
+        assessment_snip = ''
+        if org_assessment:
+            framework = org_assessment.get('framework') or '?'
+            score = org_assessment.get('overall_score')
+            resps = org_assessment.get('responses') or {}
+            keys = list(resps.keys())[:30]
+            assessment_snip = f"Framework: {framework} · Overall score: {score}\n"
+            for k in keys:
+                v = resps.get(k)
+                if isinstance(v, str) and v.strip():
+                    assessment_snip += f"  • {k}: {v[:300]}\n"
+
+        prior_snip = ''
+        for i, p in enumerate(prior_applications or [], 1):
+            g = p.get('grant_title') or 'unknown grant'
+            resps = p.get('responses') or {}
+            prior_snip += f"\nPrior application #{i} (to {g}):\n"
+            for k, v in list(resps.items())[:6]:
+                if isinstance(v, str) and v.strip():
+                    prior_snip += f"  • {k}: {v[:400]}\n"
+
+        existing_snip = ''
+        if existing_responses:
+            existing_snip = "\nNGO has already started these questions — keep their wording:\n"
+            for k, v in existing_responses.items():
+                if isinstance(v, str) and v.strip():
+                    existing_snip += f"  • {k}: {v[:200]}\n"
+
+        try:
+            client = AIService._get_client()
+            if not client:
+                raise Exception("AI client not available")
+
+            prompt = f"""You are drafting a grant application FOR an NGO in the Global South. The NGO is non-technical and is relying on you to produce a first draft they will edit. Use ONLY information present in their assessment, prior applications, or profile. NEVER invent dates, beneficiary counts, locations, or organisational facts.
+
+GRANT TITLE: {grant_title}
+GRANT DESCRIPTION: {(grant_description or '')[:1200]}
+
+ORGANISATION PROFILE:
+{json.dumps(org_profile, indent=2, default=str)[:1500]}
+
+ORGANISATION'S LATEST CAPACITY ASSESSMENT (excerpt):
+{assessment_snip or '(no assessment on file)'}
+
+ORGANISATION'S RECENT PRIOR APPLICATIONS (excerpts):
+{prior_snip or '(no prior applications on file)'}
+{existing_snip}
+
+QUESTIONS TO DRAFT (one response per key):
+{json.dumps(questions, indent=2)[:4000]}
+
+YOUR JOB:
+1. Draft a 60-180 word response for each question key, grounded in the NGO's actual context above.
+2. If you genuinely have no basis to answer a question (no context, no prior, no profile clue), put the key in "gaps" and leave its response as an empty string. Do NOT invent.
+3. Provide a brief 'rationale' for each draft — one sentence on which source you drew from (e.g. "Drawn from your 2025 capacity assessment, section IV.").
+4. Provide an overall confidence (0-100) — high when most answers were grounded in real context.
+
+Return ONLY valid JSON in this shape (no markdown):
+{{
+  "responses": {{ "<key>": "<draft text>" }},
+  "rationale": {{ "<key>": "one-sentence source attribution" }},
+  "gaps": ["<keys with no basis to answer>"],
+  "confidence": 0-100
+}}"""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text.strip()
+            if text.startswith('```'):
+                text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text, flags=re.MULTILINE).strip()
+            if text.startswith('{'):
+                parsed = json.loads(text)
+            else:
+                m = re.search(r'\{[\s\S]*\}', text)
+                parsed = json.loads(m.group()) if m else None
+            if not parsed:
+                raise Exception("AI returned no parseable JSON")
+
+            return {
+                'responses': parsed.get('responses', {}) or {},
+                'rationale': parsed.get('rationale', {}) or {},
+                'gaps':      parsed.get('gaps', []) or [],
+                'confidence': int(parsed.get('confidence', 0) or 0),
+                'ai_used':   True,
+            }
+        except Exception as e:
+            logger.error(f"draft_application_responses failed: {e}")
+            return {
+                'responses': existing_responses or {},
+                'rationale': {},
+                'gaps': [q['label'] for q in questions],
+                'confidence': 0,
+                'ai_used': False,
+                'error': str(e)[:200],
+            }
+
+    # ------------------------------------------------------------------
+    # Phase 72 — Photo-as-evidence
+    # ------------------------------------------------------------------
+    # NGOs in the Global South typically only have a smartphone as their
+    # camera/scanner/OCR/data-entry tool. A photo of an attendance sheet,
+    # receipt, training session, or field visit is the source artefact
+    # they're working from. Today they "scan + OCR + manually retype +
+    # reformat" — hours of work per report.
+    #
+    # Photo-as-evidence skips that pipeline entirely: phone photo in,
+    # structured data out, attached to the report. The extraction
+    # adapts to the photo type the NGO picked (attendance / receipt /
+    # training / site_visit / other) so the prompt asks for the right
+    # fields.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def extract_photo_evidence(image_path: str, photo_type: str = 'other',
+                                grant_title: str | None = None,
+                                report_type: str | None = None) -> dict:
+        """Use Claude vision to extract structured data from a photo.
+
+        Returns: {
+          "kind": "<canonical type>",
+          "extracted": {
+            # attendance: list of attendees w/ names + signatures present
+            # receipt:    vendor, total, currency, date, line_items
+            # training:   topic, location, date, instructor, attendee_count
+            # site_visit: location, date, observations[], people_met[]
+            # other:      free-form summary + key_facts list
+          },
+          "narrative": "1-2 sentence summary the NGO can paste",
+          "confidence": 0-100,
+          "warnings": [strings],
+          "ai_used": bool,
+        }
+        """
+        result = {
+            "kind": photo_type,
+            "extracted": {},
+            "narrative": "",
+            "confidence": 0,
+            "warnings": [],
+            "ai_used": False,
+        }
+
+        if not (HAS_ANTHROPIC and ANTHROPIC_API_KEY):
+            result["warnings"].append(
+                "AI vision is not configured. The photo is saved but data extraction was skipped."
+            )
+            return result
+
+        # Read + base64 the image. Bail early if too large for vision API.
+        try:
+            import base64, os as _os
+            size = _os.path.getsize(image_path)
+            if size > 5 * 1024 * 1024:
+                result["warnings"].append(
+                    "Photo is larger than 5 MB. Try a smaller photo or the device's "
+                    "lower-resolution camera setting."
+                )
+                return result
+            with open(image_path, 'rb') as f:
+                img_b64 = base64.standard_b64encode(f.read()).decode('ascii')
+        except Exception as e:
+            result["warnings"].append(f"Could not read photo: {e}")
+            return result
+
+        # Sniff media type from file extension. Default to jpeg.
+        ext = (image_path.rsplit('.', 1)[-1] or 'jpg').lower()
+        media_map = {'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
+                     'webp': 'image/webp', 'gif': 'image/gif'}
+        media_type = media_map.get(ext, 'image/jpeg')
+
+        # Per-type prompt — gives Claude an explicit JSON schema to fill,
+        # so the result lands directly in the report's content fields
+        # without parsing acrobatics.
+        kind_norm = (photo_type or 'other').lower().strip()
+        if kind_norm not in {'attendance', 'receipt', 'training', 'site_visit', 'other'}:
+            kind_norm = 'other'
+
+        type_prompt = {
+            'attendance': '''This is a photo of an attendance sheet from a training, meeting, or event run by an NGO. Extract:
+- event_title (if visible)
+- event_date (YYYY-MM-DD if a date is shown)
+- location
+- attendees: list of {name, signature_present (bool), other_notes (e.g. role, age, sex)}
+- attendee_count (the number of distinct people)
+- legibility_warnings (entries that are too smudged or partial to confirm)''',
+            'receipt': '''This is a photo of a receipt, invoice, or expense voucher from an NGO's field work. Extract:
+- vendor (the seller or supplier)
+- date (YYYY-MM-DD)
+- currency (3-letter code; infer from country if implicit)
+- total_amount (number, no thousand separators)
+- line_items: list of {description, quantity, unit_price, line_total}
+- tax_or_vat (if present, separately)
+- payment_method (cash, mobile money, bank — only if shown)
+- legibility_warnings''',
+            'training': '''This is a photo from an NGO training session, workshop, or field activity. Identify what is visible. Extract:
+- activity_type (e.g. classroom training, demonstration, group discussion)
+- topic_visible_on_board_or_materials (if any)
+- estimated_attendee_count (range is fine; explain reasoning)
+- location_clues (indoor/outdoor, urban/rural, country if visible)
+- visible_materials (handouts, posters, equipment)
+- observations (3-5 short factual observations the NGO could quote in a report)''',
+            'site_visit': '''This is a photo from an NGO field site visit. Extract:
+- location_clues
+- subject (what is being photographed — a borehole, classroom, distribution point, etc.)
+- condition_observations (positive: what looks good; negative: what looks like a concern)
+- people_visible_count
+- environmental_context (weather, terrain, time-of-day clues)
+- factual_observations the NGO can quote''',
+            'other': '''Identify what is in this photo. Extract:
+- subject (one short noun phrase)
+- visible_text (anything legible)
+- key_facts (3-5 factual observations the NGO could use in a report)''',
+        }
+
+        try:
+            client = AIService._get_client()
+            if not client:
+                raise Exception("AI client not available")
+
+            context_line = []
+            if grant_title:    context_line.append(f"Grant: {grant_title}")
+            if report_type:    context_line.append(f"Report type: {report_type}")
+            context = (' | '.join(context_line) + '\n\n') if context_line else ''
+
+            prompt = f"""{context}You are helping a non-technical NGO program officer turn a phone photo into structured evidence for their donor report. Be conservative: extract ONLY what is clearly visible. Do not guess. If something is illegible or ambiguous, add it to legibility_warnings instead of inventing.
+
+PHOTO TYPE the NGO selected: {kind_norm}
+
+{type_prompt[kind_norm]}
+
+ALSO produce:
+- narrative: a 1-2 sentence factual summary the NGO can paste into a report ('A training was held on 12 March 2026 with 47 attendees in Garissa County.')
+- confidence: 0-100. 100 means everything is clear and unambiguous; lower means partial extraction.
+
+Return ONLY valid JSON in this shape (no markdown fences, no preamble):
+{{
+  "extracted": {{ ...the fields above... }},
+  "narrative": "1-2 sentences",
+  "confidence": 0-100
+}}"""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2500,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img_b64}},
+                        {"type": "text", "text": prompt},
+                    ],
+                }],
+            )
+            text = response.content[0].text.strip()
+            if text.startswith('```'):
+                text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text, flags=re.MULTILINE).strip()
+            if text.startswith('{'):
+                parsed = json.loads(text)
+            else:
+                m = re.search(r'\{[\s\S]*\}', text)
+                parsed = json.loads(m.group()) if m else None
+            if not parsed:
+                raise Exception("AI returned no parseable JSON")
+
+            result["kind"] = kind_norm
+            result["extracted"] = parsed.get("extracted", {}) or {}
+            result["narrative"] = parsed.get("narrative", "") or ""
+            result["confidence"] = int(parsed.get("confidence", 0) or 0)
+            result["ai_used"] = True
+
+            # Surface any AI-side legibility flags as user-facing warnings.
+            ext_warns = result["extracted"].get("legibility_warnings")
+            if isinstance(ext_warns, list) and ext_warns:
+                result["warnings"].extend([str(w)[:200] for w in ext_warns[:10]])
+        except Exception as e:
+            logger.error(f"extract_photo_evidence AI failed: {e}")
+            result["warnings"].append(
+                "AI extraction failed for this photo, but the file is saved and attached. "
+                "You can still describe it in the report by hand."
+            )
+
+        return result
+
     @staticmethod
     def analyze_report(content, requirements, report_type):
         """Analyze a submitted report against grant reporting requirements with per-requirement scoring.

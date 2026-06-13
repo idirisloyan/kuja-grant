@@ -13,12 +13,15 @@
  */
 
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
+import { useNetworkStore } from '@/stores/network-store';
 
 export default function ChatPage() {
+  const network = useNetworkStore((s) => s.network);
+  const tenantName = network?.name || 'Kuja';
   return (
     <div className="max-w-3xl mx-auto space-y-3">
       <div>
-        <h1 className="kuja-display text-2xl">Chat with Kuja</h1>
+        <h1 className="kuja-display text-2xl">Chat with {tenantName}</h1>
         <p className="text-sm text-muted-foreground">
           A real conversation — ask follow-ups, refine in place, compare across turns.
           Each chat is private to you and tagged for cost. Tap reset anytime to start fresh.

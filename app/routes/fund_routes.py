@@ -186,6 +186,29 @@ def api_create_window(fund_id):
         w.set_application_template(body["application_template"])
     db.session.add(w)
     db.session.commit()
+
+    # Phase 67 — audit the window create so it shows up in the chain
+    # with subject_kind='window'. Activates the Phase 61 drill-in for
+    # this kind, and makes window lifecycle events visible to
+    # compliance reviewers.
+    try:
+        from app.models import AuditChainEntry
+        AuditChainEntry.append(
+            action="window.created",
+            actor_email=current_user.email,
+            subject_kind="window",
+            subject_id=w.id,
+            details={
+                "fund_id": fund_id,
+                "slug": slug,
+                "name": name,
+                "status": w.status,
+                "network_id": f.network_id,
+            },
+        )
+    except Exception as e:
+        logger.warning("window.created audit append failed: %s", e)
+
     return jsonify({"success": True, "window": w.to_dict()})
 
 
@@ -199,6 +222,241 @@ def api_get_window(window_id):
     return jsonify({"success": True, "window": w.to_dict(include_rubric=True)})
 
 
+@fund_bp.route("/windows/<int:window_id>/operational", methods=["GET"])
+@login_required
+def api_window_operational_rollup(window_id):
+    """Phase 52 — operational state rollup for a window.
+
+    Returns the live count of declarations / grants / due reports tied
+    to this window so the funds page can lead with operational state
+    instead of configuration (see docs/DESIGN_PRINCIPLES.md, brief for
+    Funds & Windows).
+
+    Shape:
+      {
+        "success": True,
+        "window_id": <int>,
+        "available_budget": <int|null>,    # fund pool — disbursed (best-effort)
+        "currency": <str>,
+        "active_declaration_count": <int>, # in_review + signed_active
+        "open_grant_count": <int>,         # status='open' under this window
+        "due_report_count": <int>,         # tied grants, due in next 30 days
+        "overdue_report_count": <int>,     # tied grants, due_date < today
+        "top_risks": []                    # placeholder; populated by a
+                                           # later AI surface
+      }
+    """
+    from datetime import date, timedelta
+    from app.models import EmergencyDeclaration, Grant, Report
+
+    w = FundWindow.query.get_or_404(window_id)
+    network_id = get_current_network_id()
+    if network_id and w.fund.network_id != network_id:
+        return jsonify({"success": False, "error": "Wrong network context"}), 403
+
+    today = date.today()
+    in_30 = today + timedelta(days=30)
+
+    active_decl = (
+        EmergencyDeclaration.query
+        .filter(EmergencyDeclaration.window_id == window_id)
+        .filter(EmergencyDeclaration.status.in_(["in_review", "signed_active"]))
+        .count()
+    )
+    open_grants = (
+        Grant.query
+        .filter(Grant.fund_window_id == window_id)
+        .filter(Grant.status == "open")
+        .count()
+    )
+    # Reports are tied to grants, not directly to windows; join by grant.
+    due_reports = (
+        db.session.query(Report.id)
+        .join(Grant, Report.grant_id == Grant.id)
+        .filter(Grant.fund_window_id == window_id)
+        .filter(Report.status.in_(["draft", "pending"]))
+        .filter(Report.due_date.isnot(None))
+        .filter(Report.due_date >= today)
+        .filter(Report.due_date <= in_30)
+        .count()
+    )
+    overdue_reports = (
+        db.session.query(Report.id)
+        .join(Grant, Report.grant_id == Grant.id)
+        .filter(Grant.fund_window_id == window_id)
+        .filter(Report.status.in_(["draft", "pending"]))
+        .filter(Report.due_date.isnot(None))
+        .filter(Report.due_date < today)
+        .count()
+    )
+
+    # Best-effort budget: fund.total_pool_amount minus disbursed_to_date if
+    # tracked. Per-window slicing requires a separate accounting endpoint
+    # and isn't in scope for Phase 52.
+    fund = w.fund
+    pool = getattr(fund, "total_pool_amount", None)
+    disbursed = getattr(fund, "disbursed_to_date", None) or 0
+    available_budget = None
+    if pool is not None:
+        try:
+            available_budget = max(0, int(pool) - int(disbursed))
+        except (TypeError, ValueError):
+            available_budget = pool
+
+    # ------------------------------------------------------------------
+    # Phase 56 — top_risks. Rule-based synthesis from cheap signals.
+    # Each risk has:
+    #   { kind: str, severity: 'low'|'medium'|'high',
+    #     label: str, hint: str|None, count: int|None }
+    # Ordered by severity desc, then count desc.
+    # ------------------------------------------------------------------
+    top_risks: list[dict] = []
+
+    if overdue_reports > 0:
+        top_risks.append({
+            "kind": "overdue_reports",
+            "severity": "high" if overdue_reports >= 3 else "medium",
+            "label": (
+                f"{overdue_reports} overdue report"
+                f"{'s' if overdue_reports != 1 else ''}"
+            ),
+            "hint": "Reporting compliance slipping under this window.",
+            "count": overdue_reports,
+        })
+
+    # Declarations cancelled in the last 90 days under this window.
+    in_90 = today - timedelta(days=90)
+    cancelled_recent = (
+        EmergencyDeclaration.query
+        .filter(EmergencyDeclaration.window_id == window_id)
+        .filter(EmergencyDeclaration.status == "cancelled")
+        .filter(EmergencyDeclaration.created_at >= in_90)
+        .count()
+    )
+    if cancelled_recent > 0:
+        top_risks.append({
+            "kind": "cancelled_declarations",
+            "severity": "high" if cancelled_recent >= 2 else "medium",
+            "label": (
+                f"{cancelled_recent} declaration"
+                f"{'s' if cancelled_recent != 1 else ''}"
+                " cancelled in last 90 days"
+            ),
+            "hint": "Process friction or COI patterns worth reviewing.",
+            "count": cancelled_recent,
+        })
+
+    # Declarations stuck in_review past their decision SLA. SLA window
+    # is on the FundWindow row (decision_sla_days, default 6).
+    sla_days = getattr(w, "decision_sla_days", None) or 6
+    sla_cutoff = today - timedelta(days=int(sla_days))
+    stuck_in_review = (
+        EmergencyDeclaration.query
+        .filter(EmergencyDeclaration.window_id == window_id)
+        .filter(EmergencyDeclaration.status == "in_review")
+        .filter(EmergencyDeclaration.created_at < sla_cutoff)
+        .count()
+    )
+    if stuck_in_review > 0:
+        top_risks.append({
+            "kind": "stuck_in_review",
+            "severity": "high",
+            "label": (
+                f"{stuck_in_review} declaration"
+                f"{'s' if stuck_in_review != 1 else ''}"
+                f" past {sla_days}-day decision SLA"
+            ),
+            "hint": "Committee response is slow — chase signatures or split work.",
+            "count": stuck_in_review,
+        })
+
+    # Active declarations whose applicants haven't been notified yet (the
+    # post-Phase-9 "ready to release" backlog). Surfaces secretariat work.
+    ready_release = (
+        EmergencyDeclaration.query
+        .filter(EmergencyDeclaration.window_id == window_id)
+        .filter(EmergencyDeclaration.status == "signed_active")
+        .filter(EmergencyDeclaration.applicants_notified_at.is_(None))
+        .count()
+    )
+    if ready_release > 0:
+        top_risks.append({
+            "kind": "ready_to_release",
+            "severity": "medium",
+            "label": (
+                f"{ready_release} declaration"
+                f"{'s' if ready_release != 1 else ''}"
+                " ready to release"
+            ),
+            "hint": "Flip the auto-created grant drafts to open and notify shortlisted NGOs.",
+            "count": ready_release,
+        })
+
+    # Sort by severity desc, then count desc, cap at 5.
+    _SEVERITY_ORDER = {"high": 3, "medium": 2, "low": 1}
+    top_risks.sort(
+        key=lambda r: (
+            -_SEVERITY_ORDER.get(r.get("severity", "low"), 0),
+            -(r.get("count") or 0),
+        ),
+    )
+    top_risks = top_risks[:5]
+
+    # Phase 60 — optional AI narration. Opt-in via ?narrate=true so the
+    # default call path stays cheap and deterministic. If narration fails
+    # (AI down, no API key, schema error) we silently keep the rule-based
+    # labels.
+    narration_ok: bool | None = None
+    if top_risks and request.args.get("narrate", "").lower() in ("true", "1", "yes"):
+        try:
+            from app.services.network_ai_service import NetworkAIService
+
+            # Grab the most recent declarations on this window so the AI
+            # has concrete entities to cite, not the window aggregate.
+            recent_decls = (
+                EmergencyDeclaration.query
+                .filter(EmergencyDeclaration.window_id == window_id)
+                .order_by(EmergencyDeclaration.created_at.desc())
+                .limit(8)
+                .all()
+            )
+            ai_result = NetworkAIService.narrate_top_risks(
+                rule_based_risks=top_risks,
+                window_ctx={
+                    "name": w.name,
+                    "fund_name": fund.name if fund else None,
+                    "currency": getattr(fund, "currency", None),
+                    "available_budget": available_budget,
+                },
+                recent_declarations=[d.to_dict() for d in recent_decls],
+            )
+            if ai_result.get("ok") and ai_result.get("risks"):
+                top_risks = ai_result["risks"]
+                narration_ok = True
+            else:
+                narration_ok = False
+        except Exception as e:
+            logger.warning(
+                "narrate_top_risks failed for window %s: %s", window_id, e,
+            )
+            narration_ok = False
+
+    response = {
+        "success": True,
+        "window_id": window_id,
+        "available_budget": available_budget,
+        "currency": getattr(fund, "currency", None),
+        "active_declaration_count": active_decl,
+        "open_grant_count": open_grants,
+        "due_report_count": due_reports,
+        "overdue_report_count": overdue_reports,
+        "top_risks": top_risks,
+    }
+    if narration_ok is not None:
+        response["narration_ok"] = narration_ok
+    return jsonify(response)
+
+
 @fund_bp.route("/windows/<int:window_id>", methods=["PUT"])
 @role_required("admin")
 def api_update_window(window_id):
@@ -208,6 +466,12 @@ def api_update_window(window_id):
         return jsonify({"success": False, "error": "Wrong network context"}), 403
 
     body = get_request_json() or {}
+
+    # Phase 67 — snapshot pre-update state so the audit row shows
+    # what actually changed, not just "something was updated".
+    prev_status = w.status
+    changed: dict = {}
+
     for fld in (
         "name", "description", "crisis_type",
         "min_grant_amount", "max_grant_amount",
@@ -219,14 +483,46 @@ def api_update_window(window_id):
         "status",
     ):
         if fld in body:
-            setattr(w, fld, body[fld])
+            old_val = getattr(w, fld, None)
+            new_val = body[fld]
+            if old_val != new_val:
+                changed[fld] = {"from": old_val, "to": new_val}
+            setattr(w, fld, new_val)
     if "is_public" in body:
-        w.is_public = bool(body["is_public"])
+        new_pub = bool(body["is_public"])
+        if w.is_public != new_pub:
+            changed["is_public"] = {"from": w.is_public, "to": new_pub}
+        w.is_public = new_pub
     if isinstance(body.get("application_template"), list):
         w.set_application_template(body["application_template"])
+        changed["application_template"] = {"changed": True}
     if w.status not in WINDOW_STATUSES:
         return jsonify({"success": False, "error": f"invalid status '{w.status}'"}), 400
     db.session.commit()
+
+    # Phase 67 — audit the update. Status changes get their own action
+    # so they're trivially filterable in the chain.
+    try:
+        from app.models import AuditChainEntry
+        if changed:
+            action = (
+                "window.status_changed"
+                if "status" in changed and prev_status != w.status
+                else "window.updated"
+            )
+            AuditChainEntry.append(
+                action=action,
+                actor_email=current_user.email,
+                subject_kind="window",
+                subject_id=w.id,
+                details={
+                    "fund_id": w.fund_id,
+                    "changed": changed,
+                },
+            )
+    except Exception as e:
+        logger.warning("window.updated audit append failed: %s", e)
+
     return jsonify({"success": True, "window": w.to_dict()})
 
 

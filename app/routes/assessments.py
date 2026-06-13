@@ -1,14 +1,46 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from flask_login import login_required, current_user
 from datetime import datetime, timezone
 from app.extensions import db
 from app.models import Assessment, Document, Organization
+from app.models.network_membership import NetworkMembership
 from app.utils.helpers import get_request_json, paginate_query
 from app.utils.decorators import role_required
 from app.services.scoring_engine import _calculate_assessment_scores
 import logging
 
 logger = logging.getLogger('kuja')
+
+
+def _autolink_assessment_to_membership(assessment):
+    """When an assessment completes, attach it to any draft/pending network
+    membership for the same org in the active tenant that doesn't already
+    have a capacity_assessment_id set.
+
+    The membership submission flow (network_membership_routes.api_submit_for_review)
+    requires capacity_assessment_id to be populated. Without this auto-link an
+    NGO would have to manually re-link via a separate UI; this closes that gap.
+    """
+    network_id = getattr(g, "network_id", None)
+    if not network_id or not assessment.org_id:
+        return
+    candidate = (
+        NetworkMembership.query
+        .filter_by(
+            org_id=assessment.org_id,
+            network_id=network_id,
+            capacity_assessment_id=None,
+        )
+        .filter(NetworkMembership.status.in_(("pending", "under_review")))
+        .order_by(NetworkMembership.id.desc())
+        .first()
+    )
+    if candidate is not None:
+        candidate.capacity_assessment_id = assessment.id
+        logger.info(
+            "Auto-linked assessment %s to membership %s (org=%s, network=%s)",
+            assessment.id, candidate.id, assessment.org_id, network_id,
+        )
 
 assessments_bp = Blueprint('assessments', __name__, url_prefix='/api/assessments')
 
@@ -96,6 +128,11 @@ def api_create_assessment():
             org.assess_date = datetime.now(timezone.utc)
 
     db.session.add(assessment)
+    db.session.flush()  # populate assessment.id before auto-link
+
+    if assessment.status == 'completed':
+        _autolink_assessment_to_membership(assessment)
+
     db.session.commit()
 
     logger.info(f"Assessment created: org={org_id}, id={assessment.id}, score={assessment.overall_score}")
@@ -138,6 +175,8 @@ def api_update_assessment(assess_id):
             if org:
                 org.assess_score = overall
                 org.assess_date = datetime.now(timezone.utc)
+
+            _autolink_assessment_to_membership(assessment)
 
     db.session.commit()
     return jsonify({'success': True, 'assessment': assessment.to_dict()})

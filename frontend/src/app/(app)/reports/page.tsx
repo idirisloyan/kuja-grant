@@ -5,12 +5,17 @@ import { toast } from 'sonner';
 import { useNetworkStore } from '@/stores/network-store';
 import { NearComplianceReporting } from '@/components/reports/near-compliance-reporting';
 import { ReportDraftCoAuthor } from '@/components/reports/ReportDraftCoAuthor';
+import { VoiceReportComposer } from '@/components/reports/VoiceReportComposer';
+import { PhotoEvidenceUploader } from '@/components/reports/PhotoEvidenceUploader';
+import { AIToolsAccordion } from '@/components/shared/ai-tools-accordion';
 import { ReportReadiness } from '@/components/reports/ReportReadiness';
 import { ReportBundlePanel } from '@/components/reports/report-bundle-panel';
 import { useAuthStore } from '@/stores/auth-store';
 import { useApiError } from '@/lib/hooks/use-api-error';
 import { useReports, useUpcomingReports } from '@/lib/hooks/use-api';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { AiBadge } from '@/components/shared/ai-badge';
@@ -24,7 +29,10 @@ import {
   Upload,
   Loader2,
   CheckCircle2,
+  BarChart3,
+  X,
 } from 'lucide-react';
+import { PageShell, PageHeader, PageMain, PageAttention } from '@/components/layout/page-shell';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -779,20 +787,28 @@ export default function ReportsPage() {
 
 function NearReportsPage() {
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="kuja-display text-3xl">Compliance &amp; reporting</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Your reporting activities, grouped by grant.
-        </p>
-      </div>
-      <NearComplianceReporting />
-    </div>
+    <PageShell>
+      <PageHeader
+        title="Reports"
+        icon={BarChart3}
+        subtitle="Your reporting activities, grouped by grant."
+      />
+      <PageMain>
+        <NearComplianceReporting />
+      </PageMain>
+    </PageShell>
   );
 }
 
 function KujaReportsPage() {
-  const { data: reportData, isLoading: reportsLoading, mutate: mutateReports } = useReports();
+  // Phase 66 — optional ?window_id=N filter, deep-linkable from
+  // /admin/windows/[id] for the operator scoping reports to a window.
+  const searchParams = useSearchParams();
+  const windowIdParam = searchParams.get('window_id');
+  const windowId = windowIdParam ? Number(windowIdParam) : null;
+  const { data: reportData, isLoading: reportsLoading, mutate: mutateReports } = useReports(
+    windowId ? { window_id: String(windowId) } : undefined,
+  );
   const { data: upcomingData, isLoading: upcomingLoading } = useUpcomingReports();
   const { t, formatDate } = useTranslation();
   const [tabValue, setTabValue] = useState(0);
@@ -866,27 +882,60 @@ function KujaReportsPage() {
         ? 'bg-amber-500'
         : 'bg-red-500';
 
-  return (
-    <div className="max-w-[960px] space-y-7">
-      <div>
-        <h1 className="kuja-display text-[2.25rem] font-semibold leading-[1.1] text-foreground">
-          {t('report.reports_compliance')}
-        </h1>
-        <div className="mt-1 flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
-            {overallCompliance > 0
-              ? t('report.compliant', { score: overallCompliance })
-              : t('report.reports_total', { count: reports.length })}
-          </span>
-          {overdueCount > 0 && (
-            <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">
-              {overdueCount} {String(t('common.overdue')).toLowerCase()}
-            </span>
-          )}
-        </div>
-      </div>
+  // Phase 55 — attention strip surfaces overdue + due-soon counts.
+  const dueSoon = timelineItems.filter((i) => i.daysLeft >= 0 && i.daysLeft <= 7).length;
+  const attentionStrip: import('@/components/layout/page-shell').AttentionItem[] = [];
+  if (overdueCount > 0) {
+    attentionStrip.push({
+      tone: 'bad',
+      label: `${overdueCount} report${overdueCount === 1 ? '' : 's'} overdue`,
+      hint: 'Submit or request a deadline extension.',
+    });
+  }
+  if (dueSoon > 0) {
+    attentionStrip.push({
+      tone: 'warn',
+      label: `${dueSoon} report${dueSoon === 1 ? '' : 's'} due in the next 7 days`,
+    });
+  }
 
-      <ComplianceCalendar reportsByGrant={reportsByGrant} />
+  return (
+    <div className="max-w-[960px]">
+      <PageShell>
+        <PageHeader
+          title={t('report.reports_compliance')}
+          icon={BarChart3}
+          subtitle={overallCompliance > 0
+            ? t('report.compliant', { score: overallCompliance })
+            : t('report.reports_total', { count: reports.length })}
+        />
+
+        <PageAttention items={attentionStrip} />
+
+        <PageMain>
+        {/* Phase 66 — active window filter chip. The user came from
+            /admin/windows/<id> "See all"; let them clear the scope. */}
+        {windowId && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-[hsl(var(--kuja-clay))]/15 text-[hsl(var(--kuja-clay))] font-semibold">
+              Window #{windowId}
+              <Link
+                href="/reports"
+                className="inline-flex items-center hover:bg-[hsl(var(--kuja-clay))]/20 rounded-full p-0.5 ml-0.5"
+                title="Clear window filter"
+              >
+                <X className="w-3 h-3" />
+              </Link>
+            </span>
+            <Link
+              href={`/admin/windows/${windowId}`}
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Open window operations
+            </Link>
+          </div>
+        )}
+        <ComplianceCalendar reportsByGrant={reportsByGrant} />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card className="p-5">
@@ -1006,6 +1055,8 @@ function KujaReportsPage() {
           </div>
         )}
       </div>
+        </PageMain>
+      </PageShell>
     </div>
   );
 }
@@ -1194,13 +1245,30 @@ function ReportRow({ report, mutateReports }: { report: Report; mutateReports: (
                 to miss next to the existing precheck panel. The banner
                 variant makes the donor-perspective AI scan unmistakably
                 visible the moment a draft row opens. */}
+            {/* Primary actions — readiness check is the most important
+                'is this report good?' signal; voice + photo are the two
+                fastest ways to populate the report. */}
             <ReportReadiness reportId={report.id} variant="banner" />
-            <ReportDraftCoAuthor reportId={report.id} onApplied={() => mutateReports()} />
-            {/* Phase 8 — donor review bundle. NGO assembles + publishes;
-                donors/admin assemble (read-only) to see what they'll review. */}
-            <BundleWrap report={report} />
-            <PreSubmitReviewPanel report={report} mutateReports={mutateReports} />
-            <AIReportGuidancePanel report={report} />
+            {/* Phase 71 — voice-to-report. */}
+            <VoiceReportComposer reportId={report.id} onApplied={() => mutateReports()} />
+            {/* Phase 72 — photo-evidence. */}
+            <PhotoEvidenceUploader reportId={report.id} onApplied={() => mutateReports()} />
+
+            {/* Phase 83 — AI consolidation. Team review: report drafts
+                stacked 7 AI surfaces. The three above are the primary
+                ones; the four below get collapsed behind a single
+                disclosure so non-technical NGOs see less, power users
+                still get one click to expand. */}
+            <AIToolsAccordion
+              label="More AI tools"
+              hint="Typed co-author, donor review bundle, pre-submit checks, AI guidance"
+              toolCount={4}
+            >
+              <ReportDraftCoAuthor reportId={report.id} onApplied={() => mutateReports()} />
+              <BundleWrap report={report} />
+              <PreSubmitReviewPanel report={report} mutateReports={mutateReports} />
+              <AIReportGuidancePanel report={report} />
+            </AIToolsAccordion>
           </td>
         </tr>
       )}

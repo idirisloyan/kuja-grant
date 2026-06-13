@@ -416,10 +416,30 @@ class DeclarationSignature(db.Model):
         return True
 
     def to_dict(self) -> dict:
+        # Resolve signer name + org for the UI. Best-effort; falls back
+        # to 'User #N' if the user row is missing (deleted, etc).
+        signer_name = None
+        signer_email = None
+        signer_org_name = None
+        try:
+            from app.models import User, Organization
+            u = User.query.get(self.signer_user_id) if self.signer_user_id else None
+            if u:
+                signer_name = u.name
+                signer_email = u.email
+                if u.org_id:
+                    o = Organization.query.get(u.org_id)
+                    if o:
+                        signer_org_name = o.name
+        except Exception:
+            pass
         return {
             "id": self.id,
             "declaration_id": self.declaration_id,
             "signer_user_id": self.signer_user_id,
+            "signer_name": signer_name,
+            "signer_email": signer_email,
+            "signer_org_name": signer_org_name,
             "required_order": self.required_order,
             "status": self.status,
             "signature_method": self.signature_method,

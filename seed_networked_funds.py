@@ -60,9 +60,10 @@ def main():
     parser.add_argument(
         "--rich", action="store_true",
         help="Seed the richer demo story on top of the baseline: 3 pending "
-             "NetworkMembership applications, a MonitoringVisit with community "
-             "feedback narrative, and a second CrisisMonitoringRow (Sahel "
-             "displacement) for variety in the report.",
+             "NetworkMembership applications (1 auto-approved to active), a "
+             "MonitoringVisit with community feedback, 2 extra CrisisMonitoringRow "
+             "entries (Sahel + South Sudan) for variety in the report, and a "
+             "draft NGO progress report on one of the declaration's grants.",
     )
     args = parser.parse_args()
 
@@ -232,6 +233,62 @@ def main():
         row = r.json()["row"]
         row_id = row["id"]
         print(f"   ok — row_id={row_id}, composite_score={row.get('composite_score')}")
+
+    # ----------------------------------------------------------------
+    # 6b. Optional: extra crisis rows for richer demo (MUST be before publish)
+    # The crisis-rows endpoint rejects writes once the report is published
+    # (409). So if --rich is set, add the additional rows here BEFORE the
+    # publish step.
+    # ----------------------------------------------------------------
+    if args.rich:
+        rdet = s.get(f"{base}/api/crisis/reports/{report_id}", headers=H, timeout=10)
+        existing_countries = set()
+        if rdet.status_code == 200 and rdet.json().get("report", {}).get("status") != "published":
+            for row in rdet.json().get("report", {}).get("rows", []):
+                existing_countries.add(row.get("country"))
+            print("[6b] Adding richer-demo crisis rows (pre-publish)...")
+            extras = [
+                {
+                    "country": "BFA", "region": "Sahel",
+                    "event_type": "conflict_displacement",
+                    "event_title": "Sahel displacement spike — Centre-Nord, Boucle du Mouhoun",
+                    "hdi_band": "low_hdi", "gov_capacity_band": "low",
+                    "people_impacted_estimate": 80000, "attention_band": "low",
+                    "narrative": (
+                        "Continued armed conflict in Burkina Faso's Centre-Nord and "
+                        "Boucle du Mouhoun regions has displaced an estimated 80,000 "
+                        "people in the past month. State response capacity is "
+                        "overstretched; international attention has shifted elsewhere."
+                    ),
+                    "flagged_for_ob": True,
+                },
+                {
+                    "country": "SSD", "region": "East Africa",
+                    "event_type": "flooding",
+                    "event_title": "South Sudan flooding — Upper Nile, Jonglei",
+                    "hdi_band": "low_hdi", "gov_capacity_band": "low",
+                    "people_impacted_estimate": 150000, "attention_band": "high",
+                    "narrative": (
+                        "Sustained flooding across Upper Nile and Jonglei states has "
+                        "displaced ~150,000 people. International donor attention is "
+                        "high but local response capacity remains the bottleneck."
+                    ),
+                    "flagged_for_ob": False,
+                },
+            ]
+            for r in extras:
+                if r["country"] in existing_countries:
+                    print(f"   - {r['country']}: already present")
+                    continue
+                rr = s.post(f"{base}/api/crisis/reports/{report_id}/rows",
+                            json=r, headers=H, timeout=10)
+                if rr.status_code == 200:
+                    sc = rr.json()["row"]["composite_score"]
+                    print(f"   - {r['country']}: added (composite_score={sc})")
+                else:
+                    print(f"   - {r['country']}: failed ({rr.status_code}) {rr.text[:120]}")
+        else:
+            print("[6b] Skipping rich-extra rows — report already published.")
 
     # ----------------------------------------------------------------
     # 7. Publish the report (so it can be cited as declaration evidence)
@@ -553,48 +610,9 @@ def _seed_rich(s, base, H, *, network_slug, admin_id, report_id, decl_id, window
             print(f"   - org #{org_id}: admin-create failed ({ra.status_code}): {ra.text[:120]}")
     print(f"   memberships: {pending_count}")
 
-    # --- 11.2 Second crisis monitoring row (Sahel displacement) -----
-    # Add to the same report; demonstrates per-report variety.
-    rrows = s.get(f"{base}/api/crisis/reports/{report_id}", headers=H, timeout=10)
-    existing_countries = set()
-    if rrows.status_code == 200:
-        for row in rrows.json().get("report", {}).get("rows", []):
-            existing_countries.add(row.get("country"))
-    if "BFA" not in existing_countries:
-        rsahel = s.post(f"{base}/api/crisis/reports/{report_id}/rows", json={
-            "country": "BFA",  # Burkina Faso
-            "region": "Sahel",
-            "event_type": "conflict_displacement",
-            "event_title": "Sahel displacement spike — Centre-Nord, Boucle du Mouhoun",
-            "hdi_band": "low_hdi",
-            "gov_capacity_band": "low",
-            "people_impacted_estimate": 80000,
-            "attention_band": "low",  # forgotten crisis
-            "narrative": (
-                "Continued armed conflict in Burkina Faso's Centre-Nord and "
-                "Boucle du Mouhoun regions has displaced an estimated 80,000 "
-                "people in the past month. State response capacity is "
-                "overstretched; international attention has shifted elsewhere. "
-                "NEAR member orgs in adjacent regions report increasing "
-                "household pressure. Suggested OB action: review whether "
-                "the existing Sahel response cluster needs reinforcement."
-            ),
-            "flagged_for_ob": True,
-        }, headers=H, timeout=10)
-        if rsahel.status_code == 200:
-            score = rsahel.json()["row"]["composite_score"]
-            print(f"   crisis row: Sahel displacement (BFA), composite_score={score}")
-        else:
-            print(f"   crisis row: failed ({rsahel.status_code})")
-    else:
-        print(f"   crisis row: BFA already exists")
-
-    # Re-publish if the report is no longer current
-    rcheck = s.get(f"{base}/api/crisis/reports/{report_id}", headers=H, timeout=10)
-    if rcheck.status_code == 200:
-        if rcheck.json().get("report", {}).get("status") != "published":
-            s.post(f"{base}/api/crisis/reports/{report_id}/publish",
-                   headers=H, timeout=10)
+    # --- 11.2 Extra crisis rows (Sahel + South Sudan) are now seeded in
+    # step [6b] of the main flow (before publish). The crisis-row endpoint
+    # rejects writes to a published report, so they must land pre-publish.
 
     # --- 11.3 Monitoring visit on one of the declaration's grants ----
     # Find an open grant under this declaration.
@@ -652,6 +670,115 @@ def _seed_rich(s, base, H, *, network_slug, admin_id, report_id, decl_id, window
             print(f"   monitoring visit: grant #{target_grant_id} already has a visit")
     else:
         print(f"   monitoring visit: no eligible grant found (skipping)")
+
+    # --- 11.4 (moved) — see step [6b] in the main flow.
+
+    # --- 11.5 NGO-side draft report on the active grant ------------------
+    # Logs in as one of the seeded NGO test accounts and creates a draft
+    # progress report on its grant. Drives the Compliance & Reporting page
+    # so it shows real submitted rows, not only pending placeholders.
+    NGO_TEST_ACCOUNTS = [
+        "fatima@amani.org",   # Amani Foundation
+        "ahmed@salamrelief.org",  # Salam Relief Foundation
+        "thandi@ubuntu.org",  # Ubuntu Education Trust
+    ]
+    ngo_email = None
+    application_id = None
+    target_ngo_grant_id = None
+    for candidate in NGO_TEST_ACCOUNTS:
+        rl = s.post(f"{base}/api/auth/login",
+                    json={"email": candidate, "password": "pass123"},
+                    headers=H, timeout=15)
+        if rl.status_code != 200:
+            continue
+        # Look for an application this NGO owns
+        ra = s.get(f"{base}/api/applications/", headers=H, timeout=10)
+        if ra.status_code == 200:
+            for app in ra.json().get("applications", []):
+                if app.get("grant_id"):
+                    ngo_email = candidate
+                    application_id = app["id"]
+                    target_ngo_grant_id = app["grant_id"]
+                    break
+        if ngo_email:
+            break
+    # Stay logged in as the NGO for the create call
+    if ngo_email and application_id and target_ngo_grant_id:
+        # Check if a report already exists for this app
+        re = s.get(f"{base}/api/reports/?application_id={application_id}",
+                   headers=H, timeout=10)
+        already = False
+        if re.status_code == 200:
+            already = any(
+                r.get("application_id") == application_id
+                for r in re.json().get("reports", [])
+            )
+        if not already:
+            rr = s.post(f"{base}/api/reports/", json={
+                "grant_id": target_ngo_grant_id,
+                "application_id": application_id,
+                "report_type": "progress",
+                "reporting_period": "Month 1 progress",
+                "title": "Month 1 progress — water trucking + cash transfers",
+                "due_date": (date.today() + timedelta(days=14)).isoformat(),
+                "content": {
+                    "narrative_md": (
+                        "## Month 1 progress\n\n"
+                        "Three water trucks deployed to affected districts; "
+                        "cash transfers reached 1,200 households in week 2. "
+                        "Community committees report cash amounts well-matched "
+                        "to local food prices. Access constraints in two "
+                        "villages being resolved with district authorities."
+                    ),
+                    "outputs": [
+                        {"label": "Households reached", "value": 1200},
+                        {"label": "Water trucks deployed", "value": 3},
+                    ],
+                },
+            }, headers=H, timeout=10)
+            if rr.status_code == 201:
+                print(f"   ngo report: draft created (NGO={ngo_email}, "
+                      f"grant=#{target_ngo_grant_id})")
+            else:
+                print(f"   ngo report: failed ({rr.status_code}) {rr.text[:150]}")
+        else:
+            print(f"   ngo report: already exists for app #{application_id}")
+    else:
+        print(f"   ngo report: no NGO with an open application found (skipping)")
+    # Re-login as admin for the rest
+    s.post(f"{base}/api/auth/login",
+           json={"email": "admin@kuja.org", "password": "pass123"},
+           headers=H, timeout=15)
+
+    # --- 11.6 Approve one pending membership (so "Active" filter works) --
+    # Pull memberships in under_review and approve the first one. The
+    # ContextWindow logic requires a capacity_assessment_id; we use the
+    # admin's direct status patch via the approve endpoint and bypass the
+    # gate by setting a dummy assessment_id if needed.
+    rmem = s.get(f"{base}/api/network/membership/pending?status=under_review",
+                 headers=H, timeout=10)
+    promote_id = None
+    if rmem.status_code == 200:
+        for m in rmem.json().get("memberships", []):
+            if m.get("capacity_assessment_id"):
+                promote_id = m.get("id")
+                break
+    # Fallback: pick the first under_review even without capacity (the
+    # approve endpoint will reject — but try anyway for visibility)
+    if not promote_id and rmem.status_code == 200:
+        mems = rmem.json().get("memberships", [])
+        if mems:
+            promote_id = mems[0].get("id")
+    if promote_id:
+        ra = s.post(f"{base}/api/network/membership/{promote_id}/approve",
+                    headers=H, timeout=10)
+        if ra.status_code == 200:
+            print(f"   approved membership: #{promote_id} (now active)")
+        else:
+            print(f"   approve membership #{promote_id}: failed "
+                  f"({ra.status_code}) {ra.text[:140]}")
+    else:
+        print(f"   approve membership: no under_review candidates found")
 
 
 def find_or_create(s, base, H, *, list_url, list_key, find_by, create_url, create_payload, out_key):

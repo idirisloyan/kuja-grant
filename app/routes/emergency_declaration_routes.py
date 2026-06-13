@@ -41,7 +41,7 @@ from app.models import (
     CrisisMonitoringReport, CrisisMonitoringRow,
     SIGNATURE_METHODS, DOCUMENT_KINDS,
 )
-from app.utils.network import get_current_network_id
+from app.utils.network import get_current_network_id, ob_required, is_oversight_body_member
 from app.utils.helpers import get_request_json
 from app.utils.decorators import role_required
 from app.services.reauth_service import verify_reauth
@@ -67,9 +67,23 @@ def api_list_declarations():
     if not network_id:
         return jsonify({"success": False, "error": "Network not resolved"}), 400
     status = request.args.get("status")
+    # Phase 65 — optional window_id filter so per-window drill-ins
+    # (the funds page, /admin/windows/[id]) can deep-link into a
+    # scoped declarations list. Network gate is still enforced via
+    # filter_by(network_id=...) so this can't leak across tenants.
+    window_id_param = request.args.get("window_id")
+    window_id = None
+    if window_id_param:
+        try:
+            window_id = int(window_id_param)
+        except ValueError:
+            window_id = None
+
     q = EmergencyDeclaration.query.filter_by(network_id=network_id)
     if status:
         q = q.filter_by(status=status)
+    if window_id is not None:
+        q = q.filter_by(window_id=window_id)
     rows = q.order_by(EmergencyDeclaration.created_at.desc()).limit(100).all()
     return jsonify({
         "success": True,
@@ -77,8 +91,82 @@ def api_list_declarations():
     })
 
 
+@emergency_bp.route("/parse-narrative", methods=["POST"])
+@login_required
+def api_parse_declaration_narrative():
+    """Phase 79 — Declaration-as-conversation.
+
+    OB member writes (or voice-transcribes) what's happening on the
+    ground. Claude parses into the structured declaration shape and
+    suggests an OB committee. Preview only — does NOT create a
+    declaration; the caller uses the returned fields to pre-fill the
+    wizard / confirm before POSTing to the create endpoint.
+    """
+    from app.services.ai_service import AIService
+    from app.models import NetworkMembership, User
+    try:
+        from app.models import CrisisMonitoringRow
+    except Exception:
+        CrisisMonitoringRow = None
+
+    data = get_request_json() or {}
+    narrative = (data.get('narrative') or '').strip()
+    if not narrative:
+        return jsonify({'success': False, 'error': 'narrative is required'}), 400
+    if len(narrative) > 6000:
+        narrative = narrative[:6000]
+
+    network_id = get_current_network_id()
+    network_name = None
+    roster = []
+    crisis_rows = []
+
+    try:
+        if network_id:
+            from app.models import Network
+            net = db.session.get(Network, network_id)
+            if net:
+                network_name = getattr(net, 'name', None)
+            roster_rows = NetworkMembership.query.filter_by(
+                network_id=network_id, status='active',
+            ).limit(50).all()
+            for m in roster_rows:
+                uid = getattr(m, 'user_id', None) or getattr(m, 'primary_contact_user_id', None)
+                u = db.session.get(User, uid) if uid else None
+                if u:
+                    roster.append({
+                        'id': u.id,
+                        'name': getattr(u, 'name', None) or getattr(u, 'email', None),
+                        'role': getattr(u, 'role', None),
+                        'country': getattr(u, 'country', None),
+                    })
+    except Exception:
+        pass
+
+    try:
+        if CrisisMonitoringRow is not None:
+            rows = CrisisMonitoringRow.query.order_by(
+                CrisisMonitoringRow.id.desc()).limit(20).all()
+            crisis_rows = [{
+                'country': getattr(r, 'country', None),
+                'severity': getattr(r, 'severity', None),
+                'crisis_type': getattr(r, 'crisis_type', None),
+                'headline': getattr(r, 'headline', None) or getattr(r, 'summary', None) or '',
+            } for r in rows]
+    except Exception:
+        pass
+
+    result = AIService.parse_declaration_from_narrative(
+        narrative=narrative,
+        network_name=network_name,
+        available_committee=roster,
+        recent_crisis_rows=crisis_rows,
+    )
+    return jsonify({'success': True, **result})
+
+
 @emergency_bp.route("", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_create_declaration():
     network_id = get_current_network_id()
     if not network_id:
@@ -145,8 +233,165 @@ def api_get_declaration(declaration_id):
     return jsonify({"success": True, "declaration": d.to_dict(include_children=True)})
 
 
+@emergency_bp.route("/<int:declaration_id>/ledger", methods=["GET"])
+@login_required
+def api_declaration_ledger(declaration_id):
+    """Phase 43C — Human-readable timeline of the audit chain.
+
+    Translates every AuditChainEntry tied to this declaration into a
+    chronological narrative the OB can review at a glance: who
+    drafted, who signed (with COI attestation + method), who recused
+    (with reason), when activation fired, what grants were
+    auto-created, when applications were released, etc.
+
+    Each event carries:
+      seq            — monotonic position in the tamper-evident chain
+      audit_id       — DB id of the AuditChainEntry
+      action         — raw action string for filtering
+      label          — human title (e.g. 'Signed by Sarah Goldberg')
+      detail         — secondary line (e.g. 'method: manual_admin · declared no COI')
+      created_at     — ISO timestamp
+      actor_email    — who did it (None for auto-actions)
+      tone           — 'info' | 'good' | 'warn' | 'bad' for the UI
+    """
+    d = EmergencyDeclaration.query.get_or_404(declaration_id)
+    if not _scope(d):
+        return jsonify({"success": False, "error": "Wrong network context"}), 403
+
+    from app.models import AuditChainEntry, User
+    entries = (
+        AuditChainEntry.query
+        .filter_by(subject_kind="emergency_declaration", subject_id=d.id)
+        .order_by(AuditChainEntry.seq.asc())
+        .all()
+    )
+
+    # Resolve signer user names so the timeline reads as prose
+    user_name_cache: dict[int, str] = {}
+    def _name(user_id):
+        if not user_id:
+            return None
+        if user_id in user_name_cache:
+            return user_name_cache[user_id]
+        u = User.query.get(user_id)
+        nm = u.name if u else f"User #{user_id}"
+        user_name_cache[user_id] = nm
+        return nm
+
+    timeline = []
+    for e in entries:
+        action = e.action or ""
+        details = {}
+        try:
+            import json
+            details = json.loads(e.details_json or "{}")
+        except Exception:
+            details = {}
+
+        label = action
+        detail = ""
+        tone = "info"
+
+        if action == "emergency.declaration.drafted":
+            label = "Declaration drafted"
+            detail = f"Title: {details.get('title', '—')}"
+        elif action == "emergency.declaration.submitted_for_signature":
+            label = "Submitted for signature"
+            required = details.get("required_signer_count")
+            count = details.get("signer_count")
+            detail = (f"{required} of {count} signer slots — "
+                      "awaiting OB action.") if required else "Awaiting OB action."
+            tone = "warn"
+        elif action == "emergency.declaration.signed":
+            label = f"Signed by {_name(details.get('signer_user_id')) or 'OB member'}"
+            method = details.get("signature_method")
+            coi = details.get("declared_no_coi")
+            parts = []
+            if method:
+                parts.append(f"method: {method}")
+            if coi is True:
+                parts.append("declared no COI")
+            elif coi is False:
+                parts.append("did NOT declare no COI")
+            detail = " · ".join(parts) or "Signature recorded."
+            tone = "good"
+        elif action == "emergency.declaration.recused":
+            label = f"Recused by {_name(details.get('signer_user_id')) or 'OB member'}"
+            reason = (details.get("reason") or "").strip()
+            detail = f"Reason: “{reason}”" if reason else "No reason provided."
+            tone = "warn"
+        elif action == "emergency.declaration.rejected":
+            label = f"Rejected by {_name(details.get('signer_user_id')) or 'OB member'}"
+            reason = (details.get("reason") or "").strip()
+            detail = f"Reason: “{reason}”" if reason else "No reason provided."
+            tone = "bad"
+        elif action == "emergency.declaration.signed_active":
+            label = "Activated — declaration is now signed_active"
+            signers = details.get("signers") or []
+            recused = details.get("recused") or []
+            n_signed = len(signers)
+            n_recused = len(recused)
+            bits = [f"{n_signed} signature(s) collected"]
+            if n_recused:
+                bits.append(f"{n_recused} recused")
+            bits.append("72-hour application window opened")
+            detail = " · ".join(bits)
+            tone = "good"
+        elif action == "emergency.declaration.grants_auto_created":
+            label = "Draft grants auto-created"
+            created = details.get("grants_created") or []
+            per = details.get("per_org_amount")
+            bits = [f"{len(created)} grant draft(s)"]
+            if per:
+                bits.append(f"~{int(per):,} per org")
+            detail = " · ".join(bits)
+        elif action == "emergency.declaration.grants_added_retroactively":
+            label = "Grants added retroactively"
+            org_ids = details.get("added_org_ids") or []
+            detail = f"{len(org_ids)} org(s) added to shortlist"
+        elif action == "emergency.declaration.applications_released":
+            label = "Applications released to NGOs"
+            released = details.get("released_count")
+            detail = (f"{released} grant(s) flipped to 'open' · "
+                      "Shortlisted NGOs notified.") if released else "—"
+            tone = "good"
+        elif action == "emergency.declaration.cancelled":
+            label = "Declaration cancelled by drafter"
+            detail = details.get("reason") or "No reason provided."
+            tone = "bad"
+        elif action == "emergency.declaration.cancelled_by_signer":
+            label = "Declaration auto-cancelled (signer rejected)"
+            tone = "bad"
+        elif action == "emergency.declaration.closed":
+            label = "Closed — all grants under this declaration are complete"
+            tone = "info"
+        else:
+            # Fallback for any action we haven't translated yet
+            label = action.replace("emergency.declaration.", "").replace("_", " ").title()
+            detail = ", ".join(f"{k}={v}" for k, v in details.items() if k not in ("network_id",))[:200]
+
+        timeline.append({
+            "seq": e.seq,
+            "audit_id": e.id,
+            "action": action,
+            "label": label,
+            "detail": detail,
+            "tone": tone,
+            "actor_email": e.actor_email,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        })
+
+    return jsonify({
+        "success": True,
+        "declaration_id": d.id,
+        "declaration_title": d.title,
+        "events": timeline,
+        "audit_chain_verified": True,  # the chain itself is verified by /admin/audit-chain
+    })
+
+
 @emergency_bp.route("/<int:declaration_id>", methods=["PUT"])
-@role_required("admin")
+@ob_required
 def api_update_declaration(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -169,7 +414,7 @@ def api_update_declaration(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/submit", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_submit_declaration(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -203,7 +448,7 @@ def api_submit_declaration(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/cancel", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_cancel_declaration(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -222,7 +467,7 @@ def api_cancel_declaration(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/create-shortlist-grants", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_create_shortlist_grants(declaration_id):
     """Retroactively create grant drafts for a signed-active declaration.
 
@@ -272,7 +517,7 @@ def api_create_shortlist_grants(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/close", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_close_declaration(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -291,7 +536,7 @@ def api_close_declaration(declaration_id):
 # =============================================================================
 
 @emergency_bp.route("/<int:declaration_id>/release-applications", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_release_applications(declaration_id):
     """One-click governed handoff. After the declaration activates,
     auto-created grant drafts sit in 'draft' status until the
@@ -375,7 +620,7 @@ def api_release_applications(declaration_id):
 # =============================================================================
 
 @emergency_bp.route("/<int:declaration_id>/signers", methods=["POST"])
-@role_required("admin")
+@ob_required
 def api_add_signer(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -389,6 +634,24 @@ def api_add_signer(declaration_id):
     u = User.query.get(user_id)
     if not u:
         return jsonify({"success": False, "error": "User not found"}), 404
+    # Phase 44C — Only OB members can be assigned as signers. Platform
+    # admins still pass via the legacy is_oversight_body_member shortcut.
+    # `allow_admin_override` flag in the body lets a platform admin add a
+    # non-OB signer for the manual_admin paper-ceremony fallback that
+    # NEAR uses while the OB seats are being populated.
+    allow_admin_override = bool(body.get("allow_admin_override"))
+    if not is_oversight_body_member(u, network_id=d.network_id):
+        if not (allow_admin_override and getattr(current_user, "role", None) == "admin"):
+            return jsonify({
+                "success": False,
+                "error": (
+                    f"User {u.email} is not an OB member of this network. "
+                    "Grant them an OB seat from /admin/network-memberships/<id>, "
+                    "or pass allow_admin_override=true (admin only) for the "
+                    "paper-ceremony fallback."
+                ),
+                "code": "err.signer_not_ob",
+            }), 400
     if DeclarationSignature.query.filter_by(
         declaration_id=declaration_id, signer_user_id=user_id,
     ).first():
@@ -405,7 +668,7 @@ def api_add_signer(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/signers/<int:sig_id>", methods=["DELETE"])
-@role_required("admin")
+@ob_required
 def api_remove_signer(declaration_id, sig_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):

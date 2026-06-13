@@ -348,6 +348,42 @@ export function useWindowRubric(windowId: number | null) {
   );
 }
 
+// Phase 52 — per-window operational rollup. Leads with state, not config.
+// Phase 56 — top_risks is now structured (rule-based synthesis), not strings.
+// Phase 60 — optional AI narration via ?narrate=true.
+export interface WindowRisk {
+  kind: string;
+  severity: 'low' | 'medium' | 'high';
+  label: string;
+  hint: string | null;
+  count: number | null;
+}
+
+export interface WindowOperational {
+  success: boolean;
+  window_id: number;
+  available_budget: number | null;
+  currency: string | null;
+  active_declaration_count: number;
+  open_grant_count: number;
+  due_report_count: number;
+  overdue_report_count: number;
+  top_risks: WindowRisk[];
+  /** Present only when ?narrate=true was passed. True if AI narration succeeded. */
+  narration_ok?: boolean;
+}
+
+export function useWindowOperational(
+  windowId: number | null,
+  opts?: { narrate?: boolean },
+) {
+  const narrate = opts?.narrate ? '?narrate=true' : '';
+  return useSWR<WindowOperational>(
+    windowId ? `/windows/${windowId}/operational${narrate}` : null,
+    fetcher,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Crisis Monitoring (Phase 35)
 // ---------------------------------------------------------------------------
@@ -413,6 +449,9 @@ export interface DeclarationSignature {
   id: number;
   declaration_id: number;
   signer_user_id: number;
+  signer_name: string | null;
+  signer_email: string | null;
+  signer_org_name: string | null;
   required_order: number;
   status: 'pending' | 'signed' | 'recused' | 'rejected';
   signature_method: string | null;
@@ -420,6 +459,26 @@ export interface DeclarationSignature {
   recusal_reason: string | null;
   rejection_reason: string | null;
   signed_at: string | null;
+}
+
+// Phase 45 — Oversight Body roster (used by declaration signer-picker).
+export interface ObRosterMember {
+  membership_id: number;
+  org_id: number;
+  org_name: string;
+  country: string | null;
+  user_id: number;
+  user_name: string | null;
+  user_email: string | null;
+  user_role: string | null;
+  ob_role_started_at: string | null;
+}
+
+export function useObRoster() {
+  return useSWR<{ success: boolean; members: ObRosterMember[]; count: number }>(
+    '/network/membership/ob-roster',
+    fetcher,
+  );
 }
 
 export interface DeclarationDocument {
@@ -464,8 +523,13 @@ export interface EmergencyDeclaration {
   documents?: DeclarationDocument[];
 }
 
-export function useDeclarations(status?: string) {
-  const url = status ? `/declarations?status=${encodeURIComponent(status)}` : '/declarations';
+export function useDeclarations(status?: string, opts?: { windowId?: number | null }) {
+  // Phase 65 — optional window_id filter.
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (opts?.windowId != null) params.set('window_id', String(opts.windowId));
+  const qs = params.toString();
+  const url = qs ? `/declarations?${qs}` : '/declarations';
   return useSWR<{ success: boolean; declarations: EmergencyDeclaration[] }>(url, fetcher);
 }
 

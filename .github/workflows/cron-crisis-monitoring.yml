@@ -1,0 +1,102 @@
+name: Weekly Crisis Monitoring Report draft cron
+
+# Phase 35 + Phase 44B — weekly cron that calls
+# /api/cron/crisis-monitoring-draft on prod so each NEAR-class network
+# starts every Monday with a fresh Crisis Monitoring Report draft
+# already on the OB's screen. Idempotent: the endpoint internally
+# skips networks that already have a draft for the current week.
+#
+# The Concept Note (IKEA, 2026) says "OB stays informed of emerging
+# crises... through a weekly Humanitarian Crisis Monitoring Report" —
+# wiring this scheduler is the structural change that makes that
+# weekly cadence actually happen on the platform.
+#
+# Required repo secrets:
+#   CRON_SECRET — must match the CRON_SECRET set on Railway
+#   PROD_BASE   — optional override of the base URL
+
+on:
+  # Mondays at 06:00 UTC — picks up the previous 7-day window and
+  # lands the draft in the OB's inbox before EAT (GMT+3) Monday
+  # morning standup. Avoids the noisy 03:00 UTC window already used
+  # by the UAT-fixtures cron.
+  schedule:
+    - cron: "0 6 * * 1"
+
+  # Manual trigger for ad-hoc re-runs (e.g. crisis escalates mid-week
+  # and the OB wants a fresh draft).
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Determine base URL
+        id: base
+        run: |
+          if [ -n "${{ secrets.PROD_BASE }}" ]; then
+            echo "url=${{ secrets.PROD_BASE }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://web-production-6f8a.up.railway.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: POST /api/cron/crisis-monitoring-draft
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET repo secret is missing — add it under Settings → Secrets and variables → Actions, matching the Railway env var."
+            exit 1
+          fi
+          http_code=$(curl -s -o /tmp/body.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            -d '{}' \
+            "${BASE_URL}/api/cron/crisis-monitoring-draft")
+          echo "HTTP ${http_code}"
+          cat /tmp/body.json || true
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Crisis monitoring cron returned ${http_code}"
+            exit 1
+          fi
+
+      - name: Summarise run output
+        if: always()
+        run: |
+          if [ -f /tmp/body.json ]; then
+            python3 - <<'PY'
+          import json, os
+          with open('/tmp/body.json') as f:
+              try:
+                  d = json.load(f)
+              except Exception:
+                  print('Cron returned non-JSON body')
+                  raise SystemExit(0)
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if not summary:
+              print(json.dumps(d, indent=2))
+              raise SystemExit(0)
+          drafted = d.get('drafted') or []
+          skipped = d.get('skipped') or []
+          rolled = d.get('rolled_signals')
+          with open(summary, 'a') as out:
+              out.write('# Weekly Crisis Monitoring cron\n\n')
+              out.write(f'- **Networks drafted**: {len(drafted)}\n')
+              out.write(f'- **Networks skipped (already had a draft)**: {len(skipped)}\n')
+              if rolled is not None:
+                  out.write(f'- **Pending signals rolled in**: {rolled}\n')
+              if drafted:
+                  out.write('\n## Drafted reports\n')
+                  for d_item in drafted:
+                      out.write(f'- network_id={d_item.get("network_id")} → report_id={d_item.get("report_id")}\n')
+              if skipped:
+                  out.write('\n## Skipped (already had a draft for this week)\n')
+                  for s_item in skipped:
+                      out.write(f'- network_id={s_item.get("network_id")} → report_id={s_item.get("report_id")}\n')
+          PY
+          fi
