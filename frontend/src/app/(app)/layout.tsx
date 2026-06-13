@@ -76,9 +76,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </a>
       <div className="relative min-h-screen bg-[hsl(var(--kuja-quartz))]">
         <Sidebar width={SIDEBAR_WIDTH} collapsedWidth={COLLAPSED_WIDTH} />
+        {/* Sidebar is `hidden lg:block`, so only pad for it at lg+. On
+            mobile the content needs the full viewport width — applying
+            the desktop padding unconditionally caused horizontal overflow
+            (633px doc on a 390px screen). */}
         <div
-          className="flex flex-col min-h-screen transition-[padding-left] duration-200 ease-in-out"
-          style={{ paddingLeft: currentWidth }}
+          className="flex flex-col min-h-screen transition-[padding-left] duration-200 ease-in-out lg:[padding-left:var(--sidebar-w)]"
+          style={{ ['--sidebar-w' as string]: `${currentWidth}px` }}
         >
           <Header />
           <main

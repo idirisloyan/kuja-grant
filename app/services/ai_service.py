@@ -4487,11 +4487,26 @@ RETURN ONLY valid JSON in this exact shape (no commentary, no markdown fences):
   "missing": ["<human labels of requirements not addressed at all>"]
 }}"""
 
+            import time as _time
+            t0 = _time.time()
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=2500,
                 messages=[{"role": "user", "content": prompt}],
             )
+            latency_ms = int((_time.time() - t0) * 1000)
+            usage = getattr(response, 'usage', None)
+            in_tok = getattr(usage, 'input_tokens', 0) if usage else 0
+            out_tok = getattr(usage, 'output_tokens', 0) if usage else 0
+            try:
+                AIService._record_call(
+                    endpoint='voice-structure', role='ngo', language=language,
+                    input_tokens=in_tok, output_tokens=out_tok,
+                    latency_ms=latency_ms, success=True,
+                )
+            except Exception:
+                pass
+
             text = response.content[0].text.strip()
             if text.startswith('```'):
                 # Strip markdown fences defensively.
@@ -4520,6 +4535,14 @@ RETURN ONLY valid JSON in this exact shape (no commentary, no markdown fences):
             }
         except Exception as e:
             logger.error(f"structure_voice_report AI failed: {e}")
+            try:
+                AIService._record_call(
+                    endpoint='voice-structure', role='ngo', language=language,
+                    input_tokens=0, output_tokens=0, latency_ms=0,
+                    success=False, error=str(e)[:200],
+                )
+            except Exception:
+                pass
             # Fall back to deterministic mapping rather than blocking the NGO.
             content = dict(existing_content or {})
             if matching:
@@ -4750,11 +4773,27 @@ Return ONLY JSON in this exact shape (no markdown fences):
   "notes": "<empty string or 1-2 sentences flagging tricky choices>"
 }}"""
 
+            import time as _time
+            t0 = _time.time()
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=2500,
                 messages=[{"role": "user", "content": prompt}],
             )
+            latency_ms = int((_time.time() - t0) * 1000)
+            usage = getattr(response, 'usage', None)
+            in_tok = getattr(usage, 'input_tokens', 0) if usage else 0
+            out_tok = getattr(usage, 'output_tokens', 0) if usage else 0
+            try:
+                AIService._record_call(
+                    endpoint='translate', role=None,
+                    language=target_language[:2],
+                    input_tokens=in_tok, output_tokens=out_tok,
+                    latency_ms=latency_ms, success=True,
+                )
+            except Exception:
+                pass
+
             t = response.content[0].text.strip()
             if t.startswith('```'):
                 t = re.sub(r'^```(?:json)?\s*|\s*```$', '', t, flags=re.MULTILINE).strip()
@@ -4769,6 +4808,15 @@ Return ONLY JSON in this exact shape (no markdown fences):
             }
         except Exception as e:
             logger.error(f"translate_text failed: {e}")
+            try:
+                AIService._record_call(
+                    endpoint='translate', role=None,
+                    language=target_language[:2],
+                    input_tokens=0, output_tokens=0, latency_ms=0,
+                    success=False, error=str(e)[:200],
+                )
+            except Exception:
+                pass
             return {'translated': text, 'source_language': source_language,
                     'target_language': target_language, 'fidelity': 0,
                     'notes': f'Translation failed; showing original. ({type(e).__name__})',
@@ -5166,6 +5214,8 @@ Return ONLY valid JSON in this shape (no markdown fences, no preamble):
   "confidence": 0-100
 }}"""
 
+            import time as _time
+            t0 = _time.time()
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=2500,
@@ -5177,6 +5227,20 @@ Return ONLY valid JSON in this shape (no markdown fences, no preamble):
                     ],
                 }],
             )
+            latency_ms = int((_time.time() - t0) * 1000)
+            usage = getattr(response, 'usage', None)
+            in_tok = getattr(usage, 'input_tokens', 0) if usage else 0
+            out_tok = getattr(usage, 'output_tokens', 0) if usage else 0
+            try:
+                AIService._record_call(
+                    endpoint=f'photo-extract:{kind_norm}', role='ngo',
+                    language=None,
+                    input_tokens=in_tok, output_tokens=out_tok,
+                    latency_ms=latency_ms, success=True,
+                )
+            except Exception:
+                pass
+
             text = response.content[0].text.strip()
             if text.startswith('```'):
                 text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text, flags=re.MULTILINE).strip()
@@ -5200,6 +5264,15 @@ Return ONLY valid JSON in this shape (no markdown fences, no preamble):
                 result["warnings"].extend([str(w)[:200] for w in ext_warns[:10]])
         except Exception as e:
             logger.error(f"extract_photo_evidence AI failed: {e}")
+            try:
+                AIService._record_call(
+                    endpoint=f'photo-extract:{kind_norm}', role='ngo',
+                    language=None,
+                    input_tokens=0, output_tokens=0, latency_ms=0,
+                    success=False, error=str(e)[:200],
+                )
+            except Exception:
+                pass
             result["warnings"].append(
                 "AI extraction failed for this photo, but the file is saved and attached. "
                 "You can still describe it in the report by hand."

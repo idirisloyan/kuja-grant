@@ -426,16 +426,34 @@ class CopilotService:
             "page they're on, and a small JSON of relevant state, suggest 3-5 "
             "specific actions they should take next. Each suggestion should "
             "name a concrete thing (a grant title, a missing document, a "
-            "deadline) — avoid generic prompts like 'review your dashboard'."
+            "deadline) — avoid generic prompts like 'review your dashboard'.\n\n"
+            "CRITICAL GROUNDING RULE: every suggestion MUST cite a specific "
+            "entity (id, title, name, or counter) that is present in the "
+            "STATE JSON below. Do NOT invent incidents, alarms, audits, or "
+            "system-health concerns from training data. If STATE shows no "
+            "problem in some area, do not surface a suggestion in that area. "
+            "If STATE is empty or minimal, return fewer suggestions (1-2) "
+            "rather than padding with generic guesses. Never use terms like "
+            "'Backup Verification', 'Access Audit', 'System Health Check', "
+            "or any other incident framing unless the STATE literally "
+            "contains a row, counter, or flag that names it."
         )
         # Role-aware voice — same data, different lens. NGO gets coached,
         # donor gets briefed, reviewer gets evidence pointers, admin gets
-        # operational signals.
+        # operational signals — but only signals visibly present in STATE.
         role_voice = {
-            'ngo': " VOICE: warm coach. 'You / your team'. Each suggestion unblocks a submission, sharpens a narrative, or closes a gap.",
-            'donor': " VOICE: strategic advisor. 'Your portfolio'. Each suggestion is a decision: approve, escalate, reallocate, or follow up.",
-            'reviewer': " VOICE: analytical peer. Each suggestion points at evidence to verify, contradictions to reconcile, or scoring inconsistencies to revisit.",
-            'admin': " VOICE: operations brief. Each suggestion is a system-level action — a stuck workflow, a compliance backlog, an AI quality signal.",
+            'ngo': " VOICE: warm coach. 'You / your team'. Each suggestion unblocks a submission, sharpens a narrative, or closes a gap that STATE names.",
+            'donor': " VOICE: strategic advisor. 'Your portfolio'. Each suggestion is a decision (approve, escalate, reallocate, follow up) on a grant/application/report that STATE names.",
+            'reviewer': " VOICE: analytical peer. Each suggestion points at a specific source document, claim, or score in STATE — evidence to verify, contradictions to reconcile, scoring inconsistencies to revisit.",
+            'admin': (
+                " VOICE: operations brief. Each suggestion targets a stuck "
+                "workflow, compliance backlog, or AI quality signal that is "
+                "DIRECTLY VISIBLE in STATE (e.g. a count of stalled reviews, "
+                "an AI failure rate, a queue depth). If STATE shows green "
+                "across the board, say so plainly — do not manufacture "
+                "incidents. Never recommend backup/audit/health-check "
+                "actions unless STATE names that exact failure."
+            ),
         }
         if role in role_voice:
             system += role_voice[role]

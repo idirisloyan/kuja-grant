@@ -438,7 +438,11 @@ def register_middleware(app):
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+        # Allow same-origin access to camera + microphone — Voice composer
+        # (Phase 71/93) and Photo evidence (Phase 72) need them. Locking
+        # microphone=() entirely was the root cause of "Your audio is being
+        # recorded" appearing without an actual recording.
+        response.headers['Permissions-Policy'] = 'camera=(self), microphone=(self), geolocation=()'
         # CSP: Next.js static export requires 'unsafe-inline' for hydration
         # bootstrap scripts. TODO: replace with build-time SHA-256 hashes
         # of inline scripts (Option A in enterprise remediation plan).

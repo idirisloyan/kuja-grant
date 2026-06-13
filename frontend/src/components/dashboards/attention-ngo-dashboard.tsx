@@ -48,7 +48,18 @@ export function AttentionNgoDashboard() {
     ['submitted', 'in_review'].includes(a.status),
   );
   // upcoming_reports is typed `unknown[]` at the hook; narrow it here.
-  type Upcoming = { id: number; grant_title?: string; due_date?: string };
+  // Backend returns `draft_report_id` (nullable when not yet started)
+  // plus `application_id` — there is no top-level `id` field.
+  type Upcoming = {
+    grant_id: number;
+    grant_title?: string;
+    due_date?: string;
+    application_id?: number;
+    draft_report_id: number | null;
+    requirement_title?: string;
+    reporting_period?: string;
+    status?: string;
+  };
   const upcoming = ((upcomingReps?.upcoming_reports ?? []) as Upcoming[]).slice(0, 3);
 
   // Phase 63 — name the entities (same pattern as Phase 62).
@@ -56,7 +67,7 @@ export function AttentionNgoDashboard() {
     .map((a) => a.grant_title ? `"${a.grant_title}"` : `App #${a.id}`)
     .slice(0, 2);
   const upcomingNames = upcoming
-    .map((r) => r.grant_title ? `"${r.grant_title}"` : `Report #${r.id}`)
+    .map((r) => r.grant_title ? `"${r.grant_title}"` : (r.requirement_title || 'Report'))
     .slice(0, 2);
   const fmtList = (sample: string[], total: number) => {
     if (sample.length === 0) return '';
@@ -172,18 +183,34 @@ export function AttentionNgoDashboard() {
               </Link>
             </div>
             <ul className="space-y-2">
-              {upcoming.map((r) => (
-                <li key={r.id} className="text-xs flex items-center justify-between gap-3 border border-border rounded-md p-3">
-                  <Link href={`/reports/${r.id}`} className="min-w-0 flex-1">
-                    <div className="font-medium text-sm truncate">
-                      {r.grant_title || `Report #${r.id}`}
-                    </div>
-                    <div className="text-muted-foreground mt-0.5">
-                      {r.due_date && <>Due {new Date(r.due_date).toLocaleDateString()}</>}
-                    </div>
-                  </Link>
-                </li>
-              ))}
+              {upcoming.map((r, idx) => {
+                // Drafts have a real report row; not-yet-started periods
+                // don't, and need to be created from the reports list page
+                // (deep-linked to the grant).
+                const href = r.draft_report_id
+                  ? `/reports/${r.draft_report_id}`
+                  : `/reports?grant_id=${r.grant_id}`;
+                const cta = r.draft_report_id ? 'Resume draft' : 'Start report';
+                return (
+                  <li
+                    key={`${r.grant_id}-${r.reporting_period || idx}`}
+                    className="text-xs flex items-center justify-between gap-3 border border-border rounded-md p-3"
+                  >
+                    <Link href={href} className="min-w-0 flex-1">
+                      <div className="font-medium text-sm truncate">
+                        {r.grant_title || r.requirement_title || 'Report'}
+                      </div>
+                      <div className="text-muted-foreground mt-0.5 flex items-center gap-2">
+                        {r.due_date && <span>Due {new Date(r.due_date).toLocaleDateString()}</span>}
+                        {r.reporting_period && <span className="opacity-70">· {r.reporting_period}</span>}
+                      </div>
+                    </Link>
+                    <span className="text-[10px] uppercase tracking-wide text-[hsl(var(--kuja-clay))] font-semibold whitespace-nowrap">
+                      {cta}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         )}

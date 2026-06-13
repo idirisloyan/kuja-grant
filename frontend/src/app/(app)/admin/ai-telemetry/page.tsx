@@ -17,8 +17,9 @@ import useSWR from 'swr';
 import {
   PageShell, PageBack, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
-import { Activity, AlertTriangle } from 'lucide-react';
+import { Activity, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface ByEndpoint {
   endpoint: string;
@@ -56,11 +57,39 @@ const WINDOW_OPTIONS = [
 ];
 
 export default function AdminAiTelemetryPage() {
+  const user = useAuthStore((s) => s.user);
   const [hours, setHours] = useState(168);
+  const isAdmin = !user || user.role === 'admin';
+
+  // useSWR call must be unconditional — non-admins pass `null` as the key
+  // so SWR skips the fetch. Hooks order stays consistent.
   const { data, isLoading } = useSWR<TelemetryResp>(
-    `/admin/ai-telemetry?hours=${hours}`,
+    isAdmin ? `/admin/ai-telemetry?hours=${hours}` : null,
     (url: string) => api.get<TelemetryResp>(url),
   );
+
+  // Non-admins see a "not for you" shell rather than the empty page they
+  // would otherwise hit when the API responds 403.
+  if (user && user.role !== 'admin') {
+    return (
+      <PageShell>
+        <PageHeader title="AI telemetry" icon={Activity} subtitle="" />
+        <PageMain>
+          <div className="border border-border rounded-lg bg-card p-6 flex items-start gap-3">
+            <ShieldAlert className="h-5 w-5 text-[hsl(var(--kuja-clay))] mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <div className="font-semibold mb-1">This page is for platform admins.</div>
+              <div className="text-muted-foreground">
+                AI telemetry shows system-wide failure rates and is only available to
+                administrators. If you reached this page by accident, head back to your
+                dashboard.
+              </div>
+            </div>
+          </div>
+        </PageMain>
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell>

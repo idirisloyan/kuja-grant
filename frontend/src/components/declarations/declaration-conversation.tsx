@@ -103,8 +103,11 @@ export function DeclarationConversation({ onParsed, onCancel, className = '' }: 
     return () => { try { recogRef.current?.stop(); } catch { /* ignore */ } };
   }, []);
 
-  async function startAudioBackup() {
-    if (typeof window === 'undefined' || !navigator.mediaDevices) return;
+  async function startAudioBackup(): Promise<boolean> {
+    // Phase 94 — returns true only when MediaRecorder actually started.
+    // Lets the caller stop pretending we're recording when the mic is
+    // unavailable.
+    if (typeof window === 'undefined' || !navigator.mediaDevices) return false;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream);
@@ -119,17 +122,23 @@ export function DeclarationConversation({ onParsed, onCancel, className = '' }: 
       };
       mr.start();
       mediaRecorderRef.current = mr;
+      return true;
     } catch {
-      // Mic permission denied — silently skip backup
+      return false;
     }
   }
 
   async function startRecording() {
-    // Always capture audio as backup, even when speech recognition won't work.
-    await startAudioBackup();
+    const micOk = await startAudioBackup();
 
     const Ctor = getSpeechRecognition();
     if (!Ctor || lang.speechQuality === 'unsupported') {
+      if (!micOk) {
+        toast.error(
+          'Microphone is not available — please grant mic permission, or type your declaration directly below.',
+        );
+        return;
+      }
       toast.message(
         lang.speechQuality === 'unsupported'
           ? `Voice transcription isn't supported for ${lang.label} in this browser. Your audio is being recorded — listen back and type below.`
@@ -165,7 +174,14 @@ export function DeclarationConversation({ onParsed, onCancel, className = '' }: 
       recogRef.current = r;
       setRecording(true);
     } catch (e) {
-      toast.error((e as Error).message || 'Could not start the microphone.');
+      if (!micOk) {
+        toast.error((e as Error).message || 'Microphone is not available — please grant permission or type below.');
+        return;
+      }
+      toast.message(
+        'Live transcription unavailable — your audio is still recording. Listen back and type below.',
+      );
+      setRecording(true);
     }
   }
 

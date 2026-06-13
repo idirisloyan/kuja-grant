@@ -177,10 +177,12 @@ export function VoiceReportComposer({ reportId, onApplied, className = '' }: Pro
     }
   }
 
-  async function startAudioBackup() {
+  async function startAudioBackup(): Promise<boolean> {
     // Phase 93 — start MediaRecorder so the audio is captured even if
-    // Speech Recognition fails or is unsupported.
-    if (typeof window === 'undefined' || !navigator.mediaDevices) return;
+    // Speech Recognition fails or is unsupported. Returns true only when
+    // the mic was actually acquired AND MediaRecorder started — so the
+    // caller can decide whether to honestly claim "recording".
+    if (typeof window === 'undefined' || !navigator.mediaDevices) return false;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream);
@@ -203,18 +205,28 @@ export function VoiceReportComposer({ reportId, onApplied, className = '' }: Pro
       };
       mr.start();
       mediaRecorderRef.current = mr;
+      return true;
     } catch {
-      // Mic permission denied or unavailable — silently skip backup
+      return false;
     }
   }
 
   async function startRecording() {
-    // Always start the audio backup if possible (Phase 93). This works
-    // even when Speech Recognition is unsupported (e.g. Somali).
-    await startAudioBackup();
+    // Always try the audio backup first (Phase 93). Works even when
+    // Speech Recognition is unsupported (e.g. Somali).
+    const micOk = await startAudioBackup();
 
     const Ctor = getSpeechRecognition();
     if (!Ctor || lang.speechQuality === 'unsupported') {
+      // No speech recognition for this language — recording is
+      // ONLY truthful if the mic actually started. Otherwise tell
+      // the user why and stay in the typed-input state.
+      if (!micOk) {
+        toast.error(
+          'Microphone is not available — please grant mic permission, or type your memo directly below.',
+        );
+        return;
+      }
       toast.message(
         lang.speechQuality === 'unsupported'
           ? `Voice transcription is not supported for ${lang.label} in this browser. Your audio is being recorded — listen back and type below.`
@@ -253,7 +265,16 @@ export function VoiceReportComposer({ reportId, onApplied, className = '' }: Pro
       setRecording(true);
       recogRef.current = r;
     } catch (e) {
-      toast.error((e as Error).message || 'Could not start the microphone.');
+      // Speech recognition refused to start. If mic ALSO didn't open,
+      // there's no recording happening — say so.
+      if (!micOk) {
+        toast.error((e as Error).message || 'Microphone is not available — please grant permission or type below.');
+        return;
+      }
+      toast.message(
+        'Live transcription unavailable — your audio is still recording. Listen back and type below.',
+      );
+      setRecording(true);
     }
   }
 
@@ -305,7 +326,7 @@ export function VoiceReportComposer({ reportId, onApplied, className = '' }: Pro
         className={`inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-clay))]/30 bg-[hsl(var(--kuja-clay))]/5 px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay))]/10 ${className}`}
         title="Record a voice memo and let Kuja structure it into the donor&apos;s reporting framework."
       >
-        <Mic className="h-3.5 w-3.5" /> Voice draft (Phase 71)
+        <Mic className="h-3.5 w-3.5" /> Voice draft
       </button>
     );
   }

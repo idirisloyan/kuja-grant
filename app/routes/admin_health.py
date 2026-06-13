@@ -87,6 +87,24 @@ def api_system_health():
                        'current': 'Not set',
                        'fix': 'Generate a 32-char token and set CRON_SECRET in Railway env.'})
 
+    # 3b. Phase 96 — WHISPER_API_KEY (OpenAI Whisper fallback). Optional,
+    # but surfaced as 'warn' when missing so the team can see that
+    # Somali / Swahili / Arabic auto-transcription is NOT active. Without
+    # it, the Voice composer + Declaration conversation fall back to
+    # MediaRecorder + listen-back-and-type (Phase 93 fallbacks).
+    if os.environ.get('WHISPER_API_KEY'):
+        checks.append({'key': 'whisper_key', 'status': 'ok',
+                       'why': 'Activates auto-transcription for Somali / Swahili / Arabic',
+                       'current': 'Set', 'fix': ''})
+    else:
+        checks.append({'key': 'whisper_key', 'status': 'warn',
+                       'why': ('Voice users in Somali / Swahili / Arabic have no '
+                               'live-transcription path — they fall back to '
+                               'listen-back-and-type. Audio capture still works.'),
+                       'current': 'Not set',
+                       'fix': ('Set WHISPER_API_KEY in Railway env (OpenAI key). '
+                               'Approx $0.006/min of audio.')})
+
     # 4. AI failure rate (last 24h)
     try:
         result = db.session.execute(text("""

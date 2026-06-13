@@ -133,7 +133,7 @@ export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: P
         className={`inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-grow))]/30 bg-[hsl(var(--kuja-grow))]/5 px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-grow))] hover:bg-[hsl(var(--kuja-grow))]/10 ${className}`}
         title="Take a photo of an attendance sheet, receipt, or training session — Kuja extracts the details."
       >
-        <Camera className="h-3.5 w-3.5" /> Add photo evidence (Phase 72)
+        <Camera className="h-3.5 w-3.5" /> Add photo evidence
       </button>
     );
   }
