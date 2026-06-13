@@ -1239,31 +1239,21 @@ function ReportRow({ report, mutateReports }: { report: Report; mutateReports: (
       {report.status === 'draft' && (
         <tr>
           <td colSpan={6} className="border-t-0 px-4 py-2 space-y-2">
-            {/* Phase 10.2 — banner-prominent pre-flight check, FIRST.
-                Earlier the team retest noted they didn't see the new
-                report pre-flight in action; the small button was easy
-                to miss next to the existing precheck panel. The banner
-                variant makes the donor-perspective AI scan unmistakably
-                visible the moment a draft row opens. */}
-            {/* Primary actions — readiness check is the most important
-                'is this report good?' signal; voice + photo are the two
-                fastest ways to populate the report. */}
+            {/* Readiness banner stays always-visible — it's the "is this
+                report good?" signal the NGO needs at a glance. Every
+                other AI tool now hides inside one accordion so an open
+                draft row shows AT MOST one banner + one disclosure
+                instead of four stacked panels. Team review (2026-06-13)
+                noted the stacked panels per-draft felt noisy. */}
             <ReportReadiness reportId={report.id} variant="banner" />
-            {/* Phase 71 — voice-to-report. */}
-            <VoiceReportComposer reportId={report.id} onApplied={() => mutateReports()} />
-            {/* Phase 72 — photo-evidence. */}
-            <PhotoEvidenceUploader reportId={report.id} onApplied={() => mutateReports()} />
 
-            {/* Phase 83 — AI consolidation. Team review: report drafts
-                stacked 7 AI surfaces. The three above are the primary
-                ones; the four below get collapsed behind a single
-                disclosure so non-technical NGOs see less, power users
-                still get one click to expand. */}
             <AIToolsAccordion
-              label="More AI tools"
-              hint="Typed co-author, donor review bundle, pre-submit checks, AI guidance"
-              toolCount={4}
+              label="AI tools for this report"
+              hint="Voice draft · Photo evidence · Typed co-author · Donor bundle · Pre-submit checks · Guidance"
+              toolCount={6}
             >
+              <VoiceReportComposer reportId={report.id} onApplied={() => mutateReports()} />
+              <PhotoEvidenceUploader reportId={report.id} onApplied={() => mutateReports()} />
               <ReportDraftCoAuthor reportId={report.id} onApplied={() => mutateReports()} />
               <BundleWrap report={report} />
               <PreSubmitReviewPanel report={report} mutateReports={mutateReports} />

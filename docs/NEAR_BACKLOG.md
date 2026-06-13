@@ -224,6 +224,70 @@
 
 ---
 
+## Quality bar (added 2026-06-13)
+
+### Production demo-data cleanup
+- **last_touched:** 2026-06-13
+- **Why:** Code-review pass flagged that dashboards feel noisy / less
+  credible because prod still contains E2E grants, applications and
+  empty records left over from the test fixture-pinning work + the
+  ongoing UAT sweeps. Real team-of-N users land on a dashboard with
+  "Test Grant #47" rows next to real grants and the immediate read is
+  "this is a demo, not a system." Same surfaces under-report what real
+  signal-to-noise looks like for new NGOs.
+- **Action:** Audit the prod DB for rows authored by E2E / fixture
+  accounts (`*e2e*@*.org`, `uat-fixture@adeso.org`-style markers, draft
+  rows older than N days with no real activity) and soft-delete or
+  archive them. KEEP the marker rows the UAT cron uses
+  (`/api/cron/uat-fixtures` self-heals 3 contracts — those are
+  load-bearing) and seed accounts (fatima@amani.org etc. — the team
+  demos with them). Everything else: cull. Pair with the team on the
+  cull list before pulling the trigger.
+- **Status:** deferred. Not safe to mutate prod without explicit ops
+  alignment + a backup snapshot.
+
+### Arabic translation completeness
+- **last_touched:** 2026-06-13
+- **Why:** Code-review pass observed the Arabic donor experience renders
+  RTL nav but the dashboard content stays mostly English. Mixed-language
+  UX is worse than monolingual English — readers context-switch every
+  line. The root cause: `frontend/src/i18n/ar.json` covers the original
+  Phase 13 / Phase 32 keys but the modern dashboard / Phase 48 attention
+  surfaces / Phase 70+ reviewer surfaces shipped without parallel Arabic
+  keys, so `translate()` falls back to English.
+- **Action:** Diff `frontend/src/i18n/en.json` against `ar.json`,
+  generate a translator-ready spreadsheet of missing keys, run it
+  through an Arabic-native translator (NOT machine translation — the
+  Arabic in the existing file is already curated and a new MT pass
+  would lower quality), drop the result back into `ar.json`. Same pass
+  is owed to `sw.json` and `so.json`, but Arabic is most visible
+  because it's the only RTL surface.
+- **Status:** deferred. Needs a translator, not just code. Tracked
+  separately from `[[reference_kuja_near_backlog]]` because it's
+  cross-tenant.
+
+### Native-language user testing on real low-cost Android devices
+- **last_touched:** 2026-06-13
+- **Why:** Code-review verdict was that the product can't credibly
+  approach 9.5–10/10 launch quality until non-technical NGO users have
+  validated the mobile + voice + photo flows on the devices they
+  actually use. Headless tests + this session's Playwright sweeps run
+  on desktop Chrome — they don't catch low-bandwidth UX, RTL keyboard
+  quirks, or whether the audio fallback path is actually usable on a
+  $100 Android with 2G.
+- **Action:** Recruit 6–10 NGO program officers across Somali (3+),
+  Swahili (2+), Arabic (2+), French (1+) language groups. Moderated
+  45-min sessions on their own devices, on a metered connection if
+  available. Tasks: submit a draft application, file a quarterly
+  report from a phone photo + voice memo, navigate the membership
+  flow, find a deadline. Capture: where do they get stuck, where do
+  they switch to typing, what English copy lands as nonsense in
+  translation.
+- **Status:** deferred. Needs recruitment + budget, not code. Block on
+  this before claiming a 9.5/10 quality bar in any pitch.
+
+---
+
 ## Explicitly declined
 
 *(empty — add items here as the team decides not to build them, with the date and reason)*

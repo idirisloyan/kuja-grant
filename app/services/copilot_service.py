@@ -89,10 +89,19 @@ class CopilotService:
             attempts += 1
             t0 = time.time()
             try:
+                # Phase 98 — prompt-cache the system block for the central
+                # copilot _call. context_suggestions / chat / insights all
+                # share the role-decorated grounding rule from
+                # context_suggestions(), which is long enough to benefit
+                # from the 5-min ephemeral cache on the second call.
                 msg = client.messages.create(
                     model=model,
                     max_tokens=max_tokens,
-                    system=system,
+                    system=[{
+                        "type": "text",
+                        "text": system,
+                        "cache_control": {"type": "ephemeral"},
+                    }],
                     messages=[{'role': 'user', 'content': user}],
                 )
                 usage = getattr(msg, 'usage', None)
@@ -571,10 +580,20 @@ class CopilotService:
         msgs.append({'role': 'user', 'content': full_user})
 
         try:
+            # Phase 98 — prompt-cache the assembled co-pilot system block.
+            # System here is large (role addendum + grounding rules +
+            # citation discipline + language pin) and identical across
+            # turns in the same session, so a 5-minute ephemeral cache
+            # eats most of the prefix-processing cost on follow-up
+            # questions. Same surface that was slowest in UAT chat.
             with client.messages.stream(
                 model=MODEL_PRIMARY,
                 max_tokens=2000,
-                system=system,
+                system=[{
+                    "type": "text",
+                    "text": system,
+                    "cache_control": {"type": "ephemeral"},
+                }],
                 messages=msgs,
             ) as stream:
                 for delta in stream.text_stream:

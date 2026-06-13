@@ -565,10 +565,22 @@ class AIService:
             # longer than the caller's intended budget.
             per_call_timeout = cls._resolve_timeout(endpoint)
             scoped = client.with_options(timeout=per_call_timeout)
+            # Anthropic prompt caching — when the (language + role + tone)-
+            # decorated system prompt is ≥1024 tokens, the second call
+            # within 5 min reuses the prefix and lops 30-50% off latency.
+            # Below the threshold Anthropic silently ignores the marker, so
+            # this is safe even for short prompts. Has no effect on cost
+            # for short prompts; on long ones, cache reads cost 10% of a
+            # fresh write.
+            system_blocks = [{
+                "type": "text",
+                "text": system_prompt,
+                "cache_control": {"type": "ephemeral"},
+            }]
             message = scoped.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=max_tokens,
-                system=system_prompt,
+                system=system_blocks,
                 messages=[{"role": "user", "content": user_message}],
             )
             latency_ms = int((time.monotonic() - t0) * 1000)
@@ -4489,9 +4501,13 @@ RETURN ONLY valid JSON in this exact shape (no commentary, no markdown fences):
 
             import time as _time
             t0 = _time.time()
+            # Phase 98 — voice-structure max_tokens 2500 → 1800. Real
+            # voice memos rarely produce >1200-token structured drafts;
+            # the lower ceiling speeds start-of-generation without
+            # affecting any actual transcript we've seen in UAT.
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
-                max_tokens=2500,
+                max_tokens=1800,
                 messages=[{"role": "user", "content": prompt}],
             )
             latency_ms = int((_time.time() - t0) * 1000)
@@ -4775,9 +4791,16 @@ Return ONLY JSON in this exact shape (no markdown fences):
 
             import time as _time
             t0 = _time.time()
+            # Phase 98 — translate runs on Haiku 4.5 instead of Sonnet 4.
+            # Translation is a well-defined transform: instructions are
+            # short, output structure is fixed, no chain-of-reasoning
+            # needed. Haiku 4.5 is ~3-5x faster on tasks like this with
+            # no quality loss for the 6 languages we support. Sonnet
+            # cost was wasted here. max_tokens dropped from 2500 to 1500
+            # — even verbose translations sit well under 1000 tokens.
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=2500,
+                model="claude-haiku-4-5-20251001",
+                max_tokens=1500,
                 messages=[{"role": "user", "content": prompt}],
             )
             latency_ms = int((_time.time() - t0) * 1000)
@@ -5216,9 +5239,13 @@ Return ONLY valid JSON in this shape (no markdown fences, no preamble):
 
             import time as _time
             t0 = _time.time()
+            # Phase 98 — photo-extract max_tokens 2500 → 1800. Even
+            # legibly-extracted attendance sheets sit well under 1500
+            # tokens of JSON; the lower ceiling cuts start-of-generation
+            # latency without affecting the actual output we've seen.
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
-                max_tokens=2500,
+                max_tokens=1800,
                 messages=[{
                     "role": "user",
                     "content": [
