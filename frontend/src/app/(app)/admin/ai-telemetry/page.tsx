@@ -1,0 +1,205 @@
+'use client';
+
+/**
+ * Phase 97 — Admin AI telemetry rollup.
+ *
+ * Shows real-world AI call statistics so the team can see which
+ * features fail in production and where the next fallback investment
+ * should go (Whisper for which languages? More compliance explainers?
+ * Better prompt for which surface?).
+ *
+ * Until we have this data, every "how reliable is X" question is
+ * anecdotal. Now it's measurable.
+ */
+
+import { useState } from 'react';
+import useSWR from 'swr';
+import {
+  PageShell, PageBack, PageHeader, PageMain,
+} from '@/components/layout/page-shell';
+import { Activity, AlertTriangle } from 'lucide-react';
+import { api } from '@/lib/api';
+
+interface ByEndpoint {
+  endpoint: string;
+  calls: number;
+  failures: number;
+  failure_rate_pct: number;
+  p50_ms: number | null;
+  p95_ms: number | null;
+  total_tokens_out: number;
+}
+
+interface RecentFailure {
+  endpoint: string;
+  error_code: string | null;
+  error_message: string;
+  duration_ms: number | null;
+  created_at: string | null;
+}
+
+interface TelemetryResp {
+  success: boolean;
+  window_hours: number;
+  total_calls: number;
+  total_failures: number;
+  failure_rate_pct: number;
+  by_endpoint: ByEndpoint[];
+  recent_failures: RecentFailure[];
+}
+
+const WINDOW_OPTIONS = [
+  { hours: 24,  label: 'Last 24h' },
+  { hours: 72,  label: 'Last 3d' },
+  { hours: 168, label: 'Last 7d' },
+  { hours: 720, label: 'Last 30d' },
+];
+
+export default function AdminAiTelemetryPage() {
+  const [hours, setHours] = useState(168);
+  const { data, isLoading } = useSWR<TelemetryResp>(
+    `/admin/ai-telemetry?hours=${hours}`,
+    (url: string) => api.get<TelemetryResp>(url),
+  );
+
+  return (
+    <PageShell>
+      <PageBack href="/admin/security" label="Back to admin" />
+      <PageHeader
+        title="AI telemetry"
+        icon={Activity}
+        subtitle="Real-world AI call statistics — per-endpoint failure rates, latency, token usage."
+      />
+
+      <PageMain>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {WINDOW_OPTIONS.map((o) => (
+            <button
+              key={o.hours}
+              type="button"
+              onClick={() => setHours(o.hours)}
+              className={
+                'px-2.5 py-1 rounded-full border text-[11px] ' +
+                (o.hours === hours
+                  ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-clay))]/15 text-[hsl(var(--kuja-clay))] font-semibold'
+                  : 'border-border text-muted-foreground hover:text-foreground')
+              }
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+
+        {isLoading && <div className="kuja-shimmer h-32 rounded-lg" />}
+
+        {data && data.success && (
+          <>
+            {/* Top-line summary */}
+            <section className="grid grid-cols-3 gap-3">
+              <Stat label="Total AI calls" value={data.total_calls.toLocaleString()} />
+              <Stat
+                label="Failed"
+                value={data.total_failures.toLocaleString()}
+                tone={data.failure_rate_pct >= 10 ? 'bad' : data.failure_rate_pct >= 3 ? 'warn' : 'good'}
+              />
+              <Stat
+                label="Failure rate"
+                value={`${data.failure_rate_pct.toFixed(1)}%`}
+                tone={data.failure_rate_pct >= 10 ? 'bad' : data.failure_rate_pct >= 3 ? 'warn' : 'good'}
+              />
+            </section>
+
+            {/* Per-endpoint rollup */}
+            <section className="border border-border rounded-lg bg-card overflow-hidden">
+              <div className="px-4 py-2 border-b border-border bg-muted/30">
+                <h2 className="text-sm font-semibold">By endpoint</h2>
+              </div>
+              <table className="w-full text-xs">
+                <thead className="bg-muted/30">
+                  <tr className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                    <th className="text-left px-3 py-2">Endpoint</th>
+                    <th className="text-right px-3 py-2">Calls</th>
+                    <th className="text-right px-3 py-2">Failures</th>
+                    <th className="text-right px-3 py-2">Fail %</th>
+                    <th className="text-right px-3 py-2">p50</th>
+                    <th className="text-right px-3 py-2">p95</th>
+                    <th className="text-right px-3 py-2">Tokens out</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.by_endpoint.map((e) => {
+                    const tone =
+                      e.failure_rate_pct >= 10 ? 'text-destructive font-semibold' :
+                      e.failure_rate_pct >= 3 ? 'text-[hsl(var(--kuja-sun))]' : '';
+                    return (
+                      <tr key={e.endpoint} className="border-b border-border last:border-0">
+                        <td className="px-3 py-2 font-mono text-[11px] truncate max-w-[260px]" title={e.endpoint}>
+                          {e.endpoint}
+                        </td>
+                        <td className="px-3 py-2 text-right kuja-numeric">{e.calls}</td>
+                        <td className="px-3 py-2 text-right kuja-numeric">{e.failures}</td>
+                        <td className={`px-3 py-2 text-right kuja-numeric ${tone}`}>{e.failure_rate_pct.toFixed(1)}%</td>
+                        <td className="px-3 py-2 text-right kuja-numeric">{e.p50_ms ?? '—'}</td>
+                        <td className="px-3 py-2 text-right kuja-numeric">{e.p95_ms ?? '—'}</td>
+                        <td className="px-3 py-2 text-right kuja-numeric">{e.total_tokens_out.toLocaleString()}</td>
+                      </tr>
+                    );
+                  })}
+                  {data.by_endpoint.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground italic">
+                        No AI calls recorded in this window.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </section>
+
+            {/* Recent failures */}
+            {data.recent_failures.length > 0 && (
+              <section className="border border-destructive/30 bg-destructive/5 rounded-lg overflow-hidden">
+                <div className="px-4 py-2 border-b border-destructive/30 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                  <h2 className="text-sm font-semibold">Recent failures</h2>
+                </div>
+                <ul className="divide-y divide-border">
+                  {data.recent_failures.map((f, i) => (
+                    <li key={i} className="px-3 py-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-[11px]">{f.endpoint}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {f.created_at ? new Date(f.created_at).toLocaleString() : '—'}
+                        </span>
+                      </div>
+                      {f.error_code && (
+                        <div className="mt-0.5 text-[10px] text-muted-foreground">code: {f.error_code}</div>
+                      )}
+                      {f.error_message && (
+                        <div className="mt-0.5 text-foreground/80 leading-relaxed">{f.error_message}</div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </>
+        )}
+      </PageMain>
+    </PageShell>
+  );
+}
+
+function Stat({ label, value, tone = 'muted' }: { label: string; value: string; tone?: 'good' | 'warn' | 'bad' | 'muted' }) {
+  const cls =
+    tone === 'good' ? 'border-[hsl(var(--kuja-grow))]/40 bg-[hsl(var(--kuja-grow))]/5 text-[hsl(var(--kuja-grow))]' :
+    tone === 'warn' ? 'border-[hsl(var(--kuja-sun))]/40 bg-[hsl(var(--kuja-sun))]/5 text-[hsl(var(--kuja-sun))]' :
+    tone === 'bad'  ? 'border-destructive/40 bg-destructive/5 text-destructive' :
+                       'border-border';
+  return (
+    <div className={`border rounded-md p-3 ${cls}`}>
+      <div className="text-[10px] uppercase tracking-wide opacity-70 font-semibold">{label}</div>
+      <div className="font-semibold text-2xl mt-0.5 kuja-numeric">{value}</div>
+    </div>
+  );
+}

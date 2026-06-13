@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { AIStatusNotice } from '@/components/shared/ai-status-notice';
+import { useAiStatus } from '@/lib/hooks/use-ai-status';
 
 type PhotoKind = 'attendance' | 'receipt' | 'training' | 'site_visit' | 'other';
 
@@ -67,6 +68,7 @@ export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: P
   const [result, setResult] = useState<ExtractionResp | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const aiStatus = useAiStatus();
 
   function onPick(f: File | null) {
     if (!f) return;
@@ -149,6 +151,17 @@ export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: P
           <X className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Phase 95 — global AI service availability. Photo upload still
+          works (file gets saved + attached), but the extraction step
+          won't work until AI is back. */}
+      {aiStatus.ready && aiStatus.isUnavailable && (
+        <AIStatusNotice
+          kind="unavailable"
+          title="AI extraction is temporarily unavailable"
+          body="You can still upload the photo — it'll be attached to your report as-is. You'll just need to type the details from the photo by hand. Try the extraction again later."
+        />
+      )}
 
       {/* Kind picker — chips */}
       <div className="flex flex-wrap gap-1.5">

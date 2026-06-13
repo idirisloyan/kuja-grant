@@ -19,6 +19,7 @@ import { Sparkles, Loader2, CheckCircle2, AlertTriangle, ChevronRight, X } from 
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { AIStatusNotice } from '@/components/shared/ai-status-notice';
+import { useAiStatus } from '@/lib/hooks/use-ai-status';
 
 interface AiDraftResp {
   success: boolean;
@@ -47,12 +48,26 @@ export function SmartDraftBanner({
   const [preview, setPreview] = useState<AiDraftResp | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hidden, setHidden] = useState(false);
+  const aiStatus = useAiStatus();
 
   // Hide when NGO already has substantive content — pre-fill makes no sense.
   const anyTyped = Object.values(currentResponses || {})
     .some((v) => (v || '').trim().length > 30);
 
   if (hidden || anyTyped) return null;
+
+  // Phase 95 — when AI is known-down, replace the banner with a quiet
+  // notice instead of showing a button that won't work.
+  if (aiStatus.ready && aiStatus.isUnavailable) {
+    return (
+      <AIStatusNotice
+        className={className}
+        kind="unavailable"
+        title="AI drafting is temporarily unavailable"
+        body="You'll need to write each section by hand for now. Your work autosaves as you type, so you can pause and come back. Try the AI draft again later."
+      />
+    );
+  }
 
   async function runPreview() {
     setBusy(true); setError(null); setPreview(null);

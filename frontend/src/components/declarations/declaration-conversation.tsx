@@ -22,14 +22,19 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { AIStatusNotice } from '@/components/shared/ai-status-notice';
 
-const LANGS = [
-  { code: 'en-US', label: 'English' },
-  { code: 'fr-FR', label: 'Français' },
-  { code: 'ar-SA', label: 'العربية' },
-  { code: 'sw-KE', label: 'Kiswahili' },
-  { code: 'so-SO', label: 'Soomaali' },
-  { code: 'es-ES', label: 'Español' },
+// Phase 94 — same language quality metadata as VoiceReportComposer.
+const LANGS: Array<{
+  code: string; label: string;
+  speechQuality: 'good' | 'fair' | 'unsupported';
+}> = [
+  { code: 'en-US', label: 'English',   speechQuality: 'good' },
+  { code: 'fr-FR', label: 'Français',  speechQuality: 'good' },
+  { code: 'es-ES', label: 'Español',   speechQuality: 'good' },
+  { code: 'ar-SA', label: 'العربية',   speechQuality: 'fair' },
+  { code: 'sw-KE', label: 'Kiswahili', speechQuality: 'fair' },
+  { code: 'so-SO', label: 'Soomaali',  speechQuality: 'unsupported' },
 ];
 
 interface ParsedDeclaration {
@@ -86,14 +91,51 @@ export function DeclarationConversation({ onParsed, onCancel, className = '' }: 
   const recogRef = useRef<SpeechRecognitionLike | null>(null);
   const sttSupported = !!getSpeechRecognition();
 
+  // Phase 94 — MediaRecorder audio backup (same pattern as
+  // VoiceReportComposer). Captures the raw audio in parallel with
+  // speech recognition so Somali / Firefox / Safari iOS users still
+  // get a recording they can listen back and type from.
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null);
+
   useEffect(() => {
     return () => { try { recogRef.current?.stop(); } catch { /* ignore */ } };
   }, []);
 
-  function startRecording() {
+  async function startAudioBackup() {
+    if (typeof window === 'undefined' || !navigator.mediaDevices) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      mr.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlobUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      mr.start();
+      mediaRecorderRef.current = mr;
+    } catch {
+      // Mic permission denied — silently skip backup
+    }
+  }
+
+  async function startRecording() {
+    // Always capture audio as backup, even when speech recognition won't work.
+    await startAudioBackup();
+
     const Ctor = getSpeechRecognition();
-    if (!Ctor) {
-      toast.error('Voice input not supported on this browser. Type your description instead.');
+    if (!Ctor || lang.speechQuality === 'unsupported') {
+      toast.message(
+        lang.speechQuality === 'unsupported'
+          ? `Voice transcription isn't supported for ${lang.label} in this browser. Your audio is being recorded — listen back and type below.`
+          : 'Voice transcription isn\'t supported on this browser. Your audio is being recorded — listen back and type below.',
+      );
+      setRecording(true);
       return;
     }
     const r = new Ctor();
@@ -129,6 +171,7 @@ export function DeclarationConversation({ onParsed, onCancel, className = '' }: 
 
   function stopRecording() {
     try { recogRef.current?.stop(); } catch { /* ignore */ }
+    try { mediaRecorderRef.current?.stop(); } catch { /* ignore */ }
     setRecording(false);
     setInterim('');
   }
@@ -193,29 +236,63 @@ export function DeclarationConversation({ onParsed, onCancel, className = '' }: 
           ))}
         </div>
 
-        {/* Record toggle */}
-        {sttSupported && (
-          <div className="flex items-center gap-2">
-            {!recording ? (
-              <button
-                type="button"
-                onClick={startRecording}
-                className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] text-white text-xs font-semibold px-3 py-1.5 hover:opacity-90"
-              >
-                <Mic className="w-3.5 h-3.5" /> Speak instead
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={stopRecording}
-                className="inline-flex items-center gap-1.5 rounded-md bg-destructive text-white text-xs font-semibold px-3 py-1.5 hover:opacity-90 animate-pulse"
-              >
-                <MicOff className="w-3.5 h-3.5" /> Stop recording
-              </button>
-            )}
-            {recording && (
-              <span className="text-[11px] text-muted-foreground">Speak naturally. Tap Stop when done.</span>
-            )}
+        {/* Phase 94 — proactive language warnings + audio backup. Same
+            treatment as Phase 71's voice-to-report. */}
+        {!sttSupported && (
+          <AIStatusNotice
+            kind="unsupported_input"
+            title="Voice transcription isn't available in this browser"
+            body="Your browser doesn't support live voice transcription. Type your description below — or tap Record to capture audio you can listen back to."
+          />
+        )}
+        {sttSupported && lang.speechQuality === 'unsupported' && (
+          <AIStatusNotice
+            kind="unsupported_input"
+            title={`Voice transcription isn't supported for ${lang.label}`}
+            body="Audio will still be recorded — listen back and type below, or switch to English / French / Arabic for live transcription."
+          />
+        )}
+        {sttSupported && lang.speechQuality === 'fair' && (
+          <AIStatusNotice
+            kind="experimental"
+            title={`Voice transcription for ${lang.label} is experimental`}
+            body="Quality varies. Speak slowly and clearly. Audio is recorded as backup so you can verify what was captured."
+          />
+        )}
+
+        {/* Record toggle — always shown so the audio-backup path works
+            even when speech recognition is unsupported. */}
+        <div className="flex items-center gap-2">
+          {!recording ? (
+            <button
+              type="button"
+              onClick={startRecording}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] text-white text-xs font-semibold px-3 py-1.5 hover:opacity-90"
+            >
+              <Mic className="w-3.5 h-3.5" /> {lang.speechQuality === 'unsupported' || !sttSupported ? 'Record audio (manual transcribe)' : 'Speak instead'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={stopRecording}
+              className="inline-flex items-center gap-1.5 rounded-md bg-destructive text-white text-xs font-semibold px-3 py-1.5 hover:opacity-90 animate-pulse"
+            >
+              <MicOff className="w-3.5 h-3.5" /> Stop recording
+            </button>
+          )}
+          {recording && (
+            <span className="text-[11px] text-muted-foreground">Speak naturally. Tap Stop when done.</span>
+          )}
+        </div>
+
+        {/* Phase 94 — audio playback so the OB member can listen back
+            and type for unsupported languages. */}
+        {audioBlobUrl && !recording && (
+          <div className="border border-border bg-muted/30 rounded-md p-2 space-y-1">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+              Your recording (replay to type from)
+            </div>
+            <audio src={audioBlobUrl} controls className="w-full" />
           </div>
         )}
 

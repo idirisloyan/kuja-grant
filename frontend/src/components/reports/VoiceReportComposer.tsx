@@ -33,6 +33,7 @@ import {
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { AIStatusNotice } from '@/components/shared/ai-status-notice';
+import { useAiStatus } from '@/lib/hooks/use-ai-status';
 
 // --------------------------------------------------------------------------
 // Locale set — six platform languages with BCP-47 codes that the Web Speech
@@ -127,6 +128,11 @@ export function VoiceReportComposer({ reportId, onApplied, className = '' }: Pro
   const audioChunksRef = useRef<Blob[]>([]);
   const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null);
 
+  // Phase 95 — global AI service availability. When known-down we
+  // proactively surface that to the user instead of letting them record
+  // a 5-min memo first.
+  const aiStatus = useAiStatus();
+
   // Computed warnings for the chosen language. Shown above the record
   // button so the user knows BEFORE they start whether voice will work
   // for them.
@@ -143,6 +149,33 @@ export function VoiceReportComposer({ reportId, onApplied, className = '' }: Pro
       try { recogRef.current?.stop(); } catch { /* ignore */ }
     };
   }, []);
+
+  const [whisperBusy, setWhisperBusy] = useState(false);
+  async function runWhisperFallback(blob: Blob) {
+    // Phase 96 — try server-side Whisper transcription. Activates only
+    // when WHISPER_API_KEY is configured; gracefully no-ops otherwise.
+    try {
+      setWhisperBusy(true);
+      const fd = new FormData();
+      fd.append('file', blob, 'recording.webm');
+      fd.append('language', lang.short);
+      const resp = await api.upload<{ success: boolean; text?: string; error?: string }>(
+        '/whisper/transcribe', fd,
+      );
+      if (resp.success && resp.text && resp.text.trim()) {
+        setTranscript(resp.text.trim());
+        toast.success('Audio transcribed via Whisper (fallback for unsupported language).');
+      } else if (resp.error && !resp.error.includes('not configured')) {
+        // Quietly skip if Whisper isn't set up; only surface real errors.
+        toast.message('Whisper fallback failed — type your memo from the recording below.');
+      }
+    } catch {
+      // Whisper isn't enabled or service is down — fall back to the
+      // existing listen-back-and-type workflow. No noisy error.
+    } finally {
+      setWhisperBusy(false);
+    }
+  }
 
   async function startAudioBackup() {
     // Phase 93 — start MediaRecorder so the audio is captured even if
@@ -161,6 +194,12 @@ export function VoiceReportComposer({ reportId, onApplied, className = '' }: Pro
         setAudioBlobUrl(url);
         // Release the mic
         stream.getTracks().forEach((t) => t.stop());
+        // Phase 96 — when Web Speech didn't transcribe (Somali / Firefox
+        // / etc.) AND Whisper is available, auto-transcribe the captured
+        // audio. User doesn't have to listen-back-and-type anymore.
+        if (!transcript.trim() && lang.speechQuality !== 'good') {
+          void runWhisperFallback(blob);
+        }
       };
       mr.start();
       mediaRecorderRef.current = mr;
@@ -316,6 +355,22 @@ export function VoiceReportComposer({ reportId, onApplied, className = '' }: Pro
         ))}
       </div>
 
+      {/* Phase 95 — global AI service availability. If Claude is known
+          to be down, surface that BEFORE the user records 5 minutes of
+          audio that can't be structured. The audio backup + typed text
+          still work — the AI structuring step is what's unavailable. */}
+      {aiStatus.ready && aiStatus.isUnavailable && (
+        <AIStatusNotice
+          kind="unavailable"
+          title="AI structuring is temporarily unavailable"
+          body={
+            aiStatus.isMissingKey
+              ? 'The Anthropic API key is not configured on this deployment. Your audio + transcript will be saved to your report as-is so you can edit by hand.'
+              : 'The AI service can\'t be reached right now. Your audio + transcript will be saved to your report as-is so you can edit by hand. Try again later.'
+          }
+        />
+      )}
+
       {/* Phase 93 — proactive language warnings. Tell the user BEFORE they
           record what they should expect for their language choice. */}
       {!sttSupported && (
@@ -379,8 +434,13 @@ export function VoiceReportComposer({ reportId, onApplied, className = '' }: Pro
           recognition is unavailable or weak. */}
       {audioBlobUrl && !recording && (
         <div className="border border-border bg-muted/30 rounded-md p-2 space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
-            Your recording (replay to type from)
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center justify-between gap-2">
+            <span>Your recording (replay to type from)</span>
+            {whisperBusy && (
+              <span className="inline-flex items-center gap-1 text-[10px] normal-case text-foreground/70">
+                <Loader2 className="w-3 h-3 animate-spin" /> Trying Whisper fallback…
+              </span>
+            )}
           </div>
           <audio src={audioBlobUrl} controls className="w-full" />
         </div>

@@ -367,33 +367,22 @@ flip them on quickly.
 - **Code state:** AutoRubricScorer service exists. The new work is
   exposing it as a live endpoint + a sidebar panel on /apply.
 
-### Server-side Whisper transcription for unsupported languages (added 2026-06-13)
-- **last_touched:** 2026-06-13 (queued during Phase 93 robustness pass)
+### Server-side Whisper transcription — UNBLOCK BY SETTING ENV VAR (was deferred)
+- **last_touched:** 2026-06-13 (scaffolding shipped Phase 96)
 - **Why:** Chrome's Web Speech API does NOT support Somali at all and is
-  weak on Swahili / Arabic. The current MediaRecorder fallback captures
-  audio so the user can replay and type — but transcription itself
-  doesn't work for the languages most needed in our target geographies.
-- **Unblock:** OpenAI Whisper API (supports Somali, Swahili, Arabic
-  natively at good quality). Add WHISPER_API_KEY on Railway + small
-  backend route that accepts the audio blob and returns transcript.
-- **Engineering effort:** ~3 days including audio upload limits +
-  cost-control + retry behaviour.
-- **Code state:** Phase 93 added MediaRecorder + audio backup in the
-  Voice composer; the audio blob is in-memory only today. The Whisper
-  fallback would POST the captured blob when speech recognition fails
-  / language isn't supported.
-
-### AI telemetry + failure observability (added 2026-06-13)
-- **last_touched:** 2026-06-13 (queued during Phase 93 robustness pass)
-- **Why:** We don't yet know our real-world AI failure rates by feature
-  + language + browser. Without that we can't prioritise the next
-  fallback investment.
-- **Unblock:** None — engineering only. Backend already logs every AI
-  call. Need a small admin /ai-telemetry view that rolls up
-  failure_rate, avg_confidence, avg_fidelity, and surfaces per
-  feature + language.
-- **Engineering effort:** ~2 days. AI call log model exists; the
-  rollup endpoint + admin UI are net-new.
+  weak on Swahili / Arabic. Phase 93's MediaRecorder fallback captures
+  audio so the user can replay and type — but auto-transcription itself
+  needs Whisper for those languages.
+- **Status as of 2026-06-13:** Code path is ready. When `WHISPER_API_KEY`
+  is set on Railway, the Voice composer auto-transcribes the captured
+  audio for Somali / Swahili / Arabic users. When unset, behaviour is
+  unchanged (replay-and-type workflow).
+- **Action remaining:** OpenAI account + WHISPER_API_KEY on Railway.
+  Cost ~$0.006/minute of audio. Hit `/api/whisper/status` after setting
+  to confirm Whisper returns `status: ok`.
+- **Code state:** `app/services/whisper_service.py` + `app/routes/
+  whisper_routes.py` (`/api/whisper/status`, `/api/whisper/transcribe`),
+  wired into VoiceReportComposer's MediaRecorder onstop handler.
 
 ### Native-language user testing (added 2026-06-12 — team review)
 - **last_touched:** 2026-06-12
