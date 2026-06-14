@@ -1,0 +1,128 @@
+name: Health monitor
+
+# 2026-06-13 retest verdict surfaced gunicorn worker saturation: silent
+# multi-minute log gaps + 3-of-5 /api/health probes hanging past 8s. We
+# had no observable signal until the team manually ran regression suites
+# and noticed the cascade. This cron is the missing alert.
+#
+# Strategy: every 5 minutes hit /api/health + /api/network/current, fail
+# the workflow if status != 200 OR latency > 2s. GitHub's built-in
+# workflow-failure email notification (configurable per-user in GitHub
+# settings) is the alert transport — no Slack/SendGrid wiring needed.
+#
+# When this workflow fails:
+#   1. Repo owner gets an email from GitHub
+#   2. The Actions tab shows the failed run with timing detail
+#   3. The team-known recovery action is `railway redeploy --yes`
+#      (documented in docs/NEAR_BACKLOG.md "Deploy-cadence guardrail")
+#
+# Tunables:
+#   LATENCY_BUDGET_SECONDS — the slow-vs-fast cutoff. Set to 2s per the
+#     verdict's recommendation. Healthy prod responds in ~0.4s.
+#
+# No repo secrets required. PROD_BASE defaults to the kuja prod URL.
+
+on:
+  schedule:
+    # Every 5 minutes. GitHub's minimum is 5 min; finer granularity needs
+    # an internal cron or external monitoring. 5 min is the verdict's
+    # implied window — long enough not to spam, short enough to catch a
+    # multi-minute wedge.
+    - cron: "*/5 * * * *"
+
+  # Manual trigger so the team can verify the alert path is wired
+  # without waiting for the next scheduled run.
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Determine base URL
+        id: base
+        run: |
+          if [ -n "${{ secrets.PROD_BASE }}" ]; then
+            echo "url=${{ secrets.PROD_BASE }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://web-production-6f8a.up.railway.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Probe /api/health
+        id: health
+        env:
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          response=$(curl -s -o /dev/null -w "%{http_code}|%{time_total}" \
+            --max-time 8 "${BASE_URL}/api/health" || echo "000|timeout")
+          code="${response%%|*}"
+          duration="${response##*|}"
+          echo "code=${code}" >> $GITHUB_OUTPUT
+          echo "duration=${duration}" >> $GITHUB_OUTPUT
+          echo "health: HTTP ${code} in ${duration}s"
+
+      - name: Probe /api/network/current
+        id: network
+        env:
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          response=$(curl -s -o /dev/null -w "%{http_code}|%{time_total}" \
+            --max-time 8 "${BASE_URL}/api/network/current" || echo "000|timeout")
+          code="${response%%|*}"
+          duration="${response##*|}"
+          echo "code=${code}" >> $GITHUB_OUTPUT
+          echo "duration=${duration}" >> $GITHUB_OUTPUT
+          echo "network: HTTP ${code} in ${duration}s"
+
+      - name: Evaluate against budget
+        env:
+          HEALTH_CODE: ${{ steps.health.outputs.code }}
+          HEALTH_DUR:  ${{ steps.health.outputs.duration }}
+          NET_CODE:    ${{ steps.network.outputs.code }}
+          NET_DUR:     ${{ steps.network.outputs.duration }}
+          LATENCY_BUDGET_SECONDS: "2.0"
+        run: |
+          set -euo pipefail
+          fail=0
+          {
+            echo "# Health monitor probe"
+            echo ""
+            echo "| Endpoint | HTTP | Latency | Verdict |"
+            echo "|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          check_one() {
+            local name="$1" code="$2" dur="$3"
+            local verdict="ok"
+            # `awk` here because bash arithmetic can't handle floats.
+            local over_budget
+            over_budget=$(awk -v d="${dur}" -v b="${LATENCY_BUDGET_SECONDS}" \
+              'BEGIN { print (d+0 > b+0) ? 1 : 0 }')
+            if [ "${code}" != "200" ]; then
+              verdict="FAIL — http ${code}"
+              fail=1
+            elif [ "${over_budget}" = "1" ]; then
+              verdict="SLOW — ${dur}s > ${LATENCY_BUDGET_SECONDS}s budget"
+              fail=1
+            fi
+            echo "| ${name} | ${code} | ${dur}s | ${verdict} |" >> "$GITHUB_STEP_SUMMARY"
+            if [ "${verdict}" != "ok" ]; then
+              echo "::error title=${name} unhealthy::HTTP=${code} latency=${dur}s verdict=${verdict}"
+            fi
+          }
+
+          check_one "/api/health" "${HEALTH_CODE}" "${HEALTH_DUR}"
+          check_one "/api/network/current" "${NET_CODE}" "${NET_DUR}"
+
+          if [ "${fail}" = "1" ]; then
+            {
+              echo ""
+              echo "**Recovery action:** \`railway redeploy --yes\`"
+              echo ""
+              echo "See docs/NEAR_BACKLOG.md → \"Deploy-cadence guardrail\""
+              echo "and \"SLOW_REQUEST observability\" for context."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

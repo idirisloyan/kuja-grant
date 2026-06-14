@@ -266,6 +266,43 @@
   separately from `[[reference_kuja_near_backlog]]` because it's
   cross-tenant.
 
+### Investigate gunicorn `--preload` after SLOW_REQUEST data accumulates
+- **last_touched:** 2026-06-13
+- **Why:** The 2026-06-13 retest verdict reproduced a wedge in the
+  Railway web service: silent multi-minute log gaps, 3-of-5 `/api/health`
+  probes hung past 8s. `railway redeploy --yes` recovered cleanly. The
+  service runs gunicorn with `--workers 4 --threads 8 --timeout 180
+  --worker-class gthread --max-requests 1000 --preload` (Procfile).
+  With `--preload`, the Flask app is loaded once in the master and the
+  module-level state (including the shared Anthropic client + any
+  cached connection pools) is inherited by every worker. A hypothesis
+  that fits the symptom: the inherited Anthropic SDK connection pool
+  hits a shared per-process limit faster than separate-per-worker
+  pools would, and once exhausted, subsequent calls block until SDK
+  internals time out (180s default — matches the `gunicorn --timeout`
+  value). Dropping `--preload` would give each worker its own
+  Anthropic client + connection pool at the cost of ~50-100 MB more
+  RSS per worker (4× extra ≈ 200-400 MB).
+- **Why NOT touch yet:** Speculative. We have no telemetry confirming
+  the Anthropic pool is the bottleneck — `--preload` could equally be
+  unrelated and the wedge could be a DB pool / SQLAlchemy session
+  / a single slow endpoint. Changing `--preload` without data risks
+  trading a stable-with-known-rescue setup for a less-stable setup
+  with worse failure modes. The slow-request logger (commit `27e608ed`,
+  `SLOW_REQUEST` warnings on any `/api/*` > 5s) is the data source
+  that has to come first.
+- **Revisit criteria:** if `railway logs | grep SLOW_REQUEST` over a
+  one-week window shows the slow requests clustering on Anthropic-
+  calling endpoints (`/api/copilot/*`, `/api/applications/.../ai-*`,
+  `/api/reports/.../structure-from-voice`, `/api/whisper/transcribe`,
+  `/api/translate`, photo-evidence uploads), AND the cluster appears
+  alongside the silent-log-gap signature, then the Anthropic pool
+  hypothesis is supported — test dropping `--preload` in a controlled
+  deploy + observe for 24h. If SLOW_REQUEST clusters elsewhere
+  (e.g. `/api/applications/.../submit`, `/api/documents/upload`),
+  the bottleneck is somewhere else and `--preload` is a distraction.
+- **Status:** deferred pending SLOW_REQUEST telemetry from prod usage.
+
 ### Native-language user testing on real low-cost Android devices
 - **last_touched:** 2026-06-13
 - **Why:** Code-review verdict was that the product can't credibly
