@@ -80,7 +80,15 @@ def _run_network_rubric_scorer_background(*, app, application_id: int):
 @applications_bp.route('/', methods=['GET'])
 @login_required
 def api_list_applications():
-    """List applications filtered by role."""
+    """List applications filtered by role + current network.
+
+    Phase 99 — code-review verdict found a NEAR member's dashboard
+    surfaced their Kuja marketplace drafts because this endpoint
+    filtered by role but not by network. Adding the tenant filter here
+    (rather than at each consumer) means every list view stays inside
+    its tenant boundary by default.
+    """
+    from app.utils.network import scope_application_query
     # Eager-load grant and ngo_org to avoid N+1 queries in to_dict()
     query = Application.query.options(
         db.joinedload(Application.grant),
@@ -99,7 +107,13 @@ def api_list_applications():
             reviewer_user_id=current_user.id
         ).subquery()
         query = query.filter(Application.id.in_(review_app_ids))
-    # Admin sees all
+    # Admin sees all (still tenant-scoped — admin viewing NEAR sees NEAR
+    # only; admin viewing Kuja sees Kuja only; admin can switch tenants).
+
+    # Tenant scope last so the joins don't fight with the role-specific
+    # joins above. Donor branch already joined Grant — scope_application_query
+    # joins it again, which is harmless for SQLAlchemy.
+    query = scope_application_query(query)
 
     status = request.args.get('status')
     if status:

@@ -54,6 +54,10 @@ class Review(db.Model):
             'application_title': self.application.grant.title if self.application and self.application.grant else None,
             'grant_title': self.application.grant.title if self.application and self.application.grant else None,
             'org_name': self.application.ngo_org.name if self.application and self.application.ngo_org else None,
+            # Phase 99 — reviewers' assignments table reads `ngo_org_name`
+            # and was falling back to "Application #176" because we only
+            # exposed `org_name`. Alias both so callers can use either.
+            'ngo_org_name': self.application.ngo_org.name if self.application and self.application.ngo_org else None,
             'application_name': f'Application #{self.application_id}',
             'score': self.overall_score,
         }

@@ -163,7 +163,7 @@ class TrustProfileService:
                 completed_count += 1
                 breakdown.append({
                     'framework': fw_key,
-                    'label': cls._framework_label(fw_key),
+                    'label': cls._framework_label_for_network(fw_key),
                     'status': a.status or 'completed',
                     'score': fw_score,
                     'last_updated': a.updated_at.isoformat() if a.updated_at else None,
@@ -172,7 +172,7 @@ class TrustProfileService:
             else:
                 breakdown.append({
                     'framework': fw_key,
-                    'label': cls._framework_label(fw_key),
+                    'label': cls._framework_label_for_network(fw_key),
                     'status': 'not_started',
                     'score': None,
                     'last_updated': None,
@@ -207,6 +207,10 @@ class TrustProfileService:
 
     @staticmethod
     def _framework_label(key: str) -> str:
+        """Static framework name. For the network-specific in-house
+        framework label (e.g. 'NEAR Capacity Framework' when in NEAR),
+        use _framework_label_for_network() instead.
+        """
         return {
             'kuja': 'Kuja Capacity Framework',
             'step': 'STEP (Strategic Tools for Evaluating People)',
@@ -214,6 +218,31 @@ class TrustProfileService:
             'chs': 'CHS (Core Humanitarian Standard)',
             'nupas': 'NUPAS (Non-US Pre-Award Survey)',
         }.get(key, key.upper())
+
+    @classmethod
+    def _framework_label_for_network(cls, key: str) -> str:
+        """Phase 99 — render the in-house framework with the current
+        network's display name when on a non-default tenant.
+
+        On Kuja marketplace this returns the same label as before. On
+        NEAR (or any other network), if `Network.assessment_framework_display`
+        is set, that string is returned for the 'kuja' key so members
+        see 'NEAR Capacity Framework' / their own brand instead of the
+        parent platform label. All other framework keys (STEP, HACT,
+        etc.) are external standards and stay unchanged.
+        """
+        if key != 'kuja':
+            return cls._framework_label(key)
+        try:
+            from app.utils.network import get_current_network
+            net = get_current_network()
+            if net and not getattr(net, 'is_default', True):
+                custom = getattr(net, 'assessment_framework_display', None)
+                if custom:
+                    return custom
+        except Exception:
+            pass
+        return cls._framework_label(key)
 
     @classmethod
     def _extract_strengths_gaps(cls, assessments: list) -> tuple[list[str], list[str]]:
@@ -237,7 +266,26 @@ class TrustProfileService:
                 gaps = []
                 for g in gaps_raw[:3]:
                     if isinstance(g, dict):
-                        gaps.append(g.get('description') or g.get('title') or str(g))
+                        # Phase 99 — verdict found "{'category': 'financial',
+                        # 'score': 78, ...}" rendering raw in the UI when
+                        # neither description nor title was present.
+                        # Compose a human-readable summary from known
+                        # fields instead of dumping the dict's repr.
+                        label = (
+                            g.get('description')
+                            or g.get('title')
+                            or g.get('summary')
+                            or g.get('label')
+                        )
+                        if not label:
+                            category = g.get('category') or g.get('area') or 'this area'
+                            score = g.get('score')
+                            label = (
+                                f'Score in {category}: {score}/100'
+                                if score is not None
+                                else f'Gap in {category}'
+                            )
+                        gaps.append(label)
                     else:
                         gaps.append(str(g))
                 if strengths or gaps:
@@ -302,9 +350,24 @@ class TrustProfileService:
 
         diligence_score = int(round(weighted_total / weight_used)) if weight_used else 0
 
+        # Phase 99 — verdict found "Due Diligence 28/100 · Clear" — score
+        # said flagged, status said clear because the two were computed
+        # independently. Reconcile: take the WORSE of the
+        # component-driven worst_status and the score-band status so the
+        # banner can never claim Clear when the score is in the flagged
+        # range. Mirrors the capacity pillar's score-to-status mapping
+        # (lines ~185-192 above this method).
+        if diligence_score < 40:
+            score_band = 'flagged'
+        elif diligence_score < 70:
+            score_band = 'review'
+        else:
+            score_band = 'clear'
+        reconciled_status = cls._worse_status(worst_status, score_band, status_order)
+
         return {
             'score': diligence_score,
-            'status': worst_status,
+            'status': reconciled_status,
             'breakdown': components,
         }
 

@@ -38,6 +38,94 @@ def get_current_network_id() -> int | None:
     return net.id if net else None
 
 
+def is_current_network_default() -> bool:
+    """True when the current request is in the default (Kuja marketplace)
+    network. Marketplace grants have `fund_window_id IS NULL`; NEAR-style
+    closed networks always go through `Fund → FundWindow → Grant`.
+    Knowing which side we're on is what lets the tenant filter return the
+    right slice of cross-network data without two divergent query paths.
+    """
+    net = get_current_network()
+    return bool(net and getattr(net, "is_default", False))
+
+
+# ---------------------------------------------------------------------------
+# Phase 99 — tenant-scoped query helpers (2026-06-13)
+# ---------------------------------------------------------------------------
+# Code-review verdict found that a NEAR member's dashboard surfaced their
+# Kuja marketplace drafts + grants + reports. The leak was that
+# `/api/applications`, `/api/grants`, and `/api/reports/upcoming`
+# filtered by role but not by current network. Adding the filter at the
+# query layer (not the route) keeps the tenant boundary in one place and
+# means every caller of these list endpoints gets it for free.
+#
+# Marketplace ↔ NEAR taxonomy:
+#   • A Grant belongs to the marketplace iff `fund_window_id IS NULL`.
+#   • Otherwise it joins through FundWindow → Fund.network_id.
+#   • Applications + Reports inherit their network from the Grant they
+#     reference (Application.grant_id → Grant → ...).
+
+
+def _current_network_grant_id_subquery():
+    """Subquery of `Grant.id`s belonging to the current network.
+
+    Returns None if no network is resolvable (rare — admin-only / boot).
+    Using a subquery keeps callers free to add their own joins on Grant
+    without colliding with the tenant filter.
+    """
+    from app.extensions import db
+    from app.models import Grant, FundWindow, Fund
+    if is_current_network_default():
+        return db.session.query(Grant.id).filter(Grant.fund_window_id.is_(None)).subquery()
+    nid = get_current_network_id()
+    if nid is None:
+        return None
+    return (
+        db.session.query(Grant.id)
+        .join(FundWindow, Grant.fund_window_id == FundWindow.id)
+        .join(Fund, FundWindow.fund_id == Fund.id)
+        .filter(Fund.network_id == nid)
+        .subquery()
+    )
+
+
+def scope_grant_query(query):
+    """Filter a Grant query down to the current network.
+
+    For the default Kuja marketplace network, that means grants without a
+    fund_window assignment. For any other network (e.g. NEAR), uses the
+    subquery so callers' own joins are unaffected.
+    """
+    from app.models import Grant
+    sub = _current_network_grant_id_subquery()
+    if sub is None:
+        return query  # No resolvable network — fail open.
+    return query.filter(Grant.id.in_(sub))
+
+
+def scope_application_query(query):
+    """Same shape as scope_grant_query, applied through Application.grant_id.
+
+    Uses the subquery so callers that already joined Grant (e.g. the
+    donor branch of /api/applications) don't end up with a duplicate
+    join or a Cartesian product.
+    """
+    from app.models import Application
+    sub = _current_network_grant_id_subquery()
+    if sub is None:
+        return query
+    return query.filter(Application.grant_id.in_(sub))
+
+
+def scope_report_query(query):
+    """Filter a Report query to the current network via Report.grant_id."""
+    from app.models import Report
+    sub = _current_network_grant_id_subquery()
+    if sub is None:
+        return query
+    return query.filter(Report.grant_id.in_(sub))
+
+
 # ---------------------------------------------------------------------------
 # Phase 44 — Oversight Body permission helpers
 # ---------------------------------------------------------------------------

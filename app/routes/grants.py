@@ -50,8 +50,14 @@ def _validate_grant_arrays(data):
 @grants_bp.route('/', methods=['GET'])
 @login_required
 def api_list_grants():
-    """List grants with optional filters."""
-    query = Grant.query
+    """List grants with optional filters.
+
+    Phase 99 — code-review verdict found NEAR members surfacing Kuja
+    marketplace grants (and vice versa). Tenant filter applied at the
+    base query so every caller is scoped without per-route work.
+    """
+    from app.utils.network import scope_grant_query
+    query = scope_grant_query(Grant.query)
 
     status = request.args.get('status')
     if status:

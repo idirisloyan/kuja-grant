@@ -65,6 +65,16 @@ export function ReviewerQueue() {
     return raw.map((b) => ({ ...b, fill: colorFor[b.age] ?? SAVANNA }));
   }, [stats]);
 
+  // Phase 99 — derive the queue count from the actual stats, NOT from
+  // whether AI suggestions exist. Previously the VerdictCard read
+  // "Queue is clear" whenever suggestions were empty even when the SLA
+  // chart below showed 26 items + 108d oldest. Reviewer dashboard now
+  // reflects one truth: what's actually pending.
+  const pendingCount = useMemo(
+    () => slaData.reduce((sum, b) => sum + (b.count ?? 0), 0),
+    [slaData],
+  );
+
   // Reviewer next-actions all live on the /reviews queue page where the
   // actual scoring work happens. Send them there directly instead of just
   // opening the co-pilot rail.
@@ -74,16 +84,26 @@ export function ReviewerQueue() {
     href: '/reviews',
   }));
 
-  const tone = actions.some((a) => a.severity === 'critical') ? 'danger' : 'spark';
+  const tone = actions.some((a) => a.severity === 'critical')
+    ? 'danger'
+    : pendingCount > 0 ? 'spark' : 'success';
+
+  const headline = (() => {
+    if (pendingCount === 0) return 'Queue is clear.';
+    if (suggestions && suggestions.length > 0) {
+      return `${pendingCount} item${pendingCount === 1 ? '' : 's'} in queue. AI has ranked them by review priority.`;
+    }
+    return `${pendingCount} item${pendingCount === 1 ? '' : 's'} waiting for review.`;
+  })();
 
   return (
     <div className="space-y-4">
       <VerdictCard
         tone={tone}
         eyebrow="YOUR REVIEW QUEUE"
-        headline={suggestions && suggestions.length > 0 ? 'AI has ranked your queue by review priority.' : 'Queue is clear.'}
+        headline={headline}
         body={error ?? undefined}
-        aiBadge={suggestions ? 'AI prioritized' : undefined}
+        aiBadge={suggestions && pendingCount > 0 ? 'AI prioritized' : undefined}
         actions={actions}
         loading={loading}
       />

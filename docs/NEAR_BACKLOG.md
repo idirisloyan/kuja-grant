@@ -266,6 +266,48 @@
   separately from `[[reference_kuja_near_backlog]]` because it's
   cross-tenant.
 
+### Track AI acceptance / edit / time-saved per surface
+- **last_touched:** 2026-06-13
+- **Why:** The 2026-06-13 verdict's AI assessment noted "0% recorded
+  failure rate, 7/7 flagship surfaces succeeded" but flagged that
+  technical reliability ≠ demonstrated user value. We have no telemetry
+  on whether NGOs actually USE the AI output: do they accept the
+  generated draft as-is, edit it heavily, or scrap it? Without this we
+  can't tell whether voice-to-report drafts are saving time or being
+  thrown away. Phase 97 telemetry covers latency + failure rate
+  (`/admin/ai-telemetry`), not acceptance.
+- **Action:** Extend AICallLog (or a sibling table) with
+  `outcome ∈ {accepted, edited, rejected, ignored}` and
+  `time_saved_estimate_seconds`. Wire NGO-facing buttons (Voice draft,
+  Photo evidence, Co-author, Smart draft, Translate) so the user's
+  next action implies outcome — clicking Save = accepted, clicking
+  Edit then Save = edited, dismissing the panel = rejected. Add the
+  rollup to `/admin/ai-telemetry` next to failure rate. Lets us answer
+  "which AI surface is actually earning its compute budget" with data.
+- **Status:** deferred until the team is past the current UAT round —
+  the metric is most useful with sustained NGO usage.
+
+### Simplify dense pages around one recommended next action
+- **last_touched:** 2026-06-13
+- **Why:** The verdict's product assessment noted that Trust Profile,
+  assessment history, and reports pages are "highly dense for a
+  non-technical NGO user" and obscure the recommended action. The
+  consolidation work already done on the reports page (one accordion
+  per draft instead of four stacked panels — commit 217bf5d5) is the
+  template. Need the same pass on Trust Profile and assessment
+  history.
+- **Action:** For Trust Profile: above the existing detail breakdown,
+  add a single "Next action" verdict card driven by the worst pillar's
+  status — "Complete your Bank Verification (Due Diligence Flagged)"
+  / "Re-take Capacity Assessment (no result in 12 months)" / etc.
+  Default-collapse the per-pillar breakdown for non-admins. For
+  assessment history: collapse all but the most recent assessment per
+  framework, with "Show older results" disclosure. Let the team
+  validate with a real NGO walkthrough before generalising further.
+- **Status:** deferred. Needs design pass — these pages are also
+  due for the native-language test (which gates the simplification
+  copy choices).
+
 ### Investigate gunicorn `--preload` after SLOW_REQUEST data accumulates
 - **last_touched:** 2026-06-13
 - **Why:** The 2026-06-13 retest verdict reproduced a wedge in the

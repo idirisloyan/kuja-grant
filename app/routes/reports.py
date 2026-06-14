@@ -55,6 +55,12 @@ def api_list_reports():
     else:
         query = base_query
 
+    # Phase 99 — scope to current network. Verdict found NEAR members
+    # seeing Kuja reports in their NEAR dashboard. Filter at the base
+    # query so every consumer of /api/reports stays inside the tenant.
+    from app.utils.network import scope_report_query
+    query = scope_report_query(query)
+
     grant_id = request.args.get('grant_id', type=int)
     if grant_id:
         query = query.filter(Report.grant_id == grant_id)
@@ -810,11 +816,15 @@ def api_upcoming_reports():
     upcoming = []
 
     if current_user.role == 'ngo':
-        # Find awarded applications for this NGO's org (with eager loading)
-        awarded_apps = Application.query.options(
-            db.joinedload(Application.grant).joinedload(Grant.donor_org)
-        ).filter_by(
-            ngo_org_id=current_user.org_id, status='awarded'
+        # Phase 99 — scope to current network so a NEAR member doesn't
+        # see Kuja marketplace reports surfacing on their NEAR dashboard.
+        from app.utils.network import scope_application_query
+        awarded_apps = scope_application_query(
+            Application.query.options(
+                db.joinedload(Application.grant).joinedload(Grant.donor_org)
+            ).filter_by(
+                ngo_org_id=current_user.org_id, status='awarded'
+            )
         ).all()
 
         # Pre-fetch all reports for this org to avoid N+1 queries
@@ -931,13 +941,18 @@ def api_upcoming_reports():
                     })
 
     elif current_user.role == 'donor':
-        # Find grants owned by this donor that are awarded (with eager loading)
-        awarded_apps = Application.query.options(
-            db.joinedload(Application.grant),
-            db.joinedload(Application.ngo_org)
-        ).join(Grant).filter(
-            Grant.donor_org_id == current_user.org_id,
-            Application.status == 'awarded'
+        # Phase 99 — donor side scoped to current network so a Kuja donor
+        # signed in via the NEAR tenant doesn't see Kuja grant reports
+        # there. Helper subquery composes cleanly with the donor join.
+        from app.utils.network import scope_application_query
+        awarded_apps = scope_application_query(
+            Application.query.options(
+                db.joinedload(Application.grant),
+                db.joinedload(Application.ngo_org)
+            ).join(Grant).filter(
+                Grant.donor_org_id == current_user.org_id,
+                Application.status == 'awarded'
+            )
         ).all()
 
         # Pre-fetch all reports for grants owned by this donor to avoid N+1 queries
