@@ -397,6 +397,21 @@ def register_middleware(app):
             )
             # Add Server-Timing header for browser DevTools
             response.headers['Server-Timing'] = f'total;dur={duration_ms:.1f}'
+
+            # Non-AI counterpart to AI_STALLED. The 2026-06-13 retest
+            # verdict found gunicorn workers wedging silently and we
+            # had no observable signal beyond multi-minute log gaps.
+            # Any /api/* call over 5s gets a grep-friendly warning so
+            # next time we can identify the wedger by path + user
+            # without correlating timestamps by hand.
+            if duration_ms > 5000:
+                logger.warning(
+                    f"SLOW_REQUEST {request.method} {request.path} "
+                    f"status={response.status_code} "
+                    f"duration_ms={duration_ms:.0f} "
+                    f"user={user_email} "
+                    f"request_id={req_id}"
+                )
         return response
 
     @app.after_request
