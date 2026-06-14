@@ -43,7 +43,14 @@ export function ReviewerActionQueue({ className }: { className?: string }) {
       .then((res) => {
         if (cancelled) return;
         const reviews = res.reviews ?? [];
-        setPending(reviews.filter((r) => r.status === 'pending').slice(0, 7));
+        // Review statuses are 'assigned' | 'in_progress' | 'completed'.
+        // Filtering on `'pending'` never matched anything, so the card
+        // claimed "0 pending — you're all caught up" while the SLA
+        // breakdown on the same dashboard showed 26 items. Pending
+        // here = anything that still needs work (not completed).
+        const isPending = (r: Review) =>
+          r.status === 'assigned' || r.status === 'in_progress';
+        setPending(reviews.filter(isPending).slice(0, 7));
         setCompletedCount(reviews.filter((r) => r.status === 'completed').length);
       })
       .catch(() => {})

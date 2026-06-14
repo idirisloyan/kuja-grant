@@ -575,14 +575,43 @@ def api_release_applications(declaration_id):
     skipped = []
     now = datetime.now(timezone.utc)
 
+    # Phase 99 follow-up — lookup org names so we recognise grants under
+    # the new "{decl} — {org_name}" title pattern as well as the legacy
+    # "{decl} — Org #{id}" pattern. Avoids dropping freshly-titled grants
+    # from the release sweep.
+    from app.models import Organization
+    org_name_map = dict(
+        db.session.query(Organization.id, Organization.name)
+        .filter(Organization.id.in_(org_ids))
+        .all()
+    )
+
+    def _grant_is_linked(grant) -> bool:
+        title = grant.title or ""
+        for oid in org_ids:
+            if f"— Org #{oid}" in title:
+                return True
+            name = (org_name_map.get(oid) or "").strip()
+            if name and f"— {name}" in title:
+                return True
+        return False
+
     for g in grants:
-        # Match the auto-created grant's title pattern.
-        is_linked = any(f"— Org #{oid}" in (g.title or "") for oid in org_ids)
-        if not is_linked:
+        if not _grant_is_linked(g):
             continue
         if g.status != "draft":
             skipped.append({"grant_id": g.id, "status": g.status})
             continue
+        # Backfill legacy "Org #N" titles in place so the team sees the
+        # real org name in the operator console after the next release.
+        if g.title and "— Org #" in g.title:
+            for oid in org_ids:
+                marker = f"— Org #{oid}"
+                if marker in g.title:
+                    name = (org_name_map.get(oid) or "").strip()
+                    if name:
+                        g.title = g.title.replace(marker, f"— {name}")
+                    break
         g.status = "open"
         g.published_at = now
         released.append({"grant_id": g.id, "title": g.title})
@@ -771,20 +800,38 @@ def _create_grant_drafts_for_declaration(d: EmergencyDeclaration) -> None:
     if per_org_amount is None and window.max_grant_amount is not None:
         per_org_amount = float(window.max_grant_amount)
 
+    # Phase 99 follow-up — verdict found NEAR grant titles literally
+    # contained "Org #9", "Org #10", "Org #11" because the legacy code
+    # auto-titled grants `f"{decl.title} — Org #{org_id}"`. Look up
+    # the org names once and use them; fall back to "Org #{id}" only
+    # when an org has no name (defensive — shouldn't happen in prod).
+    from app.models import Organization
+    org_name_map = dict(
+        db.session.query(Organization.id, Organization.name)
+        .filter(Organization.id.in_(org_ids))
+        .all()
+    )
+    def _grant_title_for(org_id: int) -> str:
+        name = (org_name_map.get(org_id) or "").strip()
+        return f"{d.title} — {name}" if name else f"{d.title} — Org #{org_id}"
+
     created = []
     for org_id in org_ids:
+        new_title = _grant_title_for(org_id)
         # Idempotency: skip if a grant for this declaration + org already
-        # exists (re-running activation shouldn't duplicate).
-        existing = Grant.query.filter_by(
-            fund_window_id=window.id,
-            donor_org_id=donor_org_id,
-            title=f"{d.title} — Org #{org_id}",
+        # exists. Match BOTH the new name-based title AND the legacy
+        # "Org #N" title so re-activation across the rename doesn't
+        # duplicate historical grants.
+        existing = Grant.query.filter(
+            Grant.fund_window_id == window.id,
+            Grant.donor_org_id == donor_org_id,
+            Grant.title.in_([new_title, f"{d.title} — Org #{org_id}"]),
         ).first()
         if existing:
             continue
         g = Grant(
             donor_org_id=donor_org_id,
-            title=f"{d.title} — Org #{org_id}",
+            title=new_title,
             description=d.summary_md or "",
             total_funding=per_org_amount,
             currency="USD",  # window currency is on the parent fund; fine for draft

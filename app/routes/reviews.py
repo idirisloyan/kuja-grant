@@ -32,7 +32,15 @@ reviews_bp = Blueprint('reviews', __name__, url_prefix='/api/reviews')
 @reviews_bp.route('/', methods=['GET'])
 @login_required
 def api_list_reviews():
-    """List reviews based on user role."""
+    """List reviews based on user role + current network.
+
+    Phase 99 follow-up — the verdict's second retest found that a
+    reviewer signed in on the NEAR tenant could open /reviews/ and
+    see 20 Kuja Marketplace assignments because the role filter
+    didn't include network scope. Helper added at the query layer so
+    every consumer is tenant-bounded.
+    """
+    from app.utils.network import scope_review_query
     # Eager-load relationships to avoid N+1 in to_dict()
     query = Review.query.options(
         db.joinedload(Review.application).joinedload(Application.grant),
@@ -53,6 +61,10 @@ def api_list_reviews():
         query = query.join(Application).filter(
             Application.ngo_org_id == current_user.org_id
         )
+
+    # Tenant scope: applied after the role/joins so the helper's
+    # in-list filter doesn't collide with the explicit joins above.
+    query = scope_review_query(query)
 
     status = request.args.get('status')
     if status:

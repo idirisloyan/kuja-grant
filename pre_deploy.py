@@ -85,6 +85,51 @@ def main():
         print(f"pre_deploy: Warning - {e}")
         print("pre_deploy: Continuing anyway (flask db upgrade will handle it)")
 
+    # Phase 99 follow-up — one-shot backfill: rename emergency-declaration
+    # auto-grants that still carry the legacy "— Org #N" suffix to use
+    # the actual organization name. Verdict's second retest found these
+    # rendering on the live NEAR view ("Org #9", "Org #10"). Idempotent
+    # — scans for the literal " — Org #" substring; rows already renamed
+    # don't match. Falls through silently on any DB issue so a backfill
+    # hiccup never blocks the deploy.
+    try:
+        import sqlalchemy
+        engine = sqlalchemy.create_engine(db_url)
+        with engine.connect() as conn:
+            legacy = conn.execute(sqlalchemy.text(
+                "SELECT id, title FROM grants WHERE title LIKE '%— Org #%'"
+            )).fetchall()
+            renamed = 0
+            for grant_id, title in legacy:
+                marker = "— Org #"
+                idx = title.rfind(marker)
+                if idx < 0:
+                    continue
+                suffix = title[idx + len(marker):].strip()
+                try:
+                    org_id = int(suffix.split()[0])
+                except (ValueError, IndexError):
+                    continue
+                org_row = conn.execute(
+                    sqlalchemy.text("SELECT name FROM organizations WHERE id = :oid"),
+                    {"oid": org_id},
+                ).fetchone()
+                if not org_row or not (org_row[0] or "").strip():
+                    continue
+                new_title = title[:idx] + f"— {org_row[0].strip()}"
+                conn.execute(
+                    sqlalchemy.text("UPDATE grants SET title = :t WHERE id = :gid"),
+                    {"t": new_title, "gid": grant_id},
+                )
+                renamed += 1
+            if renamed:
+                conn.commit()
+                print(f"pre_deploy: Renamed {renamed} legacy 'Org #N' grant title(s)")
+            else:
+                print("pre_deploy: No legacy 'Org #N' grant titles to backfill")
+    except Exception as backfill_err:
+        print(f"pre_deploy: Org-name backfill skipped: {backfill_err}")
+
 
 if __name__ == '__main__':
     main()

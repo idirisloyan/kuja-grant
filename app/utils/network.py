@@ -126,6 +126,28 @@ def scope_report_query(query):
     return query.filter(Report.grant_id.in_(sub))
 
 
+def scope_review_query(query):
+    """Filter a Review query to the current network via Application.grant_id.
+
+    Phase 99 follow-up — a reviewer signed in on the NEAR tenant was
+    seeing Kuja Marketplace assignments because /api/reviews + the
+    reviewer dashboard data sources didn't scope. The subquery filters
+    to reviews whose application_id maps to an application whose
+    grant_id is in the current network's grant set.
+    """
+    from app.extensions import db
+    from app.models import Review, Application
+    sub = _current_network_grant_id_subquery()
+    if sub is None:
+        return query
+    network_app_ids = (
+        db.session.query(Application.id)
+        .filter(Application.grant_id.in_(sub))
+        .subquery()
+    )
+    return query.filter(Review.application_id.in_(network_app_ids))
+
+
 # ---------------------------------------------------------------------------
 # Phase 44 — Oversight Body permission helpers
 # ---------------------------------------------------------------------------

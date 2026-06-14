@@ -99,9 +99,28 @@ class TrustProfileService:
         # Composite score: average of two pillars
         overall_score = int(round((capacity['score'] + diligence['score']) / 2))
 
-        # Status: take the worse of the two (asymmetric — diligence wins ties)
+        # Phase 99 follow-up — verdict's second retest found overall
+        # remained "Clear" while Due Diligence was "28/100 Flagged".
+        # Root cause: `max(..., key=order.index)` picks the element with
+        # the HIGHEST index, which is 'clear' (3) — it was selecting the
+        # BEST status, not the worst. Switched to `min` so 'flagged' (0)
+        # wins. Also reconcile with the composite score band so the
+        # banner can't claim Clear at < 70 overall.
         order = ['flagged', 'review', 'incomplete', 'clear']
-        worst = max([capacity['status'], diligence['status']], key=lambda s: order.index(s) if s in order else len(order))
+        worst = min(
+            [capacity['status'], diligence['status']],
+            key=lambda s: order.index(s) if s in order else len(order),
+        )
+        if overall_score < 40:
+            score_band = 'flagged'
+        elif overall_score < 70:
+            score_band = 'review'
+        else:
+            score_band = 'clear'
+        worst = min(
+            [worst, score_band],
+            key=lambda s: order.index(s) if s in order else len(order),
+        )
 
         # Sector: prefer first entry of org.sectors (JSON array), fall back to single field
         sector = None
@@ -364,6 +383,33 @@ class TrustProfileService:
         else:
             score_band = 'clear'
         reconciled_status = cls._worse_status(worst_status, score_band, status_order)
+
+        # Phase 99 follow-up — verdict's second retest gave
+        # "Registration 10/100 · Clear" as a per-component contradiction.
+        # Each component builder returns its own status independently of
+        # the score it returns; reconcile here so a low-scoring component
+        # can never claim Clear. Same score bands as the pillar.
+        for comp in components:
+            try:
+                c_score = int(comp.get('score') or 0)
+            except (TypeError, ValueError):
+                c_score = 0
+            if c_score < 40:
+                c_band = 'flagged'
+            elif c_score < 70:
+                c_band = 'review'
+            else:
+                c_band = 'clear'
+            current = comp.get('status') or 'clear'
+            comp['status'] = cls._worse_status(current, c_band, status_order)
+
+        # And re-derive the pillar's worst_status from the now-reconciled
+        # components so the pillar banner matches what users see in the
+        # breakdown.
+        for comp in components:
+            reconciled_status = cls._worse_status(
+                reconciled_status, comp.get('status') or 'clear', status_order,
+            )
 
         return {
             'score': diligence_score,

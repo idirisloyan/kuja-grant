@@ -595,49 +595,63 @@ def _build_donor_stats(org_id):
 # ---------------------------------------------------------------------------
 
 def _build_reviewer_stats(user_id):
-    """Build reviewer dashboard stats with consolidated queries."""
+    """Build reviewer dashboard stats with consolidated queries.
+
+    Phase 99 follow-up — scoped to current network so a reviewer on the
+    NEAR tenant sees only NEAR review stats, not their Kuja assignments.
+    """
     from datetime import datetime, timezone, timedelta
+    from app.utils.network import scope_review_query
     stats = {}
 
-    # -- Single GROUP BY for review status counts --
-    review_counts = db.session.query(
-        Review.status,
-        func.count(Review.id)
-    ).filter(
-        Review.reviewer_user_id == user_id
-    ).group_by(Review.status).all()
+    # -- Single GROUP BY for review status counts (tenant-scoped) --
+    counts_query = scope_review_query(
+        db.session.query(Review.status, func.count(Review.id)).filter(
+            Review.reviewer_user_id == user_id
+        )
+    ).group_by(Review.status)
+    review_counts = counts_query.all()
 
     review_map = dict(review_counts)
     stats['total_reviews'] = sum(review_map.values())
     stats['assigned_reviews'] = review_map.get('assigned', 0)
     stats['in_progress_reviews'] = review_map.get('in_progress', 0)
     stats['completed_reviews'] = review_map.get('completed', 0)
+    # Single canonical "pending" count for the dashboard. Verdict's
+    # retest found "26 items waiting" + "0 pending" + "You're all
+    # caught up" coexisting because each consumer rolled its own.
+    stats['pending_reviews'] = (
+        stats['assigned_reviews'] + stats['in_progress_reviews']
+    )
 
-    # -- Average score via SQL aggregate --
-    avg = db.session.query(
-        func.avg(Review.overall_score)
-    ).filter(
-        Review.reviewer_user_id == user_id,
-        Review.overall_score.isnot(None)
-    ).scalar()
+    # -- Average score via SQL aggregate (tenant-scoped) --
+    avg_query = scope_review_query(
+        db.session.query(func.avg(Review.overall_score)).filter(
+            Review.reviewer_user_id == user_id,
+            Review.overall_score.isnot(None),
+        )
+    )
+    avg = avg_query.scalar()
     stats['average_score_given'] = round(float(avg), 1) if avg else None
 
-    # -- Recent reviews with eager loading --
-    recent_reviews = Review.query.options(
-        db.joinedload(Review.application).joinedload(Application.grant),
-        db.joinedload(Review.reviewer)
-    ).filter_by(
-        reviewer_user_id=user_id
+    # -- Recent reviews with eager loading (tenant-scoped) --
+    recent_reviews = scope_review_query(
+        Review.query.options(
+            db.joinedload(Review.application).joinedload(Application.grant),
+            db.joinedload(Review.reviewer)
+        ).filter_by(reviewer_user_id=user_id)
     ).order_by(Review.created_at.desc()).limit(5).all()
     stats['recent_reviews'] = [r.to_dict() for r in recent_reviews]
 
     # -- SLA breakdown: open reviews bucketed by age in queue --
-    # Buckets: <3d, 3-7d, 7-14d, 14d+. Used by the ReviewerQueue
-    # command center so the SLA doughnut reflects real data, not demo.
+    # Buckets: <3d, 3-7d, 7-14d, 14d+. Tenant-scoped so SLA reflects
+    # only the current network's queue.
     now = datetime.now(timezone.utc)
-    open_reviews = Review.query.filter(
-        Review.reviewer_user_id == user_id,
-        Review.status.in_(['assigned', 'in_progress']),
+    open_reviews = scope_review_query(
+        Review.query.filter(
+            Review.reviewer_user_id == user_id,
+            Review.status.in_(['assigned', 'in_progress']),
+        )
     ).all()
     buckets = {'<3d': 0, '3-7d': 0, '7-14d': 0, '14d+': 0}
     for r in open_reviews:
