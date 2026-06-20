@@ -76,7 +76,7 @@ export default function SavedSearchesPage() {
         {rows && rows.length === 0 && (
           <Card className="p-6 text-center text-sm text-muted-foreground">
             No saved searches yet. Open the grants, applications, or organizations
-            list and click "Save this search" to stash a filter.
+            list and click &ldquo;Save this search&rdquo; to stash a filter.
           </Card>
         )}
         {rows && rows.length > 0 && (
