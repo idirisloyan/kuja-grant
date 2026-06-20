@@ -577,6 +577,28 @@ def _build_donor_stats(org_id):
     stats['reports_due_soon'] = report_status_map.get('submitted', 0)
     stats['flagged_compliance'] = 0  # placeholder
 
+    # Phase 220 — median decision time (submitted_at -> decision_recorded_at).
+    deltas = db.session.query(
+        Application.submitted_at, Application.decision_recorded_at,
+    ).join(Grant).filter(
+        Grant.donor_org_id == org_id,
+        Application.submitted_at.isnot(None),
+        Application.decision_recorded_at.isnot(None),
+    ).all()
+    days = []
+    for sub, dec in deltas:
+        if sub and dec and dec > sub:
+            days.append((dec - sub).total_seconds() / 86400.0)
+    if days:
+        s = sorted(days)
+        mid = len(s) // 2
+        median = s[mid] if len(s) % 2 else (s[mid - 1] + s[mid]) / 2
+        stats['median_decision_days'] = round(median, 1)
+        stats['decisions_counted'] = len(days)
+    else:
+        stats['median_decision_days'] = None
+        stats['decisions_counted'] = 0
+
     # -- Application status breakdown for pipeline widget --
     stats['application_status_breakdown'] = {
         'draft': app_status_map.get('draft', 0),

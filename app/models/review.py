@@ -21,6 +21,10 @@ class Review(db.Model):
     overall_score = db.Column(db.Float, nullable=True)
     status = db.Column(db.String(50), default='assigned')  # assigned, in_progress, completed
     completed_at = db.Column(db.DateTime, nullable=True)
+    # Phase 221 — private reviewer notes. Visible to reviewers + donor +
+    # admin, never to the NGO. Free-form text. Audit log entries
+    # reference these by review_id.
+    private_notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
@@ -50,6 +54,7 @@ class Review(db.Model):
             'completed_at': self.completed_at.isoformat() if self.completed_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'private_notes': self.private_notes,
             'reviewer_name': self.reviewer.name if self.reviewer else None,
             'application_title': self.application.grant.title if self.application and self.application.grant else None,
             'grant_title': self.application.grant.title if self.application and self.application.grant else None,

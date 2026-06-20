@@ -9,22 +9,32 @@ import { cn } from '@/lib/utils';
 import type { Organization } from '@/lib/types';
 import { SavedSearchesBar } from '@/components/shared/saved-searches-bar';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
+import { useAuthStore } from '@/stores/auth-store';
 
 export default function OrgSearchPage() {
   const { t } = useTranslation();
   const router = useRouter();
+  const viewer = useAuthStore((s) => s.user);
+  const isAdmin = viewer?.role === 'admin';
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Organization[]>([]);
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  // Phase 218 — admin-only sanctions filter chips.
+  const [screeningStatus, setScreeningStatus] = useState<'' | 'flagged' | 'review' | 'clear' | 'pending'>('');
+  const [screeningStale, setScreeningStale] = useState(false);
 
   const handleSearch = useCallback(async () => {
-    if (!query.trim()) return;
+    if (!query.trim() && !screeningStatus && !screeningStale) return;
     setSearching(true);
     setHasSearched(true);
     try {
+      const params = new URLSearchParams();
+      if (query.trim()) params.set('search', query.trim());
+      if (isAdmin && screeningStatus) params.set('screening_status', screeningStatus);
+      if (isAdmin && screeningStale) params.set('screening_stale', '1');
       const res = await api.get<{ organizations: Organization[] }>(
-        `/organizations/?search=${encodeURIComponent(query.trim())}`,
+        `/organizations/?${params.toString()}`,
       );
       setResults(res.organizations ?? []);
     } catch {
@@ -32,7 +42,7 @@ export default function OrgSearchPage() {
     } finally {
       setSearching(false);
     }
-  }, [query]);
+  }, [query, screeningStatus, screeningStale, isAdmin]);
 
   return (
     <PageShell>
@@ -82,6 +92,42 @@ export default function OrgSearchPage() {
           {t('common.search')}
         </button>
       </div>
+
+      {/* Phase 218 — admin-only sanctions screening filter chips. */}
+      {isAdmin && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Sanctions:</span>
+          {(['flagged', 'review', 'clear', 'pending'] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setScreeningStatus((cur) => (cur === s ? '' : s))}
+              className={cn(
+                'rounded-full border px-2.5 py-1 transition-colors',
+                screeningStatus === s
+                  ? 'bg-[hsl(var(--kuja-clay))] text-white border-transparent'
+                  : 'border-border hover:bg-muted',
+              )}
+            >
+              {s}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setScreeningStale((v) => !v)}
+            aria-pressed={screeningStale}
+            className={cn(
+              'rounded-full border px-2.5 py-1 transition-colors',
+              screeningStale
+                ? 'bg-[hsl(var(--kuja-clay))] text-white border-transparent'
+                : 'border-border hover:bg-muted',
+            )}
+            title="Last screened > 180 days ago, or never"
+          >
+            Stale &gt; 180d
+          </button>
+        </div>
+      )}
 
       {/* Results */}
       {searching && (

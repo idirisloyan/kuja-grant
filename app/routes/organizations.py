@@ -32,6 +32,26 @@ def api_list_organizations():
     if search:
         query = query.filter(Organization.name.ilike(f'%{search}%'))
 
+    # Phase 218 — admin-only sanctions screening filters.
+    if current_user.is_authenticated and getattr(current_user, 'role', None) == 'admin':
+        from app.models.adverse_media import AdverseMediaScreening
+        screening_status = request.args.get('screening_status')
+        if screening_status:
+            sub = (
+                db.session.query(AdverseMediaScreening.org_id)
+                .filter(AdverseMediaScreening.status == screening_status)
+                .subquery()
+            )
+            query = query.filter(Organization.id.in_(db.session.query(sub.c.org_id)))
+        if request.args.get('screening_stale') in ('1', 'true'):
+            from datetime import datetime, timezone, timedelta
+            cutoff = datetime.now(timezone.utc) - timedelta(days=180)
+            # Orgs whose latest screening (or none) is older than 180d.
+            recent_ids = db.session.query(AdverseMediaScreening.org_id).filter(
+                AdverseMediaScreening.screened_at >= cutoff,
+            ).distinct().subquery()
+            query = query.filter(~Organization.id.in_(db.session.query(recent_ids.c.org_id)))
+
     query = query.order_by(Organization.name)
     pagination = paginate_query(query)
 

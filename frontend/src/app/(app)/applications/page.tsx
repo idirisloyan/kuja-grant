@@ -67,6 +67,9 @@ export default function ApplicationsPage() {
   // is_starred bool already lands in app.to_dict()).
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const canSeeStarred = viewer?.role !== 'ngo';
+  // Phase 217 — donor archive search by org_name. Only shown when
+  // statusFilter === 'archived'; clears when the filter changes.
+  const [archiveQ, setArchiveQ] = useState('');
   const applications = useMemo(() => {
     let rows = all;
     if (statusFilter !== 'all') {
@@ -81,8 +84,16 @@ export default function ApplicationsPage() {
     if (showStarredOnly && canSeeStarred) {
       rows = rows.filter((a) => Boolean((a as { is_starred?: boolean }).is_starred));
     }
+    if (statusFilter === 'archived' && archiveQ.trim()) {
+      const q = archiveQ.trim().toLowerCase();
+      rows = rows.filter((a) => {
+        const name = (a as { org_name?: string; ngo_org_name?: string }).org_name
+          ?? (a as { ngo_org_name?: string }).ngo_org_name ?? '';
+        return name.toLowerCase().includes(q);
+      });
+    }
     return rows;
-  }, [all, statusFilter, showStarredOnly, canSeeStarred]);
+  }, [all, statusFilter, showStarredOnly, canSeeStarred, archiveQ]);
 
   if (isLoading) {
     return (
@@ -218,6 +229,18 @@ export default function ApplicationsPage() {
           />
         )}
       </div>
+      {/* Phase 217 — archive search by org name. Only visible when the
+          archive filter is on. Plain in-memory filter on whatever the
+          list endpoint returned. */}
+      {statusFilter === 'archived' && (
+        <input
+          type="search"
+          value={archiveQ}
+          onChange={(e) => setArchiveQ(e.target.value)}
+          placeholder="Filter archive by organization name…"
+          className="w-full max-w-sm rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+        />
+      )}
 
       {canSeeKanban && view === 'kanban' ? (
         <ApplicationKanban />

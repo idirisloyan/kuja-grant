@@ -390,6 +390,12 @@ def create_app(config_name=None):
                     conn.execute(text("ALTER TABLE applications ADD COLUMN is_starred BOOLEAN DEFAULT FALSE NOT NULL"))
                     added.append('applications.is_starred')
 
+                # Phase 221 — reviewer private notes.
+                rev_cols = {c['name'] for c in inspector.get_columns('reviews')} if 'reviews' in inspector.get_table_names() else set()
+                if rev_cols and 'private_notes' not in rev_cols:
+                    conn.execute(text("ALTER TABLE reviews ADD COLUMN private_notes TEXT"))
+                    added.append('reviews.private_notes')
+
                 # Phase 102 — replay tooling: optional full input/output
                 # text on AI call logs. Populated only for replay-eligible
                 # calls (scoring decisions, narrative outputs that land in

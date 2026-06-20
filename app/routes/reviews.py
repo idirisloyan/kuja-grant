@@ -390,6 +390,13 @@ def api_update_review(review_id):
         review.set_comments(data['comments'])
     if 'overall_score' in data:
         review.overall_score = data['overall_score']
+    # Phase 221 — private notes (reviewer/donor/admin visible, never NGO).
+    if 'private_notes' in data:
+        pn = data['private_notes']
+        if pn is None:
+            review.private_notes = None
+        elif isinstance(pn, str):
+            review.private_notes = pn[:8000]
 
     # Auto-calculate overall from criterion scores if not explicitly set
     if 'scores' in data and 'overall_score' not in data:

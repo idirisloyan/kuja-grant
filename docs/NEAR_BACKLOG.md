@@ -584,6 +584,26 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 217-221 — Search + analytics polish: (a)
+  Donor archive (statusFilter='archived') picks up an inline
+  org-name search box for faster grantee lookup across closed
+  grants. (b) `/api/organizations/` admin-only accepts
+  `?screening_status=flagged|review|clear|pending` and
+  `?screening_stale=1` (180-day cutoff); /organizations/search picks
+  up matching admin-gated chips. (c) New
+  `/settings/saved-searches` page lists every saved search across
+  scopes with one-click delete (uses existing
+  /api/saved-searches/ endpoints). (d) Donor dashboard adds
+  `<DecisionTimeCard>` — median days from submitted_at →
+  decision_recorded_at across donor's grants
+  (`stats.median_decision_days` + `decisions_counted` added to
+  `_build_donor_stats`). Self-gates when no decisions recorded yet.
+  (e) `Review.private_notes` TEXT column + bootstrap ALTER; PUT
+  `/api/reviews/<id>` accepts `private_notes`; reviewer/donor/admin
+  can read via to_dict, NGO never sees it (GET endpoints
+  role-gated). UI integration deferred (current reviewer page
+  POST-only).
+
 - **2026-06-20** Phase 211-215 — Shortlist usability pass: (a)
   `?starred=1` filter added to `/api/applications` + new "Shortlisted"
   pill on the applications list (donor/reviewer/admin). (b) NGO
