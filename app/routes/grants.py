@@ -220,6 +220,195 @@ def api_create_grant():
     return jsonify({'success': True, 'grant': grant.to_dict()}), 201
 
 
+@grants_bp.route('/<int:grant_id>/broadcasts', methods=['GET'])
+@login_required
+def api_grant_broadcasts(grant_id):
+    """Phase 190 — Recent broadcasts sent on this grant.
+
+    Reads AuditChainEntry rows for action='grant.broadcast.sent' so the
+    donor sees their own history + NGO recipients see the same record
+    as proof of receipt. Returns at most 50 newest first.
+
+    Access: NGO with an application on this grant + donor that owns +
+    admin.
+    """
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found'}), 404
+    role_ok = False
+    if current_user.role == 'admin':
+        role_ok = True
+    elif current_user.role == 'donor' and grant.donor_org_id == current_user.org_id:
+        role_ok = True
+    elif current_user.role == 'ngo':
+        # NGO can see if they have any app on this grant.
+        has_app = (
+            Application.query
+            .filter_by(grant_id=grant_id, ngo_org_id=current_user.org_id)
+            .first()
+        )
+        role_ok = has_app is not None
+    if not role_ok:
+        return jsonify({'error': 'Access denied'}), 403
+
+    try:
+        from app.models import AuditChainEntry
+        import json as _json
+        rows = (
+            AuditChainEntry.query
+            .filter(AuditChainEntry.action == 'grant.broadcast.sent')
+            .filter(AuditChainEntry.subject_kind == 'grant')
+            .filter(AuditChainEntry.subject_id == grant_id)
+            .order_by(AuditChainEntry.seq.desc())
+            .limit(50)
+            .all()
+        )
+    except Exception as e:
+        logger.warning('grant broadcasts query failed: %s', e)
+        rows = []
+
+    items = []
+    for r in rows:
+        try:
+            details = _json.loads(r.details_json or '{}')
+        except Exception:
+            details = {}
+        items.append({
+            'seq': r.seq,
+            'sender_email': r.actor_email,
+            'sent_at': r.created_at.isoformat() if r.created_at else None,
+            'audience': details.get('audience'),
+            'subject': details.get('subject'),
+            'body': details.get('body'),
+            'orgs_targeted': details.get('orgs_targeted'),
+            'users_notified': details.get('users_notified'),
+        })
+
+    return jsonify({'success': True, 'grant_id': grant_id, 'broadcasts': items})
+
+
+@grants_bp.route('/criteria-templates', methods=['GET'])
+@role_required('donor', 'admin')
+def api_list_criteria_templates():
+    """Phase 189 — List the calling donor org's saved criteria templates."""
+    try:
+        from app.models import CriteriaTemplate
+        # Bootstrap-create the table on first call (sqlite dev + first prod).
+        try:
+            CriteriaTemplate.__table__.create(bind=db.engine, checkfirst=True)
+        except Exception:
+            pass
+        rows = (
+            CriteriaTemplate.query
+            .filter_by(donor_org_id=current_user.org_id)
+            .order_by(CriteriaTemplate.created_at.desc())
+            .all()
+        )
+        return jsonify({
+            'success': True,
+            'templates': [r.to_dict() for r in rows],
+        })
+    except Exception as e:
+        logger.warning('criteria templates list failed: %s', e)
+        return jsonify({'success': True, 'templates': []})
+
+
+@grants_bp.route('/criteria-templates', methods=['POST'])
+@role_required('donor', 'admin')
+def api_create_criteria_template():
+    """Save a set of criteria as a named template for re-use."""
+    data = get_request_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'name required', 'success': False}), 400
+    criteria = data.get('criteria') or []
+    if not isinstance(criteria, list) or not criteria:
+        return jsonify({
+            'error': 'criteria must be a non-empty list', 'success': False,
+        }), 400
+    description = (data.get('description') or '').strip()[:500] or None
+
+    try:
+        from app.models import CriteriaTemplate
+        import json as _json
+        try:
+            CriteriaTemplate.__table__.create(bind=db.engine, checkfirst=True)
+        except Exception:
+            pass
+        tpl = CriteriaTemplate(
+            donor_org_id=current_user.org_id,
+            name=name[:120],
+            description=description,
+            criteria_json=_json.dumps(criteria),
+            created_by_user_id=current_user.id,
+        )
+        db.session.add(tpl)
+        db.session.commit()
+        return jsonify({'success': True, 'template': tpl.to_dict()})
+    except Exception as e:
+        logger.exception('criteria template create failed: %s', e)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return jsonify({'error': 'create failed', 'success': False}), 500
+
+
+@grants_bp.route('/criteria-templates/<int:template_id>', methods=['DELETE'])
+@role_required('donor', 'admin')
+def api_delete_criteria_template(template_id):
+    from app.models import CriteriaTemplate
+    tpl = CriteriaTemplate.query.get_or_404(template_id)
+    if current_user.role == 'donor' and tpl.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied', 'success': False}), 403
+    db.session.delete(tpl)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@grants_bp.route('/<int:grant_id>/save-as-template', methods=['POST'])
+@role_required('donor', 'admin')
+def api_save_grant_criteria_as_template(grant_id):
+    """Save the criteria off a specific grant into the donor's template library."""
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found', 'success': False}), 404
+    if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied', 'success': False}), 403
+    data = get_request_json() or {}
+    name = (data.get('name') or '').strip() or f'{grant.title} criteria'
+    try:
+        crits = grant.get_criteria() if hasattr(grant, 'get_criteria') else []
+    except Exception:
+        crits = []
+    if not crits:
+        return jsonify({'error': 'Grant has no criteria to save', 'success': False}), 400
+    try:
+        from app.models import CriteriaTemplate
+        import json as _json
+        try:
+            CriteriaTemplate.__table__.create(bind=db.engine, checkfirst=True)
+        except Exception:
+            pass
+        tpl = CriteriaTemplate(
+            donor_org_id=grant.donor_org_id,
+            name=name[:120],
+            description=f'From grant #{grant.id}',
+            criteria_json=_json.dumps(crits),
+            created_by_user_id=current_user.id,
+        )
+        db.session.add(tpl)
+        db.session.commit()
+        return jsonify({'success': True, 'template': tpl.to_dict()})
+    except Exception as e:
+        logger.exception('save-as-template failed: %s', e)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return jsonify({'error': 'create failed', 'success': False}), 500
+
+
 @grants_bp.route('/<int:grant_id>/duplicate', methods=['POST'])
 @role_required('donor', 'admin')
 def api_duplicate_grant(grant_id):

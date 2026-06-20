@@ -44,6 +44,11 @@ const CATEGORY_LABELS: Record<string, { label: string; hint: string }> = {
   reviews:    { label: 'Reviews',             hint: 'Application reviews assigned or completed' },
   compliance: { label: 'Compliance & risk',   hint: 'AI pre-emption flags, sanctions hits, adverse media' },
   decisions:  { label: 'Donor decisions',     hint: 'Donor decisions on your applications and reports' },
+  // Phase 170 added saved-search alerts. Phase 187 surfaces them in the UI.
+  saved_search_matches: {
+    label: 'Saved-search matches',
+    hint: 'New grants published that match one of your saved searches',
+  },
 };
 
 const CHANNEL_LABELS: Record<string, { label: string; icon: typeof Bell; muted?: boolean; locked?: boolean }> = {

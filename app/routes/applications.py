@@ -134,6 +134,75 @@ def api_list_applications():
     })
 
 
+@applications_bp.route('/<int:app_id>/ngo-history', methods=['GET'])
+@login_required
+def api_application_ngo_history(app_id):
+    """Phase 188 — Past applications from the same NGO (donor view).
+
+    Returns up to 12 prior applications from this NGO across grants
+    (newest first) — title, status, scores, date. Helps donors gauge
+    the relationship history when reviewing a fresh application.
+
+    Access: donor (only for own grants), admin, the NGO itself.
+    """
+    application = db.session.get(Application, app_id)
+    if not application:
+        return jsonify({'error': 'Application not found'}), 404
+    if current_user.role == 'donor':
+        grant_check = db.session.get(Grant, application.grant_id)
+        if not grant_check or grant_check.donor_org_id != current_user.org_id:
+            return jsonify({'error': 'Access denied'}), 403
+    if current_user.role == 'ngo' and application.ngo_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    try:
+        rows = (
+            Application.query
+            .filter(Application.ngo_org_id == application.ngo_org_id)
+            .filter(Application.id != application.id)
+            .order_by(Application.submitted_at.desc().nullslast())
+            .limit(12)
+            .all()
+        )
+    except Exception as e:
+        logger.warning('ngo-history query failed: %s', e)
+        rows = []
+
+    items = []
+    for r in rows:
+        grant_title = None
+        try:
+            g = db.session.get(Grant, r.grant_id) if r.grant_id else None
+            grant_title = g.title if g else None
+        except Exception:
+            pass
+        items.append({
+            'id': r.id,
+            'grant_id': r.grant_id,
+            'grant_title': grant_title,
+            'status': r.status,
+            'ai_score': r.ai_score,
+            'human_score': r.human_score,
+            'submitted_at':
+                r.submitted_at.isoformat() if r.submitted_at else None,
+        })
+
+    # Quick aggregate so the donor sees a one-line context.
+    awarded = sum(1 for it in items if it['status'] == 'awarded')
+    rejected = sum(1 for it in items if it['status'] in ('rejected', 'declined'))
+
+    return jsonify({
+        'success': True,
+        'applications': items,
+        'summary': {
+            'total': len(items),
+            'awarded': awarded,
+            'rejected': rejected,
+            'in_progress': len(items) - awarded - rejected,
+        },
+    })
+
+
 @applications_bp.route('/<int:app_id>.pdf', methods=['GET'])
 @login_required
 def api_application_pdf(app_id):

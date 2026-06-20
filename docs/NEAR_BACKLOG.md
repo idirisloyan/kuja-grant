@@ -584,6 +584,23 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 187-191 — `saved_search_matches` category now
+  rendered in `/settings/notifications` with proper label + hint
+  (Phase 170 had defined it backend-side only). New
+  `/api/applications/<id>/ngo-history` returns the past 12
+  applications from the same NGO; `<NgoHistoryPanel>` on donor /
+  admin / reviewer view shows them with status badges + summary.
+  New `criteria_templates` table + 4 endpoints
+  (list / create / delete / save-as-template-from-grant) for the
+  Phase 189 grant criteria template library. New
+  `/api/grants/<id>/broadcasts` endpoint reads the audit chain for
+  `grant.broadcast.sent` actions to produce a thread view; broadcast
+  service now stores body alongside subject so the thread shows the
+  actual messages. New `/api/exports/org-bundle.zip` packages the
+  Phase 99 JSON bundle alongside every application as a self-
+  contained Phase 159 PDF in a single download; "ZIP (with PDFs)" CTA
+  on org profile alongside the existing JSON button.
+
 - **2026-06-20** Phase 181-185 — "Duplicate" CTA on grant detail
   (donor/admin) calls the Phase 177 backend + routes to the new draft.
   **Critical bugfix found in Phase 182:** Phase 167/169/176 + Phase

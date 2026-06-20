@@ -108,6 +108,10 @@ class GrantBroadcastService:
                     'orgs_targeted': len(ngo_org_ids),
                     'users_notified': notified,
                     'subject': subject[:120],
+                    # Phase 190 — store body so the thread view can
+                    # show the actual broadcast text instead of just
+                    # the subject line. Capped at 2000 chars.
+                    'body': (body or '')[:2000],
                 },
             )
         except Exception as e:

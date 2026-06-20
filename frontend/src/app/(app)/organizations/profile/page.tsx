@@ -151,7 +151,17 @@ export default function OrgProfilePage() {
               title="Download every record Kuja holds for your organization as JSON"
             >
               <Download className="h-4 w-4" />
-              Download my data
+              JSON
+            </a>
+            {/* Phase 191 — ZIP variant with embedded per-application PDFs. */}
+            <a
+              href="/api/exports/org-bundle.zip"
+              download
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card text-sm font-medium px-3 py-2 hover:bg-muted text-foreground"
+              title="Download JSON + every application as PDF in a ZIP archive"
+            >
+              <Download className="h-4 w-4" />
+              ZIP (with PDFs)
             </a>
             <button
               type="button"

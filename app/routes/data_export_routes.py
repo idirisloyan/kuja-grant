@@ -161,3 +161,105 @@ def api_org_bundle():
         )
 
     return jsonify({'success': True, 'bundle': bundle})
+
+
+@data_export_bp.route('/org-bundle.zip', methods=['GET'])
+@login_required
+def api_org_bundle_zip():
+    """Phase 191 — ZIP version of the per-tenant export bundle.
+
+    Includes:
+      - bundle.json: same shape as the JSON export
+      - applications/<id>.pdf: every application as a self-contained PDF
+        (Phase 159 service). Best-effort — failures are noted in a
+        manifest.txt rather than aborting the whole archive.
+      - README.txt: short index + verification notes.
+
+    Auth: same as /org-bundle (admin can target other orgs, NGO sees own).
+    """
+    org_id = current_user.org_id
+    if current_user.role == 'admin' and request.args.get('org_id'):
+        try:
+            org_id = int(request.args.get('org_id'))
+        except ValueError:
+            return jsonify({'success': False, 'error': 'org_id must be an integer'}), 400
+    if org_id is None:
+        return jsonify({'success': False, 'error': 'No org associated with this user.'}), 403
+
+    bundle = _build_org_bundle(org_id)
+    if bundle is None:
+        return jsonify({'success': False, 'error': 'Org not found.'}), 404
+
+    import io as _io
+    import zipfile as _zip
+    from app.models import Application, Grant, Organization
+
+    buf = _io.BytesIO()
+    org_obj = db.session.get(Organization, org_id)
+    org_name = (bundle.get('org') or {}).get('name') or f'org-{org_id}'
+    manifest_lines = [
+        f'Kuja org export — {org_name}',
+        f'Generated: {datetime.now(timezone.utc).isoformat()}',
+        '',
+        'Files:',
+        '  bundle.json — full JSON dump (same schema as /api/exports/org-bundle)',
+        '  applications/*.pdf — every application as a self-contained PDF',
+        '  README.txt — this file',
+        '',
+        'Verification: the JSON bundle includes a `meta.exported_at` field. To',
+        'audit-trace any record, look it up in /admin/audit-chain by subject_kind',
+        '+ subject_id.',
+    ]
+
+    with _zip.ZipFile(buf, 'w', _zip.ZIP_DEFLATED) as zf:
+        zf.writestr('bundle.json', json.dumps(bundle, indent=2, default=str))
+
+        # Add per-application PDFs. Best-effort.
+        try:
+            from app.services.application_pdf_service import build_application_pdf
+        except Exception:
+            build_application_pdf = None  # type: ignore
+
+        if build_application_pdf is not None:
+            try:
+                apps = Application.query.filter_by(ngo_org_id=org_id).all()
+            except Exception:
+                apps = []
+            ok_count = 0
+            fail_count = 0
+            for a in apps:
+                try:
+                    grant = db.session.get(Grant, a.grant_id) if a.grant_id else None
+                    criteria = []
+                    try:
+                        criteria = grant.get_criteria() if grant else []
+                    except Exception:
+                        criteria = []
+                    responses = {}
+                    try:
+                        responses = a.get_responses() or {}
+                    except Exception:
+                        pass
+                    pdf_bytes = build_application_pdf(
+                        application=a, grant=grant, org=org_obj,
+                        criteria=criteria, responses=responses,
+                    )
+                    zf.writestr(f'applications/application-{a.id}.pdf', pdf_bytes)
+                    ok_count += 1
+                except Exception as e:
+                    manifest_lines.append(f'! application-{a.id} PDF failed: {str(e)[:120]}')
+                    fail_count += 1
+            manifest_lines.append('')
+            manifest_lines.append(f'PDFs included: {ok_count}; failed: {fail_count}')
+
+        zf.writestr('README.txt', '\n'.join(manifest_lines))
+
+    safe = ''.join(c if c.isalnum() or c in '-_' else '_' for c in org_name)[:60]
+    filename = f"kuja-export-{safe}-{datetime.now(timezone.utc).strftime('%Y%m%d')}.zip"
+    return Response(
+        buf.getvalue(),
+        mimetype='application/zip',
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
+        },
+    )

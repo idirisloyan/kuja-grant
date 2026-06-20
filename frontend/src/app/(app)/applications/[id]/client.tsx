@@ -38,6 +38,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { api, ApiError } from '@/lib/api';
 import { toast } from 'sonner';
 import { DecisionAuditDrawer } from '@/components/applications/DecisionAuditDrawer';
+import { NgoHistoryPanel } from '@/components/applications/ngo-history-panel';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
 const TAB_KEYS: { id: TabId; key: string }[] = [
@@ -203,6 +204,12 @@ export default function ApplicationDetailClient() {
             On-demand AI explanation; lazy-loaded when opened. */}
         {['declined', 'rejected', 'revision_requested'].includes(application.status) && (
           <WhyRejectedPanel kind="application" entityId={application.id} />
+        )}
+
+        {/* Phase 188 — Donor / admin / reviewer view: past
+            applications from this NGO for relationship context. */}
+        {isReviewerSide && (
+          <NgoHistoryPanel applicationId={application.id} />
         )}
 
         {/* Phase 163 — NGO revision banner. Shown when the donor has
