@@ -42,6 +42,7 @@ import { DocsRequestedCard } from '@/components/dashboards/docs-requested-card';
 import { NgoInboxCard } from '@/components/dashboards/ngo-inbox-card';
 import { TrustCompletenessCard } from '@/components/dashboards/trust-completeness-card';
 import { ActiveApplicationsCard } from '@/components/dashboards/active-applications-card';
+import { TrustShareCard } from '@/components/dashboards/trust-share-card';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -157,6 +158,8 @@ export function AttentionNgoDashboard() {
       <TrustCompletenessCard />
       {/* Phase 245 — applications in submitted/under_review/scored. */}
       <ActiveApplicationsCard />
+      {/* Phase 257 — public Trust Profile share link CTA. */}
+      <TrustShareCard />
       {/* Phase 154 — rolling 12-month impact summary. Self-gates if zero activity. */}
       <ImpactCard />
       {/* Phase 185 — peer-anonymized win rate by sector. Self-gates

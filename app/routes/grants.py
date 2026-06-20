@@ -1686,6 +1686,43 @@ def api_grant_ai_vs_human(grant_id):
     })
 
 
+@grants_bp.route('/<int:grant_id>/summary.pdf', methods=['GET'])
+@login_required
+@role_required('donor', 'admin')
+def api_grant_summary_pdf(grant_id):
+    """Phase 253 — Grant performance summary PDF."""
+    from flask import Response
+    from app.services.grant_summary_pdf_service import build_grant_summary_pdf
+
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found'}), 404
+    if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    apps = Application.query.filter_by(grant_id=grant_id).all()
+
+    # Reuse Phase 247 computation inline.
+    deltas = [
+        float(a.human_score) - float(a.ai_score)
+        for a in apps
+        if a.ai_score is not None and a.human_score is not None
+    ]
+    mean_delta = round(sum(deltas) / len(deltas), 1) if deltas else None
+
+    pdf_bytes = build_grant_summary_pdf(
+        grant=grant,
+        applications=apps,
+        ai_vs_human_delta=mean_delta,
+        ai_vs_human_pool=len(deltas),
+    )
+    safe = ''.join(c for c in (grant.title or 'grant') if c.isalnum() or c in ('-', '_'))[:60] or 'grant'
+    return Response(
+        pdf_bytes, mimetype='application/pdf',
+        headers={'Content-Disposition': f'attachment; filename="{safe}_summary.pdf"'},
+    )
+
+
 @grants_bp.route('/<int:grant_id>/applications.csv', methods=['GET'])
 @login_required
 @role_required('donor', 'admin')

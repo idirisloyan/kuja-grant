@@ -584,6 +584,25 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 253-257 — Polished outputs + sharing: (a) New
+  `grant_summary_pdf_service.py` + `GET /api/grants/<id>/summary.pdf`
+  (donor + admin, owner-scoped) renders a 1-2 page reportlab PDF
+  with status breakdown, AI vs human calibration, and top-5 apps
+  by AI score. "Summary PDF" download CTA on grant detail. (b)
+  Documents step on apply now accepts drag-and-drop (with visual
+  drop-target highlight) in addition to click-to-browse. (c)
+  Phase 255 (reviewer 0-10 hotkeys) DEFERRED — conflicts with text
+  entry in comment fields and the existing range slider + numeric
+  input + Phase 183 AI-suggested-score copy button already cover
+  score entry. (d) `<AdminStatusCard>` on the operator dashboard
+  fetches both `/api/cron/health` + `/admin/ai-cost-by-tenant?days=30`
+  and renders a compact two-line status with deep links to both
+  detail pages. Self-gates when everything is clean. (e)
+  `<TrustShareCard>` on the NGO dashboard exposes a single-click
+  "Generate share link" CTA calling `/api/passport/publish`, auto-
+  copies the public `/trust/share/<slug>` URL to clipboard. Hidden
+  for non-NGO viewers.
+
 - **2026-06-20** Phase 247-251 — Calibration + UX persistence: (a)
   New `GET /api/grants/<id>/ai-vs-human` (donor + admin, owner-
   scoped) returns mean (human − ai) score delta + mean abs delta

@@ -1596,13 +1596,30 @@ function DocumentsStep({
                       }}
                     />
                     <button
+                      type="button"
                       onClick={() => fileInputRefs.current[doc.key]?.click()}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.add('border-[hsl(var(--kuja-clay))]', 'bg-[hsl(var(--kuja-sand))]/40');
+                      }}
+                      onDragLeave={(e) => {
+                        e.currentTarget.classList.remove('border-[hsl(var(--kuja-clay))]', 'bg-[hsl(var(--kuja-sand))]/40');
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.remove('border-[hsl(var(--kuja-clay))]', 'bg-[hsl(var(--kuja-sand))]/40');
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) onUpload(doc.key, doc.key, file);
+                      }}
                       className="flex w-full flex-col items-center gap-2 rounded-[10px] border-2 border-dashed border-border p-8 transition hover:border-[hsl(var(--kuja-clay))] hover:bg-muted/30"
                     >
                       <Upload className="h-6 w-6 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">{t('apply.click_to_upload')}</span>
                       <span className="text-xs text-muted-foreground/70">
                         {t('apply.upload_constraints')}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/60">
+                        or drag a file here
                       </span>
                     </button>
                   </div>

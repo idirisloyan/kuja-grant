@@ -217,6 +217,16 @@ export default function GrantDetailClient() {
           Export applications CSV
         </a>
       )}
+      {/* Phase 253 — Grant performance summary PDF. */}
+      {isDonor && grant.id != null && (
+        <a
+          href={`/api/grants/${grant.id}/summary.pdf`}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand))]/40 text-sm font-medium px-4 py-2"
+          title="Download a one-page performance summary as PDF"
+        >
+          Summary PDF
+        </a>
+      )}
       {/* Phase 233 — withdraw a published grant (cascades to apps). */}
       {isDonor && grant.id != null && ['open', 'draft'].includes(grant.status) && (
         <WithdrawGrantButton grantId={grant.id} grantTitle={grant.title ?? ''} />
