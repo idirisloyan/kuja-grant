@@ -115,10 +115,17 @@ class AICallLog(db.Model):
     model = db.Column(db.String(80), nullable=True)
     error_code = db.Column(db.String(60), nullable=True)
     error_message = db.Column(db.String(500), nullable=True)
+    # Phase 102 — replay tooling. Populated only for replay-eligible
+    # calls (scoring decisions, narrative outputs that land in the audit
+    # chain). Other calls leave these NULL.
+    input_text = db.Column(db.Text, nullable=True)
+    output_text = db.Column(db.Text, nullable=True)
+    replay_subject_kind = db.Column(db.String(40), nullable=True)
+    replay_subject_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
-    def to_dict(self):
-        return {
+    def to_dict(self, include_replay: bool = False):
+        out = {
             'id': self.id,
             'endpoint': self.endpoint,
             'user_id': self.user_id,
@@ -129,5 +136,11 @@ class AICallLog(db.Model):
             'model': self.model,
             'error_code': self.error_code,
             'error_message': self.error_message,
+            'replay_subject_kind': self.replay_subject_kind,
+            'replay_subject_id': self.replay_subject_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
+        if include_replay:
+            out['input_text'] = self.input_text
+            out['output_text'] = self.output_text
+        return out

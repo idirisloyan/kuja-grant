@@ -378,6 +378,26 @@ def create_app(config_name=None):
                     conn.execute(text("ALTER TABLE applications ADD COLUMN decision_recorded_by_user_id INTEGER"))
                     added.append('applications.decision_recorded_by_user_id')
 
+                # Phase 102 — replay tooling: optional full input/output
+                # text on AI call logs. Populated only for replay-eligible
+                # calls (scoring decisions, narrative outputs that land in
+                # the audit chain). Other calls leave these NULL to keep
+                # storage cheap.
+                if 'ai_call_logs' in tables:
+                    aicall_cols = {c['name'] for c in inspector.get_columns('ai_call_logs')}
+                    if 'input_text' not in aicall_cols:
+                        conn.execute(text("ALTER TABLE ai_call_logs ADD COLUMN input_text TEXT"))
+                        added.append('ai_call_logs.input_text')
+                    if 'output_text' not in aicall_cols:
+                        conn.execute(text("ALTER TABLE ai_call_logs ADD COLUMN output_text TEXT"))
+                        added.append('ai_call_logs.output_text')
+                    if 'replay_subject_kind' not in aicall_cols:
+                        conn.execute(text("ALTER TABLE ai_call_logs ADD COLUMN replay_subject_kind VARCHAR(40)"))
+                        added.append('ai_call_logs.replay_subject_kind')
+                    if 'replay_subject_id' not in aicall_cols:
+                        conn.execute(text("ALTER TABLE ai_call_logs ADD COLUMN replay_subject_id INTEGER"))
+                        added.append('ai_call_logs.replay_subject_id')
+
                 # Phase 13.15 — TOTP 2FA columns on users.
                 user_cols = {c['name'] for c in inspector.get_columns('users')}
                 if 'totp_secret' not in user_cols:

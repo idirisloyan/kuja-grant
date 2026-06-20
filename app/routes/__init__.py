@@ -72,6 +72,9 @@ def register_blueprints(app):
     from app.routes.data_export_routes import data_export_bp  # Phase 99: per-tenant data export bundle
     from app.routes.integrity_routes import integrity_bp  # Phase 99: DB integrity invariants
     from app.routes.credentials_routes import credentials_bp, passport_vc_bp, well_known_bp  # Phase 100: W3C Verifiable Credentials
+    from app.routes.synthetic_monitor_routes import synthetic_monitor_bp  # Phase 101: synthetic production monitoring
+    from app.routes.replay_routes import replay_bp  # Phase 102: audit-chain replay
+    from app.routes.tenant_health_routes import tenant_health_bp  # Phase 106: per-tenant health dashboard
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -91,5 +94,6 @@ def register_blueprints(app):
                compliance_explainer_bp, journey_bp, ai_health_bp,
                whisper_bp, ai_telemetry_bp, ai_quality_bp,
                whats_new_bp, data_export_bp, integrity_bp,
-               credentials_bp, passport_vc_bp, well_known_bp]:
+               credentials_bp, passport_vc_bp, well_known_bp,
+               synthetic_monitor_bp, replay_bp, tenant_health_bp]:
         app.register_blueprint(bp)

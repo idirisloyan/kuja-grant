@@ -1357,6 +1357,225 @@ def api_application_activity(app_id):
     return jsonify({'success': True, 'events': events, 'application_id': app_id})
 
 
+@applications_bp.route('/<int:app_id>/trust-profile-readiness', methods=['GET'])
+@login_required
+def api_application_trust_profile_readiness(app_id):
+    """Phase 105 — soft Trust Profile readiness check at submit time.
+
+    The system DELIBERATELY does not gate draft creation on Trust
+    Profile completeness — NGOs can draft an application before their
+    Trust Profile exists (verified at applications.py line 178+; no
+    passport/trust-profile gates in api_create_application).
+
+    This endpoint surfaces "how complete is the Trust Profile that will
+    accompany this submission" as a non-blocking nudge the apply UI can
+    show next to the Submit button. Donors see a more compelling
+    application when the Trust Profile is fleshed out — but the
+    submitter is the one who decides when to ship.
+
+    Auth: owning NGO + admin.
+    """
+    application = Application.query.filter_by(id=app_id).first()
+    if application is None:
+        return jsonify({'success': False, 'error': 'application.not_found'}), 404
+    if current_user.role == 'ngo' and application.ngo_org_id != current_user.org_id:
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    # Lookup the org's published Capacity Passport (the closest thing to
+    # a single Trust-Profile completeness signal). If none, return a
+    # gentle nudge — no submit block.
+    from app.models.capacity_passport import CapacityPassport
+    active = (
+        CapacityPassport.query
+        .filter(CapacityPassport.org_id == application.ngo_org_id)
+        .filter(CapacityPassport.status == 'active')
+        .order_by(CapacityPassport.published_at.desc().nullslast() if hasattr(CapacityPassport.published_at, 'desc') else CapacityPassport.id.desc())
+        .first()
+    )
+
+    if active is None:
+        return jsonify({
+            'success': True,
+            'ready': True,  # never blocks
+            'state': 'no_published_passport',
+            'nudge': (
+                "You can submit now. Donors see a stronger application "
+                "when your Trust Profile is published — consider publishing "
+                "a Capacity Passport from /trust before sending."
+            ),
+            'cta': {'label': 'Open Trust', 'href': '/trust'},
+        })
+
+    snapshot = active.get_snapshot() or {}
+    composite = snapshot.get('composite_score') or snapshot.get('composite') or None
+    return jsonify({
+        'success': True,
+        'ready': True,
+        'state': 'published',
+        'passport_id': active.id,
+        'composite_score': composite,
+        'published_at': active.published_at.isoformat() if active.published_at else None,
+    })
+
+
+def _ai_pre_submit_prediction(application, criteria, responses, per_crit):
+    """Phase 103 — AI-driven pre-submit prediction.
+
+    Returns the response dict on success, or None to fall back to the
+    rule-based v0. Logs the full prompt + response via replay_service so
+    the audit chain can be replayed for any donor/regulator dispute.
+    """
+    import json as _json
+    import time as _time
+
+    from app.services.copilot_service import CopilotService
+    from app.services.replay_service import log_replayable_ai_call
+    from app.models.audit_chain import AuditChainEntry
+
+    # Build a compact prompt — only criterion label/weight + the user's
+    # current response. Keeps tokens manageable while giving the model
+    # enough to predict a band.
+    crit_block = []
+    for c in criteria:
+        if not isinstance(c, dict):
+            continue
+        key = str(c.get('key') or c.get('id') or '')
+        label = c.get('label') or key
+        weight = c.get('weight') or 0
+        text = str(responses.get(key, '') or '').strip()
+        crit_block.append({
+            'key': key,
+            'label': label,
+            'weight': weight,
+            'response': text[:1200] if text else '',
+            'response_len': len(text),
+        })
+
+    user_payload = {
+        'grant_title': getattr(application.grant, 'title', None),
+        'grant_summary': getattr(application.grant, 'description', None) or '',
+        'criteria': crit_block,
+    }
+    user_msg = (
+        "You are previewing what a reviewer will likely see in this draft "
+        "application. Predict a reviewer band, name 2 specific cheap fixes "
+        "with estimated minutes, and return ONLY JSON matching the schema.\n\n"
+        + _json.dumps(user_payload, ensure_ascii=False)[:7000]
+    )
+    schema_hint = (
+        '{ "predictedBand": "Likely strong (top 25%)" | "Likely '
+        'competitive" | "Borderline" | "Likely below threshold", '
+        '"confidence": "high"|"medium"|"low", '
+        '"overall_score_pct": number 0..100, '
+        '"rationale": "1-2 sentence reviewer\'s-eye view (≤320 chars)", '
+        '"fixes": [ { "fieldId": "<criterion key from input>", '
+        '"label": "imperative one-liner", "estimatedMinutes": integer } ] }'
+    )
+    system_msg = (
+        "You are a calibrated grant reviewer giving the applicant a "
+        "preview. Be specific. Tie fixes to the criterion key. Never "
+        "invent fields not in the criteria list."
+    )
+
+    t0 = _time.time()
+    try:
+        res = CopilotService._call_json(
+            system_msg, user_msg, schema_hint,
+            max_tokens=900, lang=(getattr(application, 'language', None) or 'en'),
+        )
+    except Exception:
+        return None
+
+    duration_ms = int((_time.time() - t0) * 1000)
+    if not res.get('ok'):
+        return None
+
+    parsed = res.get('data') or {}
+    if not isinstance(parsed, dict):
+        return None
+    band = parsed.get('predictedBand')
+    confidence = parsed.get('confidence')
+    score_pct = parsed.get('overall_score_pct')
+    fixes = parsed.get('fixes') or []
+    if not band or not isinstance(fixes, list):
+        return None
+
+    # Sanity-check fixes shape; drop malformed entries instead of failing.
+    safe_fixes = []
+    for f in fixes[:3]:
+        if not isinstance(f, dict):
+            continue
+        label = f.get('label')
+        field_id = f.get('fieldId')
+        est = f.get('estimatedMinutes')
+        if not label or not field_id:
+            continue
+        try:
+            est = int(est)
+        except (TypeError, ValueError):
+            est = 5
+        safe_fixes.append({
+            'label': str(label)[:240],
+            'fieldId': str(field_id)[:80],
+            'estimatedMinutes': max(1, min(60, est)),
+        })
+
+    # Replay-eligible log — full prompt + response. Tagged so the admin
+    # AI telemetry rollup shows it as its own surface.
+    meta = res.get('meta') or {}
+    call_id = log_replayable_ai_call(
+        endpoint='ai-pre-submit-prediction',
+        user_id=getattr(current_user, 'id', None),
+        input_text=f"SYSTEM:\n{system_msg}\n\nUSER:\n{user_msg}",
+        output_text=_json.dumps(parsed, ensure_ascii=False),
+        model=meta.get('model'),
+        tokens_in=meta.get('tokens_in'),
+        tokens_out=meta.get('tokens_out'),
+        duration_ms=duration_ms,
+        success=True,
+        subject_kind='application',
+        subject_id=application.id,
+    )
+
+    # Audit chain entry so a donor dispute can resolve the exact AI call.
+    try:
+        AuditChainEntry.append(
+            action='ai.pre_submit_prediction',
+            actor_email=getattr(current_user, 'email', None),
+            subject_kind='application',
+            subject_id=application.id,
+            details={
+                'ai_call_id': call_id,
+                'predictedBand': band,
+                'overall_score_pct': score_pct,
+                'fallback_used': bool(meta.get('fallback_used')),
+                'model': meta.get('model'),
+            },
+        )
+    except Exception:
+        pass
+
+    return {
+        'success': True,
+        'status': 'ready',
+        'predictedBand': str(band),
+        'confidence': str(confidence) if confidence else 'medium',
+        'overall_score_pct': score_pct,
+        'rationale': str(parsed.get('rationale') or '')[:320] or None,
+        'filled': sum(1 for p in per_crit if p['response_len'] > 0),
+        'total_criteria': len(per_crit),
+        'fixes': safe_fixes[:2],
+        'method': 'ai-v1',
+        'replay': {'ai_call_id': call_id} if call_id else None,
+        'meta': {
+            'model': meta.get('model'),
+            'fallback_used': bool(meta.get('fallback_used')),
+        },
+    }
+
+
 @applications_bp.route('/<int:app_id>/pre-submit-preview', methods=['GET'])
 @login_required
 def api_application_pre_submit_preview(app_id):
@@ -1441,6 +1660,16 @@ def api_application_pre_submit_preview(app_id):
             'filled': filled,
             'total_criteria': len(per_crit),
         })
+
+    # Phase 103 — AI prediction. Try Claude first; fall back to the
+    # heuristic below on any failure (no API key, parse error,
+    # transient outage). Default ON; pass ?method=heuristic to force the
+    # rule-based path (used by tests + the v0 reference impl).
+    method_q = request.args.get('method', 'auto')
+    if method_q != 'heuristic':
+        ai_resp = _ai_pre_submit_prediction(application, criteria, responses, per_crit)
+        if ai_resp is not None:
+            return jsonify(ai_resp)
 
     # Weighted overall (0..1)
     total_weight = sum(p['weight'] for p in per_crit) or 1.0

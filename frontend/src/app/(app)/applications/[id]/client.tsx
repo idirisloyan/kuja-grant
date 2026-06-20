@@ -454,6 +454,8 @@ interface PreSubmitData {
   predictedBand?: string;
   confidence?: 'high' | 'medium' | 'low';
   fixes?: Fix[];
+  rationale?: string | null;
+  meta?: { fallback_used?: boolean; model?: string | null; fallback_from?: string | null } | null;
 }
 
 function ApplicationPreSubmitPreview({ applicationId }: { applicationId: number }) {
@@ -477,6 +479,8 @@ function ApplicationPreSubmitPreview({ applicationId }: { applicationId: number 
       predictedBand={data?.predictedBand}
       confidence={data?.confidence}
       fixes={data?.fixes}
+      rationale={data?.rationale}
+      meta={data?.meta}
       onFixIt={(f) => {
         // Jump to the responses tab + scroll to the field if present
         if (f.fieldId && typeof window !== 'undefined') {

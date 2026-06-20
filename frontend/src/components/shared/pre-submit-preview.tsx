@@ -21,6 +21,7 @@
 import { Sparkles, TrendingUp, Wrench, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AIConfidenceBadge } from './ai-confidence-badge';
+import { AIFallbackNotice } from './ai-fallback-notice';
 import { cn } from '@/lib/utils';
 
 export interface Fix {
@@ -42,6 +43,10 @@ interface Props {
   confidence?: 'high' | 'medium' | 'low';
   /** Top 1-2 cheap fixes that would move the score. */
   fixes?: Fix[];
+  /** Optional rationale sentence from the AI prediction (Phase 103). */
+  rationale?: string | null;
+  /** AI call meta — used to render the fallback notice. */
+  meta?: { fallback_used?: boolean; model?: string | null; fallback_from?: string | null } | null;
   /** Called when the user clicks "Submit anyway" / "I'll fix first". */
   onSubmitAnyway?: () => void;
   onFixIt?: (fix: Fix) => void;
@@ -53,6 +58,8 @@ export function PreSubmitPreview({
   predictedBand,
   confidence,
   fixes,
+  rationale,
+  meta,
   onSubmitAnyway,
   onFixIt,
   className,
@@ -109,11 +116,29 @@ export function PreSubmitPreview({
       </div>
 
       {predictedBand && (
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-3 flex items-center gap-2 flex-wrap">
           <TrendingUp className="h-5 w-5 text-emerald-700" />
           <span className="font-serif text-xl font-medium text-emerald-900">
             {predictedBand}
           </span>
+          {meta?.fallback_used && (
+            <AIFallbackNotice meta={meta} compact />
+          )}
+        </div>
+      )}
+
+      {/* Phase 103 — AI rationale ("reviewer's-eye view"). Optional. */}
+      {rationale && (
+        <p className="mb-3 text-xs italic text-emerald-900/80 border-l-2 border-emerald-300 pl-2">
+          {rationale}
+        </p>
+      )}
+
+      {/* Phase 104 — full-banner fallback notice when there is no
+          predictedBand row to attach the compact chip to. */}
+      {meta?.fallback_used && !predictedBand && (
+        <div className="mb-3">
+          <AIFallbackNotice meta={meta} />
         </div>
       )}
 

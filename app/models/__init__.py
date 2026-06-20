@@ -61,6 +61,7 @@ from app.models.tenant_message import TenantMessage, TenantMessageRead
 from app.models.member_feedback import (
     MemberFeedback, FEEDBACK_CATEGORIES, FEEDBACK_STATUSES,
 )
+from app.models.synthetic_monitor import SyntheticMonitorRun
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',

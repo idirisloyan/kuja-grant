@@ -202,6 +202,104 @@ Operational TODOs added with this batch:
   hostname; override for a custom domain so the DID stays stable
   across infra moves.
 
+**Phase 101–106 — three more Tier-S items + three Tier-A items
+shipped this session:**
+
+Phase 101 — Synthetic production monitoring (Tier S #4):
+- `app/services/synthetic_monitor.py` — probes against the 9 critical
+  user paths (health, NGO login + dashboard + apps + reports, donor
+  login + reviews, DID document, status list). Soft 3s + hard 10s
+  deadlines. Returns structured ProbeResult per path.
+- `app/models/synthetic_monitor.py:SyntheticMonitorRun` — one row per
+  sweep. Bootstrap-altered into the DB on boot.
+- Endpoints: `POST /api/admin/synthetic-monitor/run` (admin),
+  `GET /api/admin/synthetic-monitor` (admin: 7d window + per-probe
+  failure rate + recent runs), `POST /api/cron/synthetic-monitor`
+  (CRON_SECRET-gated).
+- Fires admin notifications on failure via the existing
+  `create_notification` helper.
+- Frontend: `/admin/synthetic-monitor` page with "Run now" button,
+  window picker, per-probe failure-rate table, recent-runs list with
+  per-probe color chips.
+
+Phase 102 — Audit-chain replay tooling (Tier S #3):
+- AICallLog extended with `input_text`, `output_text`,
+  `replay_subject_kind`, `replay_subject_id` columns. Bootstrap-altered.
+- `app/services/replay_service.py:log_replayable_ai_call` — helper for
+  call sites to log full prompt + response (truncated at 256KB each)
+  with subject linkage.
+- Endpoints: `GET /api/admin/audit-chain/<seq>/replay` (looks up the
+  audit entry + linked AI call(s) via `details.ai_call_id` OR by
+  `(subject_kind, subject_id)` fallback);
+  `GET /api/admin/ai-calls/<id>/replay`.
+- Frontend: `/admin/replay?seq=N` page. Renders the audit entry's hash
+  chain context + linked AI calls with collapsible input/output panes
+  + per-pane "Copy" buttons.
+
+Phase 103 — AI prediction for pre-submit (Tier S #5):
+- `_ai_pre_submit_prediction` helper in `app/routes/applications.py`.
+  Sends grant criteria + responses to Claude Sonnet 4.6 via
+  `CopilotService._call_json`, asks for `{predictedBand, confidence,
+  fixes, rationale}`. Falls through to the rule-based v0 on any AI
+  failure.
+- Wired into `/api/applications/<id>/pre-submit-preview` as the
+  default; pass `?method=heuristic` to force v0 for tests / reference.
+- Each AI call is logged with `log_replayable_ai_call` (input prompt +
+  response) AND an audit chain entry
+  (action='ai.pre_submit_prediction', details.ai_call_id=…). Disputes
+  resolve directly through Phase 102 replay.
+- Endpoint response now carries `rationale`, `meta.fallback_used`,
+  and `meta.model`. Frontend `PreSubmitPreview` extended to render
+  both.
+
+Phase 104 — AI fallback notice UI (Tier A):
+- New `<AIFallbackNotice>` component with `compact` chip mode + full
+  banner mode. Self-gated to `meta.fallback_used === true`.
+- Wired into `<PreSubmitPreview>` (the Phase 99 backend fallback
+  marker now reaches users via this surface).
+
+Phase 105 — Onboarding ungate drafts (Tier A):
+- Verified: there is no Trust Profile / Capacity Passport gate on
+  draft creation today. The API already correctly gates the submit,
+  not the draft.
+- Added `GET /api/applications/<id>/trust-profile-readiness` as the
+  soft nudge surface — returns `ready: true` always, but flags
+  `state: 'no_published_passport'` with a friendly suggestion to
+  publish a Capacity Passport from `/trust` for a stronger
+  application. Non-blocking by design.
+
+Phase 106 — Tenant health dashboard (Tier A):
+- `GET /api/admin/tenant-health?days=7` — per-org rollup of AI calls
+  + failure rate, applications (total/draft/submitted/stale),
+  members + admins, active passport state, last activity timestamp.
+  Classifies each tenant as red/amber/green with flags.
+- Thresholds: red = AI failure ≥ 25% OR 5+ stale drafts; amber = AI
+  failure ≥ 10% OR drafts without AI activity. Tunable in
+  `app/routes/tenant_health_routes.py:_classify`.
+- Frontend: `/admin/tenant-health` page with summary tiles + sortable
+  table. Sorted by health (red first) then failure rate desc.
+
+Operational follow-ups added with this batch:
+- [ ] **Wire `/api/cron/synthetic-monitor` to a 30-min schedule.**
+  Once the cron runner is set up (Railway-side or via the existing
+  `cron_routes.py` daily scheduler), point it at the synthetic monitor
+  endpoint with `Authorization: Bearer $CRON_SECRET`.
+- [ ] **Wire `log_replayable_ai_call` into the other critical AI
+  decision paths.** Phase 103 covers pre-submit prediction; reviewer
+  scoring, application autoscoring, and grant-evaluation calls are
+  the next-priority sites so future disputes there are also
+  replayable. Each is a ~5-line wrap of the existing AI call.
+
+Phase 101–106 still-deferred items (subset of what's still genuinely
+multi-week or non-code):
+- Live tuning of the AI pre-submit prompt against past
+  applications + reviewer scores. The v1 prompt shipped today is the
+  baseline.
+- Cross-link the audit chain UI's "view replay" affordance into the
+  Phase 102 surface. Currently admins navigate to `/admin/replay?seq=N`
+  directly; the affordance from the audit chain page would be a 5-line
+  link addition.
+
 Phase 100 still-deferred (subset of what's still genuinely multi-week):
 - Multi-key DID (key rotation that keeps prior VCs verifiable) —
   one PR, but only matters when there are external long-lived
