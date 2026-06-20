@@ -577,6 +577,24 @@ def _build_donor_stats(org_id):
     stats['reports_due_soon'] = report_status_map.get('submitted', 0)
     stats['flagged_compliance'] = 0  # placeholder
 
+    # Phase 259 — applications by primary sector across the donor's grants.
+    # Reads each org's primary sector.
+    sector_bucket = {}
+    apps_with_org = (
+        db.session.query(Application, Organization)
+        .join(Grant, Application.grant_id == Grant.id)
+        .join(Organization, Application.ngo_org_id == Organization.id)
+        .filter(Grant.donor_org_id == org_id)
+        .all()
+    )
+    for a, ngo in apps_with_org:
+        sect = (getattr(ngo, 'sector', None) or 'Unspecified').strip() or 'Unspecified'
+        sector_bucket[sect] = sector_bucket.get(sect, 0) + 1
+    stats['apps_by_sector'] = sorted(
+        [{'sector': k, 'count': v} for k, v in sector_bucket.items()],
+        key=lambda x: -x['count'],
+    )[:10]
+
     # Phase 220 — median decision time (submitted_at -> decision_recorded_at).
     deltas = db.session.query(
         Application.submitted_at, Application.decision_recorded_at,

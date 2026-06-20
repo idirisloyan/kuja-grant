@@ -584,6 +584,24 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 259-263 — Rollups + lifecycle:
+  (a) `_build_donor_stats` now also computes `apps_by_sector`
+  (top 10) joining Application → Grant → Organization. New
+  `<SectorRollupCard>` on donor dashboard with mini bars.
+  (b) `<PastDecisionsCard>` on NGO dashboard lists the 5 most
+  recent awarded/declined/rejected/revision_requested apps with
+  status pills + decision notes. (c) Reviewer review page gains
+  a "Save draft" button alongside Submit — calls PUT
+  `/api/reviews/<id>` with scores + comments (existing endpoint
+  flips status to 'in_progress' but never completes), shows
+  "Draft saved" pill on success. (d) Phase 262 (admin deferred-
+  items log) DEFERRED — the backlog markdown is a build-time
+  artifact, not a runtime data source; admins read it directly
+  in `docs/NEAR_BACKLOG.md`. (e) `<PostDeadlineCard>` on donor
+  dashboard cross-references grants + submitted applications and
+  surfaces grants whose deadline has passed with un-reviewed
+  submitted applications.
+
 - **2026-06-20** Phase 253-257 — Polished outputs + sharing: (a) New
   `grant_summary_pdf_service.py` + `GET /api/grants/<id>/summary.pdf`
   (donor + admin, owner-scoped) renders a 1-2 page reportlab PDF

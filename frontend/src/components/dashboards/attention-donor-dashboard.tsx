@@ -29,6 +29,8 @@ import { DonorStatusBreakdownCard } from '@/components/dashboards/donor-status-b
 import { DonorShortlistCard } from '@/components/dashboards/donor-shortlist-card';
 import { DecisionTimeCard } from '@/components/dashboards/decision-time-card';
 import { AwaitingDecisionCard } from '@/components/dashboards/awaiting-decision-card';
+import { SectorRollupCard } from '@/components/dashboards/sector-rollup-card';
+import { PostDeadlineCard } from '@/components/dashboards/post-deadline-card';
 import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
 import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
 import { PortfolioRiskHeatmap } from '@/components/dashboards/portfolio-risk-heatmap';
@@ -150,6 +152,10 @@ export function AttentionDonorDashboard() {
 
       {/* Phase 235 — applications scored, waiting on donor decision. */}
       <AwaitingDecisionCard />
+      {/* Phase 259 — applications by primary sector. */}
+      <SectorRollupCard />
+      {/* Phase 263 — grants past deadline with un-reviewed submitted apps. */}
+      <PostDeadlineCard />
 
       {/* Phase 99 — OneNumberCard portfolio at-a-glance row. Replaces the
           metric-soup pattern with three calm numbers + one next action

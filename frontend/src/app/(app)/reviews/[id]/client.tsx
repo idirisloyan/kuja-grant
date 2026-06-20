@@ -135,6 +135,9 @@ export default function ReviewDetailClient() {
   const [privateNotes, setPrivateNotes] = useState<string>('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [notesSaved, setNotesSaved] = useState(false);
+  // Phase 261 — save scores as a draft without submitting.
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [aiScoring, setAiScoring] = useState(false);
   // Per-criterion "Suggest rationale" loading state — separate from bulk
@@ -1056,6 +1059,40 @@ export default function ReviewDetailClient() {
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               {submitting ? t('review.submitting') : t('review.detail.submit_btn')}
             </button>
+            {/* Phase 261 — save scores as a draft without submitting. */}
+            {reviewId != null && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (savingDraft) return;
+                  setSavingDraft(true);
+                  try {
+                    const scoreMap: Record<string, number> = {};
+                    const commentMap: Record<string, string> = {};
+                    for (const [key, val] of Object.entries(scores)) {
+                      scoreMap[key] = val.score;
+                      commentMap[key] = val.comment;
+                    }
+                    await api.put(`/api/reviews/${reviewId}`, {
+                      scores: scoreMap, comments: commentMap,
+                    });
+                    setDraftSaved(true);
+                  } catch {
+                    toast.error('Could not save draft.');
+                  } finally {
+                    setSavingDraft(false);
+                  }
+                }}
+                disabled={savingDraft || criteria.length === 0}
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
+              >
+                {savingDraft ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Save draft
+              </button>
+            )}
+            {draftSaved && !savingDraft && (
+              <span className="text-[10px] text-emerald-600">Draft saved</span>
+            )}
           </div>
         </div>
       )}
