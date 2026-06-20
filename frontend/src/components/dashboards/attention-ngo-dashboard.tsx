@@ -35,6 +35,7 @@ import { ResumeBanner } from '@/components/dashboards/resume-banner';
 import { JourneyTracker } from '@/components/dashboards/journey-tracker';
 import { WatchedGrantsCard } from '@/components/dashboards/watched-grants-card';
 import { ImpactCard } from '@/components/dashboards/impact-card';
+import { NewGrantMatchesCard } from '@/components/dashboards/new-grant-matches-card';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -138,6 +139,8 @@ export function AttentionNgoDashboard() {
       <ResumeBanner />
       <PageAttention items={attention} />
 
+      {/* Phase 172 — saved-search match inbox. Self-gates when zero. */}
+      <NewGrantMatchesCard />
       {/* Phase 154 — rolling 12-month impact summary. Self-gates if zero activity. */}
       <ImpactCard />
       {/* Phase 148 — watchlist tile. Hidden when empty + no signal value. */}

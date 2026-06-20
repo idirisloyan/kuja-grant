@@ -93,6 +93,7 @@ def api_cron_health():
         'reviewer-auto-assign-sweep': (24, 'Nightly safety-net for reviewer assignment'),
         'uat-fixtures': (24, 'Self-healing demo fixtures for UAT'),
         'crisis-monitoring-draft': (24 * 7, 'Weekly Crisis Monitoring Report draft'),
+        'webhook-deliveries-cleanup': (24, 'Cap WebhookDelivery rows per hook to bound table size'),
     }
 
     from sqlalchemy import func as _f
@@ -410,4 +411,71 @@ def api_cron_crisis_monitoring_draft():
         })
     except Exception as e:
         logger.exception(f'crisis monitoring draft cron failed: {e}')
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/webhook-deliveries-cleanup', methods=['POST'])
+def api_cron_webhook_cleanup():
+    """Phase 171 — Keep only the last N WebhookDelivery rows per hook.
+
+    webhook_deliveries grows by one row per fan-out; even a modest
+    pipeline can hit hundreds of thousands quickly. We don't need
+    deeper history than the dashboard surfaces (last 20), so a hard
+    cap at 200 per hook gives ops 10x the visible window without
+    letting the table balloon.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    KEEP_PER_HOOK = 200
+    try:
+        from app.models import Webhook, WebhookDelivery, record_cron_run as _rcr
+        from sqlalchemy import select as _select
+        deleted_total = 0
+        hooks_swept = 0
+        for hook in Webhook.query.all():
+            # Find the row ids we want to KEEP — the last KEEP_PER_HOOK.
+            keep_ids = [
+                r[0] for r in db.session.execute(
+                    _select(WebhookDelivery.id)
+                    .where(WebhookDelivery.webhook_id == hook.id)
+                    .order_by(WebhookDelivery.delivered_at.desc())
+                    .limit(KEEP_PER_HOOK)
+                ).all()
+            ]
+            if not keep_ids:
+                continue
+            # Delete the older overflow.
+            n = (
+                WebhookDelivery.query
+                .filter_by(webhook_id=hook.id)
+                .filter(~WebhookDelivery.id.in_(keep_ids))
+                .delete(synchronize_session=False)
+            )
+            deleted_total += int(n or 0)
+            hooks_swept += 1
+        db.session.commit()
+        result = {
+            'hooks_swept': hooks_swept,
+            'rows_deleted': deleted_total,
+            'keep_per_hook': KEEP_PER_HOOK,
+        }
+        _rcr('webhook-deliveries-cleanup',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception(f'webhook deliveries cleanup cron failed: {e}')
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('webhook-deliveries-cleanup',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500

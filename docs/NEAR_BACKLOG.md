@@ -584,6 +584,20 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 169-173 — Reviewer-assigned notification on the
+  applicant NGO side (`application_under_review` notification fired
+  alongside the existing application.status flip). New
+  `saved_search_matches` notification category in the prefs system
+  (defaults to in_app only); Phase 167 fan-out now respects the
+  per-user preference. New `/api/cron/webhook-deliveries-cleanup`
+  caps WebhookDelivery rows at 200 per hook so the table doesn't
+  balloon; registered in cron-health. New `<NewGrantMatchesCard>` on
+  NGO dashboard surfaces unread `grant_published_match` notifications
+  as a dedicated tile. Webhook settings page got a per-event filter
+  dropdown (visible when >1 hook registered). Smoke test
+  NOTIFPREF-001 relaxed from rigid `== 4` to `>= 4` so adding a
+  category doesn't break the suite.
+
 - **2026-06-20** Phase 163-167 — Application revision UI: donor
   "Request revision" button with feedback dialog on application detail;
   NGO-side banner when `status === 'revision_requested'` surfaces the

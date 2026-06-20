@@ -138,6 +138,8 @@ export default function WebhooksSettingsPage() {
   const [creating, setCreating] = useState(false);
   const [createdSecret, setCreatedSecret] = useState<CreatedHook | null>(null);
   const [secretCopied, setSecretCopied] = useState(false);
+  // Phase 173 — filter the displayed hook list by event.
+  const [eventFilter, setEventFilter] = useState<string>('');
 
   const load = async () => {
     setLoading(true);
@@ -343,8 +345,28 @@ export default function WebhooksSettingsPage() {
           </Card>
         )}
 
+        {/* Phase 173 — event filter dropdown. Only meaningful when
+            multiple hooks exist. */}
+        {hooks.length > 1 && (
+          <div className="flex items-center gap-2 mb-3 text-xs">
+            <span className="text-muted-foreground">Filter by event:</span>
+            <select
+              value={eventFilter}
+              onChange={(e) => setEventFilter(e.target.value)}
+              className="rounded-md border border-border bg-background px-2 py-1"
+            >
+              <option value="">All events</option>
+              {events.map((e) => (
+                <option key={e} value={e}>{e}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="space-y-2">
-          {hooks.map((h) => {
+          {hooks
+            .filter((h) => !eventFilter || h.events.includes(eventFilter))
+            .map((h) => {
             const errorRate = h.delivery_count > 0
               ? Math.round(100 * h.failure_count / h.delivery_count)
               : 0;

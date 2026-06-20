@@ -88,6 +88,16 @@ def fan_out_for_grant(grant_id: int) -> int:
                 continue
             if owner.org_id == grant.donor_org_id:
                 continue
+            # Phase 170 — respect the per-user notification preference.
+            try:
+                from app.models import NotificationPreference
+                channels = NotificationPreference.channels_for(
+                    user_id=owner.id, category='saved_search_matches',
+                )
+                if 'in_app' not in channels:
+                    continue
+            except Exception:
+                pass
         except Exception:
             continue
         try:

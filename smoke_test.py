@@ -1737,14 +1737,18 @@ def make_tests(base):
     # --- Phase 6: Notification preferences + dispatcher ---
 
     def test_notif_prefs_default_shape():
-        """GET /api/notification-preferences returns all 4 categories with defaults."""
+        """GET /api/notification-preferences returns every category with defaults."""
         s = login_ok(base, USERS["ngo"])
         r = s.get(f"{base}/api/notification-preferences",
                   headers={"X-Requested-With": "XMLHttpRequest"}, timeout=10)
         assert r.status_code == 200, f"prefs GET: {r.status_code}: {r.text[:200]}"
         d = r.json()
         cats = d.get("categories", [])
-        assert len(cats) == 4, f"Expected 4 categories, got {len(cats)}"
+        # Phase 170 added 'saved_search_matches'; future categories will
+        # add more. We assert presence of the known set rather than a
+        # rigid count so the smoke doesn't break every time we extend
+        # the enum.
+        assert len(cats) >= 4, f"Expected at least 4 categories, got {len(cats)}"
         cat_names = {c.get("category") for c in cats}
         for expected in ("deadlines", "reviews", "compliance", "decisions"):
             assert expected in cat_names, f"Missing category: {expected}"

@@ -176,6 +176,27 @@ def api_create_review():
     db.session.commit()
 
     logger.info(f"Review assigned: app={application_id}, reviewer={reviewer_user_id}, review_id={review.id}")
+
+    # Phase 169 — notify the applicant NGO that their application is
+    # now actively being reviewed (without naming the reviewer, since
+    # the panel composition is private until decision).
+    try:
+        from app.models import Notification
+        import json as _json
+        n = Notification(
+            user_id=None,
+            org_id=application.ngo_org_id,
+            kind='application_under_review',
+            payload_json=_json.dumps({
+                'application_id': application.id,
+                'grant_id': application.grant_id,
+            }),
+        )
+        db.session.add(n)
+        db.session.commit()
+    except Exception as e:
+        logger.debug('under-review notification skipped: %s', e)
+
     return jsonify({'success': True, 'review': review.to_dict()}), 201
 
 
