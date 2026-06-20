@@ -456,6 +456,7 @@ interface PreSubmitData {
   fixes?: Fix[];
   rationale?: string | null;
   meta?: { fallback_used?: boolean; model?: string | null; fallback_from?: string | null } | null;
+  replay?: { ai_call_id: number | null } | null;
 }
 
 function ApplicationPreSubmitPreview({ applicationId }: { applicationId: number }) {
@@ -481,6 +482,7 @@ function ApplicationPreSubmitPreview({ applicationId }: { applicationId: number 
       fixes={data?.fixes}
       rationale={data?.rationale}
       meta={data?.meta}
+      callId={data?.replay?.ai_call_id ?? null}
       onFixIt={(f) => {
         // Jump to the responses tab + scroll to the field if present
         if (f.fieldId && typeof window !== 'undefined') {

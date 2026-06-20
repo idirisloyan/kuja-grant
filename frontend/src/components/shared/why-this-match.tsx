@@ -17,6 +17,7 @@
 
 import { Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AIFeedbackChip } from './ai-feedback-chip';
 
 export type ReasonFacet =
   | 'sector'
@@ -49,10 +50,12 @@ interface Props {
   reasons: Reason[];
   /** Optional dismissive copy, e.g. "(this match is automated; ask if unclear)". */
   caveat?: string;
+  /** Phase 125 — AI call id for an inline feedback chip. */
+  callId?: number | null;
   className?: string;
 }
 
-export function WhyThisMatch({ reasons, caveat, className }: Props) {
+export function WhyThisMatch({ reasons, caveat, callId, className }: Props) {
   if (!reasons || reasons.length === 0) return null;
 
   return (
@@ -82,6 +85,11 @@ export function WhyThisMatch({ reasons, caveat, className }: Props) {
       </ul>
       {caveat && (
         <p className="mt-2 text-[10px] italic text-muted-foreground">{caveat}</p>
+      )}
+      {callId != null && (
+        <div className="mt-2">
+          <AIFeedbackChip callId={callId} surfaceLabel="match explanation" />
+        </div>
       )}
     </div>
   );

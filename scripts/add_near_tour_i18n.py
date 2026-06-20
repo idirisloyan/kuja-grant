@@ -1,0 +1,173 @@
+"""One-shot helper to insert Phase 123 NEAR tour i18n keys into every locale file.
+
+Idempotent: if a key already exists, leaves it alone.
+"""
+import json
+import os
+
+ROOT = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'src', 'i18n')
+
+# Locale → 11 strings per key. Hand-translated; not machine-translated.
+# Format: (key, en, fr, ar, sw, so, es)
+ROWS = [
+    ('tour.near.ngo.welcome.title',
+     'Welcome to {network}',
+     'Bienvenue dans {network}',
+     'مرحبا بكم في {network}',
+     'Karibu kwenye {network}',
+     'Ku soo dhowoow {network}',
+     'Bienvenido a {network}'),
+    ('tour.near.ngo.welcome.body',
+     "You're a member of this network. This dashboard surfaces your active grants, what's due, and where the network needs you.",
+     "Vous êtes membre de ce réseau. Ce tableau de bord affiche vos subventions actives, vos échéances et là où le réseau a besoin de vous.",
+     'أنت عضو في هذه الشبكة. تعرض هذه اللوحة المنح النشطة والمواعيد النهائية ومتطلبات الشبكة.',
+     'Wewe ni mwanachama wa mtandao huu. Dashibodi hii inaonyesha ruzuku zako, ratiba na pale mtandao unakuhitaji.',
+     'Waxaad xubin ka tahay shabakaddan. Dashboard-kani waxay muujinaysaa deeqaha aad heshay, waxa la rabo, iyo halka shabakadu kaa rabto.',
+     'Eres miembro de esta red. Este panel muestra tus becas activas, los vencimientos y dónde te necesita la red.'),
+    ('tour.near.ngo.capacity.title',
+     'Capacity assessment',
+     'Évaluation des capacités',
+     'تقييم القدرات',
+     'Tathmini ya uwezo',
+     'Qiimaynta awoodda',
+     'Evaluación de capacidad'),
+    ('tour.near.ngo.capacity.body',
+     'The capacity framework drives your eligibility. Take it during onboarding and refresh annually — the Oversight Body sees your score.',
+     "Le cadre de capacités définit votre éligibilité. Complétez-le lors de l'intégration et mettez-le à jour chaque année — l'organe de supervision voit votre score.",
+     'يحدد إطار القدرات أهليتك. أكمله أثناء التهيئة وحدّثه سنويا — تستطيع هيئة الإشراف رؤية درجتك.',
+     'Mfumo wa uwezo unaamua ustahiki wako. Ufanye wakati wa kuanza na ufanye upya kila mwaka — Bodi ya Usimamizi inaona alama yako.',
+     'Qaab dhismeedka awoodda ayaa go\'aamiya u-qalmistaada. Ka qaad inta lagu jiro qabqabashada oo cusboonaysii sannad walba — Guddiga Kormeerka ayaa arka natijadaada.',
+     'El marco de capacidades determina tu elegibilidad. Realízalo durante la incorporación y actualízalo cada año — el Órgano de Supervisión ve tu puntuación.'),
+    ('tour.near.ngo.compliance.title',
+     'Compliance & reporting',
+     'Conformité et rapports',
+     'الامتثال والتقارير',
+     'Utii na ripoti',
+     'U-hoggaansanaanta iyo warbixinta',
+     'Cumplimiento e informes'),
+    ('tour.near.ngo.compliance.body',
+     'Reports are grouped by grant. Submit progress, financial, and final reports straight from each grant card; deadlines are colour-coded.',
+     'Les rapports sont regroupés par subvention. Envoyez les rapports de progression, financiers et finaux depuis chaque carte ; les échéances sont codées par couleur.',
+     'يتم تجميع التقارير حسب المنحة. أرسل تقارير التقدم والتقارير المالية والنهائية مباشرة من بطاقة كل منحة؛ المواعيد النهائية مرمزة بالألوان.',
+     'Ripoti zimegawanywa kwa ruzuku. Tuma ripoti za maendeleo, fedha, na za mwisho moja kwa moja kutoka kwa kila kadi ya ruzuku; tarehe za mwisho zina rangi.',
+     'Warbixinada waxaa loo kala saaray deeqaha. Soo dir warbixinada horumarka, kuwa maaliyadda iyo kuwa kama dambeysa toos ka kaadhka deeqda kasta; muddooyinka waa la midabbeeyey.',
+     'Los informes se agrupan por beca. Envía los informes de progreso, financieros y finales directamente desde cada tarjeta; los plazos están codificados por colores.'),
+    ('tour.near.ngo.copilot.title',
+     'Co-pilot',
+     'Co-pilote',
+     'المساعد',
+     'Mshirika',
+     'Kaaliye',
+     'Copiloto'),
+    ('tour.near.ngo.copilot.body',
+     'Ask anything about your obligations, declarations you can apply to, or how to read your scores.',
+     'Posez vos questions sur vos obligations, les déclarations auxquelles vous pouvez postuler ou la lecture de vos scores.',
+     'اسأل أي شيء عن التزاماتك، الإعلانات التي يمكنك التقديم لها، أو كيفية قراءة درجاتك.',
+     'Uliza chochote kuhusu majukumu yako, matamko unayoweza kuomba, au jinsi ya kusoma alama zako.',
+     'Wax kasta weydii xilliyada saaran, ku-dhawaaqyada aad codsan kartid, ama sida loo akhriyo natiijadaada.',
+     'Pregunta cualquier cosa sobre tus obligaciones, declaraciones a las que puedes postularte o cómo leer tus puntuaciones.'),
+    ('tour.near.admin.console.title',
+     '{network} operator console',
+     "Console d'opérateur {network}",
+     'وحدة تحكم مشغل {network}',
+     'Konsoli ya msimamizi {network}',
+     'Konsole-ka maamulaha {network}',
+     'Consola del operador {network}'),
+    ('tour.near.admin.console.body',
+     "This is your control panel: membership pipeline, active declarations, the Change Fund pulse, and the Crisis Monitoring Report at a glance.",
+     "Voici votre panneau de contrôle : pipeline d'adhésion, déclarations actives, pouls du Fonds de Changement, et rapport de suivi des crises.",
+     'هذه هي لوحة التحكم: مسار العضوية، الإعلانات النشطة، نبض صندوق التغيير، وتقرير رصد الأزمات في لمحة.',
+     'Hii ni dashibodi yako: bomba la uanachama, matamko ya sasa, Mfuko wa Mabadiliko, na Ripoti ya Ufuatiliaji wa Migogoro.',
+     "Tani waa shaybaadhka maaree: tubada xubinnimada, ku-dhawaaqyada firfircoon, garaaca Sanduuqa Isbeddelka, iyo Warbixinta Kormeerka Xaaladaha Degdegga.",
+     'Este es tu panel de control: tramitación de afiliaciones, declaraciones activas, el Fondo de Cambio y el Informe de Monitoreo de Crisis de un vistazo.'),
+    ('tour.near.admin.crisis.title',
+     'Crisis monitoring',
+     'Suivi des crises',
+     'رصد الأزمات',
+     'Ufuatiliaji wa migogoro',
+     'Kormeerka xaaladaha degdegga',
+     'Monitoreo de crisis'),
+    ('tour.near.admin.crisis.body',
+     'The OB reviews active crises weekly. Rows with a high composite score (HDI + government capacity + people impacted + attention level) become declaration candidates.',
+     'L\'organe de supervision examine chaque semaine les crises actives. Les lignes avec un score composite élevé (IDH + capacité gouvernementale + personnes impactées + niveau d\'attention) deviennent des candidates à la déclaration.',
+     'تراجع هيئة الإشراف الأزمات النشطة أسبوعيا. الصفوف ذات الدرجة المركبة العالية (مؤشر التنمية البشرية + قدرة الحكومة + الأشخاص المتأثرون + مستوى الاهتمام) تصبح مرشحة للإعلان.',
+     'Bodi ya Usimamizi inakagua migogoro hai kila wiki. Safu zenye alama ya juu (HDI + uwezo wa serikali + watu walioathiriwa + kiwango cha tahadhari) huwa wagombea wa tamko.',
+     'Guddiga Kormeerka wuxuu dib u eegaa xaaladaha degdegga ah toddobaadkii. Safafka leh natiijada sare (HDI + awoodda dawladda + dadka saameeyay + heerka feejignaanta) ayaa noqda musharaxiinta ku-dhawaaqista.',
+     'El Órgano de Supervisión revisa las crisis activas semanalmente. Las filas con puntuación compuesta alta (IDH + capacidad gubernamental + personas impactadas + nivel de atención) se convierten en candidatas a declaración.'),
+    ('tour.near.admin.memberships.title',
+     'Membership reviews',
+     "Revues d'adhésion",
+     'مراجعات العضوية',
+     'Mapitio ya uanachama',
+     'Dib u eegista xubinnimada',
+     'Revisiones de membresía'),
+    ('tour.near.admin.memberships.body',
+     'New applications need OB review. Run the trust process (sanctions, registry, adverse media) and check the capacity assessment before approving.',
+     "Les nouvelles candidatures nécessitent un examen de l'organe de supervision. Lancez le processus de confiance (sanctions, registre, médias défavorables) et vérifiez l'évaluation des capacités avant d'approuver.",
+     'تتطلب الطلبات الجديدة مراجعة هيئة الإشراف. شغّل عملية الثقة (العقوبات، السجل، الإعلام السلبي) وتحقق من تقييم القدرات قبل الموافقة.',
+     'Maombi mapya yanahitaji mapitio ya Bodi ya Usimamizi. Endesha mchakato wa imani (vikwazo, daftari, vyombo vya habari) na ukague tathmini ya uwezo kabla ya kupitisha.',
+     'Codsiyada cusub waxay u baahan yihiin dib u eegis Guddiga Kormeerka. Ka maamul habka kalsoonida (cunaqabateynta, diiwaanka, warbaahinta xun) oo hubi qiimaynta awoodda ka hor ansixinta.',
+     'Las nuevas solicitudes requieren revisión del Órgano de Supervisión. Ejecuta el proceso de confianza (sanciones, registro, medios adversos) y verifica la evaluación de capacidad antes de aprobar.'),
+    ('tour.near.admin.declarations.title',
+     'Emergency declarations',
+     'Déclarations d\'urgence',
+     'إعلانات الطوارئ',
+     'Matamko ya dharura',
+     'Ku-dhawaaqyada degdegga',
+     'Declaraciones de emergencia'),
+    ('tour.near.admin.declarations.body',
+     'Multi-signature with COI recusal — every signature is audit-anchored. Activated declarations auto-create shortlisted grants ready for release.',
+     "Multi-signature avec récusation pour conflit d'intérêts — chaque signature est ancrée à l'audit. Les déclarations activées créent automatiquement des subventions présélectionnées prêtes à être libérées.",
+     'متعدد التوقيع مع تنحي بسبب تضارب المصالح — كل توقيع موثق في سجل التدقيق. الإعلانات المفعلة تنشئ تلقائيا منحا مختصرة جاهزة للإصدار.',
+     'Saini nyingi na kujiondoa kwa mgongano wa maslahi — kila saini imetiwa nanga ya ukaguzi. Matamko yaliyowezeshwa huunda ruzuku zilizoteuliwa tayari kutolewa.',
+     'Saxiixyo badan oo leh ka-baxa COI — saxiixa kasta waxaa lagu daawanaa hanjabaadda. Ku-dhawaaqyada la firfircooneeyay si toos ah ayey u abuuraan deeqaha la doortay si la sii daayo.',
+     'Multifirma con recusación por conflicto de interés — cada firma queda anclada al registro de auditoría. Las declaraciones activadas crean automáticamente becas preseleccionadas listas para liberar.'),
+    ('tour.near.reviewer.welcome.title',
+     'Welcome to {network}',
+     'Bienvenue dans {network}',
+     'مرحبا بكم في {network}',
+     'Karibu kwenye {network}',
+     'Ku soo dhowoow {network}',
+     'Bienvenido a {network}'),
+    ('tour.near.reviewer.welcome.body',
+     "{network} is a closed network — reviewers operate through the OB workflow rather than independent panels.",
+     "{network} est un réseau fermé — les évaluateurs opèrent via le flux de travail de l'organe de supervision plutôt que via des panels indépendants.",
+     '{network} هي شبكة مغلقة — يعمل المراجعون من خلال سير عمل هيئة الإشراف بدلا من لوحات مستقلة.',
+     '{network} ni mtandao uliofungwa — wakaguzi hufanya kazi kupitia mtiririko wa Bodi ya Usimamizi badala ya paneli huru.',
+     '{network} waa shabakad xiran — dib u eegayaasha waxay u shaqeeyaan habka shaqada Guddiga Kormeerka halkii ay ka shaqayn lahaayeen guddiyo madax-bannaan.',
+     '{network} es una red cerrada — los revisores operan a través del flujo del Órgano de Supervisión en lugar de paneles independientes.'),
+    ('tour.near.donor.welcome.title',
+     'Welcome to {network}',
+     'Bienvenue dans {network}',
+     'مرحبا بكم في {network}',
+     'Karibu kwenye {network}',
+     'Ku soo dhowoow {network}',
+     'Bienvenido a {network}'),
+    ('tour.near.donor.welcome.body',
+     "{network} is its own donor: there's no separate donor role here. Use the operator console to manage funds.",
+     "{network} est son propre donateur : il n'y a pas de rôle de donateur séparé ici. Utilisez la console d'opérateur pour gérer les fonds.",
+     '{network} هي مانح بحد ذاتها: لا يوجد دور مانح منفصل هنا. استخدم وحدة تحكم المشغل لإدارة الأموال.',
+     '{network} ni mfadhili wake mwenyewe: hakuna jukumu la mfadhili tofauti hapa. Tumia konsoli ya msimamizi kusimamia fedha.',
+     '{network} waxay tahay deeq-bixiyaha laftiisa: ma jiro doorka deeq-bixiye gooni ah halkan. Isticmaal konsole-ka maamulaha si aad u maamusho deeqaha.',
+     '{network} es su propio donante: no hay un rol de donante separado aquí. Usa la consola del operador para gestionar los fondos.'),
+]
+
+LOCALE_IDX = {'en': 1, 'fr': 2, 'ar': 3, 'sw': 4, 'so': 5, 'es': 6}
+
+for locale, idx in LOCALE_IDX.items():
+    path = os.path.join(ROOT, f'{locale}.json')
+    with open(path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    added = 0
+    for row in ROWS:
+        key = row[0]
+        val = row[idx]
+        if key not in data:
+            data[key] = val
+            added += 1
+    # Stable sort: keep keys in alphabetical order for cleaner diffs.
+    data = {k: data[k] for k in sorted(data.keys())}
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write('\n')
+    print(f'{locale}: added {added} keys')

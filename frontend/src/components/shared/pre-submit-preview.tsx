@@ -22,6 +22,7 @@ import { Sparkles, TrendingUp, Wrench, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AIConfidenceBadge } from './ai-confidence-badge';
 import { AIFallbackNotice } from './ai-fallback-notice';
+import { AIFeedbackChip } from './ai-feedback-chip';
 import { cn } from '@/lib/utils';
 
 export interface Fix {
@@ -47,6 +48,8 @@ interface Props {
   rationale?: string | null;
   /** AI call meta — used to render the fallback notice. */
   meta?: { fallback_used?: boolean; model?: string | null; fallback_from?: string | null } | null;
+  /** Phase 125 — AI call id for the helpfulness chip. */
+  callId?: number | null;
   /** Called when the user clicks "Submit anyway" / "I'll fix first". */
   onSubmitAnyway?: () => void;
   onFixIt?: (fix: Fix) => void;
@@ -60,6 +63,7 @@ export function PreSubmitPreview({
   fixes,
   rationale,
   meta,
+  callId,
   onSubmitAnyway,
   onFixIt,
   className,
@@ -176,17 +180,23 @@ export function PreSubmitPreview({
         </div>
       )}
 
-      {onSubmitAnyway && (
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          onClick={onSubmitAnyway}
-          className="h-7 text-xs text-muted-foreground"
-        >
-          Submit anyway
-        </Button>
-      )}
+      <div className="flex items-center justify-between gap-2">
+        {onSubmitAnyway && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={onSubmitAnyway}
+            className="h-7 text-xs text-muted-foreground"
+          >
+            Submit anyway
+          </Button>
+        )}
+        {/* Phase 125 — AI feedback chip on pre-submit predictions. */}
+        {callId != null && (
+          <AIFeedbackChip callId={callId} surfaceLabel="pre-submit preview" />
+        )}
+      </div>
     </div>
   );
 }

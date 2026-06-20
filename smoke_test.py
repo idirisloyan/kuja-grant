@@ -211,7 +211,26 @@ def make_tests(base):
             f"admin /pending returned {r2.status_code}: {r2.text[:200]}"
         data = r2.json()
         assert data.get("success") is True
-        assert isinstance(data.get("memberships"), list)
+        rows = data.get("memberships")
+        assert isinstance(rows, list)
+        # Phase 124 — pin the row shape so the frontend doesn't break
+        # silently when backend serializer drifts. Every row must
+        # expose these keys for /admin/network-memberships to render.
+        REQUIRED_KEYS = {
+            "id", "org_id", "network_id", "status",
+            "member_tier", "applied_at",
+        }
+        for row in rows[:5]:  # spot-check first five
+            missing = REQUIRED_KEYS - set(row.keys())
+            assert not missing, (
+                f"membership row missing keys {missing}; got keys={list(row.keys())}"
+            )
+            assert isinstance(row["id"], int), "id must be int"
+            assert isinstance(row["status"], str), "status must be string"
+            assert row["status"] in (
+                "pending", "under_review", "active",
+                "rejected", "suspended", "expelled",
+            ), f"unexpected status value: {row['status']}"
     tests.append(("Membership /pending gated to admin", test_membership_pending_admin_only))
 
     # --- NEAR redesign: admin-run trust process ---

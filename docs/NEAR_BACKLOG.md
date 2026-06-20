@@ -584,6 +584,19 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-19** Phase 121-125 — Branded HTML decision-email template
+  (EmailService.send + _send_smtp + _send_sendgrid now accept html_body;
+  membership decision sender renders via app.services.email_templates).
+  Bulk membership decision endpoint `/api/network/membership/bulk-decision`
+  (approves/rejects up to 100 rows per call, audit-chain per row, single
+  commit + best-effort per-row notify). Bulk-select + bulk-action bar on
+  /admin/network-memberships with checkbox column on each decidable row.
+  NEAR onboarding tour fully localised: 20 keys added across en/fr/ar/sw/so/es
+  with `{network}` interpolation, TourStep gained `titleArgs`/`bodyArgs`.
+  Smoke test now pins membership listing route row shape (required keys
+  + status enum). AIFeedbackChip wired on 3 surfaces: portfolio-qa
+  (Phase 116), pre-submit-preview, WhyThisMatch.
+
 - **2026-06-19** Phase 114-119 — Retire `is_oversight_body_member()`
   admin shortcut (admins no longer get phantom OB seats on every
   network; emergency-declaration + network-membership endpoints opt in

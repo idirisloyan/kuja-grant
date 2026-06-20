@@ -37,9 +37,14 @@ def _from_name() -> str:
 class EmailService:
 
     @classmethod
-    def send(cls, *, to: str, subject: str, body: str) -> dict:
-        """Send a plain-text email. Returns:
+    def send(cls, *, to: str, subject: str, body: str, html_body: str | None = None) -> dict:
+        """Send an email. Returns:
           { success, transport: 'sendgrid'|'smtp'|'log', message_id?, error? }
+
+        Phase 121 — optional html_body. When set, the email is multipart
+        (text/plain + text/html) so clients that render HTML get the
+        branded version while plain-text clients still get the body
+        fallback.
         """
         if not to or '@' not in to:
             return {'success': False, 'transport': None,
@@ -47,13 +52,13 @@ class EmailService:
 
         # 1. SendGrid first if configured
         if os.getenv('SENDGRID_API_KEY'):
-            r = cls._send_sendgrid(to=to, subject=subject, body=body)
+            r = cls._send_sendgrid(to=to, subject=subject, body=body, html_body=html_body)
             r['transport'] = 'sendgrid'
             return r
 
         # 2. SMTP fallback if configured
         if os.getenv('SMTP_HOST'):
-            r = cls._send_smtp(to=to, subject=subject, body=body)
+            r = cls._send_smtp(to=to, subject=subject, body=body, html_body=html_body)
             r['transport'] = 'smtp'
             return r
 
@@ -67,7 +72,7 @@ class EmailService:
     # ------------------------------------------------------------------
 
     @classmethod
-    def _send_sendgrid(cls, *, to: str, subject: str, body: str) -> dict:
+    def _send_sendgrid(cls, *, to: str, subject: str, body: str, html_body: str | None = None) -> dict:
         """SendGrid v3 Web API. We POST directly via requests so we
         don't take on a sendgrid SDK dependency."""
         try:
@@ -85,6 +90,8 @@ class EmailService:
             'subject': subject[:200],
             'content': [{'type': 'text/plain', 'value': body or ''}],
         }
+        if html_body:
+            payload['content'].append({'type': 'text/html', 'value': html_body})
         try:
             resp = requests.post(
                 'https://api.sendgrid.com/v3/mail/send',
@@ -112,7 +119,7 @@ class EmailService:
             return {'success': False, 'error': str(e)[:200]}
 
     @classmethod
-    def _send_smtp(cls, *, to: str, subject: str, body: str) -> dict:
+    def _send_smtp(cls, *, to: str, subject: str, body: str, html_body: str | None = None) -> dict:
         """Plain SMTP. Use STARTTLS if SMTP_TLS=1; PLAIN auth via SMTP_USER/PASS."""
         host = os.getenv('SMTP_HOST', '')
         if not host:
@@ -130,6 +137,8 @@ class EmailService:
         msg['To'] = to
         msg['Subject'] = subject[:200]
         msg.attach(MIMEText(body or '', 'plain', 'utf-8'))
+        if html_body:
+            msg.attach(MIMEText(html_body, 'html', 'utf-8'))
 
         try:
             with smtplib.SMTP(host, port, timeout=15) as server:

@@ -87,11 +87,29 @@ def _notify_membership_decision(membership, *, decision: str, reason: str | None
                 f"questions about the decision.\n\n"
                 f"— {net_name} secretariat"
             )
+        # Phase 121 — render branded HTML version alongside the text body.
+        html_body = None
+        try:
+            from app.services.email_templates import membership_decision_html
+            applicant_org = None
+            try:
+                applicant_org = Organization.query.get(membership.org_id)
+            except Exception:
+                pass
+            html_body = membership_decision_html(
+                network_name=net_name,
+                applicant_org_name=getattr(applicant_org, 'name', None),
+                decision=decision,
+                reason=reason,
+            )
+        except Exception as e:
+            logger.debug("html template render skipped: %s", e)
+
         for u in recipients:
-            r = EmailService.send(to=u.email, subject=subject, body=body)
+            r = EmailService.send(to=u.email, subject=subject, body=body, html_body=html_body)
             logger.info(
-                "membership.notify decision=%s to=%s transport=%s success=%s",
-                decision, u.email, r.get("transport"), r.get("success"),
+                "membership.notify decision=%s to=%s transport=%s success=%s html=%s",
+                decision, u.email, r.get("transport"), r.get("success"), bool(html_body),
             )
     except Exception as e:
         logger.warning("membership.notify failed: %s", e)
@@ -468,6 +486,126 @@ def api_reject_membership(membership_id):
     db.session.commit()
     _notify_membership_decision(m, decision="rejected", reason=reason)
     return jsonify({"success": True, "membership": m.to_dict()})
+
+
+@network_membership_bp.route("/bulk-decision", methods=["POST"])
+@ob_required(allow_admin_override=True)
+def api_bulk_membership_decision():
+    """Phase 122 — Approve or reject multiple memberships in one call.
+
+    Body:
+      {
+        "decision": "approved" | "rejected",
+        "membership_ids": [1, 2, 3, ...],
+        "reason": "...",          # required when decision == 'rejected'
+        "cooldown_months": 6      # optional, default 6 (rejection only)
+      }
+
+    Returns per-id success + error so the UI can flag partial failures.
+    All sends fire AuditChainEntry via the state-machine method on
+    NetworkMembership; bulk doesn't bypass per-row auditing.
+    """
+    data = get_request_json() or {}
+    decision = (data.get("decision") or "").strip().lower()
+    if decision not in ("approved", "rejected"):
+        return jsonify({
+            "success": False,
+            "error": "decision must be 'approved' or 'rejected'",
+        }), 400
+
+    raw_ids = data.get("membership_ids") or []
+    if not isinstance(raw_ids, list) or not raw_ids:
+        return jsonify({"success": False, "error": "membership_ids required"}), 400
+    if len(raw_ids) > 100:
+        return jsonify({
+            "success": False,
+            "error": "Bulk decision capped at 100 rows per call",
+        }), 400
+
+    reason = (data.get("reason") or "").strip()
+    cooldown_months = int(data.get("cooldown_months") or 6)
+    if decision == "rejected" and not reason:
+        return jsonify({
+            "success": False,
+            "error": "Reason is required when decision is 'rejected'",
+        }), 400
+
+    network_id = get_current_network_id()
+
+    results = []
+    success_count = 0
+    fail_count = 0
+
+    for mid_raw in raw_ids:
+        try:
+            mid = int(mid_raw)
+        except (TypeError, ValueError):
+            results.append({"id": mid_raw, "ok": False, "error": "invalid_id"})
+            fail_count += 1
+            continue
+        m = NetworkMembership.query.get(mid)
+        if not m:
+            results.append({"id": mid, "ok": False, "error": "not_found"})
+            fail_count += 1
+            continue
+        if network_id and m.network_id != network_id:
+            results.append({"id": mid, "ok": False, "error": "wrong_network"})
+            fail_count += 1
+            continue
+        try:
+            if decision == "approved":
+                ok = m.approve(
+                    by_user_id=current_user.id,
+                    actor_email=current_user.email,
+                )
+            else:
+                ok = m.reject(
+                    by_user_id=current_user.id,
+                    reason=reason,
+                    actor_email=current_user.email,
+                    cooldown_months=cooldown_months,
+                )
+            if not ok:
+                results.append({
+                    "id": mid, "ok": False,
+                    "error": f"invalid_status:{m.status}",
+                })
+                fail_count += 1
+                continue
+            results.append({"id": mid, "ok": True, "status": m.status})
+            success_count += 1
+        except Exception as e:
+            results.append({"id": mid, "ok": False, "error": str(e)[:120]})
+            fail_count += 1
+
+    # Single commit for the whole batch — atomic from the DB's POV.
+    db.session.commit()
+
+    # Notify per-row outside the transaction so a mail failure doesn't roll
+    # back the decisions.
+    for r in results:
+        if not r.get("ok"):
+            continue
+        try:
+            m = NetworkMembership.query.get(r["id"])
+            if m:
+                _notify_membership_decision(
+                    m, decision=decision,
+                    reason=reason if decision == "rejected" else None,
+                )
+        except Exception as e:
+            logger.warning("bulk notify failed mid=%s: %s", r.get("id"), e)
+
+    return jsonify({
+        "success": True,
+        "decision": decision,
+        "summary": {
+            "requested": len(raw_ids),
+            "succeeded": success_count,
+            "failed": fail_count,
+        },
+        "results": results,
+    })
 
 
 @network_membership_bp.route("/<int:membership_id>/suspend", methods=["POST"])

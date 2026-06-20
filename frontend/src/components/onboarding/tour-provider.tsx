@@ -26,9 +26,12 @@ import { Sparkles, X, ArrowRight } from 'lucide-react';
 interface TourStep {
   titleKey?: string;
   bodyKey?: string;
-  /** Literal text (NEAR tour). When set, takes precedence over the i18n keys. */
+  /** Literal text (legacy). When set, takes precedence over the i18n keys. */
   title?: string;
   body?: string;
+  /** Phase 123 — i18n interpolation args (e.g. {network: 'NEAR'}). */
+  titleArgs?: Record<string, string>;
+  bodyArgs?: Record<string, string>;
   /** Optional DOM selector; tooltip points at this element if found. */
   anchor?: string;
 }
@@ -61,55 +64,67 @@ const TOURS: Record<string, TourStep[]> = {
   ],
 };
 
-// NEAR-specific tours (closed network model). Hand-written copy rather
-// than i18n keys because NEAR UAT runs in English only; can be moved to
-// i18n if/when localised.
+// Phase 123 — NEAR tours moved to i18n keys. Steps reference keys so the
+// tour respects the user's locale (FR/AR/SW/SO/ES + EN). Each
+// `tour.near.<role>.<step>.title|body` key has translations in every
+// supported language file. `networkName` is still substituted into the
+// welcome line at render time.
 function nearTours(networkName: string): Record<string, TourStep[]> {
   return {
     ngo: [
       {
-        title: `Welcome to ${networkName}`,
-        body: `You're a NEAR member. This dashboard surfaces your active grants, what's due, and where the network needs you.`,
+        titleKey: 'tour.near.ngo.welcome.title',
+        bodyKey: 'tour.near.ngo.welcome.body',
+        titleArgs: { network: networkName },
       },
       {
-        title: 'Capacity assessment',
-        body: 'The NEAR capacity framework drives your eligibility. Take it during onboarding and refresh annually — the Oversight Body sees your score.',
+        titleKey: 'tour.near.ngo.capacity.title',
+        bodyKey: 'tour.near.ngo.capacity.body',
       },
       {
-        title: 'Compliance & reporting',
-        body: 'Reports are grouped by grant. Submit progress, financial, and final reports straight from each grant card; deadlines are colour-coded.',
+        titleKey: 'tour.near.ngo.compliance.title',
+        bodyKey: 'tour.near.ngo.compliance.body',
       },
       {
-        title: 'Co-pilot',
-        body: 'Ask anything about your obligations, declarations you can apply to, or how to read your scores.',
+        titleKey: 'tour.near.ngo.copilot.title',
+        bodyKey: 'tour.near.ngo.copilot.body',
         anchor: '[aria-label="Open co-pilot"]',
       },
     ],
     admin: [
       {
-        title: `${networkName} operator console`,
-        body: 'This is your control panel: membership pipeline, active declarations, the Change Fund pulse, and the Crisis Monitoring Report at a glance.',
+        titleKey: 'tour.near.admin.console.title',
+        bodyKey: 'tour.near.admin.console.body',
+        titleArgs: { network: networkName },
       },
       {
-        title: 'Crisis monitoring',
-        body: 'The OB reviews active crises weekly. Rows with a high composite score (HDI + government capacity + people impacted + attention level) become declaration candidates.',
+        titleKey: 'tour.near.admin.crisis.title',
+        bodyKey: 'tour.near.admin.crisis.body',
       },
       {
-        title: 'Membership reviews',
-        body: 'New applications need OB review. Run the trust process (sanctions, registry, adverse media) and check the capacity assessment before approving.',
+        titleKey: 'tour.near.admin.memberships.title',
+        bodyKey: 'tour.near.admin.memberships.body',
       },
       {
-        title: 'Emergency declarations',
-        body: 'Multi-signature with COI recusal — every signature is audit-anchored. Activated declarations auto-create shortlisted grants ready for release.',
+        titleKey: 'tour.near.admin.declarations.title',
+        bodyKey: 'tour.near.admin.declarations.body',
       },
     ],
-    // Reviewer + donor roles aren't part of the NEAR closed-network model;
-    // fall back to a single welcome step if they somehow appear.
     reviewer: [
-      { title: `Welcome to ${networkName}`, body: `${networkName} is a closed network — reviewers operate through the OB workflow rather than independent panels.` },
+      {
+        titleKey: 'tour.near.reviewer.welcome.title',
+        bodyKey: 'tour.near.reviewer.welcome.body',
+        titleArgs: { network: networkName },
+        bodyArgs: { network: networkName },
+      },
     ],
     donor: [
-      { title: `Welcome to ${networkName}`, body: `${networkName} is its own donor: there's no separate donor role here. Use the operator console to manage funds.` },
+      {
+        titleKey: 'tour.near.donor.welcome.title',
+        bodyKey: 'tour.near.donor.welcome.body',
+        titleArgs: { network: networkName },
+        bodyArgs: { network: networkName },
+      },
     ],
   };
 }
@@ -153,8 +168,8 @@ export function OnboardingTourProvider({ children }: { children: ReactNode }) {
   // tour ships i18n keys.
   const steps = useMemo(
     () => stepDefs.map((s) => ({
-      title: s.title ?? (s.titleKey ? t(s.titleKey) : ''),
-      body: s.body ?? (s.bodyKey ? t(s.bodyKey) : ''),
+      title: s.title ?? (s.titleKey ? t(s.titleKey, s.titleArgs) : ''),
+      body: s.body ?? (s.bodyKey ? t(s.bodyKey, s.bodyArgs) : ''),
       anchor: s.anchor,
     })),
     [stepDefs, t],

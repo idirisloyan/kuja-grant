@@ -39,6 +39,52 @@ export default function NetworkMembershipsAdminPage() {
   const network = useNetworkStore((s) => s.network);
   const [statusFilter, setStatusFilter] = useState('under_review');
   const { data, isLoading, mutate } = usePendingMemberships(statusFilter);
+  // Phase 122 — bulk-decision state.
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkRejectReason, setBulkRejectReason] = useState('');
+
+  const toggleSelect = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const bulkDecide = async (decision: 'approved' | 'rejected') => {
+    if (selected.size === 0 || bulkBusy) return;
+    if (decision === 'rejected' && !bulkRejectReason.trim()) {
+      toast.error('Add a rejection reason before bulk-rejecting.');
+      return;
+    }
+    if (!confirm(`${decision === 'approved' ? 'Approve' : 'Reject'} ${selected.size} membership${selected.size === 1 ? '' : 's'}?`)) return;
+    setBulkBusy(true);
+    try {
+      const res = await api.post<{ summary: { succeeded: number; failed: number } }>(
+        '/api/network/membership/bulk-decision',
+        {
+          decision,
+          membership_ids: Array.from(selected),
+          reason: decision === 'rejected' ? bulkRejectReason.trim() : undefined,
+        },
+      );
+      const { succeeded, failed } = res.summary;
+      toast.success(
+        failed === 0
+          ? `${succeeded} membership${succeeded === 1 ? '' : 's'} ${decision}.`
+          : `${succeeded} ${decision}, ${failed} failed.`,
+      );
+      setSelected(new Set());
+      setBulkRejectReason('');
+      mutate();
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Bulk decision failed';
+      toast.error(msg);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   if (viewer && viewer.role !== 'admin') {
     return (
@@ -114,33 +160,102 @@ export default function NetworkMembershipsAdminPage() {
         )}
 
         {!isLoading && rows.length > 0 && (
-          <div className="border border-border rounded-lg bg-card overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="text-left px-3 py-2">Org</th>
-                  <th className="text-left px-3 py-2">Country</th>
-                  <th className="text-left px-3 py-2">Tier</th>
-                  <th className="text-left px-3 py-2">Applied</th>
-                  <th className="text-left px-3 py-2">Status</th>
-                  <th className="text-left px-3 py-2">Capacity</th>
-                  <th className="text-right px-3 py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((m) => (
-                  <MembershipRow key={m.id} m={m} onChange={mutate} />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Phase 122 — Bulk action bar; appears when any row is selected. */}
+            {selected.size > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-[hsl(var(--kuja-clay))]/30 bg-[hsl(var(--kuja-clay))]/5 p-3 mb-3 text-xs">
+                <span className="font-semibold">
+                  {selected.size} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={() => bulkDecide('approved')}
+                  disabled={bulkBusy}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 text-white px-3 py-1.5 font-medium hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Approve all
+                </button>
+                <input
+                  type="text"
+                  value={bulkRejectReason}
+                  onChange={(e) => setBulkRejectReason(e.target.value)}
+                  placeholder="Rejection reason (required to reject)"
+                  className="flex-1 min-w-[200px] rounded-md border border-border bg-background px-2 py-1.5"
+                />
+                <button
+                  type="button"
+                  onClick={() => bulkDecide('rejected')}
+                  disabled={bulkBusy || !bulkRejectReason.trim()}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 text-white px-3 py-1.5 font-medium hover:bg-rose-700 disabled:opacity-50"
+                >
+                  <XCircle className="w-3.5 h-3.5" />
+                  Reject all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelected(new Set())}
+                  className="text-muted-foreground hover:text-foreground underline"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+
+            <div className="border border-border rounded-lg bg-card overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="text-left px-2 py-2 w-8">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all decidable"
+                        checked={rows.filter((m) => m.status === 'pending' || m.status === 'under_review').length > 0
+                          && rows.filter((m) => m.status === 'pending' || m.status === 'under_review').every((m) => selected.has(m.id))}
+                        onChange={(e) => {
+                          const decidableIds = rows
+                            .filter((m) => m.status === 'pending' || m.status === 'under_review')
+                            .map((m) => m.id);
+                          if (e.target.checked) setSelected(new Set(decidableIds));
+                          else setSelected(new Set());
+                        }}
+                      />
+                    </th>
+                    <th className="text-left px-3 py-2">Org</th>
+                    <th className="text-left px-3 py-2">Country</th>
+                    <th className="text-left px-3 py-2">Tier</th>
+                    <th className="text-left px-3 py-2">Applied</th>
+                    <th className="text-left px-3 py-2">Status</th>
+                    <th className="text-left px-3 py-2">Capacity</th>
+                    <th className="text-right px-3 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((m) => (
+                    <MembershipRow
+                      key={m.id}
+                      m={m}
+                      onChange={mutate}
+                      selected={selected.has(m.id)}
+                      onToggleSelect={() => toggleSelect(m.id)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </PageMain>
     </PageShell>
   );
 }
 
-function MembershipRow({ m, onChange }: { m: Membership; onChange: () => void }) {
+function MembershipRow({ m, onChange, selected, onToggleSelect }: {
+  m: Membership;
+  onChange: () => void;
+  selected?: boolean;
+  onToggleSelect?: () => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -199,6 +314,16 @@ function MembershipRow({ m, onChange }: { m: Membership; onChange: () => void })
   return (
     <>
       <tr className="border-t border-border align-top">
+        <td className="px-2 py-2">
+          {canDecide && onToggleSelect && (
+            <input
+              type="checkbox"
+              aria-label={`Select membership ${m.id}`}
+              checked={!!selected}
+              onChange={onToggleSelect}
+            />
+          )}
+        </td>
         <td className="px-3 py-2">
           <Link
             href={`/admin/network-memberships/${m.id}`}
