@@ -16,6 +16,7 @@ import { AiBadge } from '@/components/shared/ai-badge';
 import { DraftCoAuthor } from '@/components/apply/DraftCoAuthor';
 import { SmartDraftBanner } from '@/components/apply/SmartDraftBanner';
 import { TrustPortableBadge } from '@/components/shared/trust-portable-badge';
+import { PastApplicationsDrawer } from '@/components/apply/past-applications-drawer';
 import { AIToolsAccordion } from '@/components/shared/ai-tools-accordion';
 import { useAutosave } from '@/lib/hooks/use-autosave';
 import { getQuestionForLabel, getPlaceholderForLabel } from '@/lib/guided-questions';
@@ -1171,6 +1172,8 @@ function ProposalStep({
         <span className="text-[11px] text-muted-foreground">
           attached automatically with this application
         </span>
+        {/* Phase 179 — open a drawer of past awarded apps for re-use. */}
+        <PastApplicationsDrawer />
       </div>
 
       {/* Phase 130 — Beginner / expert disclosure toggle. Beginner mode

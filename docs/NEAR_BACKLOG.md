@@ -584,6 +584,24 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 175-179 — Reviewer page shows the donor's
+  scoring guidance (instructions + example) inline next to each
+  criterion as a collapsed details disclosure. Doc upload now
+  triggers an AdverseMediaService re-screen when `doc_type` is in
+  a compliance-relevant set (audit_report, mou, governance_doc,
+  policy_handbook, safeguarding_policy) + writes a
+  compliance_refreshed notification to the NGO. New
+  `POST /api/grants/<id>/duplicate` (donor/admin) clones an existing
+  grant into a fresh draft preserving every structured field
+  (criteria, eligibility, doc + reporting requirements) and resetting
+  status + deadline + published_at. New
+  `docs/WEBHOOK_VERIFICATION.md` documents the X-Kuja-Signature
+  HMAC-SHA256 scheme with Python (Flask) + Node (Express) + bash
+  examples plus retry semantics. New `<PastApplicationsDrawer>`
+  next to TrustPortableBadge on the apply page — opens a side
+  drawer of awarded apps the NGO can open in new tabs to re-use
+  successful language.
+
 - **2026-06-20** Phase 169-173 — Reviewer-assigned notification on the
   applicant NGO side (`application_under_review` notification fired
   alongside the existing application.status flip). New

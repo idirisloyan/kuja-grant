@@ -435,6 +435,35 @@ export default function ReviewDetailClient() {
                     <span className="kuja-severity kuja-severity-info">{c.weight}%</span>
                   </div>
                   {c.description && <p className="text-xs text-muted-foreground mb-2">{c.description}</p>}
+                  {/* Phase 175 — inline scoring guidance: instructions
+                      and example pulled from the donor's rubric so the
+                      reviewer doesn't have to context-switch back to
+                      the grant detail page. */}
+                  {(c.instructions || c.example) && (
+                    <details className="mb-2 text-xs">
+                      <summary className="cursor-pointer text-[hsl(var(--kuja-clay))] hover:underline">
+                        Scoring guidance
+                      </summary>
+                      <div className="mt-2 space-y-2 rounded-md border border-[hsl(var(--kuja-clay))]/30 bg-[hsl(var(--kuja-sand))]/40 p-3">
+                        {c.instructions && (
+                          <div>
+                            <div className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                              Instructions
+                            </div>
+                            <p className="whitespace-pre-wrap text-foreground">{c.instructions}</p>
+                          </div>
+                        )}
+                        {c.example && (
+                          <div>
+                            <div className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                              Example of a strong response
+                            </div>
+                            <p className="whitespace-pre-wrap italic text-foreground/80">{c.example}</p>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  )}
                   <div className="bg-muted/30 rounded-md p-3 text-sm whitespace-pre-wrap">
                     {responses[c.key] || (
                       <span className="italic text-muted-foreground">{t('review.detail.no_response')}</span>

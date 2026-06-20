@@ -220,6 +220,71 @@ def api_create_grant():
     return jsonify({'success': True, 'grant': grant.to_dict()}), 201
 
 
+@grants_bp.route('/<int:grant_id>/duplicate', methods=['POST'])
+@role_required('donor', 'admin')
+def api_duplicate_grant(grant_id):
+    """Phase 177 — Donor duplicates an existing grant into a new draft.
+
+    Carries over: title (suffixed " (copy)"), description, sectors,
+    countries, criteria, eligibility, doc_requirements,
+    reporting_requirements, report_template, reporting_frequency,
+    currency, total_funding. Resets: status='draft', deadline=null
+    (donor must set a fresh one), published_at=null.
+
+    Access: only the grant's owning donor org (or an admin).
+    """
+    original = db.session.get(Grant, grant_id)
+    if not original:
+        return jsonify({'error': 'Grant not found', 'success': False}), 404
+    if current_user.role == 'donor' and original.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'You can only duplicate your own grants', 'success': False}), 403
+
+    data = get_request_json() or {}
+    new_title = (data.get('title') or '').strip() or f'{original.title} (copy)'
+
+    copy = Grant(
+        donor_org_id=original.donor_org_id,
+        title=new_title[:500],
+        description=original.description or '',
+        total_funding=original.total_funding,
+        currency=original.currency or 'USD',
+        status='draft',
+    )
+    # Carry the structured fields without mutating the original. Each
+    # set_*() takes a list/dict and re-serialises.
+    try:
+        if original.sectors:
+            copy.set_sectors(original.sectors)
+        if original.countries:
+            copy.set_countries(original.countries)
+        elig = original.get_eligibility() if hasattr(original, 'get_eligibility') else None
+        if elig:
+            copy.set_eligibility(elig)
+        crits = original.get_criteria() if hasattr(original, 'get_criteria') else None
+        if crits:
+            copy.set_criteria(crits)
+        docs = original.get_doc_requirements() if hasattr(original, 'get_doc_requirements') else None
+        if docs:
+            copy.set_doc_requirements(docs)
+        rep = original.get_reporting_requirements() if hasattr(original, 'get_reporting_requirements') else None
+        if rep:
+            copy.set_reporting_requirements(rep)
+        rt = original.get_report_template() if hasattr(original, 'get_report_template') else None
+        if rt:
+            copy.set_report_template(rt)
+        if getattr(original, 'reporting_frequency', None):
+            copy.reporting_frequency = original.reporting_frequency
+    except Exception as e:
+        logger.warning('duplicate grant carry-over failed: %s', e)
+
+    db.session.add(copy)
+    db.session.commit()
+    logger.info(
+        f"Grant duplicated: src={original.id} -> new={copy.id} by user={current_user.email}"
+    )
+    return jsonify({'success': True, 'grant': copy.to_dict()}), 201
+
+
 @grants_bp.route('/<int:grant_id>', methods=['PUT'])
 @role_required('donor', 'admin')
 def api_update_grant(grant_id):

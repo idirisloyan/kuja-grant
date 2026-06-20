@@ -232,6 +232,10 @@ def api_upload_document():
     trace_id = document.extraction_trace_id
     logger.info(f"Document uploaded: {original_filename} (id={doc_id}, trace_id={trace_id}, AI analysis queued)")
 
+    # Phase 176 — capture uploader org id before crossing thread boundary
+    # (current_user is request-scoped and won't survive into the bg task).
+    uploader_org_id = current_user.org_id
+
     # Submit AI analysis as a background task so the upload response returns fast
     def _run_ai_analysis():
         from flask import current_app
@@ -263,6 +267,61 @@ def api_upload_document():
                         doc.extraction_used_native_pdf = True
                     db.session.commit()
                     logger.info(f"Document AI analysis complete: id={doc_id}, score={doc.score}, trace_id={trace_id}")
+
+                    # Phase 176 — re-run org compliance screen when a
+                    # compliance-relevant doc lands. Org membership +
+                    # registration verifications surface live status
+                    # off the latest AdverseMediaScreening row, so we
+                    # nudge a fresh one here.
+                    COMPLIANCE_DOC_TYPES = {
+                        'audit_report', 'audit', 'mou', 'governance_doc',
+                        'governance', 'policy_handbook',
+                        'beneficiary_data_policy', 'safeguarding_policy',
+                    }
+                    if doc_type in COMPLIANCE_DOC_TYPES and uploader_org_id:
+                        try:
+                            from app.services.adverse_media_service import AdverseMediaService
+                            from app.models import Organization as _Org, AdverseMediaScreening, Notification
+                            import json as _json
+                            org = db.session.get(_Org, uploader_org_id)
+                            if org and org.org_type == 'ngo':
+                                result = AdverseMediaService.screen(
+                                    org_name=org.name,
+                                    country=org.country,
+                                    sector=None,
+                                    leadership=None,
+                                )
+                                summary = {
+                                    'high_count': result.get('high_count') or 0,
+                                    'medium_count': result.get('medium_count') or 0,
+                                    'low_count': result.get('low_count') or 0,
+                                }
+                                ams = AdverseMediaScreening(
+                                    org_id=org.id,
+                                    status=result.get('status') or 'clean',
+                                    source='auto_rerun_post_upload',
+                                    summary_json=_json.dumps(summary),
+                                )
+                                db.session.add(ams)
+                                # Notify the NGO that their compliance state was refreshed.
+                                n = Notification(
+                                    user_id=None,
+                                    org_id=org.id,
+                                    kind='compliance_refreshed',
+                                    payload_json=_json.dumps({
+                                        'document_id': doc_id,
+                                        'doc_type': doc_type,
+                                        'status': result.get('status') or 'clean',
+                                        'summary': summary,
+                                    }),
+                                )
+                                db.session.add(n)
+                                db.session.commit()
+                                logger.info(
+                                    f"compliance re-screen after doc upload: org={org.id} status={result.get('status')}"
+                                )
+                        except Exception as _comp_e:
+                            logger.debug('compliance re-screen skipped: %s', _comp_e)
             except Exception as e:
                 logger.error(f"Background document analysis failed for id={doc_id} trace_id={trace_id}: {e}")
                 # Phase 13.5 — classify failure into PMO's vocabulary so
