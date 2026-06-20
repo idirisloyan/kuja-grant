@@ -69,6 +69,9 @@ def log_replayable_ai_call(
     error_message: str | None = None,
     subject_kind: str | None = None,
     subject_id: int | None = None,
+    org_id: int | None = None,
+    role: str | None = None,
+    language: str | None = None,
 ) -> int | None:
     """Log an AI call with full input/output text for later replay.
 
@@ -78,6 +81,27 @@ def log_replayable_ai_call(
     response can't blow up the DB.
     """
     MAX = 256 * 1024
+    # Resolve org_id from current_user if not provided. Cheap fallback
+    # so existing call sites don't need to thread it through.
+    if org_id is None:
+        try:
+            from flask_login import current_user as _cu
+            org_id = getattr(_cu, 'org_id', None)
+            if role is None:
+                role = getattr(_cu, 'role', None)
+        except Exception:
+            pass
+
+    # Estimate the USD cost from token counts.
+    usd_cost = None
+    try:
+        from app.services.ai_budget_service import AIBudgetService
+        usd_cost = AIBudgetService.estimate_call_usd(
+            int(tokens_in or 0), int(tokens_out or 0),
+        )
+    except Exception:
+        pass
+
     try:
         row = AICallLog(
             endpoint=endpoint[:80],
@@ -93,9 +117,24 @@ def log_replayable_ai_call(
             output_text=(output_text or '')[:MAX] or None,
             replay_subject_kind=(subject_kind or '')[:40] or None,
             replay_subject_id=subject_id,
+            org_id=org_id,
+            role=(role or '')[:20] or None,
+            language=(language or '')[:8] or None,
+            usd_cost=usd_cost,
         )
         db.session.add(row)
         db.session.commit()
+
+        # Phase 108 — fire the soft-cap notification when this call crosses
+        # the 75% threshold of the tenant's monthly cap. Cheap check: only
+        # fires when we have a meaningful usd_cost AND the org has a cap.
+        if usd_cost and org_id:
+            try:
+                from app.services.cost_ceiling_service import maybe_fire_threshold_notification
+                maybe_fire_threshold_notification(org_id)
+            except Exception as e:
+                logger.debug('cost ceiling notification skipped: %s', e)
+
         return row.id
     except Exception as e:
         logger.warning('replay_service log failed: %s', e)

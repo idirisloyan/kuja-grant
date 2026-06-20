@@ -30,6 +30,7 @@ import {
   Users, Sparkles, Loader2, CheckCircle2, Search, ShieldCheck,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
+import { VoiceFieldInput } from '@/components/shared/voice-field-input';
 import {
   useLatestCrisisReport, useCrisisReport, useFunds, useFund,
   useObRoster, type FundWindow, type CrisisRow, type ObRosterMember,
@@ -567,6 +568,14 @@ function Step2Declaration({ form, setForm }: { form: FormState; setForm: (f: For
             rows={5}
             className="w-full px-2 py-1.5 rounded-md border border-border bg-background text-sm"
           />
+          {/* Phase 110 — voice extension. */}
+          <div className="mt-2 flex justify-end">
+            <VoiceFieldInput
+              value={form.summary_md}
+              onChange={(next) => setForm({ ...form, summary_md: next })}
+              fieldLabel="Declaration summary"
+            />
+          </div>
         </Field>
       </div>
     </div>

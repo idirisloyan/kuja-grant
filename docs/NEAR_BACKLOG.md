@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-19** Phase 107-112 — Donor portfolio Q&A, per-tenant AI cost
+  ceiling + threshold notifications, PG CHECK constraints, voice on apply
+  + declaration fields, data-export download CTA + dark-mode toggle, real
+  match-engine-backed WhyThisMatch. New surfaces: `/portfolio-qa`,
+  `/admin/cost-ceiling`. New AICallLog columns: `org_id`, `role`,
+  `language`, `usd_cost`. `log_replayable_ai_call` now resolves org/role
+  from current_user, computes $ cost, and fires 75/90/100% threshold
+  notifications via `cost_ceiling_service`. PG CHECK constraints on
+  `grants.total_funding`, `applications.status` (when submitted_at set),
+  `reports.status` (when submitted_at set), `ai_call_logs.tokens_*`
+  non-negative — guarded by dialect check, won't break SQLite dev.
+  `<VoiceFieldInput>` chip wired on every apply textarea + declaration
+  summary. `<ThemeToggle>` in header cycles system → light → dark.
+  `/api/match/explain/<grant_id>` returns real-signal reasons (sector /
+  geography overlap, capacity fit, track record).
+
 - **2026-06-12** Phase 92 — Continuous NGO journey tracker.
   Highest-value product gap the team named. New
   GET /api/journey/me computes per-NGO stage state across 6 stages

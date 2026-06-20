@@ -8,7 +8,7 @@ import { COMMON_CURRENCIES } from '@/lib/currency';
 import { MyAIUsageCard } from '@/components/dashboards/my-ai-usage-card';
 import {
   Building2, Save, Loader2, CheckCircle, MapPin, Calendar,
-  DollarSign, Users, Target, Globe,
+  DollarSign, Users, Target, Globe, Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Organization } from '@/lib/types';
@@ -141,6 +141,18 @@ export default function OrgProfilePage() {
                 <CheckCircle className="h-4 w-4" /> {t('common.saved')}
               </span>
             )}
+            {/* Phase 111 — Discoverable data-export CTA. Phase 99
+                shipped the backend; without a button the CFO objection
+                answer was invisible. Adds the visible exit door. */}
+            <a
+              href="/api/exports/org-bundle?format=json-download"
+              download
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card text-sm font-medium px-3 py-2 hover:bg-muted text-foreground"
+              title="Download every record Kuja holds for your organization as JSON"
+            >
+              <Download className="h-4 w-4" />
+              Download my data
+            </a>
             <button
               type="button"
               onClick={handleSave}

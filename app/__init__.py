@@ -397,6 +397,86 @@ def create_app(config_name=None):
                     if 'replay_subject_id' not in aicall_cols:
                         conn.execute(text("ALTER TABLE ai_call_logs ADD COLUMN replay_subject_id INTEGER"))
                         added.append('ai_call_logs.replay_subject_id')
+                    # Phase 108 — per-tenant cost ceiling. ai_budget_service
+                    # has been querying ai_call_logs.org_id which never
+                    # existed (the try/except returned 0.0 silently). Add
+                    # org_id + role + language + usd_cost so the budget
+                    # service queries succeed and the new cost-ceiling
+                    # threshold notification has data to work with.
+                    if 'org_id' not in aicall_cols:
+                        conn.execute(text("ALTER TABLE ai_call_logs ADD COLUMN org_id INTEGER"))
+                        added.append('ai_call_logs.org_id')
+                    if 'role' not in aicall_cols:
+                        conn.execute(text("ALTER TABLE ai_call_logs ADD COLUMN role VARCHAR(20)"))
+                        added.append('ai_call_logs.role')
+                    if 'language' not in aicall_cols:
+                        conn.execute(text("ALTER TABLE ai_call_logs ADD COLUMN language VARCHAR(8)"))
+                        added.append('ai_call_logs.language')
+                    if 'usd_cost' not in aicall_cols:
+                        conn.execute(text("ALTER TABLE ai_call_logs ADD COLUMN usd_cost NUMERIC(12,6)"))
+                        added.append('ai_call_logs.usd_cost')
+
+                # Phase 108 — ensure organizations.ai_monthly_budget_usd
+                # exists. The column is on the model but if the table was
+                # created before the model field landed, it won't be in
+                # the DB (db.create_all doesn't alter existing tables).
+                if 'organizations' in tables:
+                    org_cols = {c['name'] for c in inspector.get_columns('organizations')}
+                    if 'ai_monthly_budget_usd' not in org_cols:
+                        conn.execute(text("ALTER TABLE organizations ADD COLUMN ai_monthly_budget_usd NUMERIC(12,2)"))
+                        added.append('organizations.ai_monthly_budget_usd')
+
+                # Phase 109 — DB integrity *constraints* (CHECKs). The
+                # Phase 99 /api/admin/integrity endpoint surfaces drift
+                # after it happens; these CHECKs prevent the drift at
+                # insert/update time. SQLite ignores CHECKs added via
+                # ALTER, so they're Postgres-only — guarded on dialect.
+                if db.engine.dialect.name == 'postgresql':
+                    def _check_exists(name: str) -> bool:
+                        try:
+                            r = conn.execute(text(
+                                "SELECT 1 FROM information_schema.table_constraints "
+                                "WHERE constraint_name = :n AND constraint_type = 'CHECK'"
+                            ), {'n': name}).first()
+                            return r is not None
+                        except Exception:
+                            return False
+
+                    checks = [
+                        ('ck_grants_total_funding_nonneg', 'grants',
+                         'CHECK (total_funding IS NULL OR total_funding >= 0)'),
+                        ('ck_applications_status_submission',
+                         'applications',
+                         "CHECK (submitted_at IS NULL OR status IN "
+                         "('submitted','approved','rejected','awarded',"
+                         "'in_review','under_review','scored','declined'))"),
+                        ('ck_reports_status_submission',
+                         'reports',
+                         "CHECK (submitted_at IS NULL OR status IN "
+                         "('submitted','scored','reviewed','accepted',"
+                         "'rejected','final'))"),
+                        ('ck_ai_call_logs_tokens_nonneg',
+                         'ai_call_logs',
+                         '''CHECK ((tokens_in IS NULL OR tokens_in >= 0)
+                                 AND (tokens_out IS NULL OR tokens_out >= 0))'''),
+                    ]
+                    for name, table, body in checks:
+                        if table not in tables:
+                            continue
+                        if _check_exists(name):
+                            continue
+                        try:
+                            conn.execute(text(
+                                f'ALTER TABLE {table} ADD CONSTRAINT {name} {body}'
+                            ))
+                            added.append(f'{table}.{name}')
+                        except Exception as e:
+                            # Adding a CHECK against existing bad data
+                            # fails. Log and continue — the operator can
+                            # clean the data and re-deploy.
+                            app.logger.warning(
+                                'Phase 109 CHECK %s skipped: %s', name, e,
+                            )
 
                 # Phase 13.15 — TOTP 2FA columns on users.
                 user_cols = {c['name'] for c in inspector.get_columns('users')}

@@ -19,6 +19,7 @@ import {
   Menu, LogOut, Sparkles, ChevronDown, User as UserIcon, Check, Globe, Search, Signal, SignalLow, Bell,
 } from 'lucide-react';
 import { ChangelogButton } from './ChangelogButton';
+import { ThemeToggle } from '@/components/shared/theme-toggle';
 
 export function Header() {
   const router = useRouter();
@@ -143,6 +144,9 @@ export function Header() {
 
         {/* Phase 13.16 — In-app changelog (sparkle + red dot when unread). */}
         <ChangelogButton />
+
+        {/* Phase 111 — App-wide theme toggle (system / light / dark). */}
+        <ThemeToggle />
 
         {/* Language picker */}
         <div className="relative" ref={langMenuRef}>

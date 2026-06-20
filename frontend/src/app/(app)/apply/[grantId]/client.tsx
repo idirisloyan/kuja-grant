@@ -5,6 +5,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { useParams, useRouter } from 'next/navigation';
 import { useGrant } from '@/lib/hooks/use-api';
 import { api, apiOffline } from '@/lib/api';
+import { VoiceFieldInput } from '@/components/shared/voice-field-input';
 import { toast } from 'sonner';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
@@ -1251,6 +1252,16 @@ function ProposalStep({
               onChange={(e) => onResponseChange(c.key, e.target.value)}
               className={TA_CLS}
             />
+
+            {/* Phase 110 — voice input chip. Self-gated to browsers
+                supporting Web Speech; absent silently otherwise. */}
+            <div className="mt-2 flex justify-end">
+              <VoiceFieldInput
+                value={text}
+                onChange={(next) => onResponseChange(c.key, next)}
+                fieldLabel={c.label}
+              />
+            </div>
 
             {/* Phase 19B — "from your past wins" suggester (zero AI cost,
                 lazy-loads only when the NGO opens the dropdown). */}

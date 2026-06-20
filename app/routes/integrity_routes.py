@@ -188,9 +188,38 @@ def api_integrity():
         })
         total += len(violations)
 
+    # Phase 109 — also surface the DB-level CHECK constraints that
+    # *prevent* the same drift at insert time. Lets the admin see at a
+    # glance which invariants are "guaranteed" vs "audited."
+    db_constraints = []
+    try:
+        if db.engine.dialect.name == 'postgresql':
+            rows = db.session.execute(db.text(
+                "SELECT tc.table_name, tc.constraint_name, cc.check_clause "
+                "FROM information_schema.table_constraints tc "
+                "JOIN information_schema.check_constraints cc "
+                "  ON tc.constraint_name = cc.constraint_name "
+                "WHERE tc.constraint_type = 'CHECK' "
+                "  AND tc.constraint_name LIKE 'ck_%' "
+                "ORDER BY tc.table_name, tc.constraint_name"
+            )).fetchall()
+            db_constraints = [
+                {'table': r[0], 'name': r[1], 'clause': str(r[2])[:240]}
+                for r in rows
+            ]
+        else:
+            db_constraints = [{
+                'table': '(skipped)',
+                'name': 'sqlite-dialect',
+                'clause': 'CHECK enforcement is Postgres-only in this app.',
+            }]
+    except Exception as e:
+        logger.warning('integrity CHECK reflection failed: %s', e)
+
     return jsonify({
         'success': True,
         'checks': results,
+        'db_constraints': db_constraints,
         'total_violations': total,
         'any_failed': any(not r.get('ok') for r in results),
     })

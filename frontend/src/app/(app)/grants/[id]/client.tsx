@@ -24,6 +24,62 @@ import {
 } from '@/components/layout/page-shell';
 import { describeGrantStatus } from '@/lib/status-copy';
 import { WhyThisMatch, type ReasonFacet } from '@/components/shared/why-this-match';
+import { api } from '@/lib/api';
+
+// Phase 112 — Live wrapper around WhyThisMatch. Calls /api/match/explain
+// for the calling NGO + grant, renders the resulting facets. While the
+// request is in flight we show the fallback (built from the grant's own
+// fields) so the callout doesn't pop in. On error we keep showing
+// fallback. The caveat copy honors whether reasons came from the engine.
+function WhyThisMatchLive({
+  grantId,
+  fallbackReasons,
+}: {
+  grantId: number;
+  fallbackReasons: Array<{ facet: ReasonFacet; value?: string }>;
+}) {
+  const [live, setLive] = useState<{
+    reasons: Array<{ facet: ReasonFacet; value?: string }>;
+    grounded: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<{
+        success: boolean;
+        reasons: Array<{ facet: ReasonFacet; value?: string }>;
+      }>(`/api/match/explain/${grantId}`)
+      .then((res) => {
+        if (cancelled) return;
+        if (res?.success && Array.isArray(res.reasons) && res.reasons.length > 0) {
+          setLive({ reasons: res.reasons, grounded: true });
+        } else {
+          setLive({ reasons: fallbackReasons, grounded: false });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLive({ reasons: fallbackReasons, grounded: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [grantId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const reasons = live?.reasons ?? fallbackReasons;
+  if (reasons.length === 0) return null;
+
+  return (
+    <WhyThisMatch
+      reasons={reasons}
+      caveat={
+        live?.grounded
+          ? 'Computed from your organization profile. Eligibility decisions are made by the donor.'
+          : 'Match is automated. Eligibility decisions are made by the donor.'
+      }
+    />
+  );
+}
 
 function formatFunding(amount: number | null, currency: string): string {
   if (!amount) return 'TBD';
@@ -177,30 +233,23 @@ export default function GrantDetailClient() {
       />
 
       <PageMain>
-        {/* Phase 98.6 — NGO-only "why this is a fit" callout. Transparent
-            matching builds trust and teaches NGOs what makes them fundable.
-            Reasons are computed from the grant + NGO Trust Profile match. */}
-        {isNgo && (() => {
-          const reasons: Array<{ facet: ReasonFacet; value?: string }> = [];
-          if (grant.countries && grant.countries.length > 0) {
-            reasons.push({ facet: 'country', value: grant.countries.slice(0, 2).join(', ') });
-          }
-          if (grant.sectors && grant.sectors.length > 0) {
-            reasons.push({ facet: 'sector', value: grant.sectors.slice(0, 2).join(', ') });
-          }
-          if (grant.total_funding != null) {
-            reasons.push({
-              facet: 'amount-band',
-              value: formatFunding(grant.total_funding, grant.currency ?? 'USD'),
-            });
-          }
-          return reasons.length > 0 ? (
-            <WhyThisMatch
-              reasons={reasons}
-              caveat="Match is automated. Eligibility decisions are made by the donor."
-            />
-          ) : null;
-        })()}
+        {/* Phase 112 — NGO-only "why this is a fit" callout. Now grounded
+            in real match-engine signals (sector/geography Jaccard, capacity
+            fit vs grant burden, awarded track record) via /api/match/explain
+            instead of the prior local heuristic that echoed the grant's
+            own fields. Falls back silently if the call fails. */}
+        {isNgo && id != null && (
+          <WhyThisMatchLive grantId={id} fallbackReasons={(() => {
+            const reasons: Array<{ facet: ReasonFacet; value?: string }> = [];
+            if (grant.countries && grant.countries.length > 0) {
+              reasons.push({ facet: 'country', value: grant.countries.slice(0, 2).join(', ') });
+            }
+            if (grant.sectors && grant.sectors.length > 0) {
+              reasons.push({ facet: 'sector', value: grant.sectors.slice(0, 2).join(', ') });
+            }
+            return reasons;
+          })()} />
+        )}
 
         {/* Tags row — kept near the top because they're identity / filter signals */}
         <div>

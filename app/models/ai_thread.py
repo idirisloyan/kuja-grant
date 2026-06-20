@@ -122,6 +122,13 @@ class AICallLog(db.Model):
     output_text = db.Column(db.Text, nullable=True)
     replay_subject_kind = db.Column(db.String(40), nullable=True)
     replay_subject_id = db.Column(db.Integer, nullable=True)
+    # Phase 108 — per-tenant cost ceiling needs org_id directly on the
+    # log row so the monthly cost SQL doesn't have to join users every
+    # query. Populated by log_replayable_ai_call + log_call helpers.
+    org_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=True, index=True)
+    role = db.Column(db.String(20), nullable=True)
+    language = db.Column(db.String(8), nullable=True)
+    usd_cost = db.Column(db.Numeric(12, 6), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     def to_dict(self, include_replay: bool = False):
