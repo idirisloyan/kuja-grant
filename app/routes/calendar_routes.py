@@ -269,3 +269,92 @@ def api_calendar_deadlines_pdf():
         as_attachment=True,
         download_name=filename,
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 127 — iCalendar (.ics) export for Google Calendar / Outlook / Apple
+# ---------------------------------------------------------------------------
+
+def _ics_escape(text: str) -> str:
+    """Escape per RFC 5545 §3.3.11."""
+    return (
+        (text or '')
+        .replace('\\', '\\\\')
+        .replace(';', '\\;')
+        .replace(',', '\\,')
+        .replace('\n', '\\n')
+        .replace('\r', '')
+    )
+
+
+def _build_ics(events: list, viewer_email: str) -> str:
+    """Build a minimal but valid RFC 5545 iCalendar from event dicts."""
+    now_stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Kuja Grant//EN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        'X-WR-CALNAME:Kuja deadlines',
+        f'X-WR-CALDESC:Kuja deadlines for {_ics_escape(viewer_email)}',
+    ]
+    for ev in events:
+        try:
+            d = date.fromisoformat(str(ev.get('date'))[:10])
+        except Exception:
+            continue
+        kind = ev.get('kind', 'event')
+        entity_id = ev.get('entity_id') or ''
+        uid = f"{kind}-{entity_id}-{d.isoformat()}@kuja.org"
+        summary = ev.get('label') or 'Kuja deadline'
+        detail = ev.get('detail') or ''
+        href = ev.get('href') or ''
+        # All-day event: DTSTART;VALUE=DATE + DTEND next day.
+        dt_start = d.strftime('%Y%m%d')
+        dt_end = (d + timedelta(days=1)).strftime('%Y%m%d')
+        lines.extend([
+            'BEGIN:VEVENT',
+            f'UID:{_ics_escape(uid)}',
+            f'DTSTAMP:{now_stamp}',
+            f'DTSTART;VALUE=DATE:{dt_start}',
+            f'DTEND;VALUE=DATE:{dt_end}',
+            f'SUMMARY:{_ics_escape(summary)}',
+            f'DESCRIPTION:{_ics_escape(detail)}',
+        ])
+        if href:
+            lines.append(f'URL:{_ics_escape(href)}')
+        lines.append('END:VEVENT')
+    lines.append('END:VCALENDAR')
+    # RFC 5545 requires CRLF line endings + lines folded at 75 octets.
+    # Practical calendar clients accept LF; we keep simple unfolded output.
+    return '\r\n'.join(lines) + '\r\n'
+
+
+@calendar_bp.route('/deadlines.ics', methods=['GET'])
+@login_required
+def api_calendar_deadlines_ics():
+    """Download the user's deadlines as an iCalendar file. Subscribe in
+    Google Calendar / Outlook / Apple Calendar by importing the file.
+
+    Same scoping rules as the JSON endpoint. Lookahead defaults wider
+    (180 days) since calendar clients keep events around forever.
+
+    Query: ?days=N (default 180, max 365), ?past=N (default 30, max 90)
+    """
+    days = max(7, min(365, int(request.args.get('days', 180))))
+    past_days = max(0, min(90, int(request.args.get('past', 30))))
+    payload = _build_calendar_payload(current_user, days, past_days)
+    ics_text = _build_ics(
+        payload['events'],
+        viewer_email=getattr(current_user, 'email', '') or 'user',
+    )
+    slug = re.sub(r'[^a-z0-9]+', '-',
+                  (getattr(current_user, 'email', '') or 'user').lower()).strip('-')[:40] or 'user'
+    filename = f'kuja-deadlines-{slug}.ics'
+    return send_file(
+        io.BytesIO(ics_text.encode('utf-8')),
+        mimetype='text/calendar; charset=utf-8',
+        as_attachment=True,
+        download_name=filename,
+    )

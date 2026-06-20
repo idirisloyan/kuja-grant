@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 127-131 — `/api/calendar/deadlines.ics` returns the
+  caller's deadlines as an RFC-5545 iCalendar so NGOs can subscribe in
+  Google Calendar / Outlook / Apple Calendar; "Calendar feed" CTA next to
+  the existing PDF download. New `/api/documents/<id>/raw` serves the raw
+  bytes with `Content-Disposition: inline` for PDFs / images / text so an
+  `<InlineDocPreview>` component can render them next to the NGO's upload
+  list. seed_networked_funds now `/submit`s the seeded memberships after
+  admin-create so the OB queue isn't empty on fresh deploys. New
+  `<DisclosureToggle>` + `useDisclosureMode()` hook persist a beginner/
+  expert preference in localStorage; wired on the apply page where
+  beginner mode hides the "More AI tools" accordion. New
+  `/api/audit-chain/export.jsonl` streams the full hash-chained log as
+  NDJSON for offline third-party verification; download CTA on
+  /admin/audit-chain. Stale `near-prod-redirect` entry trimmed from
+  `.claude/launch.json`.
+
 - **2026-06-19** Phase 121-125 — Branded HTML decision-email template
   (EmailService.send + _send_smtp + _send_sendgrid now accept html_body;
   membership decision sender renders via app.services.email_templates).

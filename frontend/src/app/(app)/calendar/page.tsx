@@ -280,7 +280,18 @@ export default function CalendarPage() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--kuja-ink))] hover:bg-[hsl(var(--kuja-sand-50))]"
               >
-                <Download className="w-3.5 h-3.5" /> Download PDF
+                <Download className="w-3.5 h-3.5" /> PDF
+              </a>
+              {/* Phase 127 — iCalendar (.ics) download. Subscribe in Google
+                  Calendar / Outlook / Apple Calendar to see deadlines
+                  alongside the rest of your week. */}
+              <a
+                href="/api/calendar/deadlines.ics?days=180&past=30"
+                download
+                className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--kuja-ink))] hover:bg-[hsl(var(--kuja-sand-50))]"
+                title="Subscribe in Google Calendar / Outlook / Apple Calendar"
+              >
+                <Download className="w-3.5 h-3.5" /> Calendar feed
               </a>
               <div className="inline-flex rounded-md border border-[hsl(var(--border))] overflow-hidden">
                 <button

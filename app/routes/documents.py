@@ -329,6 +329,57 @@ def api_get_document(doc_id):
     return jsonify({'document': document.to_dict()})
 
 
+@documents_bp.route('/<int:doc_id>/raw', methods=['GET'])
+@login_required
+def api_document_raw(doc_id):
+    """Phase 128 — Serve the raw bytes for inline preview.
+
+    Access mirrors api_get_document: NGO can only see their own org's
+    documents; admins see everything. Sends with `Content-Disposition:
+    inline` so the browser renders PDFs/images in an iframe rather than
+    forcing a download. Falls back to attachment for unknown mime types.
+    """
+    from flask import current_app, send_file as _send_file
+    import os as _os
+    document = db.session.get(Document, doc_id)
+    if not document:
+        return jsonify({'error': 'Document not found'}), 404
+
+    # Same auth gates as api_get_document.
+    if document.application_id:
+        application = db.session.get(Application, document.application_id)
+        if application:
+            if current_user.role == 'ngo' and application.ngo_org_id != current_user.org_id:
+                return jsonify({'error': 'Access denied'}), 403
+    if document.assessment_id:
+        assessment = db.session.get(Assessment, document.assessment_id)
+        if assessment:
+            if current_user.role not in ('admin',) and assessment.org_id != current_user.org_id:
+                return jsonify({'error': 'Access denied'}), 403
+
+    upload_dir = current_app.config.get('UPLOAD_FOLDER')
+    if not upload_dir or not document.stored_filename:
+        return jsonify({'error': 'File not available'}), 404
+    file_path = _os.path.join(upload_dir, document.stored_filename)
+    if not _os.path.exists(file_path):
+        return jsonify({'error': 'File missing on disk'}), 410
+
+    mime = document.mime_type or 'application/octet-stream'
+    inline_kinds = (
+        'application/pdf',
+        'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif',
+        'text/plain', 'text/csv',
+    )
+    as_attachment = mime not in inline_kinds
+    return _send_file(
+        file_path,
+        mimetype=mime,
+        as_attachment=as_attachment,
+        download_name=document.original_filename,
+        max_age=0,
+    )
+
+
 @documents_bp.route('/<int:doc_id>/clarification', methods=['PATCH'])
 @login_required
 def api_document_clarification(doc_id):

@@ -8,6 +8,7 @@ import { api, apiOffline } from '@/lib/api';
 import { VoiceFieldInput } from '@/components/shared/voice-field-input';
 import { PeerSnippetsButton } from '@/components/apply/peer-snippets-button';
 import { RubricLivePreview } from '@/components/apply/rubric-live-preview';
+import { DisclosureToggle, useDisclosureMode } from '@/components/shared/disclosure-toggle';
 import { toast } from 'sonner';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
@@ -1123,6 +1124,9 @@ function ProposalStep({
     disabled: applicationId == null || Object.values(responses ?? {}).every(v => !v || !v.trim()),
   });
 
+  // Phase 130 — read disclosure mode to optionally hide advanced panels.
+  const [disclosureMode] = useDisclosureMode();
+
   if (criteria.length === 0) {
     return (
       <Card className="py-10 text-center">
@@ -1169,6 +1173,13 @@ function ProposalStep({
         </span>
       </div>
 
+      {/* Phase 130 — Beginner / expert disclosure toggle. Beginner mode
+          collapses the AI tools accordion so first-time NGOs aren't
+          overwhelmed by six AI helpers stacked at the top. */}
+      <div className="flex items-center justify-end">
+        <DisclosureToggle />
+      </div>
+
       {/* Phase 119 — Side-by-side rubric preview. Updates per keystroke
           with a cheap client-only heuristic so NGOs can see if their
           response is tracking toward a strong score. */}
@@ -1194,8 +1205,9 @@ function ProposalStep({
           We keep the SmartDraftBanner above as the primary 'do it for
           me' action, and collapse the rest into one disclosure so the
           power-user tools are still available but not in the way of
-          non-technical users. */}
-      {(coAuthorEnabled || grantId != null) && (
+          non-technical users.
+          Phase 130 — also hidden entirely in beginner mode. */}
+      {disclosureMode === 'expert' && (coAuthorEnabled || grantId != null) && (
         <AIToolsAccordion
           label="More AI tools"
           hint="Guided drafting, section-by-section auto-fill, and Q&A with the donor"

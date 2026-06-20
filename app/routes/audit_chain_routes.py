@@ -114,3 +114,62 @@ def api_recent_chain():
         'offset': offset,
         'entries': entries,
     })
+
+
+@audit_chain_bp.route('/export.jsonl', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_export_chain():
+    """Phase 131 — full hash-chained audit log as newline-delimited JSON.
+
+    Each line is one entry preserving prev_hash + payload_hash so a
+    third-party verifier can re-walk the chain offline without server
+    cooperation. NDJSON keeps line-by-line streaming reasonable for
+    chains with millions of entries.
+
+    Query: ?subject_kind=&subject_id= to scope (optional).
+    """
+    import json
+    from flask import Response
+
+    subject_kind = request.args.get('subject_kind') or None
+    subject_id_param = request.args.get('subject_id')
+    subject_id = None
+    if subject_id_param:
+        try:
+            subject_id = int(subject_id_param)
+        except ValueError:
+            subject_id = None
+
+    q = AuditChainEntry.query
+    if subject_kind:
+        q = q.filter(AuditChainEntry.subject_kind == subject_kind)
+    if subject_id is not None:
+        q = q.filter(AuditChainEntry.subject_id == subject_id)
+    q = q.order_by(AuditChainEntry.seq.asc())
+
+    def stream():
+        for r in q.yield_per(500):
+            try:
+                details = json.loads(r.details_json or '{}')
+            except Exception:
+                details = {}
+            row = {
+                'id': r.id,
+                'seq': r.seq,
+                'action': r.action,
+                'actor_email': r.actor_email,
+                'subject_kind': r.subject_kind,
+                'subject_id': r.subject_id,
+                'prev_hash': r.prev_hash,
+                'payload_hash': r.payload_hash,
+                'created_at': r.created_at.isoformat() if r.created_at else None,
+                'details': details,
+            }
+            yield json.dumps(row, separators=(',', ':')) + '\n'
+
+    headers = {
+        'Content-Disposition': 'attachment; filename="kuja-audit-chain.jsonl"',
+        'Cache-Control': 'no-store',
+    }
+    return Response(stream(), mimetype='application/x-ndjson', headers=headers)

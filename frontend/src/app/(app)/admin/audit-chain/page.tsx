@@ -17,7 +17,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronRight,
+  ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronRight, Download,
   Award, User as UserIcon, ExternalLink, ArrowUpRight,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -146,6 +146,17 @@ export default function AuditChainPage() {
           title="Hash-chained audit log"
           icon={ShieldCheck}
           subtitle="Every critical event writes a hash-chained row. Any retroactive edit breaks the chain — this page proves it's intact."
+          primaryAction={
+            <a
+              href="/api/audit-chain/export.jsonl"
+              download
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+              title="Download the full chain as NDJSON for offline verification"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export chain (NDJSON)
+            </a>
+          }
         />
         <PageMain>
       {/* Integrity card */}

@@ -603,8 +603,19 @@ def _seed_rich(s, base, H, *, network_slug, admin_id, report_id, decl_id, window
             mem = ra.json().get("membership", {})
             already = ra.json().get("already_existed", False)
             pending_count += 1
-            print(f"   - org #{org_id} ({country}): membership #{mem.get('id')} "
-                  f"status={mem.get('status')}"
+            mid = mem.get("id")
+            # Phase 129 — submit so the membership lands in under_review,
+            # which is the state the OB queue filters by default. Without
+            # this nudge, fresh deploys show an empty queue.
+            advanced = False
+            if mid and mem.get("status") == "pending":
+                rs = s.post(
+                    f"{base}/api/network/membership/{mid}/submit",
+                    headers=H, timeout=10,
+                )
+                advanced = (rs.status_code == 200)
+            print(f"   - org #{org_id} ({country}): membership #{mid} "
+                  f"status={'under_review' if advanced else mem.get('status')}"
                   f"{' (already existed)' if already else ''}")
         else:
             print(f"   - org #{org_id}: admin-create failed ({ra.status_code}): {ra.text[:120]}")
