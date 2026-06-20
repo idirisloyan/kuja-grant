@@ -132,6 +132,36 @@ def api_create_webhook():
     return jsonify({'success': True, 'webhook': hook.to_dict(include_secret=True)})
 
 
+@webhook_bp.route('/<int:hook_id>/deliveries', methods=['GET'])
+@login_required
+def api_hook_deliveries(hook_id: int):
+    """Phase 165 — Recent per-attempt delivery log for one hook.
+
+    Query: ?limit=50 (max 200). Scoped to the caller's org.
+    """
+    _ensure_table()
+    hook = Webhook.query.get_or_404(hook_id)
+    if hook.org_id != getattr(current_user, 'org_id', None):
+        return error_response('auth.access_denied', 403)
+    try:
+        limit = max(1, min(200, int(request.args.get('limit', 50))))
+    except (TypeError, ValueError):
+        limit = 50
+    from app.models import WebhookDelivery
+    rows = (
+        WebhookDelivery.query
+        .filter_by(webhook_id=hook.id)
+        .order_by(WebhookDelivery.delivered_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return jsonify({
+        'success': True,
+        'webhook_id': hook.id,
+        'deliveries': [r.to_dict() for r in rows],
+    })
+
+
 @webhook_bp.route('/<int:hook_id>', methods=['DELETE'])
 @login_required
 def api_delete_webhook(hook_id: int):
@@ -263,6 +293,20 @@ def _deliver(hook: Webhook, event_name: str, payload: dict) -> dict:
         hook.delivery_count = (hook.delivery_count or 0) + 1
         if err or (status is not None and status >= 400):
             hook.failure_count = (hook.failure_count or 0) + 1
+        # Phase 165 — append per-attempt log row.
+        try:
+            from app.models import WebhookDelivery
+            log_row = WebhookDelivery(
+                webhook_id=hook.id,
+                event_name=event_name[:80],
+                status_code=status,
+                duration_ms=duration_ms,
+                attempts=attempts,
+                error=(err[:500] if err else None),
+            )
+            db.session.add(log_row)
+        except Exception:
+            pass
         db.session.commit()
     except Exception:
         try:

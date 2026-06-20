@@ -584,6 +584,23 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 163-167 — Application revision UI: donor
+  "Request revision" button with feedback dialog on application detail;
+  NGO-side banner when `status === 'revision_requested'` surfaces the
+  donor's feedback + an "Edit + resubmit" link to the apply page. "PDF"
+  CTA on application detail downloads via the Phase 159 endpoint.
+  New `webhook_deliveries` table + `WebhookDelivery` model log every
+  outbound attempt; `_deliver()` writes one row per attempt; new
+  `/api/webhooks/<id>/deliveries` returns recent history scoped to the
+  caller's org; per-hook disclosure on `/settings/webhooks` shows the
+  last 20 attempts as a table. New `<DonorPortfolioCard>` on the donor
+  dashboard reads `/api/journey/donor-summary` for 12-month rolling
+  totals (grants, committed, applications, awarded, reports). New
+  `SavedSearchAlertService` fires `grant_published_match` notifications
+  when a newly published grant matches an NGO's saved search filter.
+  ApplicationStatus type extended to include `declined`,
+  `revision_requested`, `withdrawn` (was lagging the backend enum).
+
 - **2026-06-20** Phase 157-161 — Webhook fan-out now fires on the 4
   remaining transition events: `application.awarded`,
   `application.rejected`, `report.submitted`, `grant.published` —

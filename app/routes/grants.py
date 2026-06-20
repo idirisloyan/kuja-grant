@@ -410,6 +410,15 @@ def api_publish_grant(grant_id):
 
     logger.info(f"Grant published: {grant.title} (id={grant.id}) by user {current_user.email}")
 
+    # Phase 167 — fire saved-search alerts for matching NGOs.
+    try:
+        from app.services.saved_search_alert_service import fan_out_for_grant
+        n_alerted = fan_out_for_grant(grant.id)
+        if n_alerted:
+            logger.info('saved-search alerts dispatched: grant=%s n=%s', grant.id, n_alerted)
+    except Exception as e:
+        logger.debug('saved-search alert fan-out skipped: %s', e)
+
     # Phase 157 — fan out the publish event to the donor org so
     # external systems can mirror new opportunities.
     try:

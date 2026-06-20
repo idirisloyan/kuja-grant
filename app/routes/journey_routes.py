@@ -231,6 +231,81 @@ def api_my_journey():
     })
 
 
+@journey_bp.route('/donor-summary', methods=['GET'])
+@login_required
+@role_required('donor', 'admin')
+def api_donor_summary():
+    """Phase 166 — Per-donor rolling 12-month portfolio summary.
+
+    Cheap aggregate from the data we already have:
+      - grants published (status open or closed)
+      - total funding committed (sum grant.total_funding)
+      - applications received
+      - applications awarded
+      - reports received
+    """
+    from sqlalchemy import func as _f
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+
+    org_id = current_user.org_id
+    if not org_id:
+        return jsonify({'success': False, 'error': 'no_org'}), 400
+
+    since = _dt.now(_tz.utc) - _td(days=365)
+
+    try:
+        from app.models import Grant, Application, Report
+        grants_q = Grant.query.filter_by(donor_org_id=org_id).filter(Grant.created_at >= since)
+        grants_count = grants_q.count()
+        funding_total = (
+            db.session.query(_f.coalesce(_f.sum(Grant.total_funding), 0))
+            .filter(Grant.donor_org_id == org_id)
+            .filter(Grant.created_at >= since)
+            .scalar()
+        ) or 0
+
+        apps_received = (
+            db.session.query(_f.count(Application.id))
+            .join(Grant, Grant.id == Application.grant_id)
+            .filter(Grant.donor_org_id == org_id)
+            .filter(Application.submitted_at >= since)
+            .scalar()
+        ) or 0
+        apps_awarded = (
+            db.session.query(_f.count(Application.id))
+            .join(Grant, Grant.id == Application.grant_id)
+            .filter(Grant.donor_org_id == org_id)
+            .filter(Application.status == 'awarded')
+            .filter(Application.submitted_at >= since)
+            .scalar()
+        ) or 0
+        reports_received = (
+            db.session.query(_f.count(Report.id))
+            .join(Grant, Grant.id == Report.grant_id)
+            .filter(Grant.donor_org_id == org_id)
+            .filter(Report.submitted_at.isnot(None))
+            .filter(Report.submitted_at >= since)
+            .scalar()
+        ) or 0
+    except Exception as e:
+        logger.warning('donor summary aggregate failed: %s', e)
+        grants_count = 0
+        funding_total = 0
+        apps_received = 0
+        apps_awarded = 0
+        reports_received = 0
+
+    return jsonify({
+        'success': True,
+        'window_days': 365,
+        'grants_published': grants_count,
+        'total_funding_committed': float(funding_total) if funding_total else 0.0,
+        'applications_received': apps_received,
+        'applications_awarded': apps_awarded,
+        'reports_received': reports_received,
+    })
+
+
 @journey_bp.route('/impact', methods=['GET'])
 @login_required
 @role_required('ngo')

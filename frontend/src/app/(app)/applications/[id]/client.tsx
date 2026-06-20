@@ -154,6 +154,23 @@ export default function ApplicationDetailClient() {
                 onWithdrawn={() => router.refresh()}
               />
             )}
+            {/* Phase 164 — Download self-contained PDF of this application. */}
+            <a
+              href={`/api/applications/${application.id}.pdf`}
+              download
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              title="Download this application as a PDF"
+            >
+              PDF
+            </a>
+            {/* Phase 163 — Donor requests a revision instead of hard-rejecting. */}
+            {(viewer?.role === 'donor' || viewer?.role === 'admin') &&
+             ['submitted', 'under_review', 'scored', 'declined', 'rejected'].includes(application.status) && (
+              <RequestRevisionButton
+                applicationId={application.id}
+                onSent={() => router.refresh()}
+              />
+            )}
             {application.ai_score != null && (
               <>
                 <ScoreRing score={Math.round(application.ai_score)} size={56} label="AI" />
@@ -179,6 +196,17 @@ export default function ApplicationDetailClient() {
             On-demand AI explanation; lazy-loaded when opened. */}
         {['declined', 'rejected', 'revision_requested'].includes(application.status) && (
           <WhyRejectedPanel kind="application" entityId={application.id} />
+        )}
+
+        {/* Phase 163 — NGO revision banner. Shown when the donor has
+            asked for changes; surfaces the feedback + a clear path back
+            to editing the application. */}
+        {application.status === 'revision_requested' && isOwnerNgo && (
+          <RevisionRequestedBanner
+            applicationId={application.id}
+            grantId={application.grant_id}
+            feedback={application.decision_notes ?? null}
+          />
         )}
 
         {/* 1. Summary first — "Where this stands" */}
@@ -569,6 +597,107 @@ function WithdrawApplicationButton({
         >
           Cancel
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Phase 163 — Donor "request revision" button + inline feedback dialog.
+function RequestRevisionButton({
+  applicationId, onSent,
+}: { applicationId: number; onSent: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await api.post(`/api/applications/${applicationId}/request-revision`,
+        { feedback: feedback.trim() || undefined });
+      toast.success('Revision requested. The NGO has been notified.');
+      setOpen(false);
+      onSent();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Request failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        title="Send feedback and ask the NGO to revise + resubmit"
+      >
+        Request revision
+      </button>
+    );
+  }
+  return (
+    <div className="rounded-md border border-[hsl(var(--kuja-clay))]/40 bg-[hsl(var(--kuja-sand))]/40 p-3 text-xs space-y-2 min-w-[320px]">
+      <p className="font-semibold">Request a revision</p>
+      <p className="text-muted-foreground">
+        Status flips to <code>revision_requested</code>. The NGO sees your feedback and can edit + resubmit.
+      </p>
+      <textarea
+        value={feedback}
+        onChange={(e) => setFeedback(e.target.value)}
+        placeholder="What needs to change? (optional)"
+        maxLength={2000}
+        rows={3}
+        className="w-full rounded-md border border-border bg-background px-2 py-1.5 leading-relaxed"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy}
+          className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--kuja-clay))] text-white px-3 py-1.5 font-medium hover:opacity-90 disabled:opacity-50"
+        >
+          {busy ? 'Sending…' : 'Send to NGO'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setFeedback(''); }}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Phase 163 — NGO-side banner shown when status === 'revision_requested'.
+function RevisionRequestedBanner({
+  applicationId, grantId, feedback,
+}: { applicationId: number; grantId: number; feedback: string | null }) {
+  return (
+    <div className="rounded-lg border-l-4 border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-sand))]/40 p-4 space-y-2">
+      <h2 className="text-sm font-semibold inline-flex items-center gap-1.5">
+        <Sparkles className="w-3.5 h-3.5 text-[hsl(var(--kuja-clay))]" />
+        Revision requested
+      </h2>
+      <p className="text-xs text-muted-foreground">
+        The donor has asked you to revise this application before deciding.
+      </p>
+      {feedback && (
+        <blockquote className="border-l-2 border-[hsl(var(--kuja-clay))]/40 pl-3 text-sm italic text-foreground whitespace-pre-wrap">
+          {feedback}
+        </blockquote>
+      )}
+      <div className="pt-1">
+        <a
+          href={`/apply/${grantId}?app=${applicationId}`}
+          className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] text-white text-xs font-medium px-3 py-1.5 hover:opacity-90"
+        >
+          Edit + resubmit
+        </a>
       </div>
     </div>
   );

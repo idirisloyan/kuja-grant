@@ -46,6 +46,87 @@ interface Hook {
 
 interface CreatedHook extends Hook { secret: string }
 
+interface Delivery {
+  id: number;
+  event_name: string;
+  delivered_at: string;
+  status_code: number | null;
+  duration_ms: number | null;
+  attempts: number;
+  error: string | null;
+}
+
+function DeliveryHistory({ hookId }: { hookId: number }) {
+  const [open, setOpen] = useState(false);
+  const [deliveries, setDeliveries] = useState<Delivery[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    if (deliveries || loading) return;
+    setLoading(true);
+    try {
+      const r = await api.get<{ deliveries: Delivery[] }>(
+        `/api/webhooks/${hookId}/deliveries?limit=20`,
+      );
+      setDeliveries(r.deliveries ?? []);
+    } catch {
+      setDeliveries([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-border pt-2">
+      <button
+        type="button"
+        onClick={() => { setOpen((o) => !o); void load(); }}
+        className="text-[11px] text-muted-foreground hover:text-foreground"
+      >
+        {open ? 'Hide' : 'Show'} delivery history
+      </button>
+      {open && (
+        <div className="mt-2 text-[11px]">
+          {loading && <div className="text-muted-foreground">Loading…</div>}
+          {!loading && deliveries && deliveries.length === 0 && (
+            <div className="text-muted-foreground">No deliveries yet.</div>
+          )}
+          {!loading && deliveries && deliveries.length > 0 && (
+            <table className="w-full">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="text-left py-1">When</th>
+                  <th className="text-left">Event</th>
+                  <th className="text-right">Status</th>
+                  <th className="text-right">ms</th>
+                  <th className="text-right">tries</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deliveries.map((d) => (
+                  <tr key={d.id} className="border-t border-border/60">
+                    <td className="py-1">{new Date(d.delivered_at).toLocaleString()}</td>
+                    <td className="font-mono">{d.event_name}</td>
+                    <td className={
+                      'text-right tabular-nums ' + (
+                        d.status_code && d.status_code >= 200 && d.status_code < 300
+                          ? 'text-emerald-700'
+                          : 'text-rose-600 font-semibold'
+                      )
+                    }>{d.status_code ?? '—'}</td>
+                    <td className="text-right tabular-nums">{d.duration_ms ?? '—'}</td>
+                    <td className="text-right tabular-nums">{d.attempts}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function WebhooksSettingsPage() {
   const [hooks, setHooks] = useState<Hook[]>([]);
   const [events, setEvents] = useState<string[]>([]);
@@ -333,6 +414,8 @@ export default function WebhooksSettingsPage() {
                     </span>
                   )}
                 </div>
+                {/* Phase 165 — per-hook delivery history. */}
+                <DeliveryHistory hookId={h.id} />
               </Card>
             );
           })}

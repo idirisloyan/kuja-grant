@@ -17,7 +17,10 @@ export type ApplicationStatus =
   | 'under_review'
   | 'scored'
   | 'awarded'
-  | 'rejected';
+  | 'rejected'
+  | 'declined'
+  | 'revision_requested'
+  | 'withdrawn';
 
 export type AssessmentFramework = 'kuja' | 'step' | 'un_hact' | 'chs' | 'nupas';
 
