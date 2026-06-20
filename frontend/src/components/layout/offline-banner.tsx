@@ -3,29 +3,43 @@
 /**
  * OfflineBanner — top-of-app indicator when the browser loses network.
  *
- * Pure client; no server interaction. Listens to navigator.onLine + the
- * window 'online' / 'offline' events. When offline, shows a slim amber
- * banner; when reconnected, briefly flashes a green "back online" toast.
+ * Phase 100: extended to surface the offline-outbox queue depth.
  *
- * Why this matters for the Global South audience: NGO field staff on
- * rural connections need clear feedback that the app isn't dead — they're
- * just disconnected. Without this, every spinner looks like a bug.
+ *   - Offline: amber banner with WiFi-off icon. If there are queued
+ *     mutations, shows the count ("3 changes saved on this device").
+ *   - Online + flash: green "Back online — sending 3 changes" if there
+ *     was a pending queue; "Back online" if the queue was empty.
+ *   - Online + steady state: hidden.
+ *
+ * On mount we install the auto-drain hook so that as soon as the device
+ * reconnects, queued mutations replay against the server. Browsers
+ * supporting Background Sync also get OS-level wake-ups.
  */
 
 import { useEffect, useState } from 'react';
-import { WifiOff, Wifi } from 'lucide-react';
+import { WifiOff, Wifi, CloudUpload } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  installAutoDrain, onDrainResult, countPending,
+} from '@/lib/offline-outbox';
 
 export function OfflineBanner() {
   const [online, setOnline] = useState<boolean>(true);
   const [showBackOnline, setShowBackOnline] = useState(false);
+  const [queueSize, setQueueSize] = useState<number>(0);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     setOnline(navigator.onLine);
 
-    const goOffline = () => setOnline(false);
+    // Refresh queue size on mount.
+    countPending().then(setQueueSize).catch(() => undefined);
+
+    const goOffline = () => {
+      setOnline(false);
+      countPending().then(setQueueSize).catch(() => undefined);
+    };
     const goOnline = () => {
       setOnline(true);
       setShowBackOnline(true);
@@ -34,9 +48,16 @@ export function OfflineBanner() {
 
     window.addEventListener('offline', goOffline);
     window.addEventListener('online', goOnline);
+    const teardown = installAutoDrain();
+    const unsubscribe = onDrainResult(() => {
+      countPending().then(setQueueSize).catch(() => undefined);
+    });
+
     return () => {
       window.removeEventListener('offline', goOffline);
       window.removeEventListener('online', goOnline);
+      teardown();
+      unsubscribe();
     };
   }, []);
 
@@ -55,9 +76,17 @@ export function OfflineBanner() {
     >
       <span className="inline-flex items-center gap-2">
         {online ? (
-          <><Wifi className="w-3.5 h-3.5" /> Back online — refreshing.</>
+          queueSize > 0 ? (
+            <><CloudUpload className="w-3.5 h-3.5" /> Back online — sending {queueSize} queued change{queueSize === 1 ? '' : 's'}.</>
+          ) : (
+            <><Wifi className="w-3.5 h-3.5" /> Back online — refreshing.</>
+          )
         ) : (
-          <><WifiOff className="w-3.5 h-3.5" /> You&apos;re offline. Drafts will save locally; new actions will retry when reconnected.</>
+          queueSize > 0 ? (
+            <><WifiOff className="w-3.5 h-3.5" /> You&apos;re offline. {queueSize} change{queueSize === 1 ? '' : 's'} saved on this device, will send when reconnected.</>
+          ) : (
+            <><WifiOff className="w-3.5 h-3.5" /> You&apos;re offline. Drafts will save locally; new actions will retry when reconnected.</>
+          )
         )}
       </span>
     </div>

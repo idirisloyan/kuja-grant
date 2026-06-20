@@ -146,3 +146,75 @@ export const api = {
   upload: <T>(path: string, formData: FormData) =>
     apiFetch<T>('POST', path, formData),
 };
+
+// ---------------------------------------------------------------------------
+// Phase 100 — Offline-aware POST/PUT/PATCH/DELETE.
+// ---------------------------------------------------------------------------
+//
+// `apiOffline.<verb>` checks navigator.onLine; if offline it enqueues the
+// request in the IndexedDB outbox (see lib/offline-outbox.ts) and returns
+// a synthetic { queued: true, localId } response so the UI can show
+// "saved on device, will send when back online". On reconnect the page-
+// level installAutoDrain() replays the queue.
+//
+// Callers that opt into offline-aware writes use `apiOffline` instead of
+// `api`. Critical reads (auth/session check, anything where a stale
+// answer is dangerous) still use plain `api.get`.
+
+export interface QueuedResponse {
+  queued: true;
+  localId: string;
+  kind: string;
+}
+
+function isQueuedResponse(v: unknown): v is QueuedResponse {
+  return typeof v === 'object' && v != null
+    && (v as { queued?: unknown }).queued === true;
+}
+
+export { isQueuedResponse };
+
+async function offlineMutate<T>(
+  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  path: string,
+  body: unknown | undefined,
+  kind: string,
+): Promise<T | QueuedResponse> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    // Lazy-import so the outbox isn't pulled into bundles that never use it.
+    const { enqueue } = await import('./offline-outbox');
+    const normalizedPath = path.startsWith('/api/') ? path.slice(4) : path;
+    const headers: Record<string, string> = {
+      'X-Requested-With': 'XMLHttpRequest',
+    };
+    let serializedBody: string | undefined;
+    if (body !== undefined && body !== null && !(body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+      serializedBody = JSON.stringify(body);
+    }
+    const entry = await enqueue({
+      kind,
+      method,
+      url: `/api${normalizedPath}`,
+      headers,
+      body: serializedBody,
+    });
+    return {
+      queued: true,
+      localId: entry.localId,
+      kind,
+    } as QueuedResponse;
+  }
+  return apiFetch<T>(method, path, body);
+}
+
+export const apiOffline = {
+  post: <T>(path: string, body: unknown, kind: string) =>
+    offlineMutate<T>('POST', path, body, kind),
+  put: <T>(path: string, body: unknown, kind: string) =>
+    offlineMutate<T>('PUT', path, body, kind),
+  patch: <T>(path: string, body: unknown, kind: string) =>
+    offlineMutate<T>('PATCH', path, body, kind),
+  delete: <T>(path: string, kind: string) =>
+    offlineMutate<T>('DELETE', path, undefined, kind),
+};

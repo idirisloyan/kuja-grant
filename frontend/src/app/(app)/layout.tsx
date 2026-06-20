@@ -20,6 +20,7 @@ import { CommandPalette } from '@/components/layout/command-palette';
 import { OfflineBanner } from '@/components/layout/offline-banner';
 import { JourneyRail } from '@/components/dashboards/journey-rail';
 import { WhatsNewBanner } from '@/components/layout/whats-new-banner';
+import { OfflineQueuePanel } from '@/components/layout/offline-queue-panel';
 
 const SIDEBAR_WIDTH = 280;
 const COLLAPSED_WIDTH = 72;
@@ -109,6 +110,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
         <CopilotRail />
+        {/* Phase 100 — offline outbox manual-review panel. Self-gated:
+            only renders if there are queued mutations the server
+            rejected on reconnect. Dismissible. */}
+        <OfflineQueuePanel />
         {/* Phase 13.17 — global keyboard shortcut overlay. Cmd/? opens.
             Self-gated: only listens for keydown events; no UI when closed. */}
         <KeyboardShortcutOverlay />

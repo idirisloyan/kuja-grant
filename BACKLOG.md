@@ -134,6 +134,88 @@ Items still deferred after this batch (call-outs):
 All deferred items remain in the wave sections above. The `last_touched:
 2026-06-19` markers below were refreshed where items moved.
 
+**Phase 100 (session continuation 2026-06-19) — Tier S items #1 + #2 shipped:**
+
+Offline-first PWA foundation (Wave 2b — call it OUT of "honest multi-week"):
+- ~~Service worker v15 with stale-while-revalidate API cache~~ — added
+  an allow-list of safe-GET API paths (auth/me, dashboard, grants,
+  applications, reports, journey, whats-new, notifications, passport
+  share). Cached entries get an `x-kuja-from-cache: 1` header so the
+  page can surface "showing data from cache" UI later.
+- ~~IndexedDB outbox~~ — `lib/offline-outbox.ts` with enqueue / drain /
+  listPending / count. Schema version 1. localId for client-side
+  matching to UI state.
+- ~~Background Sync + page postMessage~~ — SW registers
+  `kuja-outbox-sync` tag; page also listens on `window.online`. Both
+  fire `drain()`. Idempotent install via `installAutoDrain()`.
+- ~~`apiOffline` client~~ — wraps POST/PUT/PATCH/DELETE: if
+  `navigator.onLine === false`, enqueues to outbox and returns
+  `{queued: true, localId}` synthetic response. Wired on the
+  application autosave path as the reference example.
+- ~~OfflineBanner upgrade~~ — surfaces queue size when present
+  ("3 changes saved on this device, will send when reconnected").
+- ~~OfflineQueuePanel~~ — bottom-left toast surfaces failed entries
+  (4xx server rejections) with discard CTA. Auto-polls every 30s.
+
+W3C Verifiable Credentials (Wave 4 — the moat, call it OUT of multi-week):
+- ~~Ed25519 signing key + did:web issuer DID~~ — `vc_service.py` reads
+  `KUJA_VC_SIGNING_KEY_HEX` env var (32-byte hex). Falls back to
+  ephemeral key with logged warning. did:web resolution at
+  `/.well-known/did.json`.
+- ~~JSON-LD context endpoint~~ — `/.well-known/kuja-vc-context.jsonld`
+  resolves Kuja-specific terms (KujaCapacityPassportCredential,
+  capacityScore, etc.).
+- ~~VC issuance~~ — `GET /api/passport/<id>/vc` returns the signed
+  JSON-LD VC; `?format=download` adds attachment headers with
+  `application/vc+ld+json` MIME. Pulls subject from the existing
+  passport.snapshot; never round-trips to Anthropic.
+- ~~StatusList2021 revocation~~ —
+  `GET /api/credentials/status-list/2021` builds a gzip+base64
+  bitstring from current `CapacityPassport.status`. Bit i = 1 means
+  passport id i is revoked / expired.
+- ~~Verify endpoint~~ — `POST /api/credentials/verify` (public, CORS
+  open) returns structured report: issuer_matches,
+  verification_method_matches, signature_valid, status_active,
+  expired, errors[]. Returns the canonicalization rule so verifiers
+  can reproduce offline.
+- ~~Verifier instructions~~ —
+  `GET /api/credentials/verifier-howto` returns the step-by-step
+  guide (DID resolution → multibase decode → SHA-256 → Ed25519
+  verify → status list lookup).
+- ~~Public verifier UI~~ — `/verify-credential` page accepts paste +
+  file-upload, hits the verify endpoint, renders pass/fail checklist.
+  Unauthenticated.
+- ~~"Download VC" CTA~~ — added to `CapacityPassportPanel` next to
+  Copy URL + Revoke. Only renders when passport.status === 'active'.
+- ~~Verifier guide doc~~ — `docs/verifiable_credentials.md` documents
+  the suite, shape, and a 30-line Python offline verifier for any
+  third-party donor or regulator.
+
+Operational TODOs added with this batch:
+- [ ] **`KUJA_VC_SIGNING_KEY_HEX`** — set a stable Ed25519 private key
+  in Railway env. Without it, the platform generates an ephemeral key
+  on every process restart and previously-issued VCs become
+  unverifiable across restarts. Generate via:
+  `py -3 -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey; print(Ed25519PrivateKey.generate().private_bytes_raw().hex())"`
+- [ ] **`KUJA_PUBLIC_HOST`** — set to the canonical public hostname
+  used in the did:web DID. Default is the Railway production
+  hostname; override for a custom domain so the DID stays stable
+  across infra moves.
+
+Phase 100 still-deferred (subset of what's still genuinely multi-week):
+- Multi-key DID (key rotation that keeps prior VCs verifiable) —
+  one PR, but only matters when there are external long-lived
+  verifiers
+- Per-application offline-aware writes beyond autosave (reports,
+  declarations) — incremental wiring of more call sites to apiOffline
+- Conflict resolution UX when the server changed underneath a queued
+  mutation — currently last-write-wins; the OfflineQueuePanel
+  surfaces 4xx rejections for manual review
+- Bandwidth-aware media compression (was tied to Wave 2b)
+- Resumable file uploads (tus.io) (was tied to Wave 2b)
+- VC signed status list (currently unsigned for cost; integrity
+  implicit via did:web origin)
+
 **Sequencing principle:** Wave 1 first (pure design/UX; no new infra),
 then Wave 2a (channels — WhatsApp, voice extension, predictive nudge
 wiring), then Wave 2b (offline-first PWA + IndexedDB queue — biggest

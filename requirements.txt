@@ -19,3 +19,5 @@ pyotp==2.9.0
 pywebpush==2.0.0
 reportlab==4.2.5
 webauthn==2.5.0
+# Phase 100 — Verifiable Credentials (Ed25519Signature2020 + did:web)
+cryptography==43.0.3

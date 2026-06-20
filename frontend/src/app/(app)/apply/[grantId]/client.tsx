@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useParams, useRouter } from 'next/navigation';
 import { useGrant } from '@/lib/hooks/use-api';
-import { api } from '@/lib/api';
+import { api, apiOffline } from '@/lib/api';
 import { toast } from 'sonner';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
@@ -288,10 +288,16 @@ export default function ApplyWizardClient() {
         for (const [key, val] of Object.entries(eligibility)) {
           eligibilityPayload[key] = { met: val.checked, evidence: val.evidence };
         }
-        await api.put(`/applications/${appId}`, {
-          responses,
-          eligibility_responses: eligibilityPayload,
-        });
+        // Phase 100 — offline-aware autosave. If navigator.onLine is
+        // false, apiOffline queues the PUT in IndexedDB and resolves
+        // immediately with { queued: true }. On reconnect, the layout's
+        // OfflineBanner-installed auto-drain replays the queue. The
+        // UI flow doesn't have to special-case offline.
+        await apiOffline.put(
+          `/applications/${appId}`,
+          { responses, eligibility_responses: eligibilityPayload },
+          'application.autosave',
+        );
       } catch {
         /* best-effort */
       }

@@ -17,7 +17,7 @@
 
 import { useState } from 'react';
 import {
-  Award, Copy, RefreshCw, Loader2, AlertTriangle,
+  Award, Copy, RefreshCw, Loader2, AlertTriangle, Download,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -83,6 +83,16 @@ function PassportRow({
             >
               <Copy className="w-3 h-3" /> Copy URL
             </button>
+          )}
+          {passport.status === 'active' && (
+            <a
+              href={`/api/passport/${passport.id}/vc?format=download`}
+              download
+              className="inline-flex items-center gap-1 rounded-md border border-[hsl(var(--border))] px-2 py-1 text-[11px] font-semibold hover:bg-[hsl(var(--kuja-sand-50))]"
+              title="Download as W3C Verifiable Credential (off-platform-portable, signed JSON-LD)"
+            >
+              <Download className="w-3 h-3" /> Download VC
+            </a>
           )}
           {canRevoke && passport.status === 'active' && (
             <button
