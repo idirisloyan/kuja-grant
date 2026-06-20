@@ -175,6 +175,8 @@ export interface Application {
   eligibility_responses?: Record<string, unknown>;
   // Documents are included by /api/applications/<id> (full detail response).
   documents?: Document[];
+  // Phase 209 — donor/reviewer shortlist flag.
+  is_starred?: boolean;
   // Phase 14 — Win/loss debrief.
   decision_reason_code?: string | null;
   decision_notes?: string | null;

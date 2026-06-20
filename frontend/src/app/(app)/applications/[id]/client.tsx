@@ -184,6 +184,14 @@ export default function ApplicationDetailClient() {
              application.status !== 'draft' && (
               <RequestDocumentButton applicationId={application.id} />
             )}
+            {/* Phase 209 — Shortlist star (donor/reviewer/admin). */}
+            {(viewer?.role === 'donor' || viewer?.role === 'admin' || viewer?.role === 'reviewer') &&
+             application.status !== 'draft' && (
+              <StarApplicationButton
+                applicationId={application.id}
+                initial={!!application.is_starred}
+              />
+            )}
             {application.ai_score != null && (
               <>
                 <ScoreRing score={Math.round(application.ai_score)} size={56} label="AI" />
@@ -771,6 +779,47 @@ function RequestDocumentButton({ applicationId }: { applicationId: number }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// Phase 209 — Toggle the donor/reviewer shortlist star on an application.
+function StarApplicationButton({
+  applicationId, initial,
+}: { applicationId: number; initial: boolean }) {
+  const [starred, setStarred] = useState(initial);
+  const [busy, setBusy] = useState(false);
+
+  async function toggle() {
+    if (busy) return;
+    setBusy(true);
+    const next = !starred;
+    setStarred(next);
+    try {
+      await api.post(`/api/applications/${applicationId}/star`, { starred: next });
+    } catch {
+      setStarred(!next);
+      toast.error('Could not update shortlist.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={busy}
+      title={starred ? 'Remove from shortlist' : 'Add to shortlist'}
+      aria-pressed={starred}
+      className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium ${
+        starred
+          ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-sand))]/40 text-[hsl(var(--kuja-clay))]'
+          : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
+      } disabled:opacity-50`}
+    >
+      <span aria-hidden>{starred ? '★' : '☆'}</span>
+      Shortlist
+    </button>
   );
 }
 

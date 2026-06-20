@@ -1509,3 +1509,54 @@ def api_grant_fit_compare():
         return jsonify({'success': False, 'error': 'Could not compute comparison'}), 500
     _dashboard_cache.set(cache_key, result)
     return jsonify(result)
+
+
+@grants_bp.route('/<int:grant_id>/applications.csv', methods=['GET'])
+@login_required
+@role_required('donor', 'admin')
+def api_export_grant_applications_csv(grant_id):
+    """Phase 208 — CSV export of applications for a single grant.
+
+    Donor must own the grant. CSV columns: app_id, org_name, country,
+    status, ai_score, human_score, submitted_at, total_funding_requested.
+    """
+    from flask import Response
+    from app.models import Organization
+    import csv
+    import io
+
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found'}), 404
+    if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    apps = Application.query.filter_by(grant_id=grant_id).all()
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow([
+        'app_id', 'org_name', 'country', 'status',
+        'ai_score', 'human_score',
+        'submitted_at', 'total_funding_requested',
+    ])
+    for a in apps:
+        org = db.session.get(Organization, a.ngo_org_id) if a.ngo_org_id else None
+        w.writerow([
+            a.id,
+            (org.name if org else '') or '',
+            (getattr(org, 'country', '') if org else '') or '',
+            a.status or '',
+            '' if a.ai_score is None else round(float(a.ai_score), 2),
+            '' if a.human_score is None else round(float(a.human_score), 2),
+            a.submitted_at.isoformat() if a.submitted_at else '',
+            '' if getattr(a, 'total_funding_requested', None) is None else a.total_funding_requested,
+        ])
+
+    safe_title = ''.join(c for c in (grant.title or 'grant') if c.isalnum() or c in ('-', '_'))[:60] or 'grant'
+    filename = f'{safe_title}_applications.csv'
+    return Response(
+        buf.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'},
+    )

@@ -584,6 +584,23 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 205-209 — Operational closeout: (a) New
+  `/api/cron/reviewer-digest` POST creates an in-app digest
+  Notification per reviewer with pending count + oldest assignment
+  age (record_cron_run wired). Schedule weekly. (b) Donor dashboard
+  picks up `<DonorStatusBreakdownCard>` — reads the new
+  `app_status_breakdown` map on `/api/dashboard/stats` and lists
+  one click-through row per application status. Hidden when
+  breakdown is empty. (c) NGO dashboard picks up
+  `<DeadlineThisWeekCard>` — drafts with grant deadline ≤ 7 days,
+  sorted by deadline ascending. Hidden when nothing due. (d) New
+  `GET /api/grants/<id>/applications.csv` (donor + admin) exports
+  applications + ai/human scores + statuses as CSV. "Export
+  applications CSV" CTA on grant detail. (e) New
+  `Application.is_starred` bool column with bootstrap ALTER + POST
+  `/api/applications/<id>/star` toggle endpoint (donor + admin +
+  reviewer). `<StarApplicationButton>` on application detail header.
+
 - **2026-06-20** Phase 199-203 — Donors can now (a) save the criteria
   on an existing grant as a reusable template in one click ("Save as
   template" CTA on grant detail, uses the Phase 189 backend); (b)

@@ -674,6 +674,36 @@ def api_request_revision(app_id):
     return jsonify({'success': True, 'application': application.to_dict()})
 
 
+@applications_bp.route('/<int:app_id>/star', methods=['POST'])
+@role_required('donor', 'admin', 'reviewer')
+def api_toggle_application_star(app_id):
+    """Phase 209 — Toggle the shortlist star on an application.
+
+    Body: { starred: bool }  (or empty → toggle)
+    """
+    application = db.session.get(Application, app_id)
+    if not application:
+        return jsonify({'error': 'Application not found'}), 404
+
+    # Donors: must own the parent grant.
+    if current_user.role == 'donor':
+        grant = db.session.get(Grant, application.grant_id) if application.grant_id else None
+        if not grant or grant.donor_org_id != current_user.org_id:
+            return jsonify({'error': 'Access denied'}), 403
+
+    data = get_request_json() or {}
+    if 'starred' in data:
+        new_val = bool(data['starred'])
+    else:
+        new_val = not bool(application.is_starred)
+    application.is_starred = new_val
+    db.session.commit()
+
+    log_action('application.star_toggled', current_user.email,
+               'application', application.id, {'starred': new_val})
+    return jsonify({'success': True, 'is_starred': new_val})
+
+
 @applications_bp.route('/<int:app_id>/request-document', methods=['POST'])
 @role_required('donor', 'admin')
 def api_request_document(app_id):

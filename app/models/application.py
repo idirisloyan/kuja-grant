@@ -29,6 +29,10 @@ class Application(db.Model):
     # Phase 145 — NGO-initiated withdrawal before review starts.
     withdrawn_at = db.Column(db.DateTime, nullable=True)
     withdrawal_reason = db.Column(db.Text, nullable=True)
+    # Phase 209 — donor/reviewer-side shortlist flag. Single bool on the
+    # application row (not per-user) — a grant is owned by one donor +
+    # the small reviewer pool, so they share the shortlist.
+    is_starred = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
@@ -101,6 +105,7 @@ class Application(db.Model):
             'decision_notes': self.decision_notes,
             'decision_recorded_at': self.decision_recorded_at.isoformat() if self.decision_recorded_at else None,
             'decision_recorded_by_user_id': self.decision_recorded_by_user_id,
+            'is_starred': bool(self.is_starred),
         }
         if not summary:
             data['responses'] = self.get_responses()

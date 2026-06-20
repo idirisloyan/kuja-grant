@@ -525,6 +525,12 @@ def _build_donor_stats(org_id):
         app_status_map.get(s, 0) for s in ('submitted', 'under_review')
     )
     stats['awarded'] = app_status_map.get('awarded', 0)
+    # Phase 206 — full per-status breakdown so the dashboard tile can
+    # render every bucket (not just pending + awarded). Keys are
+    # already canonical status strings.
+    stats['app_status_breakdown'] = {
+        k: v for k, v in app_status_map.items() if k
+    }
 
     # -- Total funding awarded via SQL aggregate (subquery) --
     stats['total_funding_awarded'] = db.session.query(

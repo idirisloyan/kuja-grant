@@ -479,3 +479,78 @@ def api_cron_webhook_cleanup():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/reviewer-digest', methods=['POST'])
+def api_cron_reviewer_digest():
+    """Phase 205 — Weekly per-reviewer caseload digest.
+
+    Creates an in-app Notification per reviewer with:
+      - pending review count
+      - oldest pending assignment days (if any)
+      - count past deadline
+    Idempotent in practice — Notifications cluster per day; sending twice
+    in a row creates a duplicate notification but no harm.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import User, Review, Notification, record_cron_run as _rcr
+        from datetime import datetime, timezone
+
+        reviewers = User.query.filter_by(role='reviewer').all()
+        sent = 0
+        now = datetime.now(timezone.utc)
+        for r in reviewers:
+            pending = Review.query.filter(
+                Review.reviewer_id == r.id,
+                Review.status.in_(['pending', 'in_progress']),
+            ).all()
+            if not pending:
+                continue
+            oldest_days = 0
+            for rev in pending:
+                created = getattr(rev, 'created_at', None) or getattr(rev, 'assigned_at', None)
+                if created:
+                    if created.tzinfo is None:
+                        created = created.replace(tzinfo=timezone.utc)
+                    d = (now - created).days
+                    if d > oldest_days:
+                        oldest_days = d
+            msg = f'You have {len(pending)} pending review{"s" if len(pending) != 1 else ""}.'
+            if oldest_days > 0:
+                msg += f' Oldest is {oldest_days} day{"s" if oldest_days != 1 else ""} old.'
+            n = Notification(
+                user_id=r.id,
+                type='reviewer_digest',
+                title='Your review queue this week',
+                message=msg,
+                link='/reviews',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'reviewers_scanned': len(reviewers), 'digests_sent': sent}
+        _rcr('reviewer-digest',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception(f'reviewer digest cron failed: {e}')
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('reviewer-digest',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

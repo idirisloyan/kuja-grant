@@ -204,6 +204,16 @@ export default function GrantDetailClient() {
       {isDonor && grant.id != null && grant.criteria && grant.criteria.length > 0 && (
         <SaveCriteriaTemplateButton grantId={grant.id} />
       )}
+      {/* Phase 208 — applications CSV export. */}
+      {isDonor && grant.id != null && (
+        <a
+          href={`/api/grants/${grant.id}/applications.csv`}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand))]/40 text-sm font-medium px-4 py-2"
+          title="Download applications + scores as CSV"
+        >
+          Export applications CSV
+        </a>
+      )}
       {isNgo && grant.status === 'open' && !grant.user_application_status && (
         <button
           type="button"

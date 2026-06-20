@@ -385,6 +385,10 @@ def create_app(config_name=None):
                 if 'withdrawal_reason' not in app_cols:
                     conn.execute(text("ALTER TABLE applications ADD COLUMN withdrawal_reason TEXT"))
                     added.append('applications.withdrawal_reason')
+                # Phase 209 — donor/reviewer shortlist flag.
+                if 'is_starred' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN is_starred BOOLEAN DEFAULT FALSE NOT NULL"))
+                    added.append('applications.is_starred')
 
                 # Phase 102 — replay tooling: optional full input/output
                 # text on AI call logs. Populated only for replay-eligible
