@@ -584,6 +584,28 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 223-227 — Calibration + admin awareness:
+  (a) Phase 221 UI activated — `<textarea>` for `private_notes` on
+  the reviewer review page (auto-saves on blur via PUT
+  `/api/reviews/<id>`). Only renders when the URL resolves to an
+  existing review id. Visible label says "never the NGO." (b) New
+  `GET /api/grants/<id>/criterion-averages` returns per-criterion
+  mean AI score across applications (reads `ai_rubric_result_json`).
+  `<CriterionAveragesCard>` on grant detail (donor view) sorts
+  lowest first — surfaces where the application pool struggles. (c)
+  New `GET /api/applications/<id>/peer-score` (NGO-only)
+  compares your AI score vs median ai_score of accepted apps on
+  sector-overlapping grants. `<PeerScoreCard>` on application
+  detail; self-gates when pool < 5. (d) `<StaleReviewsCard>` on
+  the operator dashboard reads the existing
+  `/api/reviews/workload` `overdue` field and lists each reviewer
+  with assignments > 14 days old. Hidden when nothing overdue.
+  (e) `<NgoInboxCard>` on the NGO dashboard merges
+  application_document_requested + application_revision_requested
+  + application_under_review + compliance_refreshed notifications
+  into one tile, dedup-sorted by recency. Used the Phase 212
+  `?type=` notification filter.
+
 - **2026-06-20** Phase 217-221 — Search + analytics polish: (a)
   Donor archive (statusFilter='archived') picks up an inline
   org-name search box for faster grantee lookup across closed

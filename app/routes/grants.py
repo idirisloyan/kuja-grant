@@ -1511,6 +1511,78 @@ def api_grant_fit_compare():
     return jsonify(result)
 
 
+@grants_bp.route('/<int:grant_id>/criterion-averages', methods=['GET'])
+@login_required
+@role_required('donor', 'admin')
+def api_grant_criterion_averages(grant_id):
+    """Phase 224 — per-criterion average AI score across applications.
+
+    Reads each application's `ai_rubric_result_json` (set by the Phase
+    38 NEAR rubric scorer + the generic Phase 40 scorer). Returns one
+    row per criterion: {key, label, mean, n}. Donors see where their
+    rubric is calibrated low vs high relative to apps received.
+    """
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found'}), 404
+    if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    criteria = grant.get_criteria() if hasattr(grant, 'get_criteria') else []
+    key_to_label = {}
+    for c in (criteria or []):
+        if isinstance(c, dict):
+            k = c.get('key') or c.get('id')
+            if k:
+                key_to_label[str(k)] = c.get('label') or str(k)
+
+    apps = Application.query.filter_by(grant_id=grant_id).all()
+    sums = {}
+    counts = {}
+    for a in apps:
+        rubric = a.get_ai_rubric_result() if hasattr(a, 'get_ai_rubric_result') else None
+        if not isinstance(rubric, dict):
+            continue
+        per = rubric.get('per_criterion') or rubric.get('scores') or {}
+        if isinstance(per, list):
+            for item in per:
+                if not isinstance(item, dict):
+                    continue
+                k = item.get('key') or item.get('id')
+                v = item.get('score') or item.get('value')
+                if k is None or v is None:
+                    continue
+                try:
+                    v = float(v)
+                except (TypeError, ValueError):
+                    continue
+                sums[str(k)] = sums.get(str(k), 0.0) + v
+                counts[str(k)] = counts.get(str(k), 0) + 1
+        elif isinstance(per, dict):
+            for k, v in per.items():
+                try:
+                    v = float(v) if not isinstance(v, dict) else float(v.get('score') or v.get('value') or 0)
+                except (TypeError, ValueError):
+                    continue
+                sums[str(k)] = sums.get(str(k), 0.0) + v
+                counts[str(k)] = counts.get(str(k), 0) + 1
+
+    rows = []
+    for k in (key_to_label.keys() or sums.keys()):
+        n = counts.get(k, 0)
+        if n == 0:
+            continue
+        rows.append({
+            'key': k,
+            'label': key_to_label.get(k, k),
+            'mean': round(sums[k] / n, 1),
+            'n': n,
+        })
+    rows.sort(key=lambda r: r['mean'])
+
+    return jsonify({'success': True, 'rows': rows})
+
+
 @grants_bp.route('/<int:grant_id>/applications.csv', methods=['GET'])
 @login_required
 @role_required('donor', 'admin')

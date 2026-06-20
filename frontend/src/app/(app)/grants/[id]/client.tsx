@@ -26,6 +26,7 @@ import { describeGrantStatus } from '@/lib/status-copy';
 import { WhyThisMatch, type ReasonFacet } from '@/components/shared/why-this-match';
 import { TopMatchedNGOs } from '@/components/grants/top-matched-ngos';
 import { BroadcastsThread } from '@/components/grants/broadcasts-thread';
+import { CriterionAveragesCard } from '@/components/grants/criterion-averages-card';
 import { api } from '@/lib/api';
 
 // Phase 112 — Live wrapper around WhyThisMatch. Calls /api/match/explain
@@ -260,6 +261,9 @@ export default function GrantDetailClient() {
             own fields. Falls back silently if the call fails. */}
         {/* Phase 155 — Donor view: ranked NGOs that fit this grant. */}
         {isDonor && id != null && <TopMatchedNGOs grantId={id} />}
+
+        {/* Phase 224 — per-criterion AI score averages across applications. */}
+        {isDonor && id != null && <CriterionAveragesCard grantId={id} />}
 
         {/* Phase 194 — Broadcasts thread (donor + applicant NGOs). */}
         {id != null && <BroadcastsThread grantId={id} />}

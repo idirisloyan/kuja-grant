@@ -678,6 +678,57 @@ def api_request_revision(app_id):
     return jsonify({'success': True, 'application': application.to_dict()})
 
 
+@applications_bp.route('/<int:app_id>/peer-score', methods=['GET'])
+@login_required
+def api_peer_score(app_id):
+    """Phase 225 — NGO calibration signal.
+
+    Compares this application's `ai_score` with the median ai_score of
+    accepted applications across the same grant's sector(s). Returns a
+    relative delta + the n it's based on. Only the applicant NGO of the
+    application can read this.
+    """
+    a = db.session.get(Application, app_id)
+    if not a:
+        return jsonify({'error': 'Application not found'}), 404
+    if a.ngo_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+    if a.ai_score is None:
+        return jsonify({'success': True, 'reason': 'no_ai_score'})
+
+    g = db.session.get(Grant, a.grant_id) if a.grant_id else None
+    sectors = g.get_sectors() if g and hasattr(g, 'get_sectors') else []
+    if not sectors:
+        return jsonify({'success': True, 'reason': 'no_sectors'})
+
+    # Find peer apps: accepted/awarded on grants sharing at least one sector,
+    # excluding this org.
+    from sqlalchemy import or_
+    peers = Application.query.join(Grant).filter(
+        Application.status.in_(['awarded', 'accepted']),
+        Application.ngo_org_id != current_user.org_id,
+        Application.ai_score.isnot(None),
+    ).all()
+    pool = []
+    for p in peers:
+        pg = db.session.get(Grant, p.grant_id) if p.grant_id else None
+        ps = pg.get_sectors() if pg and hasattr(pg, 'get_sectors') else []
+        if any(s in ps for s in sectors):
+            pool.append(float(p.ai_score))
+    if len(pool) < 5:
+        return jsonify({'success': True, 'reason': 'small_pool', 'pool_size': len(pool)})
+    pool.sort()
+    mid = len(pool) // 2
+    median = pool[mid] if len(pool) % 2 else (pool[mid - 1] + pool[mid]) / 2
+    return jsonify({
+        'success': True,
+        'your_score': float(a.ai_score),
+        'peer_median_accepted': round(median, 1),
+        'delta': round(float(a.ai_score) - median, 1),
+        'pool_size': len(pool),
+    })
+
+
 @applications_bp.route('/bulk-star', methods=['POST'])
 @role_required('donor', 'admin', 'reviewer')
 def api_bulk_star_applications():

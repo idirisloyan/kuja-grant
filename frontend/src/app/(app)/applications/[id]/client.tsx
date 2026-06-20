@@ -39,6 +39,7 @@ import { api, ApiError } from '@/lib/api';
 import { toast } from 'sonner';
 import { DecisionAuditDrawer } from '@/components/applications/DecisionAuditDrawer';
 import { NgoHistoryPanel } from '@/components/applications/ngo-history-panel';
+import { PeerScoreCard } from '@/components/applications/peer-score-card';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
 const TAB_KEYS: { id: TabId; key: string }[] = [
@@ -223,6 +224,13 @@ export default function ApplicationDetailClient() {
             applications from this NGO for relationship context. */}
         {isReviewerSide && (
           <NgoHistoryPanel applicationId={application.id} />
+        )}
+
+        {/* Phase 225 — NGO calibration: where the AI scored this app
+            relative to accepted peers on similar grants. Self-gates
+            when the peer pool is < 5 or no AI score yet. */}
+        {isOwnerNgo && application.status !== 'draft' && (
+          <PeerScoreCard applicationId={application.id} />
         )}
 
         {/* Phase 163 — NGO revision banner. Shown when the donor has

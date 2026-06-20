@@ -29,6 +29,7 @@ import {
   PageDetailSection, type AttentionItem,
 } from '@/components/layout/page-shell';
 import { SignerCoachCard } from '@/components/dashboards/signer-coach-card';
+import { StaleReviewsCard } from '@/components/dashboards/stale-reviews-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -251,6 +252,8 @@ export function AttentionOperatorDashboard() {
             Card auto-hides via the show flag when there's nothing to
             coach on. */}
         <SignerCoachCard />
+        {/* Phase 226 — Reviewers with overdue assignments (>14 days). */}
+        <StaleReviewsCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

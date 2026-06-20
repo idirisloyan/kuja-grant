@@ -91,11 +91,19 @@ export default function ReviewDetailClient() {
     }
     let cancelled = false;
     setResolvingId(true);
-    api.get<{ review: { application_id: number } }>(`/reviews/${urlId}`)
+    api.get<{ review: { id?: number; application_id: number; private_notes?: string | null } }>(`/reviews/${urlId}`)
       .then((res) => {
         if (cancelled) return;
         const applicationId = res?.review?.application_id;
         setAppId(typeof applicationId === 'number' ? applicationId : urlId);
+        // Phase 223 — capture review id + existing private_notes so the
+        // textarea has something to PUT.
+        if (typeof res?.review?.id === 'number') {
+          setReviewId(res.review.id);
+        }
+        if (typeof res?.review?.private_notes === 'string') {
+          setPrivateNotes(res.review.private_notes);
+        }
       })
       .catch(() => {
         // 404/403 from the review lookup — assume the URL id is itself an
@@ -117,6 +125,11 @@ export default function ReviewDetailClient() {
   const responses = (application?.responses ?? {}) as Record<string, string>;
 
   const [scores, setScores] = useState<Record<string, ScoreEntry>>({});
+  // Phase 223 — private notes (reviewer/donor/admin visible, NGO never).
+  const [reviewId, setReviewId] = useState<number | null>(null);
+  const [privateNotes, setPrivateNotes] = useState<string>('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [aiScoring, setAiScoring] = useState(false);
   // Per-criterion "Suggest rationale" loading state — separate from bulk
@@ -946,6 +959,38 @@ export default function ReviewDetailClient() {
           {error && (
             <div className="rounded-md border border-[hsl(var(--kuja-flag))]/30 bg-[hsl(0_85%_97%)] text-[hsl(var(--kuja-flag))] px-4 py-2 text-sm">
               {error}
+            </div>
+          )}
+
+          {/* Phase 223 — Private notes textarea (reviewer/donor/admin
+              only; NGO never sees these). Saves via PUT on blur. */}
+          {reviewId != null && (
+            <div className="rounded-md border border-dashed border-border bg-muted/30 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="private-notes" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Private notes
+                </label>
+                {savingNotes && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                {notesSaved && !savingNotes && <span className="text-[10px] text-emerald-600">Saved</span>}
+              </div>
+              <textarea
+                id="private-notes"
+                value={privateNotes}
+                onChange={(e) => { setPrivateNotes(e.target.value); setNotesSaved(false); }}
+                onBlur={async () => {
+                  if (!reviewId) return;
+                  setSavingNotes(true);
+                  try {
+                    await api.put(`/api/reviews/${reviewId}`, { private_notes: privateNotes });
+                    setNotesSaved(true);
+                  } catch {/* silent — surface via lack of "Saved" pill */}
+                  finally { setSavingNotes(false); }
+                }}
+                placeholder="Visible to reviewers, donor, and admin only — never the NGO."
+                maxLength={8000}
+                rows={3}
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs leading-relaxed"
+              />
             </div>
           )}
 
