@@ -20,6 +20,7 @@ import { Card } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { AIFallbackNotice } from '@/components/shared/ai-fallback-notice';
+import { AIFeedbackChip } from '@/components/shared/ai-feedback-chip';
 
 interface Citation {
   kind: 'grant' | 'application' | 'report';
@@ -32,6 +33,7 @@ interface QAResp {
   answer: string;
   citations: Citation[];
   meta?: { model?: string | null; fallback_used?: boolean; tokens_in?: number; tokens_out?: number; duration_ms?: number };
+  replay?: { ai_call_id: number | null } | null;
 }
 
 const SUGGESTED: string[] = [
@@ -129,6 +131,14 @@ export default function PortfolioQaClient() {
                 {result.meta?.fallback_used && (
                   <div className="mt-3">
                     <AIFallbackNotice meta={result.meta} />
+                  </div>
+                )}
+                {result.replay?.ai_call_id != null && (
+                  <div className="mt-3">
+                    <AIFeedbackChip
+                      callId={result.replay.ai_call_id}
+                      surfaceLabel="portfolio Q&A"
+                    />
                   </div>
                 )}
               </div>

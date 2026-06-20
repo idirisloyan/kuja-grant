@@ -166,7 +166,7 @@ def api_parse_declaration_narrative():
 
 
 @emergency_bp.route("", methods=["POST"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_create_declaration():
     network_id = get_current_network_id()
     if not network_id:
@@ -391,7 +391,7 @@ def api_declaration_ledger(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>", methods=["PUT"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_update_declaration(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -414,7 +414,7 @@ def api_update_declaration(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/submit", methods=["POST"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_submit_declaration(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -448,7 +448,7 @@ def api_submit_declaration(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/cancel", methods=["POST"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_cancel_declaration(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -467,7 +467,7 @@ def api_cancel_declaration(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/create-shortlist-grants", methods=["POST"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_create_shortlist_grants(declaration_id):
     """Retroactively create grant drafts for a signed-active declaration.
 
@@ -517,7 +517,7 @@ def api_create_shortlist_grants(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/close", methods=["POST"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_close_declaration(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -536,7 +536,7 @@ def api_close_declaration(declaration_id):
 # =============================================================================
 
 @emergency_bp.route("/<int:declaration_id>/release-applications", methods=["POST"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_release_applications(declaration_id):
     """One-click governed handoff. After the declaration activates,
     auto-created grant drafts sit in 'draft' status until the
@@ -649,7 +649,7 @@ def api_release_applications(declaration_id):
 # =============================================================================
 
 @emergency_bp.route("/<int:declaration_id>/signers", methods=["POST"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_add_signer(declaration_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):
@@ -697,7 +697,7 @@ def api_add_signer(declaration_id):
 
 
 @emergency_bp.route("/<int:declaration_id>/signers/<int:sig_id>", methods=["DELETE"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_remove_signer(declaration_id, sig_id):
     d = EmergencyDeclaration.query.get_or_404(declaration_id)
     if not _scope(d):

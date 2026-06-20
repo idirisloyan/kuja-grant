@@ -158,17 +158,23 @@ def is_oversight_body_member(user, *, network_id: int | None = None) -> bool:
 
     OB members are peer-elected from NEAR member orgs per the IKEA
     Concept Note — so the permission is granted at the org level on
-    the user's NetworkMembership. Platform admins (the Adeso staff
-    who run Kuja) are still recognised here so existing admin flows
-    keep working during the rollout; once every actual OB member is
-    flagged the admin shortcut can be retired.
+    the user's NetworkMembership.
+
+    Phase 114 — Platform-admin shortcut retired. Admins who legitimately
+    sit on an OB are now flagged on their NetworkMembership.is_oversight_body
+    like any other member. The earlier admin auto-pass was only a rollout
+    convenience while the OB roster was being populated; keeping it gave
+    Adeso staff phantom OB seats on every network, which weakens the
+    governance audit trail (declaration signatures appeared to come from
+    an OB peer when they really came from platform support).
+
+    For routes that genuinely need admin OR OB (rare — admin tooling
+    that happens to share an endpoint with OB workflows), pass
+    `allow_admin_override=True` when calling the decorator, or check
+    `user.role == 'admin'` explicitly at the route.
     """
     if not user:
         return False
-    # Platform admin keeps the legacy shortcut so we don't break in-flight
-    # OB workflows while the per-network OB roster is being populated.
-    if getattr(user, "role", None) == "admin":
-        return True
     nid = network_id or get_current_network_id()
     if not nid or not getattr(user, "org_id", None):
         return False
@@ -184,26 +190,39 @@ def is_oversight_body_member(user, *, network_id: int | None = None) -> bool:
     return bool(m and getattr(m, "is_oversight_body", False))
 
 
-def ob_required(fn):
+def ob_required(fn=None, *, allow_admin_override: bool = False):
     """Flask decorator: 403 unless the caller has OB permissions in
     the current network. Use on declaration sign / approve, membership
     approve, run-trust-process — anything that the Concept Note says
     the OB does.
+
+    Phase 114 — `allow_admin_override` lets specific admin tooling
+    routes share an OB endpoint (e.g. read-only dashboards) without
+    handing every admin a phantom OB seat across all networks. Default
+    is False (strict OB).
     """
     from functools import wraps
     from flask import jsonify
     from flask_login import current_user
 
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if not getattr(current_user, "is_authenticated", False):
-            return jsonify({"success": False, "error": "Authentication required"}), 401
-        if not is_oversight_body_member(current_user):
-            return jsonify({
-                "success": False,
-                "error": "Oversight Body permission required",
-                "code": "err.ob_required",
-            }), 403
-        return fn(*args, **kwargs)
+    def _wrap(inner):
+        @wraps(inner)
+        def wrapper(*args, **kwargs):
+            if not getattr(current_user, "is_authenticated", False):
+                return jsonify({"success": False, "error": "Authentication required"}), 401
+            if allow_admin_override and getattr(current_user, "role", None) == "admin":
+                return inner(*args, **kwargs)
+            if not is_oversight_body_member(current_user):
+                return jsonify({
+                    "success": False,
+                    "error": "Oversight Body permission required",
+                    "code": "err.ob_required",
+                }), 403
+            return inner(*args, **kwargs)
 
-    return wrapper
+        return wrapper
+
+    # Support both @ob_required and @ob_required(allow_admin_override=True)
+    if fn is not None and callable(fn):
+        return _wrap(fn)
+    return _wrap

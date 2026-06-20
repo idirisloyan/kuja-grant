@@ -26,6 +26,7 @@ import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
+import QRCode from 'qrcode';
 
 interface StatusResponse {
   enabled: boolean;
@@ -54,6 +55,26 @@ export default function SecurityPage() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [secret, setSecret] = useState<string>('');
   const [provisioningUri, setProvisioningUri] = useState<string>('');
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+
+  // Phase 118 — render the otpauth:// URI as a scannable PNG QR data URL.
+  useEffect(() => {
+    if (!provisioningUri) {
+      setQrDataUrl('');
+      return;
+    }
+    let cancelled = false;
+    QRCode.toDataURL(provisioningUri, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 220,
+    }).then((url) => {
+      if (!cancelled) setQrDataUrl(url);
+    }).catch(() => {
+      if (!cancelled) setQrDataUrl('');
+    });
+    return () => { cancelled = true; };
+  }, [provisioningUri]);
   const [verifyCode, setVerifyCode] = useState('');
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -223,11 +244,27 @@ export default function SecurityPage() {
           <h2 className="text-base font-semibold">{t('security.scan_title')}</h2>
           <p className="text-sm text-muted-foreground">{t('security.scan_body')}</p>
 
-          {/* Provisioning URI rendered as text + secret pasta. We avoid
-              the QR library install by giving the user the raw URI to
-              paste into Authy / Google Authenticator (most apps accept
-              an otpauth:// URL); for an inline QR upgrade later, swap
-              this to qrcode.react. */}
+          {/* Phase 118 — real QR code from the otpauth:// URI.
+              Authenticator apps scan this directly. Secret + URI below
+              are the typed/pasted fallback for browsers where the camera
+              isn't an option. */}
+          {qrDataUrl && (
+            <div className="flex justify-center">
+              <div className="inline-flex flex-col items-center rounded-md border border-border bg-white p-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={qrDataUrl}
+                  alt="TOTP QR code — scan with your authenticator app"
+                  width={220}
+                  height={220}
+                  className="block"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Scan with Google Authenticator, Authy, 1Password, etc.
+                </p>
+              </div>
+            </div>
+          )}
           <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
             <div>
               <div className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">

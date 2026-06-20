@@ -6,6 +6,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useGrant } from '@/lib/hooks/use-api';
 import { api, apiOffline } from '@/lib/api';
 import { VoiceFieldInput } from '@/components/shared/voice-field-input';
+import { PeerSnippetsButton } from '@/components/apply/peer-snippets-button';
+import { RubricLivePreview } from '@/components/apply/rubric-live-preview';
 import { toast } from 'sonner';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
@@ -1167,6 +1169,13 @@ function ProposalStep({
         </span>
       </div>
 
+      {/* Phase 119 — Side-by-side rubric preview. Updates per keystroke
+          with a cheap client-only heuristic so NGOs can see if their
+          response is tracking toward a strong score. */}
+      {criteria.length > 0 && (
+        <RubricLivePreview criteria={criteria} responses={responses} />
+      )}
+
       {/* Phase 75 — bulk-prefill from assessment + history. Sits above
           DraftCoAuthor because it's the "do it for me" path; coAuthor is
           the "guide me through it" path. Only renders when every
@@ -1255,7 +1264,9 @@ function ProposalStep({
 
             {/* Phase 110 — voice input chip. Self-gated to browsers
                 supporting Web Speech; absent silently otherwise. */}
-            <div className="mt-2 flex justify-end">
+            <div className="mt-2 flex items-center justify-between gap-2">
+              {/* Phase 117 — peer reference snippets ("orgs like yours wrote this"). */}
+              <PeerSnippetsButton criterionKey={c.key} grantId={grantId} />
               <VoiceFieldInput
                 value={text}
                 onChange={(next) => onResponseChange(c.key, next)}

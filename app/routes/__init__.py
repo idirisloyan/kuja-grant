@@ -77,6 +77,7 @@ def register_blueprints(app):
     from app.routes.tenant_health_routes import tenant_health_bp  # Phase 106: per-tenant health dashboard
     from app.routes.donor_portfolio_qa_routes import donor_portfolio_qa_bp  # Phase 107: donor "ask about my grantees"
     from app.routes.cost_ceiling_routes import cost_ceiling_bp  # Phase 108: per-tenant AI cost ceiling
+    from app.routes.peer_snippets_routes import peer_snippets_bp  # Phase 117: peer reference snippets
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -98,5 +99,5 @@ def register_blueprints(app):
                whats_new_bp, data_export_bp, integrity_bp,
                credentials_bp, passport_vc_bp, well_known_bp,
                synthetic_monitor_bp, replay_bp, tenant_health_bp,
-               donor_portfolio_qa_bp, cost_ceiling_bp]:
+               donor_portfolio_qa_bp, cost_ceiling_bp, peer_snippets_bp]:
         app.register_blueprint(bp)

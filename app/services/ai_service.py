@@ -1018,7 +1018,13 @@ class AIService:
     @classmethod
     def _record_call(cls, *, endpoint, role, language, input_tokens, output_tokens,
                      latency_ms, success, error=None):
-        """Record one AI call. Returns the inserted row id for later helpfulness patching."""
+        """Record one AI call. Returns the inserted row id for later helpfulness patching.
+
+        Phase 115 — also estimates usd_cost from token counts and fires the
+        Phase 108 monthly-cap threshold notification so every AIService call
+        (not just replay-tracked ones) feeds the budget ledger. Falls back
+        silently on any error so AI calls never fail because of bookkeeping.
+        """
         if not cls._ensure_ai_logs_columns():
             return None
         try:
@@ -1033,16 +1039,24 @@ class AIService:
                     org_id = getattr(current_user, 'org_id', None)
             except Exception:
                 pass
+            usd_cost = None
+            try:
+                from app.services.ai_budget_service import AIBudgetService
+                usd_cost = AIBudgetService.estimate_call_usd(
+                    int(input_tokens or 0), int(output_tokens or 0),
+                )
+            except Exception:
+                pass
             r = db.session.execute(
                 text("""
                     INSERT INTO ai_call_logs
                       (endpoint, user_id, success, duration_ms, tokens_in, tokens_out,
                        model, error_code, error_message,
-                       role, language, org_id)
+                       role, language, org_id, usd_cost)
                     VALUES
                       (:endpoint, :uid, :ok, :dur, :ti, :to,
                        :model, NULL, :err,
-                       :role, :lang, :oid)
+                       :role, :lang, :oid, :cost)
                     RETURNING id
                 """),
                 {
@@ -1050,10 +1064,20 @@ class AIService:
                     "dur": latency_ms, "ti": input_tokens, "to": output_tokens,
                     "model": "claude-sonnet-4-6", "err": error,
                     "role": role, "lang": language, "oid": org_id,
+                    "cost": usd_cost,
                 },
             )
             row = r.fetchone()
             db.session.commit()
+
+            # Phase 115 — fire monthly-cap threshold notification (best effort)
+            if usd_cost and org_id:
+                try:
+                    from app.services.cost_ceiling_service import maybe_fire_threshold_notification
+                    maybe_fire_threshold_notification(org_id)
+                except Exception as e:
+                    logger.debug('cost ceiling notification skipped: %s', e)
+
             return row[0] if row else None
         except Exception as e:
             try:

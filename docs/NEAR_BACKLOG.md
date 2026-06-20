@@ -584,6 +584,23 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-19** Phase 114-119 — Retire `is_oversight_body_member()`
+  admin shortcut (admins no longer get phantom OB seats on every
+  network; emergency-declaration + network-membership endpoints opt in
+  to `allow_admin_override=True` for the paper-ceremony fallback).
+  Every `AIService._record_call` now estimates `usd_cost` and fires
+  Phase 108 monthly-cap threshold notifications (was previously only
+  hit on `log_replayable_ai_call` paths). New `<AIFeedbackChip>`
+  generic component captures used/edited/dismissed signals; wired on
+  the Phase 107 portfolio-qa surface. New `/api/peer-snippets/<criterionKey>`
+  returns 1-3 anonymized excerpts from peer awarded applications
+  ranked by sector + country Jaccard; `<PeerSnippetsButton>` renders
+  inline on every criterion. Real PNG QR code on TOTP enrol (Phase 118
+  dropped the qrcode lib + dynamic data-URL render). New
+  `<RubricLivePreview>` shows a sticky-side per-criterion bar updated
+  per keystroke from a deterministic length+structure+specificity
+  heuristic (no AI, no server round-trip).
+
 - **2026-06-19** Phase 107-112 — Donor portfolio Q&A, per-tenant AI cost
   ceiling + threshold notifications, PG CHECK constraints, voice on apply
   + declaration fields, data-export download CTA + dark-mode toggle, real

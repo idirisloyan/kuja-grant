@@ -368,7 +368,7 @@ def _is_ob_or_admin() -> bool:
 
 
 @network_membership_bp.route("/pending", methods=["GET"])
-@ob_required  # Phase 44C — was admin; OB members of this network see the queue
+@ob_required(allow_admin_override=True)  # Phase 44C — OB members see the queue; Phase 114 — admins can still observe (read-only)
 def api_list_pending_memberships():
     """List memberships awaiting OB decision in the current network.
 
@@ -423,7 +423,7 @@ def api_get_membership(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/approve", methods=["POST"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_approve_membership(membership_id):
     m = NetworkMembership.query.get_or_404(membership_id)
     # Scope-check: admin must be acting within the network that owns this row.
@@ -442,7 +442,7 @@ def api_approve_membership(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/reject", methods=["POST"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_reject_membership(membership_id):
     m = NetworkMembership.query.get_or_404(membership_id)
     body = get_request_json() or {}
@@ -471,7 +471,7 @@ def api_reject_membership(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/suspend", methods=["POST"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_suspend_membership(membership_id):
     m = NetworkMembership.query.get_or_404(membership_id)
     body = get_request_json() or {}
@@ -493,7 +493,7 @@ def api_suspend_membership(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/run-trust-process", methods=["POST"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_run_trust_process(membership_id):
     """Phase 15 (NEAR redesign) — NEAR operator runs the trust process on
     behalf of the network. Triggers the existing trust-profile build
@@ -616,7 +616,7 @@ def api_run_trust_process(membership_id):
 
 
 @network_membership_bp.route("/<int:membership_id>/expel", methods=["POST"])
-@ob_required
+@ob_required(allow_admin_override=True)
 def api_expel_membership(membership_id):
     m = NetworkMembership.query.get_or_404(membership_id)
     body = get_request_json() or {}
