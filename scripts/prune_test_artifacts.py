@@ -60,14 +60,45 @@ from app.utils.test_artifact_titles import (
 
 
 def _find_test_grants() -> list[Grant]:
-    return (
+    """Find every Grant the pruner considers a test artifact.
+
+    Combines three SQL filters (cheap, indexable) and one Python-side
+    pass (regex patterns + empty/whitespace check) so we can match
+    the same titles `is_test_artifact_title()` matches without having
+    to encode the regex in Postgres-specific syntax.
+    """
+    # Coarse SQL filter — anything that's plausibly a test artifact.
+    # We then refine in Python via `is_test_artifact_title`.
+    candidates = (
         Grant.query
         .filter(db.or_(
             Grant.title.in_(set(LEGACY_TEST_GRANT_TITLES)),
             Grant.title.startswith(E2E_TITLE_PREFIX),
+            Grant.title.is_(None),
+            Grant.title == '',
+            # Specific test-runner prefixes (some end in `-<n>` instead
+            # of a space-separated timestamp, so they won't match the
+            # generic " <digits>" regex below).
+            Grant.title.like('SOAK-%'),
+            Grant.title.like('SOAK30-%'),
+            Grant.title.like('E2E Test Grant %'),
+            Grant.title.like('BROWSER E2E %'),
+            Grant.title.like('API CORE RETEST %'),
+            Grant.title.like('Somalia drought emergency %'),
+            # Generic catch-all for `<phrase> <unix-ms>` titles. The
+            # Python filter (`is_test_artifact_title`) narrows these
+            # to titles where the trailing 10-13 digit token is a
+            # standalone numeric suffix.
+            Grant.title.op('~')(r' [0-9]{10,13}$'),
         ))
         .all()
     )
+    # Refine: keep only what `is_test_artifact_title` confirms. This
+    # guards against the SQL prefix filters accidentally pulling a
+    # seed title with a similar prefix (e.g. a real grant titled
+    # "SOAK testing program" would NOT match the SOAK-<digits>-<n>
+    # regex).
+    return [g for g in candidates if is_test_artifact_title(g.title)]
 
 
 def _find_stale_draft_apps(grant_ids: list[int], stale_days: int) -> list[Application]:
@@ -83,16 +114,42 @@ def _find_stale_draft_apps(grant_ids: list[int], stale_days: int) -> list[Applic
 
 
 def _delete_apps_dependents(app_ids: list[int]) -> dict[str, int]:
-    """Delete rows that point at Application but don't cascade.
+    """Delete rows that point at Application but don't cascade at the DB level.
 
-    Returns a count map: {table: rows_deleted}. Application.documents
-    and Application.reviews have cascade='all, delete-orphan' on the
-    relationship — they fall out when the Application row is removed.
-    Diligence and Report references to applications do NOT cascade.
+    Returns a count map: {table: rows_deleted}. Application.documents and
+    Application.reviews declare cascade='all, delete-orphan' on the
+    SQLAlchemy relationship, but that cascade only fires through the ORM
+    session (i.e. db.session.delete(obj_instance)). The bulk
+    `query.filter(...).delete(synchronize_session=False)` path we use here
+    issues a single DELETE statement that bypasses the cascade — so the
+    DB-level FK constraint (reviews_application_id_fkey,
+    documents_application_id_fkey) rejects the delete. We have to clear
+    these tables explicitly first.
+
+    Diligence and Report references to applications also do not cascade
+    and are handled below.
     """
     counts = {}
     if not app_ids:
         return counts
+    try:
+        from app.models.review import Review
+        counts['reviews'] = (
+            Review.query
+            .filter(Review.application_id.in_(app_ids))
+            .delete(synchronize_session=False)
+        )
+    except Exception as e:
+        counts['reviews'] = f"skipped ({e!s})"
+    try:
+        from app.models.document import Document
+        counts['documents'] = (
+            Document.query
+            .filter(Document.application_id.in_(app_ids))
+            .delete(synchronize_session=False)
+        )
+    except Exception as e:
+        counts['documents'] = f"skipped ({e!s})"
     try:
         from app.models.diligence import DiligenceItem
         counts['diligences'] = (
