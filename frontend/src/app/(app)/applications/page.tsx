@@ -15,6 +15,7 @@ import { RecencyChip } from '@/components/shared/recency-chip';
 import { ApplicationKanban } from '@/components/applications/application-kanban';
 import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
 
 import { FileText, Eye, ArrowRight, Inbox } from 'lucide-react';
 import {
@@ -62,17 +63,26 @@ export default function ApplicationsPage() {
   // worth capturing. The filter chip strip is keyboard-accessible and
   // i18n-free (status labels come from StatusBadge's role-aware lookup).
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  // Phase 211 — donor/reviewer shortlist filter (in-memory only — the
+  // is_starred bool already lands in app.to_dict()).
+  const [showStarredOnly, setShowStarredOnly] = useState(false);
+  const canSeeStarred = viewer?.role !== 'ngo';
   const applications = useMemo(() => {
-    if (statusFilter === 'all') return all;
-    // Phase 195 — meta filters for the donor archive.
-    if (statusFilter === 'archived') {
-      return all.filter((a) => ARCHIVED_STATES.has(a.status));
+    let rows = all;
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'archived') {
+        rows = rows.filter((a) => ARCHIVED_STATES.has(a.status));
+      } else if (statusFilter === 'active') {
+        rows = rows.filter((a) => !ARCHIVED_STATES.has(a.status));
+      } else {
+        rows = rows.filter((a) => a.status === statusFilter);
+      }
     }
-    if (statusFilter === 'active') {
-      return all.filter((a) => !ARCHIVED_STATES.has(a.status));
+    if (showStarredOnly && canSeeStarred) {
+      rows = rows.filter((a) => Boolean((a as { is_starred?: boolean }).is_starred));
     }
-    return all.filter((a) => a.status === statusFilter);
-  }, [all, statusFilter]);
+    return rows;
+  }, [all, statusFilter, showStarredOnly, canSeeStarred]);
 
   if (isLoading) {
     return (
@@ -184,6 +194,29 @@ export default function ApplicationsPage() {
             {s === 'all' ? t('common.all') || 'All' : describeApplicationStatus(s).label}
           </button>
         ))}
+        {/* Phase 211 — shortlist filter (donor/reviewer/admin). */}
+        {canSeeStarred && (
+          <button
+            type="button"
+            onClick={() => setShowStarredOnly((v) => !v)}
+            aria-pressed={showStarredOnly}
+            className={cn(
+              'rounded-full border text-xs px-3 py-1.5 transition-colors inline-flex items-center gap-1',
+              showStarredOnly
+                ? 'bg-[hsl(var(--kuja-clay))] text-white border-transparent'
+                : 'border-border text-foreground hover:bg-muted',
+            )}
+          >
+            <span aria-hidden>★</span> Shortlisted
+          </button>
+        )}
+        {/* Phase 215 — bulk unstar when shortlist filter is on. */}
+        {canSeeStarred && showStarredOnly && applications.length > 0 && (
+          <BulkUnstarButton
+            ids={applications.map((a) => a.id)}
+            onDone={() => window.location.reload()}
+          />
+        )}
       </div>
 
       {canSeeKanban && view === 'kanban' ? (
@@ -264,5 +297,33 @@ export default function ApplicationsPage() {
       )}
       </PageMain>
     </PageShell>
+  );
+}
+
+// Phase 215 — bulk-unstar action when the shortlist filter is on.
+function BulkUnstarButton({ ids, onDone }: { ids: number[]; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    if (busy || ids.length === 0) return;
+    if (!confirm(`Remove ${ids.length} application${ids.length === 1 ? '' : 's'} from shortlist?`)) return;
+    setBusy(true);
+    try {
+      await api.post('/api/applications/bulk-star', { ids, starred: false });
+      onDone();
+    } catch {
+      alert('Could not unstar.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={go}
+      disabled={busy}
+      className="rounded-full border border-border text-xs px-3 py-1.5 hover:bg-muted disabled:opacity-60"
+    >
+      {busy ? 'Removing…' : `Unstar ${ids.length}`}
+    </button>
   );
 }

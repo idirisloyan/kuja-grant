@@ -38,6 +38,7 @@ import { ImpactCard } from '@/components/dashboards/impact-card';
 import { NewGrantMatchesCard } from '@/components/dashboards/new-grant-matches-card';
 import { PeerWinRateCard } from '@/components/dashboards/peer-win-rate-card';
 import { DeadlineThisWeekCard } from '@/components/dashboards/deadline-this-week-card';
+import { DocsRequestedCard } from '@/components/dashboards/docs-requested-card';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -145,6 +146,8 @@ export function AttentionNgoDashboard() {
       <NewGrantMatchesCard />
       {/* Phase 207 — Drafts with deadline ≤ 7 days. Self-gates when none. */}
       <DeadlineThisWeekCard />
+      {/* Phase 212 — Donor-requested extra documents. Self-gates when none. */}
+      <DocsRequestedCard />
       {/* Phase 154 — rolling 12-month impact summary. Self-gates if zero activity. */}
       <ImpactCard />
       {/* Phase 185 — peer-anonymized win rate by sector. Self-gates

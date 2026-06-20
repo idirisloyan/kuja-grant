@@ -584,6 +584,20 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 211-215 — Shortlist usability pass: (a)
+  `?starred=1` filter added to `/api/applications` + new "Shortlisted"
+  pill on the applications list (donor/reviewer/admin). (b) NGO
+  dashboard picks up `<DocsRequestedCard>` — surfaces unread
+  `application_document_requested` notifications (created by Phase
+  202). Needed `?type=` filter on `/api/notifications` which is now
+  supported. (c) Donor dashboard picks up `<DonorShortlistCard>` —
+  reads `/api/applications?starred=1`. Hidden when empty. (d)
+  "My shortlist" quick link on the reviewer reviews page lands on
+  `/applications?starred=1` which already enforces reviewer scope.
+  (e) New `POST /api/applications/bulk-star` (max 100 ids) +
+  "Unstar N" button on the applications list when the shortlist
+  filter is on.
+
 - **2026-06-20** Phase 205-209 — Operational closeout: (a) New
   `/api/cron/reviewer-digest` POST creates an in-app digest
   Notification per reviewer with pending count + oldest assignment

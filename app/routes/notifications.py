@@ -37,6 +37,11 @@ def api_list_notifications():
     if unread_only:
         query = query.filter_by(read=False)
 
+    # Phase 212 — optional ?type=foo to scope by notification type.
+    notif_type = request.args.get('type')
+    if notif_type:
+        query = query.filter_by(type=notif_type)
+
     # Unread first, then by created_at descending
     query = query.order_by(Notification.read.asc(), Notification.created_at.desc())
 

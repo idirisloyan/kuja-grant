@@ -118,6 +118,18 @@ function ReviewerView() {
       />
       <PageMain>
 
+      {/* Phase 214 — quick link to the reviewer's starred shortlist
+          across all reviews they've handled. Lands on /applications
+          which already enforces reviewer scoping. */}
+      <div className="flex justify-end">
+        <a
+          href="/applications?starred=1"
+          className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+        >
+          ★ My shortlist
+        </a>
+      </div>
+
       {(compareResult || compareError) && (
         <ReviewerCompareCard
           result={compareResult}

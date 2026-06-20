@@ -123,6 +123,10 @@ def api_list_applications():
     if grant_id:
         query = query.filter(Application.grant_id == grant_id)
 
+    # Phase 211 — donor/reviewer shortlist filter.
+    if request.args.get('starred') in ('1', 'true'):
+        query = query.filter(Application.is_starred == True)  # noqa: E712
+
     query = query.order_by(Application.created_at.desc())
     pagination = paginate_query(query)
 
@@ -672,6 +676,46 @@ def api_request_revision(app_id):
         logger.debug('revision-request notify skipped: %s', e)
 
     return jsonify({'success': True, 'application': application.to_dict()})
+
+
+@applications_bp.route('/bulk-star', methods=['POST'])
+@role_required('donor', 'admin', 'reviewer')
+def api_bulk_star_applications():
+    """Phase 215 — Bulk star/unstar.
+
+    Body: { ids: [int], starred: bool }
+    Donors must own every parent grant; mixed access → 403.
+    """
+    data = get_request_json() or {}
+    raw_ids = data.get('ids') or []
+    if not isinstance(raw_ids, list) or not raw_ids:
+        return jsonify({'error': 'ids must be a non-empty list'}), 400
+    try:
+        ids = [int(x) for x in raw_ids][:100]
+    except (TypeError, ValueError):
+        return jsonify({'error': 'ids must be integers'}), 400
+    starred = bool(data.get('starred', True))
+
+    apps = Application.query.filter(Application.id.in_(ids)).all()
+    if not apps:
+        return jsonify({'success': True, 'updated': 0})
+
+    if current_user.role == 'donor':
+        for a in apps:
+            g = db.session.get(Grant, a.grant_id) if a.grant_id else None
+            if not g or g.donor_org_id != current_user.org_id:
+                return jsonify({'error': 'Access denied'}), 403
+
+    n = 0
+    for a in apps:
+        if a.is_starred != starred:
+            a.is_starred = starred
+            n += 1
+    if n > 0:
+        db.session.commit()
+    log_action('application.bulk_star_toggled', current_user.email,
+               'application', apps[0].id, {'count': n, 'starred': starred, 'ids': ids})
+    return jsonify({'success': True, 'updated': n})
 
 
 @applications_bp.route('/<int:app_id>/star', methods=['POST'])
