@@ -351,7 +351,7 @@ def run_agent(query: str, current_user, *, max_steps: int = 3) -> dict:
         scoped = client.with_options(timeout=AIService._resolve_timeout('chat'))
         for _ in range(max_steps):
             resp = scoped.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=1024,
                 system=system,
                 tools=available_tools,

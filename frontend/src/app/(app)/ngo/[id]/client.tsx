@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { NameChip } from '@/components/shared/name-chip';
 import { NativeShareButton } from '@/components/shared/native-share-button';
+import { OneNumberCard } from '@/components/shared/one-number-card';
 import { PageShell, PageBack, PageMain } from '@/components/layout/page-shell';
 
 interface NGOSummary {
@@ -202,31 +203,29 @@ export default function NGOSummaryClient() {
         </div>
       )}
 
-      {/* Delivery snapshot */}
+      {/* Delivery snapshot — Phase 98.4 OneNumberCard pattern */}
       <div>
         <h2 className="kuja-display text-lg mb-2">Delivery snapshot</h2>
-        <div className="grid grid-cols-3 gap-2">
-          <Card className="p-3">
-            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-              <Award className="h-3 w-3" /> Awarded
-            </div>
-            <div className="text-2xl font-semibold tabular-nums mt-0.5">{data.awarded_count ?? 0}</div>
-            <div className="text-[10px] text-muted-foreground">applications won</div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-              <Briefcase className="h-3 w-3" /> Active
-            </div>
-            <div className="text-2xl font-semibold tabular-nums mt-0.5">{data.active_grant_count ?? 0}</div>
-            <div className="text-[10px] text-muted-foreground">grants in flight</div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-              <FileCheck2 className="h-3 w-3" /> Reports
-            </div>
-            <div className="text-2xl font-semibold tabular-nums mt-0.5">{data.reports_submitted_count ?? 0}</div>
-            <div className="text-[10px] text-muted-foreground">submitted on time</div>
-          </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <OneNumberCard
+            label="Awarded"
+            value={String(data.awarded_count ?? 0)}
+            icon={Award}
+            comparison="applications won"
+          />
+          <OneNumberCard
+            label="Active"
+            value={String(data.active_grant_count ?? 0)}
+            icon={Briefcase}
+            comparison="grants in flight"
+          />
+          <OneNumberCard
+            label="Reports"
+            value={String(data.reports_submitted_count ?? 0)}
+            icon={FileCheck2}
+            comparison="submitted on time"
+            tone="success"
+          />
         </div>
       </div>
 

@@ -29,7 +29,7 @@ admin_health_bp = Blueprint('admin_health', __name__, url_prefix='/api/admin')
 # Anthropic prices as of 2026-04 — update when the bill arrives.
 # Prices in USD per million tokens.
 _PRICING = {
-    'claude-sonnet-4-20250514': {'input': 3.0, 'output': 15.0},
+    'claude-sonnet-4-6': {'input': 3.0, 'output': 15.0},
     'claude-haiku-4-5-20250514': {'input': 0.30, 'output': 1.5},  # rough ratio
 }
 
@@ -331,7 +331,7 @@ def api_ai_spend():
         logging.getLogger('kuja').exception('ai-spend SQL failed')
         return error_response('admin.ai_spend_query_failed', 500, detail=str(e)[:200])
 
-    sonnet = _PRICING['claude-sonnet-4-20250514']
+    sonnet = _PRICING['claude-sonnet-4-6']
     per_day_map: dict[str, dict] = {}
     per_endpoint_map: dict[str, dict] = {}
     total_usd = 0.0
@@ -417,7 +417,7 @@ def api_ai_spend_forecast():
         return error_response('admin.ai_spend_forecast_failed', 500, detail=str(e)[:200])
     in_t = int((rows[0] if rows else 0) or 0)
     out_t = int((rows[1] if rows else 0) or 0)
-    sonnet = _PRICING['claude-sonnet-4-20250514']
+    sonnet = _PRICING['claude-sonnet-4-6']
     trailing_total = (in_t / 1_000_000 * sonnet['input']) + (out_t / 1_000_000 * sonnet['output'])
     daily_avg = trailing_total / max(trailing, 1)
     forecast_30 = daily_avg * 30

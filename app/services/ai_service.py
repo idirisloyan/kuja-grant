@@ -578,7 +578,7 @@ class AIService:
                 "cache_control": {"type": "ephemeral"},
             }]
             message = scoped.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=max_tokens,
                 system=system_blocks,
                 messages=[{"role": "user", "content": user_message}],
@@ -600,7 +600,7 @@ class AIService:
             input_tokens = getattr(usage, 'input_tokens', 0) if usage else 0
             output_tokens = getattr(usage, 'output_tokens', 0) if usage else 0
             logger.info(
-                f"AI_CALL endpoint={endpoint or '-'} model=claude-sonnet-4-20250514 "
+                f"AI_CALL endpoint={endpoint or '-'} model=claude-sonnet-4-6 "
                 f"role={role or '-'} lang={language or 'en'} "
                 f"input_tokens={input_tokens} output_tokens={output_tokens} "
                 f"latency_ms={latency_ms} max_tokens={max_tokens}"
@@ -759,7 +759,7 @@ class AIService:
             per_call_timeout = cls._resolve_timeout(endpoint)
             scoped = client.with_options(timeout=per_call_timeout)
             message = scoped.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=max_tokens,
                 system=system_prompt,
                 tools=[{
@@ -1048,7 +1048,7 @@ class AIService:
                 {
                     "endpoint": endpoint, "uid": user_id, "ok": success,
                     "dur": latency_ms, "ti": input_tokens, "to": output_tokens,
-                    "model": "claude-sonnet-4-20250514", "err": error,
+                    "model": "claude-sonnet-4-6", "err": error,
                     "role": role, "lang": language, "oid": org_id,
                 },
             )
@@ -3923,13 +3923,13 @@ Return ONLY valid JSON."""
                 )
                 if content_blocks is not None:
                     response = scoped.messages.create(
-                        model="claude-sonnet-4-20250514",
+                        model="claude-sonnet-4-6",
                         max_tokens=1500,  # native PDF needs more headroom
                         messages=[{"role": "user", "content": content_blocks}],
                     )
                 else:
                     response = scoped.messages.create(
-                        model="claude-sonnet-4-20250514",
+                        model="claude-sonnet-4-6",
                         max_tokens=1000,
                         messages=[{"role": "user", "content": prompt}],
                     )
@@ -4177,7 +4177,7 @@ Analyze this registration document and extract the following information. Return
 }}"""
 
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=1500,
                     messages=[{"role": "user", "content": prompt}]
                 )
@@ -4506,7 +4506,7 @@ RETURN ONLY valid JSON in this exact shape (no commentary, no markdown fences):
             # the lower ceiling speeds start-of-generation without
             # affecting any actual transcript we've seen in UAT.
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=1800,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -4683,7 +4683,7 @@ Return ONLY JSON in this exact shape (no markdown):
 }}"""
 
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=2500,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -4927,7 +4927,7 @@ OUTPUT — return ONLY JSON in this shape (no markdown):
 Aim for 2-4 specific issues and 2-4 suggestions. Do NOT invent reasons that aren't supported by the content or donor notes — if the donor gave no useful feedback, say so transparently in the summary."""
 
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=2500,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -5060,7 +5060,7 @@ Return ONLY valid JSON in this shape (no markdown):
 }}"""
 
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=4096,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -5244,7 +5244,7 @@ Return ONLY valid JSON in this shape (no markdown fences, no preamble):
             # tokens of JSON; the lower ceiling cuts start-of-generation
             # latency without affecting the actual output we've seen.
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=1800,
                 messages=[{
                     "role": "user",
@@ -5381,7 +5381,7 @@ IMPORTANT: compliance_score MUST equal the arithmetic average of all per_require
 Return ONLY valid JSON, no other text."""
 
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=3000,
                     messages=[{"role": "user", "content": prompt}]
                 )
@@ -5643,7 +5643,7 @@ If the document doesn't clearly specify reporting requirements, infer reasonable
 Return ONLY valid JSON, no other text."""
 
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=2000,
                     messages=[{"role": "user", "content": prompt}]
                 )

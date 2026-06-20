@@ -1355,3 +1355,148 @@ def api_application_activity(app_id):
     events = events[:100]
 
     return jsonify({'success': True, 'events': events, 'application_id': app_id})
+
+
+@applications_bp.route('/<int:app_id>/pre-submit-preview', methods=['GET'])
+@login_required
+def api_application_pre_submit_preview(app_id):
+    """Phase 98.7 (Wave 3) — pre-submission preview.
+
+    Returns "what a reviewer will likely see" with a predicted band + the
+    1-2 cheapest fixes that would move the score, computed from the
+    application's current draft responses against the grant's criteria.
+
+    This v0 is a rule-based heuristic — no new AI call — so it's cheap
+    enough to run on every draft autosave. Wave 3 final replaces the
+    heuristic with the AI prediction once the prompt is tuned.
+
+    Auth: only the applying NGO + admin can read.
+    """
+    import json as _json
+    application = (
+        Application.query.options(db.joinedload(Application.grant))
+        .filter_by(id=app_id).first()
+    )
+    if not application:
+        return jsonify({'success': False, 'error': 'application.not_found'}), 404
+    if current_user.role == 'ngo' and application.ngo_org_id != current_user.org_id:
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    criteria = (
+        application.grant.get_criteria()
+        if application.grant and hasattr(application.grant, 'get_criteria')
+        else []
+    )
+    if not criteria:
+        return jsonify({
+            'success': True,
+            'status': 'low-conf',
+            'reason': 'no_criteria_defined',
+        })
+
+    try:
+        responses = _json.loads(application.responses or '{}')
+    except Exception:
+        responses = {}
+
+    # Heuristic per-criterion score: 0..1 from response length.
+    # < 40 chars   → 0.10   (almost empty)
+    # < 120 chars  → 0.40
+    # < 400 chars  → 0.70
+    # >= 400 chars → 0.90
+    per_crit = []
+    filled = 0
+    for c in criteria:
+        if not isinstance(c, dict):
+            continue
+        key = str(c.get('key') or c.get('id') or '')
+        weight = float(c.get('weight') or 0)
+        label = c.get('label') or key
+        text = str(responses.get(key, '') or '').strip()
+        n = len(text)
+        if n == 0:
+            score = 0.0
+        elif n < 40:
+            score = 0.10
+        elif n < 120:
+            score = 0.40
+        elif n < 400:
+            score = 0.70
+        else:
+            score = 0.90
+        if n > 0:
+            filled += 1
+        per_crit.append({
+            'key': key, 'label': label, 'weight': weight,
+            'score': score, 'response_len': n,
+        })
+
+    if filled < max(2, len(per_crit) // 3):
+        return jsonify({
+            'success': True,
+            'status': 'low-conf',
+            'reason': 'too_few_responses_filled',
+            'filled': filled,
+            'total_criteria': len(per_crit),
+        })
+
+    # Weighted overall (0..1)
+    total_weight = sum(p['weight'] for p in per_crit) or 1.0
+    overall = sum(p['score'] * p['weight'] for p in per_crit) / total_weight
+
+    if overall >= 0.78:
+        band = 'Likely strong (top 25%)'
+        confidence = 'high'
+    elif overall >= 0.60:
+        band = 'Likely competitive'
+        confidence = 'medium'
+    elif overall >= 0.40:
+        band = 'Borderline'
+        confidence = 'medium'
+    else:
+        band = 'Likely below threshold'
+        confidence = 'low'
+
+    # Cheapest fixes — pick the 2 weighted-lowest criteria the user has
+    # NOT yet filled deeply, sorted by weight × headroom desc.
+    def headroom(p):
+        return (0.90 - p['score']) * p['weight']
+    fixes_sorted = sorted(per_crit, key=headroom, reverse=True)
+    fixes = []
+    for p in fixes_sorted[:3]:
+        if p['score'] >= 0.85:
+            continue
+        # Weights here are stored as 0..100 in the criteria JSON, not 0..1.
+        # Normalise so the displayed % is always 0..100.
+        w = p['weight']
+        w_pct = int(round(w if w > 1 else w * 100))
+        if p['response_len'] == 0:
+            label_text = f"Answer the «{p['label']}» question — it carries {w_pct}% of the score"
+            est = 6
+        elif p['response_len'] < 120:
+            label_text = f"Expand «{p['label']}» — add 1-2 specifics"
+            est = 4
+        else:
+            label_text = f"Strengthen «{p['label']}» with a concrete example"
+            est = 4
+        fixes.append({
+            'label': label_text,
+            'fieldId': p['key'],
+            'estimatedMinutes': est,
+        })
+        if len(fixes) >= 2:
+            break
+
+    return jsonify({
+        'success': True,
+        'status': 'ready',
+        'predictedBand': band,
+        'confidence': confidence,
+        'overall_score_pct': round(overall * 100, 1),
+        'filled': filled,
+        'total_criteria': len(per_crit),
+        'fixes': fixes,
+        'method': 'rule-based-v0',
+    })

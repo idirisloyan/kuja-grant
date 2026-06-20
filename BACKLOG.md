@@ -28,9 +28,393 @@ re-discussing.
 
 ## High priority
 
-_None open. Last sweep on 2026-05-06 closed all open high-priority
-items. New high-priority work should land here with a clear "Why"
-section before any code is written._
+### Phase 98 — Design backlog (June 2026 design review)
+
+**Context.** A design review document landed June 2026 with ~30 ideas
+across AI substrate, design, UI, usability, clutter removal, trust /
+differentiation, and measurement. Review pass agreed with most ideas,
+deferred four for design re-spike, and added ten reliability + usability
+ideas of our own. This block is the implementation plan.
+
+**Session-of-2026-06-19 status:** Wave 1 components shipped + wired,
+Wave 3 pre-submit preview shipped (rule-based v0), Wave 4 public Trust
+Profile share page shipped, RTL + dark-mode + a11y all verified in
+browser. WhatsApp / offline PWA / verifiable credential export are
+multi-week and remain committed in the relevant Wave sections below.
+
+**Sequencing principle:** Wave 1 first (pure design/UX; no new infra),
+then Wave 2a (channels — WhatsApp, voice extension, predictive nudge
+wiring), then Wave 2b (offline-first PWA + IndexedDB queue — biggest
+engineering chunk), then Wave 3 (foresight — pre-submit preview, jargon
+melt, OB confirmation card), then Wave 4 (moat — portable Trust Profile
+share page + AI quality instrumentation expansion).
+
+**Cross-cutting guardrail (every wave):** validate with moderated,
+native-language sessions on a mid-range phone over a throttled
+connection. This is the ship gate, not the polish step.
+
+---
+
+#### Wave 1 — Coherence (no new infra; ship first)
+
+Shipped in this commit (June 2026):
+- ~~`shared/waiting-for.tsx`~~ — humanises wait states ("Waiting for 2
+  signatures · Amina signed; Peter pending"). Wired into
+  `/admin/declarations/[id]`. Extends Phase 62-63 named-entities to
+  signature-pending surfaces.
+- ~~`shared/time-estimate.tsx`~~ — "~6 min · 3 of 5 fields" badge.
+- ~~`shared/ai-diff.tsx`~~ — universal Propose → Diff → Accept pattern
+  with word-level inline diff. Exports `editDistanceWords` for the AI
+  quality metric.
+- ~~`shared/one-number-card.tsx`~~ — one big number + one next action +
+  optional peer comparison. Replaces metric-soup tiles.
+- ~~`shared/sticky-mobile-cta.tsx`~~ — pinned bottom primary action on
+  mobile; inline above sm:.
+- ~~`shared/why-this-match.tsx`~~ — match transparency. 1-3 reason
+  facets with optional precise values.
+- ~~`shared/pre-submit-preview.tsx`~~ — "what a reviewer will see" with
+  predicted band + top 2 cheap fixes.
+- ~~`shared/predictive-nudge.tsx`~~ — "You're 80% done · ~6 min left ·
+  next: Save and continue" replacing dumb deadline reminders.
+- ~~`shared/collapse-section.tsx`~~ — secondary content collapsed by
+  default; persisted state per `storageKey`.
+- ~~`shared/primary-ai-bar.tsx`~~ — one primary AI verb per surface;
+  "More AI tools" dropdown for everything else. Extends Phase 83.
+- ~~`lib/ai-quality.ts`~~ — `recordAiQuality()` + `markFalseConfidence()`
+  client-side telemetry. Pairs edit-ratio with false-confidence rate
+  so we don't optimise acceptance into confidently-wrong AI.
+
+Additional Wave 1 wirings landed in this session:
+- ~~`OneNumberCard` on `/ngo/[id]` Delivery snapshot~~ — 3 cards with
+  real data (Awarded, Active, Reports).
+- ~~`TimeEstimate` on `/reports/[id]`~~ — shown for draft reports next
+  to due date.
+- ~~`CollapseSection` on `/reports/[id]`~~ — wraps the AI analysis block
+  with persisted open/close state.
+- ~~`WhyThisMatch` on `/grants/[id]` for NGO users~~ — 3 reasons
+  (country/sector/amount) with caveat.
+- ~~`/admin/design-gallery`~~ — admin-only dev surface that renders
+  all 10 components with sample data + interactivity for QA.
+- ~~RTL/dark-mode/a11y verified~~ — all 10 components survive Arabic
+  layout (1159px at 1280px desktop, dir=rtl); dark-mode-token mapping
+  works (added explicit `dark:` variants on the amber/sky semantic-light
+  components); `role="status"` on WaitingFor + `aria-label` on AiDiff;
+  native `<button>` + `aria-expanded` on CollapseSection.
+
+Open (Wave 1 work remaining):
+- Sweep existing dashboards beyond `/ngo/[id]` to use `OneNumberCard`.
+  Next targets: `/admin/dashboard`, `/dashboard`, donor dashboards,
+  reviewer queue.
+  `last_touched: 2026-06-19`
+- **App-wide dark mode toggle** — `dark:` variants exist on the new
+  components but the app itself has no theme switcher (admin dashboard
+  body remained `rgb(255,255,255)` in the verification pass until I
+  force-added the `.dark` class on `<html>`). Needs: theme toggle in
+  user settings, `prefers-color-scheme` listener, dark-token audit
+  across pre-Phase-98 surfaces.
+  `last_touched: 2026-06-19`
+- **Other browsers** — only Chrome-based preview tested today; need
+  Firefox + Safari pass before claiming cross-browser support.
+  `last_touched: 2026-06-19`
+- **Real screen reader pass** — NVDA / VoiceOver on the new components.
+  ARIA attributes audited (role/aria-label/aria-expanded) but the
+  announcement order + live-region behaviour needs assistive-tech run.
+  `last_touched: 2026-06-19`
+- **Real-device mobile testing** — emulated 375×812 viewport verified
+  StickyMobileCta pin; need a real phone on 3G/4G to validate touch
+  targets + sticky behaviour with the iOS Safari bottom-bar quirk +
+  Android keyboard overlay.
+  `last_touched: 2026-06-19`
+- **Long-form load tests** — components verified with realistic sample
+  data; no load-test pass against very long forms (50+ field apps) or
+  reviewer queues with 100+ items.
+  `last_touched: 2026-06-19`
+- Audit every page for "one primary action per page" — enforce as a
+  code-review rule. Anything with two co-equal primary buttons is a
+  bug; demote one to a text link.
+- Enforce `EmptyState` body field (currently optional) — fail lint when
+  an EmptyState is rendered without a `body` that names the next action
+  and why it matters.
+- Replace all per-page percentage-style AI confidence with the existing
+  bucketed `AIConfidenceBadge` (already calm) — codemod sweep.
+- Unify duplicate vocabularies. Audit for the same concept shown two
+  ways (status words, role labels, type chips) — pick one and dedupe.
+- Persistent quiet journey rail — extend the Phase 92 journey tracker
+  to render as a thin top rail on every NGO screen, not a page to visit.
+- Cross-tenant token unification — Kuja + NEAR share infrastructure but
+  must share one token + component system with two themes. Audit for
+  drift.
+
+#### Wave 2a — Channels (after Wave 1 sweep)
+
+- **WhatsApp Business API for deadline nudges + status changes** —
+  vendor integration (likely Twilio or 360dialog). Outbound first
+  (cheaper, easier), inbound report-by-WhatsApp as a Wave 2b stretch.
+- **SMS fallback** for users where WhatsApp isn't available.
+- **Voice on every long field** — extend Phase 71 from reports to apply
+  responses + declaration descriptions, six languages, same
+  map-to-structure + coverage feedback.
+- **Time + effort estimates everywhere** — sweep using
+  `<TimeEstimate>` on every multi-step form.
+- **Predictive nudge wiring** — implement the server-side estimate
+  computation (autosave snapshot + field schema + historical median),
+  feed `<PredictiveNudge>`.
+- **"What changed since you last visited" digest** (our addition) —
+  shown on login. Compresses re-orientation cost for weekly users.
+- **Magic-link login via email AND WhatsApp** (our addition) — Global
+  South NGOs lose password-reset emails frequently. Reduces churn.
+- **Global "simplify" reading-level control** (from the design doc) —
+  one toggle that rewrites on-screen content to a lower reading level
+  in the user's language (AI-generated, cached). Helps users with
+  limited literacy or non-native English far beyond translation alone.
+  Concern to design through first: which copy is rewritable (narrative)
+  vs not (legal/compliance/contractual language must stay verbatim).
+  Cache key per term per language to lock in vocabulary across sessions.
+  `last_touched: 2026-06-19`
+
+#### Wave 2b — Offline-first
+
+- PWA install + IndexedDB queue. The `pwa-install-banner.tsx`
+  component already exists as a starter; need the actual service worker
+  + queue + reconciliation logic.
+- Offline status indicator + sync states ("Saved on your device · will
+  send when you're back online").
+- Conflict resolution on reconnect — surface a clear diff when the
+  server changed while the user was offline.
+- Bandwidth-aware media (our addition) — detect poor connection, more
+  aggressive photo compression, queue large uploads.
+- Resumable file uploads (our addition) — RFC 8673 / tus.io for
+  agreements + reports.
+- Accessibility floor — large-text mode, high-contrast theme, full
+  keyboard paths, RTL for Arabic. Treated as ship gates per language,
+  not enhancements.
+
+#### Wave 3 — Foresight
+
+- ~~**Pre-submit "what reviewer will see"** wiring~~ — shipped in this
+  session. Rule-based v0: backend `/api/applications/<id>/pre-submit-
+  preview` computes a band + top 2 cheap fixes from response length
+  per criterion + criterion weights. No new AI call. Wired into
+  `/applications/[id]/client.tsx` for owning NGOs on draft state.
+  **Next:** replace heuristic with AI prediction once the prompt is
+  tuned (multi-day, separate session).
+- **Jargon-melting on tap** — extends `concept-helper.tsx` with
+  AI-cached per-language rewrites for unknown terms.
+- **OB visual confirmation card** for declaration-as-conversation
+  (Phase 79) — parse is invisible, confirmation is explicit.
+- **Smart batch operations for reviewers** (our addition) — "score 5
+  applications in a row using the same rubric" instead of context-
+  switching back and forth.
+- **Inline scenario modeling** (our addition) — "What if I delay this
+  report by 2 weeks?" → shows downstream impact.
+- **Inactivity-triggered help** (our addition) — 45-second nudge with
+  "Stuck? Here's what most users do."
+
+#### Wave 4 — Moat + measurement
+
+- ~~**Portable Trust Profile share page**~~ — shipped 2026-06-19.
+  Backend `/api/passport/share/<slug>` returns 200 with the snapshot
+  (no token); 410 Gone for revoked / expired / non-active with the
+  reason. Frontend `/trust/share/[slug]/` renders the existing
+  `TrustProfileCard` primitive in `showActions={false}` mode + a
+  "Public snapshot — for cryptographic verification, ask the NGO for
+  the token-bearing link" framing. Browser-verified for both active
+  and revoked states. The "fresh share link" copy renders for the
+  revoked case without leaking the old snapshot.
+- Verifiable credential export (W3C VC format) the NGO can send to any
+  funder, on or off Kuja. **The Portable Share Page above is the
+  precursor.** Multi-week (see "What is genuinely multi-week" below).
+  `last_touched: 2026-06-19`
+- **"Why this match" transparency** wiring — `<WhyThisMatch>` exists
+  and is wired on `/grants/[id]` (NGO view) with country/sector/amount
+  match facets computed locally from grant data. **Needs:** real
+  recommendation endpoint that emits per-NGO match-reasoning with
+  readiness + past-success + capacity-match signals, and wiring on
+  the NGO dashboard / Marketplace cards. 2-3 days.
+  `last_touched: 2026-06-19`
+- AI quality dashboard — admin-side rollup of `editRatio` per surface
+  per language; flags surfaces with high editRatio (weak prompt) or
+  high `falseConfidenceRate` (confidently wrong). **Backend telemetry
+  shipped** (`/api/ai-telemetry/quality` + `/api/ai-telemetry/false-
+  confidence` write to `ai_call_logs` with endpoint tag
+  `ai-quality/<surface>`, rolled up by existing Phase 97
+  `/api/admin/ai-telemetry`). **UI not built** — dedicated admin page
+  needs the quality-specific cuts: median edit-ratio per surface,
+  false-confidence rate per surface × language, mode-distribution
+  histogram (verbatim/blended/rejected). Estimate 2-3 days.
+  `last_touched: 2026-06-19`
+- **Per-donor "ask about my grantees" surface** (our addition) —
+  donor-side mirror of the NGO compliance coach. Cited answers across
+  the portfolio.
+- **Grant agreement template library** (our addition) — public library
+  of templates donors can fork.
+
+#### Cross-cutting metrics (instrumentation)
+
+Per the design doc Section 7, plus our addition of the false-confidence
+rate guardrail:
+
+- Journey funnel: completion + drop-off at each stage (Build profile →
+  Apply → Submit → Award → Report).
+- AI acceptance rate per surface per language (already supported by
+  `recordAiQuality()`).
+- Time-to-first-submission and time-to-first-report for a new NGO.
+- On-time reporting rate vs peer median over time.
+- NEAR signing pace median + p90 days-to-signed against 6-day SLA.
+- **False confidence rate** (our addition) — % of times users accepted
+  AI verbatim AND the recipient (donor/reviewer/OB) later corrected it.
+  Without this, the team optimises acceptance and misses confidently-
+  wrong AI. Captured by `markFalseConfidence()`.
+
+#### Reliability additions (our list — beyond the input doc)
+
+- **Per-surface AI cost ceiling user-visible** — extend Phase 97 admin
+  telemetry to user-visible per-tenant cost meter. Backend telemetry
+  table exists (`ai_call_logs.tokens_in/out`); needs a per-tenant
+  meter component + admin-side cap configuration UI + soft/hard
+  threshold notifications. 3-4 days. (This was previously marked done
+  by mistake; the meter UI was never built — only the rollup endpoint.)
+  `last_touched: 2026-06-19`
+- AI fallback hierarchy with user-visible status — when Claude is
+  unavailable and we degrade to Haiku, show "Using draft mode — full
+  review available shortly" instead of silent fallback.
+- Replay tooling for audit chain disputes — given an entry, replay the
+  exact AI input/output that produced it. Required for compliance trust.
+- Synthetic production monitoring — end-to-end tests running every 30
+  minutes against critical paths (NGO apply, reviewer score, donor
+  agreement upload). Page on failure.
+- Database integrity invariants — assert at the DB level that key
+  invariants hold (e.g. `grant.total >= sum(grant.line_items.amount)`).
+  Catches drift from bugs and admin tooling errors.
+- Read-only failover mode — when the DB is degraded, allow reads
+  (past grants, reports) even when writes fail. Better than full outage.
+- Per-tenant data export bundle — daily snapshot the NGO can download.
+  Removes the "what if Kuja goes away?" CFO objection.
+- Tenant health dashboard — proactive monitoring of each tenant's data
+  integrity, AI quality, signature pace. Surface drift before it bites.
+- Graceful degradation when third-party APIs fail (OpenSanctions, the
+  African registry adapters, Plaid, OpenAI Whisper) — each has a
+  documented failure mode that doesn't block the user.
+- SIM-roam-resistant sessions — users in our markets switch SIMs
+  frequently. Sessions should survive IP changes without re-login.
+
+#### Usability additions (our list — beyond the input doc)
+
+- Recurring meeting / signature blocks — let an OB member declare
+  "I can sign 9-11am Tuesdays". System schedules nudges around it.
+- Voice search / global voice command — "show me my reports due this
+  month" navigates. Voice for navigation, not just for input.
+- Inline currency / unit / date conversion — USD grant agreement read by
+  Kenyan NGO shows KES inline; "30 days from award" shows the actual
+  date in user's locale.
+- Drafts shared across NGOs (with permission) — if NGO A's similar
+  application won, NGO B (with consent) can use it as a template.
+- Co-pilot for the NGO board meeting — auto-generate the board-pack
+  from the platform (Elevate-style capability for Grant-only customers).
+- "Why this notification?" link on every alert — explain which rule
+  fired; offer mute/configure. Reduces notification fatigue.
+- Onboarding that doesn't gate the value — let an NGO draft a grant
+  application before completing their Trust Profile (gate the submit,
+  not the draft).
+- Per-donor "house style" learning — AI learns each donor's preferred
+  narrative style from accepted applications.
+- Anti-data-loss when battery dies — tune autosave cadence based on
+  battery indicator where available.
+- Offline-first reviewer mode — reviewers might travel; let them
+  download applications, score offline, sync.
+
+#### Deferred (revisit conditions explicit per backlog convention)
+
+Four ideas from the design review document deferred after review:
+
+1. **Draft-first as universal default state for every long field.**
+   Idea: AI proposal pre-filled in every long field, user edits/accepts.
+   *Why deferred:* training users to accept-without-reading is a real
+   failure mode for high-stakes factual fields (budget, beneficiary
+   count, indicators). *Revisit trigger:* design re-spike that
+   distinguishes stylistic fields (drafts YES) from high-stakes
+   factual fields (drafts NO, AI confirms numbers but doesn't propose
+   them). `last_touched: 2026-06-18`
+
+2. **Reviewer consistency assist comparing to own historical pattern.**
+   Idea: flag when a reviewer's score diverges from their own
+   historical pattern. *Why deferred:* fairness paradox — if a
+   reviewer realised they've been too lenient and is now correcting,
+   the flag suppresses the correction and reinforces the old bias.
+   *Revisit trigger:* re-spike that compares to panel average instead,
+   with separate (not real-time) self-reflection surface for own-drift.
+   `last_touched: 2026-06-18`
+
+3. **Single live "Readiness" gauge per role.**
+   Idea: one calm gauge per role that recomputes as the user works,
+   showing the one thing that would move it most. *Why deferred:* risk
+   of becoming the only metric anyone optimises for, and the inputs
+   will be reverse-engineered within weeks. *Revisit trigger:*
+   re-spike with anti-gaming inputs and decision on whether the gauge
+   is ever cross-NGO comparable (probably not). `last_touched: 2026-06-18`
+
+4. **Cross-device resume (laptop ↔ phone).**
+   Idea: server-synced draft so the user can start on a phone and
+   finish on a laptop. *Why deferred:* harder than it looks — needs
+   careful conflict resolution if the user has been offline on two
+   devices simultaneously. *Revisit trigger:* paired with Wave 2b
+   offline-first work; conflict resolution UX designed first.
+   `last_touched: 2026-06-18`
+
+- `last_touched: 2026-06-18`
+
+#### What is genuinely multi-week (not session-achievable, even at pace)
+
+The user asked for "the remaining waves from today" — being honest about
+why some Wave items are still in the backlog after pulling everything
+within reach:
+
+- **Wave 2a WhatsApp Business API integration.** Requires Twilio /
+  360dialog account, real-domain WhatsApp Business profile registration
+  (multi-week vendor process), conversational templates approval cycle,
+  inbound webhook handlers, two-way ID linking from phone number to
+  Kuja user, opt-in/opt-out flows, and language detection per message.
+  Estimate: 4-6 weeks of focused work even after vendor onboarding.
+  **Next step:** kick off vendor procurement; meanwhile, the existing
+  email-based deadline nudges remain the channel.
+- **Wave 2a SMS fallback.** Same vendor question + per-country carrier
+  cost modelling. 2-3 weeks.
+- **Wave 2b offline-first PWA.** Service worker design + IndexedDB
+  schema + queue + reconciliation UI + offline status indicator + sync
+  conflict resolution. Estimate: 6-10 weeks. The `pwa-install-banner.tsx`
+  starter exists.
+- **Wave 4 verifiable credential (W3C VC) export.** Requires choosing a
+  VC suite (e.g. BBS+ for selective disclosure), issuer DID, key
+  management, revocation list publishing, an example verifier. 4-6
+  weeks. The shareable-public-link landed today is the precursor.
+- **Wave 4 donor "ask about my grantees" surface.** Requires an AI Q&A
+  endpoint scoped to donor's grantee portfolio with citations to source
+  records. 2-3 weeks just for the prompt + grounding work.
+- **Wave 3 AI prediction for pre-submit.** Replace the rule-based v0
+  shipped today. Multi-day prompt tuning + offline eval against past
+  applications + telemetry instrumentation.
+- **App-wide dark mode toggle.** The Phase 98 components ship with
+  `dark:` variants, but the app has no theme switcher today (no `.dark`
+  class on `<html>` from any user action; body stays
+  `rgb(255,255,255)` in default state). Needs: settings-page toggle,
+  `prefers-color-scheme` listener, persist preference per user,
+  audit pre-Phase-98 surfaces for dark-token compliance, validate
+  on print stylesheets. 1-2 weeks.
+- **AI quality dashboard UI** (companion to the Phase 98.10 telemetry
+  endpoint). Backend telemetry is shipped + verified end-to-end; the
+  admin page that surfaces median edit-ratio per surface +
+  false-confidence rate × language + mode distribution does not exist
+  yet. 2-3 days.
+- **Per-tenant AI cost meter UI.** Telemetry exists; the user-visible
+  cost meter component + admin-side cap config + threshold
+  notifications do not. 3-4 days.
+
+These items remain committed in the relevant Wave sections above; the
+estimates here are the scope honesty that lets the team plan against
+them rather than slip them into a single session.
+
+- `last_touched: 2026-06-19` (session update — Wave 1 deep wirings +
+  Wave 3 pre-submit v0 + Wave 4 share page shipped)
 
 ---
 

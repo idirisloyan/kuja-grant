@@ -201,7 +201,7 @@ class AdverseMediaService:
             import time
             t0 = time.monotonic()
             message = client.with_options(timeout=120).messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=4096,
                 system=system_prompt,
                 tools=tools,

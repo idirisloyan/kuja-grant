@@ -47,7 +47,7 @@ import os
 logger = logging.getLogger(__name__)
 
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY')
-MODEL_PRIMARY = "claude-sonnet-4-20250514"
+MODEL_PRIMARY = "claude-sonnet-4-6"
 MODEL_FAST = "claude-haiku-4-5-20251001"
 
 

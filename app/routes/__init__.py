@@ -67,7 +67,7 @@ def register_blueprints(app):
     from app.routes.journey_routes import journey_bp  # Phase 92: continuous NGO journey
     from app.routes.ai_health_routes import ai_health_bp  # Phase 93: AI service health probe
     from app.routes.whisper_routes import whisper_bp  # Phase 96: OpenAI Whisper fallback transcription
-    from app.routes.ai_telemetry_routes import ai_telemetry_bp  # Phase 97: admin AI failure-rate rollup
+    from app.routes.ai_telemetry_routes import ai_telemetry_bp, ai_quality_bp  # Phase 97 admin rollup + Phase 98.10 producer endpoints
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -85,5 +85,5 @@ def register_blueprints(app):
                emergency_bp, window_report_bp, network_ai_bp,
                tenant_message_bp, member_feedback_bp, translate_bp,
                compliance_explainer_bp, journey_bp, ai_health_bp,
-               whisper_bp, ai_telemetry_bp]:
+               whisper_bp, ai_telemetry_bp, ai_quality_bp]:
         app.register_blueprint(bp)

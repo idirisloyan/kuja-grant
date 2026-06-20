@@ -382,6 +382,48 @@ def api_revoke_passport(passport_id):
     })
 
 
+@trust_bp.route('/passport/share/<slug>', methods=['GET'])
+def api_share_passport(slug):
+    """PUBLIC endpoint — read a published Capacity Passport by slug ONLY.
+
+    Phase 98.4 (Wave 4) — extends Phase 77 trust-portable badge to a
+    shareable, no-token public URL. Marketing/funder-facing surface so
+    NGOs can put the link on their website + business card. Returns the
+    snapshot data on the same shape as /api/passport/verify, minus the
+    share token and minus the audit-trail bump (verification_count is
+    not incremented for unauthenticated share reads, to avoid bot inflation).
+
+    Revocation handling: if the passport's status is anything other than
+    'active' (revoked / expired / draft), the endpoint returns 410 Gone
+    with the reason. The frontend renders a clear "stale credential"
+    state rather than the snapshot.
+    """
+    from app.models import CapacityPassport
+    p = CapacityPassport.query.filter_by(slug=slug).first()
+    if not p:
+        return jsonify({'success': False, 'reason': 'not_found'}), 404
+    if p.status == 'revoked':
+        return jsonify({'success': False, 'reason': 'revoked'}), 410
+    if p.expires_at and p.expires_at < datetime.now(timezone.utc):
+        return jsonify({'success': False, 'reason': 'expired'}), 410
+    if p.status != 'active':
+        return jsonify({'success': False, 'reason': p.status}), 410
+
+    snapshot = p.to_dict(include_token=False)
+    # For the cryptographically-anchored verify URL we hand to the donor,
+    # use the existing verify route — but the NGO does NOT share that link
+    # publicly because the token in it is bearer-style.
+    return jsonify({
+        'success': True,
+        'verified': False,  # NOT verified; just the published snapshot
+        'public_share': True,
+        'passport': snapshot,
+        # Hint the frontend can use to surface a "Verify cryptographically"
+        # CTA — the verify URL has the token only the NGO can produce.
+        'verify_hint': 'Verify cryptographically via the link your NGO sent you (with ?t=<token>).',
+    })
+
+
 @trust_bp.route('/passport/verify/<slug>', methods=['GET'])
 def api_verify_passport(slug):
     """PUBLIC endpoint — verify a Capacity Passport by slug + token.

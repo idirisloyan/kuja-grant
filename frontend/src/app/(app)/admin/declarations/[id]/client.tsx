@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { DeclarationLedgerPanel } from '@/components/declarations/declaration-ledger-panel';
 import { DeclarationStepper } from '@/components/declarations/declaration-stepper';
+import { WaitingFor, type Actor } from '@/components/shared/waiting-for';
 import {
   PageShell, PageBack, PageHeader, PageMain, PageDetail, PageDetailSection,
 } from '@/components/layout/page-shell';
@@ -115,6 +116,31 @@ export default function DeclarationDetailClient() {
       {/* Phase 45 stepper carries the live counter + count-aware "Next:" hint.
           This IS the page's attention surface for declarations. */}
       <DeclarationStepper d={d} />
+
+      {/* Phase 98.1 — humanise the wait. When signatures are pending, show
+          named signers and exactly who's holding things up so the OB chair
+          can chase the right person instead of staring at a counter. */}
+      {(d.status === 'draft' || d.status === 'in_review') &&
+        (d.signatures ?? []).length > 0 &&
+        (d.signed_count < d.required_signer_count) && (
+        <WaitingFor
+          what={`${d.required_signer_count - d.signed_count} signature${
+            d.required_signer_count - d.signed_count === 1 ? '' : 's'
+          }`}
+          actors={
+            (d.signatures ?? []).map<Actor>(s => ({
+              name: s.signer_name || s.signer_email || `User #${s.signer_user_id}`,
+              status:
+                s.status === 'signed' ? 'done' :
+                s.status === 'recused' || s.status === 'rejected' ? 'declined' :
+                'pending',
+              at: s.signed_at,
+              role: s.signer_org_name || undefined,
+            }))
+          }
+          className="mb-3"
+        />
+      )}
 
       <PageMain>
         {/* Context: summary + evidence anchor */}

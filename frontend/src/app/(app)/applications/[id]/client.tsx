@@ -22,6 +22,7 @@ import { ApplicationTimeline } from '@/components/applications/application-timel
 import { StatusSignalsRail } from '@/components/shared/status-signals-rail';
 import { WhyRejectedPanel } from '@/components/shared/why-rejected-panel';
 import { PreflightPanel } from '@/components/shared/preflight-panel';
+import { PreSubmitPreview, type Fix } from '@/components/shared/pre-submit-preview';
 import { ReviewerFollowupsPanel } from '@/components/reviews/reviewer-followups-panel';
 import { ReviewerBriefingCard } from '@/components/reviews/reviewer-briefing-card';
 import { PanelCalibrationCard } from '@/components/reviews/panel-calibration-card';
@@ -145,6 +146,13 @@ export default function ApplicationDetailClient() {
       />
 
       <PageMain>
+        {/* Phase 98.7 (Wave 3) — pre-submit preview. Only shown for the
+            owning NGO while the application is still a draft. Rule-based
+            v0 server-side; replaced by AI prediction in Wave 3 final. */}
+        {application.status === 'draft' && isOwnerNgo && (
+          <ApplicationPreSubmitPreview applicationId={application.id} />
+        )}
+
         {/* Phase 76 — Why-rejected, constructively. Surfaces only when
             the application is declined / rejected / revision_requested.
             On-demand AI explanation; lazy-loaded when opened. */}
@@ -425,5 +433,45 @@ function EmptyTab({ icon: Icon, label }: { icon: typeof FileText; label: string 
       <Icon className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
       <p className="text-sm text-muted-foreground">{label}</p>
     </div>
+  );
+}
+
+interface PreSubmitData {
+  status?: 'ready' | 'low-conf';
+  predictedBand?: string;
+  confidence?: 'high' | 'medium' | 'low';
+  fixes?: Fix[];
+}
+
+function ApplicationPreSubmitPreview({ applicationId }: { applicationId: number }) {
+  const [data, setData] = useState<PreSubmitData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/applications/${applicationId}/pre-submit-preview`)
+      .then(r => r.json())
+      .then(j => { if (!cancelled) setData(j); })
+      .catch(() => { if (!cancelled) setData({ status: 'low-conf' }); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [applicationId]);
+  const status: 'loading' | 'ready' | 'low-conf' =
+    loading ? 'loading' : (data?.status === 'ready' ? 'ready' : 'low-conf');
+  return (
+    <PreSubmitPreview
+      status={status}
+      predictedBand={data?.predictedBand}
+      confidence={data?.confidence}
+      fixes={data?.fixes}
+      onFixIt={(f) => {
+        // Jump to the responses tab + scroll to the field if present
+        if (f.fieldId && typeof window !== 'undefined') {
+          const el = document.getElementById(f.fieldId);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }}
+      className="mb-3"
+    />
   );
 }

@@ -22,6 +22,12 @@ logger = logging.getLogger('kuja')
 
 ai_telemetry_bp = Blueprint('ai_telemetry', __name__, url_prefix='/api/admin')
 
+# Phase 98.10 — AI quality telemetry. User-facing producer endpoints that
+# every AI-touched form submits to. Read side stays under the existing admin
+# rollup; producer side lives on a separate blueprint at /api/ai-telemetry
+# so the frontend ai-quality.ts module's hardcoded paths resolve.
+ai_quality_bp = Blueprint('ai_quality', __name__, url_prefix='/api/ai-telemetry')
+
 
 @ai_telemetry_bp.route('/ai-telemetry', methods=['GET'])
 @login_required
@@ -107,3 +113,106 @@ def api_ai_telemetry():
         'by_endpoint': by_endpoint,
         'recent_failures': recent_failures,
     })
+
+
+# ---------------------------------------------------------------------------
+# Phase 98.10 — AI quality (edit-distance + false-confidence)
+# ---------------------------------------------------------------------------
+#
+# These two endpoints accept producer events from `lib/ai-quality.ts` on the
+# frontend. The endpoints are intentionally lightweight: validate the payload
+# shape, log it, and reuse the existing AICallLog table (with endpoint tag
+# "ai-quality/<surface>") so the existing /api/admin/ai-telemetry rollup
+# surface picks the events up automatically. We intentionally do not block
+# the user on telemetry failure — bad input returns 200 + ignored=true.
+
+@ai_quality_bp.route('/quality', methods=['POST'])
+@login_required
+def api_ai_quality():
+    """Record an AI-quality event produced by recordAiQuality() on the client.
+
+    Payload (best-effort; all fields optional, ignored if malformed):
+      surface (str), mode ('verbatim'|'blended'|'rejected'),
+      editDistanceWords (int), proposedWords (int), finalWords (int),
+      editRatio (float 0..1), language (str), latencyMs (int),
+      capturedAtISO (ISO timestamp).
+
+    Returns 200 always so the producer's keepalive POST never errors —
+    invalid events are silently dropped with ignored=true.
+    """
+    from flask import request as flask_request
+    try:
+        body = flask_request.get_json(silent=True) or {}
+    except Exception:
+        body = {}
+
+    surface = str(body.get('surface') or '').strip()[:80]
+    mode = str(body.get('mode') or '').strip()
+    edit_ratio = body.get('editRatio')
+    if not surface or mode not in ('verbatim', 'blended', 'rejected'):
+        return jsonify({'success': True, 'ignored': True, 'reason': 'malformed'})
+
+    # Reuse AICallLog to avoid adding a separate table. The endpoint tag
+    # encodes the producer surface so the existing rollup groups events.
+    try:
+        log = AICallLog(
+            endpoint=f'ai-quality/{surface}',
+            success=True,
+            user_id=current_user.id if current_user.is_authenticated else None,
+            duration_ms=int(body.get('latencyMs') or 0) or None,
+            tokens_out=int(body.get('finalWords') or 0) or None,
+            error_code=mode,
+            error_message=(
+                f"editRatio={edit_ratio} "
+                f"editDistanceWords={body.get('editDistanceWords')} "
+                f"language={body.get('language') or 'n/a'}"
+            )[:500],
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception as e:
+        logger.warning('ai-quality log failed: %s', e)
+        db.session.rollback()
+        return jsonify({'success': True, 'ignored': True, 'reason': 'log_failed'})
+
+    return jsonify({'success': True})
+
+
+@ai_quality_bp.route('/false-confidence', methods=['POST'])
+@login_required
+def api_ai_false_confidence():
+    """Record a false-confidence event: AI was accepted verbatim but later
+    corrected by a recipient (donor / reviewer / OB / system).
+
+    This is the metric guardrail introduced in the Phase 98 design review:
+    without it, the team optimises AI acceptance and ships confidently-wrong
+    output. Pairs with /quality above.
+    """
+    from flask import request as flask_request
+    try:
+        body = flask_request.get_json(silent=True) or {}
+    except Exception:
+        body = {}
+
+    surface = str(body.get('surface') or '').strip()[:80]
+    item_id = str(body.get('itemId') or '').strip()[:64]
+    corrected_by = str(body.get('correctedBy') or '').strip()
+    if not surface or corrected_by not in ('donor', 'reviewer', 'ob', 'system'):
+        return jsonify({'success': True, 'ignored': True, 'reason': 'malformed'})
+
+    try:
+        log = AICallLog(
+            endpoint=f'ai-quality/{surface}/false-confidence',
+            success=False,
+            user_id=current_user.id if current_user.is_authenticated else None,
+            error_code=corrected_by,
+            error_message=f'item={item_id} corrected_by={corrected_by}'[:500],
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception as e:
+        logger.warning('ai-false-confidence log failed: %s', e)
+        db.session.rollback()
+        return jsonify({'success': True, 'ignored': True, 'reason': 'log_failed'})
+
+    return jsonify({'success': True})

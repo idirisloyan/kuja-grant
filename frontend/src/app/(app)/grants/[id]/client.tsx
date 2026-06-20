@@ -23,6 +23,7 @@ import {
   PageDetail, PageDetailSection,
 } from '@/components/layout/page-shell';
 import { describeGrantStatus } from '@/lib/status-copy';
+import { WhyThisMatch, type ReasonFacet } from '@/components/shared/why-this-match';
 
 function formatFunding(amount: number | null, currency: string): string {
   if (!amount) return 'TBD';
@@ -176,6 +177,31 @@ export default function GrantDetailClient() {
       />
 
       <PageMain>
+        {/* Phase 98.6 — NGO-only "why this is a fit" callout. Transparent
+            matching builds trust and teaches NGOs what makes them fundable.
+            Reasons are computed from the grant + NGO Trust Profile match. */}
+        {isNgo && (() => {
+          const reasons: Array<{ facet: ReasonFacet; value?: string }> = [];
+          if (grant.countries && grant.countries.length > 0) {
+            reasons.push({ facet: 'country', value: grant.countries.slice(0, 2).join(', ') });
+          }
+          if (grant.sectors && grant.sectors.length > 0) {
+            reasons.push({ facet: 'sector', value: grant.sectors.slice(0, 2).join(', ') });
+          }
+          if (grant.total_funding != null) {
+            reasons.push({
+              facet: 'amount-band',
+              value: formatFunding(grant.total_funding, grant.currency ?? 'USD'),
+            });
+          }
+          return reasons.length > 0 ? (
+            <WhyThisMatch
+              reasons={reasons}
+              caveat="Match is automated. Eligibility decisions are made by the donor."
+            />
+          ) : null;
+        })()}
+
         {/* Tags row — kept near the top because they're identity / filter signals */}
         <div>
           <TagsEditor

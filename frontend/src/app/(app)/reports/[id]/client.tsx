@@ -33,6 +33,8 @@ import { describeReportStatus, TONE_PILL_CLASS } from '@/lib/status-copy';
 import { WhyRejectedPanel } from '@/components/shared/why-rejected-panel';
 import { TranslateThis } from '@/components/shared/translate-this';
 import { DeadlineNegotiator } from '@/components/reports/deadline-negotiator';
+import { TimeEstimate } from '@/components/shared/time-estimate';
+import { CollapseSection } from '@/components/shared/collapse-section';
 
 interface ReportDetail {
   id: number;
@@ -221,6 +223,17 @@ export default function ReportDetailClient() {
           ]}
         />
 
+        {/* Phase 98.2 — time-estimate badge for draft reports. Removes
+            "how long will this take?" friction at the top of the page. */}
+        {status === 'draft' && daysUntil(data.due_date) != null && (
+          <div className="mb-3 flex items-center justify-end">
+            <TimeEstimate
+              minutes={Math.max(5, (daysUntil(data.due_date) ?? 0) * 30)}
+              trailingLabel="estimated for first draft"
+            />
+          </div>
+        )}
+
         <PageAttention items={attention} />
 
         <PageMain>
@@ -266,15 +279,16 @@ export default function ReportDetailClient() {
           )}
 
           {data.ai_analysis?.summary && (
-            <section className="border border-border rounded-lg bg-card p-5">
-              <h2 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[hsl(var(--kuja-spark))]" />
-                AI analysis
-              </h2>
+            <CollapseSection
+              title="AI analysis"
+              storageKey={`report-${data.id}-ai-summary`}
+              defaultOpen={true}
+              caption="summary + score"
+            >
               <p className="text-sm whitespace-pre-wrap leading-relaxed">
                 {data.ai_analysis.summary}
               </p>
-            </section>
+            </CollapseSection>
           )}
 
           {/* Status pill duplicated inline for quick scan even when meta
