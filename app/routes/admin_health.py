@@ -771,3 +771,143 @@ def api_docs_html():
 </body>
 </html>"""
     return Response(html, mimetype='text/html')
+
+
+# ---------------------------------------------------------------------------
+# Test-artifact inventory (read-only)
+# ---------------------------------------------------------------------------
+#
+# The E2E suite (test_e2e_final.py) creates short-named draft grants like
+# "Apply Entry Test Grant" / "Tiny Test" / "Wizard E2E Grant" via the real
+# REST API, then leaves them behind when it exits. Over time these
+# accumulate on the donor dashboard and any NGO that drafted an application
+# against them sees that draft on their own dashboard — the demo data the
+# team tests against ends up indistinguishable from automation drift.
+#
+# This endpoint is the read-only inventory side. The pruner that actually
+# removes them is `scripts/prune_test_artifacts.py`.
+
+@admin_health_bp.route('/test-data/inventory', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_test_data_inventory():
+    """Read-only inventory of test-suite artifacts in this database.
+
+    Returns:
+      {
+        success: true,
+        test_grants: [{id, title, donor_email, created_at, application_count}],
+        test_applications: [{id, grant_id, grant_title, ngo_email, status, created_at}],
+        stale_drafts: [{id, grant_title, ngo_email, age_days, created_at}],
+        counts: {test_grants, test_applications, stale_drafts}
+      }
+
+    Query params:
+      stale_draft_age_days  (default 30, range 7..365) — drafts older than
+                            this AND not linked to a test grant.
+    """
+    from app.models.grant import Grant
+    from app.models.application import Application
+    from app.models.organization import Organization
+    from app.utils.test_artifact_titles import (
+        LEGACY_TEST_GRANT_TITLES, E2E_TITLE_PREFIX,
+    )
+
+    try:
+        stale_days = _parse_int_arg('stale_draft_age_days', 30, 7, 365)
+    except _BadIntArg as e:
+        return error_response('validation.invalid_value', 400,
+                              field=e.name, default=str(e))
+
+    legacy_set = set(LEGACY_TEST_GRANT_TITLES)
+    test_grants = (
+        Grant.query
+        .filter(db.or_(
+            Grant.title.in_(legacy_set),
+            Grant.title.startswith(E2E_TITLE_PREFIX),
+        ))
+        .all()
+    )
+    grant_ids = [g.id for g in test_grants]
+
+    test_apps = []
+    if grant_ids:
+        test_apps = (
+            Application.query
+            .filter(Application.grant_id.in_(grant_ids))
+            .all()
+        )
+
+    # Grant + Application both store created_at as naive UTC. Compare
+    # against a naive cutoff to avoid driver-level tz-awareness errors.
+    now_naive = datetime.utcnow()
+    cutoff = now_naive - timedelta(days=stale_days)
+    stale_drafts_q = (
+        Application.query
+        .filter(Application.status == 'draft')
+        .filter(Application.created_at < cutoff)
+    )
+    if grant_ids:
+        # Drafts on NON-test grants that are just old — surface separately
+        # so the operator can see them but they're not auto-pruned.
+        stale_drafts_q = stale_drafts_q.filter(~Application.grant_id.in_(grant_ids))
+    stale_drafts = stale_drafts_q.all()
+
+    # Resolve donor + NGO org names once, in batch.
+    org_ids: set[int] = set()
+    for g in test_grants:
+        if getattr(g, 'donor_org_id', None):
+            org_ids.add(g.donor_org_id)
+    for a in (*test_apps, *stale_drafts):
+        if getattr(a, 'ngo_org_id', None):
+            org_ids.add(a.ngo_org_id)
+    org_name_by_id = {
+        o.id: o.name
+        for o in Organization.query.filter(Organization.id.in_(org_ids)).all()
+    } if org_ids else {}
+
+    def _grant_row(g):
+        return {
+            'id': g.id,
+            'title': g.title,
+            'donor_org': org_name_by_id.get(getattr(g, 'donor_org_id', None)),
+            'created_at': g.created_at.isoformat() if getattr(g, 'created_at', None) else None,
+            'application_count': sum(1 for a in test_apps if a.grant_id == g.id),
+        }
+
+    def _app_row(a):
+        return {
+            'id': a.id,
+            'grant_id': a.grant_id,
+            'grant_title': next((g.title for g in test_grants if g.id == a.grant_id), None),
+            'ngo_org': org_name_by_id.get(a.ngo_org_id),
+            'status': a.status,
+            'created_at': a.created_at.isoformat() if getattr(a, 'created_at', None) else None,
+        }
+
+    def _stale_row(a):
+        age = (now_naive - a.created_at).days if a.created_at else None
+        return {
+            'id': a.id,
+            'grant_id': a.grant_id,
+            'ngo_org': org_name_by_id.get(a.ngo_org_id),
+            'status': a.status,
+            'age_days': age,
+            'created_at': a.created_at.isoformat() if a.created_at else None,
+        }
+
+    return jsonify({
+        'success': True,
+        'test_grants': [_grant_row(g) for g in test_grants],
+        'test_applications': [_app_row(a) for a in test_apps],
+        'stale_drafts': [_stale_row(a) for a in stale_drafts],
+        'counts': {
+            'test_grants': len(test_grants),
+            'test_applications': len(test_apps),
+            'stale_drafts': len(stale_drafts),
+        },
+        'stale_draft_age_days': stale_days,
+        'note': ('Read-only inventory. To delete: '
+                 'railway run python scripts/prune_test_artifacts.py --dry-run '
+                 'then add --confirm.'),
+    })

@@ -20,6 +20,17 @@ from requests.adapters import HTTPAdapter
 BASE = os.getenv("KUJA_URL", "https://web-production-6f8a.up.railway.app")
 PASS = "pass123"
 
+# Every grant title this suite creates is prefixed so the pruner
+# (`scripts/prune_test_artifacts.py`) and the admin inventory
+# endpoint (`GET /api/admin/test-data/inventory`) can recognise it
+# unambiguously. The list of legacy bare titles still lives in
+# `app/utils/test_artifact_titles.py` for backward compatibility.
+E2E_TITLE_PREFIX = "[E2E-TEST]"
+
+def E(label: str) -> str:
+    """Prefix a grant title so cleanup tooling recognises it."""
+    return f"{E2E_TITLE_PREFIX} {label}"
+
 # --- Retry-aware request helper for flaky network timing ---
 def _retry_session():
     """Create a requests session with automatic retries for transient errors."""
@@ -168,7 +179,7 @@ def test_empty_pdf_rejected_grants():
                  b"0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n"
                  b"trailer<</Size 3/Root 1 0 R>>\nstartxref\n109\n%%EOF")
     gr = s.post(f"{BASE}/api/grants", json={
-        "title": "Empty PDF Test", "description": "t", "total_funding": 1000,
+        "title": E("Empty PDF Test"), "description": "t", "total_funding": 1000,
         "currency": "USD", "status": "draft"
     }, timeout=10)
     gid = gr.json()["grant"]["id"]
@@ -199,7 +210,7 @@ run("DEF-UPL-001: Empty PDF -> 400 (document upload)", test_empty_pdf_rejected_d
 def test_tiny_file_rejected():
     s = login_ok(DONOR2)
     gr = s.post(f"{BASE}/api/grants", json={
-        "title": "Tiny Test", "description": "t", "total_funding": 1000,
+        "title": E("Tiny Test"), "description": "t", "total_funding": 1000,
         "currency": "USD", "status": "draft"
     }, timeout=10)
     gid = gr.json()["grant"]["id"]
@@ -214,7 +225,7 @@ run("DEF-UPL-001: Tiny file (8 bytes) -> 400", test_tiny_file_rejected)
 def test_exe_rejected():
     s = login_ok(DONOR2)
     gr = s.post(f"{BASE}/api/grants", json={
-        "title": "Exe Test", "description": "t", "total_funding": 1000,
+        "title": E("Exe Test"), "description": "t", "total_funding": 1000,
         "currency": "USD", "status": "draft"
     }, timeout=10)
     gid = gr.json()["grant"]["id"]
@@ -229,7 +240,7 @@ run("DEF-UPL-001: Unsupported .exe -> 400", test_exe_rejected)
 def test_valid_txt_accepted():
     s = login_ok(DONOR2)
     gr = s.post(f"{BASE}/api/grants", json={
-        "title": "Valid TXT Test", "description": "t", "total_funding": 50000,
+        "title": E("Valid TXT Test"), "description": "t", "total_funding": 50000,
         "currency": "USD", "status": "draft"
     }, timeout=10)
     gid = gr.json()["grant"]["id"]
@@ -263,7 +274,7 @@ def test_oversized_upload():
     FAILS if a 5xx is returned."""
     s = login_ok(DONOR2)
     gr = s.post(f"{BASE}/api/grants", json={
-        "title": "Oversized Test", "description": "t", "total_funding": 1000,
+        "title": E("Oversized Test"), "description": "t", "total_funding": 1000,
         "currency": "USD", "status": "draft"
     }, timeout=10)
     gid = gr.json()["grant"]["id"]
@@ -304,7 +315,7 @@ print("\n--- DEF-UI-001: Upload feedback (API level) ---")
 def test_upload_success_has_all_fields():
     s = login_ok(DONOR2)
     gr = s.post(f"{BASE}/api/grants", json={
-        "title": "Feedback Test", "description": "t", "total_funding": 50000,
+        "title": E("Feedback Test"), "description": "t", "total_funding": 50000,
         "currency": "USD", "status": "draft"
     }, timeout=10)
     gid = gr.json()["grant"]["id"]
@@ -329,7 +340,7 @@ run("DEF-UI-001: Upload response has all extraction fields", test_upload_success
 def test_upload_error_returns_json_error():
     s = login_ok(DONOR2)
     gr = s.post(f"{BASE}/api/grants", json={
-        "title": "Error Test", "description": "t", "total_funding": 1000,
+        "title": E("Error Test"), "description": "t", "total_funding": 1000,
         "currency": "USD", "status": "draft"
     }, timeout=10)
     gid = gr.json()["grant"]["id"]
@@ -351,7 +362,7 @@ print("\n--- DEF-UI-002: Save-as-draft (API level) ---")
 def test_save_draft_creates_grant():
     s = login_ok(DONOR2)
     r = s.post(f"{BASE}/api/grants", json={
-        "title": "Draft Save Test", "description": "Testing draft save",
+        "title": E("Draft Save Test"), "description": "Testing draft save",
         "total_funding": 5000, "currency": "USD", "status": "draft"
     }, timeout=10)
     assert r.status_code in (200, 201), f"Draft save failed: {r.status_code}"
@@ -369,7 +380,7 @@ run("DEF-UI-002: Save draft creates and persists grant", test_save_draft_creates
 def test_save_draft_update_existing():
     s = login_ok(DONOR2)
     r = s.post(f"{BASE}/api/grants", json={
-        "title": "Draft Update Test", "description": "Original",
+        "title": E("Draft Update Test"), "description": "Original",
         "total_funding": 5000, "currency": "USD", "status": "draft"
     }, timeout=10)
     gid = r.json()["grant"]["id"]
@@ -391,7 +402,7 @@ def test_apply_grant_detail_loads():
     global test_apply_grant_id
     s = login_ok(DONOR2)
     r = s.post(f"{BASE}/api/grants", json={
-        "title": "Apply Entry Test Grant", "description": "For apply test",
+        "title": E("Apply Entry Test Grant"), "description": "For apply test",
         "total_funding": 50000, "currency": "USD", "status": "draft"
     }, timeout=10)
     gid = r.json()["grant"]["id"]
@@ -401,7 +412,7 @@ def test_apply_grant_detail_loads():
     r2 = ns.get(f"{BASE}/api/grants/{gid}", timeout=10)
     assert r2.status_code == 200, f"Grant detail load failed: {r2.status_code}"
     grant = r2.json().get("grant", r2.json())
-    assert grant.get("title") == "Apply Entry Test Grant"
+    assert grant.get("title") == E("Apply Entry Test Grant")
 
 run("DEF-UI-003: Grant detail loads for apply entry", test_apply_grant_detail_loads)
 
@@ -440,7 +451,7 @@ run("AUTH: Unauthenticated -> 401", test_unauth_401)
 
 def test_ngo_cant_create_grant():
     s = login_ok(NGO1)
-    r = s.post(f"{BASE}/api/grants", json={"title": "X", "total_funding": 1000, "currency": "USD"}, timeout=10)
+    r = s.post(f"{BASE}/api/grants", json={"title": E("X"), "total_funding": 1000, "currency": "USD"}, timeout=10)
     assert r.status_code == 403
 
 run("AUTH: NGO cannot create grants -> 403", test_ngo_cant_create_grant)
@@ -450,7 +461,7 @@ def test_create_grant():
     global test_grant_id
     s = login_ok(DONOR2)
     r = s.post(f"{BASE}/api/grants", json={
-        "title": "Regression Grant", "description": "Test", "total_funding": 100000,
+        "title": E("Regression Grant"), "description": "Test", "total_funding": 100000,
         "currency": "USD", "deadline": "2026-12-31", "status": "draft"
     }, timeout=10)
     assert r.status_code in (200, 201)
@@ -695,7 +706,7 @@ def test_wizard_step1_create():
     global _wizard_grant_id
     s = login_ok(DONOR1)
     r = s.post(f"{BASE}/api/grants", json={
-        "title": "Wizard E2E Grant",
+        "title": E("Wizard E2E Grant"),
         "description": "End-to-end test of the 5-step donor wizard flow.",
         "total_funding": 250000,
         "currency": "USD",
@@ -797,7 +808,7 @@ def test_apply_load_details():
     r = s.get(f"{BASE}/api/grants/{_wizard_grant_id}", timeout=10)
     assert r.status_code == 200
     g = r.json().get("grant", r.json())
-    assert g.get("title") == "Wizard E2E Grant"
+    assert g.get("title") == E("Wizard E2E Grant")
     assert len(g.get("criteria", [])) >= 3
     assert len(g.get("doc_requirements", [])) >= 2
 
