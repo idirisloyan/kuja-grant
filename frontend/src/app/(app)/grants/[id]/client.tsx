@@ -195,6 +195,10 @@ export default function GrantDetailClient() {
           <Megaphone className="h-4 w-4" /> Broadcast
         </button>
       )}
+      {/* Phase 181 — duplicate this grant into a fresh draft. */}
+      {isDonor && grant.id != null && (
+        <DuplicateGrantButton grantId={grant.id} />
+      )}
       {isNgo && grant.status === 'open' && !grant.user_application_status && (
         <button
           type="button"
@@ -522,5 +526,45 @@ function EmptyBlock({ icon: Icon, label }: { icon: typeof FileText; label: strin
       <Icon className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
       <p className="text-sm text-muted-foreground">{label}</p>
     </div>
+  );
+}
+
+// Phase 181 — duplicate-grant CTA. Calls the Phase 177 backend, then
+// navigates the donor to the new draft so they can tweak title +
+// deadline and publish.
+function DuplicateGrantButton({ grantId }: { grantId: number }) {
+  const router = useRouter();
+  const { t: _t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  void _t;
+
+  async function go() {
+    if (busy) return;
+    if (!confirm('Duplicate this grant into a new draft? You can edit the copy before publishing.')) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await api.post<{ grant: { id: number } }>(
+        `/api/grants/${grantId}/duplicate`, {},
+      );
+      router.push(`/grants/${res.grant.id}`);
+    } catch {
+      alert('Failed to duplicate grant. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={go}
+      disabled={busy}
+      className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand))]/40 text-sm font-medium px-4 py-2 disabled:opacity-60"
+      title="Clone this grant into a new draft"
+    >
+      {busy ? 'Duplicating…' : 'Duplicate'}
+    </button>
   );
 }

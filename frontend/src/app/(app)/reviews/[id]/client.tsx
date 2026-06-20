@@ -338,14 +338,37 @@ export default function ReviewDetailClient() {
       <div className="rounded-xl border border-border bg-background p-5 border-l-4 border-l-[hsl(var(--kuja-spark))]">
         <div className="flex gap-2 flex-wrap">
           {application.ai_score != null && (
-            <ScoreBox
-              tone="spark"
-              icon={<Cpu className="h-3 w-3" />}
-              label="AI Score"
-              value={`${application.ai_score}%`}
-              valueCls={toneBy(application.ai_score)}
-              footnote="Completeness 25% · Relevance 35% · Depth 40%"
-            />
+            <div className="flex flex-col gap-1.5">
+              <ScoreBox
+                tone="spark"
+                icon={<Cpu className="h-3 w-3" />}
+                label="AI Score"
+                value={`${application.ai_score}%`}
+                valueCls={toneBy(application.ai_score)}
+                footnote="Completeness 25% · Relevance 35% · Depth 40%"
+              />
+              {/* Phase 183 — one-click "accept AI's overall score" shortcut.
+                  Snaps every criterion's score input to the AI's score so
+                  the reviewer can confirm + add comments instead of
+                  filling sliders. They can still override per-row. */}
+              <button
+                type="button"
+                onClick={() => {
+                  const target = Math.round(application.ai_score!);
+                  setScores((prev) => {
+                    const next = { ...prev };
+                    for (const c of criteria) {
+                      next[c.key] = { ...(next[c.key] ?? { score: 0, comment: '' }), score: target };
+                    }
+                    return next;
+                  });
+                }}
+                className="inline-flex items-center justify-center gap-1 rounded-md border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]/40 text-[hsl(var(--kuja-spark))] text-[10px] font-semibold px-2 py-1 hover:bg-[hsl(var(--kuja-spark-soft))]"
+                title="Snap every criterion's score to the AI's overall score"
+              >
+                Accept AI score
+              </button>
+            </div>
           )}
           <ScoreBox
             tone={overallScore > 0 ? 'success' : 'default'}

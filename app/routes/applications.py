@@ -581,21 +581,24 @@ def api_request_revision(app_id):
                'application', application.id,
                {'feedback_chars': len(feedback) if feedback else 0})
 
-    # Notify the NGO
+    # Phase 182 — per-user fan-out (Notification.user_id is NOT NULL).
     try:
-        from app.models import Notification
-        n = Notification(
-            user_id=None,  # org-wide; the existing notif system handles this
-            org_id=application.ngo_org_id,
-            kind='application_revision_requested',
-            payload_json=__import__('json').dumps({
-                'application_id': application.id,
-                'grant_id': application.grant_id,
-                'feedback': feedback,
-            }),
-        )
-        db.session.add(n)
-        db.session.commit()
+        from app.models import Notification, User
+        ngo_users = User.query.filter_by(
+            org_id=application.ngo_org_id, role='ngo',
+        ).all()
+        summary = (feedback[:140] + '…') if feedback and len(feedback) > 140 else feedback
+        for u in ngo_users:
+            n = Notification(
+                user_id=u.id,
+                type='application_revision_requested',
+                title='Donor requested a revision',
+                message=summary or 'Open the application to see what to change.',
+                link=f'/applications/{application.id}',
+            )
+            db.session.add(n)
+        if ngo_users:
+            db.session.commit()
     except Exception as e:
         logger.debug('revision-request notify skipped: %s', e)
 

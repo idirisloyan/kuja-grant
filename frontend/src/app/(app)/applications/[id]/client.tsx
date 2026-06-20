@@ -37,6 +37,7 @@ import { InactivityHelp } from '@/components/shared/inactivity-help';
 import { useAuthStore } from '@/stores/auth-store';
 import { api, ApiError } from '@/lib/api';
 import { toast } from 'sonner';
+import { DecisionAuditDrawer } from '@/components/applications/DecisionAuditDrawer';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
 const TAB_KEYS: { id: TabId; key: string }[] = [
@@ -163,6 +164,12 @@ export default function ApplicationDetailClient() {
             >
               PDF
             </a>
+            {/* Phase 184 — Decision audit drawer for donor / admin /
+                reviewer view: every status transition + actor + AI
+                call grounded in the hash-chained audit log. */}
+            {isReviewerSide && (
+              <DecisionAuditDrawer applicationId={application.id} />
+            )}
             {/* Phase 163 — Donor requests a revision instead of hard-rejecting. */}
             {(viewer?.role === 'donor' || viewer?.role === 'admin') &&
              ['submitted', 'under_review', 'scored', 'declined', 'rejected'].includes(application.status) && (

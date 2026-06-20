@@ -584,6 +584,24 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 181-185 — "Duplicate" CTA on grant detail
+  (donor/admin) calls the Phase 177 backend + routes to the new draft.
+  **Critical bugfix found in Phase 182:** Phase 167/169/176 + Phase
+  160 were writing Notification rows with non-existent kwargs
+  (`kind=`, `org_id=`, `payload_json=`, `user_id=None`) — the model
+  only has `user_id` (NOT NULL) + `type`/`title`/`message`/`link`.
+  All 4 sites fixed to fan out per-user across the relevant org +
+  use the schema fields; <NewGrantMatchesCard> updated to read the
+  new shape. New Phase 183 "Accept AI score" chip on the reviewer
+  page snaps every criterion's score to `application.ai_score` so
+  reviewers who concur with the AI can confirm + comment instead of
+  filling sliders. Decision audit drawer (existing Phase 10.8
+  component) now wired on the donor/admin/reviewer view of the
+  application detail page (Phase 184). New
+  `/api/journey/peer-win-rate` (NGO-only) returns this NGO's
+  win rate + an anonymized peer pool average; tile gates when
+  peer pool <5. `<PeerWinRateCard>` on NGO dashboard surfaces it.
+
 - **2026-06-20** Phase 175-179 — Reviewer page shows the donor's
   scoring guidance (instructions + example) inline next to each
   criterion as a collapsed details disclosure. Doc upload now

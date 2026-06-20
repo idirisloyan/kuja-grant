@@ -101,16 +101,13 @@ def fan_out_for_grant(grant_id: int) -> int:
         except Exception:
             continue
         try:
+            ss_name = getattr(ss, 'name', None) or 'saved search'
             n = Notification(
                 user_id=ss.user_id,
-                org_id=owner.org_id,
-                kind='grant_published_match',
-                payload_json=json.dumps({
-                    'grant_id': grant.id,
-                    'grant_title': grant.title,
-                    'saved_search_id': ss.id,
-                    'saved_search_name': getattr(ss, 'name', None),
-                }),
+                type='grant_published_match',
+                title='New grant matching your saved search',
+                message=f'“{grant.title}” matched “{ss_name}”.',
+                link=f'/grants/{grant.id}',
             )
             db.session.add(n)
             dispatched += 1

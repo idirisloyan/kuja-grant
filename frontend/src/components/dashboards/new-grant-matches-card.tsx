@@ -16,15 +16,12 @@ import { Card } from '@/components/ui/card';
 
 interface NotificationItem {
   id: number;
-  kind: string;
-  payload?: {
-    grant_id?: number;
-    grant_title?: string;
-    saved_search_id?: number;
-    saved_search_name?: string;
-  };
+  type: string;
+  title?: string;
+  message?: string;
+  link?: string | null;
+  read?: boolean;
   created_at?: string;
-  read_at?: string | null;
 }
 
 export function NewGrantMatchesCard() {
@@ -35,7 +32,7 @@ export function NewGrantMatchesCard() {
     api.get<{ notifications: NotificationItem[] }>('/api/notifications/?limit=30').then((r) => {
       if (cancelled) return;
       const matches = (r.notifications ?? [])
-        .filter((n) => n.kind === 'grant_published_match' && !n.read_at)
+        .filter((n) => n.type === 'grant_published_match' && !n.read)
         .slice(0, 5);
       setItems(matches);
     }).catch(() => {/* silent */});
@@ -57,17 +54,17 @@ export function NewGrantMatchesCard() {
         {items.map((n) => (
           <li key={n.id}>
             <Link
-              href={`/grants/${n.payload?.grant_id ?? 0}`}
+              href={n.link || '/grants'}
               className="block rounded-md border border-border p-2 hover:bg-muted/40"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium truncate">
-                    {n.payload?.grant_title ?? 'New grant'}
+                    {n.title || 'New grant matching your saved search'}
                   </div>
-                  {n.payload?.saved_search_name && (
-                    <div className="text-[11px] text-muted-foreground">
-                      matched: {n.payload.saved_search_name}
+                  {n.message && (
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {n.message}
                     </div>
                   )}
                 </div>

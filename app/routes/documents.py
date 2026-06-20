@@ -303,19 +303,22 @@ def api_upload_document():
                                     summary_json=_json.dumps(summary),
                                 )
                                 db.session.add(ams)
-                                # Notify the NGO that their compliance state was refreshed.
-                                n = Notification(
-                                    user_id=None,
-                                    org_id=org.id,
-                                    kind='compliance_refreshed',
-                                    payload_json=_json.dumps({
-                                        'document_id': doc_id,
-                                        'doc_type': doc_type,
-                                        'status': result.get('status') or 'clean',
-                                        'summary': summary,
-                                    }),
-                                )
-                                db.session.add(n)
+                                # Phase 182 — per-user fan-out (Notification.user_id NOT NULL).
+                                from app.models import User as _User
+                                ngo_users = _User.query.filter_by(org_id=org.id, role='ngo').all()
+                                status_label = (result.get('status') or 'clean').replace('_', ' ')
+                                for _u in ngo_users:
+                                    n = Notification(
+                                        user_id=_u.id,
+                                        type='compliance_refreshed',
+                                        title='Compliance check refreshed',
+                                        message=(
+                                            f'We re-ran your screening after the new {doc_type} '
+                                            f'upload. Status: {status_label}.'
+                                        ),
+                                        link='/compliance',
+                                    )
+                                    db.session.add(n)
                                 db.session.commit()
                                 logger.info(
                                     f"compliance re-screen after doc upload: org={org.id} status={result.get('status')}"

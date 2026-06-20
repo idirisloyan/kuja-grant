@@ -231,6 +231,111 @@ def api_my_journey():
     })
 
 
+@journey_bp.route('/peer-win-rate', methods=['GET'])
+@login_required
+@role_required('ngo')
+def api_peer_win_rate():
+    """Phase 185 — Anonymized peer win-rate benchmark for the NGO's sectors.
+
+    Returns:
+      - my_win_rate_pct: this NGO's win rate over the past year
+      - peer_win_rate_pct: average win rate of orgs sharing >=1 sector
+      - peer_count: how many peer orgs are in the pool
+      - my_apps: count of own apps in window
+      - my_awards: count of own awards in window
+
+    Self-gates: returns peer_win_rate_pct=null when peer_count < 5 so
+    we don't leak individual peer behavior. Sector matching is union-of-
+    sectors at the org level; we don't filter to grant-sector.
+    """
+    from sqlalchemy import func as _f
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    from app.models import Application, Organization
+
+    org_id = current_user.org_id
+    if not org_id:
+        return jsonify({'success': False, 'error': 'no_org'}), 400
+
+    org = db.session.get(Organization, org_id)
+    if not org:
+        return jsonify({'success': False, 'error': 'no_org'}), 400
+
+    since = _dt.now(_tz.utc) - _td(days=365)
+
+    # Own stats
+    try:
+        my_apps = (
+            db.session.query(_f.count(Application.id))
+            .filter(Application.ngo_org_id == org_id)
+            .filter(Application.submitted_at >= since)
+            .scalar()
+        ) or 0
+        my_awards = (
+            db.session.query(_f.count(Application.id))
+            .filter(Application.ngo_org_id == org_id)
+            .filter(Application.status == 'awarded')
+            .filter(Application.submitted_at >= since)
+            .scalar()
+        ) or 0
+    except Exception:
+        my_apps = 0
+        my_awards = 0
+    my_win_rate_pct = round(100 * my_awards / max(1, my_apps), 1) if my_apps > 0 else None
+
+    # Peer pool: orgs sharing at least one sector with this org.
+    my_sectors = set(s.lower() for s in (org.sectors or []) if s)
+    peer_orgs: list[int] = []
+    if my_sectors:
+        try:
+            candidates = (
+                Organization.query
+                .filter(Organization.org_type == 'ngo')
+                .filter(Organization.id != org_id)
+                .all()
+            )
+            for o in candidates:
+                their = set(s.lower() for s in (o.sectors or []) if s)
+                if my_sectors & their:
+                    peer_orgs.append(o.id)
+        except Exception:
+            peer_orgs = []
+
+    peer_win_rate_pct = None
+    peer_apps_total = 0
+    peer_awards_total = 0
+    if len(peer_orgs) >= 5:
+        try:
+            peer_apps_total = (
+                db.session.query(_f.count(Application.id))
+                .filter(Application.ngo_org_id.in_(peer_orgs))
+                .filter(Application.submitted_at >= since)
+                .scalar()
+            ) or 0
+            peer_awards_total = (
+                db.session.query(_f.count(Application.id))
+                .filter(Application.ngo_org_id.in_(peer_orgs))
+                .filter(Application.status == 'awarded')
+                .filter(Application.submitted_at >= since)
+                .scalar()
+            ) or 0
+            if peer_apps_total > 0:
+                peer_win_rate_pct = round(100 * peer_awards_total / peer_apps_total, 1)
+        except Exception:
+            peer_win_rate_pct = None
+
+    return jsonify({
+        'success': True,
+        'my_apps': my_apps,
+        'my_awards': my_awards,
+        'my_win_rate_pct': my_win_rate_pct,
+        'peer_count': len(peer_orgs),
+        'peer_apps': peer_apps_total,
+        'peer_awards': peer_awards_total,
+        'peer_win_rate_pct': peer_win_rate_pct,
+        'sectors_used': sorted(my_sectors),
+    })
+
+
 @journey_bp.route('/donor-summary', methods=['GET'])
 @login_required
 @role_required('donor', 'admin')

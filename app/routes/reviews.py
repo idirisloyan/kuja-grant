@@ -180,20 +180,24 @@ def api_create_review():
     # Phase 169 — notify the applicant NGO that their application is
     # now actively being reviewed (without naming the reviewer, since
     # the panel composition is private until decision).
+    # Phase 182 — fan out to every user in the applicant org since
+    # Notification is per-user (user_id NOT NULL).
     try:
-        from app.models import Notification
-        import json as _json
-        n = Notification(
-            user_id=None,
-            org_id=application.ngo_org_id,
-            kind='application_under_review',
-            payload_json=_json.dumps({
-                'application_id': application.id,
-                'grant_id': application.grant_id,
-            }),
-        )
-        db.session.add(n)
-        db.session.commit()
+        from app.models import Notification, User
+        ngo_users = User.query.filter_by(
+            org_id=application.ngo_org_id, role='ngo',
+        ).all()
+        for u in ngo_users:
+            n = Notification(
+                user_id=u.id,
+                type='application_under_review',
+                title='Your application is being reviewed',
+                message='A reviewer has been assigned. We\'ll notify you when a decision is made.',
+                link=f'/applications/{application.id}',
+            )
+            db.session.add(n)
+        if ngo_users:
+            db.session.commit()
     except Exception as e:
         logger.debug('under-review notification skipped: %s', e)
 
