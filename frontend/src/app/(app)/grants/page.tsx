@@ -74,6 +74,9 @@ export default function GrantsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useUrlState('q', '');
   const [activeSectors, setActiveSectors] = useUrlSetState('sector');
+  // Phase 161 — country + deadline-window facets.
+  const [activeCountries, setActiveCountries] = useUrlSetState('country');
+  const [deadlineBand, setDeadlineBand] = useState<'all' | '7d' | '30d' | '90d'>('all');
   const [sortBy, setSortBy] = useState<SortOption>('deadline');
   // Phase 17C — multi-select for fit comparison (NGO only)
   const [compareMode, setCompareMode] = useState(false);
@@ -111,6 +114,18 @@ export default function GrantsPage() {
     if (activeSectors.size > 0) {
       result = result.filter((g) => g.sectors?.some((s: string) => activeSectors.has(s)));
     }
+    if (activeCountries.size > 0) {
+      result = result.filter((g) => g.countries?.some((c: string) => activeCountries.has(c)));
+    }
+    if (deadlineBand !== 'all') {
+      const days = deadlineBand === '7d' ? 7 : deadlineBand === '30d' ? 30 : 90;
+      const cutoff = Date.now() + days * 24 * 60 * 60 * 1000;
+      result = result.filter((g) => {
+        if (!g.deadline) return false;
+        const t = new Date(g.deadline).getTime();
+        return t >= Date.now() && t <= cutoff;
+      });
+    }
     result = [...result].sort((a, b) => {
       if (sortBy === 'deadline') {
         if (!a.deadline) return 1;
@@ -121,7 +136,7 @@ export default function GrantsPage() {
       return new Date(b.created_at ?? '').getTime() - new Date(a.created_at ?? '').getTime();
     });
     return result;
-  }, [grants, searchQuery, activeSectors, sortBy]);
+  }, [grants, searchQuery, activeSectors, activeCountries, deadlineBand, sortBy]);
 
   const toggleSector = (sector: string) => {
     const next = new Set(activeSectors);
@@ -129,6 +144,20 @@ export default function GrantsPage() {
     else next.add(sector);
     setActiveSectors(next);
   };
+  // Phase 161 — country toggle + derived list of countries actually
+  // present on the visible grant set (so the picker doesn't show
+  // dozens of empty country chips).
+  const toggleCountry = (c: string) => {
+    const next = new Set(activeCountries);
+    if (next.has(c)) next.delete(c);
+    else next.add(c);
+    setActiveCountries(next);
+  };
+  const availableCountries = useMemo(() => {
+    const set = new Set<string>();
+    grants.forEach((g) => (g.countries ?? []).forEach((c) => c && set.add(c)));
+    return Array.from(set).sort();
+  }, [grants]);
 
   const isNgo = user?.role === 'ngo';
 
@@ -302,24 +331,82 @@ export default function GrantsPage() {
           </button>
         )}
 
-        <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-          {t('common.sort_by')}
-          {(['deadline', 'funding', 'recent'] as const).map((s) => (
+        {/* Phase 161 — deadline-window quick picker. */}
+        <div className="inline-flex items-center gap-1 text-xs ml-2 border-l border-border pl-3">
+          <span className="text-muted-foreground">Closing in:</span>
+          {(['all', '7d', '30d', '90d'] as const).map((band) => (
             <button
-              key={s}
+              key={band}
               type="button"
-              onClick={() => setSortBy(s)}
+              onClick={() => setDeadlineBand(band)}
               className={cn(
-                'px-2 py-1 rounded transition-colors',
-                sortBy === s
-                  ? 'text-[hsl(var(--kuja-clay))] font-medium'
-                  : 'hover:text-foreground',
+                'px-2 py-1 rounded',
+                deadlineBand === band
+                  ? 'bg-[hsl(var(--kuja-clay))] text-white'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
             >
-              {s[0].toUpperCase() + s.slice(1)}
+              {band === 'all' ? 'Any' : band}
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Phase 161 — country facet. Self-hides when only one country is
+          present across the visible grants. */}
+      {availableCountries.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Country:</span>
+          {availableCountries.slice(0, 12).map((c) => {
+            const active = activeCountries.has(c);
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => toggleCountry(c)}
+                className={cn(
+                  'rounded-full border px-2.5 py-1 transition-colors',
+                  active
+                    ? 'bg-[hsl(var(--kuja-clay))] text-white border-transparent'
+                    : 'border-border text-foreground hover:bg-muted',
+                )}
+              >
+                {c}
+              </button>
+            );
+          })}
+          {activeCountries.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setActiveCountries(new Set())}
+              className="text-[hsl(var(--kuja-flag))] hover:underline px-2"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Sort-by row — moved here so it survives when the country
+          facet is hidden. */}
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <span className="ml-auto" />
+        {t('common.sort_by')}
+        {(['deadline', 'funding', 'recent'] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setSortBy(s)}
+            className={cn(
+              'px-2 py-1 rounded transition-colors',
+              sortBy === s
+                ? 'text-[hsl(var(--kuja-clay))] font-medium'
+                : 'hover:text-foreground',
+            )}
+          >
+            {s[0].toUpperCase() + s.slice(1)}
+          </button>
+        ))}
       </div>
 
       {/* Grant cards */}

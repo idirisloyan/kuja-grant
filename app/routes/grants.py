@@ -410,6 +410,25 @@ def api_publish_grant(grant_id):
 
     logger.info(f"Grant published: {grant.title} (id={grant.id}) by user {current_user.email}")
 
+    # Phase 157 — fan out the publish event to the donor org so
+    # external systems can mirror new opportunities.
+    try:
+        from app.routes.webhook_routes import dispatch_event
+        if grant.donor_org_id:
+            dispatch_event(grant.donor_org_id, 'grant.published', {
+                'grant_id': grant.id,
+                'title': grant.title,
+                'donor_org_id': grant.donor_org_id,
+                'deadline': grant.deadline.isoformat() if getattr(grant, 'deadline', None) else None,
+                'total_funding':
+                    float(grant.total_funding) if grant.total_funding is not None else None,
+                'currency': getattr(grant, 'currency', None),
+                'sectors': grant.sectors or [],
+                'countries': grant.countries or [],
+            })
+    except Exception as e:
+        logger.debug('webhook dispatch (grant.published) skipped: %s', e)
+
     # Phase 16C — fire smart-match notifications. Best-effort, never
     # blocks the publish response. The service is idempotent (writes an
     # audit-chain anchor) so a republish doesn't re-fire.

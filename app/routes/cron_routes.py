@@ -178,6 +178,8 @@ def api_cron_reviewer_auto_assign_sweep():
     """
     if not _is_authorized():
         return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
     try:
         from app.models import Application, Review
         from app.services.reviewer_auto_assign_service import (
@@ -235,9 +237,20 @@ def api_cron_reviewer_auto_assign_sweep():
             'cap': MAX_PER_RUN,
         }
         logger.info(f'reviewer auto-assign sweep cron: {result}')
+        from app.models import record_cron_run as _rcr
+        _rcr('reviewer-auto-assign-sweep',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
         return jsonify({'success': True, 'result': result})
     except Exception as e:
         logger.exception(f'reviewer auto-assign sweep cron failed: {e}')
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('reviewer-auto-assign-sweep',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
@@ -256,13 +269,26 @@ def api_cron_uat_fixtures():
     if not _is_authorized():
         return jsonify({'success': False, 'error': 'forbidden'}), 403
 
+    import time as _time
+    _t0 = _time.time()
     try:
         from app.services.uat_fixture_service import UATFixtureService
         result = UATFixtureService.run()
         logger.info(f'UAT fixture cron: {result}')
+        from app.models import record_cron_run as _rcr
+        _rcr('uat-fixtures',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
         return jsonify({'success': True, 'result': result})
     except Exception as e:
         logger.exception(f'UAT fixture cron failed: {e}')
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('uat-fixtures',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
@@ -279,6 +305,8 @@ def api_cron_crisis_monitoring_draft():
     if not _is_authorized():
         return jsonify({'success': False, 'error': 'forbidden'}), 403
 
+    import time as _time
+    _t0 = _time.time()
     try:
         from datetime import date, timedelta
         from app.extensions import db
@@ -362,6 +390,14 @@ def api_cron_crisis_monitoring_draft():
             drafted.append({"network_id": net.id, "report_id": r.id})
 
         db.session.commit()
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('crisis-monitoring-draft',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=True,
+                 summary=f'drafted={len(drafted)} skipped={skipped} signals={rolled_signals}'[:480])
+        except Exception:
+            pass
         return jsonify({
             'success': True,
             'result': {

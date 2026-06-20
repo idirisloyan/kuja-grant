@@ -584,6 +584,20 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 157-161 — Webhook fan-out now fires on the 4
+  remaining transition events: `application.awarded`,
+  `application.rejected`, `report.submitted`, `grant.published` —
+  routed to both NGO + donor orgs where relevant. `record_cron_run()`
+  wired into the 3 remaining cron handlers (reviewer-auto-assign-sweep,
+  uat-fixtures, crisis-monitoring-draft) so the Phase 153 cron-health
+  dashboard sees every cron, not just compliance-rerun. New per-app
+  PDF export at `/api/applications/<id>.pdf` (NGO/donor/admin scoped)
+  via `application_pdf_service` — header + criterion responses +
+  optional budget table. New `/api/applications/<id>/request-revision`
+  (donor/admin) flips status to `revision_requested` + records
+  feedback + notifies the NGO. Grants list now has country + closing-in
+  (7/30/90d) facets in addition to the existing sector filter.
+
 - **2026-06-20** Phase 151-155 — Org-admin webhook management UI at
   `/settings/webhooks` (register URL + events, fire test ping, see
   delivery stats, secret shown ONCE). Application withdraw button on

@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
 from datetime import datetime, date, timezone
 from app.extensions import db
-from app.models import Grant, Application, Document, Review
+from app.models import Grant, Application, Document, Review, Organization
 from app.utils.helpers import get_request_json, paginate_query
 from app.utils.decorators import role_required
 from app.services.scoring_engine import ScoringEngine
@@ -132,6 +132,65 @@ def api_list_applications():
         'page': pagination.page,
         'pages': pagination.pages,
     })
+
+
+@applications_bp.route('/<int:app_id>.pdf', methods=['GET'])
+@login_required
+def api_application_pdf(app_id):
+    """Phase 159 — Self-contained PDF export of a single application.
+
+    Access mirrors the JSON detail endpoint: NGO sees their own,
+    donor sees apps to their grants, admin sees all.
+    """
+    application = db.session.get(Application, app_id)
+    if not application:
+        return jsonify({'error': 'Application not found'}), 404
+    if current_user.role == 'ngo' and application.ngo_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+    if current_user.role == 'donor':
+        g_check = db.session.get(Grant, application.grant_id)
+        if not g_check or g_check.donor_org_id != current_user.org_id:
+            return jsonify({'error': 'Access denied'}), 403
+
+    grant = db.session.get(Grant, application.grant_id)
+    org = db.session.get(Organization, application.ngo_org_id)
+
+    criteria = []
+    try:
+        criteria = grant.get_criteria() if grant else []
+    except Exception:
+        criteria = []
+    responses = {}
+    try:
+        responses = application.get_responses() or {}
+    except Exception:
+        pass
+
+    try:
+        from app.services.application_pdf_service import build_application_pdf
+        pdf_bytes = build_application_pdf(
+            application=application,
+            grant=grant,
+            org=org,
+            criteria=criteria,
+            responses=responses,
+        )
+    except Exception as e:
+        logger.exception(f'application PDF render failed: {e}')
+        return jsonify({'success': False, 'error': 'PDF render failed'}), 500
+
+    import re as _re
+    slug_src = (grant.title if grant else f'app-{app_id}') or f'app-{app_id}'
+    slug = _re.sub(r'[^a-z0-9]+', '-', slug_src.lower()).strip('-')[:60] or f'app-{app_id}'
+    filename = f'kuja-application-{slug}-{app_id}.pdf'
+    from flask import send_file as _send_file
+    import io as _io
+    return _send_file(
+        _io.BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=filename,
+    )
 
 
 @applications_bp.route('/<int:app_id>', methods=['GET'])
@@ -448,6 +507,97 @@ def api_update_application(app_id):
     if new_status == 'awarded':
         log_action('application.awarded', current_user.email, 'application', application.id,
                    {'grant_id': application.grant_id})
+
+    # Phase 157 — fan out the transition as a webhook event so external
+    # systems can pick up award / decline decisions without polling.
+    if new_status in ('awarded', 'rejected', 'declined'):
+        try:
+            from app.routes.webhook_routes import dispatch_event
+            event_name = (
+                'application.awarded' if new_status == 'awarded'
+                else 'application.rejected'
+            )
+            payload = {
+                'application_id': application.id,
+                'grant_id': application.grant_id,
+                'ngo_org_id': application.ngo_org_id,
+                'status': new_status,
+                'final_score': application.final_score,
+            }
+            dispatch_event(application.ngo_org_id, event_name, payload)
+            try:
+                grant_obj = (
+                    db.session.get(Grant, application.grant_id)
+                    if application.grant_id else None
+                )
+                if grant_obj and grant_obj.donor_org_id:
+                    dispatch_event(grant_obj.donor_org_id, event_name, payload)
+            except Exception:
+                pass
+        except Exception as e:
+            logger.debug('webhook dispatch (%s) skipped: %s', new_status, e)
+
+    return jsonify({'success': True, 'application': application.to_dict()})
+
+
+@applications_bp.route('/<int:app_id>/request-revision', methods=['POST'])
+@role_required('donor', 'admin')
+def api_request_revision(app_id):
+    """Phase 160 — Donor requests a revision on a declined / under-review
+    application instead of issuing a hard reject.
+
+    Body: { feedback?: str (max 2000) }
+
+    Sets status to 'revision_requested' so the NGO can edit + resubmit.
+    Audited; notifies the NGO with the feedback if provided.
+    """
+    application = db.session.get(Application, app_id)
+    if not application:
+        return jsonify({'error': 'Application not found'}), 404
+    # Donor scope check
+    if current_user.role == 'donor':
+        grant_check = db.session.get(Grant, application.grant_id)
+        if not grant_check or grant_check.donor_org_id != current_user.org_id:
+            return jsonify({'error': 'Access denied'}), 403
+
+    if application.status not in ('submitted', 'under_review', 'scored', 'declined', 'rejected'):
+        return jsonify({
+            'success': False,
+            'error': f"Cannot request revision from status '{application.status}'",
+        }), 400
+
+    from app.utils.helpers import get_request_json as _get
+    data = _get() or {}
+    feedback = (data.get('feedback') or '').strip()[:2000] or None
+
+    application.status = 'revision_requested'
+    if feedback:
+        application.decision_notes = feedback
+        application.decision_recorded_at = datetime.now(timezone.utc)
+        application.decision_recorded_by_user_id = current_user.id
+    db.session.commit()
+
+    log_action('application.revision_requested', current_user.email,
+               'application', application.id,
+               {'feedback_chars': len(feedback) if feedback else 0})
+
+    # Notify the NGO
+    try:
+        from app.models import Notification
+        n = Notification(
+            user_id=None,  # org-wide; the existing notif system handles this
+            org_id=application.ngo_org_id,
+            kind='application_revision_requested',
+            payload_json=__import__('json').dumps({
+                'application_id': application.id,
+                'grant_id': application.grant_id,
+                'feedback': feedback,
+            }),
+        )
+        db.session.add(n)
+        db.session.commit()
+    except Exception as e:
+        logger.debug('revision-request notify skipped: %s', e)
 
     return jsonify({'success': True, 'application': application.to_dict()})
 
