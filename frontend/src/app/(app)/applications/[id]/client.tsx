@@ -35,6 +35,8 @@ import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
 import { MicroSurvey } from '@/components/shared/micro-survey';
 import { InactivityHelp } from '@/components/shared/inactivity-help';
 import { useAuthStore } from '@/stores/auth-store';
+import { api, ApiError } from '@/lib/api';
+import { toast } from 'sonner';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
 const TAB_KEYS: { id: TabId; key: string }[] = [
@@ -145,6 +147,12 @@ export default function ApplicationDetailClient() {
           <div className="flex items-center gap-3 flex-wrap">
             {(application.status === 'draft' || application.status === 'submitted') && (
               <PreflightPanel kind="application" entityId={application.id} />
+            )}
+            {application.status === 'submitted' && isOwnerNgo && (
+              <WithdrawApplicationButton
+                applicationId={application.id}
+                onWithdrawn={() => router.refresh()}
+              />
             )}
             {application.ai_score != null && (
               <>
@@ -492,5 +500,76 @@ function ApplicationPreSubmitPreview({ applicationId }: { applicationId: number 
       }}
       className="mb-3"
     />
+  );
+}
+
+// Phase 152 — Withdraw button + reason dialog.
+function WithdrawApplicationButton({
+  applicationId, onWithdrawn,
+}: { applicationId: number; onWithdrawn: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await api.post(`/api/applications/${applicationId}/withdraw`,
+        { reason: reason.trim() || undefined });
+      toast.success('Application withdrawn.');
+      setOpen(false);
+      onWithdrawn();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Withdraw failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        title="Withdraw before review starts"
+      >
+        Withdraw
+      </button>
+    );
+  }
+  return (
+    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs space-y-2 min-w-[280px]">
+      <p className="font-semibold text-amber-900">Withdraw this application?</p>
+      <p className="text-amber-900/80">
+        The donor will be notified. You can re-apply during a future window.
+      </p>
+      <input
+        type="text"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Reason (optional)"
+        maxLength={500}
+        className="w-full rounded-md border border-border bg-background px-2 py-1.5"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy}
+          className="inline-flex items-center gap-1 rounded-md bg-rose-600 text-white px-3 py-1.5 font-medium hover:bg-rose-700 disabled:opacity-50"
+        >
+          {busy ? 'Withdrawing…' : 'Confirm withdraw'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setReason(''); }}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }

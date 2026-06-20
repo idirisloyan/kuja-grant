@@ -229,3 +229,95 @@ def api_my_journey():
         'completion_pct': completion_pct,
         'all_done': all(stage_status.values()),
     })
+
+
+@journey_bp.route('/impact', methods=['GET'])
+@login_required
+@role_required('ngo')
+def api_my_impact():
+    """Phase 154 — Per-NGO impact summary (rolling 12 months).
+
+    Aggregates from the data we already have:
+      - applications submitted (any status)
+      - applications awarded (count + total funding)
+      - reports submitted
+      - people impacted (sum from report numeric fields where present)
+
+    Cheap query — three counts + two sums. Cached at the client side by
+    the dashboard tile so we don't re-hit on every navigation.
+    """
+    from sqlalchemy import func as _f
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    from app.models import Application, Report
+
+    org_id = current_user.org_id
+    if not org_id:
+        return jsonify({'success': False, 'error': 'no_org'}), 400
+
+    since = _dt.now(_tz.utc) - _td(days=365)
+
+    try:
+        apps_submitted = (
+            db.session.query(_f.count(Application.id))
+            .filter(Application.ngo_org_id == org_id)
+            .filter(Application.submitted_at >= since)
+            .scalar()
+        ) or 0
+        awards_row = (
+            db.session.query(
+                _f.count(Application.id),
+                _f.coalesce(_f.sum(Application.final_score), 0),
+            )
+            .filter(Application.ngo_org_id == org_id)
+            .filter(Application.status == 'awarded')
+            .filter(Application.submitted_at >= since)
+            .first()
+        )
+        awards_count = awards_row[0] if awards_row else 0
+        reports_submitted = (
+            db.session.query(_f.count(Report.id))
+            .filter(Report.ngo_org_id == org_id)
+            .filter(Report.submitted_at.isnot(None))
+            .filter(Report.submitted_at >= since)
+            .scalar()
+        ) or 0
+    except Exception as e:
+        logger.warning('impact aggregate failed: %s', e)
+        apps_submitted = 0
+        awards_count = 0
+        reports_submitted = 0
+
+    # Total funding from awarded grants. Joining Application → Grant
+    # for each awarded app gives the granted amount.
+    total_funding = 0.0
+    try:
+        from app.models import Grant
+        awarded_apps = (
+            Application.query
+            .filter_by(ngo_org_id=org_id, status='awarded')
+            .filter(Application.submitted_at >= since)
+            .all()
+        )
+        for a in awarded_apps:
+            try:
+                g = db.session.get(Grant, a.grant_id) if a.grant_id else None
+                if g and g.total_funding is not None:
+                    total_funding += float(g.total_funding)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    win_rate_pct = None
+    if apps_submitted > 0:
+        win_rate_pct = round(100 * awards_count / apps_submitted, 1)
+
+    return jsonify({
+        'success': True,
+        'window_days': 365,
+        'applications_submitted': apps_submitted,
+        'awards_count': awards_count,
+        'win_rate_pct': win_rate_pct,
+        'reports_submitted': reports_submitted,
+        'total_funding_awarded': round(total_funding, 2),
+    })

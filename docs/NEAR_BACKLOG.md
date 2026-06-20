@@ -584,6 +584,18 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 151-155 — Org-admin webhook management UI at
+  `/settings/webhooks` (register URL + events, fire test ping, see
+  delivery stats, secret shown ONCE). Application withdraw button on
+  the application detail page (submitted-state only) with reason
+  dialog. New `cron_runs` table + `record_cron_run()` + `/api/cron/health`
+  + `/admin/cron-health` page surfacing last-run / overdue / never
+  bands per registered cron. Rolling 12-month `<ImpactCard>` on the
+  NGO dashboard (submitted, awarded, win rate, total funding,
+  reports). New `<TopMatchedNGOs>` panel on the donor view of grant
+  detail consuming `/api/match/for-grant/<id>` (Phase 112 match
+  engine surface that was sitting unwired).
+
 - **2026-06-20** Phase 145-149 — NGO can now withdraw a submitted
   application before review starts via
   `POST /api/applications/<id>/withdraw`; new `withdrawn_at` +

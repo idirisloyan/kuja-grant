@@ -24,6 +24,7 @@ import {
 } from '@/components/layout/page-shell';
 import { describeGrantStatus } from '@/lib/status-copy';
 import { WhyThisMatch, type ReasonFacet } from '@/components/shared/why-this-match';
+import { TopMatchedNGOs } from '@/components/grants/top-matched-ngos';
 import { api } from '@/lib/api';
 
 // Phase 112 — Live wrapper around WhyThisMatch. Calls /api/match/explain
@@ -238,6 +239,9 @@ export default function GrantDetailClient() {
             fit vs grant burden, awarded track record) via /api/match/explain
             instead of the prior local heuristic that echoed the grant's
             own fields. Falls back silently if the call fails. */}
+        {/* Phase 155 — Donor view: ranked NGOs that fit this grant. */}
+        {isDonor && id != null && <TopMatchedNGOs grantId={id} />}
+
         {isNgo && id != null && (
           <WhyThisMatchLive grantId={id} fallbackReasons={(() => {
             const reasons: Array<{ facet: ReasonFacet; value?: string }> = [];

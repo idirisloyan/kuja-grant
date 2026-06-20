@@ -63,6 +63,7 @@ from app.models.member_feedback import (
 )
 from app.models.synthetic_monitor import SyntheticMonitorRun
 from app.models.webhook import Webhook
+from app.models.cron_run import CronRun, record_cron_run
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',

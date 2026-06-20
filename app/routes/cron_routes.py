@@ -42,14 +42,122 @@ def api_cron_compliance_rerun():
     """
     if not _is_authorized():
         return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    t0 = _time.time()
     try:
         from app.services.compliance_rerun_service import ComplianceRerunService
         result = ComplianceRerunService.run()
         logger.info(f'compliance rerun cron: {result}')
+        from app.models import record_cron_run
+        record_cron_run('compliance-rerun',
+                        duration_ms=int((_time.time() - t0) * 1000),
+                        success=True, summary=str(result)[:480])
         return jsonify({'success': True, 'result': result})
     except Exception as e:
         logger.exception(f'compliance rerun cron failed: {e}')
+        try:
+            from app.models import record_cron_run
+            record_cron_run('compliance-rerun',
+                            duration_ms=int((_time.time() - t0) * 1000),
+                            success=False, summary=str(e)[:480])
+        except Exception:
+            pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/health', methods=['GET'])
+def api_cron_health():
+    """Phase 153 — Cron health snapshot for the admin monitor page.
+
+    For each known cron, returns:
+      - last_run_at (ISO) or null
+      - last_success
+      - last_duration_ms
+      - last_summary
+      - staleness_band: 'fresh' (ran in expected window),
+                       'overdue' (past expected window),
+                       'never' (no row ever)
+
+    Admin-only. Reads from the cron_runs table populated by every
+    cron handler.
+    """
+    from flask_login import current_user as _cu
+    if not getattr(_cu, 'is_authenticated', False):
+        return jsonify({'success': False, 'error': 'unauth'}), 401
+    if getattr(_cu, 'role', None) != 'admin':
+        return jsonify({'success': False, 'error': 'admin_only'}), 403
+
+    KNOWN = {
+        # name -> expected_cadence_hours, description
+        'compliance-rerun': (24, 'Re-screen NGOs with stale adverse-media checks'),
+        'reviewer-auto-assign-sweep': (24, 'Nightly safety-net for reviewer assignment'),
+        'uat-fixtures': (24, 'Self-healing demo fixtures for UAT'),
+        'crisis-monitoring-draft': (24 * 7, 'Weekly Crisis Monitoring Report draft'),
+    }
+
+    from sqlalchemy import func as _f
+    from datetime import datetime, timezone as _tz, timedelta as _td
+    from app.models import CronRun
+    try:
+        rows = (
+            db.session.query(
+                CronRun.name,
+                _f.max(CronRun.run_at).label('last_run_at'),
+            )
+            .filter(CronRun.name.in_(list(KNOWN.keys())))
+            .group_by(CronRun.name)
+            .all()
+        )
+    except Exception:
+        rows = []
+    last_run_map = {r[0]: r[1] for r in rows}
+
+    detail = []
+    now = datetime.now(_tz.utc)
+    for name, (cadence_h, desc) in KNOWN.items():
+        last_at = last_run_map.get(name)
+        # Pull the most recent row for that cron to surface
+        # success + summary + duration.
+        latest = None
+        try:
+            latest = (
+                CronRun.query
+                .filter_by(name=name)
+                .order_by(CronRun.run_at.desc())
+                .first()
+            )
+        except Exception:
+            pass
+        if last_at is None:
+            band = 'never'
+        else:
+            # Compare against expected cadence + grace (50% over).
+            if last_at.tzinfo is None:
+                last_at_aware = last_at.replace(tzinfo=_tz.utc)
+            else:
+                last_at_aware = last_at
+            age_h = (now - last_at_aware).total_seconds() / 3600
+            band = 'fresh' if age_h <= cadence_h * 1.5 else 'overdue'
+        detail.append({
+            'name': name,
+            'description': desc,
+            'cadence_hours': cadence_h,
+            'last_run_at': last_at.isoformat() if last_at else None,
+            'last_success': bool(latest.success) if latest else None,
+            'last_duration_ms': latest.duration_ms if latest else None,
+            'last_summary': latest.summary if latest else None,
+            'staleness_band': band,
+        })
+
+    return jsonify({
+        'success': True,
+        'crons': detail,
+        'summary': {
+            'fresh': sum(1 for d in detail if d['staleness_band'] == 'fresh'),
+            'overdue': sum(1 for d in detail if d['staleness_band'] == 'overdue'),
+            'never': sum(1 for d in detail if d['staleness_band'] == 'never'),
+        },
+    })
 
 
 @cron_bp.route('/reviewer-auto-assign-sweep', methods=['POST'])
