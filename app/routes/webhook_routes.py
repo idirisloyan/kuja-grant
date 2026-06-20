@@ -198,9 +198,17 @@ def dispatch_event(org_id: int | None, event_name: str, payload: dict) -> int:
 
 
 def _deliver(hook: Webhook, event_name: str, payload: dict) -> dict:
-    """Synchronous POST. Updates the hook's delivery stats. Returns
-    a dict with status + duration_ms + any error so the caller can
-    surface it (for the /test endpoint)."""
+    """Synchronous POST with exponential-backoff retry on transient
+    failures (connection errors + 5xx). Updates the hook's delivery
+    stats. Returns a dict with status + duration_ms + attempts + error
+    so the caller can surface it (for the /test endpoint).
+
+    Phase 147 — receivers sometimes hiccup (brief network drop,
+    transient 502 from a reverse proxy). We retry up to 2 more times
+    with backoff 200ms → 600ms before giving up. 4xx is treated as
+    permanent (the receiver actively rejected the payload) and skips
+    retry to avoid wasting cycles on a misconfigured webhook.
+    """
     import requests  # local — keeps import cost off cold start
     body = json.dumps({
         'event': event_name,
@@ -219,20 +227,39 @@ def _deliver(hook: Webhook, event_name: str, payload: dict) -> dict:
         'X-Kuja-Signature': f'sha256={signature}',
         'User-Agent': 'KujaWebhook/1.0',
     }
+
+    MAX_ATTEMPTS = 3
+    BACKOFF_MS = [0, 200, 600]  # delay before attempt N
+
     started = time.time()
     status = None
     err = None
-    try:
-        r = requests.post(hook.url, data=body, headers=headers, timeout=8)
-        status = r.status_code
-    except Exception as e:
-        err = type(e).__name__ + ': ' + str(e)[:400]
+    attempts = 0
+
+    for attempt in range(MAX_ATTEMPTS):
+        attempts = attempt + 1
+        if BACKOFF_MS[attempt]:
+            time.sleep(BACKOFF_MS[attempt] / 1000.0)
+        status = None
+        err = None
+        try:
+            r = requests.post(hook.url, data=body, headers=headers, timeout=8)
+            status = r.status_code
+            if status < 500:
+                # 2xx success or 4xx permanent reject — either way, stop.
+                break
+        except Exception as e:
+            err = type(e).__name__ + ': ' + str(e)[:400]
+        # else: 5xx or connection error — retry until MAX_ATTEMPTS reached.
+
     duration_ms = int((time.time() - started) * 1000)
     from datetime import datetime, timezone as _tz
     try:
         hook.last_delivery_at = datetime.now(_tz.utc)
         hook.last_delivery_status = status
-        hook.last_delivery_error = err[:500] if err else None
+        hook.last_delivery_error = (
+            f'[after {attempts} attempt(s)] {err[:480]}' if err else None
+        )
         hook.delivery_count = (hook.delivery_count or 0) + 1
         if err or (status is not None and status >= 400):
             hook.failure_count = (hook.failure_count or 0) + 1
@@ -245,5 +272,6 @@ def _deliver(hook: Webhook, event_name: str, payload: dict) -> dict:
     return {
         'status': status,
         'duration_ms': duration_ms,
+        'attempts': attempts,
         'error': err,
     }

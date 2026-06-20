@@ -26,6 +26,9 @@ class Application(db.Model):
     human_score = db.Column(db.Float, nullable=True)
     final_score = db.Column(db.Float, nullable=True)
     submitted_at = db.Column(db.DateTime, nullable=True)
+    # Phase 145 — NGO-initiated withdrawal before review starts.
+    withdrawn_at = db.Column(db.DateTime, nullable=True)
+    withdrawal_reason = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))

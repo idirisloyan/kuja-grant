@@ -378,6 +378,14 @@ def create_app(config_name=None):
                     conn.execute(text("ALTER TABLE applications ADD COLUMN decision_recorded_by_user_id INTEGER"))
                     added.append('applications.decision_recorded_by_user_id')
 
+                # Phase 145 — NGO-initiated application withdrawal.
+                if 'withdrawn_at' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN withdrawn_at TIMESTAMP"))
+                    added.append('applications.withdrawn_at')
+                if 'withdrawal_reason' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN withdrawal_reason TEXT"))
+                    added.append('applications.withdrawal_reason')
+
                 # Phase 102 — replay tooling: optional full input/output
                 # text on AI call logs. Populated only for replay-eligible
                 # calls (scoring decisions, narrative outputs that land in

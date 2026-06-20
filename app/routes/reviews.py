@@ -179,6 +179,61 @@ def api_create_review():
     return jsonify({'success': True, 'review': review.to_dict()}), 201
 
 
+@reviews_bp.route('/workload', methods=['GET'])
+@login_required
+@role_required('donor', 'admin')
+def api_reviewer_workload():
+    """Phase 146 — Per-reviewer load summary.
+
+    Admin / donor sees each reviewer's current pipeline so they don't
+    pile more work on someone already over-extended. Counts:
+      - assigned: in 'assigned' status, not yet started
+      - in_progress: status in scoring/reviewing states
+      - overdue: assigned > 14 days ago, not yet completed
+      - completed: status in finished states
+      - total: sum of the above (lifetime; cap at 90 days for sane bars)
+    """
+    from sqlalchemy import func as _f
+    cutoff_overdue_days = 14
+
+    reviewers = User.query.filter_by(role='reviewer').all()
+    rows = []
+    for r in reviewers:
+        qs = Review.query.filter_by(reviewer_user_id=r.id)
+        assigned_q = qs.filter(Review.status == 'assigned')
+        completed_q = qs.filter(Review.status.in_(['submitted', 'scored', 'completed']))
+        in_progress_q = qs.filter(Review.status.in_(['in_progress', 'reviewing']))
+        # Overdue = still 'assigned' and assigned > 14 days ago.
+        from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+        cutoff = _dt.now(_tz.utc) - _td(days=cutoff_overdue_days)
+        overdue_q = assigned_q.filter(Review.created_at < cutoff)
+        rows.append({
+            'reviewer_user_id': r.id,
+            'name': r.name,
+            'email': r.email,
+            'assigned': assigned_q.count(),
+            'in_progress': in_progress_q.count(),
+            'overdue': overdue_q.count(),
+            'completed': completed_q.count(),
+            'total': qs.count(),
+        })
+
+    # Sort: highest active load first (assigned + in_progress).
+    rows.sort(key=lambda x: (x['assigned'] + x['in_progress']), reverse=True)
+
+    return jsonify({
+        'success': True,
+        'reviewers': rows,
+        'overdue_threshold_days': cutoff_overdue_days,
+        'summary': {
+            'reviewers': len(rows),
+            'total_assigned': sum(r['assigned'] for r in rows),
+            'total_in_progress': sum(r['in_progress'] for r in rows),
+            'total_overdue': sum(r['overdue'] for r in rows),
+        },
+    })
+
+
 @reviews_bp.route('/bulk-assign', methods=['POST'])
 @role_required('donor', 'admin')
 def api_bulk_assign_reviews():

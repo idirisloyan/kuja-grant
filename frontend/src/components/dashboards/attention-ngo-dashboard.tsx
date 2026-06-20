@@ -33,6 +33,7 @@ import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { ResumeBanner } from '@/components/dashboards/resume-banner';
 // Phase 92 — Continuous NGO journey tracker.
 import { JourneyTracker } from '@/components/dashboards/journey-tracker';
+import { WatchedGrantsCard } from '@/components/dashboards/watched-grants-card';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -135,6 +136,9 @@ export function AttentionNgoDashboard() {
       {/* Phase 84 — Resume where you left off. Reads from localStorage. */}
       <ResumeBanner />
       <PageAttention items={attention} />
+
+      {/* Phase 148 — watchlist tile. Hidden when empty + no signal value. */}
+      <WatchedGrantsCard />
 
       <PageMain>
         {/* Applications in progress (drafts) */}

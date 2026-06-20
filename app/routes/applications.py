@@ -452,6 +452,83 @@ def api_update_application(app_id):
     return jsonify({'success': True, 'application': application.to_dict()})
 
 
+@applications_bp.route('/<int:app_id>/withdraw', methods=['POST'])
+@role_required('ngo')
+def api_withdraw_application(app_id):
+    """Phase 145 — NGO withdraws a submitted application.
+
+    Allowed only while the application is in 'submitted' (not yet
+    under_review/scored/awarded/declined). Idempotent: returns success
+    if already withdrawn.
+
+    Records audit-chain entry + fires the
+    `application.rejected` webhook (status === withdrawn is a form of
+    not-going-forward; mapping it to a separate event would inflate
+    surface area for little gain — the payload includes the
+    `withdrawn=true` flag).
+    """
+    application = db.session.get(Application, app_id)
+    if not application:
+        return jsonify({'error': 'Application not found'}), 404
+    if application.ngo_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+    if application.status == 'withdrawn':
+        return jsonify({
+            'success': True,
+            'message': 'Application already withdrawn',
+            'application': application.to_dict(),
+        })
+    if application.status != 'submitted':
+        return jsonify({
+            'success': False,
+            'error': (
+                f"Cannot withdraw from status '{application.status}'. "
+                "Withdraw is only available before review begins."
+            ),
+        }), 400
+
+    from app.utils.helpers import get_request_json as _get
+    data = _get() or {}
+    reason = (data.get('reason') or '').strip()[:500] or None
+
+    application.status = 'withdrawn'
+    application.withdrawn_at = datetime.now(timezone.utc)
+    if reason:
+        application.withdrawal_reason = reason
+    db.session.commit()
+
+    log_action(
+        'application.withdrawn', current_user.email,
+        'application', application.id,
+        {'reason': reason or None},
+    )
+
+    # Phase 143 — fire webhook to both NGO + donor orgs.
+    try:
+        from app.routes.webhook_routes import dispatch_event
+        payload = {
+            'application_id': application.id,
+            'grant_id': application.grant_id,
+            'ngo_org_id': application.ngo_org_id,
+            'withdrawn': True,
+            'reason': reason,
+            'withdrawn_at':
+                application.withdrawn_at.isoformat()
+                if getattr(application, 'withdrawn_at', None) else None,
+        }
+        dispatch_event(application.ngo_org_id, 'application.rejected', payload)
+        try:
+            grant_obj = db.session.get(Grant, application.grant_id) if application.grant_id else None
+            if grant_obj and grant_obj.donor_org_id:
+                dispatch_event(grant_obj.donor_org_id, 'application.rejected', payload)
+        except Exception:
+            pass
+    except Exception as e:
+        logger.debug('webhook dispatch (application.withdrawn) skipped: %s', e)
+
+    return jsonify({'success': True, 'application': application.to_dict()})
+
+
 @applications_bp.route('/<int:app_id>/submit', methods=['POST'])
 @role_required('ngo')
 def api_submit_application(app_id):

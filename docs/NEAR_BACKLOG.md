@@ -584,6 +584,21 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 145-149 — NGO can now withdraw a submitted
+  application before review starts via
+  `POST /api/applications/<id>/withdraw`; new `withdrawn_at` +
+  `withdrawal_reason` columns + bootstrap ALTER for prod. Fires the
+  `application.rejected` webhook with `withdrawn=true`. New
+  `/admin/reviewers-workload` dashboard: per-reviewer assigned /
+  in-progress / overdue (>14 days) / completed bars, sorted by active
+  load — pair with /admin/reviews-bulk to rebalance. Webhook delivery
+  now does exponential-backoff retry (200ms → 600ms, 3 attempts max)
+  on 5xx + connection errors; 4xx is treated as permanent. New
+  `<WatchedGrantsCard>` tile on the NGO dashboard surfaces the user's
+  starred grants with deadline countdown + "Apply" link. Gunicorn
+  `--preload` was already enabled in the Procfile; documented the
+  rationale + side-effects in `gunicorn.conf.py`.
+
 - **2026-06-20** Phase 139-143 — `<InlineDocPreview>` (Phase 128 component)
   now wired on the reports bundle panel — reviewers see PDF/image
   previews next to evidence attachments without leaving the page. New
