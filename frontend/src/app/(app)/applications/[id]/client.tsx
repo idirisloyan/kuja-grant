@@ -40,6 +40,7 @@ import { toast } from 'sonner';
 import { DecisionAuditDrawer } from '@/components/applications/DecisionAuditDrawer';
 import { NgoHistoryPanel } from '@/components/applications/ngo-history-panel';
 import { PeerScoreCard } from '@/components/applications/peer-score-card';
+import { StatusTimeline } from '@/components/applications/status-timeline';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
 const TAB_KEYS: { id: TabId; key: string }[] = [
@@ -231,6 +232,13 @@ export default function ApplicationDetailClient() {
             when the peer pool is < 5 or no AI score yet. */}
         {isOwnerNgo && application.status !== 'draft' && (
           <PeerScoreCard applicationId={application.id} />
+        )}
+
+        {/* Phase 237 — chronological status timeline. Visible to anyone
+            who can read this application (NGO + reviewer-side); the
+            audit-chain endpoint enforces its own access control. */}
+        {application.status !== 'draft' && (
+          <StatusTimeline applicationId={application.id} />
         )}
 
         {/* Phase 163 — NGO revision banner. Shown when the donor has

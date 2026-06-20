@@ -204,6 +204,31 @@ def api_create_review():
     return jsonify({'success': True, 'review': review.to_dict()}), 201
 
 
+@reviews_bp.route('/my-stats', methods=['GET'])
+@login_required
+@role_required('reviewer')
+def api_reviewer_my_stats():
+    """Phase 236 — Reviewer completion rate over last 90 days."""
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    cutoff = _dt.now(_tz.utc) - _td(days=90)
+    qs = Review.query.filter(
+        Review.reviewer_user_id == current_user.id,
+        Review.created_at >= cutoff,
+    )
+    total = qs.count()
+    completed = qs.filter(
+        Review.status.in_(['submitted', 'scored', 'completed']),
+    ).count()
+    rate = round(100 * completed / total, 1) if total > 0 else None
+    return jsonify({
+        'success': True,
+        'window_days': 90,
+        'total_assigned': total,
+        'completed': completed,
+        'completion_pct': rate,
+    })
+
+
 @reviews_bp.route('/workload', methods=['GET'])
 @login_required
 @role_required('donor', 'admin')

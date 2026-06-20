@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react';
 import { Clock, AlertTriangle, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
+import { FreshnessStamp } from '@/components/shared/freshness-stamp';
 import { cn } from '@/lib/utils';
 import {
   PageShell, PageHeader, PageMain,
@@ -52,11 +53,17 @@ function timeAgo(iso: string | null): string {
 export default function CronHealthPage() {
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(true);
+  // Phase 239 — last-fetched timestamp so the admin can see how stale
+  // the rendered numbers are.
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     api.get<Resp>('/api/cron/health').then((r) => {
-      if (!cancelled) setData(r);
+      if (!cancelled) {
+        setData(r);
+        setLoadedAt(new Date());
+      }
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -69,6 +76,7 @@ export default function CronHealthPage() {
         title="Cron health"
         icon={Clock}
         subtitle="Last-run timestamp per scheduled job. Overdue + never bands flag a broken schedule before it bites."
+        secondaryAction={<FreshnessStamp loadedAt={loadedAt} label="Loaded" />}
       />
       <PageMain>
         {loading && (

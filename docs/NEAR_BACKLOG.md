@@ -584,6 +584,21 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 235-239 — Visibility tiles + cron + timeline:
+  (a) `<AwaitingDecisionCard>` on donor dashboard surfaces apps in
+  `scored` status (reviewer done, donor sign-off pending). (b) New
+  `GET /api/reviews/my-stats` (reviewer-only) returns 90-day
+  completion rate + counts. `<MyCompletionStat>` strip on the
+  reviews page header. (c) `<StatusTimeline>` on application detail
+  reads `/api/audit-chain/recent?subject_kind=application` and
+  renders chronological action events with human labels. (d) New
+  `POST /api/cron/watched-deadlines` scans every WatchlistItem
+  kind='grant' and emits a `grant_deadline_soon` notification when
+  the grant deadline is 0..3 days out; record_cron_run wired. (e)
+  New `<FreshnessStamp>` component (auto-updates every 30s) added to
+  the cron-health page header to show how stale the rendered data
+  is. Drop-in reusable on any admin page that fetches.
+
 - **2026-06-20** Phase 229-233 — More dashboards + control: (a)
   `<ApplicationsReceivedTable>` on grant detail (donor) shows top-10
   apps by AI score with star + status badge + open link, plus a

@@ -481,6 +481,78 @@ def api_cron_webhook_cleanup():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/watched-deadlines', methods=['POST'])
+def api_cron_watched_deadlines():
+    """Phase 238 — Notify NGOs about watched grants closing in <= 3 days.
+
+    Idempotent per-day in practice — sending twice creates dupe
+    notifications but no harm. Pulls every WatchlistItem where
+    kind='grant', joins the grant, computes days-until-deadline, and
+    if 0..3 fires a `grant_deadline_soon` notification.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            WatchlistItem, Grant, Notification, record_cron_run as _rcr,
+        )
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        items = WatchlistItem.query.filter_by(kind='grant').all()
+        sent = 0
+        scanned = 0
+        for w in items:
+            scanned += 1
+            g = db.session.get(Grant, w.target_id)
+            if not g or g.status != 'open' or not g.deadline:
+                continue
+            dl = g.deadline
+            if dl.tzinfo is None:
+                dl = dl.replace(tzinfo=timezone.utc)
+            days = (dl - now).days
+            if 0 <= days <= 3:
+                msg = (
+                    f'"{g.title}" closes in {days} day{"s" if days != 1 else ""}.'
+                    if days > 0 else
+                    f'"{g.title}" closes today.'
+                )
+                n = Notification(
+                    user_id=w.user_id,
+                    type='grant_deadline_soon',
+                    title='Watched grant closing soon',
+                    message=msg,
+                    link=f'/grants/{g.id}',
+                )
+                db.session.add(n)
+                sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'scanned': scanned, 'sent': sent}
+        _rcr('watched-deadlines',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('watched-deadlines cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('watched-deadlines',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/reviewer-digest', methods=['POST'])
 def api_cron_reviewer_digest():
     """Phase 205 — Weekly per-reviewer caseload digest.

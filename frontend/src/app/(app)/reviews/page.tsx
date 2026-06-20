@@ -6,7 +6,8 @@
  * Donor view: all applications filtered by grant.
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useReviews, useApplications, useGrants } from '@/lib/hooks/use-api';
@@ -117,6 +118,9 @@ function ReviewerView() {
         ) : null}
       />
       <PageMain>
+
+      {/* Phase 236 — completion rate over last 90 days. */}
+      <MyCompletionStat />
 
       {/* Phase 214 — quick link to the reviewer's starred shortlist
           across all reviews they've handled. Lands on /applications
@@ -486,6 +490,37 @@ function EmptyState({ icon: Icon, title, body }: { icon: typeof ClipboardCheck; 
       <Icon className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
       <p className="kuja-display text-xl">{title}</p>
       <p className="text-sm text-muted-foreground mt-1">{body}</p>
+    </div>
+  );
+}
+
+// Phase 236 — Reviewer completion rate strip over the last 90 days.
+function MyCompletionStat() {
+  const [data, setData] = useState<{
+    completion_pct: number | null;
+    completed: number;
+    total_assigned: number;
+    window_days: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get<typeof data>('/api/reviews/my-stats').then((r) => {
+      if (!cancelled) setData(r);
+    }).catch(() => {/* silent */});
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!data || data.total_assigned === 0) return null;
+  return (
+    <div className="rounded-md border border-border bg-card p-3 text-xs flex items-center justify-between">
+      <span className="text-muted-foreground">
+        Last {data.window_days} days
+      </span>
+      <span className="tabular-nums">
+        <span className="font-semibold">{data.completion_pct ?? 0}%</span> completion
+        <span className="text-muted-foreground"> ({data.completed} of {data.total_assigned})</span>
+      </span>
     </div>
   );
 }
