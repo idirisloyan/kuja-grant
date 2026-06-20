@@ -584,6 +584,27 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 265-269 — Test fixes + AI triage + cron + perf:
+  (a) Fixed `Emergency Declaration multi-sig end-to-end -- add signer
+  1` smoke failure by passing `allow_admin_override=true` when the
+  admin session adds non-OB users as signers (the override path is
+  documented in the endpoint's error message). (b) Same fix
+  applied to the `Release applications handoff (governed)` test —
+  the upstream declaration must reach signed_active for the
+  downstream release endpoint to flip grants to 'open'. (c) New
+  `POST /api/ai/summarize-application` (reviewer/donor/admin)
+  returns a 3-sentence triage summary calling
+  `AIService._call_claude` directly with org+grant+responses
+  context. `<TriageSummary>` panel on the reviewer review page
+  Responses tab (collapsed by default; one-tap "Summarize" CTA).
+  Falls back to a deterministic template when Claude is
+  unavailable. (d) New `POST /api/cron/donor-digest` (CRON_SECRET-
+  gated) emits one in-app `donor_weekly_digest` notification per
+  donor user with last-7-days counts (received/scored/decided).
+  record_cron_run wired. (e) Phase 269 closed as already-shipped —
+  `/api/dashboard/stats` was already 30-second-cached per
+  user+role via `_dashboard_cache`.
+
 - **2026-06-20** Phase 259-263 — Rollups + lifecycle:
   (a) `_build_donor_stats` now also computes `apps_by_sector`
   (top 10) joining Application → Grant → Organization. New

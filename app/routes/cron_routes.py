@@ -553,6 +553,85 @@ def api_cron_watched_deadlines():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/donor-digest', methods=['POST'])
+def api_cron_donor_digest():
+    """Phase 268 — Weekly donor summary notification.
+
+    Fires one in-app notification per donor user with last-7-days counts:
+      - applications received
+      - applications scored
+      - applications decided (awarded/declined/rejected)
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Application, Grant, Notification, record_cron_run as _rcr,
+        )
+        from datetime import datetime, timezone, timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+
+        donors = User.query.filter_by(role='donor').all()
+        sent = 0
+        for u in donors:
+            if not u.org_id:
+                continue
+            # Apps received: created in window
+            received = Application.query.join(Grant).filter(
+                Grant.donor_org_id == u.org_id,
+                Application.created_at >= cutoff,
+            ).count()
+            scored = Application.query.join(Grant).filter(
+                Grant.donor_org_id == u.org_id,
+                Application.status == 'scored',
+                Application.updated_at >= cutoff,
+            ).count()
+            decided = Application.query.join(Grant).filter(
+                Grant.donor_org_id == u.org_id,
+                Application.decision_recorded_at >= cutoff,
+            ).count() if hasattr(Application, 'decision_recorded_at') else 0
+
+            if received + scored + decided == 0:
+                continue
+            n = Notification(
+                user_id=u.id,
+                type='donor_weekly_digest',
+                title='Weekly summary',
+                message=(
+                    f'Last 7 days: {received} received, {scored} scored, {decided} decided.'
+                ),
+                link='/dashboard',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'donors_scanned': len(donors), 'digests_sent': sent}
+        _rcr('donor-digest',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('donor digest cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('donor-digest',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/reviewer-digest', methods=['POST'])
 def api_cron_reviewer_digest():
     """Phase 205 — Weekly per-reviewer caseload digest.

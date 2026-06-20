@@ -466,6 +466,9 @@ export default function ReviewDetailClient() {
       </div>
 
       {/* Responses */}
+      {tab === 'responses' && appId != null && (
+        <TriageSummary applicationId={appId} />
+      )}
       {tab === 'responses' && (
         <div className="space-y-3">
           {criteria.length === 0 && Object.keys(responses).length === 0 ? (
@@ -1098,6 +1101,55 @@ export default function ReviewDetailClient() {
       )}
       </PageMain>
     </PageShell>
+  );
+}
+
+// Phase 267 — AI 3-sentence triage summary for the reviewer.
+function TriageSummary({ applicationId }: { applicationId: number }) {
+  const [summary, setSummary] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [source, setSource] = useState<string>('');
+
+  async function load() {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const r = await api.post<{ summary: string; source: string }>(
+        '/api/ai/summarize-application',
+        { application_id: applicationId },
+      );
+      setSummary(r.summary);
+      setSource(r.source);
+    } catch {/* silent */}
+    finally { setLoading(false); }
+  }
+
+  return (
+    <div className="rounded-md border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))]/40 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--kuja-spark))]">
+          AI triage summary
+        </div>
+        {!summary && (
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className="text-xs text-[hsl(var(--kuja-spark))] hover:underline"
+          >
+            {loading ? 'Summarizing…' : 'Summarize'}
+          </button>
+        )}
+      </div>
+      {summary && (
+        <>
+          <p className="text-sm whitespace-pre-line text-foreground/90">{summary}</p>
+          {source === 'template' && (
+            <p className="text-[10px] text-muted-foreground">AI fallback (Claude unavailable).</p>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 

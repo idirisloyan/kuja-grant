@@ -105,6 +105,74 @@ def api_ai_guidance():
     })
 
 
+@ai_bp.route('/summarize-application', methods=['POST'])
+@login_required
+@role_required('reviewer', 'donor', 'admin')
+def api_ai_summarize_application():
+    """Phase 267 — Reviewer triage summary.
+
+    Body: { application_id: int }
+    Returns: { summary: str (3 sentences), source: 'claude' | 'template' }
+    """
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return jsonify({'error': 'Too many AI requests.', 'success': False}), 429
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json() or {}
+    app_id = data.get('application_id')
+    if not app_id:
+        return jsonify({'error': 'application_id is required', 'success': False}), 400
+
+    application = db.session.get(Application, app_id)
+    if not application:
+        return jsonify({'error': 'Application not found', 'success': False}), 404
+
+    grant = db.session.get(Grant, application.grant_id) if application.grant_id else None
+    org = db.session.get(Organization, application.ngo_org_id) if application.ngo_org_id else None
+    responses = application.get_responses() if hasattr(application, 'get_responses') else {}
+
+    # Compose context.
+    org_summary = {
+        'name': org.name if org else 'Unknown',
+        'country': getattr(org, 'country', None) if org else None,
+        'sector': getattr(org, 'sector', None) if org else None,
+    }
+    grant_summary = {
+        'title': grant.title if grant else '',
+        'description': (grant.description or '')[:600] if grant else '',
+    }
+    responses_blob = '\n\n'.join(
+        f'{k}:\n{(v or "")[:700]}' for k, v in (responses or {}).items()
+    )[:3500]
+
+    system_msg = (
+        "You're a grant-review co-pilot. The reviewer needs a fast 3-sentence "
+        "triage summary of this application: (1) who is applying and what they "
+        "do, (2) what they propose to do with the grant, (3) the strongest "
+        "supporting fact you see. No padding, no hedging."
+    )
+    user_msg = (
+        f"ORG:\n{json.dumps(org_summary, indent=2)}\n\n"
+        f"GRANT:\n{json.dumps(grant_summary, indent=2)}\n\n"
+        f"APPLICANT RESPONSES:\n{responses_blob}\n\n"
+        "Write the 3-sentence summary now."
+    )
+
+    text = AIService._call_claude(system_msg, user_msg, max_tokens=350)
+    if text and text.strip():
+        return jsonify({'success': True, 'summary': text.strip(), 'source': 'claude'})
+
+    # Fallback template.
+    fallback = (
+        f"{org_summary['name']} from {org_summary['country'] or 'their country'} "
+        f"applied to {grant_summary['title'] or 'this grant'}. "
+        f"They submitted {len(responses or {})} criterion responses. "
+        "AI summarization is not available — read the responses directly."
+    )
+    return jsonify({'success': True, 'summary': fallback, 'source': 'template'})
+
+
 @ai_bp.route('/strengthen-section', methods=['POST'])
 @login_required
 @role_required('ngo')

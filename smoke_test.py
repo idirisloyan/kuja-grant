@@ -474,14 +474,19 @@ def make_tests(base):
         s_ngo = login_ok(base, USERS["ngo"])
         ngo_me = s_ngo.get(f"{base}/api/auth/me", headers=H, timeout=5).json()["user"]
 
+        # Phase 265 — pass allow_admin_override=true since the seeded
+        # donor/ngo users aren't OB-seated in the test network. The flag
+        # is admin-only and the test session is logged in as admin.
         rs1 = s.post(f"{base}/api/declarations/{decl_id}/signers", json={
             "user_id": donor_me["id"], "required_order": 0,
+            "allow_admin_override": True,
         }, headers=H, timeout=10)
         assert rs1.status_code == 200, f"add signer 1: {rs1.text[:200]}"
         sig1_id = rs1.json()["signature"]["id"]
 
         rs2 = s.post(f"{base}/api/declarations/{decl_id}/signers", json={
             "user_id": ngo_me["id"], "required_order": 1,
+            "allow_admin_override": True,
         }, headers=H, timeout=10)
         assert rs2.status_code == 200, f"add signer 2: {rs2.text[:200]}"
         sig2_id = rs2.json()["signature"]["id"]
@@ -776,10 +781,13 @@ def make_tests(base):
         donor_id = s_donor.get(f"{base}/api/auth/me", headers=H, timeout=5).json()["user"]["id"]
         s_ngo = login_ok(base, USERS["ngo"])
         ngo_id = s_ngo.get(f"{base}/api/auth/me", headers=H, timeout=5).json()["user"]["id"]
+        # Phase 266 — same admin-override fix as Phase 265.
         s.post(f"{base}/api/declarations/{decl_id}/signers",
-               json={"user_id": donor_id}, headers=H, timeout=10)
+               json={"user_id": donor_id, "allow_admin_override": True},
+               headers=H, timeout=10)
         s.post(f"{base}/api/declarations/{decl_id}/signers",
-               json={"user_id": ngo_id}, headers=H, timeout=10)
+               json={"user_id": ngo_id, "allow_admin_override": True},
+               headers=H, timeout=10)
         s.post(f"{base}/api/declarations/{decl_id}/submit", headers=H, timeout=10)
 
         # Sign both via manual_admin
