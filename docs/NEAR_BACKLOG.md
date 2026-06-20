@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 133-137 — Smoke test now enforces a latency
+  budget on 5 critical user-facing endpoints (dashboard/stats,
+  applications/, grants/, calendar/deadlines, journey/me). Soft +
+  hard thresholds; warm-up call + measured 2nd call so we catch
+  real regression, not noise. Arabic translation parity audit:
+  ar.json at 100% (7 ASCII-identical are correctly-untranslated
+  acronyms / placeholders); 3 header keys (`header.logout`,
+  `header.notification_settings`, `nav.metrics`) backfilled in
+  fr/sw/so/es. Sahel + South Sudan crisis rows now seeded on every
+  `seed_networked_funds` run (was previously gated by `--rich`).
+  New `POST /api/reviews/bulk-assign` to assign one reviewer to up
+  to 100 applications in one call with per-row idempotency. New
+  `GET /api/network/messages/<id>/read-receipts` exposes the
+  sender-side view of who has opened a tenant message (admin-only;
+  the inbox endpoint already showed per-recipient `is_read`).
+
 - **2026-06-20** Phase 127-131 — `/api/calendar/deadlines.ics` returns the
   caller's deadlines as an RFC-5545 iCalendar so NGOs can subscribe in
   Google Calendar / Outlook / Apple Calendar; "Calendar feed" CTA next to

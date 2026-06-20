@@ -240,13 +240,18 @@ def main():
     # (409). So if --rich is set, add the additional rows here BEFORE the
     # publish step.
     # ----------------------------------------------------------------
-    if args.rich:
+    # Phase 135 — Backfill Sahel + South Sudan rows on EVERY seed run
+    # (previously gated by --rich; the backlog flagged that prod's
+    # Crisis Monitoring Report looked sparse without them). Idempotent:
+    # rows with an existing country are skipped.
+    backfill_crisis_rows = True
+    if backfill_crisis_rows:
         rdet = s.get(f"{base}/api/crisis/reports/{report_id}", headers=H, timeout=10)
         existing_countries = set()
         if rdet.status_code == 200 and rdet.json().get("report", {}).get("status") != "published":
             for row in rdet.json().get("report", {}).get("rows", []):
                 existing_countries.add(row.get("country"))
-            print("[6b] Adding richer-demo crisis rows (pre-publish)...")
+            print("[6b] Adding Sahel + South Sudan crisis rows (pre-publish)...")
             extras = [
                 {
                     "country": "BFA", "region": "Sahel",

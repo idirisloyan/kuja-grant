@@ -3434,6 +3434,68 @@ def make_tests(base):
         )
     tests.append(("ENDPOINT-SCAN: No 500 errors on any critical endpoint", test_endpoint_scan))
 
+    # ---------------------------------------------------------------
+    # Phase 133 — latency budget on user-facing critical endpoints.
+    #
+    # Backlog item. Without a guardrail in CI, a regression that
+    # quietly doubles dashboard render time ships unnoticed. Budgets are
+    # generous (compared to typical local prod perf) so we catch ~2x
+    # drift, not normal noise.
+    #
+    # The threshold is server-side compute only; network jitter to
+    # 127.0.0.1 is negligible. requests timeout=20 acts as the hard
+    # upper bound.
+    # ---------------------------------------------------------------
+    def test_latency_budget():
+        import time as _t
+        # Endpoint, role, soft budget (ms), hard budget (ms).
+        # Soft = warning printed, hard = test fails.
+        budgets = [
+            ("/api/dashboard/stats", "ngo", 800, 3000),
+            ("/api/applications/", "ngo", 800, 3000),
+            ("/api/grants/", "ngo", 1000, 3500),
+            ("/api/calendar/deadlines", "ngo", 1200, 4000),
+            ("/api/journey/me", "ngo", 1000, 3000),
+        ]
+        warnings = []
+        failures = []
+        for path, role, soft_ms, hard_ms in budgets:
+            s = login_ok(base, USERS[role])
+            # Warm-up: many endpoints hit cold caches; we measure the
+            # second call. Real users see warm latency after the first
+            # navigation in the session.
+            try:
+                s.get(f"{base}{path}",
+                      headers={"X-Requested-With": "XMLHttpRequest"}, timeout=20)
+            except Exception:
+                pass
+            t0 = _t.time()
+            try:
+                r = s.get(f"{base}{path}",
+                          headers={"X-Requested-With": "XMLHttpRequest"}, timeout=20)
+            except Exception as exc:
+                failures.append(f"{path} ({role}): {type(exc).__name__}: {exc}")
+                continue
+            elapsed_ms = int((_t.time() - t0) * 1000)
+            if r.status_code >= 500:
+                failures.append(f"{path} ({role}): {r.status_code} (latency not measured)")
+                continue
+            if elapsed_ms > hard_ms:
+                failures.append(
+                    f"{path} ({role}): {elapsed_ms}ms > hard budget {hard_ms}ms"
+                )
+            elif elapsed_ms > soft_ms:
+                warnings.append(f"{path} ({role}): {elapsed_ms}ms > soft {soft_ms}ms")
+        if warnings:
+            print("  LATENCY WARNINGS:")
+            for w in warnings:
+                print(f"    - {w}")
+        assert not failures, (
+            f"LATENCY-BUDGET: {len(failures)} endpoint(s) exceeded budget:\n"
+            + "\n".join(f"  - {f}" for f in failures)
+        )
+    tests.append(("LATENCY-BUDGET: critical endpoints under threshold", test_latency_budget))
+
     return tests
 
 

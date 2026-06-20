@@ -173,6 +173,80 @@ def api_mark_read(message_id):
     return jsonify({'success': True})
 
 
+@tenant_message_bp.route('/<int:message_id>/read-receipts', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_message_read_receipts(message_id):
+    """Phase 137 — Sender-side view: which orgs have opened this message?
+
+    Returns the list of orgs that fall in the message's scope, with a
+    read_at timestamp where available. Admin-only — the inbox endpoint
+    already shows individual recipients their own is_read flag.
+    """
+    network_id = get_current_network_id()
+    msg = TenantMessage.query.get_or_404(message_id)
+    if network_id and msg.network_id != network_id:
+        return jsonify({'success': False, 'error': 'Wrong network context'}), 403
+
+    # Resolve recipient set the same way the inbox does.
+    from app.models import NetworkMembership, Organization
+    q = (
+        db.session.query(NetworkMembership, Organization)
+        .join(Organization, Organization.id == NetworkMembership.org_id)
+        .filter(NetworkMembership.network_id == msg.network_id)
+        .filter(NetworkMembership.status == 'active')
+    )
+    if msg.scope == 'org':
+        try:
+            q = q.filter(NetworkMembership.org_id == int(msg.scope_value or 0))
+        except (TypeError, ValueError):
+            q = q.filter(False)
+    elif msg.scope == 'country' and msg.scope_value:
+        q = q.filter(Organization.country == msg.scope_value)
+    # 'network' and 'declaration' — no extra filter here; declaration
+    # scope is filtered downstream by the inbox visibility check.
+
+    receipts_map = {
+        r.org_id: r.read_at
+        for r in TenantMessageRead.query.filter_by(message_id=message_id).all()
+    }
+
+    recipients = []
+    read_count = 0
+    for membership, org in q.all():
+        read_at = receipts_map.get(org.id)
+        if read_at:
+            read_count += 1
+        recipients.append({
+            'org_id': org.id,
+            'org_name': org.name,
+            'org_country': getattr(org, 'country', None),
+            'read_at': read_at.isoformat() if read_at else None,
+        })
+
+    recipients.sort(key=lambda r: (
+        # read first by recency, then unread by org name.
+        0 if r['read_at'] else 1,
+        -(int(r['read_at'].replace('-', '').replace(':', '').replace('T', '').replace('.', '')[:14])
+          if r['read_at'] else 0),
+        r['org_name'] or '',
+    ))
+
+    return jsonify({
+        'success': True,
+        'message_id': message_id,
+        'subject': msg.subject,
+        'sent_at': msg.sent_at.isoformat() if msg.sent_at else None,
+        'summary': {
+            'recipients': len(recipients),
+            'read': read_count,
+            'unread': len(recipients) - read_count,
+            'read_pct': round(100 * read_count / max(1, len(recipients)), 1),
+        },
+        'recipients': recipients,
+    })
+
+
 @tenant_message_bp.route('/recipients', methods=['POST'])
 @login_required
 @role_required('admin')

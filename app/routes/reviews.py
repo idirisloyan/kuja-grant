@@ -179,6 +179,108 @@ def api_create_review():
     return jsonify({'success': True, 'review': review.to_dict()}), 201
 
 
+@reviews_bp.route('/bulk-assign', methods=['POST'])
+@role_required('donor', 'admin')
+def api_bulk_assign_reviews():
+    """Phase 136 — Assign one reviewer to many applications at once.
+
+    Body:
+      {
+        "reviewer_user_id": 5,
+        "application_ids": [1, 2, 3]   # cap 100 per call
+      }
+
+    Per-row idempotent: if a review already exists for
+    (application_id, reviewer_user_id), it's marked as already_assigned
+    in the result and the row is not duplicated. Returns per-row results
+    so the caller can render partial successes.
+    """
+    data = get_request_json() or {}
+    reviewer_user_id = data.get('reviewer_user_id')
+    raw_ids = data.get('application_ids') or []
+
+    if not reviewer_user_id or not isinstance(raw_ids, list) or not raw_ids:
+        return jsonify({
+            'success': False,
+            'error': 'reviewer_user_id and application_ids (non-empty list) required',
+        }), 400
+    if len(raw_ids) > 100:
+        return jsonify({
+            'success': False,
+            'error': 'Bulk-assign capped at 100 applications per call',
+        }), 400
+
+    reviewer = db.session.get(User, reviewer_user_id)
+    if not reviewer or reviewer.role != 'reviewer':
+        return jsonify({
+            'success': False,
+            'error': 'Reviewer not found or user is not a reviewer',
+        }), 404
+
+    results = []
+    created = 0
+    already = 0
+    failed = 0
+
+    for aid_raw in raw_ids:
+        try:
+            aid = int(aid_raw)
+        except (TypeError, ValueError):
+            results.append({'application_id': aid_raw, 'ok': False, 'error': 'invalid_id'})
+            failed += 1
+            continue
+        application = db.session.get(Application, aid)
+        if not application:
+            results.append({'application_id': aid, 'ok': False, 'error': 'not_found'})
+            failed += 1
+            continue
+        existing = Review.query.filter_by(
+            application_id=aid, reviewer_user_id=reviewer_user_id,
+        ).first()
+        if existing:
+            results.append({
+                'application_id': aid, 'ok': True,
+                'already_assigned': True, 'review_id': existing.id,
+            })
+            already += 1
+            continue
+        try:
+            review = Review(
+                application_id=aid,
+                reviewer_user_id=reviewer_user_id,
+                status='assigned',
+            )
+            if application.status == 'submitted':
+                application.status = 'under_review'
+            db.session.add(review)
+            db.session.flush()
+            results.append({
+                'application_id': aid, 'ok': True,
+                'already_assigned': False, 'review_id': review.id,
+            })
+            created += 1
+        except Exception as e:
+            results.append({'application_id': aid, 'ok': False, 'error': str(e)[:120]})
+            failed += 1
+
+    db.session.commit()
+    logger.info(
+        "bulk-assign: reviewer=%s created=%s already=%s failed=%s",
+        reviewer_user_id, created, already, failed,
+    )
+    return jsonify({
+        'success': True,
+        'reviewer_user_id': reviewer_user_id,
+        'summary': {
+            'requested': len(raw_ids),
+            'created': created,
+            'already_assigned': already,
+            'failed': failed,
+        },
+        'results': results,
+    })
+
+
 @reviews_bp.route('/<int:review_id>', methods=['PUT'])
 @login_required
 @role_required('reviewer', 'admin')
