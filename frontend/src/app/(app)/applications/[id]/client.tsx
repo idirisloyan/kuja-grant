@@ -33,6 +33,7 @@ import { ApplicationMessageThread } from '@/components/applications/application-
 import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
 import { MicroSurvey } from '@/components/shared/micro-survey';
+import { InactivityHelp } from '@/components/shared/inactivity-help';
 import { useAuthStore } from '@/stores/auth-store';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
@@ -123,6 +124,18 @@ export default function ApplicationDetailClient() {
   return (
     <PageShell>
       <PageBack href="/applications" label={t('application.back')} />
+      {/* Phase 99 — Inactivity-triggered help. Fires after ~45s of no
+          activity on a draft application detail page; first-time NGOs
+          freeze here without a nudge towards the budget tab, which is
+          where most successful applications start. Per-session dismissal. */}
+      {application.status === 'draft' && isOwnerNgo && (
+        <InactivityHelp
+          surfaceKey={`application-${application.id}-draft`}
+          hint="Most NGOs start with the budget section — it shapes the rest of the answers."
+          nextHref={`#tab=responses`}
+          nextLabel="Open the response form"
+        />
+      )}
 
       <PageHeader
         title={application.grant_title || t('applications.label_fallback', { n: application.id })}

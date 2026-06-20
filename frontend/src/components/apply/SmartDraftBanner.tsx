@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { AIStatusNotice } from '@/components/shared/ai-status-notice';
 import { useAiStatus } from '@/lib/hooks/use-ai-status';
+import { AIConfidenceBadge, confidenceFromScore } from '@/components/shared/ai-confidence-badge';
 
 interface AiDraftResp {
   success: boolean;
@@ -169,9 +170,12 @@ export function SmartDraftBanner({
           <h3 className="font-semibold text-sm">
             Draft ready · {respCount} section{respCount === 1 ? '' : 's'} drafted
             {preview.confidence != null && (
-              <span className="ml-2 text-[10px] text-muted-foreground font-normal">
-                confidence {preview.confidence}/100
-              </span>
+              <AIConfidenceBadge
+                confidence={confidenceFromScore(preview.confidence)}
+                variant="inline"
+                className="ml-2"
+                title={`AI confidence on this draft: ${preview.confidence}/100. Higher = more grounded in your existing data.`}
+              />
             )}
           </h3>
           <p className="text-xs text-muted-foreground leading-relaxed">

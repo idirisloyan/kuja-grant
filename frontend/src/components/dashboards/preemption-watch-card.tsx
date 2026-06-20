@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { AIConfidenceBadge, confidenceFromScore } from '@/components/shared/ai-confidence-badge';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -81,9 +82,11 @@ function FindingCard({ finding }: { finding: PreemptionFinding }) {
             <span className="text-[10px] uppercase tracking-wider font-semibold text-[hsl(var(--kuja-ink-soft))]">
               {CATEGORY_LABEL[finding.category] ?? finding.category}
             </span>
-            <Badge variant="outline" className="text-[10px]">
-              conf {finding.confidence}/100
-            </Badge>
+            <AIConfidenceBadge
+              confidence={confidenceFromScore(finding.confidence)}
+              variant="inline"
+              title={`AI confidence: ${finding.confidence}/100 — bucketed for calibration honesty (see Phase 5.4 design doc).`}
+            />
           </div>
           <p className="mt-1 text-sm font-semibold text-[hsl(var(--kuja-ink))]">
             {finding.deliverable}

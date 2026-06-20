@@ -42,6 +42,98 @@ Profile share page shipped, RTL + dark-mode + a11y all verified in
 browser. WhatsApp / offline PWA / verifiable credential export are
 multi-week and remain committed in the relevant Wave sections below.
 
+**Phase 99 Session-of-2026-06-19 batch — additional deferred-item sweep
+shipped this session:**
+
+Wave 1 finishing:
+- ~~Persistent NGO journey rail~~ — new `<JourneyRail>` component, mounted
+  in the (app) layout, NGO-only, hidden on /dashboard, dismissible per
+  session. Shares the SWR key with the full `<JourneyTracker>` so no
+  double-fetch.
+- ~~AIConfidenceBadge codemod~~ — added `confidenceFromScore()` helper to
+  `<AIConfidenceBadge>`. Migrated 6 hand-rolled confidence sites
+  (preemption-watch, SmartDraftBanner, declaration-conversation,
+  PhotoEvidenceUploader, adverse-media-panel, registration-panel,
+  evidence-panel) to bucketed badge + helper.
+- ~~OneNumberCard sweep — donor dashboard~~ — 3-card portfolio
+  at-a-glance row above PageMain (Open grants / Apps awaiting / Reports
+  awaiting), tone-coded.
+
+Wave 2a doable:
+- ~~Predictive nudge server-side estimate~~ — new
+  `GET /api/applications/<id>/predictive-nudge` returns percent done,
+  minutes left (from NGO's historical median minutes-per-field across
+  last 3 submissions, default 3min), fields-left + next-tap label.
+- ~~"What changed since you last visited" digest~~ — new
+  `GET /api/whats-new?since=<iso>` (NGO/donor/reviewer/admin variants)
+  + new `<WhatsNewBanner>` mounted in (app) layout. localStorage
+  tracks last-visit; dismissible.
+
+Wave 3 doable:
+- ~~OB confirmation framing for declaration-as-conversation~~ — clearer
+  "Are these right? Confirm before sending to OB" header + intro copy
+  making the parse explicit. No new submit gate — the existing two
+  CTAs already require explicit click.
+- ~~Inactivity-triggered help~~ — new `<InactivityHelp>` component:
+  bottom-right tooltip after 45s of no activity on a surface, calmly
+  prompts "Stuck? Here's what most users do." with a jump link.
+  Per-session dismissal. Wired on `/applications/[id]` for draft state.
+
+Wave 4 + reliability:
+- ~~AI quality dashboard UI~~ — `/admin/ai-quality` page consuming new
+  `GET /api/admin/ai-quality-rollup`: median edit-ratio per surface,
+  mode distribution (verbatim/blended/rejected), false-confidence rate
+  × language. The companion to Phase 97.
+- ~~Per-tenant AI cost meter UI~~ — `/admin/ai-cost` page consuming new
+  `GET /api/admin/ai-cost-by-tenant`: per-org token spend with share %,
+  joins AICallLog → User → Organization.
+- ~~AI fallback hierarchy~~ — `copilot_service._call` now tries Sonnet
+  4.6 → Haiku 4.5 with `meta.fallback_used: true` marker for the
+  caller's user-facing notice.
+- ~~Per-tenant data export bundle~~ — `GET /api/exports/org-bundle`
+  returns org + users + applications + grants + reports + assessments +
+  passports + documents. JSON or download-as-attachment.
+- ~~DB integrity invariants~~ — new `/api/admin/integrity` runs 5
+  invariants (orphan apps/reports, unsubmitted-with-submitted_at,
+  negative funding, user without org). Returns per-check violation
+  count + samples.
+
+Usability + polish:
+- ~~Translation merge script~~ — `frontend/scripts/update_translations.py`:
+  per-lang or bulk-dir merge with dry-run, preserves key order, refuses
+  keys not in canonical en.json, refuses empty values.
+
+Items still deferred after this batch (call-outs):
+- TimeEstimate codemod across multi-step forms (incremental polish)
+- Voice on apply responses + declaration descriptions (extension of
+  Phase 71 — defer; needs separate UX session)
+- Global "simplify" reading-level control (needs UX decisions on which
+  copy is rewritable)
+- Jargon-melting on tap (concept-helper extension — needs prompt
+  tuning)
+- Smart batch operations for reviewers (new flow — defer)
+- Inline scenario modeling (complex AI surface — defer)
+- WhyThisMatch real recommendation endpoint (needs match scoring
+  rework — defer)
+- Per-donor "ask about my grantees" surface (multi-day AI prompt
+  work — defer)
+- App-wide dark mode toggle (1-2 weeks per honesty section — defer)
+- OneNumberCard sweep on NGO/admin/reviewer dashboards (incremental;
+  donor done this session as the reference)
+- EmptyState body field enforcement (lint rule — needs eslint plugin
+  authorship)
+- "One primary action per page" audit (manual sweep)
+- "Why this notification?" link (defer — needs notification metadata
+  schema)
+- Onboarding ungate drafts (defer — needs gating logic refactor)
+- Cross-tenant token unification audit (defer — large refactor)
+- Recurring meeting / signature blocks (defer — new scheduling feature)
+- Per-tenant AI cost ceiling threshold notifications (the cost meter
+  UI is shipped; soft/hard cap with admin config is the next layer)
+
+All deferred items remain in the wave sections above. The `last_touched:
+2026-06-19` markers below were refreshed where items moved.
+
 **Sequencing principle:** Wave 1 first (pure design/UX; no new infra),
 then Wave 2a (channels — WhatsApp, voice extension, predictive nudge
 wiring), then Wave 2b (offline-first PWA + IndexedDB queue — biggest

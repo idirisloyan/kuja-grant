@@ -7,6 +7,7 @@
 
 import { Quote } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AIConfidenceBadge, confidenceFromScore } from '@/components/shared/ai-confidence-badge';
 
 type Severity = 'critical' | 'major' | 'minor' | 'info' | 'good';
 
@@ -39,9 +40,11 @@ export function EvidencePanel({
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className={`kuja-severity kuja-severity-${severity}`}>{severity}</span>
             {confidence !== undefined && (
-              <span className="text-[10px] text-muted-foreground">
-                AI confidence {Math.round(confidence * 100)}%
-              </span>
+              <AIConfidenceBadge
+                confidence={confidenceFromScore(confidence)}
+                variant="inline"
+                title={`AI confidence on this evidence: ${Math.round(confidence * 100)}%.`}
+              />
             )}
           </div>
           <div className="text-sm font-semibold text-foreground">{title}</div>

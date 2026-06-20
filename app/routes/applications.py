@@ -1500,3 +1500,152 @@ def api_application_pre_submit_preview(app_id):
         'fixes': fixes,
         'method': 'rule-based-v0',
     })
+
+
+# ---------------------------------------------------------------------------
+# Phase 99 — Predictive nudge wiring
+# ---------------------------------------------------------------------------
+
+@applications_bp.route('/<int:app_id>/predictive-nudge', methods=['GET'])
+@login_required
+def api_application_predictive_nudge(app_id):
+    """Phase 99 — predictive nudge for the <PredictiveNudge> component.
+
+    Computes a forward-looking estimate from the application's autosave
+    state and the grant's field schema:
+
+      - percentDone   — proportion of fields with >= some content
+      - minutesLeft   — fieldsLeft × NGO's historical median minutes-per-
+                        -field across their last 3 submissions, with a
+                        global 3-min default for cold-start NGOs.
+      - fieldsLeft    — count of unfilled criteria
+      - fieldsTotal   — total criteria on the grant
+      - nextTap       — { label, hint } pointing at the first unfilled
+                        criterion so the nudge says exactly what to do next.
+
+    Auth: same as pre-submit-preview (owning NGO + admin).
+
+    Returns a status sentinel:
+      ready    — usable estimate
+      complete — every field has content (no nudge needed)
+      no_criteria — grant has no rubric configured
+    """
+    import json as _json
+
+    application = (
+        Application.query.options(db.joinedload(Application.grant))
+        .filter_by(id=app_id).first()
+    )
+    if not application:
+        return jsonify({'success': False, 'error': 'application.not_found'}), 404
+    if current_user.role == 'ngo' and application.ngo_org_id != current_user.org_id:
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    criteria = (
+        application.grant.get_criteria()
+        if application.grant and hasattr(application.grant, 'get_criteria')
+        else []
+    )
+    if not criteria:
+        return jsonify({'success': True, 'status': 'no_criteria'})
+
+    try:
+        responses = _json.loads(application.responses or '{}')
+    except Exception:
+        responses = {}
+
+    total = 0
+    filled = 0
+    first_empty = None
+    for c in criteria:
+        if not isinstance(c, dict):
+            continue
+        total += 1
+        key = str(c.get('key') or c.get('id') or '')
+        text = str(responses.get(key, '') or '').strip()
+        # "Filled" = ≥40 chars, matching the pre-submit-preview heuristic.
+        if len(text) >= 40:
+            filled += 1
+        elif first_empty is None:
+            first_empty = c
+
+    if total == 0:
+        return jsonify({'success': True, 'status': 'no_criteria'})
+
+    fields_left = max(0, total - filled)
+    pct_done = round(100 * filled / total, 1)
+    if fields_left == 0:
+        return jsonify({
+            'success': True,
+            'status': 'complete',
+            'percentDone': 100.0,
+            'fieldsTotal': total,
+            'fieldsLeft': 0,
+        })
+
+    # Historical median minutes-per-field for this NGO. We approximate from
+    # the last 3 submitted applications by the same org — created_at →
+    # submitted_at delta, divided by # of criteria on that grant. If the
+    # NGO has no prior submissions, fall back to the global 3-min default.
+    median_minutes_per_field = _median_minutes_per_field_for_org(
+        application.ngo_org_id, exclude_app_id=app_id,
+    )
+    minutes_left = int(round(fields_left * median_minutes_per_field))
+
+    next_tap = None
+    if first_empty is not None:
+        next_tap = {
+            'label': f"Answer '{first_empty.get('label') or first_empty.get('key')}'",
+            'hint': str(first_empty.get('description') or '')[:200] or None,
+            'criterion_key': str(first_empty.get('key') or first_empty.get('id') or ''),
+        }
+
+    return jsonify({
+        'success': True,
+        'status': 'ready',
+        'percentDone': pct_done,
+        'minutesLeft': minutes_left,
+        'fieldsLeft': fields_left,
+        'fieldsTotal': total,
+        'nextTap': next_tap,
+        'method': 'rule-based-v0',
+        'minutes_per_field_basis': median_minutes_per_field,
+    })
+
+
+def _median_minutes_per_field_for_org(org_id, exclude_app_id=None):
+    """NGO's historical minutes-per-field, computed from their last 3
+    submitted applications. Returns the global 3-min default for cold
+    starts."""
+    if org_id is None:
+        return 3.0
+    try:
+        q = (
+            Application.query.options(db.joinedload(Application.grant))
+            .filter(Application.ngo_org_id == org_id)
+            .filter(Application.submitted_at.isnot(None))
+        )
+        if exclude_app_id:
+            q = q.filter(Application.id != exclude_app_id)
+        recent = q.order_by(Application.submitted_at.desc()).limit(3).all()
+    except Exception:
+        return 3.0
+    samples = []
+    for a in recent:
+        if not a.submitted_at or not a.created_at:
+            continue
+        delta = (a.submitted_at - a.created_at).total_seconds() / 60.0
+        if delta <= 0 or delta > 60 * 24 * 30:  # 30-day sanity cap
+            continue
+        crits = a.grant.get_criteria() if a.grant and hasattr(a.grant, 'get_criteria') else []
+        n = sum(1 for c in crits if isinstance(c, dict))
+        if n == 0:
+            continue
+        samples.append(delta / n)
+    if not samples:
+        return 3.0
+    s = sorted(samples)
+    mid = len(s) // 2
+    return s[mid] if len(s) % 2 else (s[mid - 1] + s[mid]) / 2

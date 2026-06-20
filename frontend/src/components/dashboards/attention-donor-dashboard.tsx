@@ -23,6 +23,7 @@ import {
 } from '@/components/layout/page-shell';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { DonorCommandCenter } from '@/components/dashboards/donor-command-center';
+import { OneNumberCard } from '@/components/shared/one-number-card';
 import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
 import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
 import { PortfolioRiskHeatmap } from '@/components/dashboards/portfolio-risk-heatmap';
@@ -128,6 +129,34 @@ export function AttentionDonorDashboard() {
 
       <TodayFocusBanner items={attention} />
       <PageAttention items={attention} />
+
+      {/* Phase 99 — OneNumberCard portfolio at-a-glance row. Replaces the
+          metric-soup pattern with three calm numbers + one next action
+          each. Counts come from the same hooks the lists below use, so
+          there's no extra fetch and no drift between rail and content. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 my-4">
+        <OneNumberCard
+          label="Open grants"
+          value={String((openGrants?.grants ?? []).length)}
+          nextAction="Open all grants"
+          nextActionHref="/grants"
+          tone={(openGrants?.grants ?? []).length === 0 ? 'warning' : 'neutral'}
+        />
+        <OneNumberCard
+          label="Applications awaiting action"
+          value={String(submittedApps.length)}
+          nextAction={submittedApps.length > 0 ? 'Open reviews' : 'See past reviews'}
+          nextActionHref={submittedApps.length > 0 ? '/reviews' : '/reviews?status=scored'}
+          tone={submittedApps.length > 0 ? 'warning' : 'success'}
+        />
+        <OneNumberCard
+          label="Reports awaiting review"
+          value={String(submittedReps.length)}
+          nextAction={submittedReps.length > 0 ? 'Open reports' : 'See past reports'}
+          nextActionHref={submittedReps.length > 0 ? '/reports' : '/reports?status=scored'}
+          tone={submittedReps.length > 0 ? 'warning' : 'success'}
+        />
+      </div>
 
       <PageMain>
         {/* My grants — quick portfolio look without a chart */}

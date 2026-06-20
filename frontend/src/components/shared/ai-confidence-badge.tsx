@@ -48,6 +48,29 @@ interface Props {
   className?: string;
 }
 
+/**
+ * Convert a numeric AI confidence (either a 0-1 probability or a 0-100
+ * score) to the bucketed value AIConfidenceBadge takes. The single
+ * threshold convention across the app:
+ *
+ *   ≥ 75 → high     (we'd act on this)
+ *   ≥ 50 → medium   (worth a human glance)
+ *   < 50 → low      (don't trust without verifying)
+ *
+ * Calibrated against the Phase 5.4 design rationale: bucketing is the
+ * honest summary of model output; raw probabilities don't survive cross-
+ * surface comparison. Use this everywhere a percentage was previously
+ * rendered inline.
+ */
+export function confidenceFromScore(score: number | null | undefined): 'high' | 'medium' | 'low' {
+  const n = Number(score);
+  if (!Number.isFinite(n)) return 'medium';
+  const v = n <= 1 ? n * 100 : n;
+  if (v >= 75) return 'high';
+  if (v >= 50) return 'medium';
+  return 'low';
+}
+
 export function AIConfidenceBadge({
   confidence,
   variant = 'inline',

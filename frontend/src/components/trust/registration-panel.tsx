@@ -20,6 +20,7 @@
 import useSWR from 'swr';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { AIConfidenceBadge, confidenceFromScore } from '@/components/shared/ai-confidence-badge';
 
 const fetcher = <T,>(url: string): Promise<T> => api.get<T>(url);
 import {
@@ -165,7 +166,11 @@ export function RegistrationPanel({ orgId }: { orgId: number }) {
                 <div className="text-xs text-muted-foreground mt-0.5">
                   Last checked {new Date(latest.updated_at).toLocaleDateString()}
                   {latest.ai_confidence != null && (
-                    <> · AI confidence <span className="font-semibold">{Math.round(latest.ai_confidence)}%</span></>
+                    <> · <AIConfidenceBadge
+                      confidence={confidenceFromScore(latest.ai_confidence)}
+                      variant="inline"
+                      title={`AI confidence on registration verification: ${Math.round(latest.ai_confidence)}%.`}
+                    /></>
                   )}
                   {latest.ai_analysis?.findings && latest.ai_analysis.findings.length > 0 && (
                     <> · {latest.ai_analysis.findings.length} finding(s)</>

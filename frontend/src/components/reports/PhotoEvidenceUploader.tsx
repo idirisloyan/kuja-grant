@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { AIStatusNotice } from '@/components/shared/ai-status-notice';
 import { useAiStatus } from '@/lib/hooks/use-ai-status';
+import { confidenceFromScore } from '@/components/shared/ai-confidence-badge';
 
 type PhotoKind = 'attendance' | 'receipt' | 'training' | 'site_visit' | 'other';
 
@@ -106,7 +107,7 @@ export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: P
         onApplied?.();
         toast.success(
           resp.ai_used
-            ? `Photo extracted (confidence ${resp.confidence ?? 0}/100). Review below.`
+            ? `Photo extracted with ${confidenceFromScore(resp.confidence ?? 0)} confidence. Review below.`
             : 'Photo attached.',
         );
       }

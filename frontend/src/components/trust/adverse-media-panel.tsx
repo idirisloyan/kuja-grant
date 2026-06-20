@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { AIConfidenceBadge, confidenceFromScore } from '@/components/shared/ai-confidence-badge';
 import { trustApi } from '@/lib/trust-api';
 import type { AdverseMediaScreening, AdverseMediaFinding } from '@/lib/trust-api';
 import { cn } from '@/lib/utils';
@@ -47,9 +48,11 @@ function FindingCard({ finding }: { finding: AdverseMediaFinding }) {
         <span className="text-[11px] uppercase tracking-wider font-semibold opacity-70">
           {CATEGORY_LABEL[finding.category] ?? finding.category}
         </span>
-        <span className="text-[11px] opacity-60">
-          confidence {finding.confidence}/100
-        </span>
+        <AIConfidenceBadge
+          confidence={confidenceFromScore(finding.confidence)}
+          variant="inline"
+          title={`AI confidence on this finding: ${finding.confidence}/100. Bucketed for calibration.`}
+        />
       </div>
       <h4 className="text-sm font-semibold mt-2 text-[hsl(var(--kuja-ink))]">
         {finding.headline}

@@ -83,51 +83,73 @@ class CopilotService:
             if lang in LANG_NAMES:
                 system += f"\n\nIMPORTANT: Respond entirely in {LANG_NAMES[lang]}."
 
-        attempts = 0
+        # Phase 99 — fallback hierarchy. We try the primary (Sonnet) first;
+        # if every attempt fails AND the caller didn't explicitly pin to
+        # Haiku, we degrade to Haiku before giving up. The Haiku result is
+        # marked `meta.fallback_used: True` so the calling route can render
+        # the "Using draft mode — full review available shortly" notice
+        # instead of silently substituting model output.
+        attempt_models = [model]
+        if model != MODEL_FAST:
+            attempt_models.append(MODEL_FAST)
+
         last_err = None
-        while attempts < 2:
-            attempts += 1
-            t0 = time.time()
-            try:
-                # Phase 98 — prompt-cache the system block for the central
-                # copilot _call. context_suggestions / chat / insights all
-                # share the role-decorated grounding rule from
-                # context_suggestions(), which is long enough to benefit
-                # from the 5-min ephemeral cache on the second call.
-                msg = client.messages.create(
-                    model=model,
-                    max_tokens=max_tokens,
-                    system=[{
-                        "type": "text",
-                        "text": system,
-                        "cache_control": {"type": "ephemeral"},
-                    }],
-                    messages=[{'role': 'user', 'content': user}],
-                )
-                usage = getattr(msg, 'usage', None)
-                tin = getattr(usage, 'input_tokens', 0) if usage else 0
-                tout = getattr(usage, 'output_tokens', 0) if usage else 0
-                text = msg.content[0].text if msg.content else ''
-                return {
-                    'ok': True,
-                    'data': {'text': text},
-                    'meta': {
-                        'tokens_in': tin, 'tokens_out': tout, 'model': model,
-                        'duration_ms': int((time.time() - t0) * 1000),
-                    },
-                }
-            except Exception as e:  # noqa: BLE001
-                last_err = e
-                logger.warning(f"copilot._call attempt {attempts} failed: {e}")
-                if attempts < 2:
-                    time.sleep(1.5)
-                    continue
-                break
+        for model_idx, m in enumerate(attempt_models):
+            is_fallback = model_idx > 0
+            attempts = 0
+            while attempts < 2:
+                attempts += 1
+                t0 = time.time()
+                try:
+                    # Phase 98 — prompt-cache the system block for the central
+                    # copilot _call. context_suggestions / chat / insights all
+                    # share the role-decorated grounding rule from
+                    # context_suggestions(), which is long enough to benefit
+                    # from the 5-min ephemeral cache on the second call.
+                    msg = client.messages.create(
+                        model=m,
+                        max_tokens=max_tokens,
+                        system=[{
+                            "type": "text",
+                            "text": system,
+                            "cache_control": {"type": "ephemeral"},
+                        }],
+                        messages=[{'role': 'user', 'content': user}],
+                    )
+                    usage = getattr(msg, 'usage', None)
+                    tin = getattr(usage, 'input_tokens', 0) if usage else 0
+                    tout = getattr(usage, 'output_tokens', 0) if usage else 0
+                    text = msg.content[0].text if msg.content else ''
+                    if is_fallback:
+                        logger.info(
+                            "copilot._call recovered via fallback model=%s after primary=%s failed: %s",
+                            m, model, last_err,
+                        )
+                    return {
+                        'ok': True,
+                        'data': {'text': text},
+                        'meta': {
+                            'tokens_in': tin, 'tokens_out': tout, 'model': m,
+                            'duration_ms': int((time.time() - t0) * 1000),
+                            'fallback_used': is_fallback,
+                            'fallback_from': model if is_fallback else None,
+                        },
+                    }
+                except Exception as e:  # noqa: BLE001
+                    last_err = e
+                    logger.warning(
+                        f"copilot._call attempt {attempts} on model={m} failed: {e}"
+                    )
+                    if attempts < 2:
+                        time.sleep(1.5)
+                        continue
+                    break
+            # Loop fell through — try the next model in the hierarchy.
 
         return {
             'ok': False,
             'code': 'AI_FAILED',
-            'message': f"AI call failed: {last_err}",
+            'message': f"AI call failed (primary + fallback exhausted): {last_err}",
         }
 
     @classmethod

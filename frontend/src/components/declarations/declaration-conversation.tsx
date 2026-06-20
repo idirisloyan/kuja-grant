@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { AIStatusNotice } from '@/components/shared/ai-status-notice';
+import { AIConfidenceBadge, confidenceFromScore } from '@/components/shared/ai-confidence-badge';
 
 // Phase 94 — same language quality metadata as VoiceReportComposer.
 const LANGS: Array<{
@@ -350,9 +351,26 @@ export function DeclarationConversation({ onParsed, onCancel, className = '' }: 
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-[hsl(var(--kuja-grow))]" />
-              Parsed draft · confidence {result.confidence ?? 0}/100
+              Are these right? Confirm before sending to OB
+              <AIConfidenceBadge
+                confidence={confidenceFromScore(result.confidence ?? 0)}
+                variant="inline"
+                title={`AI confidence on this declaration parse: ${result.confidence ?? 0}/100.`}
+              />
             </h3>
           </div>
+
+          {/* Phase 99 — explicit OB confirmation framing. Per the backlog
+              "parse is invisible, confirmation is explicit": the OB
+              should never sign a declaration whose AI-parsed fields
+              they didn't actually read. The two CTAs below already
+              require an explicit click, this is the reading-prompt that
+              makes the parse visible. */}
+          <p className="text-[11px] text-muted-foreground -mt-1">
+            Kuja AI pulled these fields from what you described. Skim them
+            below — if anything&apos;s wrong, edit the description and re-parse.
+            Nothing is sent to the OB until you choose <em>Use this draft</em>.
+          </p>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
             <Field label="Title" value={result.title} />

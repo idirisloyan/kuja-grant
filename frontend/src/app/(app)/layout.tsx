@@ -18,6 +18,8 @@ import { TwoFactorNagBanner } from '@/components/security/TwoFactorNagBanner';
 import { KeyboardShortcutOverlay } from '@/components/shared/KeyboardShortcutOverlay';
 import { CommandPalette } from '@/components/layout/command-palette';
 import { OfflineBanner } from '@/components/layout/offline-banner';
+import { JourneyRail } from '@/components/dashboards/journey-rail';
+import { WhatsNewBanner } from '@/components/layout/whats-new-banner';
 
 const SIDEBAR_WIDTH = 280;
 const COLLAPSED_WIDTH = 72;
@@ -85,6 +87,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           style={{ ['--sidebar-w' as string]: `${currentWidth}px` }}
         >
           <Header />
+          {/* Phase 99 — persistent NGO journey rail above main content.
+              Self-gated to user.role==='ngo' and hidden on /dashboard
+              where the full <JourneyTracker> renders. Dismissible per
+              session. */}
+          <JourneyRail />
+          {/* Phase 99 — "what's new since you last visited" digest.
+              Self-gated: only shows if the digest has items AND the user
+              has visited before (localStorage marker). Dismissible. */}
+          <WhatsNewBanner />
           <main
             id="main-content"
             role="main"
