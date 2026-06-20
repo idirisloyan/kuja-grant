@@ -18,6 +18,7 @@ import { SmartDraftBanner } from '@/components/apply/SmartDraftBanner';
 import { TrustPortableBadge } from '@/components/shared/trust-portable-badge';
 import { PastApplicationsDrawer } from '@/components/apply/past-applications-drawer';
 import { AIToolsAccordion } from '@/components/shared/ai-tools-accordion';
+import { AIFeedbackChip } from '@/components/shared/ai-feedback-chip';
 import { useAutosave } from '@/lib/hooks/use-autosave';
 import { getQuestionForLabel, getPlaceholderForLabel } from '@/lib/guided-questions';
 import { SubmissionVelocityBar } from '@/components/apply/submission-velocity-bar';
@@ -86,6 +87,7 @@ interface GuidanceResult {
   quality_score: number;
   source: string;
   visible: boolean;
+  ai_call_id?: number | null;
 }
 
 interface StrengthenResult {
@@ -95,6 +97,7 @@ interface StrengthenResult {
   tweaks: string[];
   source: string;
   visible: boolean;
+  ai_call_id?: number | null;
 }
 
 interface UploadedDoc {
@@ -414,6 +417,7 @@ export default function ApplyWizardClient() {
             quality_score: res.quality_score,
             source: res.source,
             visible: true,
+            ai_call_id: res.ai_call_id ?? null,
           },
         }));
       } catch {
@@ -455,6 +459,7 @@ export default function ApplyWizardClient() {
           sharpened: string;
           tweaks: string[];
           source: string;
+          ai_call_id?: number | null;
         }>('/ai/strengthen-section', {
           criterion: {
             label: criterion.label,
@@ -476,6 +481,7 @@ export default function ApplyWizardClient() {
             tweaks: res.tweaks || [],
             source: res.source || '',
             visible: true,
+            ai_call_id: res.ai_call_id ?? null,
           },
         }));
         toast.success(t('apply.improve_toast'));
@@ -1426,6 +1432,12 @@ function ProposalStep({
                       </ul>
                     </div>
                   )}
+                  {/* Phase 201 — AI feedback chip for telemetry */}
+                  {strengthen.ai_call_id ? (
+                    <div className="pt-1">
+                      <AIFeedbackChip callId={strengthen.ai_call_id} surfaceLabel="strengthen rewrite" />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )}
@@ -1443,19 +1455,25 @@ function ProposalStep({
                   </div>
                 </div>
                 <p className="mb-3 whitespace-pre-line text-sm text-[#4C1D95]">{guidance.guidance}</p>
-                <div className="flex justify-end gap-1.5 border-t border-[hsl(var(--kuja-spark)/0.15)] pt-2">
-                  <button
-                    onClick={() => onDismissGuidance(c.key)}
-                    className="inline-flex items-center gap-1 rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-background"
-                  >
-                    <X className="h-3 w-3" /> Dismiss
-                  </button>
-                  <button
-                    onClick={() => onApplySuggestions(c.key)}
-                    className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--kuja-spark))] px-3 py-1 text-xs font-medium text-white hover:opacity-90"
-                  >
-                    <Sparkles className="h-3 w-3" /> Apply Suggestions
-                  </button>
+                <div className="flex items-center justify-between gap-1.5 border-t border-[hsl(var(--kuja-spark)/0.15)] pt-2">
+                  {/* Phase 201 — AI feedback chip for telemetry */}
+                  {guidance.ai_call_id ? (
+                    <AIFeedbackChip callId={guidance.ai_call_id} surfaceLabel="AI guidance" />
+                  ) : <span />}
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => onDismissGuidance(c.key)}
+                      className="inline-flex items-center gap-1 rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-background"
+                    >
+                      <X className="h-3 w-3" /> Dismiss
+                    </button>
+                    <button
+                      onClick={() => onApplySuggestions(c.key)}
+                      className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--kuja-spark))] px-3 py-1 text-xs font-medium text-white hover:opacity-90"
+                    >
+                      <Sparkles className="h-3 w-3" /> Apply Suggestions
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

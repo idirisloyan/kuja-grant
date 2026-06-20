@@ -73,11 +73,31 @@ def api_ai_guidance():
     result = AIService.guidance(field_name, grant_criteria, current_text)
 
     source = result.get('source', 'unknown')
+
+    # Phase 200 — log a replayable call so the AIFeedbackChip can attach
+    # accept/edit/dismiss feedback to a stable id.
+    ai_call_id = None
+    try:
+        from app.services.replay_service import log_replayable_ai_call
+        ai_call_id = log_replayable_ai_call(
+            endpoint='ai-guidance',
+            user_id=current_user.id,
+            input_text=f"FIELD: {field_name}\nCURRENT: {(current_text or '')[:2000]}",
+            output_text=(result.get('guidance') or '')[:5000],
+            success=(source == 'claude'),
+            subject_kind='field',
+            org_id=getattr(current_user, 'org_id', None),
+            role=getattr(current_user, 'role', None),
+        )
+    except Exception:
+        ai_call_id = None
+
     return jsonify({
         'success': True,
         'guidance': result['guidance'],
         'quality_score': result.get('quality_score', 0),
         'source': source,
+        'ai_call_id': ai_call_id,
         'ai_transparency': {
             'engine': 'Claude AI' if source == 'claude' else 'Rule-based heuristics',
             'disclaimer': 'AI-generated guidance — always apply professional judgment.',
@@ -139,7 +159,29 @@ def api_ai_strengthen_section():
         org_summary=org_summary,
     )
 
-    return jsonify({'success': True, **result})
+    # Phase 200 — replayable call id for AIFeedbackChip.
+    ai_call_id = None
+    try:
+        from app.services.replay_service import log_replayable_ai_call
+        ai_call_id = log_replayable_ai_call(
+            endpoint='ai-strengthen-section',
+            user_id=current_user.id,
+            input_text=(
+                f"CRITERION: {criterion.get('label') or criterion.get('key') or ''}\n"
+                f"GRANT: {(grant_context or {}).get('title') if grant_context else ''}\n"
+                f"DRAFT:\n{(current_text or '')[:2000]}"
+            ),
+            output_text=(result.get('sharpened') or '')[:5000],
+            success=(result.get('source') == 'claude'),
+            subject_kind='grant',
+            subject_id=int(grant_id) if grant_id else None,
+            org_id=getattr(current_user, 'org_id', None),
+            role=getattr(current_user, 'role', None),
+        )
+    except Exception:
+        ai_call_id = None
+
+    return jsonify({'success': True, 'ai_call_id': ai_call_id, **result})
 
 
 @ai_bp.route('/jobs/<job_id>', methods=['GET'])
@@ -1114,9 +1156,32 @@ def api_ai_compliance_preempt():
             documents=documents,
             language=captured_lang,
         )
+        # Phase 200 — replayable call id for AIFeedbackChip.
+        ai_call_id = None
+        try:
+            from app.services.replay_service import log_replayable_ai_call
+            ai_call_id = log_replayable_ai_call(
+                endpoint='ai-compliance-preempt',
+                user_id=current_user.id,
+                input_text=(
+                    f"APPLICATION: {application.id}\nGRANT: {grant.title}\n"
+                    f"RESPONSES_SUMMARY: {json.dumps(application_payload['responses'])[:1500]}"
+                ),
+                output_text=json.dumps(parsed)[:5000],
+                success=(parsed.get('source') == 'claude'),
+                subject_kind='application',
+                subject_id=application.id,
+                org_id=getattr(current_user, 'org_id', None),
+                role=getattr(current_user, 'role', None),
+                language=captured_lang,
+            )
+        except Exception:
+            ai_call_id = None
+
         return {
             'success': True,
             'preempt': parsed,
+            'ai_call_id': ai_call_id,
             'ai_transparency': {
                 'engine': 'Claude AI' if parsed.get('source') == 'claude' else 'Template fallback',
                 'disclaimer': 'AI compliance scan — not a guarantee. Verify against the donor agreement.',

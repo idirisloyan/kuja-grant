@@ -584,6 +584,23 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 199-203 — Donors can now (a) save the criteria
+  on an existing grant as a reusable template in one click ("Save as
+  template" CTA on grant detail, uses the Phase 189 backend); (b)
+  attach AI feedback chips to `/ai/guidance` and
+  `/ai/strengthen-section` because both endpoints now stamp every
+  response with `ai_call_id` via `log_replayable_ai_call`
+  (compliance-preempt is also wired but its UI surface is
+  feature-flagged); (c) ask the NGO for a specific extra document via
+  `POST /api/applications/<id>/request-document` + the
+  `<RequestDocumentButton>` on application detail — lighter-touch than
+  a revision request, fires a `application_document_requested`
+  notification per NGO user; (d) view 2-4 applications side-by-side
+  on `/applications/compare?ids=…` against the same grant's criteria
+  via a new `GET /api/applications/compare` endpoint that owner-scopes
+  to the donor's grants. This closes the Phase 196 deferral (chip on
+  apply-page AI panels is now live).
+
 - **2026-06-20** Phase 193-197 — `<CriteriaTemplatePicker>` on the
   grant create form lets donors apply a saved criteria template
   (Phase 189) in one click. `<BroadcastsThread>` on grant detail

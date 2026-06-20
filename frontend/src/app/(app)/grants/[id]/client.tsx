@@ -200,6 +200,10 @@ export default function GrantDetailClient() {
       {isDonor && grant.id != null && (
         <DuplicateGrantButton grantId={grant.id} />
       )}
+      {/* Phase 199 — save criteria as reusable template. */}
+      {isDonor && grant.id != null && grant.criteria && grant.criteria.length > 0 && (
+        <SaveCriteriaTemplateButton grantId={grant.id} />
+      )}
       {isNgo && grant.status === 'open' && !grant.user_application_status && (
         <button
           type="button"
@@ -530,6 +534,40 @@ function EmptyBlock({ icon: Icon, label }: { icon: typeof FileText; label: strin
       <Icon className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
       <p className="text-sm text-muted-foreground">{label}</p>
     </div>
+  );
+}
+
+// Phase 199 — Save criteria as a re-usable template (Phase 189 lib).
+function SaveCriteriaTemplateButton({ grantId }: { grantId: number }) {
+  const [busy, setBusy] = useState(false);
+
+  async function go() {
+    if (busy) return;
+    const name = prompt('Name this criteria template (e.g. "WASH evaluation v2"):');
+    if (!name || !name.trim()) return;
+    setBusy(true);
+    try {
+      await api.post(`/api/grants/${grantId}/save-as-template`, {
+        name: name.trim(),
+      });
+      alert('Saved. The picker on grant create will show it next time.');
+    } catch {
+      alert('Could not save template.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={go}
+      disabled={busy}
+      className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand))]/40 text-sm font-medium px-4 py-2 disabled:opacity-60"
+      title="Save these criteria as a reusable template"
+    >
+      {busy ? 'Saving…' : 'Save as template'}
+    </button>
   );
 }
 

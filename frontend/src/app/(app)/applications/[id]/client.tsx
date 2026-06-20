@@ -179,6 +179,11 @@ export default function ApplicationDetailClient() {
                 onSent={() => router.refresh()}
               />
             )}
+            {/* Phase 202 — Donor asks the NGO for a specific extra document. */}
+            {(viewer?.role === 'donor' || viewer?.role === 'admin') &&
+             application.status !== 'draft' && (
+              <RequestDocumentButton applicationId={application.id} />
+            )}
             {application.ai_score != null && (
               <>
                 <ScoreRing score={Math.round(application.ai_score)} size={56} label="AI" />
@@ -678,6 +683,88 @@ function RequestRevisionButton({
         <button
           type="button"
           onClick={() => { setOpen(false); setFeedback(''); }}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Phase 202 — Donor asks the NGO for a specific extra document.
+function RequestDocumentButton({ applicationId }: { applicationId: number }) {
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (busy) return;
+    if (!label.trim()) {
+      toast.error('Name the document, e.g. "Audited 2025 financials".');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/api/applications/${applicationId}/request-document`, {
+        label: label.trim(),
+        note: note.trim() || undefined,
+      });
+      toast.success('The NGO has been notified.');
+      setOpen(false);
+      setLabel('');
+      setNote('');
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Request failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        title="Ask the NGO to upload a specific additional document"
+      >
+        Request document
+      </button>
+    );
+  }
+  return (
+    <div className="rounded-md border border-border bg-card p-3 text-xs space-y-2 min-w-[320px]">
+      <p className="font-semibold">Request a document</p>
+      <input
+        type="text"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        placeholder='e.g. "Audited 2025 financials"'
+        maxLength={200}
+        className="w-full rounded-md border border-border bg-background px-2 py-1.5"
+      />
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Add context (optional)"
+        maxLength={1000}
+        rows={2}
+        className="w-full rounded-md border border-border bg-background px-2 py-1.5 leading-relaxed"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy || !label.trim()}
+          className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--kuja-clay))] text-white px-3 py-1.5 font-medium hover:opacity-90 disabled:opacity-50"
+        >
+          {busy ? 'Sending…' : 'Notify NGO'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setLabel(''); setNote(''); }}
           className="text-muted-foreground hover:text-foreground"
         >
           Cancel

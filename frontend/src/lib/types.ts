@@ -325,6 +325,7 @@ export interface AIGuidanceResponse {
   guidance: string;
   quality_score: number;
   source: string;
+  ai_call_id?: number | null;
 }
 
 export interface AICriterionScore {

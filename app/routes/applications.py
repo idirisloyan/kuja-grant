@@ -674,6 +674,60 @@ def api_request_revision(app_id):
     return jsonify({'success': True, 'application': application.to_dict()})
 
 
+@applications_bp.route('/<int:app_id>/request-document', methods=['POST'])
+@role_required('donor', 'admin')
+def api_request_document(app_id):
+    """Phase 202 — Donor asks the NGO for a specific additional document.
+
+    Lighter-touch than request-revision: doesn't change the application
+    status, just records a request + notifies the NGO. The NGO uploads
+    the doc and the donor sees it in the documents list.
+
+    Body: { label: str (required), note?: str (max 1000) }
+    """
+    application = db.session.get(Application, app_id)
+    if not application:
+        return jsonify({'error': 'Application not found'}), 404
+    if application.status == 'draft':
+        return jsonify({'error': 'Cannot request documents on a draft application.'}), 400
+
+    data = get_request_json() or {}
+    label = (data.get('label') or '').strip()
+    if not label:
+        return jsonify({'error': 'label is required'}), 400
+    label = label[:200]
+    note = (data.get('note') or '').strip()[:1000] or None
+
+    log_action('application.document_requested', current_user.email,
+               'application', application.id,
+               {'label': label, 'note_chars': len(note) if note else 0})
+
+    # Notify all NGO users in the applicant org.
+    try:
+        from app.models import Notification, User
+        ngo_users = User.query.filter_by(
+            org_id=application.ngo_org_id, role='ngo',
+        ).all()
+        msg = f'The donor would like you to upload: "{label}".'
+        if note:
+            msg += f' Note: {note[:200]}'
+        for u in ngo_users:
+            n = Notification(
+                user_id=u.id,
+                type='application_document_requested',
+                title='Donor requested an additional document',
+                message=msg,
+                link=f'/applications/{application.id}',
+            )
+            db.session.add(n)
+        if ngo_users:
+            db.session.commit()
+    except Exception as e:
+        logger.debug('document-request notify skipped: %s', e)
+
+    return jsonify({'success': True})
+
+
 @applications_bp.route('/<int:app_id>/withdraw', methods=['POST'])
 @role_required('ngo')
 def api_withdraw_application(app_id):
@@ -2200,3 +2254,69 @@ def _median_minutes_per_field_for_org(org_id, exclude_app_id=None):
     s = sorted(samples)
     mid = len(s) // 2
     return s[mid] if len(s) % 2 else (s[mid - 1] + s[mid]) / 2
+
+
+@applications_bp.route('/compare', methods=['GET'])
+@role_required('donor', 'admin')
+def api_compare_applications():
+    """Phase 203 — Side-by-side compare of 2-3 applications.
+
+    Query: ?ids=1,2,3 (max 4)
+
+    Returns the same criterion shape so the UI can render columns. Donor
+    must own every grant the applications are tied to.
+    """
+    raw = request.args.get('ids', '').strip()
+    if not raw:
+        return jsonify({'error': 'ids is required'}), 400
+    try:
+        ids = [int(x) for x in raw.split(',') if x.strip()][:4]
+    except (TypeError, ValueError):
+        return jsonify({'error': 'ids must be a comma-separated list of integers'}), 400
+    if len(ids) < 2:
+        return jsonify({'error': 'Provide at least 2 application ids'}), 400
+
+    apps = Application.query.filter(Application.id.in_(ids)).all()
+    if not apps:
+        return jsonify({'applications': [], 'criteria': []})
+
+    if current_user.role == 'donor':
+        for a in apps:
+            g = db.session.get(Grant, a.grant_id) if a.grant_id else None
+            if not g or g.donor_org_id != current_user.org_id:
+                return jsonify({'error': 'Access denied'}), 403
+
+    # Take criteria from the first app's grant — assumes compare is
+    # within the same grant (UI enforces). If grants differ we still
+    # show whatever criteria we find on app[0].
+    grant0 = db.session.get(Grant, apps[0].grant_id) if apps[0].grant_id else None
+    criteria = []
+    if grant0 and hasattr(grant0, 'get_criteria'):
+        for c in (grant0.get_criteria() or []):
+            if isinstance(c, dict):
+                criteria.append({
+                    'key': c.get('key'),
+                    'label': c.get('label'),
+                    'weight': c.get('weight'),
+                })
+
+    out_apps = []
+    for a in apps:
+        ngo = db.session.get(Organization, a.ngo_org_id) if a.ngo_org_id else None
+        responses = a.get_responses() if hasattr(a, 'get_responses') else {}
+        out_apps.append({
+            'id': a.id,
+            'org_name': ngo.name if ngo else 'Unknown',
+            'org_country': getattr(ngo, 'country', None) if ngo else None,
+            'status': a.status,
+            'ai_score': a.ai_score,
+            'human_score': a.human_score,
+            'responses': {k: v for k, v in (responses or {}).items()},
+            'submitted_at': a.submitted_at.isoformat() if a.submitted_at else None,
+        })
+
+    return jsonify({
+        'success': True,
+        'criteria': criteria,
+        'applications': out_apps,
+    })
