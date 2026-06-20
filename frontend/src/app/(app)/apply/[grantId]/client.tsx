@@ -19,6 +19,7 @@ import { TrustPortableBadge } from '@/components/shared/trust-portable-badge';
 import { PastApplicationsDrawer } from '@/components/apply/past-applications-drawer';
 import { AIToolsAccordion } from '@/components/shared/ai-tools-accordion';
 import { AIFeedbackChip } from '@/components/shared/ai-feedback-chip';
+import { FreshnessStamp } from '@/components/shared/freshness-stamp';
 import { useAutosave } from '@/lib/hooks/use-autosave';
 import { getQuestionForLabel, getPlaceholderForLabel } from '@/lib/guided-questions';
 import { SubmissionVelocityBar } from '@/components/apply/submission-velocity-bar';
@@ -289,6 +290,8 @@ export default function ApplyWizardClient() {
     }
   }, [applicationId, grantId]);
 
+  // Phase 248 — visible savedAt stamp for the apply page header.
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
   const autoSave = useCallback(
     async (appId: number) => {
       try {
@@ -306,6 +309,7 @@ export default function ApplyWizardClient() {
           { responses, eligibility_responses: eligibilityPayload },
           'application.autosave',
         );
+        setSavedAt(new Date());
       } catch {
         /* best-effort */
       }
@@ -772,6 +776,7 @@ export default function ApplyWizardClient() {
           title={`Apply: ${grant.title}`}
           icon={Briefcase}
           subtitle={grant.donor_org_name}
+          secondaryAction={<FreshnessStamp loadedAt={savedAt} label="Saved" />}
         />
         <PageMain>
       {/* Phase 21D — existing application banner */}

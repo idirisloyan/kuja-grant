@@ -584,6 +584,24 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 247-251 — Calibration + UX persistence: (a)
+  New `GET /api/grants/<id>/ai-vs-human` (donor + admin, owner-
+  scoped) returns mean (human − ai) score delta + mean abs delta
+  across applications with both scores. `<AiVsHumanCard>` on grant
+  detail with positive/negative tone. (b) Apply page now captures
+  the autosave timestamp and renders `<FreshnessStamp loadedAt>` in
+  the PageHeader secondaryAction slot — visible "Saved X min ago"
+  proof every time the PUT autosave completes. (c) Reviewer detail
+  page exposes a "Show scoring guidance for all criteria" checkbox
+  that toggles each criterion's `<details>` open state and persists
+  the preference under `kuja_reviewer_show_guidance` in
+  localStorage. (d) New `/admin/feature-usage` endpoint groups
+  UserEvent rows by event_name over a configurable window
+  (top 30). `<FeatureUsageTable>` added beneath the AI cost
+  breakdown on `/admin/ai-cost`. (e) `/grants` (NGO) now persists
+  the last search query under `kuja_last_grant_query` and rehydrates
+  it on next visit when the URL doesn't carry `?q=`.
+
 - **2026-06-20** Phase 241-245 — Surface polish: (a) Phase 241
   (generic "was this helpful" on AIBadge) deferred — the existing
   `<AIFeedbackChip>` already handles per-call feedback when

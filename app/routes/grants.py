@@ -1652,6 +1652,40 @@ def api_grant_criterion_averages(grant_id):
     return jsonify({'success': True, 'rows': rows})
 
 
+@grants_bp.route('/<int:grant_id>/ai-vs-human', methods=['GET'])
+@login_required
+@role_required('donor', 'admin')
+def api_grant_ai_vs_human(grant_id):
+    """Phase 247 — AI vs human score calibration delta.
+
+    For applications with both ai_score and human_score, computes the
+    mean (human - ai) delta. Positive = humans rate higher than AI;
+    negative = AI rates higher than humans.
+    """
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found'}), 404
+    if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    apps = Application.query.filter(
+        Application.grant_id == grant_id,
+        Application.ai_score.isnot(None),
+        Application.human_score.isnot(None),
+    ).all()
+    if not apps:
+        return jsonify({'success': True, 'pool_size': 0, 'mean_delta': None})
+    deltas = [float(a.human_score) - float(a.ai_score) for a in apps]
+    mean = sum(deltas) / len(deltas)
+    abs_mean = sum(abs(d) for d in deltas) / len(deltas)
+    return jsonify({
+        'success': True,
+        'pool_size': len(deltas),
+        'mean_delta': round(mean, 1),
+        'mean_abs_delta': round(abs_mean, 1),
+    })
+
+
 @grants_bp.route('/<int:grant_id>/applications.csv', methods=['GET'])
 @login_required
 @role_required('donor', 'admin')

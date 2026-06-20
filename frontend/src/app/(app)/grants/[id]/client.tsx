@@ -28,6 +28,7 @@ import { TopMatchedNGOs } from '@/components/grants/top-matched-ngos';
 import { BroadcastsThread } from '@/components/grants/broadcasts-thread';
 import { CriterionAveragesCard } from '@/components/grants/criterion-averages-card';
 import { ApplicationsReceivedTable } from '@/components/grants/applications-received-table';
+import { AiVsHumanCard } from '@/components/grants/ai-vs-human-card';
 import { api } from '@/lib/api';
 
 // Phase 112 — Live wrapper around WhyThisMatch. Calls /api/match/explain
@@ -272,6 +273,9 @@ export default function GrantDetailClient() {
 
         {/* Phase 229 — applications received mini-table (donor view). */}
         {isDonor && id != null && <ApplicationsReceivedTable grantId={id} />}
+
+        {/* Phase 247 — AI vs human score calibration delta. */}
+        {isDonor && id != null && <AiVsHumanCard grantId={id} />}
 
         {/* Phase 194 — Broadcasts thread (donor + applicant NGOs). */}
         {id != null && <BroadcastsThread grantId={id} />}

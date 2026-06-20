@@ -5,7 +5,7 @@
  * Search, sector filters, sort, role-aware copy (NGO: Browse / Donor: My Grants).
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -73,6 +73,21 @@ export default function GrantsPage() {
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useUrlState('q', '');
+  // Phase 251 — remember last query in localStorage so the next visit
+  // pre-fills the search box if the URL doesn't carry a `?q=`.
+  useEffect(() => {
+    if (searchQuery) {
+      try { localStorage.setItem('kuja_last_grant_query', searchQuery); } catch {/* ignore */}
+    }
+  }, [searchQuery]);
+  useEffect(() => {
+    if (searchQuery) return;
+    try {
+      const saved = localStorage.getItem('kuja_last_grant_query');
+      if (saved) setSearchQuery(saved);
+    } catch {/* ignore */}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [activeSectors, setActiveSectors] = useUrlSetState('sector');
   // Phase 161 — country + deadline-window facets.
   const [activeCountries, setActiveCountries] = useUrlSetState('country');

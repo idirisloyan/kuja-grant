@@ -499,6 +499,49 @@ def api_ai_cost_by_tenant():
     })
 
 
+@ai_telemetry_bp.route('/feature-usage', methods=['GET'])
+@login_required
+def api_feature_usage():
+    """Phase 250 — Top-N event_name counts over a configurable window.
+
+    Reads UserEvent rows in the window, groups by event_name + role,
+    returns top 30 events by count. Admin-only.
+
+    Query: ?days=N (1..90, default 30)
+    """
+    from collections import defaultdict
+    from app.models.user_event import UserEvent
+
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Admin only.'}), 403
+
+    try:
+        days = int(request.args.get('days', 30))
+        days = max(1, min(90, days))
+    except ValueError:
+        days = 30
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    rows = (
+        UserEvent.query
+        .filter(UserEvent.occurred_at >= cutoff)
+        .all()
+    )
+    by_event = defaultdict(int)
+    for r in rows:
+        by_event[r.event_name] += 1
+    out = sorted(
+        [{'event_name': k, 'count': v} for k, v in by_event.items()],
+        key=lambda x: -x['count'],
+    )[:30]
+    return jsonify({
+        'success': True,
+        'window_days': days,
+        'total_events': len(rows),
+        'top_events': out,
+    })
+
+
 @ai_telemetry_bp.route('/ai-cost-by-user', methods=['GET'])
 @login_required
 def api_ai_cost_by_user():

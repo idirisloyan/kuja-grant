@@ -186,6 +186,8 @@ export default function AICostByTenantPage() {
 
             {/* Phase 231 — top users by AI cost over the same window. */}
             <ByUserTable days={days} />
+            {/* Phase 250 — top feature events over the same window. */}
+            <FeatureUsageTable days={days} />
           </>
         )}
       </PageMain>
@@ -245,6 +247,49 @@ function ByUserTable({ days }: { days: number }) {
               <td className="p-3 text-right">{u.tokens_in.toLocaleString()}</td>
               <td className="p-3 text-right">{u.tokens_out.toLocaleString()}</td>
               <td className="p-3 text-right font-semibold">${u.usd.toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+interface FeatureRow {
+  event_name: string;
+  count: number;
+}
+
+function FeatureUsageTable({ days }: { days: number }) {
+  const [data, setData] = useState<{ top_events: FeatureRow[]; total_events: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get<typeof data>(`/admin/feature-usage?days=${days}`).then((r) => {
+      if (!cancelled) setData(r);
+    }).catch(() => { if (!cancelled) setData(null); });
+    return () => { cancelled = true; };
+  }, [days]);
+
+  if (!data || data.top_events.length === 0) return null;
+
+  return (
+    <div className="border border-border rounded-lg bg-card overflow-x-auto mt-6">
+      <div className="p-3 border-b border-border text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+        Top feature events ({days}d) — {data.total_events.toLocaleString()} total
+      </div>
+      <table className="w-full text-xs">
+        <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <tr>
+            <th className="text-left p-3">Event</th>
+            <th className="text-right p-3">Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.top_events.map((e) => (
+            <tr key={e.event_name} className="border-t border-border">
+              <td className="p-3 font-mono text-xs">{e.event_name}</td>
+              <td className="p-3 text-right tabular-nums">{e.count.toLocaleString()}</td>
             </tr>
           ))}
         </tbody>

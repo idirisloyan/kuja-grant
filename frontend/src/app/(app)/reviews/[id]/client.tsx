@@ -125,6 +125,11 @@ export default function ReviewDetailClient() {
   const responses = (application?.responses ?? {}) as Record<string, string>;
 
   const [scores, setScores] = useState<Record<string, ScoreEntry>>({});
+  // Phase 249 — persist reviewer's "show scoring guidance" preference.
+  const [showGuidance, setShowGuidance] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try { return localStorage.getItem('kuja_reviewer_show_guidance') === '1'; } catch { return false; }
+  });
   // Phase 223 — private notes (reviewer/donor/admin visible, NGO never).
   const [reviewId, setReviewId] = useState<number | null>(null);
   const [privateNotes, setPrivateNotes] = useState<string>('');
@@ -464,6 +469,21 @@ export default function ReviewDetailClient() {
             <EmptyBox label={t('review.detail.no_responses')} />
           ) : (
             <>
+              {/* Phase 249 — toggle to show all scoring guidance, persisted to localStorage. */}
+              <div className="flex justify-end">
+                <label className="text-xs text-muted-foreground inline-flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showGuidance}
+                    onChange={(e) => {
+                      setShowGuidance(e.target.checked);
+                      try { localStorage.setItem('kuja_reviewer_show_guidance', e.target.checked ? '1' : '0'); } catch {/* ignore */}
+                    }}
+                    className="w-3 h-3"
+                  />
+                  Show scoring guidance for all criteria
+                </label>
+              </div>
               {criteria.map((c) => (
                 <div key={c.key} className="rounded-xl border border-border bg-background p-5">
                   <div className="flex items-center gap-2 mb-1">
@@ -476,7 +496,7 @@ export default function ReviewDetailClient() {
                       reviewer doesn't have to context-switch back to
                       the grant detail page. */}
                   {(c.instructions || c.example) && (
-                    <details className="mb-2 text-xs">
+                    <details className="mb-2 text-xs" open={showGuidance}>
                       <summary className="cursor-pointer text-[hsl(var(--kuja-clay))] hover:underline">
                         Scoring guidance
                       </summary>
