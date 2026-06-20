@@ -34,8 +34,19 @@ interface AppRow {
   updated_at?: string | null;
 }
 
-const STATUS_FILTERS = ['all', 'submitted', 'under_review', 'scored', 'accepted', 'rejected'] as const;
+const STATUS_FILTERS = [
+  'all', 'active', 'archived',
+  'submitted', 'under_review', 'scored', 'accepted', 'rejected',
+] as const;
 type StatusFilter = typeof STATUS_FILTERS[number];
+
+// Phase 195 — donor-friendly bucketing: "active" = anything still in the
+// review/decision pipeline; "archived" = decisions reached + apps tied to
+// closed grants. This keeps the donor queue focused on what still needs
+// action without losing access to history.
+const ARCHIVED_STATES = new Set<string>([
+  'awarded', 'rejected', 'declined', 'withdrawn',
+]);
 
 export default function ApplicationsPage() {
   const { t, formatDate } = useTranslation();
@@ -53,6 +64,13 @@ export default function ApplicationsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const applications = useMemo(() => {
     if (statusFilter === 'all') return all;
+    // Phase 195 — meta filters for the donor archive.
+    if (statusFilter === 'archived') {
+      return all.filter((a) => ARCHIVED_STATES.has(a.status));
+    }
+    if (statusFilter === 'active') {
+      return all.filter((a) => !ARCHIVED_STATES.has(a.status));
+    }
     return all.filter((a) => a.status === statusFilter);
   }, [all, statusFilter]);
 

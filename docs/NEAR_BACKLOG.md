@@ -584,6 +584,21 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 193-197 — `<CriteriaTemplatePicker>` on the
+  grant create form lets donors apply a saved criteria template
+  (Phase 189) in one click. `<BroadcastsThread>` on grant detail
+  reads the Phase 190 endpoint + renders the full message thread
+  (donor + applicant NGOs). Applications list got `'active'` and
+  `'archived'` meta-filters so donor queues stay focused on what
+  needs action while keeping awarded/rejected/withdrawn/declined
+  history accessible. New `/api/network/membership/directory`
+  + `/network/directory` page lists every active member of the
+  current network with sectors / country / capacity score + a
+  search filter. Phase 196 (AI feedback chip on more surfaces)
+  deferred — strengthen/guidance/compliance-preempt endpoints
+  don't yet expose `ai_call_id` in their responses; needs a
+  backend pass first.
+
 - **2026-06-20** Phase 187-191 — `saved_search_matches` category now
   rendered in `/settings/notifications` with proper label + hint
   (Phase 170 had defined it backend-side only). New

@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { CriteriaTemplatePicker } from '@/components/grants/criteria-template-picker';
 import { fetchGrantScaffold } from '@/lib/copilot-api';
 import { toast } from 'sonner';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -1242,6 +1243,22 @@ export default function CreateGrantPage() {
           >
             <Plus className="h-3.5 w-3.5" /> {t('grant.wizard.add')}
           </button>
+          {/* Phase 193 — Apply a saved criteria template (Phase 189). */}
+          <CriteriaTemplatePicker
+            onApply={(items) => {
+              // Items come straight from the saved template; cast into
+              // the local CriterionItem shape and replace state.
+              const next: CriterionItem[] = (items as Array<Record<string, unknown>>).map((c, i) => ({
+                key: (c.key as string) || `c${i + 1}`,
+                label: (c.label as string) || `Criterion ${i + 1}`,
+                weight: Number(c.weight ?? 0),
+                description: (c.description as string) || '',
+                instructions: (c.instructions as string) || '',
+                max_words: Number(c.max_words ?? 200),
+              }));
+              if (next.length) setCriteria(next);
+            }}
+          />
         </div>
       </div>
 

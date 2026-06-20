@@ -385,6 +385,79 @@ def _is_ob_or_admin() -> bool:
     return False
 
 
+@network_membership_bp.route("/directory", methods=["GET"])
+@login_required
+def api_network_directory():
+    """Phase 197 — Per-network member directory.
+
+    Returns every active membership in the current network with
+    org name + country + sectors + most-recent capacity score.
+    Visible to anyone whose org has an active membership in this
+    network, plus admins.
+    """
+    network_id = get_current_network_id()
+    if not network_id:
+        return jsonify({"success": False, "error": "Network not resolved"}), 400
+
+    # Access check: caller must have an active membership OR be admin.
+    role_ok = current_user.role == "admin"
+    if not role_ok and getattr(current_user, "org_id", None):
+        m = NetworkMembership.query.filter_by(
+            network_id=network_id,
+            org_id=current_user.org_id,
+            status="active",
+        ).first()
+        role_ok = m is not None
+    if not role_ok:
+        return jsonify({"success": False, "error": "Members only"}), 403
+
+    try:
+        from app.models import Assessment
+        rows = (
+            db.session.query(NetworkMembership, Organization)
+            .join(Organization, Organization.id == NetworkMembership.org_id)
+            .filter(NetworkMembership.network_id == network_id)
+            .filter(NetworkMembership.status == "active")
+            .order_by(Organization.name.asc())
+            .all()
+        )
+    except Exception as e:
+        logger.warning("network directory query failed: %s", e)
+        rows = []
+
+    items = []
+    for m, org in rows:
+        cap_score = None
+        try:
+            a = (
+                Assessment.query
+                .filter_by(organization_id=org.id)
+                .order_by(Assessment.created_at.desc())
+                .first()
+            )
+            cap_score = getattr(a, "score", None)
+        except Exception:
+            cap_score = None
+        items.append({
+            "org_id": org.id,
+            "org_name": org.name,
+            "country": getattr(org, "country", None),
+            "sectors": (org.sectors or [])[:5],
+            "member_tier": m.member_tier,
+            "capacity_score": cap_score,
+            "joined_at": (
+                m.created_at.isoformat() if getattr(m, "created_at", None) else None
+            ),
+        })
+
+    return jsonify({
+        "success": True,
+        "network_id": network_id,
+        "members": items,
+        "total": len(items),
+    })
+
+
 @network_membership_bp.route("/pending", methods=["GET"])
 @ob_required(allow_admin_override=True)  # Phase 44C — OB members see the queue; Phase 114 — admins can still observe (read-only)
 def api_list_pending_memberships():
