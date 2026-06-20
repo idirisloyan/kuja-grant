@@ -23,6 +23,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { InlineDocPreview } from '@/components/shared/inline-doc-preview';
 
 interface Indicator {
   name: string;
@@ -39,6 +40,7 @@ interface Attachment {
   file_size?: number;
   uploaded_at?: string;
   score?: number;
+  mime_type?: string | null;
 }
 
 interface Signal {
@@ -337,22 +339,23 @@ export function ReportBundlePanel({ reportId, canPublish }: ReportBundlePanelPro
         </div>
       )}
 
-      {/* Attachments */}
+      {/* Attachments. Phase 139 — uses InlineDocPreview so reviewers
+          can verify the right file was uploaded without leaving the
+          report bundle page. */}
       {bundle.attachments.length > 0 && (
         <div className="mt-4">
           <div className="kuja-label flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Evidence attachments</div>
-          <ul className="mt-2 space-y-1 text-xs">
+          <div className="mt-2 space-y-2">
             {bundle.attachments.slice(0, 10).map((a) => (
-              <li key={a.id} className="flex items-center gap-2 rounded-md border border-[hsl(var(--border))] px-2 py-1.5">
-                <FileText className="w-3.5 h-3.5 text-[hsl(var(--kuja-ink-soft))]" />
-                <span className="font-semibold truncate flex-1">{a.original_filename}</span>
-                <span className="text-[hsl(var(--kuja-ink-soft))] shrink-0">
-                  {a.doc_type && <Badge variant="outline" className="text-[9px] mr-1">{a.doc_type}</Badge>}
-                  {fmtBytes(a.file_size)}
-                </span>
-              </li>
+              <InlineDocPreview
+                key={a.id}
+                docId={a.id}
+                filename={a.original_filename}
+                mimeType={a.mime_type ?? null}
+                fileSize={a.file_size ?? null}
+              />
             ))}
-          </ul>
+          </div>
         </div>
       )}
 

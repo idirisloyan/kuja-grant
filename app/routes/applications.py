@@ -609,6 +609,29 @@ def api_submit_application(app_id):
     log_action('application.submitted', current_user.email, 'application', application.id,
                {'grant_id': application.grant_id, 'ai_score': application.ai_score})
 
+    # Phase 143 — outbound webhook fan-out to both the NGO's own org
+    # (so they can wire downstream CRMs) and the donor org that owns the
+    # grant (so they can pipe submissions into their pipeline tool).
+    # Best-effort; failures don't surface to the user.
+    try:
+        from app.routes.webhook_routes import dispatch_event
+        payload = {
+            'application_id': application.id,
+            'grant_id': application.grant_id,
+            'ngo_org_id': application.ngo_org_id,
+            'ai_score': application.ai_score,
+            'submitted_at': application.submitted_at.isoformat() if application.submitted_at else None,
+        }
+        dispatch_event(application.ngo_org_id, 'application.submitted', payload)
+        try:
+            grant_obj = db.session.get(Grant, application.grant_id) if application.grant_id else None
+            if grant_obj and grant_obj.donor_org_id:
+                dispatch_event(grant_obj.donor_org_id, 'application.submitted', payload)
+        except Exception:
+            pass
+    except Exception as e:
+        logger.debug('webhook dispatch (application.submitted) skipped: %s', e)
+
     # Phase 10.5 — auto-extract reusable memory items from the submitted
     # application so the next time this org applies, the AI co-author can
     # cite their actual figures/partners/narratives. Best-effort; errors

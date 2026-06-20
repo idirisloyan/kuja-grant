@@ -584,6 +584,21 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 139-143 — `<InlineDocPreview>` (Phase 128 component)
+  now wired on the reports bundle panel — reviewers see PDF/image
+  previews next to evidence attachments without leaving the page. New
+  admin/donor page at `/admin/reviews-bulk` calls the Phase 136
+  `/api/reviews/bulk-assign` endpoint: pick a reviewer, multi-select
+  submissions, one POST. Tenant message detail (admin view only) now
+  embeds a read receipts disclosure: counts + per-org `read_at` from
+  the Phase 137 endpoint. New smoke test `I18N-PARITY` asserts every
+  locale has the same key set as `en.json` (guardrail against the kind
+  of drift Phase 134 found — sw/so had 20 orphan keys, now cleaned up).
+  New outbound webhook system: org admins POST to `/api/webhooks` with
+  url + events; payloads POST'd with `X-Kuja-Signature` HMAC-SHA256.
+  Wired into `application.submitted` (fires for both NGO + donor orgs).
+  Test endpoint at `/api/webhooks/<id>/test` fires a synthetic ping.
+
 - **2026-06-20** Phase 133-137 — Smoke test now enforces a latency
   budget on 5 critical user-facing endpoints (dashboard/stats,
   applications/, grants/, calendar/deadlines, journey/me). Soft +

@@ -295,6 +295,72 @@ function MessageRow({ message: m, isAdmin, onChange }: { message: Message; isAdm
           {m.body_md}
         </div>
       )}
+      {/* Phase 141 — sender-side read receipts. Admins see who has
+          opened the message; collapsed by default to avoid clutter. */}
+      {isAdmin && expanded && (
+        <ReadReceipts messageId={m.id} />
+      )}
+    </div>
+  );
+}
+
+function ReadReceipts({ messageId }: { messageId: number }) {
+  const [data, setData] = useState<{
+    summary: { recipients: number; read: number; unread: number; read_pct: number };
+    recipients: { org_id: number; org_name: string; org_country: string | null; read_at: string | null }[];
+  } | null>(null);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    if (data || loading) return;
+    setLoading(true);
+    try {
+      const r = await api.get<typeof data>(
+        `/api/messages/${messageId}/read-receipts`,
+      );
+      setData(r);
+    } catch {
+      // best effort
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-border pt-3 text-xs">
+      <button
+        type="button"
+        onClick={() => { setOpen((o) => !o); load(); }}
+        className="inline-flex items-center gap-1.5 font-semibold text-muted-foreground hover:text-foreground"
+      >
+        Read receipts
+        {data && (
+          <span>
+            ({data.summary.read}/{data.summary.recipients}, {data.summary.read_pct}%)
+          </span>
+        )}
+        <ChevronRight className={`w-3 h-3 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && loading && <div className="mt-2 text-muted-foreground">Loading…</div>}
+      {open && data && (
+        <ul className="mt-2 space-y-1">
+          {data.recipients.slice(0, 30).map((r) => (
+            <li key={r.org_id} className="flex items-center justify-between gap-2">
+              <span className="truncate">
+                {r.org_name}
+                {r.org_country && <span className="text-muted-foreground"> · {r.org_country}</span>}
+              </span>
+              <span className={r.read_at ? 'text-emerald-700' : 'text-muted-foreground'}>
+                {r.read_at ? new Date(r.read_at).toLocaleDateString() : 'unread'}
+              </span>
+            </li>
+          ))}
+          {data.recipients.length > 30 && (
+            <li className="text-muted-foreground">…and {data.recipients.length - 30} more</li>
+          )}
+        </ul>
+      )}
     </div>
   );
 }

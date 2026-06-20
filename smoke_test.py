@@ -3496,6 +3496,45 @@ def make_tests(base):
         )
     tests.append(("LATENCY-BUDGET: critical endpoints under threshold", test_latency_budget))
 
+    # ---------------------------------------------------------------
+    # Phase 142 — i18n parity check.
+    #
+    # Phase 134 found that the locale files had silently drifted (3
+    # header keys missing across 4 locales). This guardrail asserts the
+    # invariant going forward: every locale must have the same key set
+    # as en.json, with no orphans.
+    #
+    # Runs in-process; no HTTP — the i18n files live in the repo.
+    # ---------------------------------------------------------------
+    def test_i18n_parity():
+        import json
+        import os
+        i18n_root = os.path.join(
+            os.path.dirname(__file__), 'frontend', 'src', 'i18n',
+        )
+        with open(os.path.join(i18n_root, 'en.json'), encoding='utf-8') as f:
+            en = json.load(f)
+        en_keys = set(en.keys())
+        problems = []
+        for lc in ('fr', 'ar', 'sw', 'so', 'es'):
+            path = os.path.join(i18n_root, f'{lc}.json')
+            with open(path, encoding='utf-8') as f:
+                data = json.load(f)
+            keys = set(data.keys())
+            missing = en_keys - keys
+            extra = keys - en_keys
+            if missing:
+                problems.append(f"{lc}: missing {len(missing)} keys (e.g. "
+                                f"{sorted(missing)[:3]})")
+            if extra:
+                problems.append(f"{lc}: {len(extra)} orphan keys not in en.json (e.g. "
+                                f"{sorted(extra)[:3]})")
+        assert not problems, (
+            f"i18n parity drift detected:\n"
+            + "\n".join(f"  - {p}" for p in problems)
+        )
+    tests.append(("I18N-PARITY: locale files match en.json key set", test_i18n_parity))
+
     return tests
 
 

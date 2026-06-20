@@ -62,6 +62,7 @@ from app.models.member_feedback import (
     MemberFeedback, FEEDBACK_CATEGORIES, FEEDBACK_STATUSES,
 )
 from app.models.synthetic_monitor import SyntheticMonitorRun
+from app.models.webhook import Webhook
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
