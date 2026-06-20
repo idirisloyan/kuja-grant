@@ -1511,6 +1511,75 @@ def api_grant_fit_compare():
     return jsonify(result)
 
 
+@grants_bp.route('/<int:grant_id>/withdraw', methods=['POST'])
+@login_required
+@role_required('donor', 'admin')
+def api_withdraw_grant(grant_id):
+    """Phase 233 — Donor withdraws a published grant.
+
+    Sets grant.status = 'withdrawn'. Cascades: every draft/submitted
+    application on this grant is moved to 'withdrawn'. Every applicant
+    NGO is notified.
+
+    Body: { reason?: str (max 1000) }
+    """
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found'}), 404
+    if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+    if grant.status not in ('open', 'draft'):
+        return jsonify({'error': f'Cannot withdraw a grant in status {grant.status}'}), 400
+
+    data = get_request_json() or {}
+    reason = (data.get('reason') or '').strip()[:1000] or None
+
+    grant.status = 'withdrawn'
+
+    affected_apps = Application.query.filter(
+        Application.grant_id == grant_id,
+        Application.status.in_(['draft', 'submitted', 'under_review', 'scored', 'revision_requested']),
+    ).all()
+    ngo_org_ids = set()
+    for a in affected_apps:
+        a.status = 'withdrawn'
+        if a.ngo_org_id:
+            ngo_org_ids.add(a.ngo_org_id)
+
+    log_action('grant.withdrawn', current_user.email,
+               'grant', grant_id,
+               {'apps_cascaded': len(affected_apps), 'reason_chars': len(reason or '')})
+
+    try:
+        from app.models import Notification, User
+        from app.models.organization import Organization
+        notified = 0
+        for org_id in ngo_org_ids:
+            users = User.query.filter_by(org_id=org_id, role='ngo').all()
+            for u in users:
+                msg = f'The donor has withdrawn "{grant.title}".'
+                if reason:
+                    msg += f' Reason: {reason[:300]}'
+                n = Notification(
+                    user_id=u.id,
+                    type='grant_withdrawn',
+                    title='A grant you applied to was withdrawn',
+                    message=msg[:500],
+                    link=f'/grants/{grant_id}',
+                )
+                db.session.add(n)
+                notified += 1
+        logger.info('grant.withdrawn cascaded: %d apps, %d users notified', len(affected_apps), notified)
+    except Exception as e:
+        logger.debug('grant withdraw notify skipped: %s', e)
+
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'apps_cascaded': len(affected_apps),
+    })
+
+
 @grants_bp.route('/<int:grant_id>/criterion-averages', methods=['GET'])
 @login_required
 @role_required('donor', 'admin')

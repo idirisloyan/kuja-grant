@@ -27,6 +27,7 @@ import { WhyThisMatch, type ReasonFacet } from '@/components/shared/why-this-mat
 import { TopMatchedNGOs } from '@/components/grants/top-matched-ngos';
 import { BroadcastsThread } from '@/components/grants/broadcasts-thread';
 import { CriterionAveragesCard } from '@/components/grants/criterion-averages-card';
+import { ApplicationsReceivedTable } from '@/components/grants/applications-received-table';
 import { api } from '@/lib/api';
 
 // Phase 112 — Live wrapper around WhyThisMatch. Calls /api/match/explain
@@ -215,6 +216,10 @@ export default function GrantDetailClient() {
           Export applications CSV
         </a>
       )}
+      {/* Phase 233 — withdraw a published grant (cascades to apps). */}
+      {isDonor && grant.id != null && ['open', 'draft'].includes(grant.status) && (
+        <WithdrawGrantButton grantId={grant.id} grantTitle={grant.title ?? ''} />
+      )}
       {isNgo && grant.status === 'open' && !grant.user_application_status && (
         <button
           type="button"
@@ -264,6 +269,9 @@ export default function GrantDetailClient() {
 
         {/* Phase 224 — per-criterion AI score averages across applications. */}
         {isDonor && id != null && <CriterionAveragesCard grantId={id} />}
+
+        {/* Phase 229 — applications received mini-table (donor view). */}
+        {isDonor && id != null && <ApplicationsReceivedTable grantId={id} />}
 
         {/* Phase 194 — Broadcasts thread (donor + applicant NGOs). */}
         {id != null && <BroadcastsThread grantId={id} />}
@@ -552,6 +560,41 @@ function EmptyBlock({ icon: Icon, label }: { icon: typeof FileText; label: strin
 }
 
 // Phase 199 — Save criteria as a re-usable template (Phase 189 lib).
+// Phase 233 — Withdraw a published grant (cascades to applications).
+function WithdrawGrantButton({ grantId, grantTitle }: { grantId: number; grantTitle: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    if (busy) return;
+    const reason = prompt(
+      `Withdraw "${grantTitle}"?\n\nThis sets the grant + every open application on it to "withdrawn" ` +
+      `and notifies every applicant NGO. Optional reason for the notification:`,
+    );
+    if (reason === null) return;
+    setBusy(true);
+    try {
+      await api.post(`/api/grants/${grantId}/withdraw`, { reason: reason.trim() || undefined });
+      alert('Grant withdrawn. Applicants have been notified.');
+      router.refresh();
+    } catch {
+      alert('Could not withdraw.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={go}
+      disabled={busy}
+      className="inline-flex items-center gap-1.5 rounded-md border border-rose-300 text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-sm font-medium px-4 py-2 disabled:opacity-50"
+      title="Withdraw this grant — cascades to all open applications"
+    >
+      {busy ? 'Withdrawing…' : 'Withdraw grant'}
+    </button>
+  );
+}
+
 function SaveCriteriaTemplateButton({ grantId }: { grantId: number }) {
   const [busy, setBusy] = useState(false);
 

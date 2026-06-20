@@ -497,3 +497,75 @@ def api_ai_cost_by_tenant():
         'total_usd': round(total_usd, 4),
         'by_tenant': by_tenant,
     })
+
+
+@ai_telemetry_bp.route('/ai-cost-by-user', methods=['GET'])
+@login_required
+def api_ai_cost_by_user():
+    """Phase 231 — top-N AI cost rollup per user.
+
+    Same data source as ai-cost-by-tenant, attributed by user instead.
+    Returns top 20 users by USD spent. Admin-only.
+
+    Query: ?days=N (1..90, default 30) ?limit=N (1..50, default 20)
+    """
+    from collections import defaultdict
+    from app.models.user import User
+    from app.routes.admin_health import _PRICING
+
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Admin only.'}), 403
+
+    try:
+        days = int(request.args.get('days', 30))
+        days = max(1, min(90, days))
+    except ValueError:
+        days = 30
+    try:
+        limit = int(request.args.get('limit', 20))
+        limit = max(1, min(50, limit))
+    except ValueError:
+        limit = 20
+
+    sonnet = _PRICING['claude-sonnet-4-6']
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    rows = (
+        AICallLog.query
+        .filter(AICallLog.created_at >= cutoff, AICallLog.user_id.isnot(None))
+        .all()
+    )
+
+    bucket = defaultdict(lambda: {'calls': 0, 'tokens_in': 0, 'tokens_out': 0})
+    for r in rows:
+        bucket[r.user_id]['calls'] += 1
+        bucket[r.user_id]['tokens_in'] += (r.tokens_in or 0)
+        bucket[r.user_id]['tokens_out'] += (r.tokens_out or 0)
+
+    user_ids = list(bucket.keys())
+    users = {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()} if user_ids else {}
+
+    by_user = []
+    for uid, agg in bucket.items():
+        usd = (
+            (agg['tokens_in'] / 1_000_000) * sonnet['input']
+            + (agg['tokens_out'] / 1_000_000) * sonnet['output']
+        )
+        u = users.get(uid)
+        by_user.append({
+            'user_id': uid,
+            'user_name': u.name if u else None,
+            'user_email': u.email if u else None,
+            'role': u.role if u else None,
+            'calls': agg['calls'],
+            'tokens_in': agg['tokens_in'],
+            'tokens_out': agg['tokens_out'],
+            'usd': round(usd, 4),
+        })
+    by_user.sort(key=lambda x: -x['usd'])
+
+    return jsonify({
+        'success': True,
+        'window_days': days,
+        'by_user': by_user[:limit],
+    })

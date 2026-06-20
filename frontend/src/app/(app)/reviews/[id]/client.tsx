@@ -962,6 +962,30 @@ export default function ReviewDetailClient() {
             </div>
           )}
 
+          {/* Phase 232 — Decline assignment (reviewer only). Shown
+              only when an existing review row is loaded and not yet
+              completed. */}
+          {reviewId != null && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={async () => {
+                  const reason = prompt('Why are you declining this assignment? (optional)') ?? '';
+                  if (!confirm('Decline this review assignment? The admin will see your reason.')) return;
+                  try {
+                    await api.post(`/api/reviews/${reviewId}/decline`, { reason: reason.trim() || undefined });
+                    router.push('/reviews');
+                  } catch {
+                    toast.error('Could not decline.');
+                  }
+                }}
+                className="text-xs text-rose-600 hover:text-rose-700 underline-offset-2 hover:underline"
+              >
+                Decline assignment
+              </button>
+            </div>
+          )}
+
           {/* Phase 223 — Private notes textarea (reviewer/donor/admin
               only; NGO never sees these). Saves via PUT on blur. */}
           {reviewId != null && (

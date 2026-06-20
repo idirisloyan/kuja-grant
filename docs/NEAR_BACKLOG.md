@@ -584,6 +584,27 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 229-233 — More dashboards + control: (a)
+  `<ApplicationsReceivedTable>` on grant detail (donor) shows top-10
+  apps by AI score with star + status badge + open link, plus a
+  "see all" CTA. (b) `<TrustCompletenessCard>` on the NGO
+  dashboard reads `/api/trust-profile/<org_id>` and lists every
+  pillar component flagged missing/incomplete/pending. Hidden when
+  none. (c) New `/admin/ai-cost-by-user` endpoint (admin-only, same
+  pricing as ai-cost-by-tenant). `/admin/ai-cost` picks up a
+  `<ByUserTable>` showing top 20 users by USD over the same window.
+  (d) New `POST /api/reviews/<id>/decline` (reviewer/admin)
+  deletes the review + flips the application status back to
+  'submitted' if no other reviews remain + fans out a
+  `review_declined` notification per admin. "Decline assignment"
+  link on the reviewer detail page. (e) New
+  `POST /api/grants/<id>/withdraw` (donor/admin, owner-scoped)
+  flips the grant to 'withdrawn', cascades to every
+  draft/submitted/under_review/scored/revision_requested
+  application, and notifies every applicant NGO user with the
+  reason. "Withdraw grant" button (rose-styled) on grant detail
+  when status is open/draft.
+
 - **2026-06-20** Phase 223-227 — Calibration + admin awareness:
   (a) Phase 221 UI activated — `<textarea>` for `private_notes` on
   the reviewer review page (auto-saves on blur via PUT

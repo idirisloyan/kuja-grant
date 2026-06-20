@@ -361,6 +361,70 @@ def api_bulk_assign_reviews():
     })
 
 
+@reviews_bp.route('/<int:review_id>/decline', methods=['POST'])
+@login_required
+@role_required('reviewer', 'admin')
+def api_decline_review(review_id):
+    """Phase 232 — Reviewer declines an assignment.
+
+    Body: { reason?: str (max 500) }
+    Sets the review's `private_notes` to "DECLINED: <reason>" so the
+    admin can see context in the audit trail, then deletes the review
+    row so the application loses the assignment. The same reviewer
+    can no longer be auto-reassigned (a fresh POST would hit the
+    existing-review duplicate check).
+    """
+    from app.services.audit import log_action
+    review = db.session.get(Review, review_id)
+    if not review:
+        return jsonify({'error': 'Review not found'}), 404
+    if current_user.role == 'reviewer' and review.reviewer_user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+    if review.status == 'completed':
+        return jsonify({'error': 'Cannot decline a completed review'}), 400
+
+    data = get_request_json() or {}
+    reason = (data.get('reason') or '').strip()[:500]
+
+    log_action('review.declined', current_user.email,
+               'review', review.id,
+               {'application_id': review.application_id, 'reason': reason})
+
+    # Notify admins via in-app notification — surface in their queue.
+    try:
+        from app.models import Notification, User
+        admins = User.query.filter_by(role='admin').all()
+        msg = (
+            f'{current_user.name or current_user.email} declined review #{review.id}'
+            f' for application #{review.application_id}.'
+            + (f' Reason: {reason}' if reason else '')
+        )
+        for u in admins:
+            n = Notification(
+                user_id=u.id,
+                type='review_declined',
+                title='Reviewer declined assignment',
+                message=msg[:500],
+                link='/admin/reviewers-workload',
+            )
+            db.session.add(n)
+    except Exception as e:
+        logger.debug('decline notify skipped: %s', e)
+
+    application_id = review.application_id
+    db.session.delete(review)
+
+    # If no remaining reviews on the app, drop status back to 'submitted'.
+    other = Review.query.filter_by(application_id=application_id).count()
+    if other == 0:
+        app_obj = db.session.get(Application, application_id)
+        if app_obj and app_obj.status == 'under_review':
+            app_obj.status = 'submitted'
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+
 @reviews_bp.route('/<int:review_id>', methods=['PUT'])
 @login_required
 @role_required('reviewer', 'admin')

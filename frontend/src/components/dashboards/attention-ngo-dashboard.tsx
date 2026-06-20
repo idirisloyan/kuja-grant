@@ -40,6 +40,7 @@ import { PeerWinRateCard } from '@/components/dashboards/peer-win-rate-card';
 import { DeadlineThisWeekCard } from '@/components/dashboards/deadline-this-week-card';
 import { DocsRequestedCard } from '@/components/dashboards/docs-requested-card';
 import { NgoInboxCard } from '@/components/dashboards/ngo-inbox-card';
+import { TrustCompletenessCard } from '@/components/dashboards/trust-completeness-card';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -151,6 +152,8 @@ export function AttentionNgoDashboard() {
       <DocsRequestedCard />
       {/* Phase 227 — Combined open-requests inbox (docs + revisions + review status). */}
       <NgoInboxCard />
+      {/* Phase 230 — Trust Profile completeness gaps. Self-gates when none. */}
+      <TrustCompletenessCard />
       {/* Phase 154 — rolling 12-month impact summary. Self-gates if zero activity. */}
       <ImpactCard />
       {/* Phase 185 — peer-anonymized win rate by sector. Self-gates

@@ -13,7 +13,7 @@
  * dollar math stays in one place.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import {
   PageShell, PageBack, PageHeader, PageMain,
@@ -183,10 +183,73 @@ export default function AICostByTenantPage() {
               and <code>/admin/ai-spend/forecast</code> for 30-day projection vs.
               <code className="mx-1">KUJA_AI_BUDGET_USD_30D</code>.
             </p>
+
+            {/* Phase 231 — top users by AI cost over the same window. */}
+            <ByUserTable days={days} />
           </>
         )}
       </PageMain>
     </PageShell>
+  );
+}
+
+interface UserRow {
+  user_id: number;
+  user_name: string | null;
+  user_email: string;
+  role: string | null;
+  calls: number;
+  tokens_in: number;
+  tokens_out: number;
+  usd: number;
+}
+
+function ByUserTable({ days }: { days: number }) {
+  const [rows, setRows] = useState<UserRow[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get<{ by_user: UserRow[] }>(`/admin/ai-cost-by-user?days=${days}&limit=20`).then((r) => {
+      if (!cancelled) setRows(Array.isArray(r?.by_user) ? r.by_user : []);
+    }).catch(() => { if (!cancelled) setRows([]); });
+    return () => { cancelled = true; };
+  }, [days]);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="border border-border rounded-lg bg-card overflow-x-auto mt-6">
+      <div className="p-3 border-b border-border text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+        Top users by AI cost ({days}d)
+      </div>
+      <table className="w-full text-xs">
+        <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <tr>
+            <th className="text-left p-3">User</th>
+            <th className="text-left p-3">Role</th>
+            <th className="text-right p-3">Calls</th>
+            <th className="text-right p-3">Tokens in</th>
+            <th className="text-right p-3">Tokens out</th>
+            <th className="text-right p-3">USD</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((u) => (
+            <tr key={u.user_id} className="border-t border-border">
+              <td className="p-3 font-semibold">
+                {u.user_name ?? u.user_email}
+                {u.user_name && <div className="font-normal text-muted-foreground text-[10px]">{u.user_email}</div>}
+              </td>
+              <td className="p-3 text-xs">{u.role ?? '—'}</td>
+              <td className="p-3 text-right">{u.calls.toLocaleString()}</td>
+              <td className="p-3 text-right">{u.tokens_in.toLocaleString()}</td>
+              <td className="p-3 text-right">{u.tokens_out.toLocaleString()}</td>
+              <td className="p-3 text-right font-semibold">${u.usd.toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
