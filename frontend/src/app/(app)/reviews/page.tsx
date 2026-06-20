@@ -8,6 +8,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { MyPastReviews } from '@/components/reviews/my-past-reviews';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useReviews, useApplications, useGrants } from '@/lib/hooks/use-api';
@@ -121,6 +122,9 @@ function ReviewerView() {
 
       {/* Phase 236 — completion rate over last 90 days. */}
       <MyCompletionStat />
+
+      {/* Phase 244 — most recent completed reviews. Self-gates when none. */}
+      <MyPastReviews />
 
       {/* Phase 214 — quick link to the reviewer's starred shortlist
           across all reviews they've handled. Lands on /applications

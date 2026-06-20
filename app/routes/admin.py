@@ -1497,3 +1497,46 @@ def api_admin_orgs_merge():
     )
     status = 200 if report.get('success') else 400
     return jsonify(report), status
+
+
+@admin_bp.route('/admin/users', methods=['GET'])
+@login_required
+def api_admin_users():
+    """Phase 242 — admin user search.
+
+    Query: ?search= name/email substring (case-insensitive), ?role=
+    optional role filter, ?limit=50.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'admin only'}), 403
+    from app.models.user import User
+    search = (request.args.get('search') or '').strip()
+    role = (request.args.get('role') or '').strip() or None
+    try:
+        limit = int(request.args.get('limit', 50))
+        limit = max(1, min(200, limit))
+    except ValueError:
+        limit = 50
+
+    q = User.query
+    if role:
+        q = q.filter_by(role=role)
+    if search:
+        like = f'%{search}%'
+        from sqlalchemy import or_
+        q = q.filter(or_(User.name.ilike(like), User.email.ilike(like)))
+    q = q.order_by(User.created_at.desc()).limit(limit)
+    users = q.all()
+    rows = []
+    for u in users:
+        rows.append({
+            'id': u.id,
+            'name': u.name,
+            'email': u.email,
+            'role': u.role,
+            'org_id': u.org_id,
+            'org_name': u.organization.name if u.organization else None,
+            'created_at': u.created_at.isoformat() if u.created_at else None,
+            'last_login_at': getattr(u, 'last_login_at', None).isoformat() if getattr(u, 'last_login_at', None) else None,
+        })
+    return jsonify({'success': True, 'users': rows})

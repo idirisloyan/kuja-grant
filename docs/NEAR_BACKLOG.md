@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 241-245 — Surface polish: (a) Phase 241
+  (generic "was this helpful" on AIBadge) deferred — the existing
+  `<AIFeedbackChip>` already handles per-call feedback when
+  `ai_call_id` is present; a generic surface-wide rating produces
+  unactionable signal. (b) New `GET /api/admin/users?search=&role=`
+  (admin-only) + new `/admin/users` page — search by name/email,
+  filter by role, see last_login_at. (c) Verified Phase 177 grant
+  duplicate already copies sectors + countries + eligibility +
+  criteria + doc_requirements + reporting_requirements +
+  report_template (no change needed). (d) `<MyPastReviews>` on the
+  reviewer reviews page lists their 5 most recent completed reviews
+  with score, sorted by completed_at desc. Hidden when none. (e)
+  `<ActiveApplicationsCard>` on the NGO dashboard combines
+  submitted + under_review + scored apps with a 3-stage progress
+  bar. Hidden when empty.
+
 - **2026-06-20** Phase 235-239 — Visibility tiles + cron + timeline:
   (a) `<AwaitingDecisionCard>` on donor dashboard surfaces apps in
   `scored` status (reviewer done, donor sign-off pending). (b) New
