@@ -34,6 +34,7 @@ import { AdminStatusCard } from '@/components/dashboards/admin-status-card';
 import { AuditIntegrityCard } from '@/components/dashboards/audit-integrity-card';
 import { WebhookHealthCard } from '@/components/dashboards/webhook-health-card';
 import { ReviewerCoiRollupCard } from '@/components/dashboards/reviewer-coi-rollup-card';
+import { ReviewerOutliersCard } from '@/components/dashboards/reviewer-outliers-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -266,6 +267,8 @@ export function AttentionOperatorDashboard() {
         <WebhookHealthCard />
         {/* Phase 292 — reviewer COI disclosures rollup. Self-gates when zero. */}
         <ReviewerCoiRollupCard />
+        {/* Phase 298 — reviewer calibration drift (mean score > 1.5σ from platform). */}
+        <ReviewerOutliersCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

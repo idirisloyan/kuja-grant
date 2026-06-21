@@ -584,6 +584,25 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 295-299 — Caseload, calibration + workload signals:
+  (a) `<MyCaseloadStrip>` header on /reviews — live open-count +
+  completed-this-month. Backend `GET /api/reviews/my-caseload`.
+  (b) Templated outreach message on donor "Reach out personally":
+  new `applications.outreach_message_text` column; donor compose
+  dialog pre-fills a template; NGO view renders the message inline
+  in an amber callout. (c) `<CommonDeclineReasonsCard>` on the
+  apply page (NGO viewer) lists the donor's top 3 decline-reason
+  codes from past declines as a quiet "things they look for" hint.
+  Backend `GET /api/applications/<id>/common-decline-reasons`.
+  Self-gates when sample < 5. (d) `<ReviewerOutliersCard>` on the
+  operator dashboard flags reviewers whose mean human score is
+  > 1.5σ from the platform mean (5+ reviews). Backend
+  `GET /api/reviews/scoring-outliers`. (e)
+  `<ReviewerWorkloadByDonorCard>` on the donor dashboard shows
+  which reviewer covers what share of the donor's review work +
+  per-reviewer pace (avg days to complete). Backend
+  `GET /api/dashboard/reviewer-workload-by-donor`.
+
 - **2026-06-20** Phase 289-293 — COI recuse + outreach loop:
   (a) Reviewer auto-recuse on COI disclosure: the Phase 283
   endpoint now deletes the review row after stamping the

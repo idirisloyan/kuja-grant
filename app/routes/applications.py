@@ -1343,6 +1343,54 @@ def api_application_feedback_viewed(app_id):
     })
 
 
+@applications_bp.route('/<int:app_id>/common-decline-reasons', methods=['GET'])
+@login_required
+def api_application_common_decline_reasons(app_id):
+    """Phase 297 — Top 3 decline reasons across this donor's declined apps.
+
+    Lightweight signal for an NGO mid-application: "things they look for".
+    Visible to the applicant org only; donor / admin / reviewer not the
+    audience (they have richer analytics).
+    """
+    app_obj = db.session.get(Application, app_id)
+    if not app_obj:
+        return jsonify({'error': 'Application not found'}), 404
+    if current_user.role != 'ngo' or current_user.org_id != app_obj.ngo_org_id:
+        return jsonify({'error': 'Access denied'}), 403
+    if not app_obj.grant:
+        return jsonify({'top_reasons': []})
+
+    from collections import Counter
+    donor_org_id = app_obj.grant.donor_org_id
+    rows = (Application.query
+            .join(Grant)
+            .filter(Grant.donor_org_id == donor_org_id,
+                    Application.status.in_(['declined', 'rejected']),
+                    Application.decision_reason_code.isnot(None))
+            .with_entities(Application.decision_reason_code)
+            .all())
+    counter = Counter([r[0] for r in rows if r[0]])
+    top = counter.most_common(3)
+    LABELS = {
+        'budget_too_high': 'Budget over the donor\'s typical range',
+        'budget_too_low': 'Budget below the donor\'s minimum',
+        'scope_misalign': 'Scope not aligned with the donor\'s priorities',
+        'geographic_misalign': 'Outside the donor\'s geographic focus',
+        'capacity_concerns': 'Concerns about organizational capacity',
+        'weak_me': 'Weak monitoring & evaluation plan',
+        'weak_evidence': 'Insufficient evidence of impact',
+        'late_submission': 'Submitted past the deadline',
+        'incomplete_application': 'Application missing required sections',
+    }
+    return jsonify({
+        'top_reasons': [
+            {'code': k, 'count': v, 'label': LABELS.get(k, k)}
+            for (k, v) in top
+        ],
+        'sample_size': sum(counter.values()),
+    })
+
+
 @applications_bp.route('/<int:app_id>/donor-outreach', methods=['POST'])
 @login_required
 def api_application_donor_outreach(app_id):
@@ -1366,9 +1414,24 @@ def api_application_donor_outreach(app_id):
             'success': True,
             'changed': False,
             'outreach_initiated_at': app_obj.outreach_initiated_at.isoformat(),
+            'outreach_message_text': app_obj.outreach_message_text,
         })
+
+    data = get_request_json() or {}
+    message_text = (data.get('message') or '').strip()[:2000]
+    if not message_text:
+        # Phase 296 — default templated opener so the donor has a meaningful
+        # starting point even when they skip the dialog.
+        grant_title = app_obj.grant.title if app_obj.grant else 'this opportunity'
+        message_text = (
+            f'Thank you for applying to "{grant_title}". '
+            'Although we couldn\'t fund this application, we were impressed by '
+            'your work and would like to stay in touch about future opportunities.'
+        )
+
     app_obj.outreach_initiated_at = datetime.now(timezone.utc)
     app_obj.outreach_initiated_by_user_id = current_user.id
+    app_obj.outreach_message_text = message_text
     try:
         from app.models import Notification, User
         ngos = User.query.filter_by(org_id=app_obj.ngo_org_id, role='ngo').all()
@@ -1377,10 +1440,7 @@ def api_application_donor_outreach(app_id):
                 user_id=u.id,
                 type='donor_outreach',
                 title='Donor is reaching out about your application',
-                message=(
-                    f'A donor has started a follow-up conversation about '
-                    f'application #{app_obj.id}. Check your messages.'
-                ),
+                message=message_text[:500],
                 link=f'/applications/{app_obj.id}',
             )
             db.session.add(n)
@@ -1391,6 +1451,7 @@ def api_application_donor_outreach(app_id):
         'success': True,
         'changed': True,
         'outreach_initiated_at': app_obj.outreach_initiated_at.isoformat(),
+        'outreach_message_text': message_text,
     })
 
 

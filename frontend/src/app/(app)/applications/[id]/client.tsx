@@ -320,6 +320,8 @@ export default function ApplicationDetailClient() {
           applicantViewedAt={(application as { applicant_viewed_feedback_at?: string | null }).applicant_viewed_feedback_at ?? null}
           status={application.status}
           outreachInitiatedAt={(application as { outreach_initiated_at?: string | null }).outreach_initiated_at ?? null}
+          outreachMessageText={(application as { outreach_message_text?: string | null }).outreach_message_text ?? null}
+          grantTitle={application.grant_title ?? null}
         />
 
         {/* 3. Main work — tabs */}

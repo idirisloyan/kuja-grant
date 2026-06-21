@@ -27,6 +27,7 @@ import { PastWinsPopover } from '@/components/apply/past-wins-popover';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
 import { PreviewAsReviewer } from '@/components/apply/PreviewAsReviewer';
 import { SubmissionReadiness } from '@/components/apply/SubmissionReadiness';
+import { CommonDeclineReasonsCard } from '@/components/apply/common-decline-reasons-card';
 import { AutofillPanel } from '@/components/apply/autofill-panel';
 import { useFlag } from '@/lib/hooks/use-feature-flags';
 import {
@@ -945,6 +946,9 @@ export default function ApplyWizardClient() {
             {t('common.next')} <ArrowRight className="h-4 w-4" />
           </button>
         ) : (
+          <div className="flex flex-col gap-2">
+            {/* Phase 297 — quiet "things they look for" hint. Self-gates. */}
+            <CommonDeclineReasonsCard applicationId={applicationId} />
           <div className="flex items-center gap-2 flex-wrap">
             <SubmissionReadiness
               applicationId={applicationId}
@@ -966,6 +970,7 @@ export default function ApplyWizardClient() {
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               {submitting ? 'Submitting...' : 'Submit Application'}
             </button>
+          </div>
           </div>
         )}
       </div>

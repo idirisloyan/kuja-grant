@@ -55,6 +55,9 @@ class Application(db.Model):
     # Stamped by POST /api/applications/<id>/donor-outreach.
     outreach_initiated_at = db.Column(db.DateTime, nullable=True)
     outreach_initiated_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    # Phase 296 — optional templated message the donor leaves for the
+    # applicant when initiating outreach. Surfaced inline in the NGO view.
+    outreach_message_text = db.Column(db.Text, nullable=True)
 
     # Phase 40 — NEAR network grants only. Auto-populated on /submit when
     # grant.fund_window_id is set:
@@ -117,6 +120,7 @@ class Application(db.Model):
             'applicant_viewed_feedback_at': self.applicant_viewed_feedback_at.isoformat() if self.applicant_viewed_feedback_at else None,
             'outreach_initiated_at': self.outreach_initiated_at.isoformat() if self.outreach_initiated_at else None,
             'outreach_initiated_by_user_id': self.outreach_initiated_by_user_id,
+            'outreach_message_text': self.outreach_message_text,
             'is_starred': bool(self.is_starred),
         }
         if not summary:

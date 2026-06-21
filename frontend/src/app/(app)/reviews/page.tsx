@@ -124,6 +124,9 @@ function ReviewerView() {
       {/* Phase 275 — resume in-progress reviews. Self-gates when none. */}
       <ReviewerResumeBanner />
 
+      {/* Phase 295 — live caseload header (open + completed this month). */}
+      <MyCaseloadStrip />
+
       {/* Phase 236 — completion rate over last 90 days. */}
       <MyCompletionStat />
 
@@ -498,6 +501,32 @@ function EmptyState({ icon: Icon, title, body }: { icon: typeof ClipboardCheck; 
       <Icon className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
       <p className="kuja-display text-xl">{title}</p>
       <p className="text-sm text-muted-foreground mt-1">{body}</p>
+    </div>
+  );
+}
+
+// Phase 295 — Live caseload header: open now + completed this month.
+function MyCaseloadStrip() {
+  const [data, setData] = useState<{ open_count: number; completed_this_month: number } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.get<typeof data>('/api/reviews/my-caseload').then((r) => {
+      if (!cancelled) setData(r);
+    }).catch(() => {/* silent */});
+    return () => { cancelled = true; };
+  }, []);
+  if (!data) return null;
+  if (data.open_count === 0 && data.completed_this_month === 0) return null;
+  return (
+    <div className="rounded-md border border-[hsl(var(--kuja-clay))]/30 bg-[hsl(var(--kuja-clay))]/5 p-3 text-xs flex items-center justify-between">
+      <span>
+        You have <span className="font-semibold text-foreground">{data.open_count}</span> open
+        review{data.open_count === 1 ? '' : 's'}
+        <span className="text-muted-foreground">
+          {' · '}
+          {data.completed_this_month} completed this month
+        </span>
+      </span>
     </div>
   );
 }

@@ -402,6 +402,11 @@ def create_app(config_name=None):
                 if 'outreach_initiated_by_user_id' not in app_cols:
                     conn.execute(text("ALTER TABLE applications ADD COLUMN outreach_initiated_by_user_id INTEGER"))
                     added.append('applications.outreach_initiated_by_user_id')
+                # Phase 296 — optional templated message body the donor leaves
+                # for the applicant when initiating outreach.
+                if 'outreach_message_text' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN outreach_message_text TEXT"))
+                    added.append('applications.outreach_message_text')
 
                 # Phase 221 — reviewer private notes.
                 rev_cols = {c['name'] for c in inspector.get_columns('reviews')} if 'reviews' in inspector.get_table_names() else set()

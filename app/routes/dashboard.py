@@ -954,6 +954,59 @@ def api_portfolio_risk_heatmap():
 # Phase 24C — Donor cohort analytics (your funded NGOs vs cohort).
 # ----------------------------------------------------------------------
 
+@dashboard_bp.route('/reviewer-workload-by-donor', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_workload_by_donor():
+    """Phase 299 — For the donor's grants, which reviewers cover what
+    share + their avg days to complete.
+
+    Helps the donor see if work is balanced + who is fast vs slow.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from app.models import Review, User
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+
+    # All reviews on this donor's applications in the last 90 days.
+    rows = (Review.query
+            .join(Application, Application.id == Review.application_id)
+            .join(Grant, Grant.id == Application.grant_id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Review.created_at >= cutoff)
+            .all())
+
+    if not rows:
+        return jsonify({'reviewers': [], 'total': 0})
+
+    from collections import defaultdict
+    by_reviewer = defaultdict(lambda: {'total': 0, 'completed': 0, 'days_sum': 0.0})
+    for r in rows:
+        slot = by_reviewer[r.reviewer_user_id]
+        slot['total'] += 1
+        if r.status == 'completed' and r.completed_at and r.created_at:
+            slot['completed'] += 1
+            slot['days_sum'] += (r.completed_at - r.created_at).total_seconds() / 86400.0
+
+    reviewer_ids = list(by_reviewer.keys())
+    name_by_id = {u.id: u.name for u in User.query.filter(User.id.in_(reviewer_ids)).all()}
+
+    total = sum(s['total'] for s in by_reviewer.values())
+    out = []
+    for rid, s in by_reviewer.items():
+        avg_days = round(s['days_sum'] / s['completed'], 1) if s['completed'] > 0 else None
+        out.append({
+            'reviewer_user_id': rid,
+            'reviewer_name': name_by_id.get(rid) or f'Reviewer #{rid}',
+            'total': s['total'],
+            'completed': s['completed'],
+            'share_pct': round(100 * s['total'] / total, 1) if total else 0,
+            'avg_days_to_complete': avg_days,
+        })
+    out.sort(key=lambda r: r['total'], reverse=True)
+    return jsonify({'reviewers': out, 'total': total, 'window_days': 90})
+
+
 @dashboard_bp.route('/donor-outreach-rollup', methods=['GET'])
 @login_required
 def api_dashboard_donor_outreach_rollup():

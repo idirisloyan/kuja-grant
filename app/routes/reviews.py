@@ -204,6 +204,33 @@ def api_create_review():
     return jsonify({'success': True, 'review': review.to_dict()}), 201
 
 
+@reviews_bp.route('/my-caseload', methods=['GET'])
+@login_required
+@role_required('reviewer')
+def api_reviewer_my_caseload():
+    """Phase 295 — Live caseload header for the reviewer queue page.
+
+    Returns open (in-flight) reviews + reviews completed in the current
+    calendar month. Cheap query — used as a persistent header strap.
+    """
+    from datetime import datetime as _dt, timezone as _tz
+    now = _dt.now(_tz.utc)
+    month_start = _dt(now.year, now.month, 1, tzinfo=_tz.utc)
+    open_count = Review.query.filter(
+        Review.reviewer_user_id == current_user.id,
+        Review.status.notin_(['completed']),
+    ).count()
+    completed_this_month = Review.query.filter(
+        Review.reviewer_user_id == current_user.id,
+        Review.status == 'completed',
+        Review.completed_at >= month_start,
+    ).count()
+    return jsonify({
+        'open_count': open_count,
+        'completed_this_month': completed_this_month,
+    })
+
+
 @reviews_bp.route('/my-stats', methods=['GET'])
 @login_required
 @role_required('reviewer')
@@ -448,6 +475,68 @@ def api_decline_review(review_id):
 
     db.session.commit()
     return jsonify({'success': True})
+
+
+@reviews_bp.route('/scoring-outliers', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_reviews_scoring_outliers():
+    """Phase 298 — Reviewers whose mean human score is > 1.5σ from the
+    platform mean across their last 5+ completed reviews.
+
+    Surfaces potential calibration drift. Cheap calculation over the
+    completed-review corpus — no AI involvement.
+    """
+    rows = (Review.query
+            .filter(Review.status == 'completed',
+                    Review.overall_score.isnot(None))
+            .all())
+    if len(rows) < 10:
+        return jsonify({'outliers': [], 'sample_size': len(rows)})
+
+    from collections import defaultdict
+    import statistics
+    scores = [r.overall_score for r in rows if r.overall_score is not None]
+    platform_mean = statistics.mean(scores)
+    try:
+        platform_stdev = statistics.stdev(scores) if len(scores) > 1 else 0.0
+    except statistics.StatisticsError:
+        platform_stdev = 0.0
+
+    by_reviewer: dict[int, list[float]] = defaultdict(list)
+    for r in rows:
+        if r.overall_score is not None:
+            by_reviewer[r.reviewer_user_id].append(r.overall_score)
+
+    outliers = []
+    for reviewer_id, vals in by_reviewer.items():
+        if len(vals) < 5:
+            continue
+        mean = statistics.mean(vals)
+        if platform_stdev > 0 and abs(mean - platform_mean) > 1.5 * platform_stdev:
+            outliers.append({
+                'reviewer_user_id': reviewer_id,
+                'mean_score': round(mean, 1),
+                'n': len(vals),
+                'delta_vs_platform': round(mean - platform_mean, 1),
+            })
+
+    if outliers:
+        # Resolve reviewer names + emails.
+        ids = [o['reviewer_user_id'] for o in outliers]
+        name_by_id = {u.id: u.name for u in User.query.filter(User.id.in_(ids)).all()}
+        email_by_id = {u.id: u.email for u in User.query.filter(User.id.in_(ids)).all()}
+        for o in outliers:
+            o['reviewer_name'] = name_by_id.get(o['reviewer_user_id'])
+            o['reviewer_email'] = email_by_id.get(o['reviewer_user_id'])
+
+    outliers.sort(key=lambda o: abs(o['delta_vs_platform']), reverse=True)
+    return jsonify({
+        'platform_mean': round(platform_mean, 1),
+        'platform_stdev': round(platform_stdev, 1),
+        'outliers': outliers[:5],
+        'sample_size': len(rows),
+    })
 
 
 @reviews_bp.route('/coi-rollup', methods=['GET'])
