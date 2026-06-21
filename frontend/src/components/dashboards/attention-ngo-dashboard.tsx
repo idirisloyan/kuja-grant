@@ -85,6 +85,7 @@ import { RevisionRequestedStat } from '@/components/dashboards/revision-requeste
 import { MostActiveGrantStat } from '@/components/dashboards/most-active-grant-stat';
 import { WithdrawnCountStat } from '@/components/dashboards/withdrawn-count-stat';
 import { PeakAiScoreStat } from '@/components/dashboards/peak-ai-score-stat';
+import { AiCostYtdStat } from '@/components/dashboards/ai-cost-ytd-stat';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -249,6 +250,7 @@ export function AttentionNgoDashboard() {
       <MostActiveGrantStat />
       <WithdrawnCountStat />
       <PeakAiScoreStat />
+      <AiCostYtdStat />
       <NgoFeedbackThemesCard />
       <CriterionScoreTrendCard />
       <DeadlineDensityCard />

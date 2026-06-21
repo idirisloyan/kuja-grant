@@ -4832,3 +4832,85 @@ def api_cron_cron_failures_yesterday():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/ngo-deadlines-today', methods=['POST'])
+def api_cron_ngo_deadlines_today():
+    """Phase 599 — Daily NGO digest of watchlisted grants with deadline
+    today or tomorrow. Distinct from Phase 431 (this-week reminder)
+    by being a daily, narrow 0-1 day horizon. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Grant, Notification, record_cron_run as _rcr,
+        )
+        from app.models.watchlist import WatchlistItem
+        from app.models.notification_preference import NotificationPreference
+        from collections import defaultdict
+        from datetime import date, timedelta
+
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        rows = (db.session.query(WatchlistItem.user_id, Grant.id, Grant.title)
+                .join(Grant, Grant.id == WatchlistItem.target_id)
+                .filter(WatchlistItem.kind == 'grant',
+                        Grant.deadline.in_([today, tomorrow]))
+                .all())
+        by_user = defaultdict(list)
+        for uid, gid, title in rows:
+            by_user[uid].append((gid, title))
+        sent = 0
+        if by_user:
+            users = User.query.filter(User.id.in_(list(by_user.keys()))).all()
+            for u in users:
+                items = by_user.get(u.id, [])
+                if not items:
+                    continue
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                short = ', '.join(t for _, t in items[:3])
+                more = f' +{len(items) - 3} more' if len(items) > 3 else ''
+                msg = (
+                    f'{len(items)} watched grant deadline'
+                    f'{"s" if len(items) != 1 else ""} today/tomorrow: '
+                    f'{short}{more}.'
+                )
+                n = Notification(
+                    user_id=u.id,
+                    type='ngo_deadlines_today',
+                    title='Deadlines today/tomorrow',
+                    message=msg[:500],
+                    link='/grants',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {'users_with_deadlines': len(by_user), 'notified': sent}
+        _rcr('ngo-deadlines-today',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ngo-deadlines-today cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ngo-deadlines-today',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

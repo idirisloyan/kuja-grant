@@ -584,6 +584,23 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 595-599 — AI cost YTD + first-time NGOs this
+  month + COI disclosed + AI tokens today + daily watchlist
+  deadlines cron:
+  (a) `<AiCostYtdStat>` on NGO dashboard sums AICallLog.usd_cost
+  for the NGO's org since Jan 1 — annual spend transparency.
+  (b) `<FirstTimeNgosMonthStat>` on donor dashboard counts distinct
+  NGO orgs applying to donor's grants this month with no prior
+  history (emerald growth tone). (c) `<CoiDisclosedCountStat>` on
+  reviewer reviews page counts Review rows with coi_disclosed_at
+  set — lifetime conflict-of-interest disclosure pattern.
+  (d) `<AiTokensTodayStat>` on operator dashboard sums AICallLog
+  tokens_in + tokens_out last 24h with breakdown (k-suffix when
+  >= 1000). (e) Phase 599 cron `/api/cron/ngo-deadlines-today`
+  daily NGO digest of watchlisted grants with deadline today or
+  tomorrow; distinct from Phase 431 (this-week reminder). Honors
+  digests opt-out.
+
 - **2026-06-21** Phase 589-593 — Peak AI score + draft grants count
   + AI score lift + networks total + daily cron failures digest:
   (a) `<PeakAiScoreStat>` on NGO dashboard shows max Application.ai_score

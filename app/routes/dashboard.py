@@ -5934,3 +5934,102 @@ def api_dashboard_admin_networks_total():
     from app.models.network import Network
     count = Network.query.count()
     return jsonify({'count': count})
+
+
+@dashboard_bp.route('/ngo-ai-cost-ytd', methods=['GET'])
+@login_required
+def api_dashboard_ngo_ai_cost_ytd():
+    """Phase 595 — Sum AICallLog.usd_cost for the NGO's org since
+    Jan 1 of the current calendar year. YTD AI spend.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    from sqlalchemy import func
+    from app.models.ai_thread import AICallLog
+    year_start = datetime.now(timezone.utc).replace(
+        month=1, day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+    total = (db.session.query(func.coalesce(func.sum(AICallLog.usd_cost), 0.0))
+             .filter(AICallLog.org_id == current_user.org_id,
+                     AICallLog.created_at >= year_start)
+             .scalar())
+    return jsonify({'usd_cost': round(float(total or 0), 4)})
+
+
+@dashboard_bp.route('/donor-first-time-ngos-month', methods=['GET'])
+@login_required
+def api_dashboard_donor_first_time_ngos_month():
+    """Phase 596 — Distinct NGO orgs applying to donor's grants this
+    calendar month who had no prior application to the donor's grants
+    before month-start. First-time applicants this month.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    this_month_orgs = set(o for (o,) in (
+        db.session.query(Application.ngo_org_id)
+        .join(Grant, Application.grant_id == Grant.id)
+        .filter(Grant.donor_org_id == current_user.org_id,
+                Application.created_at >= month_start,
+                Application.ngo_org_id.isnot(None))
+        .distinct()
+        .all()
+    ))
+    if not this_month_orgs:
+        return jsonify({'count': 0})
+    prior_orgs = set(o for (o,) in (
+        db.session.query(Application.ngo_org_id)
+        .join(Grant, Application.grant_id == Grant.id)
+        .filter(Grant.donor_org_id == current_user.org_id,
+                Application.created_at < month_start,
+                Application.ngo_org_id.in_(list(this_month_orgs)))
+        .distinct()
+        .all()
+    ))
+    return jsonify({'count': len(this_month_orgs - prior_orgs)})
+
+
+@dashboard_bp.route('/reviewer-coi-disclosed-count', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_coi_disclosed_count():
+    """Phase 597 — Count of Review rows with coi_disclosed_at IS NOT NULL
+    for the current reviewer. Lifetime conflict-of-interest disclosure
+    history.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    count = (Review.query
+             .filter(Review.reviewer_user_id == current_user.id,
+                     Review.coi_disclosed_at.isnot(None))
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/admin-ai-tokens-today', methods=['GET'])
+@login_required
+def api_dashboard_admin_ai_tokens_today():
+    """Phase 598 — Sum AICallLog tokens_in + tokens_out in last 24h.
+    Load pulse on AI traffic.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import func
+    from app.models.ai_thread import AICallLog
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    row = (db.session.query(
+                func.coalesce(func.sum(AICallLog.tokens_in), 0),
+                func.coalesce(func.sum(AICallLog.tokens_out), 0),
+            )
+            .filter(AICallLog.created_at >= cutoff)
+            .first())
+    tokens_in = int(row[0] or 0)
+    tokens_out = int(row[1] or 0)
+    return jsonify({
+        'tokens_in': tokens_in,
+        'tokens_out': tokens_out,
+        'total': tokens_in + tokens_out,
+    })
