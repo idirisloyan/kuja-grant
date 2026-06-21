@@ -26,6 +26,10 @@ interface ByEndpoint {
   calls: number;
   failures: number;
   failure_rate_pct: number;
+  current_calls?: number;
+  current_failures?: number;
+  current_failure_rate_pct?: number;
+  stale_failures?: number;
   p50_ms: number | null;
   p95_ms: number | null;
   total_tokens_out: number;
@@ -36,6 +40,8 @@ interface RecentFailure {
   error_code: string | null;
   error_message: string;
   duration_ms: number | null;
+  model?: string | null;
+  is_stale_model?: boolean;
   created_at: string | null;
 }
 
@@ -45,6 +51,11 @@ interface TelemetryResp {
   total_calls: number;
   total_failures: number;
   failure_rate_pct: number;
+  current_calls?: number;
+  current_failures?: number;
+  current_failure_rate_pct?: number;
+  stale_failures?: number;
+  current_models?: string[];
   by_endpoint: ByEndpoint[];
   recent_failures: RecentFailure[];
 }
@@ -123,20 +134,48 @@ export default function AdminAiTelemetryPage() {
 
         {data && data.success && (
           <>
-            {/* Top-line summary */}
-            <section className="grid grid-cols-3 gap-3">
+            {/* Top-line summary — Phase 611: split "live" (current model)
+                from "stale" (deprecated model) so historical 404s from
+                retired model IDs don't muddy today's SLA. */}
+            <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Stat label="Total AI calls" value={data.total_calls.toLocaleString()} />
               <Stat
-                label="Failed"
+                label="All failures"
                 value={data.total_failures.toLocaleString()}
                 tone={data.failure_rate_pct >= 10 ? 'bad' : data.failure_rate_pct >= 3 ? 'warn' : 'good'}
               />
-              <Stat
-                label="Failure rate"
-                value={`${data.failure_rate_pct.toFixed(1)}%`}
-                tone={data.failure_rate_pct >= 10 ? 'bad' : data.failure_rate_pct >= 3 ? 'warn' : 'good'}
-              />
+              {typeof data.current_failure_rate_pct === 'number' ? (
+                <Stat
+                  label="Live failure rate"
+                  value={`${data.current_failure_rate_pct.toFixed(1)}%`}
+                  tone={
+                    data.current_failure_rate_pct >= 10 ? 'bad' :
+                    data.current_failure_rate_pct >= 3 ? 'warn' : 'good'
+                  }
+                />
+              ) : (
+                <Stat
+                  label="Failure rate"
+                  value={`${data.failure_rate_pct.toFixed(1)}%`}
+                  tone={data.failure_rate_pct >= 10 ? 'bad' : data.failure_rate_pct >= 3 ? 'warn' : 'good'}
+                />
+              )}
+              {typeof data.stale_failures === 'number' && (
+                <Stat
+                  label="Stale-model failures"
+                  value={data.stale_failures.toLocaleString()}
+                  tone="muted"
+                />
+              )}
             </section>
+            {typeof data.current_failure_rate_pct === 'number' && data.stale_failures !== undefined && data.stale_failures > 0 && (
+              <p className="text-[11px] text-muted-foreground -mt-1">
+                Live failure rate excludes {data.stale_failures.toLocaleString()} historical failure
+                {data.stale_failures === 1 ? '' : 's'} attributed to deprecated model IDs (the deploy has
+                already moved past those). Current models:{' '}
+                <span className="font-mono">{(data.current_models ?? []).join(', ')}</span>.
+              </p>
+            )}
 
             {/* Per-endpoint rollup */}
             <section className="border border-border rounded-lg bg-card overflow-hidden">
@@ -196,13 +235,27 @@ export default function AdminAiTelemetryPage() {
                   {data.recent_failures.map((f, i) => (
                     <li key={i} className="px-3 py-2 text-xs">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-[11px]">{f.endpoint}</span>
+                        <span className="font-mono text-[11px] flex items-center gap-1.5">
+                          {f.endpoint}
+                          {f.is_stale_model && (
+                            <span
+                              className="px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide bg-muted text-muted-foreground border border-border"
+                              title={`Failure against deprecated model "${f.model}" — already retired in the live deploy.`}
+                            >
+                              stale model
+                            </span>
+                          )}
+                        </span>
                         <span className="text-[10px] text-muted-foreground">
                           {f.created_at ? new Date(f.created_at).toLocaleString() : '—'}
                         </span>
                       </div>
-                      {f.error_code && (
-                        <div className="mt-0.5 text-[10px] text-muted-foreground">code: {f.error_code}</div>
+                      {(f.error_code || f.model) && (
+                        <div className="mt-0.5 text-[10px] text-muted-foreground">
+                          {f.error_code && <>code: {f.error_code}</>}
+                          {f.error_code && f.model && <> · </>}
+                          {f.model && <>model: <span className="font-mono">{f.model}</span></>}
+                        </div>
                       )}
                       {f.error_message && (
                         <div className="mt-0.5 text-foreground/80 leading-relaxed">{f.error_message}</div>

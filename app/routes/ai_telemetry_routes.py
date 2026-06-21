@@ -29,6 +29,37 @@ ai_telemetry_bp = Blueprint('ai_telemetry', __name__, url_prefix='/api/admin')
 ai_quality_bp = Blueprint('ai_quality', __name__, url_prefix='/api/ai-telemetry')
 
 
+# Phase 611 — Stale-model filter. Historical DB rows from deprecated model IDs
+# (e.g. claude-sonnet-4-20250514) inflate the rolled-up failure rate because
+# Anthropic returns 404 for those IDs, but the live source code never calls
+# them. Splitting the rollup into "current" vs "stale" lets ops see today's
+# real SLA without rewriting history. Update this set whenever the source
+# code's model list changes — single source of truth for the telemetry view.
+CURRENT_MODELS = frozenset({
+    'claude-opus-4-8',
+    'claude-opus-4-7',
+    'claude-opus-4-6',
+    'claude-sonnet-4-6',
+    'claude-haiku-4-5-20251001',
+    'claude-haiku-4-5',
+    'claude-fable-5',
+})
+
+
+def _is_stale_model(model_str):
+    """Return True if `model_str` is a non-empty model ID NOT in CURRENT_MODELS.
+
+    Null/empty model strings return False so rows lacking attribution don't
+    get counted as stale. Calls that succeeded against a stale model are
+    also reported (the model was retired but the call worked at the time);
+    the meaningful number is *failures* against stale models — those are
+    almost certainly 404s the deploy has already moved past.
+    """
+    if not model_str:
+        return False
+    return model_str not in CURRENT_MODELS
+
+
 @ai_telemetry_bp.route('/ai-telemetry', methods=['GET'])
 @login_required
 def api_ai_telemetry():
@@ -59,6 +90,10 @@ def api_ai_telemetry():
 
     total = len(rows)
     failures = sum(1 for r in rows if not r.success)
+    stale_failures = sum(
+        1 for r in rows if not r.success and _is_stale_model(r.model)
+    )
+    current_failures = failures - stale_failures
     by_ep = defaultdict(list)
     for r in rows:
         by_ep[r.endpoint or 'unknown'].append(r)
@@ -78,11 +113,23 @@ def api_ai_telemetry():
         durs = [r.duration_ms for r in rs if r.duration_ms is not None]
         tok_out = sum(r.tokens_out or 0 for r in rs)
         ep_failures = sum(1 for r in rs if not r.success)
+        ep_stale_failures = sum(
+            1 for r in rs if not r.success and _is_stale_model(r.model)
+        )
+        ep_current_failures = ep_failures - ep_stale_failures
+        # current_calls = total minus the rows attributed to a stale model.
+        # Used to compute the live (non-historical) failure rate.
+        ep_stale_calls = sum(1 for r in rs if _is_stale_model(r.model))
+        ep_current_calls = len(rs) - ep_stale_calls
         by_endpoint.append({
             'endpoint': ep,
             'calls': len(rs),
             'failures': ep_failures,
             'failure_rate_pct': _pct(ep_failures, len(rs)),
+            'current_calls': ep_current_calls,
+            'current_failures': ep_current_failures,
+            'current_failure_rate_pct': _pct(ep_current_failures, ep_current_calls),
+            'stale_failures': ep_stale_failures,
             'p50_ms': _percentile(durs, 50),
             'p95_ms': _percentile(durs, 95),
             'total_tokens_out': tok_out,
@@ -96,6 +143,8 @@ def api_ai_telemetry():
             'error_code': r.error_code,
             'error_message': (r.error_message or '')[:200],
             'duration_ms': r.duration_ms,
+            'model': r.model,
+            'is_stale_model': _is_stale_model(r.model),
             'created_at': r.created_at.isoformat() if r.created_at else None,
         }
         for r in sorted(
@@ -104,12 +153,22 @@ def api_ai_telemetry():
         )[:20]
     ]
 
+    stale_calls = sum(1 for r in rows if _is_stale_model(r.model))
+    current_calls = total - stale_calls
+
     return jsonify({
         'success': True,
         'window_hours': hours,
         'total_calls': total,
         'total_failures': failures,
         'failure_rate_pct': _pct(failures, total),
+        # Phase 611 — live SLA strips rows attributed to deprecated model IDs
+        # so today's user-facing reliability isn't muddied by historical 404s.
+        'current_calls': current_calls,
+        'current_failures': current_failures,
+        'current_failure_rate_pct': _pct(current_failures, current_calls),
+        'stale_failures': stale_failures,
+        'current_models': sorted(CURRENT_MODELS),
         'by_endpoint': by_endpoint,
         'recent_failures': recent_failures,
     })
