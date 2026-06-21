@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 571-575 — Revision requested + shortlist
+  conversion + scoring time variance + monitoring visits quarter
+  + admin snoozes-ending-7d cron:
+  (a) `<RevisionRequestedStat>` on NGO dashboard counts apps with
+  status='revision_requested' — direct action signal (amber).
+  (b) `<ShortlistConversionStat>` on donor dashboard reports % of
+  donor's starred apps that became funded/awarded — measures
+  shortlist quality. (c) `<ScoringTimeVarianceStat>` on reviewer
+  reviews page reports std-dev of scoring time across last 30d
+  with steady/variable/erratic label; self-gates < 3 sample.
+  Distinct from Phase 453 (average). (d) `<MonitoringVisitsQuarterStat>`
+  on operator dashboard counts MonitoringVisit rows scheduled this
+  calendar quarter. (e) Phase 575 cron `/api/cron/snoozes-ending-7d-admin`
+  weekly admin digest counting Review.snoozed_until expirations in
+  next 7d; honors digests opt-out. Distinct from Phase 539 (per-reviewer).
+
 - **2026-06-21** Phase 565-569 — EOI counts (both sides) + private
   notes 30d + stale trust profiles + NGO year-to-date recap cron:
   (a) `<EoiCountStat>` on NGO dashboard counts ExpressionOfInterest

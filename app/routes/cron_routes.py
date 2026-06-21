@@ -4535,3 +4535,74 @@ def api_cron_ngo_ytd_recap():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/snoozes-ending-7d-admin', methods=['POST'])
+def api_cron_snoozes_ending_7d_admin():
+    """Phase 575 — Weekly admin digest counting Review.snoozed_until
+    expirations in the next 7 days. Helps the secretariat plan for
+    re-emerging review workload. Distinct from Phase 539 which is
+    the per-reviewer digest. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import User, Review, Notification, record_cron_run as _rcr
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        horizon = now + timedelta(days=7)
+        count = (Review.query
+                 .filter(Review.snoozed_until.isnot(None),
+                         Review.snoozed_until > now,
+                         Review.snoozed_until <= horizon,
+                         Review.status != 'completed')
+                 .count())
+        sent = 0
+        if count > 0:
+            msg = (
+                f'{count} snoozed review{"s" if count != 1 else ""} '
+                f'will resurface in the next 7 days.'
+            )
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='snoozes_ending_7d_admin',
+                    title='Snoozes ending this week',
+                    message=msg[:500],
+                    link='/admin/reviewers-workload',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {'snoozes_ending': count, 'admins_notified': sent}
+        _rcr('snoozes-ending-7d-admin',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('snoozes-ending-7d-admin cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('snoozes-ending-7d-admin',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

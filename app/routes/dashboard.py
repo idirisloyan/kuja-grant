@@ -5592,3 +5592,98 @@ def api_dashboard_admin_stale_trust_profiles():
                      not_(recent_sub.exists()))
              .count())
     return jsonify({'count': count})
+
+
+@dashboard_bp.route('/ngo-revision-requested-count', methods=['GET'])
+@login_required
+def api_dashboard_ngo_revision_requested_count():
+    """Phase 571 — Count of NGO's applications with status
+    'revision_requested'. Direct action signal for the NGO.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    count = (Application.query
+             .filter(Application.ngo_org_id == current_user.org_id,
+                     Application.status == 'revision_requested')
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/donor-shortlist-conversion', methods=['GET'])
+@login_required
+def api_dashboard_donor_shortlist_conversion():
+    """Phase 572 — % of donor's starred applications that ended up
+    funded/awarded. Measures shortlist quality / decision discipline.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    rows = (db.session.query(Application.status)
+            .join(Grant, Application.grant_id == Grant.id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.is_starred.is_(True))
+            .all())
+    sample = len(rows)
+    if sample == 0:
+        return jsonify({'rate': None, 'sample': 0})
+    funded = sum(1 for (s,) in rows if s in ('funded', 'awarded'))
+    rate = round(100 * funded / sample, 1)
+    return jsonify({'rate': rate, 'sample': sample, 'funded': funded})
+
+
+@dashboard_bp.route('/reviewer-scoring-time-variance', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_scoring_time_variance():
+    """Phase 573 — Variance of scoring time (minutes between created_at
+    and completed_at) across reviewer's last 30d completed reviews.
+    Distinct from Phase 453 (average). Self-gates sample < 3.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status == 'completed',
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff)
+            .all())
+    durations = []
+    for r in rows:
+        if not r.created_at or not r.completed_at:
+            continue
+        secs = (r.completed_at - r.created_at).total_seconds()
+        if secs > 0:
+            durations.append(secs / 60.0)
+    if len(durations) < 3:
+        return jsonify({'variance_min': None, 'sample': len(durations)})
+    mean = sum(durations) / len(durations)
+    var = sum((d - mean) ** 2 for d in durations) / len(durations)
+    return jsonify({
+        'variance_min': round(var, 1),
+        'std_min': round(var ** 0.5, 1),
+        'sample': len(durations),
+    })
+
+
+@dashboard_bp.route('/admin-monitoring-visits-quarter', methods=['GET'])
+@login_required
+def api_dashboard_admin_monitoring_visits_quarter():
+    """Phase 574 — Count MonitoringVisit rows scheduled for the
+    current calendar quarter.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.monitoring_visit import MonitoringVisit
+    from datetime import date
+    today = date.today()
+    q_start_month = ((today.month - 1) // 3) * 3 + 1
+    q_start = date(today.year, q_start_month, 1)
+    next_q_month = q_start_month + 3
+    next_q_year = today.year + (1 if next_q_month > 12 else 0)
+    next_q_month = ((next_q_month - 1) % 12) + 1
+    q_end = date(next_q_year, next_q_month, 1)
+    count = (MonitoringVisit.query
+             .filter(MonitoringVisit.visit_date >= q_start,
+                     MonitoringVisit.visit_date < q_end)
+             .count())
+    return jsonify({'count': count})
