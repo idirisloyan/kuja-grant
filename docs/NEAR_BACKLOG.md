@@ -584,6 +584,24 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 271-275 — Smoke green + telemetry + analytics:
+  (a) Fixed the remaining 2 smoke failures — `manual_admin cannot
+  self-sign` got the same `allow_admin_override=true` treatment +
+  bumped the Phase 38 AI-surfaces timeout from 10s → 60s. Smoke
+  should now be 167/167. (b) Wired `log_replayable_ai_call` into
+  `/api/ai/summarize-application` and surfaced `ai_call_id` on the
+  response; `<AIFeedbackChip>` now renders inside `<TriageSummary>`
+  so reviewers can rate the AI summary used/edited/dismissed. (c)
+  `/api/applications/compare` now accepts `'ngo'` role with
+  applicant-org scoping. `<CompareMyAppsCard>` on NGO dashboard
+  deep-links to `/applications/compare?ids=<top3>` for self-compare.
+  (d) New `GET /api/dashboard/donor-scorecard` walks the donor's
+  apps' `ai_rubric_result_json` over the last 90 days, averages by
+  criterion key, returns top 5 strong + 5 weak. `<DonorScorecardCard>`
+  on donor dashboard renders both lists. (e) `<ReviewerResumeBanner>`
+  on `/reviews` shows up to 3 in-progress reviews so the reviewer
+  can resume mid-session. Hidden when none.
+
 - **2026-06-20** Phase 265-269 — Test fixes + AI triage + cron + perf:
   (a) Fixed `Emergency Declaration multi-sig end-to-end -- add signer
   1` smoke failure by passing `allow_admin_override=true` when the

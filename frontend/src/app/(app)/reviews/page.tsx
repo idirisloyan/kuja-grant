@@ -9,6 +9,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { MyPastReviews } from '@/components/reviews/my-past-reviews';
+import { ReviewerResumeBanner } from '@/components/reviews/resume-banner';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useReviews, useApplications, useGrants } from '@/lib/hooks/use-api';
@@ -119,6 +120,9 @@ function ReviewerView() {
         ) : null}
       />
       <PageMain>
+
+      {/* Phase 275 — resume in-progress reviews. Self-gates when none. */}
+      <ReviewerResumeBanner />
 
       {/* Phase 236 — completion rate over last 90 days. */}
       <MyCompletionStat />

@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
+import { AIFeedbackChip } from '@/components/shared/ai-feedback-chip';
 import { ReviewerSummary } from '@/components/reviews/ReviewerSummary';
 import { DecisionAuditDrawer } from '@/components/applications/DecisionAuditDrawer';
 // Phase 70 — page-shell primitive to match the rest of the design audit.
@@ -1109,17 +1110,19 @@ function TriageSummary({ applicationId }: { applicationId: number }) {
   const [summary, setSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [source, setSource] = useState<string>('');
+  const [aiCallId, setAiCallId] = useState<number | null>(null);
 
   async function load() {
     if (loading) return;
     setLoading(true);
     try {
-      const r = await api.post<{ summary: string; source: string }>(
+      const r = await api.post<{ summary: string; source: string; ai_call_id?: number | null }>(
         '/api/ai/summarize-application',
         { application_id: applicationId },
       );
       setSummary(r.summary);
       setSource(r.source);
+      setAiCallId(r.ai_call_id ?? null);
     } catch {/* silent */}
     finally { setLoading(false); }
   }
@@ -1147,6 +1150,11 @@ function TriageSummary({ applicationId }: { applicationId: number }) {
           {source === 'template' && (
             <p className="text-[10px] text-muted-foreground">AI fallback (Claude unavailable).</p>
           )}
+          {aiCallId ? (
+            <div className="pt-1">
+              <AIFeedbackChip callId={aiCallId} surfaceLabel="triage summary" />
+            </div>
+          ) : null}
         </>
       )}
     </div>

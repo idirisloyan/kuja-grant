@@ -44,6 +44,7 @@ import { TrustCompletenessCard } from '@/components/dashboards/trust-completenes
 import { ActiveApplicationsCard } from '@/components/dashboards/active-applications-card';
 import { TrustShareCard } from '@/components/dashboards/trust-share-card';
 import { PastDecisionsCard } from '@/components/dashboards/past-decisions-card';
+import { CompareMyAppsCard } from '@/components/dashboards/compare-my-apps-card';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -163,6 +164,8 @@ export function AttentionNgoDashboard() {
       <TrustShareCard />
       {/* Phase 260 — recent donor decisions on this NGO's apps. */}
       <PastDecisionsCard />
+      {/* Phase 273 — compare your 3 most recent apps side-by-side. */}
+      <CompareMyAppsCard />
       {/* Phase 154 — rolling 12-month impact summary. Self-gates if zero activity. */}
       <ImpactCard />
       {/* Phase 185 — peer-anonymized win rate by sector. Self-gates

@@ -572,16 +572,20 @@ def make_tests(base):
             "evidence_row_id": evidence_row,
         }, headers=H, timeout=10)
         decl_id = rd.json()["declaration"]["id"]
-        # Add admin as a signer + a dummy second slot
+        # Add admin as a signer + a dummy second slot.
+        # Phase 271 — allow_admin_override needed since neither user is
+        # seeded as an OB member of the test network.
         rs = s.post(f"{base}/api/declarations/{decl_id}/signers",
-                    json={"user_id": admin_id}, headers=H, timeout=10)
+                    json={"user_id": admin_id, "allow_admin_override": True},
+                    headers=H, timeout=10)
         admin_sig_id = rs.json()["signature"]["id"]
         # Need 2 signers to submit (default min)
         donor_me = login_ok(base, USERS["donor"]).get(
             f"{base}/api/auth/me", headers=H, timeout=5,
         ).json()["user"]
         s.post(f"{base}/api/declarations/{decl_id}/signers",
-               json={"user_id": donor_me["id"]}, headers=H, timeout=10)
+               json={"user_id": donor_me["id"], "allow_admin_override": True},
+               headers=H, timeout=10)
         s.post(f"{base}/api/declarations/{decl_id}/submit", headers=H, timeout=10)
 
         # Admin attempts manual_admin on their own signature slot → 400
@@ -718,7 +722,11 @@ def make_tests(base):
 
         # The cross-window patterns endpoint is the cheapest to verify
         # because it doesn't need a specific entity id.
-        r = s.post(f"{base}/api/networks/patterns/ai-detect", headers=H, timeout=10)
+        # Phase 271 — bumped timeout from 10s to 60s. The endpoint hits the
+        # AI fallback path (no Anthropic key on the smoke harness) which
+        # still walks the windows table; on a cold start that can take
+        # longer than 10s.
+        r = s.post(f"{base}/api/networks/patterns/ai-detect", headers=H, timeout=60)
         assert r.status_code == 200, f"patterns: {r.status_code} {r.text[:200]}"
         body = r.json()
         assert body.get("success") is True

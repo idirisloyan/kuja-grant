@@ -160,17 +160,38 @@ def api_ai_summarize_application():
     )
 
     text = AIService._call_claude(system_msg, user_msg, max_tokens=350)
-    if text and text.strip():
-        return jsonify({'success': True, 'summary': text.strip(), 'source': 'claude'})
+    summary_text = (text or '').strip()
+    source = 'claude' if summary_text else 'template'
+    if not summary_text:
+        summary_text = (
+            f"{org_summary['name']} from {org_summary['country'] or 'their country'} "
+            f"applied to {grant_summary['title'] or 'this grant'}. "
+            f"They submitted {len(responses or {})} criterion responses. "
+            "AI summarization is not available — read the responses directly."
+        )
 
-    # Fallback template.
-    fallback = (
-        f"{org_summary['name']} from {org_summary['country'] or 'their country'} "
-        f"applied to {grant_summary['title'] or 'this grant'}. "
-        f"They submitted {len(responses or {})} criterion responses. "
-        "AI summarization is not available — read the responses directly."
-    )
-    return jsonify({'success': True, 'summary': fallback, 'source': 'template'})
+    # Phase 272 — replayable call id so the AIFeedbackChip can attach.
+    ai_call_id = None
+    try:
+        from app.services.replay_service import log_replayable_ai_call
+        ai_call_id = log_replayable_ai_call(
+            endpoint='ai-summarize-application',
+            user_id=current_user.id,
+            input_text=f"SYSTEM:\n{system_msg}\n\nUSER:\n{user_msg[:2000]}",
+            output_text=summary_text[:4000],
+            success=(source == 'claude'),
+            subject_kind='application',
+            subject_id=application.id,
+            org_id=getattr(current_user, 'org_id', None),
+            role=getattr(current_user, 'role', None),
+        )
+    except Exception:
+        ai_call_id = None
+
+    return jsonify({
+        'success': True, 'summary': summary_text,
+        'source': source, 'ai_call_id': ai_call_id,
+    })
 
 
 @ai_bp.route('/strengthen-section', methods=['POST'])

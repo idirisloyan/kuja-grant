@@ -2382,7 +2382,7 @@ def _median_minutes_per_field_for_org(org_id, exclude_app_id=None):
 
 
 @applications_bp.route('/compare', methods=['GET'])
-@role_required('donor', 'admin')
+@role_required('donor', 'admin', 'ngo')
 def api_compare_applications():
     """Phase 203 — Side-by-side compare of 2-3 applications.
 
@@ -2409,6 +2409,11 @@ def api_compare_applications():
         for a in apps:
             g = db.session.get(Grant, a.grant_id) if a.grant_id else None
             if not g or g.donor_org_id != current_user.org_id:
+                return jsonify({'error': 'Access denied'}), 403
+    elif current_user.role == 'ngo':
+        # Phase 273 — NGO can compare only their OWN applications.
+        for a in apps:
+            if a.ngo_org_id != current_user.org_id:
                 return jsonify({'error': 'Access denied'}), 403
 
     # Take criteria from the first app's grant — assumes compare is

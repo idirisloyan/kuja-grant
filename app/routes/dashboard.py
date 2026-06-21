@@ -799,6 +799,88 @@ def _build_admin_stats():
 # Phase 16B — Peer benchmarks (NGO vs same-country NGOs / donor vs donors)
 # ----------------------------------------------------------------------
 
+@dashboard_bp.route('/donor-scorecard', methods=['GET'])
+@login_required
+def api_dashboard_donor_scorecard():
+    """Phase 274 — Top 5 strong + 5 weak criteria across donor's grants.
+
+    Walks each app's ai_rubric_result_json over the last 90 days and
+    averages criterion scores grouped by label. Returns top 5 (strong)
+    + bottom 5 (weak).
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    sums = defaultdict(float)
+    counts = defaultdict(int)
+    labels = {}
+
+    apps = Application.query.join(Grant).filter(
+        Grant.donor_org_id == current_user.org_id,
+        Application.updated_at >= cutoff,
+    ).all()
+
+    for a in apps:
+        rubric = a.get_ai_rubric_result() if hasattr(a, 'get_ai_rubric_result') else None
+        if not isinstance(rubric, dict):
+            continue
+        per = rubric.get('per_criterion') or rubric.get('scores') or {}
+        # Pull labels off the grant for resolved display.
+        if a.grant and hasattr(a.grant, 'get_criteria'):
+            for c in (a.grant.get_criteria() or []):
+                if isinstance(c, dict):
+                    k = c.get('key') or c.get('id')
+                    if k:
+                        labels.setdefault(str(k), c.get('label') or str(k))
+        if isinstance(per, list):
+            for item in per:
+                if not isinstance(item, dict):
+                    continue
+                k = item.get('key') or item.get('id')
+                v = item.get('score') or item.get('value')
+                if k is None or v is None:
+                    continue
+                try:
+                    v = float(v)
+                except (TypeError, ValueError):
+                    continue
+                sums[str(k)] += v
+                counts[str(k)] += 1
+        elif isinstance(per, dict):
+            for k, v in per.items():
+                try:
+                    v = float(v) if not isinstance(v, dict) else float(v.get('score') or v.get('value') or 0)
+                except (TypeError, ValueError):
+                    continue
+                sums[str(k)] += v
+                counts[str(k)] += 1
+
+    rows = []
+    for k, total in sums.items():
+        n = counts[k]
+        if n == 0:
+            continue
+        rows.append({
+            'key': k,
+            'label': labels.get(k, k),
+            'mean': round(total / n, 1),
+            'n': n,
+        })
+    rows.sort(key=lambda r: r['mean'])
+    weak = rows[:5]
+    strong = list(reversed(rows[-5:])) if len(rows) >= 5 else list(reversed(rows))
+
+    return jsonify({
+        'success': True,
+        'window_days': 90,
+        'strong': strong,
+        'weak': weak,
+    })
+
+
 @dashboard_bp.route('/benchmarks', methods=['GET'])
 @login_required
 def api_dashboard_benchmarks():
