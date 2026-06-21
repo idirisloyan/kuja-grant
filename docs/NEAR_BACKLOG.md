@@ -584,6 +584,23 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 463-467 — Unread tenant messages + distinct
+  applicants this quarter + reviewer median score + audit chain age
+  + reviewer weekly recap cron:
+  (a) `<UnreadMessagesStat>` on NGO dashboard counts TenantMessage
+  rows without a TenantMessageRead receipt for the user's org_id;
+  amber pill links to /messages. Self-gates at zero.
+  (b) `<ApplicantsThisQuarterStat>` on donor dashboard shows count
+  of distinct applicant org_ids that submitted to this donor's
+  grants this calendar quarter. (c) `<MedianScoreStat>` on reviewer
+  reviews page shows median of overall_score across last 30 days;
+  self-gates < 5 samples. (d) `<AuditChainAgeCard>` on operator
+  dashboard shows seconds since most recent AuditChainEntry,
+  scale-aware label (s/m/h/d). Amber border + tone when stale
+  (> 6h). (e) Phase 467 cron `/api/cron/reviewer-weekly-recap` sends
+  reviewers a Friday recap (reviews completed, mean score, fastest
+  turnaround). Digests opt-out gated; record_cron_run wired.
+
 - **2026-06-20** Phase 457-461 — Completed assessments + approval
   rate + reviewer high-score rate + top orgs by users + yesterday
   submissions digest cron:

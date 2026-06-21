@@ -4000,3 +4000,97 @@ def api_dashboard_admin_top_orgs_by_users():
     out = [{'id': r[0], 'name': r[1], 'org_type': r[2], 'users': int(r[3] or 0)}
            for r in rows if (r[3] or 0) > 0]
     return jsonify({'orgs': out})
+
+
+@dashboard_bp.route('/ngo-unread-messages', methods=['GET'])
+@login_required
+def api_dashboard_ngo_unread_messages():
+    """Phase 463 — Count of TenantMessage rows in current user's network
+    that lack a TenantMessageRead receipt for the user's org_id.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from app.models import TenantMessage, TenantMessageRead
+    read_ids_q = db.session.query(TenantMessageRead.message_id).filter(
+        TenantMessageRead.org_id == current_user.org_id)
+    unread = (TenantMessage.query
+              .filter(TenantMessage.id.notin_(read_ids_q))
+              .count())
+    return jsonify({'unread': unread})
+
+
+@dashboard_bp.route('/donor-applicants-this-quarter', methods=['GET'])
+@login_required
+def api_dashboard_donor_applicants_this_quarter():
+    """Phase 464 — Distinct applicant org_ids on donor's grants in the
+    current calendar quarter. Pipeline-diversity signal.
+    """
+    if current_user.role not in ('donor', 'admin') or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    quarter_start_month = ((now.month - 1) // 3) * 3 + 1
+    quarter_start = datetime(now.year, quarter_start_month, 1, tzinfo=timezone.utc)
+    distinct_count = (db.session.query(Application.org_id)
+                      .join(Grant, Application.grant_id == Grant.id)
+                      .filter(Grant.donor_org_id == current_user.org_id,
+                              Application.submitted_at.isnot(None),
+                              Application.submitted_at >= quarter_start)
+                      .distinct().count())
+    return jsonify({
+        'applicants': distinct_count,
+        'quarter_start': quarter_start.date().isoformat(),
+    })
+
+
+@dashboard_bp.route('/reviewer-median-score', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_median_score():
+    """Phase 465 — Median of reviewer's overall_score across completed
+    reviews in last 30 days. Self-gates < 5 samples on the frontend.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff,
+                    Review.overall_score.isnot(None))
+            .all())
+    scores = sorted([float(r.overall_score) for r in rows])
+    if len(scores) < 5:
+        return jsonify({'median': None, 'sample': len(scores)})
+    n = len(scores)
+    median = scores[n // 2] if n % 2 else (scores[n // 2 - 1] + scores[n // 2]) / 2
+    return jsonify({
+        'median': round(median, 1),
+        'sample': n,
+    })
+
+
+@dashboard_bp.route('/audit-chain-newest-age', methods=['GET'])
+@login_required
+def api_dashboard_audit_chain_newest_age():
+    """Phase 466 — Seconds since the most recent audit chain entry.
+    Confirms the chain is actively recording. Amber if > 6 hours.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.audit_chain import AuditChainEntry
+    from datetime import datetime, timezone
+    newest = (AuditChainEntry.query
+              .order_by(AuditChainEntry.created_at.desc())
+              .first())
+    if not newest or not newest.created_at:
+        return jsonify({'seconds': None, 'newest_at': None})
+    created = newest.created_at
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    seconds = int((datetime.now(timezone.utc) - created).total_seconds())
+    return jsonify({
+        'seconds': seconds,
+        'newest_at': created.isoformat(),
+    })

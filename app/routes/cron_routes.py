@@ -3035,3 +3035,85 @@ def api_cron_yesterday_submissions_digest():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/reviewer-weekly-recap', methods=['POST'])
+def api_cron_reviewer_weekly_recap():
+    """Phase 467 — Friday cron. For each reviewer, send a weekly recap:
+    reviews completed this week, mean overall_score, fastest turnaround.
+    Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Review, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(days=7)
+        reviewers = User.query.filter_by(role='reviewer').all()
+        sent = 0
+        for u in reviewers:
+            channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+            if not channels:
+                continue
+            recent = (Review.query
+                      .filter(Review.reviewer_user_id == u.id,
+                              Review.status.in_(['submitted', 'scored', 'completed']),
+                              Review.completed_at.isnot(None),
+                              Review.completed_at >= since)
+                      .all())
+            if not recent:
+                continue
+            scores = [float(r.overall_score) for r in recent if r.overall_score is not None]
+            durations = []
+            for r in recent:
+                if r.created_at and r.completed_at:
+                    h = (r.completed_at - r.created_at).total_seconds() / 3600.0
+                    if h >= 0:
+                        durations.append(h)
+            mean_score = round(sum(scores) / len(scores), 1) if scores else None
+            fastest = round(min(durations), 1) if durations else None
+            parts = [f'{len(recent)} reviews completed']
+            if mean_score is not None:
+                parts.append(f'mean score {mean_score}')
+            if fastest is not None:
+                parts.append(f'fastest {fastest}h')
+            msg = 'Weekly recap: ' + ', '.join(parts) + '.'
+            n = Notification(
+                user_id=u.id,
+                type='reviewer_weekly_recap',
+                title='Your week in reviews',
+                message=msg[:500],
+                link='/reviews',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'reviewers_scanned': len(reviewers), 'digests_sent': sent}
+        _rcr('reviewer-weekly-recap',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('reviewer-weekly-recap cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('reviewer-weekly-recap',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

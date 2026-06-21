@@ -18,6 +18,7 @@ import { AiAgreementStat } from '@/components/reviews/ai-agreement-stat';
 import { ReviewStreakTile } from '@/components/reviews/review-streak-tile';
 import { ScoringTimeAvgStat } from '@/components/reviews/scoring-time-avg-stat';
 import { HighScoreRateStat } from '@/components/reviews/high-score-rate-stat';
+import { MedianScoreStat } from '@/components/reviews/median-score-stat';
 import { ReviewerResumeBanner } from '@/components/reviews/resume-banner';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -144,6 +145,7 @@ function ReviewerView() {
       <ReviewStreakTile />
       <ScoringTimeAvgStat />
       <HighScoreRateStat />
+      <MedianScoreStat />
       <MyCompletedThisWeek />
       <BandStreakTip />
       <ScoreDistributionCard />
