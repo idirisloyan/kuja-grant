@@ -584,6 +584,29 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 385-389 — Submit duration + response
+  completeness + low-score rationale snippets +
+  auth-lockout signal + AI quality drift cron:
+  (a) `<NgoSubmitDurationCard>` on NGO dashboard shows median
+  elapsed hours from application.created_at to submitted_at
+  across the last 5 submitted apps. Backend
+  `GET /api/dashboard/ngo-submit-duration`. (b)
+  `<ResponseCompletenessCard>` on donor dashboard shows %
+  of submitted apps with non-empty responses over the last
+  90 days; amber border <80%, gates under 10 submissions.
+  Backend `GET /api/dashboard/donor-response-completeness`.
+  (c) New `GET /api/reviews/recent-low-score-rationales`
+  returns the reviewer's last 3 completed reviews with
+  overall_score < 60 plus per-criterion comment snippets —
+  ready for reuse in new reviews (UI surface deferred). (d)
+  `<AuthLockoutCard>` on operator dashboard surfaces emails
+  that hit >=5 failed login attempts in the last 24h; rose
+  border, self-gates when zero. Backend
+  `GET /api/dashboard/auth-lockout-rate`. (e) New
+  `POST /api/cron/ai-quality-drift` compares today's median
+  AI score vs trailing 7-day baseline per donor and notifies
+  admins when any donor's median shifts >=10 points.
+
 - **2026-06-20** Phase 379-383 — This-month submissions +
   time-to-first-review + 24h deadline badge + AI replay
   coverage + webhook-health cron:

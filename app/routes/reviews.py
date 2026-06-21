@@ -304,6 +304,45 @@ def api_reviewer_my_turnaround():
     })
 
 
+@reviews_bp.route('/recent-low-score-rationales', methods=['GET'])
+@login_required
+@role_required('reviewer')
+def api_reviewer_recent_low_score_rationales():
+    """Phase 387 — Return the reviewer's last 3 completed reviews
+    with overall_score < 60. Surfaces past low-score rationale text so
+    the reviewer can reuse phrasing on similar new applications.
+    """
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.overall_score.isnot(None),
+                    Review.overall_score < 60)
+            .order_by(Review.completed_at.desc())
+            .limit(3)
+            .all())
+    out = []
+    for r in rows:
+        comments = r.get_comments() or {}
+        snippets = []
+        for key, val in comments.items():
+            if isinstance(val, str) and val.strip():
+                snippets.append({'criterion': key, 'comment': val[:280]})
+            elif isinstance(val, dict):
+                txt = val.get('feedback') or val.get('comment') or ''
+                if isinstance(txt, str) and txt.strip():
+                    snippets.append({'criterion': key, 'comment': txt[:280]})
+        if not snippets:
+            continue
+        out.append({
+            'review_id': r.id,
+            'application_id': r.application_id,
+            'overall_score': r.overall_score,
+            'completed_at': r.completed_at.isoformat() if r.completed_at else None,
+            'snippets': snippets[:3],
+        })
+    return jsonify({'success': True, 'reviews': out})
+
+
 @reviews_bp.route('/next-up', methods=['GET'])
 @login_required
 @role_required('reviewer')

@@ -2233,6 +2233,106 @@ def api_dashboard_donor_fastest_reviewer():
     })
 
 
+@dashboard_bp.route('/ngo-submit-duration', methods=['GET'])
+@login_required
+def api_dashboard_ngo_submit_duration():
+    """Phase 385 — Median elapsed time (in hours) from
+    application.created_at to application.submitted_at across the
+    NGO's last 5 submitted applications. Lets the NGO budget the
+    session before opening apply.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    rows = (Application.query
+            .filter(Application.ngo_org_id == current_user.org_id,
+                    Application.submitted_at.isnot(None),
+                    Application.created_at.isnot(None))
+            .order_by(Application.submitted_at.desc())
+            .limit(5)
+            .all())
+    hours = []
+    for a in rows:
+        if not a.submitted_at or not a.created_at:
+            continue
+        h = (a.submitted_at - a.created_at).total_seconds() / 3600.0
+        if h >= 0:
+            hours.append(h)
+    if not hours:
+        return jsonify({'median_hours': None, 'sample': 0})
+    hours.sort()
+    n = len(hours)
+    median = hours[n // 2] if n % 2 else (hours[n // 2 - 1] + hours[n // 2]) / 2.0
+    return jsonify({
+        'median_hours': round(median, 1),
+        'sample': n,
+    })
+
+
+@dashboard_bp.route('/donor-response-completeness', methods=['GET'])
+@login_required
+def api_dashboard_donor_response_completeness():
+    """Phase 386 — % of submitted applications on this donor's grants
+    that have a non-null responses field over the last 90 days.
+    Self-gates under 10 submitted apps.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (db.session.query(Application.id, Application.responses)
+            .join(Grant, Grant.id == Application.grant_id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.submitted_at.isnot(None),
+                    Application.submitted_at >= cutoff)
+            .all())
+    total = len(rows)
+    with_responses = sum(1 for _, r in rows if r and str(r).strip() not in ('', '{}', '[]', 'null'))
+    if total < 10:
+        return jsonify({'completeness_pct': None, 'total': total,
+                        'reason': 'too_few_submissions'})
+    return jsonify({
+        'completeness_pct': round(100 * with_responses / total, 1),
+        'with_responses': with_responses,
+        'total': total,
+        'window_days': 90,
+    })
+
+
+@dashboard_bp.route('/auth-lockout-rate', methods=['GET'])
+@login_required
+def api_dashboard_auth_lockout_rate():
+    """Phase 388 — Security signal: count of distinct emails that hit
+    >=5 failed login attempts in the last 24h, and total recorded
+    attempts. The login_attempts table is shared across all
+    rate-limited namespaces, so high counts may indicate brute force.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import text as _text
+    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+    try:
+        total_row = db.session.execute(_text(
+            "SELECT COUNT(*) AS total FROM login_attempts WHERE attempted_at >= :c"
+        ), {'c': cutoff}).first()
+        total = int(total_row.total or 0)
+        rate_limited_row = db.session.execute(_text(
+            "SELECT COUNT(*) AS hot_emails FROM ("
+            " SELECT email FROM login_attempts WHERE attempted_at >= :c "
+            " GROUP BY email HAVING COUNT(*) >= 5"
+            ") sub"
+        ), {'c': cutoff}).first()
+        hot_emails = int(rate_limited_row.hot_emails or 0)
+    except Exception:
+        total = 0
+        hot_emails = 0
+    return jsonify({
+        'window_hours': 24,
+        'total_attempts': total,
+        'hot_emails': hot_emails,
+    })
+
+
 @dashboard_bp.route('/ngo-submissions-this-month', methods=['GET'])
 @login_required
 def api_dashboard_ngo_submissions_this_month():

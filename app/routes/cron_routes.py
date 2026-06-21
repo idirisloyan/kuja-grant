@@ -801,6 +801,131 @@ def api_cron_donor_closing_grants():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/ai-quality-drift', methods=['POST'])
+def api_cron_ai_quality_drift():
+    """Phase 389 — Daily AI-quality drift detector. For each donor,
+    compute today's median AI score across submitted applications and
+    compare against the median over the trailing 7 days. Notify
+    admins when any donor's median shifts by more than 10 points.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            Application, Grant, User, Notification, Organization,
+            record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+        from collections import defaultdict
+
+        now = datetime.now(timezone.utc)
+        today_start = now - timedelta(days=1)
+        baseline_start = now - timedelta(days=8)
+
+        rows = (db.session.query(
+                    Grant.donor_org_id,
+                    Application.ai_score,
+                    Application.submitted_at,
+                )
+                .join(Application, Application.grant_id == Grant.id)
+                .filter(Application.submitted_at >= baseline_start,
+                        Application.ai_score.isnot(None))
+                .all())
+        today_by_donor = defaultdict(list)
+        baseline_by_donor = defaultdict(list)
+        for donor_org_id, ai_score, submitted in rows:
+            if donor_org_id is None or ai_score is None or not submitted:
+                continue
+            if submitted >= today_start:
+                today_by_donor[donor_org_id].append(float(ai_score))
+            else:
+                baseline_by_donor[donor_org_id].append(float(ai_score))
+
+        def _median(xs):
+            if not xs:
+                return None
+            s = sorted(xs)
+            n = len(s)
+            return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+
+        drifts = []
+        for donor_org_id, today_scores in today_by_donor.items():
+            if len(today_scores) < 3:
+                continue
+            baseline = baseline_by_donor.get(donor_org_id, [])
+            if len(baseline) < 5:
+                continue
+            today_median = _median(today_scores)
+            baseline_median = _median(baseline)
+            if today_median is None or baseline_median is None:
+                continue
+            delta = today_median - baseline_median
+            if abs(delta) >= 10:
+                drifts.append({
+                    'donor_org_id': donor_org_id,
+                    'today_median': round(today_median, 1),
+                    'baseline_median': round(baseline_median, 1),
+                    'delta': round(delta, 1),
+                })
+
+        sent = 0
+        if drifts:
+            org_ids = [d['donor_org_id'] for d in drifts]
+            orgs_by_id = {o.id: o for o in Organization.query.filter(Organization.id.in_(org_ids)).all()}
+            parts = []
+            for d in drifts[:5]:
+                org = orgs_by_id.get(d['donor_org_id'])
+                org_label = org.name if org else f'Org #{d["donor_org_id"]}'
+                sign = '+' if d['delta'] > 0 else ''
+                parts.append(f'{org_label} {sign}{d["delta"]}pp')
+            msg = 'AI score drift: ' + ', '.join(parts)
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='ai_quality_drift',
+                    title='AI score drift detected',
+                    message=msg[:500],
+                    link='/admin/ai-quality',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+
+        result = {
+            'donors_scanned': len(today_by_donor),
+            'drifts_detected': len(drifts),
+            'admins_notified': sent,
+        }
+        _rcr('ai-quality-drift',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result, 'drifts': drifts[:10]})
+    except Exception as e:
+        logger.exception('ai-quality-drift cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ai-quality-drift',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/webhook-deliveries-health', methods=['POST'])
 def api_cron_webhook_deliveries_health():
     """Phase 383 — Daily webhook-delivery-health summary. For each

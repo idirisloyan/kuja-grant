@@ -55,6 +55,7 @@ import { NgoStalledApplicationsCard } from '@/components/dashboards/ngo-stalled-
 import { NgoPipelineValueCard } from '@/components/dashboards/ngo-pipeline-value-card';
 import { NgoFreshDecisionBanner } from '@/components/dashboards/ngo-fresh-decision-banner';
 import { SubmissionsThisMonthCard } from '@/components/dashboards/submissions-this-month-card';
+import { NgoSubmitDurationCard } from '@/components/dashboards/ngo-submit-duration-card';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -192,6 +193,7 @@ export function AttentionNgoDashboard() {
       <NgoPipelineValueCard />
       <NgoFreshDecisionBanner />
       <SubmissionsThisMonthCard />
+      <NgoSubmitDurationCard />
       {/* Phase 154 — rolling 12-month impact summary. Self-gates if zero activity. */}
       <ImpactCard />
       {/* Phase 185 — peer-anonymized win rate by sector. Self-gates
