@@ -4032,3 +4032,85 @@ def api_cron_tenant_messages_week_digest():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/snoozed-reviews-ending-soon', methods=['POST'])
+def api_cron_snoozed_reviews_ending_soon():
+    """Phase 539 — Weekly reviewer digest of snoozed reviews whose
+    snooze timer expires in the next 3 days. Lets reviewers prepare
+    before the work reappears in their queue. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Review, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from collections import defaultdict
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        horizon = now + timedelta(days=3)
+        rows = (db.session.query(
+                    Review.reviewer_user_id,
+                    Review.snoozed_until,
+                )
+                .filter(Review.snoozed_until.isnot(None),
+                        Review.snoozed_until > now,
+                        Review.snoozed_until <= horizon,
+                        Review.status != 'completed')
+                .all())
+        by_user = defaultdict(int)
+        for uid, _ in rows:
+            by_user[uid] += 1
+        sent = 0
+        if by_user:
+            users = User.query.filter(User.id.in_(list(by_user.keys()))).all()
+            for u in users:
+                n_count = by_user.get(u.id, 0)
+                if not n_count:
+                    continue
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                msg = (
+                    f'{n_count} of your snoozed review{"s" if n_count != 1 else ""} '
+                    f'will resurface in the next 3 days.'
+                )
+                n = Notification(
+                    user_id=u.id,
+                    type='snoozed_reviews_ending_soon',
+                    title='Snoozed reviews resurfacing soon',
+                    message=msg[:500],
+                    link='/reviews',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {'reviewers_with_snoozed': len(by_user), 'notified': sent}
+        _rcr('snoozed-reviews-ending-soon',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('snoozed-reviews-ending-soon cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('snoozed-reviews-ending-soon',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

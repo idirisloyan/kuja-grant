@@ -584,6 +584,23 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 535-539 — Pipeline count + grants closing soon
+  + snoozed reviews + AI threads this week + snoozed-reviews-ending-soon
+  cron:
+  (a) `<PipelineCountStat>` on NGO dashboard counts apps in submitted/
+  in_review status (bottleneck visibility — distinct from Phase 367
+  pipeline VALUE).
+  (b) `<GrantsClosingSoonStat>` on donor dashboard counts donor's open
+  grants with deadline within next 7 days (amber tone — urgency
+  signal for last-call promotion). (c) `<SnoozedCountStat>` on reviewer
+  reviews page counts Review rows with snoozed_until > now —
+  visibility on what's temporarily hidden. (d) `<AiThreadsWeekStat>`
+  on operator dashboard counts AIThread rows created in last 7d —
+  AI co-pilot engagement pulse. (e) Phase 539 cron
+  `/api/cron/snoozed-reviews-ending-soon` weekly reviewer digest
+  for snoozed reviews resurfacing within 3 days; honors digests
+  opt-out, telemetered.
+
 - **2026-06-21** Phase 529-533 — Documents this month + approvals today
   + scoring tightness + tenant messages this week + tenant messages
   week digest cron:

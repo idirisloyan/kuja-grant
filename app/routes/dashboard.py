@@ -5156,3 +5156,74 @@ def api_dashboard_admin_tenant_messages_this_week():
              .filter(TenantMessage.sent_at >= cutoff)
              .count())
     return jsonify({'count': count})
+
+
+@dashboard_bp.route('/ngo-pipeline-count', methods=['GET'])
+@login_required
+def api_dashboard_ngo_pipeline_count():
+    """Phase 535 — Count of NGO's applications currently in 'submitted'
+    or 'in_review' — the bottleneck visibility metric.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    count = (Application.query
+             .filter(Application.ngo_org_id == current_user.org_id,
+                     Application.status.in_(['submitted', 'in_review']))
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/donor-grants-closing-7d', methods=['GET'])
+@login_required
+def api_dashboard_donor_grants_closing_7d():
+    """Phase 536 — Count of donor's published grants with deadline
+    within the next 7 days. Urgency signal for last-call promotion.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta, date
+    today = date.today()
+    horizon = today + timedelta(days=7)
+    count = (Grant.query
+             .filter(Grant.donor_org_id == current_user.org_id,
+                     Grant.status.in_(['open', 'review']),
+                     Grant.deadline.isnot(None),
+                     Grant.deadline >= today,
+                     Grant.deadline <= horizon)
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/reviewer-snoozed-count', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_snoozed_count():
+    """Phase 537 — Count of reviewer's reviews with snoozed_until > now.
+    Visibility on what's hidden behind a temporary timer.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    count = (Review.query
+             .filter(Review.reviewer_user_id == current_user.id,
+                     Review.snoozed_until.isnot(None),
+                     Review.snoozed_until > now)
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/admin-ai-threads-this-week', methods=['GET'])
+@login_required
+def api_dashboard_admin_ai_threads_this_week():
+    """Phase 538 — Count of AIThread rows created in last 7 days.
+    AI co-pilot engagement pulse.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from app.models.ai_thread import AIThread
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    count = (AIThread.query
+             .filter(AIThread.created_at >= cutoff)
+             .count())
+    return jsonify({'count': count})
