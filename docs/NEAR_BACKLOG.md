@@ -584,6 +584,33 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 373-377 — Fresh-decision banner +
+  country breakdown + score-gap tip + AI failure rate +
+  expired-grant auto-close (+ cost_usd typo fix):
+  (a) `<NgoFreshDecisionBanner>` highlights the NGO's most recent
+  unviewed decision (Phase 285's `applicant_viewed_feedback_at`
+  drives "unviewed") so funded/declined doesn't sit ignored.
+  Backend `GET /api/dashboard/ngo-fresh-decision`. (b)
+  `<AppsByCountryCard>` on donor dashboard shows country
+  breakdown of received applications. Backend
+  `GET /api/dashboard/donor-apps-by-country`. (c) Reviewer
+  score-gap inline tip on `/reviews/[id]`: when AI scoring runs
+  and the reviewer overwrites a criterion by more than 25
+  points, an amber line shows "AI suggested X · you scored Y";
+  preserves the AI score in a separate `aiCriterionScores` map
+  that the reviewer can't accidentally overwrite. (d)
+  `<AiFailureRateCard>` on operator dashboard shows % of AI
+  calls that failed in the last 24h (rose border at >=5%).
+  Backend `GET /api/dashboard/ai-failure-rate`. (e) New
+  `POST /api/cron/expired-grants-auto-close` closes grants whose
+  deadline expired more than 30 days ago with no in-flight
+  applications and writes a `grant.auto_closed` audit-chain
+  entry per closure. (f) **Bug fix:** swept all four
+  `SELECT SUM(cost_usd) FROM ai_call_logs` queries → `usd_cost`.
+  The column is `usd_cost`; the typo had been silently making
+  3 admin tiles + 1 cron return $0 since they were wrapped in
+  bare `except Exception` handlers.
+
 - **2026-06-20** Phase 367-371 — Pipeline value + portfolio
   concentration + reviewer "Next up" CTA + AI cost per app +
   peer-comparison digest:

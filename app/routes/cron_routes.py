@@ -663,7 +663,7 @@ def api_cron_admin_weekly_events():
         ).count() if hasattr(Application, 'decision_recorded_at') else 0
         try:
             ai_cost = db.session.execute(_text(
-                "SELECT COALESCE(SUM(cost_usd), 0) FROM ai_call_logs WHERE created_at >= :c"
+                "SELECT COALESCE(SUM(usd_cost), 0) FROM ai_call_logs WHERE created_at >= :c"
             ), {'c': week_ago}).scalar() or 0
             ai_cost = float(ai_cost)
         except Exception:
@@ -794,6 +794,80 @@ def api_cron_donor_closing_grants():
         try:
             from app.models import record_cron_run as _rcr
             _rcr('donor-closing-grants',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/expired-grants-auto-close', methods=['POST'])
+def api_cron_expired_grants_auto_close():
+    """Phase 377 — Auto-close grants whose deadline passed more than
+    30 days ago, status is still 'open' or 'review', and no in-flight
+    applications remain (none in submitted/under_review/scored). Sets
+    status='closed' and appends an audit-chain entry per closure.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            Grant, Application, record_cron_run as _rcr,
+        )
+        from app.models.audit_chain import AuditChainEntry
+        from datetime import datetime, timezone, timedelta, date
+
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=30)).date()
+        IN_FLIGHT = ['submitted', 'under_review', 'scored', 'revision_requested']
+
+        candidates = (Grant.query
+                      .filter(Grant.status.in_(['open', 'review']),
+                              Grant.deadline.isnot(None),
+                              Grant.deadline < cutoff_date)
+                      .all())
+        closed_ids = []
+        for g in candidates:
+            in_flight = Application.query.filter(
+                Application.grant_id == g.id,
+                Application.status.in_(IN_FLIGHT),
+            ).count()
+            if in_flight > 0:
+                continue
+            g.status = 'closed'
+            db.session.add(g)
+            AuditChainEntry.append(
+                action='grant.auto_closed',
+                actor_email='system@cron',
+                subject_kind='grant',
+                subject_id=g.id,
+                details={'reason': 'deadline_expired_30d',
+                         'deadline': g.deadline.isoformat() if g.deadline else None},
+            )
+            closed_ids.append(g.id)
+        if closed_ids:
+            db.session.commit()
+        result = {
+            'candidates_scanned': len(candidates),
+            'auto_closed': len(closed_ids),
+            'closed_ids_sample': closed_ids[:10],
+        }
+        _rcr('expired-grants-auto-close',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('expired-grants-auto-close cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('expired-grants-auto-close',
                  duration_ms=int((_time.time() - _t0) * 1000),
                  success=False, summary=str(e)[:480])
         except Exception:
@@ -1202,7 +1276,7 @@ def api_cron_weekly_kpi_snapshot():
 
         try:
             ai_cost = db.session.execute(_text(
-                "SELECT COALESCE(SUM(cost_usd), 0) FROM ai_call_logs WHERE created_at >= :a AND created_at < :b"
+                "SELECT COALESCE(SUM(usd_cost), 0) FROM ai_call_logs WHERE created_at >= :a AND created_at < :b"
             ), {'a': last_monday, 'b': next_monday}).scalar() or 0
             ai_cost = float(ai_cost)
         except Exception:

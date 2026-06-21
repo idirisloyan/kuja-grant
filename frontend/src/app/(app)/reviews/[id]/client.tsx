@@ -149,6 +149,11 @@ export default function ReviewDetailClient() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [aiScoring, setAiScoring] = useState(false);
+  // Phase 375 — preserved AI per-criterion scores so the inline tip can
+  // compare them against the reviewer's current manual score after they
+  // edit. Without this map the AI suggestion is lost the moment the
+  // reviewer overwrites `scores`.
+  const [aiCriterionScores, setAiCriterionScores] = useState<Record<string, number>>({});
   // Per-criterion "Suggest rationale" loading state — separate from bulk
   // aiScoring so reviewers can refine one row at a time without seeing the
   // whole panel disabled.
@@ -230,6 +235,13 @@ export default function ReviewDetailClient() {
             updated[key] = { score: Math.round(val.score), comment: val.feedback || updated[key]?.comment || '' };
           }
           return updated;
+        });
+        setAiCriterionScores((prev) => {
+          const next = { ...prev };
+          for (const [key, val] of Object.entries(ai)) {
+            next[key] = Math.round(val.score);
+          }
+          return next;
         });
       }
       await mutateApp();
@@ -848,6 +860,21 @@ export default function ReviewDetailClient() {
                   {application.ai_score != null && (
                     <div className="inline-flex items-center gap-1.5 rounded bg-[hsl(var(--kuja-spark-soft))] text-[hsl(var(--kuja-spark))] px-2 py-0.5 text-xs">
                       <Cpu className="h-3 w-3" /> {t('review.detail.ai_reference')}
+                    </div>
+                  )}
+
+                  {/* Phase 375 — show a subtle tip when the reviewer's
+                      manual score for this criterion diverges from the
+                      AI-suggested score by more than 25 points. Skipped
+                      if the reviewer hasn't run AI scoring yet. */}
+                  {aiCriterionScores[c.key] != null && scores[c.key]?.score != null &&
+                    Math.abs((scores[c.key]!.score ?? 0) - aiCriterionScores[c.key]) > 25 && (
+                    <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-flex items-center gap-1.5">
+                      <Cpu className="h-3 w-3" />
+                      AI suggested {aiCriterionScores[c.key]} · you scored {scores[c.key]?.score}
+                      {(scores[c.key]?.score ?? 0) > aiCriterionScores[c.key]
+                        ? ' (higher than AI)'
+                        : ' (lower than AI)'}
                     </div>
                   )}
 

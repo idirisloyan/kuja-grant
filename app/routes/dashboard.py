@@ -1539,7 +1539,7 @@ def api_dashboard_ai_cost_forecast():
     seven_ago = now - timedelta(days=7)
     try:
         total_7d = db.session.execute(text(
-            "SELECT COALESCE(SUM(cost_usd), 0) FROM ai_call_logs WHERE created_at >= :c"
+            "SELECT COALESCE(SUM(usd_cost), 0) FROM ai_call_logs WHERE created_at >= :c"
         ), {'c': seven_ago}).scalar() or 0
     except Exception:
         total_7d = 0
@@ -2233,6 +2233,93 @@ def api_dashboard_donor_fastest_reviewer():
     })
 
 
+@dashboard_bp.route('/ngo-fresh-decision', methods=['GET'])
+@login_required
+def api_dashboard_ngo_fresh_decision():
+    """Phase 373 — Surface the most recent unviewed decision on this
+    NGO's applications. Powers a landing banner so a fresh
+    funded/declined doesn't get lost in the inbox.
+    Uses Phase 285 `applicant_viewed_feedback_at` to know what's seen.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+    DECIDED = ['funded', 'awarded', 'declined', 'rejected']
+    row = (Application.query
+           .filter(Application.ngo_org_id == current_user.org_id,
+                   Application.status.in_(DECIDED),
+                   Application.decision_recorded_at.isnot(None),
+                   Application.decision_recorded_at >= cutoff,
+                   Application.applicant_viewed_feedback_at.is_(None))
+           .order_by(Application.decision_recorded_at.desc())
+           .first())
+    if not row:
+        return jsonify({'fresh': None})
+    return jsonify({
+        'fresh': {
+            'application_id': row.id,
+            'status': row.status,
+            'decision_recorded_at': row.decision_recorded_at.isoformat() if row.decision_recorded_at else None,
+            'grant_title': row.grant.title if row.grant else None,
+        },
+    })
+
+
+@dashboard_bp.route('/donor-apps-by-country', methods=['GET'])
+@login_required
+def api_dashboard_donor_apps_by_country():
+    """Phase 374 — Country breakdown of applications received across
+    this donor's grants. Geography signal for portfolio managers.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from collections import Counter
+    rows = (db.session.query(Organization.country)
+            .join(Application, Application.ngo_org_id == Organization.id)
+            .join(Grant, Grant.id == Application.grant_id)
+            .filter(Grant.donor_org_id == current_user.org_id)
+            .all())
+    counts = Counter((c[0] or 'Unknown') for c in rows)
+    out = [{'country': k, 'count': v}
+           for k, v in sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[:8]]
+    return jsonify({'countries': out, 'total': sum(counts.values())})
+
+
+@dashboard_bp.route('/ai-failure-rate', methods=['GET'])
+@login_required
+def api_dashboard_ai_failure_rate():
+    """Phase 376 — % of AI calls in the last 24 hours that failed
+    (success=False). Reliability signal for the operator dashboard.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import text as _text
+    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+    try:
+        row = db.session.execute(_text(
+            "SELECT COUNT(*) AS total, "
+            "SUM(CASE WHEN success = 0 OR success = false THEN 1 ELSE 0 END) AS failed "
+            "FROM ai_call_logs WHERE created_at >= :c"
+        ), {'c': cutoff}).first()
+        total = int(row.total or 0)
+        failed = int(row.failed or 0)
+    except Exception:
+        total = 0
+        failed = 0
+    if total == 0:
+        return jsonify({'window_hours': 24, 'total': 0, 'failed': 0,
+                        'failure_pct': None})
+    pct = round(100 * failed / total, 1)
+    return jsonify({
+        'window_hours': 24,
+        'total': total,
+        'failed': failed,
+        'failure_pct': pct,
+    })
+
+
 @dashboard_bp.route('/ngo-pipeline-value', methods=['GET'])
 @login_required
 def api_dashboard_ngo_pipeline_value():
@@ -2312,7 +2399,7 @@ def api_dashboard_ai_cost_per_app():
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     try:
         total_cost = db.session.execute(_text(
-            "SELECT COALESCE(SUM(cost_usd), 0) FROM ai_call_logs WHERE created_at >= :c"
+            "SELECT COALESCE(SUM(usd_cost), 0) FROM ai_call_logs WHERE created_at >= :c"
         ), {'c': cutoff}).scalar() or 0
         total_cost = float(total_cost)
     except Exception:
