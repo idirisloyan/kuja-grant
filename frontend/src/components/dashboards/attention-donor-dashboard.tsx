@@ -77,6 +77,7 @@ import { DeclinedThisMonthStat } from '@/components/dashboards/declined-this-mon
 import { AppsOpen60dStat } from '@/components/dashboards/apps-open-60d-stat';
 import { CriteriaTemplatesCountStat } from '@/components/dashboards/criteria-templates-count-stat';
 import { StarredCountStat } from '@/components/dashboards/starred-count-stat';
+import { EoiReceivedStat } from '@/components/dashboards/eoi-received-stat';
 import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
 import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
 import { PortfolioRiskHeatmap } from '@/components/dashboards/portfolio-risk-heatmap';
@@ -261,6 +262,7 @@ export function AttentionDonorDashboard() {
       <AppsOpen60dStat />
       <CriteriaTemplatesCountStat />
       <StarredCountStat />
+      <EoiReceivedStat />
 
       {/* Phase 99 — OneNumberCard portfolio at-a-glance row. Replaces the
           metric-soup pattern with three calm numbers + one next action

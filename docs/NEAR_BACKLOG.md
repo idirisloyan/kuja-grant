@@ -584,6 +584,20 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 565-569 — EOI counts (both sides) + private
+  notes 30d + stale trust profiles + NGO year-to-date recap cron:
+  (a) `<EoiCountStat>` on NGO dashboard counts ExpressionOfInterest
+  rows for the NGO's org — engagement signal.
+  (b) `<EoiReceivedStat>` on donor dashboard counts EOI rows across
+  the donor's grants — scalar header (distinct from Phase 349
+  per-grant rollup tile). (c) `<PrivateNotes30dStat>` on reviewer
+  reviews page counts Review rows with non-empty private_notes
+  updated in last 30d — calibration journal habit signal.
+  (d) `<StaleTrustProfilesStat>` on operator dashboard counts NGO
+  orgs with no Application activity in > 90d — dormancy/engagement
+  signal. (e) Phase 569 cron `/api/cron/ngo-ytd-recap` monthly NGO
+  YTD digest (submissions, funded, declined); honors digests opt-out.
+
 - **2026-06-21** Phase 559-563 — Submitted today + starred count +
   completed today + saved searches lifetime + donor decisions
   weekly mirror cron:

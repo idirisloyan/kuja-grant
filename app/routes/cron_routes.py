@@ -4450,3 +4450,88 @@ def api_cron_donor_decisions_week_mirror():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/ngo-ytd-recap', methods=['POST'])
+def api_cron_ngo_ytd_recap():
+    """Phase 569 — Monthly NGO year-to-date recap: submissions count,
+    funded count, declined count this calendar year. Honors digests
+    opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Application, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from collections import defaultdict
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        rows = (db.session.query(Application.ngo_org_id, Application.status)
+                .filter(Application.submitted_at.isnot(None),
+                        Application.submitted_at >= year_start,
+                        Application.ngo_org_id.isnot(None))
+                .all())
+        by_org = defaultdict(lambda: {'submissions': 0, 'funded': 0, 'declined': 0})
+        for org_id, status in rows:
+            by_org[org_id]['submissions'] += 1
+            if status in ('funded', 'awarded'):
+                by_org[org_id]['funded'] += 1
+            elif status == 'declined':
+                by_org[org_id]['declined'] += 1
+        sent = 0
+        if by_org:
+            ngo_users = (User.query
+                         .filter(User.role == 'ngo',
+                                 User.org_id.in_(list(by_org.keys())))
+                         .all())
+            for u in ngo_users:
+                stats = by_org.get(u.org_id)
+                if not stats or stats['submissions'] == 0:
+                    continue
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                msg = (
+                    f'Year-to-date: {stats["submissions"]} submissions, '
+                    f'{stats["funded"]} funded, {stats["declined"]} declined.'
+                )
+                n = Notification(
+                    user_id=u.id,
+                    type='ngo_ytd_recap',
+                    title='Your year-to-date recap',
+                    message=msg[:500],
+                    link='/dashboard',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {'orgs_active': len(by_org), 'notified': sent}
+        _rcr('ngo-ytd-recap',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ngo-ytd-recap cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ngo-ytd-recap',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

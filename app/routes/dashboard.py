@@ -5517,3 +5517,78 @@ def api_dashboard_admin_saved_searches_lifetime():
     from app.models.saved_search import SavedSearch
     count = SavedSearch.query.count()
     return jsonify({'count': count})
+
+
+@dashboard_bp.route('/ngo-eoi-count', methods=['GET'])
+@login_required
+def api_dashboard_ngo_eoi_count():
+    """Phase 565 — Count of ExpressionOfInterest rows for current
+    NGO's org. Shows how active the org has been signalling intent.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.expression_of_interest import ExpressionOfInterest
+    count = (ExpressionOfInterest.query
+             .filter(ExpressionOfInterest.org_id == current_user.org_id)
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/donor-eoi-received', methods=['GET'])
+@login_required
+def api_dashboard_donor_eoi_received():
+    """Phase 566 — Total ExpressionOfInterest rows across donor's
+    grants. Scalar header (distinct from Phase 349 which is a
+    per-grant rollup tile).
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.expression_of_interest import ExpressionOfInterest
+    count = (db.session.query(ExpressionOfInterest.id)
+             .join(Grant, ExpressionOfInterest.grant_id == Grant.id)
+             .filter(Grant.donor_org_id == current_user.org_id)
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/reviewer-private-notes-30d', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_private_notes_30d():
+    """Phase 567 — Count of reviewer's reviews with non-empty
+    private_notes updated in last 30 days. Tracks the calibration
+    journal habit.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    count = (Review.query
+             .filter(Review.reviewer_user_id == current_user.id,
+                     Review.updated_at >= cutoff,
+                     Review.private_notes.isnot(None),
+                     Review.private_notes != '')
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/admin-stale-trust-profiles', methods=['GET'])
+@login_required
+def api_dashboard_admin_stale_trust_profiles():
+    """Phase 568 — Count of NGO Organizations whose most recent
+    Application activity is older than 90 days. Engagement / dormancy
+    signal at the platform level.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import func, not_, exists
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    recent_sub = db.session.query(Application.ngo_org_id).filter(
+        Application.ngo_org_id == Organization.id,
+        Application.updated_at >= cutoff,
+    )
+    count = (Organization.query
+             .filter(Organization.org_type == 'ngo',
+                     not_(recent_sub.exists()))
+             .count())
+    return jsonify({'count': count})
