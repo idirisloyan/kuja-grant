@@ -321,6 +321,15 @@ def create_app(config_name=None):
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_resolved_at TIMESTAMP'),
                 ('appeal_resolution',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_resolution VARCHAR(20)'),
+                ('appeal_resolution_text',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_resolution_text TEXT'),
+                ('appeal_resolved_by_user_id',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_resolved_by_user_id INTEGER'),
+                # Phase 40 — NEAR network grant columns.
+                ('ai_rubric_result_json',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_rubric_result_json TEXT'),
+                ('budget_lines_json',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS budget_lines_json TEXT'),
             ]
             for col_name, ddl in per_column_alters:
                 if col_name in app_cols:
