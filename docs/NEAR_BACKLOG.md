@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 577-581 — Most active grant + EOI conversion
+  rate + highest review score + active grants total + assessments
+  weekly digest cron:
+  (a) `<MostActiveGrantStat>` on NGO dashboard shows the grant the
+  NGO has applied to most often with count × title (self-gates
+  when count < 2). (b) `<EoiConversionStat>` on donor dashboard
+  reports % of EOI rows on donor's grants where the NGO actually
+  followed through with an Application — funnel signal.
+  (c) `<HighestScoreStat>` on reviewer reviews page shows reviewer's
+  top overall_score across last 90d with the application id
+  (emerald celebration tone). (d) `<ActiveGrantsTotalStat>` on
+  operator dashboard counts Grants in 'open'/'review' status —
+  currently-live opportunities. (e) Phase 581 cron
+  `/api/cron/assessments-week-digest` weekly admin digest of
+  Assessment rows completed in last 7d; honors digests opt-out.
+
 - **2026-06-21** Phase 571-575 — Revision requested + shortlist
   conversion + scoring time variance + monitoring visits quarter
   + admin snoozes-ending-7d cron:

@@ -4606,3 +4606,72 @@ def api_cron_snoozes_ending_7d_admin():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/assessments-week-digest', methods=['POST'])
+def api_cron_assessments_week_digest():
+    """Phase 581 — Weekly admin digest of Assessment rows completed in
+    the last 7 days. Capacity assessment activity pulse. Honors
+    digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Assessment, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        count = (Assessment.query
+                 .filter(Assessment.completed_at.isnot(None),
+                         Assessment.completed_at >= cutoff)
+                 .count())
+        sent = 0
+        if count > 0:
+            msg = (
+                f'{count} capacity assessment{"s" if count != 1 else ""} '
+                f'completed in the last 7 days.'
+            )
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='assessments_week_digest',
+                    title='Assessments this week',
+                    message=msg[:500],
+                    link='/admin/observability',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {'assessments_completed': count, 'admins_notified': sent}
+        _rcr('assessments-week-digest',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('assessments-week-digest cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('assessments-week-digest',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

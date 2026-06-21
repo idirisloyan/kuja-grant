@@ -82,6 +82,7 @@ import { AuditEntriesTodayStat } from '@/components/dashboards/audit-entries-tod
 import { SavedSearchesLifetimeStat } from '@/components/dashboards/saved-searches-lifetime-stat';
 import { StaleTrustProfilesStat } from '@/components/dashboards/stale-trust-profiles-stat';
 import { MonitoringVisitsQuarterStat } from '@/components/dashboards/monitoring-visits-quarter-stat';
+import { ActiveGrantsTotalStat } from '@/components/dashboards/active-grants-total-stat';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -374,6 +375,7 @@ export function AttentionOperatorDashboard() {
         <SavedSearchesLifetimeStat />
         <StaleTrustProfilesStat />
         <MonitoringVisitsQuarterStat />
+        <ActiveGrantsTotalStat />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

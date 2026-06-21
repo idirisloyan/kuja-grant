@@ -5687,3 +5687,96 @@ def api_dashboard_admin_monitoring_visits_quarter():
                      MonitoringVisit.visit_date < q_end)
              .count())
     return jsonify({'count': count})
+
+
+@dashboard_bp.route('/ngo-most-active-grant', methods=['GET'])
+@login_required
+def api_dashboard_ngo_most_active_grant():
+    """Phase 577 — For the NGO's org, find the grant they've applied
+    to most often. Returns count + grant title.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from sqlalchemy import func
+    row = (db.session.query(Application.grant_id, func.count(Application.id))
+           .filter(Application.ngo_org_id == current_user.org_id)
+           .group_by(Application.grant_id)
+           .order_by(func.count(Application.id).desc())
+           .first())
+    if not row or row[1] < 2:
+        return jsonify({'count': 0})
+    grant_id, count = row
+    grant = Grant.query.get(grant_id)
+    return jsonify({
+        'count': count,
+        'grant_id': grant_id,
+        'grant_title': grant.title if grant else None,
+    })
+
+
+@dashboard_bp.route('/donor-eoi-conversion-rate', methods=['GET'])
+@login_required
+def api_dashboard_donor_eoi_conversion_rate():
+    """Phase 578 — % of ExpressionOfInterest rows on the donor's
+    grants whose (org_id, grant_id) also has an Application. Funnel
+    conversion signal.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.expression_of_interest import ExpressionOfInterest
+    eois = (db.session.query(ExpressionOfInterest.org_id, ExpressionOfInterest.grant_id)
+            .join(Grant, ExpressionOfInterest.grant_id == Grant.id)
+            .filter(Grant.donor_org_id == current_user.org_id)
+            .all())
+    total = len(eois)
+    if total == 0:
+        return jsonify({'rate': None, 'sample': 0})
+    converted = 0
+    for org_id, grant_id in eois:
+        applied = db.session.query(Application.id).filter(
+            Application.ngo_org_id == org_id,
+            Application.grant_id == grant_id,
+        ).first()
+        if applied:
+            converted += 1
+    rate = round(100 * converted / total, 1)
+    return jsonify({'rate': rate, 'sample': total, 'converted': converted})
+
+
+@dashboard_bp.route('/reviewer-highest-score', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_highest_score():
+    """Phase 579 — Max overall_score across reviewer's last-90d
+    completed reviews. Personal best across the recent window.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    row = (Review.query
+           .filter(Review.reviewer_user_id == current_user.id,
+                   Review.status == 'completed',
+                   Review.completed_at >= cutoff,
+                   Review.overall_score.isnot(None))
+           .order_by(Review.overall_score.desc())
+           .first())
+    if not row:
+        return jsonify({'score': None})
+    return jsonify({
+        'score': row.overall_score,
+        'application_id': row.application_id,
+    })
+
+
+@dashboard_bp.route('/admin-active-grants-total', methods=['GET'])
+@login_required
+def api_dashboard_admin_active_grants_total():
+    """Phase 580 — Count of Grant rows in status 'open' or 'review'.
+    Platform pulse on currently-live opportunities.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    count = (Grant.query
+             .filter(Grant.status.in_(['open', 'review']))
+             .count())
+    return jsonify({'count': count})

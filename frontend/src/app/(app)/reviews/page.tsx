@@ -37,6 +37,7 @@ import { ReviewVarietyStat } from '@/components/reviews/review-variety-stat';
 import { CompletedTodayStat } from '@/components/reviews/completed-today-stat';
 import { PrivateNotes30dStat } from '@/components/reviews/private-notes-30d-stat';
 import { ScoringTimeVarianceStat } from '@/components/reviews/scoring-time-variance-stat';
+import { HighestScoreStat } from '@/components/reviews/highest-score-stat';
 import { ReviewerResumeBanner } from '@/components/reviews/resume-banner';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -182,6 +183,7 @@ function ReviewerView() {
       <CompletedTodayStat />
       <PrivateNotes30dStat />
       <ScoringTimeVarianceStat />
+      <HighestScoreStat />
       <MyCompletedThisWeek />
       <BandStreakTip />
       <ScoreDistributionCard />
