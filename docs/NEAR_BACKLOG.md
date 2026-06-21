@@ -584,6 +584,24 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 331-335 — Exports + trends + onboarding clarity:
+  (a) NGO bulk CSV: new `GET /api/applications/my-applications.csv`
+  streams every app from the org (id, grant, status, scores,
+  decision reason). "Download CSV" button on /applications for
+  NGO viewers. (b) `<DecisionsByMonthCard>` on donor dashboard:
+  6-month stacked-bar mini chart of funded vs declined decisions
+  per month. Backend `GET /api/dashboard/decisions-by-month`.
+  (c) `<ReviewerScoreboardCard>` on operator dashboard: per-
+  reviewer rollup (total / completed / completion % / mean
+  score), sorted ascending so worst performers surface first.
+  Backend `GET /api/dashboard/reviewer-scoreboard`. (d) New
+  `KpiSnapshot` model + `POST /api/cron/weekly-kpi-snapshot`:
+  writes one row per ISO week (Monday) with applications
+  received, decided, avg decision days, AI cost. Idempotent.
+  (e) Submission confirmation page now shows a 3-step "What
+  happens next" panel — reviewer assignment, score notification,
+  donor decision timeline — instead of just the toast.
+
 - **2026-06-20** Phase 325-329 — Notification quality + reviewer
   ergonomics + portfolio recap:
   (a) `<NotificationVolumeCard>` on operator dashboard surfaces

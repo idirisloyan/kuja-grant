@@ -40,6 +40,7 @@ import { DataIntegrityCard } from '@/components/dashboards/data-integrity-card';
 import { AppealStatsCard } from '@/components/dashboards/appeal-stats-card';
 import { AiCostForecastCard } from '@/components/dashboards/ai-cost-forecast-card';
 import { NotificationVolumeCard } from '@/components/dashboards/notification-volume-card';
+import { ReviewerScoreboardCard } from '@/components/dashboards/reviewer-scoreboard-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -284,6 +285,8 @@ export function AttentionOperatorDashboard() {
         <AiCostForecastCard />
         {/* Phase 325 — top 5 noisiest notification recipients (7d). */}
         <NotificationVolumeCard />
+        {/* Phase 333 — per-reviewer scoreboard, completion % ascending. */}
+        <ReviewerScoreboardCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

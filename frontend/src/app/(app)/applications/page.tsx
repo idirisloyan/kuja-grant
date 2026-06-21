@@ -133,6 +133,14 @@ export default function ApplicationsPage() {
         subtitle={`${applications.length} application${applications.length !== 1 ? 's' : ''}`}
         primaryAction={
           <div className="flex items-center gap-2 flex-wrap">
+            {viewer?.role === 'ngo' && (
+              <a
+                href="/api/applications/my-applications.csv"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-border hover:bg-muted"
+              >
+                Download CSV
+              </a>
+            )}
             {canSeeKanban && (
               <div className="inline-flex rounded-md border border-border overflow-hidden">
                 <button

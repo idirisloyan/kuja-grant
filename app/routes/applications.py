@@ -1343,6 +1343,48 @@ def api_application_feedback_viewed(app_id):
     })
 
 
+@applications_bp.route('/my-applications.csv', methods=['GET'])
+@login_required
+def api_application_my_apps_csv():
+    """Phase 331 — NGO downloads CSV of every application from their org.
+
+    Columns: id, grant_title, status, submitted_at, ai_score, human_score,
+             decision_reason_code, decision_recorded_at.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+    import csv as _csv
+    import io as _io
+    from flask import Response
+    apps = (Application.query
+            .filter_by(ngo_org_id=current_user.org_id)
+            .order_by(Application.created_at.desc())
+            .all())
+    buf = _io.StringIO()
+    w = _csv.writer(buf)
+    w.writerow([
+        'application_id', 'grant_title', 'status', 'submitted_at',
+        'ai_score', 'human_score',
+        'decision_reason_code', 'decision_recorded_at',
+    ])
+    for a in apps:
+        w.writerow([
+            a.id,
+            (a.grant.title if a.grant else '') or '',
+            a.status or '',
+            a.submitted_at.isoformat() if a.submitted_at else '',
+            '' if a.ai_score is None else round(float(a.ai_score), 2),
+            '' if a.human_score is None else round(float(a.human_score), 2),
+            a.decision_reason_code or '',
+            a.decision_recorded_at.isoformat() if a.decision_recorded_at else '',
+        ])
+    return Response(
+        buf.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename="my-applications.csv"'},
+    )
+
+
 @applications_bp.route('/appeals', methods=['GET'])
 @login_required
 def api_application_appeals_queue():

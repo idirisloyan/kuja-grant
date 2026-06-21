@@ -777,6 +777,15 @@ export default function ApplyWizardClient() {
             </div>
           </div>
         )}
+        {/* Phase 335 — concrete next steps so the NGO knows what to expect. */}
+        <div className="mt-5 mx-auto max-w-md text-left rounded-md border border-border bg-muted/30 p-3 text-xs space-y-1.5">
+          <p className="font-semibold text-foreground">What happens next:</p>
+          <ol className="list-decimal ml-4 space-y-1 text-muted-foreground">
+            <li>Reviewers are assigned within a few days.</li>
+            <li>You&rsquo;ll get an in-app notification when scoring completes.</li>
+            <li>Final donor decision typically lands within 2&ndash;4 weeks of submission. Watch your inbox and the application detail page for updates.</li>
+          </ol>
+        </div>
         <div className="mt-5 flex justify-center gap-2">
           <button
             onClick={() => router.push('/applications')}

@@ -989,6 +989,46 @@ def api_dashboard_donor_appeal_sla():
     })
 
 
+@dashboard_bp.route('/decisions-by-month', methods=['GET'])
+@login_required
+def api_dashboard_decisions_by_month():
+    """Phase 332 — Donor decisions per month for last 6 months.
+
+    Returns funded / declined / total per month so the donor can spot
+    momentum or backlogs. Self-gates client-side when total is zero.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
+    now = datetime.now(timezone.utc)
+    six_months_ago = now - timedelta(days=180)
+    apps = (Application.query
+            .join(Grant)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.decision_recorded_at.isnot(None),
+                    Application.decision_recorded_at >= six_months_ago)
+            .all())
+    by_month: dict[str, dict[str, int]] = defaultdict(lambda: {'funded': 0, 'declined': 0})
+    for a in apps:
+        if not a.decision_recorded_at:
+            continue
+        key = a.decision_recorded_at.strftime('%Y-%m')
+        if a.status in ('funded', 'awarded'):
+            by_month[key]['funded'] += 1
+        elif a.status in ('declined', 'rejected'):
+            by_month[key]['declined'] += 1
+    months = sorted(by_month.keys())
+    return jsonify({
+        'months': [{
+            'month': m,
+            'funded': by_month[m]['funded'],
+            'declined': by_month[m]['declined'],
+            'total': by_month[m]['funded'] + by_month[m]['declined'],
+        } for m in months],
+    })
+
+
 @dashboard_bp.route('/reviewer-turnaround', methods=['GET'])
 @login_required
 def api_dashboard_reviewer_turnaround():
@@ -1032,6 +1072,49 @@ def api_dashboard_reviewer_turnaround():
         })
     out.sort(key=lambda r: r['avg_days'], reverse=True)
     return jsonify({'slowest': out[:5], 'window_days': 90})
+
+
+@dashboard_bp.route('/reviewer-scoreboard', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_scoreboard():
+    """Phase 333 — Per-reviewer rollup. Admin-only.
+
+    For each reviewer: total assigned, completed, completion %, mean
+    human score. Sorted by completion % ascending so the most-behind
+    reviewers surface first.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from collections import defaultdict
+    from app.models import Review, User
+    rows = Review.query.all()
+    by_reviewer: dict[int, dict] = defaultdict(lambda: {'total': 0, 'completed': 0, 'scores': []})
+    for r in rows:
+        slot = by_reviewer[r.reviewer_user_id]
+        slot['total'] += 1
+        if r.status == 'completed':
+            slot['completed'] += 1
+        if r.overall_score is not None:
+            slot['scores'].append(float(r.overall_score))
+    ids = list(by_reviewer.keys())
+    name_by_id = {u.id: u.name for u in User.query.filter(User.id.in_(ids)).all()}
+    email_by_id = {u.id: u.email for u in User.query.filter(User.id.in_(ids)).all()}
+    out = []
+    for rid, s in by_reviewer.items():
+        if s['total'] == 0:
+            continue
+        completion_pct = round(100 * s['completed'] / s['total'], 1)
+        mean_score = round(sum(s['scores']) / len(s['scores']), 1) if s['scores'] else None
+        out.append({
+            'reviewer_user_id': rid,
+            'name': name_by_id.get(rid) or email_by_id.get(rid) or f'Reviewer {rid}',
+            'total': s['total'],
+            'completed': s['completed'],
+            'completion_pct': completion_pct,
+            'mean_score': mean_score,
+        })
+    out.sort(key=lambda r: r['completion_pct'])
+    return jsonify({'reviewers': out})
 
 
 @dashboard_bp.route('/notification-volume', methods=['GET'])

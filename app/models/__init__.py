@@ -66,6 +66,7 @@ from app.models.webhook import Webhook
 from app.models.webhook_delivery import WebhookDelivery
 from app.models.cron_run import CronRun, record_cron_run
 from app.models.criteria_template import CriteriaTemplate
+from app.models.kpi_snapshot import KpiSnapshot
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',

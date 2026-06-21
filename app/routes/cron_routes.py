@@ -632,6 +632,101 @@ def api_cron_donor_digest():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/weekly-kpi-snapshot', methods=['POST'])
+def api_cron_weekly_kpi_snapshot():
+    """Phase 334 — Snapshot system KPIs for the week just ended.
+
+    Writes one row into kpi_snapshots keyed by week_starting (Monday).
+    Idempotent — re-running for the same week updates that row.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            Application, KpiSnapshot, record_cron_run as _rcr,
+        )
+        from sqlalchemy import text as _text
+        from datetime import datetime, timezone, timedelta, date as _date
+
+        now = datetime.now(timezone.utc)
+        # Monday of THIS week as the bucket key.
+        monday = (now - timedelta(days=now.weekday())).date()
+        last_monday = monday - timedelta(days=7)
+        next_monday = monday  # exclusive upper bound for last week
+
+        # Counts over [last_monday, monday).
+        received = Application.query.filter(
+            Application.created_at >= datetime.combine(last_monday, datetime.min.time()).replace(tzinfo=timezone.utc),
+            Application.created_at < datetime.combine(next_monday, datetime.min.time()).replace(tzinfo=timezone.utc),
+        ).count()
+        decided_apps = Application.query.filter(
+            Application.decision_recorded_at >= datetime.combine(last_monday, datetime.min.time()).replace(tzinfo=timezone.utc),
+            Application.decision_recorded_at < datetime.combine(next_monday, datetime.min.time()).replace(tzinfo=timezone.utc),
+        ).all() if hasattr(Application, 'decision_recorded_at') else []
+        decided = len(decided_apps)
+        days = []
+        for a in decided_apps:
+            if a.submitted_at and a.decision_recorded_at:
+                d = (a.decision_recorded_at - a.submitted_at).total_seconds() / 86400.0
+                if d >= 0:
+                    days.append(d)
+        avg_days = round(sum(days) / len(days), 1) if days else None
+
+        try:
+            ai_cost = db.session.execute(_text(
+                "SELECT COALESCE(SUM(cost_usd), 0) FROM ai_call_logs WHERE created_at >= :a AND created_at < :b"
+            ), {'a': last_monday, 'b': next_monday}).scalar() or 0
+            ai_cost = float(ai_cost)
+        except Exception:
+            ai_cost = 0.0
+
+        existing = KpiSnapshot.query.filter_by(week_starting=last_monday).first()
+        if existing:
+            existing.applications_received = received
+            existing.applications_decided = decided
+            existing.avg_decision_days = avg_days
+            existing.ai_cost_usd = ai_cost
+        else:
+            row = KpiSnapshot(
+                week_starting=last_monday,
+                applications_received=received,
+                applications_decided=decided,
+                avg_decision_days=avg_days,
+                ai_cost_usd=ai_cost,
+            )
+            db.session.add(row)
+        db.session.commit()
+        result = {
+            'week_starting': last_monday.isoformat(),
+            'applications_received': received,
+            'applications_decided': decided,
+            'avg_decision_days': avg_days,
+            'ai_cost_usd': round(ai_cost, 2),
+        }
+        _rcr('weekly-kpi-snapshot',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('weekly-kpi-snapshot cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('weekly-kpi-snapshot',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/donor-portfolio-recap', methods=['POST'])
 def api_cron_donor_portfolio_recap():
     """Phase 329 — Weekly portfolio recap per donor user.
