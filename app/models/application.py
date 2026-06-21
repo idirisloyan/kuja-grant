@@ -62,6 +62,12 @@ class Application(db.Model):
     # request a re-review; admin + donor see it as a follow-up obligation.
     appeal_requested_at = db.Column(db.DateTime, nullable=True)
     appeal_reason_text = db.Column(db.Text, nullable=True)
+    # Phase 308 — donor resolves the appeal: 'approved' reopens to
+    # under_review; 'declined' just closes the loop with a reason.
+    appeal_resolved_at = db.Column(db.DateTime, nullable=True)
+    appeal_resolution = db.Column(db.String(20), nullable=True)  # 'approved' | 'declined'
+    appeal_resolution_text = db.Column(db.Text, nullable=True)
+    appeal_resolved_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
     # Phase 40 — NEAR network grants only. Auto-populated on /submit when
     # grant.fund_window_id is set:
@@ -127,6 +133,10 @@ class Application(db.Model):
             'outreach_message_text': self.outreach_message_text,
             'appeal_requested_at': self.appeal_requested_at.isoformat() if self.appeal_requested_at else None,
             'appeal_reason_text': self.appeal_reason_text,
+            'appeal_resolved_at': self.appeal_resolved_at.isoformat() if self.appeal_resolved_at else None,
+            'appeal_resolution': self.appeal_resolution,
+            'appeal_resolution_text': self.appeal_resolution_text,
+            'appeal_resolved_by_user_id': self.appeal_resolved_by_user_id,
             'is_starred': bool(self.is_starred),
         }
         if not summary:

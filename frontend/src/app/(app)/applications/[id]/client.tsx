@@ -332,6 +332,10 @@ export default function ApplicationDetailClient() {
           status={application.status}
           appealRequestedAt={(application as { appeal_requested_at?: string | null }).appeal_requested_at ?? null}
           appealReasonText={(application as { appeal_reason_text?: string | null }).appeal_reason_text ?? null}
+          appealResolvedAt={(application as { appeal_resolved_at?: string | null }).appeal_resolved_at ?? null}
+          appealResolution={(application as { appeal_resolution?: string | null }).appeal_resolution ?? null}
+          appealResolutionText={(application as { appeal_resolution_text?: string | null }).appeal_resolution_text ?? null}
+          viewerRole={viewer?.role}
         />
 
         {/* 3. Main work — tabs */}

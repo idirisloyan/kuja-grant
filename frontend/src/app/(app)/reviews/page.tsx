@@ -133,6 +133,9 @@ function ReviewerView() {
       {/* Phase 303 — self-calibration coaching tip (only if > 1.0σ off). */}
       <MyCalibrationTip />
 
+      {/* Phase 311 — last 12 scores sparkline. Self-gates < 5. */}
+      <MyScoreSparkline />
+
       {/* Phase 244 — most recent completed reviews. Self-gates when none. */}
       <MyPastReviews />
 
@@ -504,6 +507,53 @@ function EmptyState({ icon: Icon, title, body }: { icon: typeof ClipboardCheck; 
       <Icon className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
       <p className="kuja-display text-xl">{title}</p>
       <p className="text-sm text-muted-foreground mt-1">{body}</p>
+    </div>
+  );
+}
+
+// Phase 311 — Last 12 completed-review scores rendered as a tiny SVG
+// sparkline. Self-gates when count < 5.
+function MyScoreSparkline() {
+  const [data, setData] = useState<{
+    scores: Array<{ score: number; completed_at: string | null }>;
+    total_completed: number;
+  } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.get<typeof data>('/api/reviews/my-score-history').then((r) => {
+      if (!cancelled) setData(r);
+    }).catch(() => {/* silent */});
+    return () => { cancelled = true; };
+  }, []);
+  if (!data || data.total_completed < 5) return null;
+  const vals = data.scores.map((s) => s.score);
+  const min = Math.min(...vals, 0);
+  const max = Math.max(...vals, 100);
+  const w = 200; const h = 28; const pad = 2;
+  const stepX = (w - 2 * pad) / Math.max(1, vals.length - 1);
+  const pts = vals.map((v, i) => {
+    const x = pad + i * stepX;
+    const y = h - pad - ((v - min) / Math.max(1, max - min)) * (h - 2 * pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const last = vals[vals.length - 1];
+  const first = vals[0];
+  const delta = Math.round((last - first) * 10) / 10;
+  const tone = delta > 0 ? 'text-emerald-700' : delta < 0 ? 'text-rose-700' : 'text-muted-foreground';
+  return (
+    <div className="rounded-md border border-border bg-card p-3 text-xs flex items-center justify-between gap-3">
+      <span className="text-muted-foreground">Your last {vals.length} scores</span>
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="text-[hsl(var(--kuja-clay))]">
+        <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        {vals.map((v, i) => {
+          const x = pad + i * stepX;
+          const y = h - pad - ((v - min) / Math.max(1, max - min)) * (h - 2 * pad);
+          return <circle key={i} cx={x} cy={y} r={1.5} fill="currentColor" />;
+        })}
+      </svg>
+      <span className={`tabular-nums ${tone}`}>
+        {delta > 0 ? '+' : ''}{delta}
+      </span>
     </div>
   );
 }

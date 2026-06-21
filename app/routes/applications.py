@@ -1343,6 +1343,118 @@ def api_application_feedback_viewed(app_id):
     })
 
 
+@applications_bp.route('/appeals', methods=['GET'])
+@login_required
+def api_application_appeals_queue():
+    """Phase 307 — Pending appeals across the network. Admin-only.
+
+    Returns oldest-first list with applicant, donor, reason excerpt, days
+    pending. Resolved appeals are excluded.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+    from datetime import datetime, timezone
+    rows = (Application.query
+            .filter(Application.appeal_requested_at.isnot(None),
+                    Application.appeal_resolved_at.is_(None))
+            .order_by(Application.appeal_requested_at.asc())
+            .all())
+    now = datetime.now(timezone.utc)
+    out = []
+    for a in rows:
+        days_pending = int((now - a.appeal_requested_at).total_seconds() / 86400) if a.appeal_requested_at else None
+        out.append({
+            'application_id': a.id,
+            'ngo_org_name': a.ngo_org.name if a.ngo_org else None,
+            'grant_title': a.grant.title if a.grant else None,
+            'donor_org_id': a.grant.donor_org_id if a.grant else None,
+            'appeal_requested_at': a.appeal_requested_at.isoformat() if a.appeal_requested_at else None,
+            'days_pending': days_pending,
+            'reason_excerpt': (a.appeal_reason_text or '')[:200],
+        })
+    return jsonify({'appeals': out, 'total': len(out)})
+
+
+@applications_bp.route('/<int:app_id>/appeal/resolve', methods=['POST'])
+@login_required
+def api_application_appeal_resolve(app_id):
+    """Phase 308 — Donor (or admin) resolves a pending appeal.
+
+    Body: { resolution: 'approved'|'declined', text?: str (max 2000) }
+    Approved: status flips to 'under_review' so reviewers can rescore.
+    Declined: status stays as declined, but appeal_resolved_at + reason
+    are stamped so the NGO sees the loop closed.
+    Records to the hash-chained audit log. Notifies every NGO user on
+    the applicant org.
+    """
+    from app.services.audit import log_action
+    from app.models.audit_chain import AuditChainEntry
+    app_obj = db.session.get(Application, app_id)
+    if not app_obj:
+        return jsonify({'error': 'Application not found'}), 404
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'Access denied'}), 403
+    if current_user.role == 'donor' and app_obj.grant and app_obj.grant.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+    if not app_obj.appeal_requested_at:
+        return jsonify({'error': 'No pending appeal'}), 400
+    if app_obj.appeal_resolved_at:
+        return jsonify({'error': 'Appeal already resolved'}), 400
+
+    data = get_request_json() or {}
+    resolution = (data.get('resolution') or '').strip()
+    text_resp = (data.get('text') or '').strip()[:2000]
+    if resolution not in ('approved', 'declined'):
+        return jsonify({'error': 'resolution must be approved or declined'}), 400
+
+    app_obj.appeal_resolved_at = datetime.now(timezone.utc)
+    app_obj.appeal_resolution = resolution
+    app_obj.appeal_resolution_text = text_resp or None
+    app_obj.appeal_resolved_by_user_id = current_user.id
+    if resolution == 'approved':
+        app_obj.status = 'under_review'
+
+    log_action('application.appeal_resolved', current_user.email,
+               'application', app_obj.id,
+               {'resolution': resolution, 'text_excerpt': text_resp[:200]})
+    AuditChainEntry.append(
+        action='application.appeal_resolved',
+        actor_email=current_user.email,
+        subject_kind='application',
+        subject_id=app_obj.id,
+        details={'resolution': resolution, 'text_excerpt': text_resp[:200]},
+    )
+
+    try:
+        from app.models import Notification, User
+        ngos = User.query.filter_by(org_id=app_obj.ngo_org_id, role='ngo').all()
+        title = 'Appeal approved' if resolution == 'approved' else 'Appeal declined'
+        msg = (
+            f'Your re-review request on application #{app_obj.id} was {resolution}. '
+            + (text_resp[:200] if text_resp else '')
+        ).strip()
+        for u in ngos:
+            n = Notification(
+                user_id=u.id,
+                type='application_appeal_resolved',
+                title=title,
+                message=msg[:500],
+                link=f'/applications/{app_obj.id}',
+            )
+            db.session.add(n)
+    except Exception as e:
+        logger.debug('appeal-resolve notify skipped: %s', e)
+
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'appeal_resolved_at': app_obj.appeal_resolved_at.isoformat(),
+        'appeal_resolution': app_obj.appeal_resolution,
+        'appeal_resolution_text': app_obj.appeal_resolution_text,
+        'status': app_obj.status,
+    })
+
+
 @applications_bp.route('/<int:app_id>/appeal', methods=['POST'])
 @login_required
 def api_application_appeal(app_id):

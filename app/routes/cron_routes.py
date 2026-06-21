@@ -632,6 +632,86 @@ def api_cron_donor_digest():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/trust-profile-nudge', methods=['POST'])
+def api_cron_trust_profile_nudge():
+    """Phase 310 — Monthly nudge for NGO orgs without a published Capacity Passport.
+
+    For each NGO user whose org has no active CapacityPassport AND who
+    has not been nudged in the last 30 days, drop a friendly inbox
+    notification reminding them to publish to strengthen future
+    applications.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Notification, record_cron_run as _rcr,
+        )
+        from app.models.capacity_passport import CapacityPassport
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(days=30)
+
+        ngos = User.query.filter_by(role='ngo').all()
+        sent = 0
+        for u in ngos:
+            if not u.org_id:
+                continue
+            # Skip orgs that already have an active passport.
+            active = (CapacityPassport.query
+                      .filter(CapacityPassport.org_id == u.org_id,
+                              CapacityPassport.status == 'active')
+                      .first())
+            if active is not None:
+                continue
+            # Skip users we've nudged in the last 30 days.
+            recent = (Notification.query
+                      .filter(Notification.user_id == u.id,
+                              Notification.type == 'trust_profile_nudge',
+                              Notification.created_at >= cutoff)
+                      .first())
+            if recent is not None:
+                continue
+            n = Notification(
+                user_id=u.id,
+                type='trust_profile_nudge',
+                title='Publish a Trust Profile',
+                message=(
+                    'Donors give stronger weight to applications backed by a '
+                    'published Capacity Passport. Take 10 minutes to publish '
+                    'one — it strengthens every future submission.'
+                ),
+                link='/trust',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'ngos_scanned': len(ngos), 'nudges_sent': sent}
+        _rcr('trust-profile-nudge',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('trust-profile-nudge cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('trust-profile-nudge',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/ngo-pipeline-digest', methods=['POST'])
 def api_cron_ngo_pipeline_digest():
     """Phase 304 — Weekly digest for each NGO user.

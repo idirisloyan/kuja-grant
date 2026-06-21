@@ -477,6 +477,32 @@ def api_decline_review(review_id):
     return jsonify({'success': True})
 
 
+@reviews_bp.route('/my-score-history', methods=['GET'])
+@login_required
+@role_required('reviewer')
+def api_reviewer_my_score_history():
+    """Phase 311 — Last 12 completed-review scores in chronological order.
+
+    Used to draw a small sparkline on the reviewer queue page so the
+    reviewer can see whether they're drifting up or down over time.
+    """
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status == 'completed',
+                    Review.overall_score.isnot(None),
+                    Review.completed_at.isnot(None))
+            .order_by(Review.completed_at.asc())
+            .all())
+    rows = rows[-12:]
+    return jsonify({
+        'scores': [{
+            'score': round(r.overall_score, 1),
+            'completed_at': r.completed_at.isoformat() if r.completed_at else None,
+        } for r in rows],
+        'total_completed': len(rows),
+    })
+
+
 @reviews_bp.route('/my-calibration', methods=['GET'])
 @login_required
 @role_required('reviewer')

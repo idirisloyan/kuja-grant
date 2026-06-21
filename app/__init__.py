@@ -416,6 +416,20 @@ def create_app(config_name=None):
                     conn.execute(text("ALTER TABLE applications ADD COLUMN appeal_reason_text TEXT"))
                     added.append('applications.appeal_reason_text')
 
+                # Phase 308 — donor resolves the appeal.
+                if 'appeal_resolved_at' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN appeal_resolved_at TIMESTAMP"))
+                    added.append('applications.appeal_resolved_at')
+                if 'appeal_resolution' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN appeal_resolution VARCHAR(20)"))
+                    added.append('applications.appeal_resolution')
+                if 'appeal_resolution_text' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN appeal_resolution_text TEXT"))
+                    added.append('applications.appeal_resolution_text')
+                if 'appeal_resolved_by_user_id' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN appeal_resolved_by_user_id INTEGER"))
+                    added.append('applications.appeal_resolved_by_user_id')
+
                 # Phase 221 — reviewer private notes.
                 rev_cols = {c['name'] for c in inspector.get_columns('reviews')} if 'reviews' in inspector.get_table_names() else set()
                 if rev_cols and 'private_notes' not in rev_cols:

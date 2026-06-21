@@ -584,6 +584,24 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 307-311 — Appeal loop closure + trust + sparkline:
+  (a) New /admin/appeals queue page lists every application with
+  `appeal_requested_at` set + no resolution. Backend
+  `GET /api/applications/appeals` (admin-only). (b) Donor / admin can
+  resolve an appeal: `POST /api/applications/<id>/appeal/resolve`
+  accepts `{ resolution: 'approved' | 'declined', text }`, stamps
+  `appeal_resolved_at + resolution + resolution_text + resolved_by`,
+  writes to the hash-chained audit log, notifies the NGO. Approving
+  flips status back to `under_review`. (c) `<AppealPanel>` extended:
+  three-state render — pre-appeal / pending (with Approve/Decline
+  buttons for donor/admin) / resolved (emerald approved or rose
+  declined). (d) New `POST /api/cron/trust-profile-nudge`: monthly
+  inbox reminder for NGO users whose org has no active Capacity
+  Passport. Self-guards against re-nudging within 30 days. (e)
+  `<MyScoreSparkline>` on /reviews — last 12 completed-review scores
+  as a tiny SVG sparkline with a first→last delta tag. Backend
+  `GET /api/reviews/my-score-history`. Self-gates when < 5 reviews.
+
 - **2026-06-20** Phase 301-305 — SLA + appeal + calibration + integrity:
   (a) `<SlaBreachesCard>` on operator dashboard counts applications
   still pre-decision past the 30-day mark + lists the 3 most
