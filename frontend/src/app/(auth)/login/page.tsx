@@ -237,7 +237,19 @@ export default function LoginPage() {
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            {/* action="javascript:void(0)" makes the native HTML form
+                submission a no-op. Without it, a user on a slow
+                connection who hits Enter (or clicks Sign in) BEFORE
+                React hydrates triggers a default GET submission that
+                lands them on /login/?email=foo&password=bar — the
+                credentials leak into the URL and no API call ever
+                fires. Caught by mobile_test.py running on slow-3G. */}
+            <form
+              onSubmit={handleSubmit}
+              noValidate
+              action="javascript:void(0)"
+              className="space-y-4"
+            >
               <div className="space-y-1.5">
                 <Label htmlFor="email" className="text-xs font-medium">Email</Label>
                 <div className="relative">
