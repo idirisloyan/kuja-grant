@@ -2380,6 +2380,43 @@ def test_32_9_donor_dashboard_briefing_card_shows_content(page, ctx):
 #     widgets across versions. UX defects are caught by Categories 31+32;
 #     these tests close the "does the wired path actually work end-to-end"
 #     gap that team members otherwise had to verify by hand.
+#
+#     Login bypass: page.goto('/login') downloads the full Next.js bundle
+#     and consistently times out on slow prod responses. Cat 33 tests
+#     POST /api/auth/login directly — same cookie session, no UI bundle.
+# ===========================================================================
+
+def _api_login(page, base, email, password=PASS):
+    """Set up an authenticated session via direct API login, bypassing the
+    heavy Next.js /login page. Returns True on success.
+
+    Uses the BrowserContext's request fixture so cookies set by /api/auth/login
+    are stored on the context — subsequent page.evaluate() fetches in the same
+    context inherit them. No page navigation involved, so this works even when
+    the prod /login bundle is too slow to load.
+    """
+    try:
+        resp = page.context.request.post(
+            f"{base}/api/auth/login",
+            headers={"Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest"},
+            data={"email": email, "password": password},
+            timeout=30000,
+        )
+        if resp.status != 200:
+            return False
+        body = resp.json()
+        if not body.get("success"):
+            return False
+    except Exception:
+        return False
+    # Navigate to a tiny endpoint so subsequent page.evaluate calls have an origin.
+    # api/health returns 100 bytes of JSON — way faster than /login's full bundle.
+    try:
+        page.goto(f"{base}/api/health", wait_until="domcontentloaded", timeout=30000)
+    except Exception:
+        pass
+    return True
+
 # ===========================================================================
 
 def test_33_1_totp_enrol_end_to_end(page, ctx):
@@ -2394,9 +2431,7 @@ def test_33_1_totp_enrol_end_to_end(page, ctx):
         # The point of this test is to verify prod's enrol works.
         return
 
-    login_as(page, ctx["base"], USERS["admin"])
-    page.goto(f"{ctx['base']}/dashboard", wait_until="domcontentloaded", timeout=30000)
-    page.wait_for_timeout(1500)
+    assert _api_login(page, ctx["base"], USERS["admin"]), "API login failed for admin"
 
     # If a prior run left TOTP enabled, disable it first so /enroll/start works.
     # /disable wants the current code; only callable if we know the secret. If
@@ -2482,9 +2517,7 @@ def test_33_2_webauthn_register_and_assert_end_to_end(page, ctx):
     which is the same helper /authenticate/finish uses — so a green assertion
     here proves the declaration-sign path's reauth helper is wired.
     """
-    login_as(page, ctx["base"], USERS["admin"])
-    page.goto(f"{ctx['base']}/dashboard", wait_until="domcontentloaded", timeout=30000)
-    page.wait_for_timeout(1500)
+    assert _api_login(page, ctx["base"], USERS["admin"]), "API login failed for admin"
 
     # Attach a CDP virtual authenticator. WebAuthn.enable + addVirtualAuthenticator
     # are CDP commands; Playwright exposes them via CDPSession.
@@ -2656,9 +2689,7 @@ def test_33_3_capacity_assessment_auto_link_verified(page, ctx):
     zero, the auto-link path is silently broken even though the smoke test
     confirms the helper is importable.
     """
-    login_as(page, ctx["base"], USERS["admin"])
-    page.goto(f"{ctx['base']}/dashboard", wait_until="domcontentloaded", timeout=30000)
-    page.wait_for_timeout(1500)
+    assert _api_login(page, ctx["base"], USERS["admin"]), "API login failed for admin"
 
     # Pull every membership the admin can see (status=all bypasses the
     # default under_review filter).
@@ -2690,9 +2721,7 @@ def test_33_4_application_ai_run_scorer_end_to_end(page, ctx):
     Proves the Phase 38 AI surface fires end-to-end against prod's
     Anthropic key — no mocks, real network grant + real rubric.
     """
-    login_as(page, ctx["base"], USERS["admin"])
-    page.goto(f"{ctx['base']}/dashboard", wait_until="domcontentloaded", timeout=30000)
-    page.wait_for_timeout(1500)
+    assert _api_login(page, ctx["base"], USERS["admin"]), "API login failed for admin"
 
     # Find applications that belong to a network grant (grant.fund_window_id != null).
     # The list endpoint summary doesn't include the window id, so we open each

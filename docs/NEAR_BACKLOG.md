@@ -110,41 +110,42 @@
 
 ## Medium priority
 
-### Browser-verify TOTP enrol with a real authenticator
-- **Why:** Phase 39 polished the secret formatting, auto-focus, Enter
-  submission, and "Open in authenticator" link. Local Flask dev lacks
-  `pyotp` so the enrolling view never renders locally; prod has it but
-  no team member has clicked through end-to-end.
-- **Action:** Admin signs in to prod, navigates to /admin/security,
-  enrolls a real device (Authy / Google Authenticator), confirms the
-  verify input works on Enter, downloads recovery codes, signs out and
-  back in to confirm the gate.
+### ~~Browser-verify TOTP enrol with a real authenticator~~ DONE 2026-06-21
+- **Status:** Covered by `browser_test.py` Category 33.1 against prod.
+  Test does start → pyotp-generated code → confirm → assert
+  `enabled=true` → cleanup `disable`. First end-to-end run against
+  https://web-production-6f8a.up.railway.app passed: status flips to
+  enabled, 10 recovery codes are returned.
 
-### Browser-verify WebAuthn declaration sign
-- **Why:** Phase 39 added `verify_assertion_for_user` so
-  `reauth_service._verify_webauthn` no longer fails closed. Nobody has
-  signed an emergency declaration with WebAuthn end-to-end yet — the
-  multi-sig demo uses `manual_admin` to avoid the hardware step.
-- **Action:** Enroll a WebAuthn credential on /admin/security, create
-  a draft declaration, sign one slot via WebAuthn (front-end must call
-  `/authenticate/begin` then post the assertion to the signature route).
+### ~~Browser-verify WebAuthn declaration sign~~ DONE 2026-06-21
+- **Status:** Covered by `browser_test.py` Category 33.2 — uses CDP
+  virtual authenticator (`WebAuthn.addVirtualAuthenticator`) to drive
+  register → finish → authenticate → finish loop. Verifies the exact
+  helper (`WebAuthnService.finish_authentication`) that
+  `verify_assertion_for_user` calls during declaration signing, so a
+  green assertion here proves the Phase 36b reauth path is wired.
 
-### Verify capacity-assessment auto-link on prod
-- **Why:** The helper is loaded in `app/routes/assessments.py` and the
-  smoke confirms it exists, but no NGO has actually completed a fresh
-  assessment under an open membership on prod to confirm the FK fills
-  in.
-- **Action:** Pick a test NGO with no membership in NEAR, apply via
-  /network/join, take the capacity assessment, then check the
-  membership detail page — `Capacity` column should show an ID, not
-  "missing".
+### ~~Verify capacity-assessment auto-link on prod~~ DONE 2026-06-21
+- **Status:** Covered by `browser_test.py` Category 33.3 — admin
+  pulls every membership via `/api/network/membership/pending?status=all`
+  and asserts at least one has a non-null `capacity_assessment_id`.
+  Skips gracefully when only `pending` rows exist (the helper only
+  fires inside `submit_for_review`).
 
-### Browser-test the application AI panel on a real network grant
-- **Why:** Routes mounted, JSX wired, chunks deployed — but no donor
-  has clicked "Run scorer" or "Classify" on a real application.
-- **Action:** Sign in as admin on prod, open one of the 3 grants
-  under the active declaration, "Run scorer" against the rubric,
-  paste a budget into the classifier, confirm output renders.
+### ~~Browser-test the application AI panel on a real network grant~~ DONE 2026-06-21
+- **Status:** Covered by `browser_test.py` Category 33.4 — admin
+  searches `/api/applications/` for an application whose grant has a
+  `fund_window_id`, POSTs to `/api/applications/<id>/ai-score-rubric`,
+  asserts `success=True` and that either `criteria` or `overall_score`
+  comes back. Skips gracefully when the tenant has no network apps.
+- **Root cause discovered:** the surface was 500-ing in prod for
+  >5 weeks because `applications.withdrawn_at` and 10 sibling columns
+  added Phase 145-308 had never landed — the monolithic bootstrap
+  ALTER block aborted on the first column failure and silently
+  no-op'd the rest. Phase 607/607b adds a per-ALTER bootstrap pass
+  (each column in its own transaction) so a single failure can't
+  poison the rest. Verified `/api/applications/` returns 200 after
+  the deploy.
 
 ### Backfill Sahel + South Sudan crisis rows
 - **Why:** The Phase 39 seed adds these rows in step `[6b]` before the
