@@ -584,6 +584,28 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 343-347 — Cleanup hygiene + soft signals +
+  forecasting + usage trends:
+  (a) New `POST /api/cron/notifications-cleanup` deletes read
+  notifications older than 90 days and any notification older
+  than 180 days. record_cron_run wired. (b) NGO "Express interest"
+  soft signal on a grant: new `ExpressionOfInterest` model (one
+  row per org × grant, upsert on repeat), endpoint
+  `POST /api/grants/<id>/express-interest`, "Express interest"
+  button on the grant detail page next to Apply. Donor users get
+  a one-time notification when an NGO first expresses interest.
+  (c) `<DecisionForecastCard>` on donor dashboard projects
+  month-end decision total from the trailing 90-day daily rate +
+  decisions so far this month. Backend
+  `GET /api/dashboard/decision-forecast`. Self-gates when rate too
+  thin. (d) Reviewer AI-summary auto-load preference — checkbox
+  inside the `<TriageSummary>` panel persists via localStorage so
+  the summary fetches automatically on next review open.
+  (e) `<UsageTrendCard>` on operator dashboard: 14-day mini
+  sparklines for applications created, AI calls, and decisions
+  recorded. Backend `GET /api/dashboard/usage-trend`. Self-gates
+  when total volume is zero.
+
 - **2026-06-20** Phase 337-341 — System-wide rollups + applicant
   ergonomics + stale draft hygiene:
   (a) `<ApplicationsByStatusCard>` on operator dashboard: stacked

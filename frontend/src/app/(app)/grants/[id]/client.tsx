@@ -31,6 +31,7 @@ import { ApplicationsReceivedTable } from '@/components/grants/applications-rece
 import { AiVsHumanCard } from '@/components/grants/ai-vs-human-card';
 import { ReviewerPanelCard } from '@/components/grants/reviewer-panel-card';
 import { api } from '@/lib/api';
+import { toast } from 'sonner';
 
 // Phase 112 — Live wrapper around WhyThisMatch. Calls /api/match/explain
 // for the calling NGO + grant, renders the resulting facets. While the
@@ -233,13 +234,30 @@ export default function GrantDetailClient() {
         <WithdrawGrantButton grantId={grant.id} grantTitle={grant.title ?? ''} />
       )}
       {isNgo && grant.status === 'open' && !grant.user_application_status && (
-        <button
-          type="button"
-          onClick={() => router.push(`/apply/${grant.id}`)}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
-        >
-          <FileText className="h-4 w-4" /> {t('grant.detail.apply')}
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => router.push(`/apply/${grant.id}`)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-4 py-2"
+          >
+            <FileText className="h-4 w-4" /> {t('grant.detail.apply')}
+          </button>
+          {/* Phase 344 — soft "I'm thinking about applying" signal. */}
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await api.post(`/api/grants/${grant.id}/express-interest`, {});
+                toast.success('Donor notified you might apply.');
+              } catch {
+                toast.error('Could not send signal.');
+              }
+            }}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border text-sm font-medium px-3 py-2 hover:bg-muted"
+          >
+            Express interest
+          </button>
+        </>
       )}
       {isNgo && grant.user_application_status && (
         <div className="flex items-center gap-2">

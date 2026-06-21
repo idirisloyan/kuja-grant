@@ -47,6 +47,58 @@ def _validate_grant_arrays(data):
     return errors
 
 
+@grants_bp.route('/<int:grant_id>/express-interest', methods=['POST'])
+@login_required
+def api_grant_express_interest(grant_id):
+    """Phase 344 — NGO records a soft expression of interest on a grant.
+
+    Body: { message?: str (max 2000) }
+    Upserts on (org_id, grant_id) — calling again updates the message.
+    Notifies every donor user on the grant's donor org.
+    """
+    from app.models import ExpressionOfInterest, Notification, User
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found'}), 404
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+    data = get_request_json() or {}
+    message = (data.get('message') or '').strip()[:2000] or None
+    existing = ExpressionOfInterest.query.filter_by(
+        org_id=current_user.org_id, grant_id=grant_id,
+    ).first()
+    if existing:
+        existing.message = message
+        eoi = existing
+        new = False
+    else:
+        eoi = ExpressionOfInterest(
+            org_id=current_user.org_id,
+            grant_id=grant_id,
+            message=message,
+        )
+        db.session.add(eoi)
+        new = True
+    if new:
+        try:
+            donors = User.query.filter_by(org_id=grant.donor_org_id, role='donor').all()
+            org_name = current_user.organization.name if getattr(current_user, 'organization', None) else f'Org {current_user.org_id}'
+            msg = f'{org_name} expressed interest in "{grant.title}".'
+            for u in donors:
+                n = Notification(
+                    user_id=u.id,
+                    type='grant_expression_of_interest',
+                    title='New expression of interest',
+                    message=msg,
+                    link=f'/grants/{grant_id}',
+                )
+                db.session.add(n)
+        except Exception as e:
+            logger.debug('eoi notify skipped: %s', e)
+    db.session.commit()
+    return jsonify({'success': True, 'expression': eoi.to_dict(), 'new': new})
+
+
 @grants_bp.route('/', methods=['GET'])
 @login_required
 def api_list_grants():

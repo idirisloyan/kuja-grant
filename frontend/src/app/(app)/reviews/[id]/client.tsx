@@ -1133,11 +1133,16 @@ export default function ReviewDetailClient() {
 }
 
 // Phase 267 — AI 3-sentence triage summary for the reviewer.
+// Phase 346 — auto-load preference, persisted in localStorage.
 function TriageSummary({ applicationId }: { applicationId: number }) {
   const [summary, setSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [source, setSource] = useState<string>('');
   const [aiCallId, setAiCallId] = useState<number | null>(null);
+  const [autoLoad, setAutoLoad] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try { return localStorage.getItem('kuja_triage_auto') === '1'; } catch { return false; }
+  });
 
   async function load() {
     if (loading) return;
@@ -1152,6 +1157,22 @@ function TriageSummary({ applicationId }: { applicationId: number }) {
       setAiCallId(r.ai_call_id ?? null);
     } catch {/* silent */}
     finally { setLoading(false); }
+  }
+
+  // Phase 346 — auto-fetch on mount if the reviewer opted in.
+  useEffect(() => {
+    if (autoLoad && !summary && !loading) {
+      void load();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function toggleAuto() {
+    setAutoLoad((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('kuja_triage_auto', next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
   }
 
   return (
@@ -1184,6 +1205,11 @@ function TriageSummary({ applicationId }: { applicationId: number }) {
           ) : null}
         </>
       )}
+      {/* Phase 346 — auto-load preference toggle. */}
+      <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer pt-1">
+        <input type="checkbox" checked={autoLoad} onChange={toggleAuto} className="h-3 w-3" />
+        Auto-fetch when I open a review
+      </label>
     </div>
   );
 }

@@ -632,6 +632,61 @@ def api_cron_donor_digest():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/notifications-cleanup', methods=['POST'])
+def api_cron_notifications_cleanup():
+    """Phase 343 — Delete stale notifications.
+
+    Two rules:
+      - read notifications older than 90 days → delete
+      - any notification older than 180 days → delete (read or not)
+    Keeps the notifications table from growing forever.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import Notification, record_cron_run as _rcr
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        cutoff_read = now - timedelta(days=90)
+        cutoff_all = now - timedelta(days=180)
+
+        # Delete in two passes for clarity.
+        deleted_read = (Notification.query
+                        .filter(Notification.read.is_(True),
+                                Notification.created_at < cutoff_read)
+                        .delete(synchronize_session=False))
+        deleted_old = (Notification.query
+                       .filter(Notification.created_at < cutoff_all)
+                       .delete(synchronize_session=False))
+        db.session.commit()
+        result = {
+            'deleted_read_90d': int(deleted_read or 0),
+            'deleted_any_180d': int(deleted_old or 0),
+        }
+        _rcr('notifications-cleanup',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('notifications-cleanup cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('notifications-cleanup',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/stale-draft-nudge', methods=['POST'])
 def api_cron_stale_draft_nudge():
     """Phase 341 — Nudge NGOs about draft applications idle > 7 days.

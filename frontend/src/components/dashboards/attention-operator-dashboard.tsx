@@ -42,6 +42,7 @@ import { AiCostForecastCard } from '@/components/dashboards/ai-cost-forecast-car
 import { NotificationVolumeCard } from '@/components/dashboards/notification-volume-card';
 import { ReviewerScoreboardCard } from '@/components/dashboards/reviewer-scoreboard-card';
 import { ApplicationsByStatusCard } from '@/components/dashboards/applications-by-status-card';
+import { UsageTrendCard } from '@/components/dashboards/usage-trend-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -290,6 +291,8 @@ export function AttentionOperatorDashboard() {
         <ReviewerScoreboardCard />
         {/* Phase 337 — applications by status stacked bar. */}
         <ApplicationsByStatusCard />
+        {/* Phase 347 — 14-day usage sparklines (apps, AI, decisions). */}
+        <UsageTrendCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

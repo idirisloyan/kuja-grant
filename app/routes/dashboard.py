@@ -1036,6 +1036,49 @@ def api_dashboard_ngo_docs_pending():
     return jsonify({'count': len(out_ids), 'application_ids': out_ids[:5]})
 
 
+@dashboard_bp.route('/decision-forecast', methods=['GET'])
+@login_required
+def api_dashboard_decision_forecast():
+    """Phase 345 — Project how many decisions the donor will record by
+    month-end based on trailing 90-day daily rate.
+
+    Self-gates client-side when trailing total is too small to project.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    ninety_ago = now - timedelta(days=90)
+    decided_90d = (Application.query
+                   .join(Grant)
+                   .filter(Grant.donor_org_id == current_user.org_id,
+                           Application.decision_recorded_at.isnot(None),
+                           Application.decision_recorded_at >= ninety_ago)
+                   .count())
+    daily_rate = decided_90d / 90.0
+    # End of current month — days remaining (including today).
+    if now.month == 12:
+        end_of_month = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        end_of_month = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    days_left = max(1, int((end_of_month - now).total_seconds() / 86400))
+    # Decisions so far this month
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    decided_so_far = (Application.query
+                      .join(Grant)
+                      .filter(Grant.donor_org_id == current_user.org_id,
+                              Application.decision_recorded_at.isnot(None),
+                              Application.decision_recorded_at >= month_start)
+                      .count())
+    projected = decided_so_far + int(round(daily_rate * days_left))
+    return jsonify({
+        'decided_so_far_this_month': decided_so_far,
+        'projected_total_this_month': projected,
+        'daily_rate_90d': round(daily_rate, 2),
+        'days_left': days_left,
+    })
+
+
 @dashboard_bp.route('/first-time-vs-repeat', methods=['GET'])
 @login_required
 def api_dashboard_first_time_vs_repeat():
@@ -1073,6 +1116,64 @@ def api_dashboard_first_time_vs_repeat():
         'repeat': repeat,
         'first_time': first_time,
         'window_days': 90,
+    })
+
+
+@dashboard_bp.route('/usage-trend', methods=['GET'])
+@login_required
+def api_dashboard_usage_trend():
+    """Phase 347 — 14-day daily usage trend. Admin-only.
+
+    Returns per-day applications created, AI calls, decisions recorded.
+    Used to draw a small line chart on the operator dashboard.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta, date as _date
+    from sqlalchemy import text as _text
+    now = datetime.now(timezone.utc)
+    days = []
+    apps = {}
+    ai = {}
+    dec = {}
+    for i in range(13, -1, -1):
+        d = (now - timedelta(days=i)).date()
+        days.append(d)
+        apps[d] = 0
+        ai[d] = 0
+        dec[d] = 0
+    start = days[0]
+    end = days[-1] + timedelta(days=1)
+
+    for a in Application.query.filter(Application.created_at >= start, Application.created_at < end).all():
+        if a.created_at:
+            apps[a.created_at.date()] = apps.get(a.created_at.date(), 0) + 1
+    try:
+        rows = db.session.execute(_text(
+            "SELECT DATE(created_at) AS d, COUNT(*) AS n FROM ai_call_logs WHERE created_at >= :a AND created_at < :b GROUP BY DATE(created_at)"
+        ), {'a': start, 'b': end}).fetchall()
+        for r in rows:
+            try:
+                d = r[0] if isinstance(r[0], _date) else _date.fromisoformat(str(r[0])[:10])
+                ai[d] = int(r[1])
+            except Exception:
+                pass
+    except Exception:
+        pass
+    for a in Application.query.filter(
+        Application.decision_recorded_at.isnot(None),
+        Application.decision_recorded_at >= start,
+        Application.decision_recorded_at < end,
+    ).all():
+        if a.decision_recorded_at:
+            dec[a.decision_recorded_at.date()] = dec.get(a.decision_recorded_at.date(), 0) + 1
+    return jsonify({
+        'series': [{
+            'date': d.isoformat(),
+            'applications': apps[d],
+            'ai_calls': ai[d],
+            'decisions': dec[d],
+        } for d in days],
     })
 
 
