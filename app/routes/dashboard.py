@@ -4577,3 +4577,90 @@ def api_dashboard_admin_active_webhooks():
     active = Webhook.query.filter(Webhook.active.is_(True)).count()
     total = Webhook.query.count()
     return jsonify({'active': active, 'total': total})
+
+
+@dashboard_bp.route('/ngo-watchlist-size', methods=['GET'])
+@login_required
+def api_dashboard_ngo_watchlist_size():
+    """Phase 499 — Count of WatchlistItem rows for the current user.
+    Surfaces how many grants the NGO is tracking.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.watchlist import WatchlistItem
+    count = (WatchlistItem.query
+             .filter(WatchlistItem.user_id == current_user.id)
+             .count())
+    return jsonify({'watchlist_size': count})
+
+
+@dashboard_bp.route('/donor-days-since-last-grant', methods=['GET'])
+@login_required
+def api_dashboard_donor_days_since_last_grant():
+    """Phase 500 — Days since this donor most recently created a grant.
+    Inactivity signal; amber on the frontend when > 60 days.
+    """
+    if current_user.role not in ('donor', 'admin') or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    newest = (Grant.query
+              .filter(Grant.donor_org_id == current_user.org_id)
+              .order_by(Grant.created_at.desc())
+              .first())
+    if not newest or not newest.created_at:
+        return jsonify({'days': None, 'newest_at': None})
+    created = newest.created_at
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    days = (datetime.now(timezone.utc) - created).days
+    return jsonify({
+        'days': days,
+        'newest_at': created.date().isoformat(),
+    })
+
+
+@dashboard_bp.route('/reviewer-private-notes-coverage', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_private_notes_coverage():
+    """Phase 501 — % of reviewer's last-90d completed reviews that
+    include private_notes. Self-gates < 5.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff)
+            .all())
+    if len(rows) < 5:
+        return jsonify({'coverage_pct': None, 'sample': len(rows)})
+    with_notes = sum(1 for r in rows if (r.private_notes or '').strip())
+    return jsonify({
+        'coverage_pct': round(100.0 * with_notes / len(rows), 1),
+        'with_notes': with_notes,
+        'sample': len(rows),
+    })
+
+
+@dashboard_bp.route('/admin-failed-cron-runs-7d', methods=['GET'])
+@login_required
+def api_dashboard_admin_failed_cron_runs_7d():
+    """Phase 502 — Count of CronRun rows with success=False in the last
+    7 days vs total runs in the same window. Health signal.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.cron_run import CronRun
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    failed = (CronRun.query
+              .filter(CronRun.run_at >= cutoff,
+                      CronRun.success.is_(False))
+              .count())
+    total = (CronRun.query
+             .filter(CronRun.run_at >= cutoff)
+             .count())
+    return jsonify({'failed': failed, 'total': total})

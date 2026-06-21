@@ -3543,3 +3543,91 @@ def api_cron_stale_reviewers_digest():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/ai-cost-spike-alert', methods=['POST'])
+def api_cron_ai_cost_spike_alert():
+    """Phase 503 — Daily alert. If yesterday's total AI usd_cost is
+    > 2x the previous 7-day average, notify admins. Helps catch
+    runaway-cost incidents fast. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from sqlalchemy import text as _text
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        end_yesterday = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+        start_yesterday = end_yesterday - timedelta(days=1)
+        prior_start = end_yesterday - timedelta(days=8)
+        try:
+            yesterday_cost = float(db.session.execute(_text(
+                "SELECT COALESCE(SUM(usd_cost), 0) FROM ai_call_logs "
+                "WHERE created_at >= :a AND created_at < :b"
+            ), {'a': start_yesterday, 'b': end_yesterday}).scalar() or 0)
+            prior_cost = float(db.session.execute(_text(
+                "SELECT COALESCE(SUM(usd_cost), 0) FROM ai_call_logs "
+                "WHERE created_at >= :a AND created_at < :b"
+            ), {'a': prior_start, 'b': start_yesterday}).scalar() or 0)
+        except Exception:
+            yesterday_cost = 0.0
+            prior_cost = 0.0
+
+        prior_avg = prior_cost / 7.0
+        spike = (prior_avg > 0.01) and (yesterday_cost > 2.0 * prior_avg)
+        sent = 0
+        if spike:
+            msg = (
+                f'AI cost spike: yesterday ${yesterday_cost:.2f} vs '
+                f'7-day avg ${prior_avg:.2f} '
+                f'({(yesterday_cost / prior_avg):.1f}x).'
+            )
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='ai_cost_spike',
+                    title='AI cost spike detected',
+                    message=msg[:500],
+                    link='/admin/ai-cost',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {
+            'yesterday_cost': round(yesterday_cost, 4),
+            'prior_avg': round(prior_avg, 4),
+            'spike': spike,
+            'admins_notified': sent,
+        }
+        _rcr('ai-cost-spike-alert',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ai-cost-spike-alert cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ai-cost-spike-alert',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

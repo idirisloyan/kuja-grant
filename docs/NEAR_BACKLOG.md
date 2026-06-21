@@ -584,6 +584,21 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 499-503 — Watchlist size + days since last
+  grant + private-notes coverage + failed cron runs + AI cost spike
+  cron:
+  (a) `<WatchlistSizeStat>` on NGO dashboard counts WatchlistItem
+  rows; self-gates at zero. (b) `<DaysSinceLastGrantStat>` on donor
+  dashboard shows days since most-recent grant creation; amber when
+  > 60 days. (c) `<PrivateNotesCoverageStat>` on reviewer reviews
+  page shows % of last-90d reviews that include private_notes;
+  tone-coded; self-gates < 5. (d) `<FailedCronsCard>` on operator
+  dashboard shows failed/total CronRun count in last 7 days; rose
+  border when failed > 0. (e) Phase 503 cron
+  `/api/cron/ai-cost-spike-alert` runs daily; if yesterday's AI
+  usd_cost > 2x the prior 7-day average, sends admins an alert
+  with the ratio. Digests opt-out gated; record_cron_run wired.
+
 - **2026-06-21** Phase 493-497 — Win rate this quarter + grants
   published this month + top-tier rate + active webhooks + stale
   reviewers cron:
