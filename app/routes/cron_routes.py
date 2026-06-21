@@ -801,6 +801,86 @@ def api_cron_donor_closing_grants():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/donor-decisions-backlog', methods=['POST'])
+def api_cron_donor_decisions_backlog():
+    """Phase 401 — Weekly digest to each donor org's users summarising
+    applications stuck in submitted/under_review/scored for more than
+    14 days. Pressure-relief nudge that honors the digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            Application, Grant, User, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+        from collections import defaultdict
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+        PENDING = ['submitted', 'under_review', 'scored', 'revision_requested']
+
+        rows = (db.session.query(Grant.donor_org_id, Application.id)
+                .join(Application, Application.grant_id == Grant.id)
+                .filter(Application.status.in_(PENDING),
+                        Application.submitted_at.isnot(None),
+                        Application.submitted_at < cutoff)
+                .all())
+        backlog_by_donor = defaultdict(int)
+        for donor_org_id, _ in rows:
+            if donor_org_id is None:
+                continue
+            backlog_by_donor[donor_org_id] += 1
+
+        sent = 0
+        for donor_org_id, count in backlog_by_donor.items():
+            if count < 3:
+                continue
+            donor_users = User.query.filter_by(role='donor', org_id=donor_org_id).all()
+            for u in donor_users:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='donor_backlog_digest',
+                    title=f'{count} applications waiting >14d for decision',
+                    message=f'You have {count} pending applications older than 14 days. Consider reviewing or assigning reviewers.',
+                    link='/applications',
+                )
+                db.session.add(n)
+                sent += 1
+        if sent > 0:
+            db.session.commit()
+
+        result = {
+            'donors_with_backlog': len(backlog_by_donor),
+            'digests_sent': sent,
+        }
+        _rcr('donor-decisions-backlog',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('donor-decisions-backlog cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('donor-decisions-backlog',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/grants-zero-applications', methods=['POST'])
 def api_cron_grants_zero_applications():
     """Phase 395 — Notify donors whose published grants have been open

@@ -52,6 +52,7 @@ import { AiFailureRateCard } from '@/components/dashboards/ai-failure-rate-card'
 import { AiReplayCoverageCard } from '@/components/dashboards/ai-replay-coverage-card';
 import { AuthLockoutCard } from '@/components/dashboards/auth-lockout-card';
 import { StaleNotificationsCard } from '@/components/dashboards/stale-notifications-card';
+import { DbRowCountsCard } from '@/components/dashboards/db-row-counts-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -314,6 +315,7 @@ export function AttentionOperatorDashboard() {
         <AiReplayCoverageCard />
         <AuthLockoutCard />
         <StaleNotificationsCard />
+        <DbRowCountsCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

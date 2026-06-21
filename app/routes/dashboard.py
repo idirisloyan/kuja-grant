@@ -2233,6 +2233,92 @@ def api_dashboard_donor_fastest_reviewer():
     })
 
 
+@dashboard_bp.route('/donor-track-record/<int:donor_org_id>', methods=['GET'])
+@login_required
+def api_dashboard_donor_track_record(donor_org_id):
+    """Phase 397 — Anonymised donor history snapshot. Surfaces, for any
+    NGO viewing a grant, how many decisions this donor has issued over
+    the last year and the median time from submitted to decision.
+    """
+    if current_user.role not in ('ngo', 'donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=365)
+    DECIDED = ['funded', 'awarded', 'declined', 'rejected']
+    WIN = {'funded', 'awarded'}
+    rows = (Application.query
+            .join(Grant)
+            .filter(Grant.donor_org_id == donor_org_id,
+                    Application.status.in_(DECIDED),
+                    Application.decision_recorded_at.isnot(None),
+                    Application.decision_recorded_at >= cutoff,
+                    Application.submitted_at.isnot(None))
+            .all())
+    total = len(rows)
+    if total == 0:
+        return jsonify({'decisions': 0, 'median_days': None, 'funded_pct': None})
+    funded = sum(1 for a in rows if a.status in WIN)
+    days = []
+    for a in rows:
+        if not a.submitted_at or not a.decision_recorded_at:
+            continue
+        d = (a.decision_recorded_at - a.submitted_at).total_seconds() / 86400.0
+        if d >= 0:
+            days.append(d)
+    median = None
+    if days:
+        days.sort()
+        n = len(days)
+        median = days[n // 2] if n % 2 else (days[n // 2 - 1] + days[n // 2]) / 2.0
+    return jsonify({
+        'decisions': total,
+        'median_days': round(median, 1) if median is not None else None,
+        'funded_pct': round(100 * funded / total, 1),
+    })
+
+
+@dashboard_bp.route('/donor-grants-by-status', methods=['GET'])
+@login_required
+def api_dashboard_donor_grants_by_status():
+    """Phase 398 — Counts of this donor's grants by status. Quick
+    portfolio summary tile.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    rows = (Grant.query
+            .filter(Grant.donor_org_id == current_user.org_id)
+            .with_entities(Grant.status)
+            .all())
+    counts = {'draft': 0, 'open': 0, 'review': 0, 'closed': 0, 'awarded': 0}
+    for (status,) in rows:
+        if status in counts:
+            counts[status] += 1
+    return jsonify({'counts': counts, 'total': len(rows)})
+
+
+@dashboard_bp.route('/db-row-counts', methods=['GET'])
+@login_required
+def api_dashboard_db_row_counts():
+    """Phase 400 — Quick row-count snapshot of the major tables. Gauge
+    of overall system size for admins.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from app.models import Notification
+    try:
+        counts = {
+            'users': User.query.count(),
+            'organizations': Organization.query.count(),
+            'grants': Grant.query.count(),
+            'applications': Application.query.count(),
+            'reviews': Review.query.count(),
+            'notifications': Notification.query.count(),
+        }
+    except Exception as e:
+        return jsonify({'error': 'count failed', 'detail': str(e)[:120]}), 500
+    return jsonify({'counts': counts})
+
+
 @dashboard_bp.route('/ngo-app-reviewer-signal/<int:application_id>', methods=['GET'])
 @login_required
 def api_dashboard_ngo_app_reviewer_signal(application_id):

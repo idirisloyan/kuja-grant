@@ -584,6 +584,30 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 397-401 — Donor track record + grants
+  by status + scoring rubric bands + DB row counts + decisions
+  backlog cron:
+  (a) `<DonorTrackRecord>` inline on grant pages surfaces
+  "N decisions last year · Xd median wait · Y% funded" so
+  NGOs can context-set before applying. Backend
+  `GET /api/dashboard/donor-track-record/<donor_org_id>`.
+  Anonymised aggregate; available to NGOs viewing any donor's
+  grant. (b) `<GrantsByStatusCard>` on donor dashboard shows
+  counts of donor's grants by status (open/review/closed/
+  awarded/draft). Backend
+  `GET /api/dashboard/donor-grants-by-status`. (c)
+  `<RubricScoringBands>` collapsible expander on reviewer
+  detail page lists the 4 scoring bands (0-40 Weak / 41-60
+  Developing / 61-80 Strong / 81-100 Exceptional) with brief
+  notes. Pure client component, no backend. (d)
+  `<DbRowCountsCard>` on operator dashboard shows row counts
+  for users/orgs/grants/applications/reviews/notifications.
+  Backend `GET /api/dashboard/db-row-counts`. (e) New
+  `POST /api/cron/donor-decisions-backlog` weekly digests to
+  each donor org's users summarising apps stuck in pending
+  states >14 days when >=3 stuck on their org. Honors the
+  digests opt-out.
+
 - **2026-06-20** Phase 391-395 — Reviewer signal + decision
   aging + applicant context + stale notifications + zero-apps
   nudge:

@@ -16,6 +16,7 @@ import { ReviewerCoiBanner } from '@/components/reviews/reviewer-coi-banner';
 import { ReviewerFirstTimeTips } from '@/components/reviews/first-time-tips';
 import { SnoozeButton } from '@/components/reviews/snooze-button';
 import { KeyboardHelp } from '@/components/reviews/keyboard-help';
+import { RubricScoringBands } from '@/components/reviews/rubric-scoring-bands';
 import { DecisionAuditDrawer } from '@/components/applications/DecisionAuditDrawer';
 // Phase 70 — page-shell primitive to match the rest of the design audit.
 import { PageShell, PageBack, PageHeader, PageMain } from '@/components/layout/page-shell';
@@ -388,6 +389,7 @@ export default function ReviewDetailClient() {
 
       {/* Phase 358 — press ? to open the keyboard shortcuts cheat sheet. */}
       <KeyboardHelp />
+      <RubricScoringBands />
 
       {/* Score summary card — org/grant/status are surfaced in PageHeader
           (Phase 70), so this card focuses on the three score tiles. */}
