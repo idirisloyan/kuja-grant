@@ -954,6 +954,68 @@ def api_portfolio_risk_heatmap():
 # Phase 24C — Donor cohort analytics (your funded NGOs vs cohort).
 # ----------------------------------------------------------------------
 
+@dashboard_bp.route('/decision-velocity', methods=['GET'])
+@login_required
+def api_dashboard_decision_velocity():
+    """Phase 284 — Decision velocity for a donor's grants.
+
+    Walks each decided application from the trailing 90 days and computes
+    median days from submitted_at -> updated_at (no discrete decided_at;
+    using updated_at on the decision-applied row is the best proxy).
+    Splits by funded vs declined so the donor can see whether either path
+    drags.
+
+    Response: { median_days, funded: { n, median_days },
+                declined: { n, median_days }, total_decided }
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+
+    DECIDED = {'funded', 'awarded', 'declined', 'rejected'}
+    FUNDED = {'funded', 'awarded'}
+    DECLINED = {'declined', 'rejected'}
+
+    q = (Application.query
+         .join(Grant)
+         .filter(Grant.donor_org_id == current_user.org_id,
+                 Application.status.in_(list(DECIDED)),
+                 Application.submitted_at.isnot(None),
+                 Application.updated_at >= cutoff))
+
+    funded_days = []
+    declined_days = []
+    for a in q.all():
+        if not a.submitted_at or not a.updated_at:
+            continue
+        delta = (a.updated_at - a.submitted_at).total_seconds() / 86400.0
+        if delta < 0:
+            continue
+        if a.status in FUNDED:
+            funded_days.append(delta)
+        elif a.status in DECLINED:
+            declined_days.append(delta)
+
+    def _median(xs):
+        if not xs:
+            return None
+        xs = sorted(xs)
+        mid = len(xs) // 2
+        if len(xs) % 2:
+            return round(xs[mid], 1)
+        return round((xs[mid - 1] + xs[mid]) / 2.0, 1)
+
+    all_days = funded_days + declined_days
+    return jsonify({
+        'window_days': 90,
+        'total_decided': len(all_days),
+        'median_days': _median(all_days),
+        'funded': {'n': len(funded_days), 'median_days': _median(funded_days)},
+        'declined': {'n': len(declined_days), 'median_days': _median(declined_days)},
+    })
+
+
 @dashboard_bp.route('/donor-cohort-analytics', methods=['GET'])
 @login_required
 def api_donor_cohort_analytics():

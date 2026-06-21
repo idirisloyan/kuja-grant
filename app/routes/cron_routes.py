@@ -632,6 +632,94 @@ def api_cron_donor_digest():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/donor-followup-nudge', methods=['POST'])
+def api_cron_donor_followup_nudge():
+    """Phase 287 — Nudge donors to follow up personally on stale declines.
+
+    For declined applications older than 14 days where the applicant has
+    NOT viewed the recorded feedback (applicant_viewed_feedback_at IS
+    NULL), drop one in-app notification per donor user with that grant
+    so they can reach out. Cap at the 10 most recent per donor to keep
+    the inbox calm.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Application, Grant, Notification, record_cron_run as _rcr,
+        )
+        from datetime import datetime, timezone, timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+
+        # Find declined + unviewed apps decided MORE THAN 14 days ago.
+        stale_apps = (Application.query
+                      .join(Grant)
+                      .filter(Application.status.in_(['declined', 'rejected']),
+                              Application.decision_recorded_at.isnot(None),
+                              Application.decision_recorded_at <= cutoff,
+                              Application.applicant_viewed_feedback_at.is_(None))
+                      .order_by(Application.decision_recorded_at.desc())
+                      .all())
+        if not stale_apps:
+            _rcr('donor-followup-nudge',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=True, summary='0 stale unviewed declines')
+            return jsonify({'success': True, 'result': {'stale': 0, 'nudges_sent': 0}})
+
+        # Group by donor_org_id (grant.donor_org_id).
+        by_donor_org: dict[int, list[Application]] = {}
+        for a in stale_apps:
+            if not a.grant:
+                continue
+            by_donor_org.setdefault(a.grant.donor_org_id, []).append(a)
+
+        sent = 0
+        for org_id, apps in by_donor_org.items():
+            donors = User.query.filter_by(org_id=org_id, role='donor').all()
+            if not donors:
+                continue
+            top = apps[:10]
+            msg = (
+                f'{len(top)} declined application{"s" if len(top) != 1 else ""} from the last few weeks '
+                'have not been read by the applicant. Consider reaching out personally.'
+            )
+            for u in donors:
+                n = Notification(
+                    user_id=u.id,
+                    type='donor_followup_nudge',
+                    title='Stale decline — applicant has not read feedback',
+                    message=msg,
+                    link='/applications?status=declined',
+                )
+                db.session.add(n)
+                sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'stale': len(stale_apps), 'nudges_sent': sent, 'donor_orgs': len(by_donor_org)}
+        _rcr('donor-followup-nudge',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('donor-followup-nudge cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('donor-followup-nudge',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/reviewer-digest', methods=['POST'])
 def api_cron_reviewer_digest():
     """Phase 205 — Weekly per-reviewer caseload digest.

@@ -1309,6 +1309,40 @@ def api_application_debrief(app_id):
     })
 
 
+@applications_bp.route('/<int:app_id>/feedback-viewed', methods=['POST'])
+@login_required
+def api_application_feedback_viewed(app_id):
+    """Phase 285 — NGO acknowledges they've seen the decision feedback.
+
+    Stamps applicant_viewed_feedback_at the first time, then no-ops on
+    subsequent calls (the timestamp is permanent — "first viewed").
+    Only the applicant org can hit this; donor / admin / reviewer view
+    is irrelevant.
+    """
+    app_obj = db.session.get(Application, app_id)
+    if not app_obj:
+        return jsonify({'error': 'Application not found'}), 404
+    # Only the applicant org. NGO viewers from other orgs / non-NGO roles → no-op.
+    if current_user.role != 'ngo' or current_user.org_id != app_obj.ngo_org_id:
+        return jsonify({'success': True, 'changed': False})
+    # Only meaningful once the donor has recorded a decision.
+    if not app_obj.decision_recorded_at:
+        return jsonify({'success': True, 'changed': False})
+    if app_obj.applicant_viewed_feedback_at:
+        return jsonify({
+            'success': True,
+            'changed': False,
+            'applicant_viewed_feedback_at': app_obj.applicant_viewed_feedback_at.isoformat(),
+        })
+    app_obj.applicant_viewed_feedback_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'changed': True,
+        'applicant_viewed_feedback_at': app_obj.applicant_viewed_feedback_at.isoformat(),
+    })
+
+
 @applications_bp.route('/debrief/rollup', methods=['GET'])
 @login_required
 def api_debrief_rollup():

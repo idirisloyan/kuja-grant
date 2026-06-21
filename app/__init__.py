@@ -390,11 +390,27 @@ def create_app(config_name=None):
                     conn.execute(text("ALTER TABLE applications ADD COLUMN is_starred BOOLEAN DEFAULT FALSE NOT NULL"))
                     added.append('applications.is_starred')
 
+                # Phase 285 — NGO viewed-decision-feedback acknowledgement.
+                if 'applicant_viewed_feedback_at' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN applicant_viewed_feedback_at TIMESTAMP"))
+                    added.append('applications.applicant_viewed_feedback_at')
+
                 # Phase 221 — reviewer private notes.
                 rev_cols = {c['name'] for c in inspector.get_columns('reviews')} if 'reviews' in inspector.get_table_names() else set()
                 if rev_cols and 'private_notes' not in rev_cols:
                     conn.execute(text("ALTER TABLE reviews ADD COLUMN private_notes TEXT"))
                     added.append('reviews.private_notes')
+
+                # Phase 283 — reviewer COI self-disclosure.
+                if rev_cols and 'coi_disclosed_at' not in rev_cols:
+                    conn.execute(text("ALTER TABLE reviews ADD COLUMN coi_disclosed_at TIMESTAMP"))
+                    added.append('reviews.coi_disclosed_at')
+                if rev_cols and 'coi_kind' not in rev_cols:
+                    conn.execute(text("ALTER TABLE reviews ADD COLUMN coi_kind VARCHAR(60)"))
+                    added.append('reviews.coi_kind')
+                if rev_cols and 'coi_note' not in rev_cols:
+                    conn.execute(text("ALTER TABLE reviews ADD COLUMN coi_note TEXT"))
+                    added.append('reviews.coi_note')
 
                 # Phase 102 — replay tooling: optional full input/output
                 # text on AI call logs. Populated only for replay-eligible

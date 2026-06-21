@@ -46,6 +46,11 @@ class Application(db.Model):
     decision_notes = db.Column(db.Text, nullable=True)
     decision_recorded_at = db.Column(db.DateTime, nullable=True)
     decision_recorded_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    # Phase 285 — stamped the first time the NGO views their decision /
+    # win-loss feedback after the donor records it. Lets the donor see
+    # "applicant viewed feedback at X" so they can judge whether to
+    # follow up personally.
+    applicant_viewed_feedback_at = db.Column(db.DateTime, nullable=True)
 
     # Phase 40 — NEAR network grants only. Auto-populated on /submit when
     # grant.fund_window_id is set:
@@ -105,6 +110,7 @@ class Application(db.Model):
             'decision_notes': self.decision_notes,
             'decision_recorded_at': self.decision_recorded_at.isoformat() if self.decision_recorded_at else None,
             'decision_recorded_by_user_id': self.decision_recorded_by_user_id,
+            'applicant_viewed_feedback_at': self.applicant_viewed_feedback_at.isoformat() if self.applicant_viewed_feedback_at else None,
             'is_starred': bool(self.is_starred),
         }
         if not summary:

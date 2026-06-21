@@ -31,6 +31,7 @@ import { NetworkAiPanel } from '@/components/applications/network-ai-panel';
 import { NgoBudgetPanel } from '@/components/applications/ngo-budget-panel';
 import { ApplicationMessageThread } from '@/components/applications/application-message-thread';
 import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
+import { FeedbackAcknowledgement } from '@/components/apply/feedback-acknowledgement';
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
 import { MicroSurvey } from '@/components/shared/micro-survey';
 import { InactivityHelp } from '@/components/shared/inactivity-help';
@@ -306,6 +307,17 @@ export default function ApplicationDetailClient() {
             decision_recorded_at: application.decision_recorded_at ?? null,
             decision_recorded_by_user_id: application.decision_recorded_by_user_id ?? null,
           }}
+        />
+
+        {/* Phase 285 — applicant feedback acknowledgement. NGO owner POST
+            once when they first view the recorded decision; donor sees a
+            small confirmation that the applicant has read the feedback. */}
+        <FeedbackAcknowledgement
+          applicationId={application.id}
+          isOwnerNgo={isOwnerNgo}
+          isReviewerSide={isReviewerSide}
+          decisionRecordedAt={application.decision_recorded_at ?? null}
+          applicantViewedAt={(application as { applicant_viewed_feedback_at?: string | null }).applicant_viewed_feedback_at ?? null}
         />
 
         {/* 3. Main work — tabs */}

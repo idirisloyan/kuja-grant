@@ -450,6 +450,73 @@ def api_decline_review(review_id):
     return jsonify({'success': True})
 
 
+@reviews_bp.route('/<int:review_id>/coi-flag', methods=['POST'])
+@login_required
+@role_required('reviewer', 'admin')
+def api_review_coi_flag(review_id):
+    """Phase 283 — Reviewer self-discloses a conflict of interest.
+
+    Body: { kind: 'employer_overlap'|'prior_consulting'|'family'|'other',
+            note?: str (max 1000) }
+
+    The disclosure stays on the review (kept for audit), is recorded to
+    the hash-chained audit log, and admins receive an in-app notification
+    so they can reassign.
+    """
+    from app.services.audit import log_action
+    from app.models.audit_chain import AuditChainEntry
+    review = db.session.get(Review, review_id)
+    if not review:
+        return jsonify({'error': 'Review not found'}), 404
+    if current_user.role == 'reviewer' and review.reviewer_user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    data = get_request_json() or {}
+    kind = (data.get('kind') or '').strip()[:60]
+    note = (data.get('note') or '').strip()[:1000]
+    allowed = {'employer_overlap', 'prior_consulting', 'family', 'other'}
+    if kind not in allowed:
+        return jsonify({'error': 'Invalid kind'}), 400
+
+    review.coi_disclosed_at = datetime.now(timezone.utc)
+    review.coi_kind = kind
+    review.coi_note = note or None
+    db.session.add(review)
+
+    log_action('review.coi_disclosed', current_user.email,
+               'review', review.id,
+               {'application_id': review.application_id, 'kind': kind})
+    AuditChainEntry.append(
+        action='review.coi_disclosed',
+        actor_email=current_user.email,
+        subject_kind='review',
+        subject_id=review.id,
+        details={'application_id': review.application_id, 'kind': kind, 'note': note[:200]},
+    )
+
+    try:
+        from app.models import Notification, User
+        admins = User.query.filter_by(role='admin').all()
+        msg = (
+            f'{current_user.name or current_user.email} disclosed a {kind} conflict on review #{review.id}'
+            f' for application #{review.application_id}.'
+        )
+        for u in admins:
+            n = Notification(
+                user_id=u.id,
+                type='reviewer_coi',
+                title='Reviewer disclosed conflict',
+                message=msg[:500],
+                link='/admin/reviewers-workload',
+            )
+            db.session.add(n)
+    except Exception as e:
+        logger.debug('coi notify skipped: %s', e)
+
+    db.session.commit()
+    return jsonify({'success': True, 'review': review.to_dict()})
+
+
 @reviews_bp.route('/<int:review_id>', methods=['PUT'])
 @login_required
 @role_required('reviewer', 'admin')

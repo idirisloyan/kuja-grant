@@ -190,6 +190,59 @@ def api_test_webhook(hook_id: int):
     return jsonify({'success': True, 'result': result})
 
 
+@webhook_bp.route('/admin/health', methods=['GET'])
+@login_required
+def api_admin_webhook_health():
+    """Phase 286 — admin-only rollup of webhook delivery health over 24h.
+
+    Returns { window_hours, ok, failed, retrying, total, noisiest: [...] }
+    where `noisiest` is the top 3 webhooks by failure count.
+    """
+    if getattr(current_user, 'role', None) != 'admin':
+        return error_response('auth.access_denied', 403)
+    _ensure_table()
+    from datetime import datetime, timezone, timedelta
+    from collections import Counter
+    from app.models import WebhookDelivery
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    try:
+        rows = WebhookDelivery.query.filter(WebhookDelivery.delivered_at >= cutoff).all()
+    except Exception as e:
+        logger.debug('webhook health rollup failed: %s', e)
+        return jsonify({'window_hours': 24, 'ok': 0, 'failed': 0, 'retrying': 0, 'total': 0, 'noisiest': []})
+    ok = failed = retrying = 0
+    failure_counts: Counter[int] = Counter()
+    for r in rows:
+        code = r.status_code
+        attempts = r.attempts or 1
+        if code is not None and 200 <= code < 300:
+            ok += 1
+        else:
+            failed += 1
+            failure_counts[r.webhook_id] += 1
+            if attempts and attempts > 1:
+                retrying += 1
+    noisiest = []
+    if failure_counts:
+        ids = [hid for hid, _ in failure_counts.most_common(3)]
+        hooks_by_id = {h.id: h for h in Webhook.query.filter(Webhook.id.in_(ids)).all()}
+        for hid, count in failure_counts.most_common(3):
+            h = hooks_by_id.get(hid)
+            noisiest.append({
+                'webhook_id': hid,
+                'url': (h.url if h else None),
+                'failures': count,
+            })
+    return jsonify({
+        'window_hours': 24,
+        'ok': ok,
+        'failed': failed,
+        'retrying': retrying,
+        'total': ok + failed,
+        'noisiest': noisiest,
+    })
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher — imported by the rest of the codebase at transition sites.
 # ---------------------------------------------------------------------------

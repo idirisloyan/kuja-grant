@@ -32,6 +32,7 @@ import { SignerCoachCard } from '@/components/dashboards/signer-coach-card';
 import { StaleReviewsCard } from '@/components/dashboards/stale-reviews-card';
 import { AdminStatusCard } from '@/components/dashboards/admin-status-card';
 import { AuditIntegrityCard } from '@/components/dashboards/audit-integrity-card';
+import { WebhookHealthCard } from '@/components/dashboards/webhook-health-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -260,6 +261,8 @@ export function AttentionOperatorDashboard() {
         <AdminStatusCard />
         {/* Phase 279 — audit chain integrity at-a-glance. Always visible. */}
         <AuditIntegrityCard />
+        {/* Phase 286 — 24h webhook delivery health. Self-gates when no traffic. */}
+        <WebhookHealthCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

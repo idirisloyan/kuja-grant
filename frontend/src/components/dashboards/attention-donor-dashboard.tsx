@@ -32,6 +32,7 @@ import { AwaitingDecisionCard } from '@/components/dashboards/awaiting-decision-
 import { SectorRollupCard } from '@/components/dashboards/sector-rollup-card';
 import { PostDeadlineCard } from '@/components/dashboards/post-deadline-card';
 import { DonorScorecardCard } from '@/components/dashboards/donor-scorecard';
+import { DecisionVelocityCard } from '@/components/dashboards/decision-velocity-card';
 import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
 import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
 import { PortfolioRiskHeatmap } from '@/components/dashboards/portfolio-risk-heatmap';
@@ -159,6 +160,8 @@ export function AttentionDonorDashboard() {
       <PostDeadlineCard />
       {/* Phase 274 — 90-day strongest + weakest criteria scorecard. */}
       <DonorScorecardCard />
+      {/* Phase 284 — median decision velocity, funded vs declined. */}
+      <DecisionVelocityCard />
 
       {/* Phase 99 — OneNumberCard portfolio at-a-glance row. Replaces the
           metric-soup pattern with three calm numbers + one next action

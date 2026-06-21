@@ -584,6 +584,31 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 283-287 — Trust + visibility surfaces:
+  (a) Reviewer COI self-disclosure: new
+  `POST /api/reviews/<id>/coi-flag` records a controlled-vocab kind
+  + optional note, stamps the review row, logs to the hash-chained
+  audit log, and fans out an in-app notification to every admin.
+  `<ReviewerCoiBanner>` on the review-detail page renders a
+  "Disclose conflict" link → dialog, then flips to an amber "you
+  disclosed" callout. (b) Donor decision-velocity card on the
+  donor dashboard: median days submission→decision over the
+  trailing 90 days, split funded vs declined. Backend
+  `GET /api/dashboard/decision-velocity`. (c) NGO post-decision
+  feedback ack: new
+  `applications.applicant_viewed_feedback_at` stamped via a tiny
+  `POST /api/applications/<id>/feedback-viewed` the first time
+  the applicant NGO loads a decided application; donor view shows
+  "applicant viewed feedback on X" / "applicant has not viewed
+  yet" as a small footer line. (d) `<WebhookHealthCard>` on the
+  operator dashboard rolling up 24h delivery: ok / failed /
+  retrying + the 3 noisiest webhooks. Backend
+  `GET /api/webhooks/admin/health`. (e) New
+  `POST /api/cron/donor-followup-nudge`: for declined apps older
+  than 14 days where the applicant has not viewed feedback, drop
+  a Now-rail notification on the donor users so they can reach
+  out personally. Cron health recorded via `record_cron_run`.
+
 - **2026-06-20** Phase 277-281 — Patterns + integrity surfaces:
   (a) `<LossPatternsCard>` on NGO dashboard counts
   `decision_reason_code` across past declines and surfaces the top

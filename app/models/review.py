@@ -25,6 +25,12 @@ class Review(db.Model):
     # admin, never to the NGO. Free-form text. Audit log entries
     # reference these by review_id.
     private_notes = db.Column(db.Text, nullable=True)
+    # Phase 283 — reviewer-disclosed conflict of interest. Set via
+    # POST /api/reviews/<id>/coi-flag. Logged to the audit chain + admins
+    # notified. Reviewer can recuse themselves up-front; admin reassigns.
+    coi_disclosed_at = db.Column(db.DateTime, nullable=True)
+    coi_kind = db.Column(db.String(60), nullable=True)  # employer_overlap | prior_consulting | family | other
+    coi_note = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
@@ -55,6 +61,9 @@ class Review(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'private_notes': self.private_notes,
+            'coi_disclosed_at': self.coi_disclosed_at.isoformat() if self.coi_disclosed_at else None,
+            'coi_kind': self.coi_kind,
+            'coi_note': self.coi_note,
             'reviewer_name': self.reviewer.name if self.reviewer else None,
             'application_title': self.application.grant.title if self.application and self.application.grant else None,
             'grant_title': self.application.grant.title if self.application and self.application.grant else None,

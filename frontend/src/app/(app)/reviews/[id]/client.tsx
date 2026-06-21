@@ -12,6 +12,7 @@ import { AiBadge } from '@/components/shared/ai-badge';
 import { AIFeedbackChip } from '@/components/shared/ai-feedback-chip';
 import { NgoHistoryPanel } from '@/components/applications/ngo-history-panel';
 import { ReviewerSummary } from '@/components/reviews/ReviewerSummary';
+import { ReviewerCoiBanner } from '@/components/reviews/reviewer-coi-banner';
 import { DecisionAuditDrawer } from '@/components/applications/DecisionAuditDrawer';
 // Phase 70 — page-shell primitive to match the rest of the design audit.
 import { PageShell, PageBack, PageHeader, PageMain } from '@/components/layout/page-shell';
@@ -355,6 +356,9 @@ export default function ReviewDetailClient() {
         primaryAction={<DecisionAuditDrawer applicationId={appId} />}
       />
       <PageMain>
+
+      {/* Phase 283 — reviewer self-discloses a conflict of interest. */}
+      <ReviewerCoiBanner reviewId={reviewId} />
 
       {/* Score summary card — org/grant/status are surfaced in PageHeader
           (Phase 70), so this card focuses on the three score tiles. */}
