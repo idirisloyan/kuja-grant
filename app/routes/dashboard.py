@@ -5780,3 +5780,77 @@ def api_dashboard_admin_active_grants_total():
              .filter(Grant.status.in_(['open', 'review']))
              .count())
     return jsonify({'count': count})
+
+
+@dashboard_bp.route('/ngo-withdrawn-count', methods=['GET'])
+@login_required
+def api_dashboard_ngo_withdrawn_count():
+    """Phase 583 — Count Application rows with withdrawn_at set for
+    the current NGO org. Lifetime withdrawal history.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    count = (Application.query
+             .filter(Application.ngo_org_id == current_user.org_id,
+                     Application.withdrawn_at.isnot(None))
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/donor-apps-awaiting-first-review', methods=['GET'])
+@login_required
+def api_dashboard_donor_apps_awaiting_first_review():
+    """Phase 584 — Donor's apps in submitted/in_review where
+    submitted_at > 7d ago AND no Review row carries an overall_score.
+    Surfaces apps stuck pre-scoring after the initial onboarding
+    window — distinct from Phase 518 (no reviewer assigned at all).
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import not_, exists
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    sub = (db.session.query(Review.id)
+           .filter(Review.application_id == Application.id,
+                   Review.overall_score.isnot(None)))
+    rows = (db.session.query(Application.id)
+            .join(Grant, Application.grant_id == Grant.id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.status.in_(['submitted', 'in_review']),
+                    Application.submitted_at.isnot(None),
+                    Application.submitted_at <= cutoff,
+                    not_(sub.exists()))
+            .all())
+    return jsonify({'count': len(rows)})
+
+
+@dashboard_bp.route('/reviewer-declined-count', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_declined_count():
+    """Phase 585 — Count of reviewer's Review rows with status='declined'.
+    Lifetime declines — calibration signal on what gets refused.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    count = (Review.query
+             .filter(Review.reviewer_user_id == current_user.id,
+                     Review.status == 'declined')
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/admin-compliance-snapshots-week', methods=['GET'])
+@login_required
+def api_dashboard_admin_compliance_snapshots_week():
+    """Phase 586 — Count of ComplianceSnapshot rows created in last
+    7 days. Compliance activity pulse at the platform level.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from app.models.compliance_snapshot import ComplianceSnapshot
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    count = (ComplianceSnapshot.query
+             .filter(ComplianceSnapshot.created_at >= cutoff)
+             .count())
+    return jsonify({'count': count})

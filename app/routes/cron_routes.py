@@ -4675,3 +4675,88 @@ def api_cron_assessments_week_digest():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/reviewer-decline-rate-feedback', methods=['POST'])
+def api_cron_reviewer_decline_rate_feedback():
+    """Phase 587 — Weekly reviewer feedback: per-reviewer count of
+    declines vs completes in last 30d. Honors digests opt-out;
+    skipped for reviewers with zero recent assignments.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Review, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from collections import defaultdict
+        from datetime import datetime, timezone, timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        rows = (db.session.query(Review.reviewer_user_id, Review.status)
+                .filter(Review.updated_at >= cutoff)
+                .all())
+        by_user = defaultdict(lambda: {'declined': 0, 'completed': 0, 'total': 0})
+        for uid, status in rows:
+            if uid is None:
+                continue
+            by_user[uid]['total'] += 1
+            if status == 'declined':
+                by_user[uid]['declined'] += 1
+            elif status == 'completed':
+                by_user[uid]['completed'] += 1
+        sent = 0
+        if by_user:
+            reviewers = (User.query
+                         .filter(User.role == 'reviewer',
+                                 User.id.in_(list(by_user.keys())))
+                         .all())
+            for u in reviewers:
+                stats = by_user.get(u.id, {})
+                if not stats or stats.get('total', 0) == 0:
+                    continue
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                rate = round(100 * stats['declined'] / stats['total'], 1)
+                msg = (
+                    f'Decline rate (30d): {rate}% '
+                    f'({stats["declined"]}/{stats["total"]} assignments).'
+                )
+                n = Notification(
+                    user_id=u.id,
+                    type='reviewer_decline_rate_feedback',
+                    title='Your decline rate this month',
+                    message=msg[:500],
+                    link='/reviews',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {'reviewers_active': len(by_user), 'notified': sent}
+        _rcr('reviewer-decline-rate-feedback',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('reviewer-decline-rate-feedback cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('reviewer-decline-rate-feedback',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

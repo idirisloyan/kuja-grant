@@ -83,6 +83,7 @@ import { SubmittedTodayStat } from '@/components/dashboards/submitted-today-stat
 import { EoiCountStat } from '@/components/dashboards/eoi-count-stat';
 import { RevisionRequestedStat } from '@/components/dashboards/revision-requested-stat';
 import { MostActiveGrantStat } from '@/components/dashboards/most-active-grant-stat';
+import { WithdrawnCountStat } from '@/components/dashboards/withdrawn-count-stat';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -245,6 +246,7 @@ export function AttentionNgoDashboard() {
       <EoiCountStat />
       <RevisionRequestedStat />
       <MostActiveGrantStat />
+      <WithdrawnCountStat />
       <NgoFeedbackThemesCard />
       <CriterionScoreTrendCard />
       <DeadlineDensityCard />

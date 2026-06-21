@@ -584,6 +584,23 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 583-587 — Withdrawn count + apps awaiting first
+  review + declined assignments + compliance snapshots this week +
+  reviewer decline-rate feedback cron:
+  (a) `<WithdrawnCountStat>` on NGO dashboard counts Application rows
+  with withdrawn_at set — lifetime withdrawal history.
+  (b) `<AppsAwaitingFirstReviewStat>` on donor dashboard counts apps
+  in submitted/in_review where submitted_at > 7d ago with no Review
+  carrying overall_score; amber tone — pre-scoring bottleneck
+  signal (distinct from Phase 518 no-reviewer-assigned).
+  (c) `<DeclinedCountStat>` on reviewer reviews page counts
+  Review.status='declined' lifetime — calibration on what gets
+  refused. (d) `<ComplianceSnapshotsWeekStat>` on operator dashboard
+  counts ComplianceSnapshot rows in last 7d. (e) Phase 587 cron
+  `/api/cron/reviewer-decline-rate-feedback` weekly reviewer
+  feedback digest reporting decline rate vs total assignments
+  last 30d; honors digests opt-out.
+
 - **2026-06-21** Phase 577-581 — Most active grant + EOI conversion
   rate + highest review score + active grants total + assessments
   weekly digest cron:
