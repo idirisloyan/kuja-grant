@@ -4198,3 +4198,108 @@ def api_dashboard_admin_ob_throughput_30d():
         'resolved_30d': resolved_count,
         'open': total_open,
     })
+
+
+@dashboard_bp.route('/ngo-funding-total-ytd', methods=['GET'])
+@login_required
+def api_dashboard_ngo_funding_total_ytd():
+    """Phase 475 — Sum of Grant.total_funding across this NGO's
+    applications transitioned to funded/awarded year-to-date.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    year_start = datetime(datetime.now(timezone.utc).year, 1, 1, tzinfo=timezone.utc)
+    rows = (db.session.query(Grant.total_funding, Grant.currency)
+            .join(Application, Application.grant_id == Grant.id)
+            .filter(Application.org_id == current_user.org_id,
+                    Application.status.in_(['funded', 'awarded']),
+                    Application.decision_recorded_at.isnot(None),
+                    Application.decision_recorded_at >= year_start,
+                    Grant.total_funding.isnot(None))
+            .all())
+    total = 0.0
+    currency = None
+    for amt, cur in rows:
+        try:
+            total += float(amt)
+        except (TypeError, ValueError):
+            pass
+        if currency is None and cur:
+            currency = cur
+    return jsonify({
+        'count': len(rows),
+        'total': round(total, 2),
+        'currency': currency,
+    })
+
+
+@dashboard_bp.route('/donor-active-reviewer-panel', methods=['GET'])
+@login_required
+def api_dashboard_donor_active_reviewer_panel():
+    """Phase 476 — Distinct reviewer_user_id values who completed at
+    least one review on donor's grants in the last 30 days.
+    """
+    if current_user.role not in ('donor', 'admin') or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    count = (db.session.query(Review.reviewer_user_id)
+             .join(Application, Application.id == Review.application_id)
+             .join(Grant, Application.grant_id == Grant.id)
+             .filter(Grant.donor_org_id == current_user.org_id,
+                     Review.status.in_(['submitted', 'scored', 'completed']),
+                     Review.completed_at.isnot(None),
+                     Review.completed_at >= cutoff)
+             .distinct().count())
+    return jsonify({'active_reviewers': count})
+
+
+@dashboard_bp.route('/reviewer-median-pending-age', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_median_pending_age():
+    """Phase 477 — Median days since assignment for the reviewer's
+    current pending/in_progress reviews. Self-gates < 3 pending.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['assigned', 'in_progress', 'pending']),
+                    Review.created_at.isnot(None))
+            .all())
+    now = datetime.now(timezone.utc)
+    ages = []
+    for r in rows:
+        c = r.created_at
+        if c.tzinfo is None:
+            c = c.replace(tzinfo=timezone.utc)
+        d = (now - c).days
+        if d >= 0:
+            ages.append(d)
+    if len(ages) < 3:
+        return jsonify({'median_days': None, 'pending': len(ages)})
+    ages.sort()
+    n = len(ages)
+    median = ages[n // 2] if n % 2 else (ages[n // 2 - 1] + ages[n // 2]) / 2
+    return jsonify({'median_days': round(median, 1), 'pending': n})
+
+
+@dashboard_bp.route('/admin-totp-enrollment-rate', methods=['GET'])
+@login_required
+def api_dashboard_admin_totp_enrollment_rate():
+    """Phase 478 — Percentage of users with totp_secret set. Distinct
+    from the raw "users without 2FA" count by surfacing the rate.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    total = User.query.count()
+    if total == 0:
+        return jsonify({'enrollment_pct': None, 'enrolled': 0, 'total': 0})
+    enrolled = User.query.filter(User.totp_secret.isnot(None)).count()
+    return jsonify({
+        'enrollment_pct': round(100.0 * enrolled / total, 1),
+        'enrolled': enrolled,
+        'total': total,
+    })

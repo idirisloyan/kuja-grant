@@ -584,6 +584,23 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 475-479 — Funding total YTD + active reviewer
+  panel + median pending review age + TOTP enrollment rate + review
+  pipeline summary cron:
+  (a) `<FundingTotalYtdStat>` on NGO dashboard sums Grant.total_funding
+  across funded apps year-to-date, emerald-themed callout. Self-gates
+  at zero. (b) `<ActiveReviewerPanelStat>` on donor dashboard counts
+  distinct reviewers who completed at least one review on donor's
+  grants in the last 30 days. (c) `<PendingAgeStat>` on reviewer
+  reviews page shows median days since assignment for current
+  assigned/in_progress reviews; tone-coded (amber ≥7, rose ≥14);
+  self-gates < 3 pending. (d) `<TotpEnrollmentCard>` on operator
+  dashboard shows % of users with totp_secret set; amber border <50%.
+  (e) Phase 479 cron `/api/cron/review-pipeline-summary` sends admins
+  a monthly digest with total reviews completed, mean turnaround,
+  and top 3 reviewers by completion count. Digests opt-out gated;
+  record_cron_run wired.
+
 - **2026-06-21** Phase 469-473 — Applications submitted YTD + grants
   funded YTD + reviewer low-score rate + OB throughput + unread
   broadcasts nudge cron:

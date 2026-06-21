@@ -3187,3 +3187,103 @@ def api_cron_ngo_unread_broadcasts_nudge():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/review-pipeline-summary', methods=['POST'])
+def api_cron_review_pipeline_summary():
+    """Phase 479 — Monthly admin digest. Reviews completed this 30-day
+    window, mean turnaround hours, top 3 most-active reviewers by
+    completion count. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Review, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+        from collections import Counter
+
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(days=30)
+        recent = (Review.query
+                  .filter(Review.status.in_(['submitted', 'scored', 'completed']),
+                          Review.completed_at.isnot(None),
+                          Review.completed_at >= since)
+                  .all())
+        total = len(recent)
+        durations = []
+        per_reviewer = Counter()
+        for r in recent:
+            if r.created_at and r.completed_at:
+                h = (r.completed_at - r.created_at).total_seconds() / 3600.0
+                if h >= 0:
+                    durations.append(h)
+            if r.reviewer_user_id:
+                per_reviewer[r.reviewer_user_id] += 1
+        mean_hours = round(sum(durations) / len(durations), 1) if durations else None
+
+        top_ids = [rid for rid, _ in per_reviewer.most_common(3)]
+        top_names = {}
+        if top_ids:
+            for uid, name in db.session.query(User.id, User.name).filter(
+                    User.id.in_(top_ids)).all():
+                top_names[uid] = name
+        top_parts = []
+        for rid in top_ids:
+            label = top_names.get(rid, f'User #{rid}')
+            top_parts.append(f'{label} ({per_reviewer[rid]})')
+
+        sent = 0
+        if total > 0:
+            msg_parts = [f'{total} reviews completed']
+            if mean_hours is not None:
+                msg_parts.append(f'mean turnaround {mean_hours}h')
+            if top_parts:
+                msg_parts.append('top: ' + ', '.join(top_parts))
+            msg = 'Review pipeline (30d): ' + ', '.join(msg_parts) + '.'
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='review_pipeline_summary',
+                    title='Monthly review pipeline summary',
+                    message=msg[:500],
+                    link='/admin/reviewers-workload',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {
+            'total_completed': total,
+            'mean_hours': mean_hours,
+            'top_reviewers': len(top_parts),
+            'admins_notified': sent,
+        }
+        _rcr('review-pipeline-summary',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('review-pipeline-summary cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('review-pipeline-summary',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

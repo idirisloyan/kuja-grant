@@ -65,6 +65,7 @@ import { DraftAgeStat } from '@/components/dashboards/draft-age-stat';
 import { CompletedAssessmentsStat } from '@/components/dashboards/completed-assessments-stat';
 import { UnreadMessagesStat } from '@/components/dashboards/unread-messages-stat';
 import { AppsSubmittedYtdStat } from '@/components/dashboards/apps-submitted-ytd-stat';
+import { FundingTotalYtdStat } from '@/components/dashboards/funding-total-ytd-stat';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -209,6 +210,7 @@ export function AttentionNgoDashboard() {
       <CompletedAssessmentsStat />
       <UnreadMessagesStat />
       <AppsSubmittedYtdStat />
+      <FundingTotalYtdStat />
       <NgoFeedbackThemesCard />
       <CriterionScoreTrendCard />
       <DeadlineDensityCard />

@@ -20,6 +20,7 @@ import { ScoringTimeAvgStat } from '@/components/reviews/scoring-time-avg-stat';
 import { HighScoreRateStat } from '@/components/reviews/high-score-rate-stat';
 import { MedianScoreStat } from '@/components/reviews/median-score-stat';
 import { LowScoreRateStat } from '@/components/reviews/low-score-rate-stat';
+import { PendingAgeStat } from '@/components/reviews/pending-age-stat';
 import { ReviewerResumeBanner } from '@/components/reviews/resume-banner';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -148,6 +149,7 @@ function ReviewerView() {
       <HighScoreRateStat />
       <MedianScoreStat />
       <LowScoreRateStat />
+      <PendingAgeStat />
       <MyCompletedThisWeek />
       <BandStreakTip />
       <ScoreDistributionCard />
