@@ -275,6 +275,69 @@ def create_app(config_name=None):
             app.logger.warning(f"Could not verify lockout columns (non-PostgreSQL or migration pending): {e}")
 
     # -----------------------------------------------------------------
+    # Robust per-ALTER bootstrap: every column gets its own transaction.
+    #
+    # Why this exists: the big monolithic block below ran every ALTER in
+    # one shared transaction. On Postgres, ANY failure aborts the whole
+    # tx — subsequent ALTERs return "current transaction is aborted" and
+    # silently no-op. We discovered prod was missing applications.withdrawn_at
+    # (Phase 145) because an earlier ALTER in the chain had failed, which
+    # poisoned every column added after it.
+    #
+    # This pass commits each ALTER independently so a single failure
+    # can't take down the rest. Only covers the post-Phase 145 columns
+    # that landed AFTER the original bootstrap got long enough to fail.
+    # -----------------------------------------------------------------
+    with app.app_context():
+        try:
+            from sqlalchemy import text, inspect as sa_inspect
+            inspector = sa_inspect(db.engine)
+            app_cols = set()
+            try:
+                app_cols = {c['name'] for c in inspector.get_columns('applications')}
+            except Exception:
+                pass
+            # (column_name, ddl) — each runs in its own short-lived tx.
+            per_column_alters = [
+                ('withdrawn_at',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS withdrawn_at TIMESTAMP'),
+                ('withdrawal_reason',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS withdrawal_reason TEXT'),
+                ('is_starred',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS is_starred BOOLEAN DEFAULT FALSE NOT NULL'),
+                ('applicant_viewed_feedback_at',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS applicant_viewed_feedback_at TIMESTAMP'),
+                ('outreach_initiated_at',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS outreach_initiated_at TIMESTAMP'),
+                ('outreach_initiated_by_user_id',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS outreach_initiated_by_user_id INTEGER'),
+                ('outreach_message_text',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS outreach_message_text TEXT'),
+                ('appeal_requested_at',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_requested_at TIMESTAMP'),
+                ('appeal_reason_text',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_reason_text TEXT'),
+                ('appeal_resolved_at',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_resolved_at TIMESTAMP'),
+                ('appeal_resolution',
+                 'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_resolution VARCHAR(20)'),
+            ]
+            for col_name, ddl in per_column_alters:
+                if col_name in app_cols:
+                    continue
+                # IF NOT EXISTS is Postgres-only; SQLite ignores; both swallow.
+                try:
+                    with db.engine.begin() as conn:
+                        conn.execute(text(ddl))
+                    app.logger.info(f"per-ALTER bootstrap added: applications.{col_name}")
+                except Exception as col_err:
+                    app.logger.warning(
+                        f"per-ALTER bootstrap failed for applications.{col_name}: {col_err}"
+                    )
+        except Exception as e:
+            app.logger.warning(f"per-ALTER bootstrap skipped entirely: {e}")
+
+    # -----------------------------------------------------------------
     # Ensure document versioning columns exist (added in v3.4)
     # Works on both PostgreSQL (ADD COLUMN IF NOT EXISTS) and SQLite (check pragma first)
     # -----------------------------------------------------------------
