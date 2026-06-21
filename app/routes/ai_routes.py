@@ -194,6 +194,84 @@ def api_ai_summarize_application():
     })
 
 
+@ai_bp.route('/polish-response', methods=['POST'])
+@login_required
+@role_required('ngo')
+def api_ai_polish_response():
+    """Phase 319 — Clarity-only polish on an in-progress response.
+
+    Distinct from `/ai/strengthen-section` (which tailors to the donor's
+    lens and adds rubric-specific tweaks). Polish keeps the meaning
+    intact — only improves grammar, flow, and concision. Returns the
+    polished text + 1-2 line summary of what changed.
+    """
+    ai_key = f"ai_{current_user.id}"
+    if ai_limiter.is_locked(ai_key):
+        return jsonify({'error': 'Too many AI requests. Please wait a moment.', 'success': False}), 429
+    ai_limiter.record_failure(ai_key)
+
+    data = get_request_json() or {}
+    text = (data.get('text') or '').strip()
+    if len(text) < 30:
+        return jsonify({'error': 'text must be at least 30 characters', 'success': False}), 400
+
+    system = (
+        "You are Kuja's clarity editor. The applicant has written a draft "
+        "response and wants it polished for grammar, flow, and concision. "
+        "Critical rules: NEVER invent facts, numbers, partners, or "
+        "programs not in the source. NEVER change the meaning. Keep the "
+        "applicant's voice. Return ONLY a JSON object: "
+        '{"polished": "<rewritten text>", "changes": ["<bullet 1>", "<bullet 2>"]}'
+    )
+    user_msg = f"Polish this response for clarity and concision only:\n\n{text[:4000]}"
+
+    polished_text = text
+    changes: list[str] = []
+    source = 'fallback'
+    try:
+        from app.services.ai_service import AIService
+        raw = AIService._call_claude(system=system, user_msg=user_msg, max_tokens=2000)
+        if raw:
+            import json as _json
+            try:
+                parsed = _json.loads(raw) if isinstance(raw, str) else raw
+                if isinstance(parsed, dict):
+                    polished_text = (parsed.get('polished') or text).strip()
+                    raw_changes = parsed.get('changes') or []
+                    if isinstance(raw_changes, list):
+                        changes = [str(c) for c in raw_changes][:4]
+                    source = 'claude'
+            except Exception:
+                pass
+    except Exception as e:
+        logger.debug('polish-response AI call failed: %s', e)
+
+    ai_call_id = None
+    try:
+        from app.services.replay_service import log_replayable_ai_call
+        ai_call_id = log_replayable_ai_call(
+            endpoint='ai-polish-response',
+            user_id=current_user.id,
+            input_text=text[:4000],
+            output_text=polished_text[:4000],
+            success=(source == 'claude'),
+            subject_kind=None,
+            subject_id=None,
+            org_id=getattr(current_user, 'org_id', None),
+            role=getattr(current_user, 'role', None),
+        )
+    except Exception:
+        ai_call_id = None
+
+    return jsonify({
+        'success': True,
+        'polished': polished_text,
+        'changes': changes,
+        'source': source,
+        'ai_call_id': ai_call_id,
+    })
+
+
 @ai_bp.route('/strengthen-section', methods=['POST'])
 @login_required
 @role_required('ngo')

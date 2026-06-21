@@ -989,6 +989,129 @@ def api_dashboard_donor_appeal_sla():
     })
 
 
+@dashboard_bp.route('/ai-human-agreement', methods=['GET'])
+@login_required
+def api_dashboard_ai_human_agreement():
+    """Phase 323 — Per-criterion agreement rate between AI score and the
+    average reviewer human score for this donor's grants.
+
+    Considers a pair "in agreement" when |ai - human| <= 10 points.
+    Returns rows sorted ascending by agreement_pct (most-divergent first).
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from collections import defaultdict
+    apps = (Application.query
+            .join(Grant)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.ai_rubric_result_json.isnot(None))
+            .all())
+
+    # criterion_key -> [(ai_score, human_score), ...]
+    pairs: dict[str, list[tuple[float, float]]] = defaultdict(list)
+    labels: dict[str, str] = {}
+
+    for a in apps:
+        rubric = a.get_ai_rubric_result() if hasattr(a, 'get_ai_rubric_result') else None
+        if not isinstance(rubric, dict):
+            continue
+        per = rubric.get('per_criterion') or rubric.get('scores') or {}
+        if a.grant and hasattr(a.grant, 'get_criteria'):
+            for c in (a.grant.get_criteria() or []):
+                if isinstance(c, dict):
+                    k = c.get('key') or c.get('id')
+                    if k:
+                        labels.setdefault(str(k), c.get('label') or str(k))
+        # Build per-criterion AI scores
+        ai_scores: dict[str, float] = {}
+        if isinstance(per, list):
+            for item in per:
+                if isinstance(item, dict):
+                    k = item.get('key') or item.get('id')
+                    v = item.get('score') or item.get('value')
+                    if k is not None and v is not None:
+                        try:
+                            ai_scores[str(k)] = float(v)
+                        except (TypeError, ValueError):
+                            pass
+        elif isinstance(per, dict):
+            for k, v in per.items():
+                try:
+                    val = float(v) if not isinstance(v, dict) else float(v.get('score') or v.get('value') or 0)
+                    ai_scores[str(k)] = val
+                except (TypeError, ValueError):
+                    pass
+        if not ai_scores:
+            continue
+        # Average reviewer human scores for this app, per criterion.
+        from app.models import Review
+        revs = Review.query.filter_by(application_id=a.id, status='completed').all()
+        human_by_crit: dict[str, list[float]] = defaultdict(list)
+        for r in revs:
+            scores = r.get_scores() or {}
+            for k, raw in scores.items():
+                if isinstance(raw, dict):
+                    raw = raw.get('score')
+                try:
+                    human_by_crit[str(k)].append(float(raw))
+                except (TypeError, ValueError):
+                    pass
+        for k, ai in ai_scores.items():
+            humans = human_by_crit.get(k, [])
+            if not humans:
+                continue
+            avg_h = sum(humans) / len(humans)
+            pairs[k].append((ai, avg_h))
+
+    out = []
+    for k, lst in pairs.items():
+        if len(lst) < 3:
+            continue
+        agree = sum(1 for ai, h in lst if abs(ai - h) <= 10)
+        out.append({
+            'key': k,
+            'label': labels.get(k, k),
+            'n': len(lst),
+            'agreement_pct': round(100 * agree / len(lst), 1),
+        })
+    out.sort(key=lambda r: r['agreement_pct'])
+    return jsonify({'criteria': out[:5], 'total_criteria_analyzed': len(out)})
+
+
+@dashboard_bp.route('/ai-cost-forecast', methods=['GET'])
+@login_required
+def api_dashboard_ai_cost_forecast():
+    """Phase 322 — Project month-end AI cost from trailing-7d daily rate.
+
+    Admin-only. Self-gates client-side when sample is too thin.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import text
+    now = datetime.now(timezone.utc)
+    seven_ago = now - timedelta(days=7)
+    try:
+        total_7d = db.session.execute(text(
+            "SELECT COALESCE(SUM(cost_usd), 0) FROM ai_call_logs WHERE created_at >= :c"
+        ), {'c': seven_ago}).scalar() or 0
+    except Exception:
+        total_7d = 0
+    try:
+        total_7d = float(total_7d)
+    except (TypeError, ValueError):
+        total_7d = 0.0
+    daily_avg = round(total_7d / 7, 2)
+    days_in_month = 30
+    projected = round(daily_avg * days_in_month, 2)
+    return jsonify({
+        'window_days': 7,
+        'total_7d': round(total_7d, 2),
+        'daily_avg': daily_avg,
+        'projected_monthly': projected,
+    })
+
+
 @dashboard_bp.route('/appeal-stats', methods=['GET'])
 @login_required
 def api_dashboard_appeal_stats():

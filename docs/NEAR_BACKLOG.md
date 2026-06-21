@@ -584,6 +584,24 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 319-323 — AI polish + reviewer onboarding +
+  cost / calibration insights:
+  (a) New `POST /api/ai/polish-response` — clarity-only AI rewrite
+  on a draft response (distinct from `/strengthen-section`, which
+  tailors to the donor's lens). Never invents facts. log_replayable
+  wired. (b) "Polish" button next to Strengthen on the apply page
+  proposal step; result renders inline with Accept / Dismiss
+  controls. (c) `<ReviewerFirstTimeTips>` overlay on /reviews/[id]
+  — 3 lightweight tips for first-time reviewers
+  (rubric scoring, private notes, COI disclosure). Persists
+  dismissal in localStorage. (d) `<AiCostForecastCard>` on operator
+  dashboard projects month-end AI cost from trailing 7-day daily
+  rate. Backend `GET /api/dashboard/ai-cost-forecast`. (e)
+  `<AiHumanAgreementCard>` on donor dashboard lists the 5 criteria
+  where AI score and average reviewer human score diverge most
+  (|ai - human| <= 10 = agree). Backend
+  `GET /api/dashboard/ai-human-agreement`.
+
 - **2026-06-20** Phase 313-317 — Appeal visibility across personas:
   (a) `<DonorAppealsCard>` on donor dashboard surfaces pending
   appeals on the donor's grants (backend reuses

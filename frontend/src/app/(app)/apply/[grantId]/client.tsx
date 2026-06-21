@@ -448,6 +448,9 @@ export default function ApplyWizardClient() {
   // /api/ai/strengthen-section.
   const [strengthenLoading, setStrengthenLoading] = useState<Record<string, boolean>>({});
   const [strengthenResults, setStrengthenResults] = useState<Record<string, StrengthenResult>>({});
+  // Phase 320 — lightweight polish (clarity only, no donor lens).
+  const [polishLoading, setPolishLoading] = useState<Record<string, boolean>>({});
+  const [polishResults, setPolishResults] = useState<Record<string, { polished: string; changes: string[] } | null>>({});
 
   const handleStrengthenSection = useCallback(
     async (criterion: Criterion) => {
@@ -501,6 +504,47 @@ export default function ApplyWizardClient() {
 
   const handleDismissStrengthen = useCallback((key: string) => {
     setStrengthenResults((prev) => ({ ...prev, [key]: { ...prev[key], visible: false } }));
+  }, []);
+
+  // Phase 320 — Polish (clarity only) handler.
+  const handlePolishSection = useCallback(
+    async (criterion: Criterion) => {
+      const currentText = responses[criterion.key] ?? '';
+      if (currentText.trim().length < 30) {
+        toast.error(t('apply.strengthen_failed'));
+        return;
+      }
+      setPolishLoading((p) => ({ ...p, [criterion.key]: true }));
+      try {
+        const res = await api.post<{ polished: string; changes: string[]; source: string }>(
+          '/ai/polish-response',
+          { text: currentText }
+        );
+        if (res?.polished) {
+          setPolishResults((prev) => ({
+            ...prev,
+            [criterion.key]: { polished: res.polished, changes: res.changes || [] },
+          }));
+        }
+      } catch {
+        toast.error(t('apply.strengthen_failed'));
+      } finally {
+        setPolishLoading((p) => ({ ...p, [criterion.key]: false }));
+      }
+    },
+    [responses, t],
+  );
+
+  const handleAcceptPolish = useCallback((key: string) => {
+    setPolishResults((prev) => {
+      const r = prev[key];
+      if (r) setResponses((rPrev) => ({ ...rPrev, [key]: r.polished }));
+      return { ...prev, [key]: null };
+    });
+  }, []);
+
+  const handleDismissPolish = useCallback((key: string) => {
+    setPolishResults((prev) => ({ ...prev, [key]: null }));
   }, []);
 
   const handleDraftSection = useCallback(
@@ -900,6 +944,11 @@ export default function ApplyWizardClient() {
           strengthenResults={strengthenResults}
           onStrengthenSection={handleStrengthenSection}
           onDismissStrengthen={handleDismissStrengthen}
+          polishLoading={polishLoading}
+          polishResults={polishResults}
+          onPolishSection={handlePolishSection}
+          onAcceptPolish={handleAcceptPolish}
+          onDismissPolish={handleDismissPolish}
           onDraftApplied={(newResponses) => {
             // Merge AI draft into local form state. The backend has already
             // persisted the draft; this updates the visible textareas so the
@@ -1102,6 +1151,11 @@ function ProposalStep({
   strengthenResults,
   onStrengthenSection,
   onDismissStrengthen,
+  polishLoading,
+  polishResults,
+  onPolishSection,
+  onAcceptPolish,
+  onDismissPolish,
   onDraftApplied,
 }: {
   grantId: number | null;
@@ -1122,6 +1176,11 @@ function ProposalStep({
   strengthenResults: Record<string, StrengthenResult>;
   onStrengthenSection: (criterion: Criterion) => void;
   onDismissStrengthen: (key: string) => void;
+  polishLoading: Record<string, boolean>;
+  polishResults: Record<string, { polished: string; changes: string[] } | null>;
+  onPolishSection: (criterion: Criterion) => void;
+  onAcceptPolish: (key: string) => void;
+  onDismissPolish: (key: string) => void;
   onDraftApplied: (responses: Record<string, string>) => void;
 }) {
   const { t } = useTranslation();
@@ -1366,6 +1425,16 @@ function ProposalStep({
                   )}
                   {isLoadingStrengthen ? t('apply.strengthening') : t('apply.strengthen_against_criterion')}
                 </button>
+                {/* Phase 320 — Polish for clarity (no donor lens). */}
+                <button
+                  onClick={() => onPolishSection(c)}
+                  disabled={text.trim().length < 30 || polishLoading[c.key]}
+                  title="Improve grammar + flow without changing meaning"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  {polishLoading[c.key] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {polishLoading[c.key] ? 'Polishing…' : 'Polish'}
+                </button>
                 <button
                   onClick={() => onGetGuidance(c)}
                   disabled={!text.trim() || isLoadingGuidance}
@@ -1380,6 +1449,37 @@ function ProposalStep({
                 </button>
               </div>
             </div>
+
+            {polishResults[c.key] && (
+              <div className="mt-3 rounded-[10px] border border-emerald-200 bg-emerald-50/70 dark:bg-emerald-950/20 p-3 text-sm space-y-2">
+                <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 inline-flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Polished
+                </p>
+                <p className="whitespace-pre-wrap text-sm">{polishResults[c.key]!.polished}</p>
+                {polishResults[c.key]!.changes.length > 0 && (
+                  <ul className="text-xs text-muted-foreground list-disc ml-5">
+                    {polishResults[c.key]!.changes.map((ch, i) => <li key={i}>{ch}</li>)}
+                  </ul>
+                )}
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => onDismissPolish(c.key)}
+                    className="text-xs px-2.5 py-1 rounded-md border border-border"
+                  >
+                    Dismiss
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAcceptPolish(c.key)}
+                    className="text-xs px-2.5 py-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                  >
+                    Accept
+                  </button>
+                </div>
+              </div>
+            )}
 
             {strengthen?.visible && (
               <div className="relative mt-3 rounded-[10px] border border-[hsl(var(--kuja-clay)/0.25)] bg-[hsl(var(--kuja-sand-50))] p-4">
