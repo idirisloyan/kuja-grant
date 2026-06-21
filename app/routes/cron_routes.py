@@ -801,6 +801,105 @@ def api_cron_donor_closing_grants():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/ngo-sector-grants-digest', methods=['POST'])
+def api_cron_ngo_sector_grants_digest():
+    """Phase 407 — Weekly digest to each NGO listing newly-published
+    grants whose sectors overlap with the NGO's org.sectors.
+    Honors the digests opt-out (Phase 326). Skips NGOs with no
+    sectors set on their org.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            Grant, User, Organization, Notification,
+            record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+
+        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        new_grants = (Grant.query
+                      .filter(Grant.status == 'open',
+                              Grant.published_at.isnot(None),
+                              Grant.published_at >= week_ago)
+                      .all())
+        if not new_grants:
+            result = {'new_grants': 0, 'digests_sent': 0}
+            _rcr('ngo-sector-grants-digest',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=True, summary=str(result)[:480])
+            return jsonify({'success': True, 'result': result})
+
+        ngo_users = (User.query
+                     .filter(User.role == 'ngo',
+                             User.org_id.isnot(None))
+                     .all())
+        sent = 0
+        for u in ngo_users:
+            channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+            if not channels:
+                continue
+            org = Organization.query.get(u.org_id) if u.org_id else None
+            if not org:
+                continue
+            org_sectors = set((s or '').strip().lower()
+                              for s in (org.get_sectors() if hasattr(org, 'get_sectors') else [])
+                              if s)
+            if not org_sectors:
+                continue
+            matches = []
+            for g in new_grants:
+                grant_sectors = set((s or '').strip().lower()
+                                    for s in (g.get_sectors() if hasattr(g, 'get_sectors') else [])
+                                    if s)
+                if grant_sectors & org_sectors:
+                    matches.append(g)
+            if not matches:
+                continue
+            titles = ', '.join(g.title[:50] for g in matches[:3])
+            msg = f'{len(matches)} new grant{"s" if len(matches) != 1 else ""} in your sectors: {titles}'
+            n = Notification(
+                user_id=u.id,
+                type='ngo_sector_grants',
+                title='New grants matching your sectors',
+                message=msg[:500],
+                link='/grants',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+
+        result = {
+            'new_grants': len(new_grants),
+            'ngos_scanned': len(ngo_users),
+            'digests_sent': sent,
+        }
+        _rcr('ngo-sector-grants-digest',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ngo-sector-grants-digest cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ngo-sector-grants-digest',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/donor-decisions-backlog', methods=['POST'])
 def api_cron_donor_decisions_backlog():
     """Phase 401 — Weekly digest to each donor org's users summarising

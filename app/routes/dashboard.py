@@ -2233,6 +2233,102 @@ def api_dashboard_donor_fastest_reviewer():
     })
 
 
+@dashboard_bp.route('/ngo-feedback-themes', methods=['GET'])
+@login_required
+def api_dashboard_ngo_feedback_themes():
+    """Phase 403 — Top decision_reason_code values across this NGO's
+    declined applications. Lets the NGO see patterns in why they're
+    being passed over.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from collections import Counter
+    rows = (Application.query
+            .filter(Application.ngo_org_id == current_user.org_id,
+                    Application.status.in_(['declined', 'rejected']),
+                    Application.decision_reason_code.isnot(None))
+            .with_entities(Application.decision_reason_code)
+            .all())
+    counts = Counter((c[0] or '').strip() for c in rows if c[0])
+    counts.pop('', None)
+    out = [{'reason_code': k, 'count': v}
+           for k, v in counts.most_common(3)]
+    return jsonify({'themes': out, 'total': sum(counts.values())})
+
+
+@dashboard_bp.route('/donor-starred-queue', methods=['GET'])
+@login_required
+def api_dashboard_donor_starred_queue():
+    """Phase 404 — Count of applications on this donor's grants that
+    are starred (is_starred=True) but not yet decided. Quick read of
+    "ready-to-call" inventory.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    PENDING = ['submitted', 'under_review', 'scored', 'revision_requested']
+    count = (Application.query
+             .join(Grant)
+             .filter(Grant.donor_org_id == current_user.org_id,
+                     Application.is_starred.is_(True),
+                     Application.status.in_(PENDING))
+             .count())
+    return jsonify({'starred_pending': count})
+
+
+@dashboard_bp.route('/reviews-completed-this-week', methods=['GET'])
+@login_required
+def api_dashboard_reviews_completed_this_week():
+    """Phase 405 — Count of the reviewer's reviews completed in the
+    last 7 days. Lightweight motivator stat.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    count = Review.query.filter(
+        Review.reviewer_user_id == current_user.id,
+        Review.status.in_(['submitted', 'scored', 'completed']),
+        Review.completed_at.isnot(None),
+        Review.completed_at >= cutoff,
+    ).count()
+    return jsonify({'completed_this_week': count})
+
+
+@dashboard_bp.route('/slowest-cron', methods=['GET'])
+@login_required
+def api_dashboard_slowest_cron():
+    """Phase 406 — Slowest cron run in the last 24h. Health signal —
+    spikes can indicate runaway queries or external API trouble.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import text as _text
+    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+    try:
+        row = db.session.execute(_text(
+            "SELECT name, duration_ms, ran_at "
+            "FROM cron_runs WHERE ran_at >= :c "
+            "ORDER BY duration_ms DESC NULLS LAST LIMIT 1"
+        ), {'c': cutoff}).first()
+    except Exception:
+        try:
+            row = db.session.execute(_text(
+                "SELECT name, duration_ms, ran_at "
+                "FROM cron_runs WHERE ran_at >= :c "
+                "ORDER BY duration_ms DESC LIMIT 1"
+            ), {'c': cutoff}).first()
+        except Exception:
+            row = None
+    if not row:
+        return jsonify({'name': None, 'duration_ms': None})
+    return jsonify({
+        'name': row.name,
+        'duration_ms': int(row.duration_ms or 0),
+        'ran_at': row.ran_at.isoformat() if row.ran_at else None,
+    })
+
+
 @dashboard_bp.route('/donor-track-record/<int:donor_org_id>', methods=['GET'])
 @login_required
 def api_dashboard_donor_track_record(donor_org_id):

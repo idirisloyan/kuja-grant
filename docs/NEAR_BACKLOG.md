@@ -584,6 +584,27 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 403-407 — Feedback themes + starred
+  queue + completed-this-week + slowest-cron + sector-matching
+  grants digest:
+  (a) `<NgoFeedbackThemesCard>` on NGO dashboard shows top 3
+  decision_reason_code values across the NGO's declined apps.
+  Backend `GET /api/dashboard/ngo-feedback-themes`. (b)
+  `<StarredQueueCard>` on donor dashboard counts apps starred
+  but not yet decided across the donor's grants. Backend
+  `GET /api/dashboard/donor-starred-queue`. (c) `<MyCompletedThisWeek>`
+  added to `/reviews` header stats — count of the reviewer's
+  reviews completed in the last 7 days. Backend
+  `GET /api/dashboard/reviews-completed-this-week`. Pivoted
+  from time-on-task (no persistent column). (d)
+  `<SlowestCronCard>` on operator dashboard shows the slowest
+  cron run in the last 24h from cron_runs.duration_ms; amber
+  border >=30s. Backend `GET /api/dashboard/slowest-cron`.
+  Pivoted from schema-migration warnings (no persistence).
+  (e) New `POST /api/cron/ngo-sector-grants-digest` weekly
+  digest of newly-published grants whose sectors overlap with
+  each NGO's org.sectors. Honors digests opt-out.
+
 - **2026-06-20** Phase 397-401 — Donor track record + grants
   by status + scoring rubric bands + DB row counts + decisions
   backlog cron:
