@@ -2233,6 +2233,127 @@ def api_dashboard_donor_fastest_reviewer():
     })
 
 
+@dashboard_bp.route('/ngo-app-reviewer-mix/<int:application_id>', methods=['GET'])
+@login_required
+def api_dashboard_ngo_app_reviewer_mix(application_id):
+    """Phase 415 — Reviewer-mix summary for an NGO's application:
+    total reviewers, active vs completed, % progress. No reviewer
+    names exposed.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    app_ = Application.query.get(application_id)
+    if not app_ or app_.ngo_org_id != current_user.org_id:
+        return jsonify({'error': 'not found'}), 404
+    rows = Review.query.filter_by(application_id=app_.id).all()
+    total = len(rows)
+    active = sum(1 for r in rows if r.status in ('assigned', 'in_progress', 'reviewing'))
+    completed = sum(1 for r in rows if r.status in ('submitted', 'scored', 'completed'))
+    pct = round(100 * completed / total, 0) if total > 0 else None
+    return jsonify({
+        'application_id': app_.id,
+        'total_reviewers': total,
+        'active': active,
+        'completed': completed,
+        'progress_pct': pct,
+    })
+
+
+@dashboard_bp.route('/donor-review-pipeline', methods=['GET'])
+@login_required
+def api_dashboard_donor_review_pipeline():
+    """Phase 416 — Counts of reviews by status across this donor's
+    grants. Snapshot of where the donor's review workload sits.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    rows = (db.session.query(Review.status, Review.snoozed_until)
+            .join(Application, Application.id == Review.application_id)
+            .join(Grant, Grant.id == Application.grant_id)
+            .filter(Grant.donor_org_id == current_user.org_id)
+            .all())
+    counts = {
+        'assigned': 0,
+        'in_progress': 0,
+        'completed': 0,
+        'snoozed': 0,
+    }
+    for status, snoozed_until in rows:
+        if snoozed_until and snoozed_until > now:
+            counts['snoozed'] += 1
+            continue
+        if status == 'assigned':
+            counts['assigned'] += 1
+        elif status in ('in_progress', 'reviewing'):
+            counts['in_progress'] += 1
+        elif status in ('submitted', 'scored', 'completed'):
+            counts['completed'] += 1
+    return jsonify({'counts': counts, 'total': len(rows)})
+
+
+@dashboard_bp.route('/reviewer-score-distribution', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_score_distribution():
+    """Phase 417 — 10-bucket histogram of this reviewer's overall_score
+    across reviews completed in the last 30 days. Self-calibration tool.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff,
+                    Review.overall_score.isnot(None))
+            .with_entities(Review.overall_score)
+            .all())
+    buckets = [0] * 10  # 0-9, 10-19, ..., 90-100
+    for (score,) in rows:
+        try:
+            idx = max(0, min(9, int(float(score) // 10)))
+            buckets[idx] += 1
+        except (TypeError, ValueError):
+            continue
+    return jsonify({
+        'window_days': 30,
+        'buckets': buckets,
+        'total': sum(buckets),
+    })
+
+
+@dashboard_bp.route('/new-signups-weekly', methods=['GET'])
+@login_required
+def api_dashboard_new_signups_weekly():
+    """Phase 418 — Count of users created this week vs prior week.
+    User-growth signal. (Pivoted from "inactive users" — no
+    last_login_at column exists on User.)
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    recent_start = now - timedelta(days=7)
+    prior_start = now - timedelta(days=14)
+    recent = User.query.filter(
+        User.created_at.isnot(None),
+        User.created_at >= recent_start,
+    ).count()
+    prior = User.query.filter(
+        User.created_at.isnot(None),
+        User.created_at >= prior_start,
+        User.created_at < recent_start,
+    ).count()
+    return jsonify({
+        'this_week': recent,
+        'last_week': prior,
+        'delta': recent - prior,
+    })
+
+
 @dashboard_bp.route('/peer-funded-snippets/<int:grant_id>', methods=['GET'])
 @login_required
 def api_dashboard_peer_funded_snippets(grant_id):

@@ -801,6 +801,80 @@ def api_cron_donor_closing_grants():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/trust-profile-freshness', methods=['POST'])
+def api_cron_trust_profile_freshness():
+    """Phase 419 — Quarterly nudge: NGOs whose Organization.assess_date
+    is more than 180 days old (or null) get a notification to refresh
+    their trust profile. Distinct from Phase 310 (which targets
+    incomplete profiles); this targets stale ones.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Organization, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=180)
+        ngo_users = (User.query
+                     .filter(User.role == 'ngo', User.org_id.isnot(None))
+                     .all())
+        sent = 0
+        for u in ngo_users:
+            channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+            if not channels:
+                continue
+            org = Organization.query.get(u.org_id) if u.org_id else None
+            if not org:
+                continue
+            assessed = org.assess_date
+            if assessed and assessed >= cutoff:
+                continue
+            n = Notification(
+                user_id=u.id,
+                type='trust_profile_stale',
+                title='Refresh your trust profile',
+                message=(
+                    'Your trust profile was last updated '
+                    f'{("more than 180 days ago" if assessed else "a while ago")}. '
+                    'Re-run the capacity assessment so donors see your current state.'
+                )[:500],
+                link='/trust',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {
+            'ngos_scanned': len(ngo_users),
+            'digests_sent': sent,
+        }
+        _rcr('trust-profile-freshness',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('trust-profile-freshness cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('trust-profile-freshness',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/top-ai-cost-endpoints', methods=['POST'])
 def api_cron_top_ai_cost_endpoints():
     """Phase 413 — Monthly digest to admins: top 5 AI endpoints by

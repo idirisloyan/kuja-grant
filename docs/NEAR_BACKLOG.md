@@ -584,6 +584,29 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 415-419 — Reviewer mix + review pipeline +
+  score distribution + new signups + profile-freshness cron:
+  (a) `<ReviewerMix>` inline on application detail page (NGO
+  view) shows "N/M reviewers complete · K in progress" without
+  naming reviewers. Backend
+  `GET /api/dashboard/ngo-app-reviewer-mix/<id>`. (b)
+  `<ReviewPipelineCard>` on donor dashboard counts reviews by
+  status (assigned/in_progress/completed/snoozed) across the
+  donor's grants. Backend
+  `GET /api/dashboard/donor-review-pipeline`. (c)
+  `<ScoreDistributionCard>` on /reviews shows a 10-bucket
+  histogram of the reviewer's overall_score across the last 30
+  days. Backend
+  `GET /api/dashboard/reviewer-score-distribution`. (d)
+  `<NewSignupsCard>` on operator dashboard shows new user
+  signups this week vs last week. Backend
+  `GET /api/dashboard/new-signups-weekly`. Pivoted from
+  inactive-users (no last_login_at on User). (e) New
+  `POST /api/cron/trust-profile-freshness` quarterly nudge to
+  NGOs whose Organization.assess_date is >180 days old.
+  Distinct from Phase 310 (incomplete profiles); this targets
+  stale ones. Honors digests opt-out.
+
 - **2026-06-20** Phase 409-413 — Peer funded snippets + SLA
   breach trend + 5-in-a-row band streak + audit chain rate +
   top AI cost cron:

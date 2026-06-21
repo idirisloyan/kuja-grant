@@ -55,6 +55,7 @@ import { StaleNotificationsCard } from '@/components/dashboards/stale-notificati
 import { DbRowCountsCard } from '@/components/dashboards/db-row-counts-card';
 import { SlowestCronCard } from '@/components/dashboards/slowest-cron-card';
 import { AuditChainRateCard } from '@/components/dashboards/audit-chain-rate-card';
+import { NewSignupsCard } from '@/components/dashboards/new-signups-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -320,6 +321,7 @@ export function AttentionOperatorDashboard() {
         <DbRowCountsCard />
         <SlowestCronCard />
         <AuditChainRateCard />
+        <NewSignupsCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}
