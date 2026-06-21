@@ -35,6 +35,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isDev, setIsDev] = useState(false);
+  // hydrated flips true after React mounts. Until then the submit button
+  // stays disabled so a native HTML form submission can't fire — without
+  // this, a user on a slow connection who clicks "Sign in" (or hits
+  // Enter) before the JS chunks land triggers the form's default GET
+  // submit, leaks credentials into the URL, and never reaches the API.
+  // CSP form-action 'self' blocks the javascript:void(0) escape hatch,
+  // so disabling the trigger is the only robust option.
+  const [hydrated, setHydrated] = useState(false);
   const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({});
   const { t } = useTranslation();
   const network = useNetworkStore((s) => s.network);
@@ -44,6 +52,7 @@ export default function LoginPage() {
   const tenantBrandDark = network?.brand_color_hex || '#7C2D12';
 
   useEffect(() => {
+    setHydrated(true);
     setIsDev(
       typeof window !== 'undefined' && (
         window.location.hostname === 'localhost' ||
@@ -237,17 +246,19 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* action="javascript:void(0)" makes the native HTML form
-                submission a no-op. Without it, a user on a slow
-                connection who hits Enter (or clicks Sign in) BEFORE
-                React hydrates triggers a default GET submission that
-                lands them on /login/?email=foo&password=bar — the
-                credentials leak into the URL and no API call ever
-                fires. Caught by mobile_test.py running on slow-3G. */}
+            {/* Submission is gated by the `hydrated` flag (see useState
+                above). Until React mounts, the submit button is
+                `type="button"` (not `type="submit"`), so neither
+                clicking it nor pressing Enter in an input can trigger
+                the form's default HTML GET submission. Without this,
+                slow connections leak credentials into the URL as
+                /login/?email=foo&password=bar. Caught by mobile_test.py
+                on slow-3G; CSP form-action 'self' rules out the
+                simpler javascript:void(0) escape. */}
             <form
               onSubmit={handleSubmit}
               noValidate
-              action="javascript:void(0)"
+              method="dialog"
               className="space-y-4"
             >
               <div className="space-y-1.5">
@@ -289,13 +300,17 @@ export default function LoginPage() {
               </div>
 
               <Button
-                type="submit"
-                disabled={isLoading}
+                type={hydrated ? 'submit' : 'button'}
+                disabled={isLoading || !hydrated}
                 className="w-full h-10 bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white font-medium"
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…
+                  </>
+                ) : !hydrated ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
                   </>
                 ) : (
                   <>
