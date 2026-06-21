@@ -173,21 +173,27 @@ export function AttentionNgoDashboard() {
     <PageShell>
       <PageHeader
         title={`Hi ${firstName}.`}
-        subtitle="Your workbench. Continue where you left off."
+        subtitle="Here's what to do next."
       />
 
-      {/* Phase 92 — Continuous journey thread. Sits ABOVE today's-focus
-          because it gives the through-line: the NGO sees not just what
-          to do today but where this fits in the broader path from
-          profile to funded to compliant to reporting impact. */}
-      <JourneyTracker />
-      {/* Phase 82 — sharpest possible 'what to do today' line. Picks
-          the top-priority attention item and surfaces it as one bold
-          headline with a single CTA. Page-attention list still renders
-          below for the full picture. */}
-      <TodayFocusBanner items={attention} />
-      {/* Phase 84 — Resume where you left off. Reads from localStorage. */}
+      {/* Phase 616 — "one obvious next action" pass per team retest
+          feedback (2026-06-21). The previous order put a 5-step journey
+          tracker between the user and their next action; new order is
+          strictly priority-driven so the eye lands on something
+          actionable.
+
+          1. ResumeBanner — self-gates on autosaved work; if you were
+             mid-draft, finishing it IS your next action.
+          2. TodayFocusBanner — sharpest single-sentence CTA pulled from
+             the prioritised attention list; renders an "all caught up"
+             state when there's nothing.
+
+          Journey tracker is informational orientation, not action — it
+          moved below the action tiles, where it provides "where am I
+          in the bigger picture" without competing with "what to do
+          right now." */}
       <ResumeBanner />
+      <TodayFocusBanner items={attention} />
       <PageAttention items={attention} />
 
       {/* Phase 613 — Action-driving tiles only above the fold. The team

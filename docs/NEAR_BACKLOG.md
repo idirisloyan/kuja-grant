@@ -12,6 +12,41 @@
 
 ## High priority
 
+### Real-device mobile + offline testing program
+- **last_touched:** 2026-06-21
+- **Why:** Per team feedback (2026-06-21 retest assessment, scoring path
+  to 10/10): simulated slow-3G via Playwright CDP throttling (shipped
+  in Phase 615 `mobile_test.py`) catches network-class bugs — and it
+  already did, exposing a real login hydration race the team had been
+  hitting on phones. But it can't reproduce device-class behaviour:
+  Samsung Internet quirks, iOS Safari PWA + offline, low-RAM swap
+  pressure on $80 Androids, battery throttling, screen-reader paths
+  through the actual mobile OS, the keyboard's autofill UX, etc.
+- **Action:** Stand up a real-device test cycle. Minimum loop:
+  1. **Device matrix.** Pick 3 representative phones — one current iOS,
+     one budget Android (Samsung A-series or similar), one low-end
+     legacy Android — and document them in this file. Borrow team
+     phones or use a service (BrowserStack/LambdaTest).
+  2. **Scripted user journeys.** Each release candidate is walked
+     through the same 6 flows (NGO login → draft → save → submit,
+     reviewer assign + score, donor decision + appeal response) on
+     each device. Pass/fail recorded in a doc with timestamps and
+     screen recordings of any failures.
+  3. **Offline + bad-network sweeps.** Disable wifi mid-flow on each
+     device (forces the PWA outbox + sync to actually run), then
+     reconnect and verify drafts/decisions sync correctly. Test
+     "two bars then nothing" (cell shoulder) by walking outside.
+  4. **Accessibility.** Run VoiceOver (iOS) and TalkBack (Android) on
+     /login, /dashboard, /apply/[id] — capture the announcement
+     transcripts.
+  5. **Cadence + ownership.** Decide whether this is per-release
+     (slow) or weekly (better). Name the human owner and write the
+     SOP into this backlog.
+- **Deferred-not-skipped:** the team explicitly flagged this as a
+  path-to-10 item but asked us to backlog it (not do it now). When
+  picked up, this is bigger than a "test script" — it's a
+  monthly-or-better discipline plus tooling investment.
+
 ### Set up a real domain for NEAR
 - **last_touched:** 2026-05-28
 - **Why:** Team is bookmarking `?network=near` on the Railway URL during
