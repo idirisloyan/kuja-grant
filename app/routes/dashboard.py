@@ -2233,6 +2233,103 @@ def api_dashboard_donor_fastest_reviewer():
     })
 
 
+@dashboard_bp.route('/ngo-pipeline-value', methods=['GET'])
+@login_required
+def api_dashboard_ngo_pipeline_value():
+    """Phase 367 — Total dollar value of grants this NGO has pending
+    decisions on (status in submitted/under_review/scored/revision_requested).
+    Helps the NGO see what's at stake right now.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    PENDING = ['submitted', 'under_review', 'scored', 'revision_requested']
+    rows = (db.session.query(Grant.total_funding, Grant.currency, Application.id)
+            .join(Application, Application.grant_id == Grant.id)
+            .filter(Application.ngo_org_id == current_user.org_id,
+                    Application.status.in_(PENDING))
+            .all())
+    by_currency = {}
+    count = 0
+    for amt, cur, _ in rows:
+        if amt is None:
+            continue
+        cur = cur or 'USD'
+        by_currency[cur] = by_currency.get(cur, 0.0) + float(amt)
+        count += 1
+    out = [{'currency': c, 'amount': round(v, 2)}
+           for c, v in sorted(by_currency.items(), key=lambda kv: kv[1], reverse=True)]
+    return jsonify({
+        'applications': len(rows),
+        'with_amount': count,
+        'totals': out,
+    })
+
+
+@dashboard_bp.route('/donor-decision-concentration', methods=['GET'])
+@login_required
+def api_dashboard_donor_decision_concentration():
+    """Phase 368 — % of this donor's funded volume that flows to its
+    top-third NGOs by funding count. >70% suggests concentration risk.
+    Returns null when fewer than 6 funded NGOs (too small to bucket).
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from collections import Counter
+    rows = (Application.query
+            .join(Grant)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.status.in_(['funded', 'awarded']))
+            .with_entities(Application.ngo_org_id)
+            .all())
+    counts = Counter(r[0] for r in rows if r[0])
+    n = len(counts)
+    if n < 6:
+        return jsonify({'concentration_pct': None, 'reason': 'too_few_grantees',
+                        'unique_grantees': n})
+    top_n = max(1, n // 3)
+    top_count = sum(c for _, c in counts.most_common(top_n))
+    total = sum(counts.values())
+    pct = round(100 * top_count / total, 1) if total > 0 else None
+    return jsonify({
+        'concentration_pct': pct,
+        'unique_grantees': n,
+        'top_third_size': top_n,
+        'top_third_fundings': top_count,
+        'total_fundings': total,
+    })
+
+
+@dashboard_bp.route('/ai-cost-per-app', methods=['GET'])
+@login_required
+def api_dashboard_ai_cost_per_app():
+    """Phase 370 — Average AI dollar spend per submitted application
+    over the last 30 days. Admin-only unit-economics signal.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import text as _text
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    try:
+        total_cost = db.session.execute(_text(
+            "SELECT COALESCE(SUM(cost_usd), 0) FROM ai_call_logs WHERE created_at >= :c"
+        ), {'c': cutoff}).scalar() or 0
+        total_cost = float(total_cost)
+    except Exception:
+        total_cost = 0.0
+    submitted = Application.query.filter(
+        Application.submitted_at.isnot(None),
+        Application.submitted_at >= cutoff,
+    ).count()
+    avg = round(total_cost / submitted, 4) if submitted > 0 else None
+    return jsonify({
+        'window_days': 30,
+        'total_ai_cost_usd': round(total_cost, 2),
+        'applications_submitted': submitted,
+        'avg_cost_per_app_usd': avg,
+    })
+
+
 @dashboard_bp.route('/duplicate-orgs', methods=['GET'])
 @login_required
 def api_dashboard_duplicate_orgs():

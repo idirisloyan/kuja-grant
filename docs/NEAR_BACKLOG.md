@@ -584,6 +584,27 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 367-371 — Pipeline value + portfolio
+  concentration + reviewer "Next up" CTA + AI cost per app +
+  peer-comparison digest:
+  (a) `<NgoPipelineValueCard>` on NGO dashboard sums grant funding
+  value across pending applications, grouped by currency. Backend
+  `GET /api/dashboard/ngo-pipeline-value`. (b)
+  `<DecisionConcentrationCard>` on donor dashboard shows the % of
+  funded decisions concentrated on the top-third NGOs by funding
+  count; warns amber when >=70%. Backend
+  `GET /api/dashboard/donor-decision-concentration`. Self-gates
+  under 6 unique grantees. (c) `<NextReviewCta>` on the reviewer
+  dashboard renders a one-click "Continue" link to the reviewer's
+  oldest open review (skipping snoozed). Backend
+  `GET /api/reviews/next-up`. (d) `<AiCostPerAppCard>` on operator
+  dashboard shows the rolling 30-day average AI dollar spend per
+  submitted application. Backend
+  `GET /api/dashboard/ai-cost-per-app`. (e) New
+  `POST /api/cron/ngo-peer-comparison-digest` sends each NGO a
+  weekly compare-to-sector-median digest (submissions + decisions)
+  via the Phase 326 digests opt-out.
+
 - **2026-06-20** Phase 361-365 — Stalled apps + fastest reviewer +
   turnaround stat + duplicate-org guard + monthly leaderboard:
   (a) `<NgoStalledApplicationsCard>` on NGO dashboard lists

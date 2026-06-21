@@ -47,6 +47,7 @@ import { ExpiredScreeningsCard } from '@/components/dashboards/expired-screening
 import { StaleGrantsCard } from '@/components/dashboards/stale-grants-card';
 import { UsersWithoutTwoFaCard } from '@/components/dashboards/users-without-2fa-card';
 import { DuplicateOrgsCard } from '@/components/dashboards/duplicate-orgs-card';
+import { AiCostPerAppCard } from '@/components/dashboards/ai-cost-per-app-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -304,6 +305,7 @@ export function AttentionOperatorDashboard() {
         {/* Phase 357 — privileged users without TOTP 2FA. */}
         <UsersWithoutTwoFaCard />
         <DuplicateOrgsCard />
+        <AiCostPerAppCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

@@ -801,6 +801,126 @@ def api_cron_donor_closing_grants():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/ngo-peer-comparison-digest', methods=['POST'])
+def api_cron_ngo_peer_comparison_digest():
+    """Phase 371 — Weekly per-NGO digest comparing their submitted-app
+    count and decisions over the trailing 7 days against the sector
+    median. Honors the digests opt-out (Phase 326). NGOs without an
+    activity signal this week are skipped.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Application, Organization, Notification,
+            record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+        from collections import defaultdict
+
+        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        DECIDED = ['funded', 'awarded', 'declined', 'rejected']
+
+        submitted_rows = (Application.query
+                          .filter(Application.submitted_at.isnot(None),
+                                  Application.submitted_at >= week_ago)
+                          .with_entities(Application.ngo_org_id)
+                          .all())
+        decided_rows = (Application.query
+                        .filter(Application.status.in_(DECIDED),
+                                Application.decision_recorded_at.isnot(None),
+                                Application.decision_recorded_at >= week_ago)
+                        .with_entities(Application.ngo_org_id)
+                        .all())
+        submitted_by_org = defaultdict(int)
+        for (org_id,) in submitted_rows:
+            if org_id:
+                submitted_by_org[org_id] += 1
+        decided_by_org = defaultdict(int)
+        for (org_id,) in decided_rows:
+            if org_id:
+                decided_by_org[org_id] += 1
+
+        active_org_ids = set(submitted_by_org) | set(decided_by_org)
+        if not active_org_ids:
+            result = {'orgs_active': 0, 'digests_sent': 0}
+            _rcr('ngo-peer-comparison-digest',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=True, summary=str(result)[:480])
+            return jsonify({'success': True, 'result': result})
+
+        def _median(xs):
+            if not xs:
+                return 0
+            s = sorted(xs)
+            n = len(s)
+            return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+
+        submitted_median = _median([submitted_by_org[o] for o in active_org_ids])
+        decided_median = _median([decided_by_org[o] for o in active_org_ids])
+
+        ngo_users = (User.query
+                     .filter(User.role == 'ngo',
+                             User.org_id.in_(list(active_org_ids)))
+                     .all())
+        sent = 0
+        for u in ngo_users:
+            channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+            if not channels:
+                continue
+            s = submitted_by_org.get(u.org_id, 0)
+            d = decided_by_org.get(u.org_id, 0)
+            parts = []
+            if s:
+                rel = 'above' if s > submitted_median else 'at' if s == submitted_median else 'below'
+                parts.append(f'{s} submitted ({rel} sector median {submitted_median:g})')
+            if d:
+                rel = 'above' if d > decided_median else 'at' if d == decided_median else 'below'
+                parts.append(f'{d} decided ({rel} sector median {decided_median:g})')
+            if not parts:
+                continue
+            n = Notification(
+                user_id=u.id,
+                type='ngo_peer_comparison',
+                title='How you compared this week',
+                message='; '.join(parts)[:500],
+                link='/dashboard',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {
+            'orgs_active': len(active_org_ids),
+            'digests_sent': sent,
+            'submitted_median': submitted_median,
+            'decided_median': decided_median,
+        }
+        _rcr('ngo-peer-comparison-digest',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ngo-peer-comparison-digest cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ngo-peer-comparison-digest',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/monthly-reviewer-leaderboard', methods=['POST'])
 def api_cron_monthly_reviewer_leaderboard():
     """Phase 365 — Monthly reviewer leaderboard for admins.

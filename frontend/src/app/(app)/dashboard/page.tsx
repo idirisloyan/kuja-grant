@@ -24,6 +24,7 @@ import { AttentionMemberDashboard } from '@/components/dashboards/attention-memb
 import { ReviewerQueue } from '@/components/dashboards/reviewer-queue';
 import { ReviewerActionQueue } from '@/components/dashboards/reviewer-action-queue';
 import { ReviewerThroughputCard } from '@/components/dashboards/reviewer-throughput-card';
+import { NextReviewCta } from '@/components/dashboards/next-review-cta';
 import { AdminOpsPanel } from '@/components/dashboards/admin-ops-panel';
 import { AIBudgetAdminCard } from '@/components/dashboards/ai-budget-admin-card';
 import { StageLabelsEditor } from '@/components/dashboards/stage-labels-editor';
@@ -69,6 +70,7 @@ export default function DashboardPage() {
   if (user.role === 'reviewer') {
     return (
       <div className="space-y-6">
+        <NextReviewCta />
         <ReviewerThroughputCard />
         <ReviewerActionQueue />
         <ReviewerQueue />

@@ -304,6 +304,41 @@ def api_reviewer_my_turnaround():
     })
 
 
+@reviews_bp.route('/next-up', methods=['GET'])
+@login_required
+@role_required('reviewer')
+def api_reviewer_next_up():
+    """Phase 369 — The reviewer's oldest open review (not snoozed),
+    so the dashboard can offer a one-click "Continue" CTA. Returns
+    null when the queue is empty.
+    """
+    from datetime import datetime as _dt, timezone as _tz
+    now = _dt.now(_tz.utc)
+    review = (Review.query
+              .filter(Review.reviewer_user_id == current_user.id,
+                      Review.status.in_(['assigned', 'in_progress', 'reviewing']),
+                      db.or_(Review.snoozed_until.is_(None),
+                             Review.snoozed_until <= now))
+              .order_by(Review.created_at.asc())
+              .first())
+    if not review:
+        return jsonify({'success': True, 'next': None})
+    app_ = review.application
+    grant = app_.grant if app_ else None
+    org = app_.ngo_org if app_ else None
+    return jsonify({
+        'success': True,
+        'next': {
+            'review_id': review.id,
+            'application_id': review.application_id,
+            'status': review.status,
+            'grant_title': grant.title if grant else None,
+            'org_name': org.name if org else None,
+            'assigned_at': review.created_at.isoformat() if review.created_at else None,
+        },
+    })
+
+
 @reviews_bp.route('/workload', methods=['GET'])
 @login_required
 @role_required('donor', 'admin')
