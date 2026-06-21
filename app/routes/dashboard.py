@@ -954,6 +954,89 @@ def api_portfolio_risk_heatmap():
 # Phase 24C — Donor cohort analytics (your funded NGOs vs cohort).
 # ----------------------------------------------------------------------
 
+@dashboard_bp.route('/donor-outreach-rollup', methods=['GET'])
+@login_required
+def api_dashboard_donor_outreach_rollup():
+    """Phase 293 — Donor outreach progress on stale declines.
+
+    Counts the donor's declined applications in the trailing 30 days
+    where outreach has been initiated vs not. The pair makes it easy
+    to see how much follow-up is still owed.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+
+    q = (Application.query
+         .join(Grant)
+         .filter(Grant.donor_org_id == current_user.org_id,
+                 Application.status.in_(['declined', 'rejected']),
+                 Application.decision_recorded_at.isnot(None),
+                 Application.decision_recorded_at >= cutoff))
+    apps = q.all()
+    started = sum(1 for a in apps if a.outreach_initiated_at is not None)
+    pending = sum(1 for a in apps if a.outreach_initiated_at is None)
+    return jsonify({
+        'window_days': 30,
+        'total': len(apps),
+        'outreach_started': started,
+        'outreach_pending': pending,
+    })
+
+
+@dashboard_bp.route('/ngo-decision-velocity', methods=['GET'])
+@login_required
+def api_dashboard_ngo_decision_velocity():
+    """Phase 291 — NGO mirror of donor decision velocity.
+
+    Median days from this NGO's submitted_at to updated_at on apps that
+    have been decided in the trailing 90 days, plus a count of apps
+    currently pending decision. Lets NGOs gauge wait expectations.
+    """
+    if current_user.role != 'ngo':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+
+    DECIDED = {'funded', 'awarded', 'declined', 'rejected'}
+    PENDING = {'submitted', 'under_review', 'scored'}
+
+    decided = (Application.query
+               .filter(Application.ngo_org_id == current_user.org_id,
+                       Application.status.in_(list(DECIDED)),
+                       Application.submitted_at.isnot(None),
+                       Application.updated_at >= cutoff)
+               .all())
+    days = []
+    for a in decided:
+        if not a.submitted_at or not a.updated_at:
+            continue
+        d = (a.updated_at - a.submitted_at).total_seconds() / 86400.0
+        if d >= 0:
+            days.append(d)
+    pending = (Application.query
+               .filter(Application.ngo_org_id == current_user.org_id,
+                       Application.status.in_(list(PENDING)))
+               .count())
+
+    def _median(xs):
+        if not xs:
+            return None
+        xs = sorted(xs)
+        mid = len(xs) // 2
+        if len(xs) % 2:
+            return round(xs[mid], 1)
+        return round((xs[mid - 1] + xs[mid]) / 2.0, 1)
+
+    return jsonify({
+        'window_days': 90,
+        'decided_count': len(days),
+        'median_days': _median(days),
+        'pending_count': pending,
+    })
+
+
 @dashboard_bp.route('/decision-velocity', methods=['GET'])
 @login_required
 def api_dashboard_decision_velocity():

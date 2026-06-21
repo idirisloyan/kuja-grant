@@ -450,6 +450,54 @@ def api_decline_review(review_id):
     return jsonify({'success': True})
 
 
+@reviews_bp.route('/coi-rollup', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_reviews_coi_rollup():
+    """Phase 292 — Admin rollup of COI disclosures over the last 30 days.
+
+    Reads from the hash-chained audit log (the disclosing reviewer's row
+    is deleted in auto-recuse, so the log is the only durable record).
+    Returns total count + the 3 most recent disclosures with reviewer
+    name + email + kind + application id.
+    """
+    from datetime import datetime, timezone, timedelta
+    import json as _json
+    from app.models.audit_chain import AuditChainEntry
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (AuditChainEntry.query
+            .filter(AuditChainEntry.action == 'review.coi_disclosed',
+                    AuditChainEntry.created_at >= cutoff)
+            .order_by(AuditChainEntry.created_at.desc())
+            .all())
+    total = len(rows)
+    recent = []
+    if rows:
+        # Resolve names for actor emails (best-effort).
+        emails = list({r.actor_email for r in rows[:3] if r.actor_email})
+        name_by_email = {}
+        if emails:
+            for u in User.query.filter(User.email.in_(emails)).all():
+                name_by_email[u.email] = u.name
+        for r in rows[:3]:
+            try:
+                details = _json.loads(r.details_json or '{}')
+            except Exception:
+                details = {}
+            recent.append({
+                'created_at': r.created_at.isoformat() if r.created_at else None,
+                'reviewer_email': r.actor_email,
+                'reviewer_name': name_by_email.get(r.actor_email or '', r.actor_email),
+                'kind': details.get('kind'),
+                'application_id': details.get('application_id'),
+            })
+    return jsonify({
+        'window_days': 30,
+        'total': total,
+        'recent': recent,
+    })
+
+
 @reviews_bp.route('/<int:review_id>/coi-flag', methods=['POST'])
 @login_required
 @role_required('reviewer', 'admin')
@@ -513,8 +561,22 @@ def api_review_coi_flag(review_id):
     except Exception as e:
         logger.debug('coi notify skipped: %s', e)
 
+    # Phase 289 — auto-recuse the disclosing reviewer. Keep the audit
+    # trail (the disclosure is already recorded above + on the audit
+    # chain) but remove the assignment so the COI'd reviewer can't
+    # score. Mirror Phase 232 decline semantics: drop the row, recompute
+    # application status if no other reviewers remain.
+    snapshot = review.to_dict()
+    application_id = review.application_id
+    db.session.delete(review)
+    other = Review.query.filter_by(application_id=application_id).count()
+    if other == 0:
+        app_obj = db.session.get(Application, application_id)
+        if app_obj and app_obj.status == 'under_review':
+            app_obj.status = 'submitted'
+
     db.session.commit()
-    return jsonify({'success': True, 'review': review.to_dict()})
+    return jsonify({'success': True, 'recused': True, 'review': snapshot})
 
 
 @reviews_bp.route('/<int:review_id>', methods=['PUT'])

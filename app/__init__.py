@@ -395,6 +395,14 @@ def create_app(config_name=None):
                     conn.execute(text("ALTER TABLE applications ADD COLUMN applicant_viewed_feedback_at TIMESTAMP"))
                     added.append('applications.applicant_viewed_feedback_at')
 
+                # Phase 290 — donor outreach on declined applications.
+                if 'outreach_initiated_at' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN outreach_initiated_at TIMESTAMP"))
+                    added.append('applications.outreach_initiated_at')
+                if 'outreach_initiated_by_user_id' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN outreach_initiated_by_user_id INTEGER"))
+                    added.append('applications.outreach_initiated_by_user_id')
+
                 # Phase 221 — reviewer private notes.
                 rev_cols = {c['name'] for c in inspector.get_columns('reviews')} if 'reviews' in inspector.get_table_names() else set()
                 if rev_cols and 'private_notes' not in rev_cols:

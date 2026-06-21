@@ -318,6 +318,8 @@ export default function ApplicationDetailClient() {
           isReviewerSide={isReviewerSide}
           decisionRecordedAt={application.decision_recorded_at ?? null}
           applicantViewedAt={(application as { applicant_viewed_feedback_at?: string | null }).applicant_viewed_feedback_at ?? null}
+          status={application.status}
+          outreachInitiatedAt={(application as { outreach_initiated_at?: string | null }).outreach_initiated_at ?? null}
         />
 
         {/* 3. Main work — tabs */}

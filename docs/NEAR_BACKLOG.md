@@ -584,6 +584,27 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 289-293 — COI recuse + outreach loop:
+  (a) Reviewer auto-recuse on COI disclosure: the Phase 283
+  endpoint now deletes the review row after stamping the
+  disclosure (it's preserved in the hash-chained audit log),
+  drops application status back to 'submitted' if no other
+  reviewers remain. `<ReviewerCoiBanner>` redirects to /reviews
+  after a successful disclosure. (b) Donor "Reach out personally"
+  action on declined applications: new
+  `POST /api/applications/<id>/donor-outreach` stamps
+  `outreach_initiated_at` + by_user_id, fires an in-app
+  notification to every NGO user on the applicant org. Surfaced
+  inline in `<FeedbackAcknowledgement>` next to the ack status.
+  (c) `<NgoDecisionVelocityCard>` on NGO dashboard mirrors the
+  Phase 284 donor card: median wait time across this NGO's
+  recent decisions + count pending. (d) `<ReviewerCoiRollupCard>`
+  on operator dashboard surfaces 30d COI disclosure count + the
+  3 most recent (sourced from the audit chain since the review
+  rows are auto-deleted). (e) `<DonorOutreachRollupCard>` on
+  donor dashboard shows outreach started vs pending across
+  declines, giving the Phase 287 nudge a calm counterpart.
+
 - **2026-06-20** Phase 283-287 — Trust + visibility surfaces:
   (a) Reviewer COI self-disclosure: new
   `POST /api/reviews/<id>/coi-flag` records a controlled-vocab kind

@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AlertOctagon, ShieldAlert } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
@@ -34,11 +35,13 @@ interface ReviewLite {
 }
 
 export function ReviewerCoiBanner({ reviewId }: { reviewId: number | null }) {
+  const router = useRouter();
   const [review, setReview] = useState<ReviewLite | null>(null);
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<typeof KINDS[number]['key']>('employer_overlap');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [recused, setRecused] = useState(false);
 
   useEffect(() => {
     if (!reviewId) return;
@@ -71,14 +74,36 @@ export function ReviewerCoiBanner({ reviewId }: { reviewId: number | null }) {
     if (!reviewId) return;
     setSaving(true);
     try {
-      const r = await api.post<{ review: ReviewLite }>(`/api/reviews/${reviewId}/coi-flag`, { kind, note });
+      const r = await api.post<{ review: ReviewLite; recused?: boolean }>(
+        `/api/reviews/${reviewId}/coi-flag`, { kind, note }
+      );
       setReview(r?.review ?? null);
       setOpen(false);
+      // Phase 289 — backend now auto-recuses on disclosure. The review
+      // row is gone — bounce to the queue so the reviewer doesn't sit
+      // on a stale detail page.
+      if (r?.recused) {
+        setRecused(true);
+        setTimeout(() => router.push('/reviews'), 1500);
+      }
     } catch {
       // swallow — the dialog stays open so the user can retry
     } finally {
       setSaving(false);
     }
+  }
+
+  if (recused) {
+    return (
+      <Card className="border-amber-300 bg-amber-50/70 dark:bg-amber-950/20">
+        <CardContent className="py-3 text-sm inline-flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 text-amber-700" />
+          <span className="text-amber-900 dark:text-amber-200">
+            Recused. Returning to your queue…
+          </span>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

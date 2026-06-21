@@ -46,6 +46,7 @@ import { TrustShareCard } from '@/components/dashboards/trust-share-card';
 import { PastDecisionsCard } from '@/components/dashboards/past-decisions-card';
 import { CompareMyAppsCard } from '@/components/dashboards/compare-my-apps-card';
 import { LossPatternsCard } from '@/components/dashboards/loss-patterns-card';
+import { NgoDecisionVelocityCard } from '@/components/dashboards/ngo-decision-velocity-card';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -169,6 +170,8 @@ export function AttentionNgoDashboard() {
       <CompareMyAppsCard />
       {/* Phase 277 — top 3 decline reasons across past losses. Hidden when < 3 losses. */}
       <LossPatternsCard />
+      {/* Phase 291 — median decision wait time across this NGO's apps. Self-gates when no decisions. */}
+      <NgoDecisionVelocityCard />
       {/* Phase 154 — rolling 12-month impact summary. Self-gates if zero activity. */}
       <ImpactCard />
       {/* Phase 185 — peer-anonymized win rate by sector. Self-gates

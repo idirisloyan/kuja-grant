@@ -1343,6 +1343,57 @@ def api_application_feedback_viewed(app_id):
     })
 
 
+@applications_bp.route('/<int:app_id>/donor-outreach', methods=['POST'])
+@login_required
+def api_application_donor_outreach(app_id):
+    """Phase 290 — Donor records that they've reached out to a declined applicant.
+
+    Stamps outreach_initiated_at + by_user_id, sends an in-app message to
+    every NGO user on the applicant org so they know to expect contact.
+    Idempotent — second call is a no-op.
+    """
+    app_obj = db.session.get(Application, app_id)
+    if not app_obj:
+        return jsonify({'error': 'Application not found'}), 404
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'Access denied'}), 403
+    if app_obj.grant and current_user.role == 'donor' and app_obj.grant.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+    if app_obj.status not in ('declined', 'rejected'):
+        return jsonify({'error': 'Outreach only applies to declined applications'}), 400
+    if app_obj.outreach_initiated_at:
+        return jsonify({
+            'success': True,
+            'changed': False,
+            'outreach_initiated_at': app_obj.outreach_initiated_at.isoformat(),
+        })
+    app_obj.outreach_initiated_at = datetime.now(timezone.utc)
+    app_obj.outreach_initiated_by_user_id = current_user.id
+    try:
+        from app.models import Notification, User
+        ngos = User.query.filter_by(org_id=app_obj.ngo_org_id, role='ngo').all()
+        for u in ngos:
+            n = Notification(
+                user_id=u.id,
+                type='donor_outreach',
+                title='Donor is reaching out about your application',
+                message=(
+                    f'A donor has started a follow-up conversation about '
+                    f'application #{app_obj.id}. Check your messages.'
+                ),
+                link=f'/applications/{app_obj.id}',
+            )
+            db.session.add(n)
+    except Exception as e:
+        logger.debug('donor-outreach notify skipped: %s', e)
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'changed': True,
+        'outreach_initiated_at': app_obj.outreach_initiated_at.isoformat(),
+    })
+
+
 @applications_bp.route('/debrief/rollup', methods=['GET'])
 @login_required
 def api_debrief_rollup():

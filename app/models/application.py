@@ -51,6 +51,10 @@ class Application(db.Model):
     # "applicant viewed feedback at X" so they can judge whether to
     # follow up personally.
     applicant_viewed_feedback_at = db.Column(db.DateTime, nullable=True)
+    # Phase 290 — donor initiates follow-up outreach on a declined app.
+    # Stamped by POST /api/applications/<id>/donor-outreach.
+    outreach_initiated_at = db.Column(db.DateTime, nullable=True)
+    outreach_initiated_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
     # Phase 40 — NEAR network grants only. Auto-populated on /submit when
     # grant.fund_window_id is set:
@@ -111,6 +115,8 @@ class Application(db.Model):
             'decision_recorded_at': self.decision_recorded_at.isoformat() if self.decision_recorded_at else None,
             'decision_recorded_by_user_id': self.decision_recorded_by_user_id,
             'applicant_viewed_feedback_at': self.applicant_viewed_feedback_at.isoformat() if self.applicant_viewed_feedback_at else None,
+            'outreach_initiated_at': self.outreach_initiated_at.isoformat() if self.outreach_initiated_at else None,
+            'outreach_initiated_by_user_id': self.outreach_initiated_by_user_id,
             'is_starred': bool(self.is_starred),
         }
         if not summary:
