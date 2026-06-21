@@ -4760,3 +4760,75 @@ def api_cron_reviewer_decline_rate_feedback():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/cron-failures-yesterday', methods=['POST'])
+def api_cron_cron_failures_yesterday():
+    """Phase 593 — Daily admin digest of failed CronRun rows in last
+    24 hours. Distinct from Phase 502 (failed cron tile, last 7d) by
+    being a daily push notification. Honors digests opt-out; skipped
+    when zero failures.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import User, Notification, record_cron_run as _rcr
+        from app.models.cron_run import CronRun
+        from app.models.notification_preference import NotificationPreference
+        from collections import Counter
+        from datetime import datetime, timezone, timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        rows = (db.session.query(CronRun.name)
+                .filter(CronRun.run_at >= cutoff,
+                        CronRun.success.is_(False))
+                .all())
+        sent = 0
+        if rows:
+            names = Counter(n for (n,) in rows if n)
+            top = ', '.join(f'{n}({c})' for n, c in names.most_common(5))
+            msg = (
+                f'Failed cron runs in last 24h: {len(rows)} total. '
+                f'Top: {top}.'
+            )
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='cron_failures_yesterday',
+                    title='Cron failures yesterday',
+                    message=msg[:500],
+                    link='/admin/cron-health',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {'failures': len(rows), 'notified': sent}
+        _rcr('cron-failures-yesterday',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('cron-failures-yesterday cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('cron-failures-yesterday',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

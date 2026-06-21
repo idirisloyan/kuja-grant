@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 589-593 — Peak AI score + draft grants count
+  + AI score lift + networks total + daily cron failures digest:
+  (a) `<PeakAiScoreStat>` on NGO dashboard shows max Application.ai_score
+  across last 365d with app id — personal-best confidence-builder.
+  (b) `<DraftGrantsCountStat>` on donor dashboard counts donor's
+  Grant rows in 'draft' status — surfaces unpublished work.
+  (c) `<AiScoreLiftStat>` on reviewer reviews page reports avg
+  (human_score − ai_score) across last 30d completed reviews with
+  both fields set; trending-up emerald when reviewer scores higher,
+  trending-down amber when lower. Self-gates < 3 sample.
+  (d) `<NetworksTotalStat>` on operator dashboard counts Network
+  rows — platform tenancy pulse. (e) Phase 593 cron
+  `/api/cron/cron-failures-yesterday` daily admin digest of failed
+  CronRun rows in last 24h with top-5 names; distinct from Phase 502
+  (7d tile) by being a daily push notification. Honors digests opt-out.
+
 - **2026-06-21** Phase 583-587 — Withdrawn count + apps awaiting first
   review + declined assignments + compliance snapshots this week +
   reviewer decline-rate feedback cron:

@@ -5854,3 +5854,83 @@ def api_dashboard_admin_compliance_snapshots_week():
              .filter(ComplianceSnapshot.created_at >= cutoff)
              .count())
     return jsonify({'count': count})
+
+
+@dashboard_bp.route('/ngo-peak-ai-score', methods=['GET'])
+@login_required
+def api_dashboard_ngo_peak_ai_score():
+    """Phase 589 — Max Application.ai_score across NGO's apps in last
+    365 days. Personal-best confidence-builder.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=365)
+    row = (Application.query
+           .filter(Application.ngo_org_id == current_user.org_id,
+                   Application.ai_score.isnot(None),
+                   Application.created_at >= cutoff)
+           .order_by(Application.ai_score.desc())
+           .first())
+    if not row or row.ai_score is None:
+        return jsonify({'score': None})
+    return jsonify({
+        'score': round(row.ai_score, 1),
+        'application_id': row.id,
+    })
+
+
+@dashboard_bp.route('/donor-draft-grants-count', methods=['GET'])
+@login_required
+def api_dashboard_donor_draft_grants_count():
+    """Phase 590 — Count of Grant rows in 'draft' status owned by the
+    donor's org. Surfaces unpublished work.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    count = (Grant.query
+             .filter(Grant.donor_org_id == current_user.org_id,
+                     Grant.status == 'draft')
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/reviewer-ai-score-lift', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_ai_score_lift():
+    """Phase 591 — Average (overall_score - application.ai_score) across
+    reviewer's last-30d completed reviews where both exist. Positive
+    means reviewer scores higher than AI; negative lower. Self-gates
+    < 3 sample.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (db.session.query(Review.overall_score, Application.ai_score)
+            .join(Application, Review.application_id == Application.id)
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status == 'completed',
+                    Review.completed_at >= cutoff,
+                    Review.overall_score.isnot(None),
+                    Application.ai_score.isnot(None))
+            .all())
+    lifts = [h - a for h, a in rows if h is not None and a is not None]
+    if len(lifts) < 3:
+        return jsonify({'lift': None, 'sample': len(lifts)})
+    return jsonify({
+        'lift': round(sum(lifts) / len(lifts), 1),
+        'sample': len(lifts),
+    })
+
+
+@dashboard_bp.route('/admin-networks-total', methods=['GET'])
+@login_required
+def api_dashboard_admin_networks_total():
+    """Phase 592 — Count Network rows. Platform tenancy pulse.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.network import Network
+    count = Network.query.count()
+    return jsonify({'count': count})
