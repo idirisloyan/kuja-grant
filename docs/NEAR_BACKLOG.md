@@ -584,6 +584,28 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 409-413 — Peer funded snippets + SLA
+  breach trend + 5-in-a-row band streak + audit chain rate +
+  top AI cost cron:
+  (a) `GET /api/dashboard/peer-funded-snippets/<grant_id>`
+  returns anonymised text snippets from peer NGOs' funded
+  applications on the same grant. UI surface (apply page)
+  deferred. (b) `<SlaBreachTrendCard>` on donor dashboard
+  shows a 14-day daily sparkline of reviews completed past
+  the 14-day SLA. Amber border at >=7 total breaches.
+  Backend `GET /api/dashboard/donor-sla-breach-trend`. (c)
+  `<BandStreakTip>` on /reviews surfaces a calibration nudge
+  when the reviewer's last 5 completed reviews are all in
+  the same band (all <60 or all >=80). Backend
+  `GET /api/dashboard/reviewer-band-streak`. (d)
+  `<AuditChainRateCard>` on operator dashboard shows audit
+  chain entries/day over last 7 days vs prior 7 days; amber
+  border when recent rate drops >30% below prior. Backend
+  `GET /api/dashboard/audit-chain-rate`. (e) New
+  `POST /api/cron/top-ai-cost-endpoints` monthly digest to
+  admins ranking the 5 AI endpoints by usd_cost over the
+  last 30 days; honors digests opt-out.
+
 - **2026-06-20** Phase 403-407 — Feedback themes + starred
   queue + completed-this-week + slowest-cron + sector-matching
   grants digest:

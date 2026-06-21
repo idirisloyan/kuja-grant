@@ -801,6 +801,88 @@ def api_cron_donor_closing_grants():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/top-ai-cost-endpoints', methods=['POST'])
+def api_cron_top_ai_cost_endpoints():
+    """Phase 413 — Monthly digest to admins: top 5 AI endpoints by
+    usd_cost over the last 30 days. Cost-optimization signal so the
+    team can target the most expensive surfaces.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from sqlalchemy import text as _text
+        from datetime import datetime, timezone, timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        try:
+            rows = db.session.execute(_text(
+                "SELECT endpoint, COALESCE(SUM(usd_cost), 0) AS total_cost, COUNT(*) AS calls "
+                "FROM ai_call_logs WHERE created_at >= :c "
+                "GROUP BY endpoint ORDER BY total_cost DESC LIMIT 5"
+            ), {'c': cutoff}).all()
+        except Exception:
+            rows = []
+        top = []
+        for r in rows:
+            top.append({
+                'endpoint': r.endpoint,
+                'usd_cost': float(r.total_cost or 0),
+                'calls': int(r.calls or 0),
+            })
+
+        sent = 0
+        if top and top[0]['usd_cost'] > 0:
+            parts = [f'{t["endpoint"]} ${round(t["usd_cost"], 2)}' for t in top[:3]]
+            msg = 'Top AI cost (30d): ' + ', '.join(parts)
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='top_ai_cost_endpoints',
+                    title='Monthly AI cost driver report',
+                    message=msg[:500],
+                    link='/admin/ai-cost',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+
+        result = {
+            'endpoints_ranked': len(top),
+            'admins_notified': sent,
+        }
+        _rcr('top-ai-cost-endpoints',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result, 'top': top})
+    except Exception as e:
+        logger.exception('top-ai-cost-endpoints cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('top-ai-cost-endpoints',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/ngo-sector-grants-digest', methods=['POST'])
 def api_cron_ngo_sector_grants_digest():
     """Phase 407 — Weekly digest to each NGO listing newly-published

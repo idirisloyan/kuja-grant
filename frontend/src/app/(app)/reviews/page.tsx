@@ -9,6 +9,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { MyPastReviews } from '@/components/reviews/my-past-reviews';
+import { BandStreakTip } from '@/components/reviews/band-streak-tip';
 import { ReviewerResumeBanner } from '@/components/reviews/resume-banner';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -131,6 +132,7 @@ function ReviewerView() {
       <MyCompletionStat />
       <MyTurnaroundStat />
       <MyCompletedThisWeek />
+      <BandStreakTip />
 
       {/* Phase 303 — self-calibration coaching tip (only if > 1.0σ off). */}
       <MyCalibrationTip />

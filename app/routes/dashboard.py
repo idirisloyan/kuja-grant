@@ -2233,6 +2233,144 @@ def api_dashboard_donor_fastest_reviewer():
     })
 
 
+@dashboard_bp.route('/peer-funded-snippets/<int:grant_id>', methods=['GET'])
+@login_required
+def api_dashboard_peer_funded_snippets(grant_id):
+    """Phase 409 — Anonymised text snippets from funded applications on
+    the same grant. Different from Phase 117 (peer references); this
+    surfaces actual response language. NGO sees snippets to learn how
+    successful peers framed their answers, never an NGO name attached.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    funded = (Application.query
+              .filter(Application.grant_id == grant_id,
+                      Application.status.in_(['funded', 'awarded']),
+                      Application.ngo_org_id != current_user.org_id,
+                      Application.responses.isnot(None))
+              .order_by(Application.decision_recorded_at.desc())
+              .limit(5)
+              .all())
+    snippets = []
+    for app_ in funded:
+        responses = app_.get_responses() if hasattr(app_, 'get_responses') else {}
+        if not isinstance(responses, dict):
+            continue
+        for key, val in responses.items():
+            if not isinstance(val, str):
+                continue
+            text = val.strip()
+            if len(text) < 80:
+                continue
+            snippets.append({
+                'criterion_key': key,
+                'snippet': text[:240] + ('…' if len(text) > 240 else ''),
+            })
+            if len(snippets) >= 8:
+                break
+        if len(snippets) >= 8:
+            break
+    return jsonify({'snippets': snippets, 'sample_size': len(funded)})
+
+
+@dashboard_bp.route('/donor-sla-breach-trend', methods=['GET'])
+@login_required
+def api_dashboard_donor_sla_breach_trend():
+    """Phase 410 — 14-day daily sparkline of reviews whose turnaround
+    exceeded the SLA (>14 days from created_at to completed_at) on
+    this donor's grants.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=14)
+    SLA_DAYS = 14
+
+    rows = (db.session.query(Review.created_at, Review.completed_at)
+            .join(Application, Application.id == Review.application_id)
+            .join(Grant, Grant.id == Application.grant_id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= start)
+            .all())
+    by_day = defaultdict(int)
+    for created, completed in rows:
+        if not created or not completed:
+            continue
+        days = (completed - created).total_seconds() / 86400.0
+        if days > SLA_DAYS:
+            key = completed.date().isoformat()
+            by_day[key] += 1
+    points = []
+    for i in range(14):
+        d = (start + timedelta(days=i)).date()
+        points.append({'date': d.isoformat(), 'breached': by_day.get(d.isoformat(), 0)})
+    return jsonify({'points': points, 'sla_days': SLA_DAYS})
+
+
+@dashboard_bp.route('/reviewer-band-streak', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_band_streak():
+    """Phase 411 — Detect a 5-in-a-row band streak on this reviewer's
+    last 5 completed reviews (all weak <60 or all strong >=80). Nudges
+    a calibration check.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.overall_score.isnot(None))
+            .order_by(Review.completed_at.desc())
+            .limit(5)
+            .all())
+    if len(rows) < 5:
+        return jsonify({'streak': None})
+    scores = [float(r.overall_score) for r in rows]
+    if all(s < 60 for s in scores):
+        return jsonify({'streak': 'weak', 'count': 5})
+    if all(s >= 80 for s in scores):
+        return jsonify({'streak': 'strong', 'count': 5})
+    return jsonify({'streak': None})
+
+
+@dashboard_bp.route('/audit-chain-rate', methods=['GET'])
+@login_required
+def api_dashboard_audit_chain_rate():
+    """Phase 412 — Audit chain entries per day over the last 7 days vs
+    prior 7 days. Sudden drop suggests broken audit hooks.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import text as _text
+    now = datetime.now(timezone.utc)
+    recent_start = now - timedelta(days=7)
+    prior_start = now - timedelta(days=14)
+    try:
+        recent_total = db.session.execute(_text(
+            "SELECT COUNT(*) FROM audit_chain WHERE created_at >= :c"
+        ), {'c': recent_start}).scalar() or 0
+        prior_total = db.session.execute(_text(
+            "SELECT COUNT(*) FROM audit_chain "
+            "WHERE created_at >= :a AND created_at < :b"
+        ), {'a': prior_start, 'b': recent_start}).scalar() or 0
+    except Exception:
+        recent_total = 0
+        prior_total = 0
+    recent_per_day = round(recent_total / 7.0, 1)
+    prior_per_day = round(prior_total / 7.0, 1) if prior_total else None
+    return jsonify({
+        'recent_per_day': recent_per_day,
+        'prior_per_day': prior_per_day,
+        'recent_total': int(recent_total),
+        'prior_total': int(prior_total),
+    })
+
+
 @dashboard_bp.route('/ngo-feedback-themes', methods=['GET'])
 @login_required
 def api_dashboard_ngo_feedback_themes():
