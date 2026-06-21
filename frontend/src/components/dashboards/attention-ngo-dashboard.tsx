@@ -45,6 +45,7 @@ import { ActiveApplicationsCard } from '@/components/dashboards/active-applicati
 import { TrustShareCard } from '@/components/dashboards/trust-share-card';
 import { PastDecisionsCard } from '@/components/dashboards/past-decisions-card';
 import { CompareMyAppsCard } from '@/components/dashboards/compare-my-apps-card';
+import { LossPatternsCard } from '@/components/dashboards/loss-patterns-card';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -166,6 +167,8 @@ export function AttentionNgoDashboard() {
       <PastDecisionsCard />
       {/* Phase 273 — compare your 3 most recent apps side-by-side. */}
       <CompareMyAppsCard />
+      {/* Phase 277 — top 3 decline reasons across past losses. Hidden when < 3 losses. */}
+      <LossPatternsCard />
       {/* Phase 154 — rolling 12-month impact summary. Self-gates if zero activity. */}
       <ImpactCard />
       {/* Phase 185 — peer-anonymized win rate by sector. Self-gates

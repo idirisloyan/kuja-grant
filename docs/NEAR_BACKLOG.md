@@ -584,6 +584,25 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 277-281 — Patterns + integrity surfaces:
+  (a) `<LossPatternsCard>` on NGO dashboard counts
+  `decision_reason_code` across past declines and surfaces the top
+  3 with friendly labels. Self-gates < 3 losses. (b) New
+  `GET /api/grants/<id>/reviewer-panel` (donor + admin) returns the
+  distinct reviewers + their orgs + a `org_duplicates` flag for
+  COI risk. `<ReviewerPanelCard>` on grant detail (donor view)
+  renders the panel with an amber callout when an org has > 1
+  reviewer. (c) `<AuditIntegrityCard>` on the operator dashboard
+  calls `/api/audit-chain/verify?limit=1000` and shows "chain
+  intact across N entries" (emerald) or "N breaks detected" (rose)
+  with deep link to `/admin/audit-chain`. Always visible so a
+  break cannot go unnoticed. (d) `<NgoHistoryPanel>` (Phase 188)
+  also wired on the reviewer review-detail Responses tab — reviewer
+  sees past applications from the same NGO. (e) Phase 281 closed
+  as already-shipped — apply page already renders
+  `<SubmissionReadiness>` next to the Submit button (Phase
+  105/161). My duplicate component file was removed.
+
 - **2026-06-20** Phase 271-275 — Smoke green + telemetry + analytics:
   (a) Fixed the remaining 2 smoke failures — `manual_admin cannot
   self-sign` got the same `allow_admin_override=true` treatment +

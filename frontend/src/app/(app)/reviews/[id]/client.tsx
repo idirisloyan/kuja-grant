@@ -10,6 +10,7 @@ import { ScoreRing } from '@/components/shared/score-ring';
 import { InfoTip } from '@/components/shared/info-tip';
 import { AiBadge } from '@/components/shared/ai-badge';
 import { AIFeedbackChip } from '@/components/shared/ai-feedback-chip';
+import { NgoHistoryPanel } from '@/components/applications/ngo-history-panel';
 import { ReviewerSummary } from '@/components/reviews/ReviewerSummary';
 import { DecisionAuditDrawer } from '@/components/applications/DecisionAuditDrawer';
 // Phase 70 — page-shell primitive to match the rest of the design audit.
@@ -469,6 +470,10 @@ export default function ReviewDetailClient() {
       {/* Responses */}
       {tab === 'responses' && appId != null && (
         <TriageSummary applicationId={appId} />
+      )}
+      {/* Phase 280 — past applications from this NGO for reviewer context. */}
+      {tab === 'responses' && appId != null && (
+        <NgoHistoryPanel applicationId={appId} />
       )}
       {tab === 'responses' && (
         <div className="space-y-3">

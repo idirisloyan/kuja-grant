@@ -1580,6 +1580,63 @@ def api_withdraw_grant(grant_id):
     })
 
 
+@grants_bp.route('/<int:grant_id>/reviewer-panel', methods=['GET'])
+@login_required
+@role_required('donor', 'admin')
+def api_grant_reviewer_panel(grant_id):
+    """Phase 278 — Reviewer panel diversity check.
+
+    Returns the distinct reviewers assigned to applications on this
+    grant + their org affiliations + a duplicate-org flag the donor
+    can use to spot conflict-of-interest risk.
+    """
+    grant = db.session.get(Grant, grant_id)
+    if not grant:
+        return jsonify({'error': 'Grant not found'}), 404
+    if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    from app.models.user import User
+    from app.models.organization import Organization
+
+    apps = Application.query.filter_by(grant_id=grant_id).all()
+    app_ids = [a.id for a in apps]
+    if not app_ids:
+        return jsonify({'success': True, 'reviewers': [], 'org_duplicates': []})
+
+    reviews = Review.query.filter(Review.application_id.in_(app_ids)).all()
+    reviewer_ids = {r.reviewer_user_id for r in reviews if r.reviewer_user_id}
+    if not reviewer_ids:
+        return jsonify({'success': True, 'reviewers': [], 'org_duplicates': []})
+
+    users = {u.id: u for u in User.query.filter(User.id.in_(reviewer_ids)).all()}
+    org_ids = {u.org_id for u in users.values() if u.org_id}
+    orgs = {o.id: o.name for o in Organization.query.filter(Organization.id.in_(org_ids)).all()} if org_ids else {}
+
+    org_counts = {}
+    out = []
+    for uid in reviewer_ids:
+        u = users.get(uid)
+        if not u:
+            continue
+        org_name = orgs.get(u.org_id) if u.org_id else None
+        out.append({
+            'user_id': u.id,
+            'name': u.name,
+            'email': u.email,
+            'org_id': u.org_id,
+            'org_name': org_name,
+        })
+        if org_name:
+            org_counts[org_name] = org_counts.get(org_name, 0) + 1
+    duplicates = sorted([k for k, v in org_counts.items() if v > 1])
+    return jsonify({
+        'success': True,
+        'reviewers': out,
+        'org_duplicates': duplicates,
+    })
+
+
 @grants_bp.route('/<int:grant_id>/criterion-averages', methods=['GET'])
 @login_required
 @role_required('donor', 'admin')
