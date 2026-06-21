@@ -584,6 +584,21 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 469-473 — Applications submitted YTD + grants
+  funded YTD + reviewer low-score rate + OB throughput + unread
+  broadcasts nudge cron:
+  (a) `<AppsSubmittedYtdStat>` on NGO dashboard counts applications
+  submitted year-to-date. (b) `<GrantsFundedYtdCard>` on donor
+  dashboard shows distinct grants funded YTD with total funding
+  budget; counts each grant once. (c) `<LowScoreRateStat>` on
+  reviewer reviews page shows % of last-90d reviews with score < 50;
+  self-gates < 5. (d) `<ObThroughputCard>` on operator dashboard
+  counts emergency declarations transitioned past decision_at in
+  last 30 days, plus count still open. (e) Phase 473 cron
+  `/api/cron/ngo-unread-broadcasts-nudge` sends NGO users with > 0
+  unread TenantMessages a Friday nudge. Digests opt-out gated;
+  record_cron_run wired.
+
 - **2026-06-20** Phase 463-467 — Unread tenant messages + distinct
   applicants this quarter + reviewer median score + audit chain age
   + reviewer weekly recap cron:

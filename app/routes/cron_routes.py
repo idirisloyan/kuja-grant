@@ -3117,3 +3117,73 @@ def api_cron_reviewer_weekly_recap():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/ngo-unread-broadcasts-nudge', methods=['POST'])
+def api_cron_ngo_unread_broadcasts_nudge():
+    """Phase 473 — Weekly Friday nudge. For each NGO user whose org has
+    unread TenantMessage rows, send a digest suggesting they catch up.
+    Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, TenantMessage, TenantMessageRead, Notification,
+            record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+
+        ngos = User.query.filter_by(role='ngo').all()
+        sent = 0
+        for u in ngos:
+            if not u.org_id:
+                continue
+            channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+            if not channels:
+                continue
+            read_ids_q = db.session.query(TenantMessageRead.message_id).filter(
+                TenantMessageRead.org_id == u.org_id)
+            unread = (TenantMessage.query
+                      .filter(TenantMessage.id.notin_(read_ids_q))
+                      .count())
+            if unread <= 0:
+                continue
+            msg = (
+                f'You have {unread} unread message'
+                f'{"" if unread == 1 else "s"} in your inbox.'
+            )
+            n = Notification(
+                user_id=u.id,
+                type='unread_broadcasts',
+                title='Unread messages waiting',
+                message=msg[:500],
+                link='/messages',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'ngos_scanned': len(ngos), 'nudges_sent': sent}
+        _rcr('ngo-unread-broadcasts-nudge',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ngo-unread-broadcasts-nudge cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ngo-unread-broadcasts-nudge',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

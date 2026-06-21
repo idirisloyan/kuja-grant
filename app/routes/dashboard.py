@@ -4094,3 +4094,107 @@ def api_dashboard_audit_chain_newest_age():
         'seconds': seconds,
         'newest_at': created.isoformat(),
     })
+
+
+@dashboard_bp.route('/ngo-apps-submitted-ytd', methods=['GET'])
+@login_required
+def api_dashboard_ngo_apps_submitted_ytd():
+    """Phase 469 — Count of applications this NGO submitted year-to-date."""
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    year_start = datetime(datetime.now(timezone.utc).year, 1, 1, tzinfo=timezone.utc)
+    count = (Application.query
+             .filter(Application.org_id == current_user.org_id,
+                     Application.submitted_at.isnot(None),
+                     Application.submitted_at >= year_start)
+             .count())
+    return jsonify({'submitted_ytd': count, 'year_start': year_start.date().isoformat()})
+
+
+@dashboard_bp.route('/donor-grants-funded-ytd', methods=['GET'])
+@login_required
+def api_dashboard_donor_grants_funded_ytd():
+    """Phase 470 — Count and total amount of grants funded year-to-date
+    on donor's portfolio. Counts each grant once even with multiple
+    funded applications.
+    """
+    if current_user.role not in ('donor', 'admin') or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    year_start = datetime(datetime.now(timezone.utc).year, 1, 1, tzinfo=timezone.utc)
+    rows = (db.session.query(Grant.id, Grant.total_funding, Grant.currency)
+            .join(Application, Application.grant_id == Grant.id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.status.in_(['funded', 'awarded']),
+                    Application.decision_recorded_at.isnot(None),
+                    Application.decision_recorded_at >= year_start)
+            .distinct()
+            .all())
+    grants_count = len(rows)
+    total = 0.0
+    currency = None
+    for _, amt, cur in rows:
+        try:
+            total += float(amt) if amt is not None else 0.0
+        except (TypeError, ValueError):
+            pass
+        if currency is None and cur:
+            currency = cur
+    return jsonify({
+        'grants_count': grants_count,
+        'total_funded': round(total, 2),
+        'currency': currency,
+    })
+
+
+@dashboard_bp.route('/reviewer-low-score-rate', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_low_score_rate():
+    """Phase 471 — Percentage of reviewer's completed reviews in last 90
+    days with overall_score < 50. Mirror to high-score rate.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff,
+                    Review.overall_score.isnot(None))
+            .all())
+    if len(rows) < 5:
+        return jsonify({'low_score_pct': None, 'sample': len(rows)})
+    low = sum(1 for r in rows if (r.overall_score or 0) < 50)
+    return jsonify({
+        'low_score_pct': round(100.0 * low / len(rows), 1),
+        'low_count': low,
+        'sample': len(rows),
+    })
+
+
+@dashboard_bp.route('/admin-ob-throughput-30d', methods=['GET'])
+@login_required
+def api_dashboard_admin_ob_throughput_30d():
+    """Phase 472 — Count of emergency declarations transitioned to a
+    resolved state (decision_at) in the last 30 days. Network governance
+    throughput signal.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from app.models import EmergencyDeclaration
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    resolved_count = (EmergencyDeclaration.query
+                      .filter(EmergencyDeclaration.decision_at.isnot(None),
+                              EmergencyDeclaration.decision_at >= cutoff)
+                      .count())
+    total_open = (EmergencyDeclaration.query
+                  .filter(EmergencyDeclaration.decision_at.is_(None))
+                  .count())
+    return jsonify({
+        'resolved_30d': resolved_count,
+        'open': total_open,
+    })
