@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 487-491 — Lifetime win rate + apps YoY +
+  lifetime reviews + notifications 14d sparkline + system load
+  summary cron:
+  (a) `<LifetimeWinRateStat>` on NGO dashboard shows % of all
+  decisions ever that were funded/awarded; tone-coded; self-gates
+  < 3. (b) `<AppsYoyStat>` on donor dashboard compares apps
+  submitted this calendar year vs prior, with delta + %. (c)
+  `<LifetimeCompletedStat>` on reviewer reviews page shows total
+  lifetime completed reviews; recognition milestone. (d)
+  `<Notifications14dCard>` on operator dashboard renders 14-day
+  notification volume sparkline with daily counts + avg. (e)
+  Phase 491 cron `/api/cron/system-load-summary` sends admins a
+  weekly multi-metric pulse: apps submitted, reviews completed,
+  notifications sent, audit entries — in the last 7 days. Digests
+  opt-out gated; record_cron_run wired.
+
 - **2026-06-21** Phase 481-485 — Unread notifications + average
   reviewer score + reviews this month + documents storage + monthly
   NGO accomplishments cron:

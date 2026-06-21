@@ -3377,3 +3377,86 @@ def api_cron_ngo_monthly_accomplishments():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/system-load-summary', methods=['POST'])
+def api_cron_system_load_summary():
+    """Phase 491 — Weekly admin digest. Multi-metric pulse for the last
+    7 days: notifications sent, audit chain entries, applications
+    submitted, reviews completed. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Application, Review, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from app.models.audit_chain import AuditChainEntry
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(days=7)
+        n_notifs = Notification.query.filter(Notification.created_at >= since).count()
+        n_audit = AuditChainEntry.query.filter(AuditChainEntry.created_at >= since).count()
+        n_apps = (Application.query
+                  .filter(Application.submitted_at.isnot(None),
+                          Application.submitted_at >= since)
+                  .count())
+        n_reviews = (Review.query
+                     .filter(Review.completed_at.isnot(None),
+                             Review.completed_at >= since,
+                             Review.status.in_(['submitted', 'scored', 'completed']))
+                     .count())
+        msg = (
+            f'Last 7 days: {n_apps} application(s) submitted, '
+            f'{n_reviews} review(s) completed, {n_notifs} notification(s), '
+            f'{n_audit} audit entries.'
+        )
+        sent = 0
+        if (n_apps + n_reviews + n_notifs + n_audit) > 0:
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='system_load_summary',
+                    title='Weekly system load',
+                    message=msg[:500],
+                    link='/admin/observability',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {
+            'applications': n_apps,
+            'reviews': n_reviews,
+            'notifications': n_notifs,
+            'audit_entries': n_audit,
+            'admins_notified': sent,
+        }
+        _rcr('system-load-summary',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('system-load-summary cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('system-load-summary',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

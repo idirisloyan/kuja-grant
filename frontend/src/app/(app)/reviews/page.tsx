@@ -22,6 +22,7 @@ import { MedianScoreStat } from '@/components/reviews/median-score-stat';
 import { LowScoreRateStat } from '@/components/reviews/low-score-rate-stat';
 import { PendingAgeStat } from '@/components/reviews/pending-age-stat';
 import { CompletedThisMonthStat } from '@/components/reviews/completed-this-month-stat';
+import { LifetimeCompletedStat } from '@/components/reviews/lifetime-completed-stat';
 import { ReviewerResumeBanner } from '@/components/reviews/resume-banner';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -152,6 +153,7 @@ function ReviewerView() {
       <LowScoreRateStat />
       <PendingAgeStat />
       <CompletedThisMonthStat />
+      <LifetimeCompletedStat />
       <MyCompletedThisWeek />
       <BandStreakTip />
       <ScoreDistributionCard />

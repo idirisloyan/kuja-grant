@@ -67,6 +67,7 @@ import { AuditChainAgeCard } from '@/components/dashboards/audit-chain-age-card'
 import { ObThroughputCard } from '@/components/dashboards/ob-throughput-card';
 import { TotpEnrollmentCard } from '@/components/dashboards/totp-enrollment-card';
 import { DocumentsStorageCard } from '@/components/dashboards/documents-storage-card';
+import { Notifications14dCard } from '@/components/dashboards/notifications-14d-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -344,6 +345,7 @@ export function AttentionOperatorDashboard() {
         <ObThroughputCard />
         <TotpEnrollmentCard />
         <DocumentsStorageCard />
+        <Notifications14dCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

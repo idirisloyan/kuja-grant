@@ -4388,3 +4388,103 @@ def api_dashboard_admin_documents_storage():
         'total_bytes': int(total_bytes),
         'doc_count': doc_count,
     })
+
+
+@dashboard_bp.route('/ngo-lifetime-win-rate', methods=['GET'])
+@login_required
+def api_dashboard_ngo_lifetime_win_rate():
+    """Phase 487 — % of all applications ever submitted by this NGO
+    that were funded/awarded. Self-gates < 3 decisions on the frontend.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    rows = (db.session.query(Application.status)
+            .filter(Application.org_id == current_user.org_id,
+                    Application.decision_recorded_at.isnot(None))
+            .all())
+    decisions = [s for (s,) in rows]
+    if len(decisions) < 3:
+        return jsonify({'win_rate_pct': None, 'sample': len(decisions)})
+    awarded = sum(1 for s in decisions if s in ('funded', 'awarded'))
+    return jsonify({
+        'win_rate_pct': round(100.0 * awarded / len(decisions), 1),
+        'awarded': awarded,
+        'sample': len(decisions),
+    })
+
+
+@dashboard_bp.route('/donor-apps-year-over-year', methods=['GET'])
+@login_required
+def api_dashboard_donor_apps_year_over_year():
+    """Phase 488 — Applications submitted to donor's grants this
+    calendar year vs prior calendar year, with delta.
+    """
+    if current_user.role not in ('donor', 'admin') or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    this_year_start = datetime(now.year, 1, 1, tzinfo=timezone.utc)
+    prior_year_start = datetime(now.year - 1, 1, 1, tzinfo=timezone.utc)
+    q = (db.session.query(Application)
+         .join(Grant, Application.grant_id == Grant.id)
+         .filter(Grant.donor_org_id == current_user.org_id,
+                 Application.submitted_at.isnot(None)))
+    this_year = q.filter(Application.submitted_at >= this_year_start).count()
+    prior_year = q.filter(Application.submitted_at >= prior_year_start,
+                          Application.submitted_at < this_year_start).count()
+    delta = this_year - prior_year
+    pct = round(100.0 * delta / prior_year, 1) if prior_year > 0 else None
+    return jsonify({
+        'this_year': this_year,
+        'prior_year': prior_year,
+        'delta': delta,
+        'pct_change': pct,
+        'year': now.year,
+    })
+
+
+@dashboard_bp.route('/reviewer-lifetime-completed', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_lifetime_completed():
+    """Phase 489 — Total count of completed reviews ever for this
+    reviewer. Recognition milestone.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    count = (Review.query
+             .filter(Review.reviewer_user_id == current_user.id,
+                     Review.status.in_(['submitted', 'scored', 'completed']),
+                     Review.completed_at.isnot(None))
+             .count())
+    return jsonify({'lifetime_completed': count})
+
+
+@dashboard_bp.route('/admin-notifications-14d', methods=['GET'])
+@login_required
+def api_dashboard_admin_notifications_14d():
+    """Phase 490 — 14-bucket count of Notification rows by day for the
+    last 14 days. Volume trend signal.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from app.models import Notification
+    from datetime import datetime, timezone, timedelta
+    today = datetime.now(timezone.utc).date()
+    cutoff = today - timedelta(days=13)
+    cutoff_dt = datetime(cutoff.year, cutoff.month, cutoff.day, tzinfo=timezone.utc)
+    rows = (Notification.query
+            .with_entities(Notification.created_at)
+            .filter(Notification.created_at >= cutoff_dt)
+            .all())
+    buckets = [0] * 14
+    for (created_at,) in rows:
+        if not created_at:
+            continue
+        try:
+            day = created_at.date() if hasattr(created_at, 'date') else created_at
+        except Exception:
+            continue
+        offset = (day - cutoff).days
+        if 0 <= offset < 14:
+            buckets[offset] += 1
+    return jsonify({'buckets': buckets, 'total': sum(buckets)})

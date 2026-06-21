@@ -67,6 +67,7 @@ import { UnreadMessagesStat } from '@/components/dashboards/unread-messages-stat
 import { AppsSubmittedYtdStat } from '@/components/dashboards/apps-submitted-ytd-stat';
 import { FundingTotalYtdStat } from '@/components/dashboards/funding-total-ytd-stat';
 import { UnreadNotificationsStat } from '@/components/dashboards/unread-notifications-stat';
+import { LifetimeWinRateStat } from '@/components/dashboards/lifetime-win-rate-stat';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -213,6 +214,7 @@ export function AttentionNgoDashboard() {
       <AppsSubmittedYtdStat />
       <FundingTotalYtdStat />
       <UnreadNotificationsStat />
+      <LifetimeWinRateStat />
       <NgoFeedbackThemesCard />
       <CriterionScoreTrendCard />
       <DeadlineDensityCard />
