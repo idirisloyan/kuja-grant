@@ -584,6 +584,21 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 481-485 — Unread notifications + average
+  reviewer score + reviews this month + documents storage + monthly
+  NGO accomplishments cron:
+  (a) `<UnreadNotificationsStat>` on NGO dashboard shows count of
+  unread Notification rows; amber pill. Self-gates at zero. (b)
+  `<AvgReviewerScoreStat>` on donor dashboard shows mean overall_score
+  across last-90d reviewer-completed reviews; self-gates < 5.
+  (c) `<CompletedThisMonthStat>` on reviewer reviews page counts
+  reviews completed since the 1st of the current calendar month;
+  shows month name. (d) `<DocumentsStorageCard>` on operator dashboard
+  sums Document.file_size with human-readable B/KB/MB/GB unit.
+  (e) Phase 485 cron `/api/cron/ngo-monthly-accomplishments` sends
+  each NGO a previous-month digest of submissions + funded apps.
+  Digests opt-out gated; record_cron_run wired.
+
 - **2026-06-21** Phase 475-479 — Funding total YTD + active reviewer
   panel + median pending review age + TOTP enrollment rate + review
   pipeline summary cron:

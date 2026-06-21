@@ -3287,3 +3287,93 @@ def api_cron_review_pipeline_summary():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/ngo-monthly-accomplishments', methods=['POST'])
+def api_cron_ngo_monthly_accomplishments():
+    """Phase 485 — First-of-the-month cron. Per NGO user, send a digest
+    of submissions + funded apps in the previous calendar month.
+    Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Application, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        # Previous calendar month window
+        if now.month == 1:
+            prev_year, prev_month = now.year - 1, 12
+        else:
+            prev_year, prev_month = now.year, now.month - 1
+        period_start = datetime(prev_year, prev_month, 1, tzinfo=timezone.utc)
+        period_end = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+
+        ngos = User.query.filter_by(role='ngo').all()
+        sent = 0
+        for u in ngos:
+            if not u.org_id:
+                continue
+            channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+            if not channels:
+                continue
+            submitted = (Application.query
+                         .filter(Application.org_id == u.org_id,
+                                 Application.submitted_at.isnot(None),
+                                 Application.submitted_at >= period_start,
+                                 Application.submitted_at < period_end)
+                         .count())
+            funded = (Application.query
+                      .filter(Application.org_id == u.org_id,
+                              Application.status.in_(['funded', 'awarded']),
+                              Application.decision_recorded_at.isnot(None),
+                              Application.decision_recorded_at >= period_start,
+                              Application.decision_recorded_at < period_end)
+                      .count())
+            if submitted == 0 and funded == 0:
+                continue
+            label = period_start.strftime('%B %Y')
+            parts = []
+            if submitted:
+                parts.append(f'{submitted} application{"" if submitted == 1 else "s"} submitted')
+            if funded:
+                parts.append(f'{funded} funded')
+            msg = f'{label} accomplishments: ' + ', '.join(parts) + '.'
+            n = Notification(
+                user_id=u.id,
+                type='ngo_monthly_accomplishments',
+                title='Your month in review',
+                message=msg[:500],
+                link='/dashboard',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'ngos_scanned': len(ngos), 'digests_sent': sent}
+        _rcr('ngo-monthly-accomplishments',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ngo-monthly-accomplishments cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ngo-monthly-accomplishments',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

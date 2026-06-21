@@ -4303,3 +4303,88 @@ def api_dashboard_admin_totp_enrollment_rate():
         'enrolled': enrolled,
         'total': total,
     })
+
+
+@dashboard_bp.route('/ngo-unread-notifications', methods=['GET'])
+@login_required
+def api_dashboard_ngo_unread_notifications():
+    """Phase 481 — Count of Notification rows for current user with
+    read=False. Inbox attention signal.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from app.models import Notification
+    unread = (Notification.query
+              .filter(Notification.user_id == current_user.id,
+                      Notification.read.is_(False))
+              .count())
+    return jsonify({'unread': unread})
+
+
+@dashboard_bp.route('/donor-avg-reviewer-score', methods=['GET'])
+@login_required
+def api_dashboard_donor_avg_reviewer_score():
+    """Phase 482 — Mean overall_score across reviewer-completed reviews
+    on donor's grants in last 90 days. Distinct from Phase 224 (AI
+    score per criterion).
+    """
+    if current_user.role not in ('donor', 'admin') or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (db.session.query(Review.overall_score)
+            .join(Application, Application.id == Review.application_id)
+            .join(Grant, Application.grant_id == Grant.id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff,
+                    Review.overall_score.isnot(None))
+            .all())
+    if len(rows) < 5:
+        return jsonify({'mean_score': None, 'sample': len(rows)})
+    scores = [float(s) for (s,) in rows]
+    return jsonify({
+        'mean_score': round(sum(scores) / len(scores), 1),
+        'sample': len(scores),
+    })
+
+
+@dashboard_bp.route('/reviewer-completed-this-month', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_completed_this_month():
+    """Phase 483 — Count of reviews completed by current reviewer since
+    first of the current calendar month.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    count = (Review.query
+             .filter(Review.reviewer_user_id == current_user.id,
+                     Review.status.in_(['submitted', 'scored', 'completed']),
+                     Review.completed_at.isnot(None),
+                     Review.completed_at >= month_start)
+             .count())
+    return jsonify({
+        'completed_this_month': count,
+        'month_start': month_start.date().isoformat(),
+    })
+
+
+@dashboard_bp.route('/admin-documents-storage', methods=['GET'])
+@login_required
+def api_dashboard_admin_documents_storage():
+    """Phase 484 — Sum of Document.file_size across all uploaded
+    documents. Capacity-planning signal.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    total_bytes = (db.session.query(func.coalesce(func.sum(Document.file_size), 0))
+                   .scalar() or 0)
+    doc_count = Document.query.count()
+    return jsonify({
+        'total_bytes': int(total_bytes),
+        'doc_count': doc_count,
+    })
