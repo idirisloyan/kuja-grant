@@ -190,6 +190,15 @@ export function AttentionNgoDashboard() {
       <ResumeBanner />
       <PageAttention items={attention} />
 
+      {/* Phase 613 — Action-driving tiles only above the fold. The team
+          target (Global South NGOs, often on phones, sometimes with low
+          literacy) needs a workbench, not a metrics wall. Action tiles
+          stay here — every one is either an inbox or surfaces something
+          to do. The 30+ Stat tiles + trend/history cards moved into the
+          "Your numbers" disclosure below, closed by default. Each tile
+          still self-gates when its signal is empty, so even this list
+          stays short in practice. */}
+
       {/* Phase 172 — saved-search match inbox. Self-gates when zero. */}
       <NewGrantMatchesCard />
       {/* Phase 207 — Drafts with deadline ≤ 7 days. Self-gates when none. */}
@@ -206,63 +215,14 @@ export function AttentionNgoDashboard() {
       <TrustShareCard />
       {/* Phase 260 — recent donor decisions on this NGO's apps. */}
       <PastDecisionsCard />
-      {/* Phase 273 — compare your 3 most recent apps side-by-side. */}
-      <CompareMyAppsCard />
-      {/* Phase 277 — top 3 decline reasons across past losses. Hidden when < 3 losses. */}
-      <LossPatternsCard />
-      {/* Phase 291 — median decision wait time across this NGO's apps. Self-gates when no decisions. */}
-      <NgoDecisionVelocityCard />
       {/* Phase 314 — starred grants with deadline countdown. */}
       <NgoWatchlistTile />
       {/* Phase 340 — apps needing doc upload. Self-gates when zero. */}
       <NgoDocsPendingCard />
-      {/* Phase 350 — sparkline of recent submit→decision durations. */}
-      <NgoApplicationDurationCard />
-      {/* Phase 355 — 90-day-vs-prior win rate trend. Self-gates < 3 each. */}
-      <NgoWinRateTrendCard />
+      {/* Phase 361 — stalled apps (submitted but no recent activity). Self-gates when none. */}
       <NgoStalledApplicationsCard />
-      <NgoPipelineValueCard />
+      {/* Phase 373 — first-decision landing banner. Self-gates after dismiss. */}
       <NgoFreshDecisionBanner />
-      <SubmissionsThisMonthCard />
-      <NgoSubmitDurationCard />
-      <FastestSubmissionStat />
-      <DraftFunnelStat />
-      <DraftAgeStat />
-      <CompletedAssessmentsStat />
-      <UnreadMessagesStat />
-      <AppsSubmittedYtdStat />
-      <FundingTotalYtdStat />
-      <UnreadNotificationsStat />
-      <LifetimeWinRateStat />
-      <WinRateQuarterStat />
-      <WatchlistSizeStat />
-      <SectorBreadthStat />
-      <DaysSinceLastSubmissionStat />
-      <SubmissionConsistencyStat />
-      <ActiveGrantsStat />
-      <DocumentsThisMonthStat />
-      <PipelineCountStat />
-      <SavedSearchesCountStat />
-      <DocsPendingExtractionStat />
-      <AiCalls7dStat />
-      <SubmittedTodayStat />
-      <EoiCountStat />
-      <RevisionRequestedStat />
-      <MostActiveGrantStat />
-      <WithdrawnCountStat />
-      <PeakAiScoreStat />
-      <AiCostYtdStat />
-      <DecisionVelocityFromSubmissionStat />
-      <NgoFeedbackThemesCard />
-      <CriterionScoreTrendCard />
-      <DeadlineDensityCard />
-      {/* Phase 154 — rolling 12-month impact summary. Self-gates if zero activity. */}
-      <ImpactCard />
-      {/* Phase 185 — peer-anonymized win rate by sector. Self-gates
-          when peer pool is too small to be meaningful (<5 orgs). */}
-      <PeerWinRateCard />
-      {/* Phase 148 — watchlist tile. Hidden when empty + no signal value. */}
-      <WatchedGrantsCard />
 
       <PageMain>
         {/* Applications in progress (drafts) */}
@@ -396,8 +356,70 @@ export function AttentionNgoDashboard() {
 
       </PageMain>
 
-      {/* Readiness + cross-grant patterns collapsed under "More insight" */}
+      {/* Phase 613 — Readiness + numbers split out of the main wall.
+          Two collapsible sections, both closed by default:
+
+            "Your numbers" — every Stat tile + every trend / history
+            / pattern card. Useful for organisations who want to look,
+            invisible to organisations who just want their inbox.
+
+            "Readiness & patterns" — the existing console + cross-grant
+            patterns. Stays as it was.
+
+          Each tile inside still self-gates, so opening the disclosure
+          on a brand-new account shows almost nothing rather than a
+          wall of zeros. */}
       <PageDetail>
+        <PageDetailSection title="Your numbers" icon={BarChart3} defaultOpen={false}>
+          <div className="space-y-3">
+            {/* Look-back cards — patterns, trends, history */}
+            <CompareMyAppsCard />
+            <LossPatternsCard />
+            <NgoDecisionVelocityCard />
+            <NgoApplicationDurationCard />
+            <NgoWinRateTrendCard />
+            <NgoPipelineValueCard />
+            <SubmissionsThisMonthCard />
+            <NgoSubmitDurationCard />
+            <NgoFeedbackThemesCard />
+            <CriterionScoreTrendCard />
+            <DeadlineDensityCard />
+            <ImpactCard />
+            <PeerWinRateCard />
+            <WatchedGrantsCard />
+            {/* Stat tiles — Phase 379+. Each is one number with context. */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              <FastestSubmissionStat />
+              <DraftFunnelStat />
+              <DraftAgeStat />
+              <CompletedAssessmentsStat />
+              <UnreadMessagesStat />
+              <AppsSubmittedYtdStat />
+              <FundingTotalYtdStat />
+              <UnreadNotificationsStat />
+              <LifetimeWinRateStat />
+              <WinRateQuarterStat />
+              <WatchlistSizeStat />
+              <SectorBreadthStat />
+              <DaysSinceLastSubmissionStat />
+              <SubmissionConsistencyStat />
+              <ActiveGrantsStat />
+              <DocumentsThisMonthStat />
+              <PipelineCountStat />
+              <SavedSearchesCountStat />
+              <DocsPendingExtractionStat />
+              <AiCalls7dStat />
+              <SubmittedTodayStat />
+              <EoiCountStat />
+              <RevisionRequestedStat />
+              <MostActiveGrantStat />
+              <WithdrawnCountStat />
+              <PeakAiScoreStat />
+              <AiCostYtdStat />
+              <DecisionVelocityFromSubmissionStat />
+            </div>
+          </div>
+        </PageDetailSection>
         <PageDetailSection title="Readiness & patterns" icon={Lightbulb} defaultOpen={false}>
           <div className="space-y-4">
             <NgoReadinessConsole />
