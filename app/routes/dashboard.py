@@ -1036,6 +1036,47 @@ def api_dashboard_ngo_docs_pending():
     return jsonify({'count': len(out_ids), 'application_ids': out_ids[:5]})
 
 
+@dashboard_bp.route('/donor-expressions-of-interest', methods=['GET'])
+@login_required
+def api_dashboard_donor_expressions_of_interest():
+    """Phase 349 — Recent EOIs on this donor's grants.
+
+    Newest 5 expressions with applicant name + grant title.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from app.models import ExpressionOfInterest, Organization
+    rows = (ExpressionOfInterest.query
+            .join(Grant, Grant.id == ExpressionOfInterest.grant_id)
+            .filter(Grant.donor_org_id == current_user.org_id)
+            .order_by(ExpressionOfInterest.created_at.desc())
+            .limit(5)
+            .all())
+    if not rows:
+        return jsonify({'expressions': [], 'total': 0})
+    org_ids = {r.org_id for r in rows}
+    orgs_by_id = {o.id: o for o in Organization.query.filter(Organization.id.in_(org_ids)).all()}
+    grant_ids = {r.grant_id for r in rows}
+    grants_by_id = {g.id: g for g in Grant.query.filter(Grant.id.in_(grant_ids)).all()}
+    out = []
+    for r in rows:
+        org = orgs_by_id.get(r.org_id)
+        g = grants_by_id.get(r.grant_id)
+        out.append({
+            'id': r.id,
+            'org_id': r.org_id,
+            'org_name': org.name if org else None,
+            'grant_id': r.grant_id,
+            'grant_title': g.title if g else None,
+            'created_at': r.created_at.isoformat() if r.created_at else None,
+        })
+    total = (ExpressionOfInterest.query
+             .join(Grant, Grant.id == ExpressionOfInterest.grant_id)
+             .filter(Grant.donor_org_id == current_user.org_id)
+             .count())
+    return jsonify({'expressions': out, 'total': total})
+
+
 @dashboard_bp.route('/decision-forecast', methods=['GET'])
 @login_required
 def api_dashboard_decision_forecast():
@@ -1578,6 +1619,77 @@ def api_dashboard_data_integrity():
     })
 
 
+@dashboard_bp.route('/stale-published-grants', methods=['GET'])
+@login_required
+def api_dashboard_stale_published_grants():
+    """Phase 353 — Grants still 'open' whose deadline has passed by > 7d.
+
+    Operational drift signal. Admin-only. Lists 3 oldest.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    rows = (Grant.query
+            .filter(Grant.status == 'open',
+                    Grant.deadline.isnot(None),
+                    Grant.deadline < cutoff)
+            .order_by(Grant.deadline.asc())
+            .all())
+    out = []
+    for g in rows[:3]:
+        out.append({
+            'grant_id': g.id,
+            'title': g.title,
+            'deadline': g.deadline.isoformat() if g.deadline else None,
+        })
+    return jsonify({'total': len(rows), 'oldest': out})
+
+
+@dashboard_bp.route('/expired-screenings', methods=['GET'])
+@login_required
+def api_dashboard_expired_screenings():
+    """Phase 351 — NGO orgs whose latest sanctions screening is > 6 months old.
+
+    Admin-only. Surfaces 3 oldest. Self-gates client-side when zero.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
+    from app.models import Organization, AdverseMediaScreening
+    cutoff = datetime.now(timezone.utc) - timedelta(days=180)
+
+    # Latest screening per org.
+    latest_by_org: dict[int, AdverseMediaScreening] = {}
+    rows = (AdverseMediaScreening.query
+            .order_by(AdverseMediaScreening.screened_at.desc())
+            .all())
+    for r in rows:
+        if r.org_id not in latest_by_org:
+            latest_by_org[r.org_id] = r
+
+    # NGO orgs only — filter by org_type/active where possible.
+    ngo_orgs = Organization.query.filter(
+        getattr(Organization, 'org_type', None) == 'ngo'
+        if hasattr(Organization, 'org_type') else True
+    ).all() if hasattr(Organization, 'org_type') else Organization.query.all()
+
+    overdue: list[dict] = []
+    for o in ngo_orgs:
+        s = latest_by_org.get(o.id)
+        if s is None:
+            continue
+        if s.screened_at and s.screened_at < cutoff:
+            overdue.append({
+                'org_id': o.id,
+                'org_name': o.name,
+                'last_screened_at': s.screened_at.isoformat() if s.screened_at else None,
+            })
+    overdue.sort(key=lambda r: r['last_screened_at'] or '')
+    return jsonify({'total': len(overdue), 'oldest': overdue[:3]})
+
+
 @dashboard_bp.route('/sla-breaches', methods=['GET'])
 @login_required
 def api_dashboard_sla_breaches():
@@ -1699,6 +1811,37 @@ def api_dashboard_donor_outreach_rollup():
         'outreach_started': started,
         'outreach_pending': pending,
     })
+
+
+@dashboard_bp.route('/ngo-application-duration', methods=['GET'])
+@login_required
+def api_dashboard_ngo_application_duration():
+    """Phase 350 — Submit→decision durations for the NGO's last 6
+    decided applications, oldest first. Used for a small sparkline.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    DECIDED = ['funded', 'awarded', 'declined', 'rejected']
+    rows = (Application.query
+            .filter(Application.ngo_org_id == current_user.org_id,
+                    Application.status.in_(DECIDED),
+                    Application.submitted_at.isnot(None),
+                    Application.decision_recorded_at.isnot(None))
+            .order_by(Application.decision_recorded_at.desc())
+            .limit(6)
+            .all())
+    rows = list(reversed(rows))
+    out = []
+    for a in rows:
+        if a.submitted_at and a.decision_recorded_at:
+            d = (a.decision_recorded_at - a.submitted_at).total_seconds() / 86400.0
+            if d >= 0:
+                out.append({
+                    'application_id': a.id,
+                    'days': round(d, 1),
+                    'status': a.status,
+                })
+    return jsonify({'durations': out})
 
 
 @dashboard_bp.route('/ngo-decision-velocity', methods=['GET'])

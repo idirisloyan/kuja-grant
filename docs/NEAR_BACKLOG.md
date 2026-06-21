@@ -584,6 +584,25 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 349-353 — Per-persona surfaces + operational
+  drift detectors:
+  (a) `<DonorEoiCard>` on donor dashboard lists the newest 5
+  expressions of interest (Phase 344) on this donor's grants.
+  Backend `GET /api/dashboard/donor-expressions-of-interest`.
+  (b) `<NgoApplicationDurationCard>` on NGO dashboard: SVG
+  sparkline of submit→decision durations for the last 6 decided
+  applications with a first→last delta tag. Backend
+  `GET /api/dashboard/ngo-application-duration`. Self-gates < 3.
+  (c) `<ExpiredScreeningsCard>` on operator dashboard lists NGO
+  orgs whose latest sanctions screening is > 6 months old.
+  Backend `GET /api/dashboard/expired-screenings`. (d) New
+  `POST /api/cron/donor-closing-grants` notifies donor users
+  about their own grants closing within 7 days; honors the
+  digests opt-out and dedupes within 7 days per user. (e)
+  `<StaleGrantsCard>` on operator dashboard flags grants still
+  in 'open' status whose deadline has passed by > 7 days.
+  Backend `GET /api/dashboard/stale-published-grants`.
+
 - **2026-06-20** Phase 343-347 — Cleanup hygiene + soft signals +
   forecasting + usage trends:
   (a) New `POST /api/cron/notifications-cleanup` deletes read

@@ -43,6 +43,8 @@ import { NotificationVolumeCard } from '@/components/dashboards/notification-vol
 import { ReviewerScoreboardCard } from '@/components/dashboards/reviewer-scoreboard-card';
 import { ApplicationsByStatusCard } from '@/components/dashboards/applications-by-status-card';
 import { UsageTrendCard } from '@/components/dashboards/usage-trend-card';
+import { ExpiredScreeningsCard } from '@/components/dashboards/expired-screenings-card';
+import { StaleGrantsCard } from '@/components/dashboards/stale-grants-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -293,6 +295,10 @@ export function AttentionOperatorDashboard() {
         <ApplicationsByStatusCard />
         {/* Phase 347 — 14-day usage sparklines (apps, AI, decisions). */}
         <UsageTrendCard />
+        {/* Phase 351 — NGOs without recent sanctions screening. */}
+        <ExpiredScreeningsCard />
+        {/* Phase 353 — published grants still open past their deadline. */}
+        <StaleGrantsCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}
