@@ -265,6 +265,45 @@ def api_reviewer_my_stats():
     })
 
 
+@reviews_bp.route('/my-turnaround', methods=['GET'])
+@login_required
+@role_required('reviewer')
+def api_reviewer_my_turnaround():
+    """Phase 363 — Reviewer's median + p75 turnaround days from
+    assignment (review.created_at) to completion (review.completed_at)
+    over the last 90 days. Self-knowledge signal next to my-stats.
+    """
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    cutoff = _dt.now(_tz.utc) - _td(days=90)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff)
+            .all())
+    days = []
+    for r in rows:
+        if not r.created_at or not r.completed_at:
+            continue
+        d = (r.completed_at - r.created_at).total_seconds() / 86400.0
+        if d >= 0:
+            days.append(d)
+    if not days:
+        return jsonify({'success': True, 'window_days': 90, 'count': 0,
+                        'median_days': None, 'p75_days': None})
+    days.sort()
+    n = len(days)
+    median = days[n // 2] if n % 2 else (days[n // 2 - 1] + days[n // 2]) / 2.0
+    p75_idx = max(0, int(round(0.75 * (n - 1))))
+    return jsonify({
+        'success': True,
+        'window_days': 90,
+        'count': n,
+        'median_days': round(median, 1),
+        'p75_days': round(days[p75_idx], 1),
+    })
+
+
 @reviews_bp.route('/workload', methods=['GET'])
 @login_required
 @role_required('donor', 'admin')

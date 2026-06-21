@@ -51,6 +51,7 @@ import { NgoWatchlistTile } from '@/components/dashboards/ngo-watchlist-tile';
 import { NgoDocsPendingCard } from '@/components/dashboards/ngo-docs-pending-card';
 import { NgoApplicationDurationCard } from '@/components/dashboards/ngo-application-duration-card';
 import { NgoWinRateTrendCard } from '@/components/dashboards/ngo-win-rate-trend-card';
+import { NgoStalledApplicationsCard } from '@/components/dashboards/ngo-stalled-applications-card';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -184,6 +185,7 @@ export function AttentionNgoDashboard() {
       <NgoApplicationDurationCard />
       {/* Phase 355 — 90-day-vs-prior win rate trend. Self-gates < 3 each. */}
       <NgoWinRateTrendCard />
+      <NgoStalledApplicationsCard />
       {/* Phase 154 — rolling 12-month impact summary. Self-gates if zero activity. */}
       <ImpactCard />
       {/* Phase 185 — peer-anonymized win rate by sector. Self-gates

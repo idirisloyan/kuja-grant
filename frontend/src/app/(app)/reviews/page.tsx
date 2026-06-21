@@ -129,6 +129,7 @@ function ReviewerView() {
 
       {/* Phase 236 — completion rate over last 90 days. */}
       <MyCompletionStat />
+      <MyTurnaroundStat />
 
       {/* Phase 303 — self-calibration coaching tip (only if > 1.0σ off). */}
       <MyCalibrationTip />
@@ -669,6 +670,37 @@ function MyCompletionStat() {
       <span className="tabular-nums">
         <span className="font-semibold">{data.completion_pct ?? 0}%</span> completion
         <span className="text-muted-foreground"> ({data.completed} of {data.total_assigned})</span>
+      </span>
+    </div>
+  );
+}
+
+// Phase 363 — Reviewer turnaround days strip over the last 90 days.
+function MyTurnaroundStat() {
+  const [data, setData] = useState<{
+    median_days: number | null;
+    p75_days: number | null;
+    count: number;
+    window_days: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get<typeof data>('/api/reviews/my-turnaround').then((r) => {
+      if (!cancelled) setData(r);
+    }).catch(() => {/* silent */});
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!data || !data.count || data.median_days == null) return null;
+  return (
+    <div className="rounded-md border border-border bg-card p-3 text-xs flex items-center justify-between">
+      <span className="text-muted-foreground">
+        Last {data.window_days} days
+      </span>
+      <span className="tabular-nums">
+        <span className="font-semibold">{data.median_days}d</span> median turnaround
+        <span className="text-muted-foreground"> (p75 {data.p75_days}d · {data.count} reviews)</span>
       </span>
     </div>
   );

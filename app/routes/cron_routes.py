@@ -801,6 +801,109 @@ def api_cron_donor_closing_grants():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/monthly-reviewer-leaderboard', methods=['POST'])
+def api_cron_monthly_reviewer_leaderboard():
+    """Phase 365 — Monthly reviewer leaderboard for admins.
+
+    Computes each reviewer's completed-review count + median turnaround
+    days over the trailing 30 days, ranks by completion count (median as
+    tiebreak), and notifies admins with the top 5. Honors the digests
+    opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Review, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+        from collections import defaultdict
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        rows = (Review.query
+                .filter(Review.status.in_(['submitted', 'scored', 'completed']),
+                        Review.completed_at.isnot(None),
+                        Review.completed_at >= cutoff)
+                .with_entities(Review.reviewer_user_id, Review.created_at, Review.completed_at)
+                .all())
+        by_reviewer = defaultdict(list)
+        for rid, created, completed in rows:
+            if not created or not completed:
+                continue
+            d = (completed - created).total_seconds() / 86400.0
+            if d >= 0:
+                by_reviewer[rid].append(d)
+
+        def _median(xs):
+            s = sorted(xs)
+            n = len(s)
+            return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+
+        rankings = []
+        if by_reviewer:
+            reviewer_ids = list(by_reviewer.keys())
+            users_by_id = {u.id: u for u in User.query.filter(User.id.in_(reviewer_ids)).all()}
+            for rid, days in by_reviewer.items():
+                u = users_by_id.get(rid)
+                rankings.append({
+                    'reviewer_user_id': rid,
+                    'name': (u.name or u.email) if u else f'User #{rid}',
+                    'completed': len(days),
+                    'median_days': round(_median(days), 1),
+                })
+            rankings.sort(key=lambda r: (-r['completed'], r['median_days']))
+            rankings = rankings[:5]
+
+        admins = User.query.filter_by(role='admin').all()
+        sent = 0
+        if rankings:
+            top_line = ', '.join(f'{r["name"]} ({r["completed"]})' for r in rankings[:3])
+            msg = f'Top reviewers (30d): {top_line}'[:500]
+            for u in admins:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='reviewer_leaderboard',
+                    title='Monthly reviewer leaderboard',
+                    message=msg,
+                    link='/admin/reviewers-workload',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+
+        result = {
+            'reviewers_ranked': len(rankings),
+            'admins_notified': sent,
+        }
+        _rcr('monthly-reviewer-leaderboard',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result, 'leaderboard': rankings})
+    except Exception as e:
+        logger.exception('monthly-reviewer-leaderboard cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('monthly-reviewer-leaderboard',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/notifications-cleanup', methods=['POST'])
 def api_cron_notifications_cleanup():
     """Phase 343 — Delete stale notifications.

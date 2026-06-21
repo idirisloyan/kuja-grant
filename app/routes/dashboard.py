@@ -2147,3 +2147,119 @@ def api_dashboard_reviewer_throughput():
     result = ReviewerThroughputService.for_reviewer(reviewer_user_id=rid)
     _dashboard_cache.set(cache_key, result)
     return jsonify(result)
+
+
+@dashboard_bp.route('/ngo-stalled-applications', methods=['GET'])
+@login_required
+def api_dashboard_ngo_stalled_applications():
+    """Phase 361 — NGO's applications stuck in the same pending status
+    for more than 7 days. Each row shows the status + days stalled so
+    the NGO knows where the bottleneck is.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    PENDING = ['submitted', 'under_review', 'scored', 'revision_requested']
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    rows = (Application.query
+            .filter(Application.ngo_org_id == current_user.org_id,
+                    Application.status.in_(PENDING),
+                    Application.updated_at < cutoff)
+            .order_by(Application.updated_at.asc())
+            .limit(6)
+            .all())
+    now = datetime.now(timezone.utc)
+    out = []
+    for a in rows:
+        if not a.updated_at:
+            continue
+        days = (now - a.updated_at).total_seconds() / 86400.0
+        out.append({
+            'application_id': a.id,
+            'grant_title': a.grant.title if a.grant else None,
+            'status': a.status,
+            'days_stalled': int(round(days)),
+        })
+    return jsonify({'stalled': out, 'total': len(out)})
+
+
+@dashboard_bp.route('/donor-fastest-reviewer', methods=['GET'])
+@login_required
+def api_dashboard_donor_fastest_reviewer():
+    """Phase 362 — The reviewer with the shortest median turnaround on
+    this donor's grants over the last 30 days. Returns null if fewer
+    than 3 reviewers each completed >=2 reviews in the window (avoid
+    crowning someone on one data point).
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (db.session.query(Review.reviewer_user_id, Review.created_at, Review.completed_at)
+            .join(Application, Application.id == Review.application_id)
+            .join(Grant, Grant.id == Application.grant_id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Review.status == 'completed',
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff)
+            .all())
+    if not rows:
+        return jsonify({'reviewer': None, 'reason': 'no_data'})
+    by_reviewer = defaultdict(list)
+    for rid, created, completed in rows:
+        if not created or not completed:
+            continue
+        d = (completed - created).total_seconds() / 86400.0
+        if d >= 0:
+            by_reviewer[rid].append(d)
+    eligible = {rid: days for rid, days in by_reviewer.items() if len(days) >= 2}
+    if len(eligible) < 3:
+        return jsonify({'reviewer': None, 'reason': 'insufficient_reviewers'})
+    def _median(xs):
+        s = sorted(xs)
+        n = len(s)
+        return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+    medians = {rid: _median(days) for rid, days in eligible.items()}
+    winner_id = min(medians, key=medians.get)
+    winner = User.query.get(winner_id)
+    return jsonify({
+        'reviewer': {
+            'user_id': winner_id,
+            'name': winner.name if winner else None,
+            'median_days': round(medians[winner_id], 1),
+            'reviews_completed': len(eligible[winner_id]),
+        },
+    })
+
+
+@dashboard_bp.route('/duplicate-orgs', methods=['GET'])
+@login_required
+def api_dashboard_duplicate_orgs():
+    """Phase 364 — Organisations that share a normalised legal name +
+    country. Admin-only signal for cleanup; flags possible duplicates
+    created by independent registration flows.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from collections import defaultdict
+    rows = (Organization.query
+            .with_entities(Organization.id, Organization.name, Organization.country, Organization.org_type)
+            .all())
+    groups = defaultdict(list)
+    for org_id, name, country, otype in rows:
+        if not name:
+            continue
+        key = ((name or '').strip().lower(), (country or '').strip().lower())
+        groups[key].append({'id': org_id, 'name': name, 'country': country, 'org_type': otype})
+    dupes = [orgs for orgs in groups.values() if len(orgs) >= 2]
+    dupes.sort(key=lambda g: len(g), reverse=True)
+    out = []
+    for g in dupes[:5]:
+        out.append({
+            'normalized_name': g[0]['name'],
+            'country': g[0].get('country'),
+            'count': len(g),
+            'orgs': g,
+        })
+    return jsonify({'duplicates': out, 'total_groups': len(dupes)})

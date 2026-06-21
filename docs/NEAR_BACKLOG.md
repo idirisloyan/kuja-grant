@@ -584,6 +584,30 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 361-365 — Stalled apps + fastest reviewer +
+  turnaround stat + duplicate-org guard + monthly leaderboard:
+  (a) `<NgoStalledApplicationsCard>` on NGO dashboard lists
+  applications stuck in a pending status > 7 days, with status
+  name + days stalled. Backend
+  `GET /api/dashboard/ngo-stalled-applications`. (b)
+  `<FastestReviewerCard>` on donor dashboard celebrates the
+  reviewer with the shortest median turnaround on this donor's
+  grants in the last 30 days. Backend
+  `GET /api/dashboard/donor-fastest-reviewer`. Self-gates unless
+  ≥3 reviewers each completed ≥2 reviews in the window. (c)
+  `<MyTurnaroundStat>` on /reviews shows the reviewer their own
+  median + p75 turnaround days over the last 90 days (decline
+  data isn't persisted server-side, so accept-rate pivoted to
+  turnaround). Backend `GET /api/reviews/my-turnaround`. (d)
+  `<DuplicateOrgsCard>` on operator dashboard flags
+  organisations sharing the same normalised legal name + country
+  as possible duplicates. Backend
+  `GET /api/dashboard/duplicate-orgs`. (e) New
+  `POST /api/cron/monthly-reviewer-leaderboard` ranks reviewers
+  by completed-review count over the last 30 days (median
+  turnaround as tiebreak) and sends each admin the top 3 via the
+  digests opt-out gate.
+
 - **2026-06-20** Phase 355-359 — Trend tiles + security hygiene +
   reviewer ergonomics + admin digest:
   (a) `<NgoWinRateTrendCard>` on NGO dashboard compares the NGO's
