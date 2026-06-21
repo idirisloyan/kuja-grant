@@ -1,0 +1,72 @@
+Logic invariants:
+============================================================
+  [PASS] AI SDK timeout >= 300s (PMO contract)
+  [PASS] AI heavy timeout >= 240s
+  [PASS] AI heavy timeout <= SDK ceiling
+  [PASS] AI medium timeout <= heavy timeout
+  [PASS] AI light timeout <= medium timeout
+  [PASS] endpoint draft_application resolves to heavy timeout
+  [PASS] endpoint draft_report resolves to heavy timeout
+  [PASS] endpoint generate_grant_brief resolves to heavy timeout
+  [PASS] endpoint analyze_document resolves to heavy timeout
+  [PASS] every endpoint timeout <= SDK ceiling
+  [PASS] require_string raises on missing field
+  [PASS] require_string raises on too-long input
+  [PASS] require_int raises on non-int
+  [PASS] require_int rejects bools
+  [PASS] require_email rejects malformed
+  [PASS] require_uuid rejects malformed
+  [PASS] bound_array raises on too-many items
+  [PASS] check_submission_readiness has severity bands
+  [PASS] draft_application reminds AI not to invent facts
+  [PASS] check_submission_readiness scoring band hint present
+  [PASS] reviewer summary requires evidence_for/against per criterion
+  [PASS] check_submission_readiness uses _call_claude_tool
+  [PASS] check_report_readiness uses _call_claude_tool
+  [PASS] estimate_applicant_burden uses _call_claude_tool
+  [PASS] draft_application uses _call_claude_tool
+  [PASS] generate_reviewer_summary uses _call_claude_tool
+  [PASS] Risk model has lifecycle status column
+  [PASS] AuditChainEntry has prev_hash + payload_hash
+  [PASS] OrgMemory has usage_count for ranking
+  [PASS] EntityComment is polymorphic
+  [PASS] User has TOTP columns
+  [PASS] User has lockout columns
+  [PASS] Document has extraction lifecycle columns
+  [PASS] rate policy ai_extraction registered
+  [PASS] rate policy ai_heavy stricter than ai_extraction
+  [PASS] rate policy login is IP-scoped
+  [PASS] rate_policies._get_redis returns None without REDIS_URL
+  [PASS] rate_policies has _enforce_redis backend
+  [PASS] rate_policies.enforce on unknown policy is permissive
+  [PASS] ai_mock.gate returns False when env is unset
+  [PASS] ai_jobs.submit_ai_job is callable
+  [PASS] ai_jobs.get_ai_job is callable
+  [PASS] ai_jobs.is_async_request is callable
+  [PASS] ai_jobs.submit_ai_job composes task_runner.submit_task
+  [PASS] AI semaphore cap > 0
+  [PASS] AI semaphore allows up to cap concurrent acquires
+  [PASS] AI semaphore rejects (cap+1)-th acquire
+  [PASS] AI semaphore bypasses None user_key
+  [PASS] ai_surface_health dry-run returns expected shape
+  [PASS] ai_surface_health enumerates every flagship surface
+  [PASS] ai_surface_health dry-run reports overall=skipped
+  [PASS] AIService.check_submission_readiness accepts surface-health kwargs
+  [PASS] AIService.check_report_readiness accepts surface-health kwargs
+  [PASS] AIService.estimate_applicant_burden accepts surface-health kwargs
+  [PASS] AIService.draft_application accepts surface-health kwargs
+  [PASS] AIService.generate_reviewer_summary accepts surface-health kwargs
+  [PASS] AIService.extract_evidence accepts surface-health kwargs
+  [PASS] AIService.suggest_criteria accepts surface-health kwargs
+  [PASS] flag ai.grant_brief_generator defaults ON
+  [PASS] flag ai.compliance_preempt defaults ON
+  [PASS] flag ai.cross_grant_patterns defaults ON
+  [PASS] flag ui.preview_as_reviewer defaults ON
+  [PASS] flag ui.live_drafters_pill defaults ON
+  [PASS] flag ui.audit_trail_tab defaults ON
+  [PASS] CSP includes block-all-mixed-content
+  [PASS] CSP forbids object-src
+  [PASS] CSP frame-ancestors none
+============================================================
+  Results: 67 passed, 0 failed
+  All invariants hold.

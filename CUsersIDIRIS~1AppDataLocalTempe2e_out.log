@@ -1,0 +1,137 @@
+C:\Users\IdirisLoyan\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+
+======================================================================
+SECTION 1: DEFECT RETESTS (except IP rate limit)
+======================================================================
+  [reset] cleared 24 attempts, 10 user locks
+
+--- DEF-SEC-001: Per-account lockout ---
+  [PASS] DEF-SEC-001: Per-account lockout (existing user)
+  [PASS] DEF-SEC-001: Correct pw during lockout -> 429
+  [PASS] DEF-SEC-001: Other accounts unaffected
+  [reset] cleared 14 attempts, 10 user locks
+
+--- DEF-UPL-001: Empty/invalid PDF rejection ---
+  [PASS] DEF-UPL-001: Empty PDF -> 400 (grant upload)
+  [PASS] DEF-UPL-001: Empty PDF -> 400 (document upload)
+  [PASS] DEF-UPL-001: Tiny file (8 bytes) -> 400
+  [PASS] DEF-UPL-001: Unsupported .exe -> 400
+  [PASS] DEF-UPL-001: Valid TXT -> 200 with extraction
+
+--- DEF-UPL-002: Oversized upload handling ---
+  [PASS] DEF-UPL-002: 17MB upload -> 4xx, never 5xx
+  [PASS] DEF-UPL-002: Oversized doc upload -> 4xx, never 5xx
+
+--- DEF-UI-001: Upload feedback (API level) ---
+  [PASS] DEF-UI-001: Upload response has all extraction fields
+  [PASS] DEF-UI-001: Upload error returns descriptive JSON
+
+--- DEF-UI-002: Save-as-draft (API level) ---
+  [PASS] DEF-UI-002: Save draft creates and persists grant
+  [PASS] DEF-UI-002: Save draft update existing grant
+
+--- DEF-UI-003: Apply entry (API level) ---
+  [PASS] DEF-UI-003: Grant detail loads for apply entry
+  [PASS] DEF-UI-003: NGO creates application via apply entry
+
+======================================================================
+SECTION 2: FULL REGRESSION (using cached sessions)
+======================================================================
+  [PASS] AUTH: All 8 non-locked accounts log in
+  [PASS] AUTH: Unauthenticated -> 401
+  [PASS] AUTH: NGO cannot create grants -> 403
+  [PASS] GRANT: Create draft grant
+  [PASS] GRANT: List grants
+  [PASS] GRANT: Get grant detail
+  [PASS] CAP: List frameworks (>=5)
+  [PASS] CAP: List assessments
+  [PASS] DILIGENCE: Sanctions screening
+  [PASS] DILIGENCE: Registry directory
+  [PASS] APP: NGO lists applications
+  [PASS] APP: Donor lists applications
+  [PASS] DOC: NGO uploads valid document
+  [PASS] REPORT: NGO lists reports
+  [PASS] REPORT: Donor lists reports
+  [PASS] REPORT: Upcoming reports
+  [PASS] DASHBOARD: Stats
+  [PASS] ORG: List organizations
+  [FAIL] REVIEW: List reviews -- 
+  [PASS] SEC: All security headers present
+  [PASS] HEALTH: Healthy
+  [PASS] MISC: Static assets
+  [PASS] MISC: API info
+
+======================================================================
+SECTION 2b: REGRESSION GATE (Localization + Donor Wizard + NGO Apply)
+======================================================================
+
+--- LOCALIZATION ---
+  [PASS] I18N: Translation files load with consistency check
+  [PASS] I18N: Language preference set/get
+
+--- DONOR WIZARD LIFECYCLE ---
+  [PASS] WIZARD: Step 1 - Create grant draft
+  [PASS] WIZARD: Step 2 - Add evaluation criteria
+  [PASS] WIZARD: Step 3 - Configure required documents
+  [PASS] WIZARD: Step 4 - Upload agreement + AI extraction
+  [ERR]  WIZARD: Step 5 - Publish grant -- ReadTimeout: HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=10)
+
+--- NGO APPLY LIFECYCLE ---
+  [ERR]  APPLY: NGO browses and finds open grant -- ReadTimeout: HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=10)
+  [ERR]  APPLY: Load grant details with criteria + docs -- ReadTimeout: HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=10)
+  [ERR]  APPLY: Create application -- ReadTimeout: HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=15)
+  [ERR]  APPLY: Upload required document -- ReadTimeout: HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=30)
+
+--- ADMIN AUDIT DASHBOARD ---
+  [ERR]  AUDIT: Admin stats include security+document metrics -- ReadTimeout: HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=15)
+  [ERR]  AUDIT: Security events endpoint accessible -- ReadTimeout: HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=15)
+
+======================================================================
+SECTION 3: IP RATE LIMIT TEST (runs last, 16 logins so far)
+======================================================================
+
+--- DEF-SEC-001: IP-based rate limiting ---
+  [ERR]  DEF-SEC-001: IP rate limit on non-existent emails -- ReadTimeout: HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=10)
+
+======================================================================
+CLEANUP
+======================================================================
+  [ERR]  CLEANUP: Remove test grants -- ReadTimeout: HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=15)
+
+======================================================================
+TEST SUMMARY
+======================================================================
+
+Total: 54  |  PASSED: 44  |  FAILED: 1  |  ERRORS: 9
+Pass rate: 44/54 (81%)
+Total login attempts: 18
+
+--- FAILURES & ERRORS ---
+  FAIL: REVIEW: List reviews -- 
+  ERROR: WIZARD: Step 5 - Publish grant -- HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=10)
+  ERROR: APPLY: NGO browses and finds open grant -- HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=10)
+  ERROR: APPLY: Load grant details with criteria + docs -- HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=10)
+  ERROR: APPLY: Create application -- HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=15)
+  ERROR: APPLY: Upload required document -- HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=30)
+  ERROR: AUDIT: Admin stats include security+document metrics -- HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=15)
+  ERROR: AUDIT: Security events endpoint accessible -- HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=15)
+  ERROR: DEF-SEC-001: IP rate limit on non-existent emails -- HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=10)
+  ERROR: CLEANUP: Remove test grants -- HTTPSConnectionPool(host='web-production-6f8a.up.railway.app', port=443): Read timed out. (read timeout=15)
+
+--- DEFECT RETEST SUMMARY ---
+  DEF-SEC-001: NEEDS WORK (1/4 failed)
+  DEF-UPL-001: RESOLVED (5/5 passed)
+  DEF-UPL-002: RESOLVED (2/2 passed)
+  DEF-UI-001: RESOLVED (2/2 passed)
+  DEF-UI-002: RESOLVED (2/2 passed)
+  DEF-UI-003: RESOLVED (2/2 passed)
+
+--- P1 REGRESSION GATE SUMMARY ---
+  I18N: PASS (2/2)
+  WIZARD: FAIL (1/5 failed)
+  APPLY: FAIL (4/4 failed)
+  AUDIT: FAIL (2/2 failed)
+
+  >>> REGRESSION GATE: FAIL (do NOT deploy)
+

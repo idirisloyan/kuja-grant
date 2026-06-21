@@ -1,0 +1,40 @@
+C:\Users\IdirisLoyan\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+NEAR UAT smoke against https://web-production-6f8a.up.railway.app (network=near)
+
+Tenant resolution + auth
+  [PASS] Tenant resolves to NEAR via X-Network-Override
+  [PASS] Admin login (NEAR scope)
+
+Networked-funds entities
+  [PASS] Funds list includes the Change Fund
+  [PASS] Windows have a rubric attached
+  [PASS] Window report endpoint reachable (Phase 37)
+  [PASS] Crisis Monitoring Report has a published edition
+  [PASS] Declarations list returns rows
+
+Membership + reporting
+  [PASS] Membership listing endpoint mounted
+  [PASS] Reports endpoint reachable for NGO context
+
+Phase 38 AI surfaces (route registration)
+  [PASS] Application rubric scorer route mounted
+  [PASS] Application budget classifier route mounted
+
+Phase 39 polish
+  [PASS] TOTP status endpoint reachable
+  [PASS] verify_assertion_for_user exported (WebAuthn wrapper)
+  [PASS] Capacity-assessment auto-link helper present
+  [PASS] Membership decision email helper present
+
+Phase 40 auto-rubric-score + hard-gate
+  [PASS] Application has ai_rubric_result_json + budget_lines_json columns
+  [PASS] Budget + rubric helpers round-trip on the model
+  [PASS] /submit endpoint reachable (hard-gate route mounted)
+
+NGO viewer
+  [PASS] NGO login (NEAR scope)
+
+============================================================
+NEAR UAT smoke: 19/19 passed (0 failed, 0 errored)
+============================================================

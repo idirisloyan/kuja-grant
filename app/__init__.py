@@ -348,15 +348,24 @@ def create_app(config_name=None):
                  'ALTER TABLE ai_call_logs ADD COLUMN IF NOT EXISTS language VARCHAR(8)'),
                 ('ai_call_logs', 'usd_cost',
                  'ALTER TABLE ai_call_logs ADD COLUMN IF NOT EXISTS usd_cost NUMERIC(12,6)'),
-                # ── reviews (Phase 221, 232, 327) ───────────────────────
+                # ── reviews (Phase 221, 232, 283, 327) ──────────────────
                 ('reviews', 'private_notes',
                  'ALTER TABLE reviews ADD COLUMN IF NOT EXISTS private_notes TEXT'),
                 ('reviews', 'declined_at',
                  'ALTER TABLE reviews ADD COLUMN IF NOT EXISTS declined_at TIMESTAMP'),
                 ('reviews', 'declined_reason',
                  'ALTER TABLE reviews ADD COLUMN IF NOT EXISTS declined_reason TEXT'),
+                # Phase 283 — Reviewer COI self-disclosure.
+                ('reviews', 'coi_disclosed_at',
+                 'ALTER TABLE reviews ADD COLUMN IF NOT EXISTS coi_disclosed_at TIMESTAMP'),
+                ('reviews', 'coi_kind',
+                 'ALTER TABLE reviews ADD COLUMN IF NOT EXISTS coi_kind VARCHAR(60)'),
+                ('reviews', 'coi_note',
+                 'ALTER TABLE reviews ADD COLUMN IF NOT EXISTS coi_note TEXT'),
                 ('reviews', 'snoozed_until',
                  'ALTER TABLE reviews ADD COLUMN IF NOT EXISTS snoozed_until TIMESTAMP'),
+                ('reviews', 'snoozed_reason',
+                 'ALTER TABLE reviews ADD COLUMN IF NOT EXISTS snoozed_reason VARCHAR(200)'),
                 # ── organizations (Phase 108, 257) ──────────────────────
                 ('organizations', 'ai_monthly_budget_usd',
                  'ALTER TABLE organizations ADD COLUMN IF NOT EXISTS ai_monthly_budget_usd NUMERIC(12,2)'),
