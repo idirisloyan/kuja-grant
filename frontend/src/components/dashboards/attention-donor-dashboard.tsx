@@ -74,6 +74,7 @@ import { GrantsWithoutAppsStat } from '@/components/dashboards/grants-without-ap
 import { ApprovalsTodayStat } from '@/components/dashboards/approvals-today-stat';
 import { GrantsClosingSoonStat } from '@/components/dashboards/grants-closing-soon-stat';
 import { DeclinedThisMonthStat } from '@/components/dashboards/declined-this-month-stat';
+import { AppsOpen60dStat } from '@/components/dashboards/apps-open-60d-stat';
 import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
 import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
 import { PortfolioRiskHeatmap } from '@/components/dashboards/portfolio-risk-heatmap';
@@ -255,6 +256,7 @@ export function AttentionDonorDashboard() {
       <ApprovalsTodayStat />
       <GrantsClosingSoonStat />
       <DeclinedThisMonthStat />
+      <AppsOpen60dStat />
 
       {/* Phase 99 — OneNumberCard portfolio at-a-glance row. Replaces the
           metric-soup pattern with three calm numbers + one next action

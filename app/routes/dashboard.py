@@ -5303,3 +5303,78 @@ def api_dashboard_admin_large_documents():
                      Document.file_size > threshold)
              .count())
     return jsonify({'count': count, 'threshold_mb': 10})
+
+
+@dashboard_bp.route('/ngo-documents-pending-extraction', methods=['GET'])
+@login_required
+def api_dashboard_ngo_documents_pending_extraction():
+    """Phase 547 — Count of Document rows tied to NGO's applications
+    with extraction_status in 'queued' or 'running'. Visibility on
+    the AI processing queue so the NGO knows what's still cooking.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    count = (db.session.query(Document.id)
+             .join(Application, Document.application_id == Application.id)
+             .filter(Application.ngo_org_id == current_user.org_id,
+                     Document.extraction_status.in_(['queued', 'running']))
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/donor-apps-open-over-60d', methods=['GET'])
+@login_required
+def api_dashboard_donor_apps_open_over_60d():
+    """Phase 548 — Count of donor's applications in submitted/in_review
+    with created_at older than 60 days. Staleness signal — these may
+    have slipped through cracks.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=60)
+    count = (db.session.query(Application.id)
+             .join(Grant, Application.grant_id == Grant.id)
+             .filter(Grant.donor_org_id == current_user.org_id,
+                     Application.status.in_(['submitted', 'in_review']),
+                     Application.created_at < cutoff)
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/reviewer-next-deadline', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_next_deadline():
+    """Phase 549 — Earliest grant.deadline among reviewer's non-completed
+    Review rows. Returns days from today (negative if overdue).
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import date
+    row = (db.session.query(Grant.deadline)
+           .join(Application, Application.grant_id == Grant.id)
+           .join(Review, Review.application_id == Application.id)
+           .filter(Review.reviewer_user_id == current_user.id,
+                   Review.status != 'completed',
+                   Grant.deadline.isnot(None))
+           .order_by(Grant.deadline.asc())
+           .first())
+    if not row or row[0] is None:
+        return jsonify({'days': None})
+    deadline = row[0]
+    today = date.today()
+    delta = (deadline - today).days
+    return jsonify({'days': delta, 'deadline': deadline.isoformat()})
+
+
+@dashboard_bp.route('/admin-active-push-subscriptions', methods=['GET'])
+@login_required
+def api_dashboard_admin_active_push_subscriptions():
+    """Phase 550 — Total PushSubscription rows. Push notification
+    adoption pulse.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.push_subscription import PushSubscription
+    count = PushSubscription.query.count()
+    return jsonify({'count': count})

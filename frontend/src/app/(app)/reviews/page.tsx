@@ -32,6 +32,7 @@ import { WeeklyCadenceStat } from '@/components/reviews/weekly-cadence-stat';
 import { ScoringTightnessStat } from '@/components/reviews/scoring-tightness-stat';
 import { SnoozedCountStat } from '@/components/reviews/snoozed-count-stat';
 import { CommentsRateStat } from '@/components/reviews/comments-rate-stat';
+import { NextDeadlineStat } from '@/components/reviews/next-deadline-stat';
 import { ReviewerResumeBanner } from '@/components/reviews/resume-banner';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -172,6 +173,7 @@ function ReviewerView() {
       <ScoringTightnessStat />
       <SnoozedCountStat />
       <CommentsRateStat />
+      <NextDeadlineStat />
       <MyCompletedThisWeek />
       <BandStreakTip />
       <ScoreDistributionCard />

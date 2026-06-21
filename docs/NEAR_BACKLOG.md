@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 547-551 — Docs pending AI extraction + apps open
+  > 60d + next reviewer deadline + push subscriptions + NGO AI usage
+  weekly cron:
+  (a) `<DocsPendingExtractionStat>` on NGO dashboard counts Document
+  rows in extraction_status 'queued'/'running' on NGO's apps —
+  visibility into the AI processing queue (animated spinner icon).
+  (b) `<AppsOpen60dStat>` on donor dashboard counts donor's apps in
+  submitted/in_review with created_at > 60d ago — amber staleness
+  signal. (c) `<NextDeadlineStat>` on reviewer reviews page shows the
+  earliest grant.deadline among reviewer's non-completed reviews;
+  rose tone if overdue, amber if ≤ 3d, sky otherwise. (d) `<PushSubscriptionsStat>`
+  on operator dashboard counts PushSubscription rows — push
+  adoption pulse. (e) Phase 551 cron `/api/cron/ngo-ai-usage-week`
+  weekly NGO digest of AICallLog activity in last 7d with count +
+  USD cost; honors digests opt-out.
+
 - **2026-06-21** Phase 541-545 — Saved searches + declined-this-month
   + reviewer comments rate + large documents + monthly donor
   grants-closing-month cron:

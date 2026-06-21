@@ -4202,3 +4202,87 @@ def api_cron_donor_grants_closing_month():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/ngo-ai-usage-week', methods=['POST'])
+def api_cron_ngo_ai_usage_week():
+    """Phase 551 — Weekly NGO digest of AICallLog activity attributed
+    to their org_id in the last 7 days. Counts + total USD cost.
+    Honors digests opt-out, skipped when zero usage.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import User, Notification, record_cron_run as _rcr
+        from app.models.ai_thread import AICallLog
+        from app.models.notification_preference import NotificationPreference
+        from collections import defaultdict
+        from datetime import datetime, timezone, timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        rows = (db.session.query(AICallLog.org_id, AICallLog.usd_cost)
+                .filter(AICallLog.created_at >= cutoff,
+                        AICallLog.org_id.isnot(None))
+                .all())
+        by_org_count = defaultdict(int)
+        by_org_cost = defaultdict(float)
+        for org_id, cost in rows:
+            by_org_count[org_id] += 1
+            try:
+                by_org_cost[org_id] += float(cost or 0)
+            except (TypeError, ValueError):
+                pass
+        sent = 0
+        if by_org_count:
+            ngo_users = (User.query
+                         .filter(User.role == 'ngo',
+                                 User.org_id.in_(list(by_org_count.keys())))
+                         .all())
+            for u in ngo_users:
+                n_count = by_org_count.get(u.org_id, 0)
+                if not n_count:
+                    continue
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                cost = by_org_cost.get(u.org_id, 0.0)
+                msg = (
+                    f'AI usage last 7 days for your org: {n_count} calls '
+                    f'(${cost:.2f}).'
+                )
+                n = Notification(
+                    user_id=u.id,
+                    type='ngo_ai_usage_week',
+                    title='Your AI usage this week',
+                    message=msg[:500],
+                    link='/dashboard',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {'orgs_with_usage': len(by_org_count), 'notified': sent}
+        _rcr('ngo-ai-usage-week',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ngo-ai-usage-week cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ngo-ai-usage-week',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
