@@ -149,10 +149,33 @@ def scenario_dashboard_after_ngo_login(page, base_url):
     """
     page.goto(f'{base_url}/login/', wait_until='domcontentloaded', timeout=30_000)
     page.wait_for_selector('input[name="email"]', state='visible', timeout=15_000)
+    # Wait for hydration FIRST. The inputs are controlled, and React
+    # overwrites the DOM value back to '' on hydration, wiping anything
+    # typed beforehand. Real users hit the same bug — type into the
+    # password before JS lands, see their text disappear, get confused.
+    page.wait_for_selector('button[type="submit"]:not([disabled])', timeout=25_000)
     page.fill('input[name="email"]', 'fatima@amani.org')
     page.fill('input[name="password"]', 'pass123')
-    # Wait for hydration: button is type=submit only post-mount.
-    page.wait_for_selector('button[type="submit"]:not([disabled])', timeout=25_000)
+    # Diagnostic — capture button + form state right before click so a
+    # silent click-no-op is debuggable from artifacts alone.
+    btn_state = page.evaluate("""() => {
+      const b = document.querySelector('button[type=\"submit\"]');
+      const f = document.querySelector('form');
+      const e = document.querySelector('input[name=\"email\"]');
+      const p = document.querySelector('input[name=\"password\"]');
+      return {
+        button: b ? {type: b.type, disabled: b.disabled, text: (b.textContent || '').trim().slice(0, 40)} : null,
+        form: f ? {method: f.method, action: f.action, hasOnSubmit: !!f.onsubmit} : null,
+        emailValue: e?.value,
+        passwordLength: p?.value?.length,
+        url: window.location.href,
+      };
+    }""")
+    # Diagnostic — if inputs are empty here, the controlled-input
+    # hydration race wiped them. We disable inputs until hydrated so
+    # this should never happen; if it does, the test fails loudly.
+    assert btn_state['emailValue'] == 'fatima@amani.org', \
+        f"Email value wiped by hydration race: {btn_state}"
     page.click('button[type="submit"]')
     # Hard nav lands on /dashboard/ — give the slow link time to ship the bundle
     page.wait_for_url('**/dashboard/**', timeout=30_000)

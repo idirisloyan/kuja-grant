@@ -272,7 +272,7 @@ export default function LoginPage() {
                     placeholder="you@organization.org"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    disabled={isLoading}
+                    disabled={isLoading || !hydrated}
                     className={INPUT_CLS}
                   />
                 </div>
@@ -291,7 +291,7 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    disabled={isLoading}
+                    disabled={isLoading || !hydrated}
                     className={INPUT_CLS}
                   />
                 </div>
@@ -338,7 +338,7 @@ export default function LoginPage() {
                       key={a.email}
                       type="button"
                       onClick={() => handleDemoLogin(a.email)}
-                      disabled={isLoading}
+                      disabled={isLoading || !hydrated}
                       className="group flex items-center gap-2 p-3 rounded-lg border border-border hover:border-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-sand-50))] transition-all text-left"
                     >
                       <div
