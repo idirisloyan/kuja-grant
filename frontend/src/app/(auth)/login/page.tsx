@@ -258,7 +258,6 @@ export default function LoginPage() {
             <form
               onSubmit={handleSubmit}
               noValidate
-              method="dialog"
               className="space-y-4"
             >
               <div className="space-y-1.5">

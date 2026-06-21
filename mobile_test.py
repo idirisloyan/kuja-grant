@@ -139,11 +139,20 @@ def scenario_login_cold_load(page, base_url):
 
 
 def scenario_dashboard_after_ngo_login(page, base_url):
-    """NGO can sign in and see their dashboard attention area on slow-3G."""
+    """NGO can sign in and see their dashboard attention area on slow-3G.
+
+    On slow networks the Sign-in button is intentionally disabled until
+    React hydrates (prevents native HTML form submit from leaking
+    credentials into the URL). A real user waits to see the button
+    enabled before clicking; mirror that here. Without the wait, the
+    click hits a disabled button and silently does nothing.
+    """
     page.goto(f'{base_url}/login/', wait_until='domcontentloaded', timeout=30_000)
     page.wait_for_selector('input[name="email"]', state='visible', timeout=15_000)
     page.fill('input[name="email"]', 'fatima@amani.org')
     page.fill('input[name="password"]', 'pass123')
+    # Wait for hydration: button is type=submit only post-mount.
+    page.wait_for_selector('button[type="submit"]:not([disabled])', timeout=25_000)
     page.click('button[type="submit"]')
     # Hard nav lands on /dashboard/ — give the slow link time to ship the bundle
     page.wait_for_url('**/dashboard/**', timeout=30_000)
