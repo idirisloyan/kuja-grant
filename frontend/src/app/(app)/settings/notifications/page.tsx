@@ -49,6 +49,11 @@ const CATEGORY_LABELS: Record<string, { label: string; hint: string }> = {
     label: 'Saved-search matches',
     hint: 'New grants published that match one of your saved searches',
   },
+  // Phase 326 — opt-out for weekly digests (NGO pipeline, donor recap, etc).
+  digests: {
+    label: 'Weekly digests',
+    hint: 'Weekly summary of in-flight applications, decisions, and grants closing soon',
+  },
 };
 
 const CHANNEL_LABELS: Record<string, { label: string; icon: typeof Bell; muted?: boolean; locked?: boolean }> = {

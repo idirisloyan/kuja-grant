@@ -447,6 +447,14 @@ def create_app(config_name=None):
                     conn.execute(text("ALTER TABLE reviews ADD COLUMN coi_note TEXT"))
                     added.append('reviews.coi_note')
 
+                # Phase 327 — reviewer snooze.
+                if rev_cols and 'snoozed_until' not in rev_cols:
+                    conn.execute(text("ALTER TABLE reviews ADD COLUMN snoozed_until TIMESTAMP"))
+                    added.append('reviews.snoozed_until')
+                if rev_cols and 'snoozed_reason' not in rev_cols:
+                    conn.execute(text("ALTER TABLE reviews ADD COLUMN snoozed_reason VARCHAR(200)"))
+                    added.append('reviews.snoozed_reason')
+
                 # Phase 102 — replay tooling: optional full input/output
                 # text on AI call logs. Populated only for replay-eligible
                 # calls (scoring decisions, narrative outputs that land in

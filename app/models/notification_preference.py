@@ -29,7 +29,7 @@ from app.extensions import db
 from app.utils.helpers import _json_load, _json_dump
 
 
-VALID_CATEGORIES = {'deadlines', 'reviews', 'compliance', 'decisions', 'saved_search_matches'}
+VALID_CATEGORIES = {'deadlines', 'reviews', 'compliance', 'decisions', 'saved_search_matches', 'digests'}
 VALID_CHANNELS = {'in_app', 'email', 'sms', 'whatsapp', 'web_push'}
 
 DEFAULT_CHANNELS_BY_CATEGORY = {
@@ -40,6 +40,10 @@ DEFAULT_CHANNELS_BY_CATEGORY = {
     # Phase 170 — saved-search match alerts (Phase 167 fan-out).
     # Default to in-app only since these can be high-frequency.
     'saved_search_matches': ['in_app'],
+    # Phase 326 — weekly summary digests (Phase 304 NGO pipeline,
+    # Phase 268 donor weekly, Phase 329 donor portfolio recap).
+    # Default to in-app; user opts in for email.
+    'digests': ['in_app'],
 }
 
 

@@ -989,6 +989,89 @@ def api_dashboard_donor_appeal_sla():
     })
 
 
+@dashboard_bp.route('/reviewer-turnaround', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_turnaround():
+    """Phase 328 — Average days from review assignment to completion,
+    per reviewer, scoped to the donor's grants over the last 90 days.
+
+    Shows the slowest 5 reviewers (most days to complete). Useful when
+    the donor's queue is backed up and they want to ask admin to
+    rebalance.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from collections import defaultdict
+    from datetime import datetime, timezone, timedelta
+    from app.models import Review, User
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (Review.query
+            .join(Application, Application.id == Review.application_id)
+            .join(Grant, Grant.id == Application.grant_id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Review.status == 'completed',
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff)
+            .all())
+    by_reviewer: dict[int, list[float]] = defaultdict(list)
+    for r in rows:
+        if r.completed_at and r.created_at:
+            d = (r.completed_at - r.created_at).total_seconds() / 86400.0
+            if d >= 0:
+                by_reviewer[r.reviewer_user_id].append(d)
+    out = []
+    name_by_id = {u.id: u.name for u in User.query.filter(User.id.in_(list(by_reviewer.keys()))).all()}
+    for rid, days in by_reviewer.items():
+        if len(days) < 3:
+            continue
+        out.append({
+            'reviewer_user_id': rid,
+            'reviewer_name': name_by_id.get(rid) or f'Reviewer #{rid}',
+            'avg_days': round(sum(days) / len(days), 1),
+            'n': len(days),
+        })
+    out.sort(key=lambda r: r['avg_days'], reverse=True)
+    return jsonify({'slowest': out[:5], 'window_days': 90})
+
+
+@dashboard_bp.route('/notification-volume', methods=['GET'])
+@login_required
+def api_dashboard_notification_volume():
+    """Phase 325 — 5 noisiest notification recipients in the last 7 days.
+
+    Admin-only. Helps spot users getting blasted (broken filtering, etc).
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import func
+    from app.models import Notification, User
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    rows = (db.session.query(Notification.user_id, func.count(Notification.id).label('n'))
+            .filter(Notification.created_at >= cutoff)
+            .group_by(Notification.user_id)
+            .order_by(func.count(Notification.id).desc())
+            .limit(5)
+            .all())
+    if not rows:
+        return jsonify({'noisiest': [], 'total': 0})
+    ids = [r.user_id for r in rows]
+    users_by_id = {u.id: u for u in User.query.filter(User.id.in_(ids)).all()}
+    total = (db.session.query(func.count(Notification.id))
+             .filter(Notification.created_at >= cutoff)
+             .scalar() or 0)
+    out = []
+    for r in rows:
+        u = users_by_id.get(r.user_id)
+        out.append({
+            'user_id': r.user_id,
+            'name': (u.name if u else None) or (u.email if u else f'User {r.user_id}'),
+            'email': u.email if u else None,
+            'count': int(r.n),
+        })
+    return jsonify({'noisiest': out, 'total': int(total), 'window_days': 7})
+
+
 @dashboard_bp.route('/ai-human-agreement', methods=['GET'])
 @login_required
 def api_dashboard_ai_human_agreement():

@@ -584,6 +584,29 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 325-329 — Notification quality + reviewer
+  ergonomics + portfolio recap:
+  (a) `<NotificationVolumeCard>` on operator dashboard surfaces
+  the 5 users receiving the most notifications in the last 7
+  days. Backend `GET /api/dashboard/notification-volume`.
+  (b) New `'digests'` notification preference category — Phase
+  304 NGO pipeline cron now honors opt-out via
+  `NotificationPreference.channels_for('digests')`. Settings UI
+  surfaces the new category. (c) Reviewer snooze: new
+  `reviews.snoozed_until + snoozed_reason`, endpoint
+  `POST /api/reviews/<id>/snooze` accepts 3/7/14 days; queue
+  filters snoozed reviews out by default (override with
+  `?include_snoozed=1`). `<SnoozeButton>` on review-detail page;
+  redirects to /reviews after snoozing. (d)
+  `<ReviewerTurnaroundCard>` on donor dashboard shows the 5
+  slowest reviewers (avg days assignment → completion) over the
+  last 90 days. Backend
+  `GET /api/dashboard/reviewer-turnaround`. (e) New
+  `POST /api/cron/donor-portfolio-recap`: weekly summary digest
+  per donor (open grants, new submissions, decisions, pending
+  appeals). Skips users opted out of `digests`. Cron health
+  recorded via `record_cron_run`.
+
 - **2026-06-20** Phase 319-323 — AI polish + reviewer onboarding +
   cost / calibration insights:
   (a) New `POST /api/ai/polish-response` — clarity-only AI rewrite

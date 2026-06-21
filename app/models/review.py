@@ -31,6 +31,10 @@ class Review(db.Model):
     coi_disclosed_at = db.Column(db.DateTime, nullable=True)
     coi_kind = db.Column(db.String(60), nullable=True)  # employer_overlap | prior_consulting | family | other
     coi_note = db.Column(db.Text, nullable=True)
+    # Phase 327 — reviewer can snooze a review for N days. Snoozed
+    # reviews fall out of the visible queue until the timer expires.
+    snoozed_until = db.Column(db.DateTime, nullable=True)
+    snoozed_reason = db.Column(db.String(200), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
@@ -64,6 +68,8 @@ class Review(db.Model):
             'coi_disclosed_at': self.coi_disclosed_at.isoformat() if self.coi_disclosed_at else None,
             'coi_kind': self.coi_kind,
             'coi_note': self.coi_note,
+            'snoozed_until': self.snoozed_until.isoformat() if self.snoozed_until else None,
+            'snoozed_reason': self.snoozed_reason,
             'reviewer_name': self.reviewer.name if self.reviewer else None,
             'application_title': self.application.grant.title if self.application and self.application.grant else None,
             'grant_title': self.application.grant.title if self.application and self.application.grant else None,

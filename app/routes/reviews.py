@@ -70,6 +70,15 @@ def api_list_reviews():
     if status:
         query = query.filter(Review.status == status)
 
+    # Phase 327 — hide snoozed reviews from the queue until expiry.
+    # Reviewer can opt to include them via ?include_snoozed=1.
+    if (current_user.role == 'reviewer'
+            and request.args.get('include_snoozed') not in ('1', 'true')):
+        now = datetime.now(timezone.utc)
+        query = query.filter(
+            db.or_(Review.snoozed_until.is_(None), Review.snoozed_until <= now)
+        )
+
     application_id = request.args.get('application_id', type=int)
     if application_id:
         query = query.filter(Review.application_id == application_id)
@@ -655,6 +664,39 @@ def api_reviews_coi_rollup():
         'window_days': 30,
         'total': total,
         'recent': recent,
+    })
+
+
+@reviews_bp.route('/<int:review_id>/snooze', methods=['POST'])
+@login_required
+@role_required('reviewer', 'admin')
+def api_review_snooze(review_id):
+    """Phase 327 — Reviewer snoozes a review for N days.
+
+    Body: { days: 3|7|14, reason?: str (max 200) }
+    Reviews snoozed past today fall out of the visible queue until expiry.
+    """
+    from datetime import timedelta
+    review = db.session.get(Review, review_id)
+    if not review:
+        return jsonify({'error': 'Review not found'}), 404
+    if current_user.role == 'reviewer' and review.reviewer_user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+    data = get_request_json() or {}
+    try:
+        days = int(data.get('days') or 0)
+    except (TypeError, ValueError):
+        days = 0
+    if days not in (3, 7, 14):
+        return jsonify({'error': 'days must be 3, 7 or 14'}), 400
+    reason = (data.get('reason') or '').strip()[:200]
+    review.snoozed_until = datetime.now(timezone.utc) + timedelta(days=days)
+    review.snoozed_reason = reason or None
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'snoozed_until': review.snoozed_until.isoformat(),
+        'snoozed_reason': review.snoozed_reason,
     })
 
 

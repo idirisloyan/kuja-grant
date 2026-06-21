@@ -38,6 +38,7 @@ import { ReviewerWorkloadByDonorCard } from '@/components/dashboards/reviewer-wo
 import { DonorAppealsCard } from '@/components/dashboards/donor-appeals-card';
 import { DonorAppealSlaCard } from '@/components/dashboards/donor-appeal-sla-card';
 import { AiHumanAgreementCard } from '@/components/dashboards/ai-human-agreement-card';
+import { ReviewerTurnaroundCard } from '@/components/dashboards/reviewer-turnaround-card';
 import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
 import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
 import { PortfolioRiskHeatmap } from '@/components/dashboards/portfolio-risk-heatmap';
@@ -177,6 +178,8 @@ export function AttentionDonorDashboard() {
       <DonorAppealSlaCard />
       {/* Phase 323 — criteria where AI and human reviewers diverge most. */}
       <AiHumanAgreementCard />
+      {/* Phase 328 — slowest reviewers by avg days to complete. */}
+      <ReviewerTurnaroundCard />
 
       {/* Phase 99 — OneNumberCard portfolio at-a-glance row. Replaces the
           metric-soup pattern with three calm numbers + one next action
