@@ -30,6 +30,7 @@ import { CriterionAveragesCard } from '@/components/grants/criterion-averages-ca
 import { ApplicationsReceivedTable } from '@/components/grants/applications-received-table';
 import { AiVsHumanCard } from '@/components/grants/ai-vs-human-card';
 import { ReviewerPanelCard } from '@/components/grants/reviewer-panel-card';
+import { PeersWatching } from '@/components/grants/peers-watching';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -265,6 +266,7 @@ export default function GrantDetailClient() {
           <StatusBadge status={grant.user_application_status} kind="app" />
         </div>
       )}
+      {isNgo && grant.id != null && <PeersWatching grantId={grant.id} />}
       {isDonor && <LiveDraftersPill grantId={grant.id} />}
     </div>
   );

@@ -801,6 +801,103 @@ def api_cron_donor_closing_grants():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/feature-usage-delta', methods=['POST'])
+def api_cron_feature_usage_delta():
+    """Phase 437 — Weekly digest to admins highlighting AI endpoints
+    whose call count shifted most week-over-week. Top 3 by absolute
+    delta, both up and down. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from sqlalchemy import text as _text
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        recent_start = now - timedelta(days=7)
+        prior_start = now - timedelta(days=14)
+        try:
+            recent_rows = db.session.execute(_text(
+                "SELECT endpoint, COUNT(*) AS n FROM ai_call_logs "
+                "WHERE created_at >= :c GROUP BY endpoint"
+            ), {'c': recent_start}).all()
+            prior_rows = db.session.execute(_text(
+                "SELECT endpoint, COUNT(*) AS n FROM ai_call_logs "
+                "WHERE created_at >= :a AND created_at < :b GROUP BY endpoint"
+            ), {'a': prior_start, 'b': recent_start}).all()
+        except Exception:
+            recent_rows = []
+            prior_rows = []
+
+        recent = {r.endpoint: int(r.n or 0) for r in recent_rows}
+        prior = {r.endpoint: int(r.n or 0) for r in prior_rows}
+        all_keys = set(recent) | set(prior)
+        deltas = []
+        for k in all_keys:
+            r = recent.get(k, 0)
+            p = prior.get(k, 0)
+            deltas.append({'endpoint': k, 'recent': r, 'prior': p, 'delta': r - p})
+
+        deltas.sort(key=lambda d: abs(d['delta']), reverse=True)
+        top = [d for d in deltas if abs(d['delta']) > 0][:3]
+
+        sent = 0
+        if top:
+            parts = []
+            for d in top:
+                sign = '+' if d['delta'] > 0 else ''
+                parts.append(f'{d["endpoint"]} {sign}{d["delta"]} ({d["recent"]} this wk)')
+            msg = 'AI usage shift: ' + ', '.join(parts)
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='feature_usage_delta',
+                    title='Weekly AI feature usage shifts',
+                    message=msg[:500],
+                    link='/admin/ai-quality',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+
+        result = {
+            'endpoints_tracked': len(all_keys),
+            'top_deltas': len(top),
+            'admins_notified': sent,
+        }
+        _rcr('feature-usage-delta',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result, 'top': top})
+    except Exception as e:
+        logger.exception('feature-usage-delta cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('feature-usage-delta',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/ngo-watchlist-deadlines', methods=['POST'])
 def api_cron_ngo_watchlist_deadlines():
     """Phase 431 — Weekly digest to each NGO user listing watchlisted

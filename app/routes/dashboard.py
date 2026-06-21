@@ -2233,6 +2233,113 @@ def api_dashboard_donor_fastest_reviewer():
     })
 
 
+@dashboard_bp.route('/peers-watching-grant/<int:grant_id>', methods=['GET'])
+@login_required
+def api_dashboard_peers_watching_grant(grant_id):
+    """Phase 433 — Count of distinct other users watchlisting this
+    grant. Social signal — popular grants may be competitive.
+    """
+    if current_user.role not in ('ngo', 'donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.watchlist import WatchlistItem
+    total = (db.session.query(db.func.count(db.distinct(WatchlistItem.user_id)))
+             .filter(WatchlistItem.kind == 'grant',
+                     WatchlistItem.target_id == grant_id,
+                     WatchlistItem.user_id != current_user.id)
+             .scalar() or 0)
+    return jsonify({'grant_id': grant_id, 'others_watching': int(total)})
+
+
+@dashboard_bp.route('/donor-apps-per-grant', methods=['GET'])
+@login_required
+def api_dashboard_donor_apps_per_grant():
+    """Phase 434 — Mean number of applications received per grant
+    over the last 90 days for this donor. Reach health signal.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    grants_with_published = (Grant.query
+                             .filter(Grant.donor_org_id == current_user.org_id,
+                                     Grant.published_at.isnot(None),
+                                     Grant.published_at >= cutoff)
+                             .count())
+    if grants_with_published == 0:
+        return jsonify({'mean_apps_per_grant': None, 'grants': 0, 'apps': 0})
+    apps = (Application.query
+            .join(Grant)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.submitted_at.isnot(None),
+                    Application.submitted_at >= cutoff)
+            .count())
+    return jsonify({
+        'mean_apps_per_grant': round(apps / grants_with_published, 1),
+        'grants': grants_with_published,
+        'apps': apps,
+    })
+
+
+@dashboard_bp.route('/reviewer-fastest-score', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_fastest_score():
+    """Phase 435 — Reviewer's minimum turnaround time across completed
+    reviews in last 90 days, with sample size for context.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.created_at.isnot(None),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff)
+            .all())
+    durations = []
+    for r in rows:
+        if not r.created_at or not r.completed_at:
+            continue
+        h = (r.completed_at - r.created_at).total_seconds() / 3600.0
+        if h >= 0:
+            durations.append(h)
+    if not durations:
+        return jsonify({'fastest_hours': None, 'sample': 0})
+    return jsonify({
+        'fastest_hours': round(min(durations), 1),
+        'sample': len(durations),
+    })
+
+
+@dashboard_bp.route('/ai-calls-by-hour', methods=['GET'])
+@login_required
+def api_dashboard_ai_calls_by_hour():
+    """Phase 436 — AI call counts grouped by hour-of-day over the last
+    7 days. Identifies peak load windows.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import text as _text
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    buckets = [0] * 24
+    try:
+        rows = db.session.execute(_text(
+            "SELECT created_at FROM ai_call_logs WHERE created_at >= :c"
+        ), {'c': cutoff}).all()
+        for (created_at,) in rows:
+            if created_at is None:
+                continue
+            try:
+                buckets[created_at.hour] += 1
+            except (AttributeError, IndexError):
+                continue
+    except Exception:
+        pass
+    return jsonify({'buckets': buckets, 'total': sum(buckets)})
+
+
 @dashboard_bp.route('/ngo-deadline-density', methods=['GET'])
 @login_required
 def api_dashboard_ngo_deadline_density():

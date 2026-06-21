@@ -13,6 +13,7 @@ import { BandStreakTip } from '@/components/reviews/band-streak-tip';
 import { ScoreDistributionCard } from '@/components/reviews/score-distribution-card';
 import { QueueSectorMix } from '@/components/reviews/queue-sector-mix';
 import { OverdueCountStat } from '@/components/reviews/overdue-count-stat';
+import { FastestScoreStat } from '@/components/reviews/fastest-score-stat';
 import { ReviewerResumeBanner } from '@/components/reviews/resume-banner';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -134,6 +135,7 @@ function ReviewerView() {
       {/* Phase 236 — completion rate over last 90 days. */}
       <MyCompletionStat />
       <MyTurnaroundStat />
+      <FastestScoreStat />
       <MyCompletedThisWeek />
       <BandStreakTip />
       <ScoreDistributionCard />

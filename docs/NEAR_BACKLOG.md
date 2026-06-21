@@ -584,6 +584,29 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 433-437 — Peers-watching social signal
+  + apps-per-grant + reviewer fastest score + AI calls by hour
+  + feature usage delta cron:
+  (a) `<PeersWatching>` on the NGO grant detail page renders an
+  anonymized "N other organisations watching" pill — backend
+  `/api/dashboard/peers-watching-grant/<id>` counts distinct other
+  users with a WatchlistItem(kind='grant', target_id) — a soft
+  social signal that the grant is on others' radars without
+  exposing identities. (b) `<AppsPerGrantCard>` on the donor
+  attention dashboard shows the mean applications per grant over
+  the last 90 days; amber border when < 3 to flag low-discovery
+  publishing — mean across grants published in the last 90d.
+  (c) `<FastestScoreStat>` on the reviewer reviews page shows
+  the reviewer's fastest turnaround in the last 90 days (m/h/d
+  scale-aware label), self-gates < 3 reviews so it never appears
+  as misleading vanity. (d) `<AiCallsByHourCard>` on the operator
+  dashboard renders a 24-bar histogram of AI call distribution
+  by UTC hour over the last 7 days — highlights peak hour for
+  load-shaping decisions. (e) Phase 437 cron
+  `/api/cron/feature-usage-delta` compares this week vs prior
+  week AI call counts per endpoint, sends admins the top 3
+  movers in each direction via the digests opt-out gate.
+
 - **2026-06-20** Phase 427-431 — Deadline density + median
   funded amount + overdue assignments + cron failure rate +
   watchlist deadlines cron:
