@@ -45,6 +45,8 @@ import { DecisionAuditDrawer } from '@/components/applications/DecisionAuditDraw
 import { NgoHistoryPanel } from '@/components/applications/ngo-history-panel';
 import { PeerScoreCard } from '@/components/applications/peer-score-card';
 import { StatusTimeline } from '@/components/applications/status-timeline';
+import { StickyMobileCta } from '@/components/shared/sticky-mobile-cta';
+import { ArrowRight } from 'lucide-react';
 
 type TabId = 'responses' | 'documents' | 'scores' | 'reviews' | 'activity';
 const TAB_KEYS: { id: TabId; key: string }[] = [
@@ -453,6 +455,36 @@ export default function ApplicationDetailClient() {
           </PageDetailSection>
         )}
       </PageDetail>
+
+      {/* Phase 612 — Sticky mobile CTA. The page is long and the header
+          actions scroll off-screen on phones. For NGO owners with a
+          draft or a revision request, surface a single obvious "go
+          back to editing" affordance pinned to the thumb zone. We don't
+          render it for reviewer-side viewers (their actions are
+          context-dependent and many) or completed/declined apps
+          (nothing primary for the NGO to do here). */}
+      {isOwnerNgo && application.status === 'draft' && (
+        <StickyMobileCta
+          hint={t('applications.detail.summary_subtitle_draft')}
+        >
+          <a
+            href={`/apply/${application.grant_id}?app=${application.id}`}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] text-white text-sm font-semibold px-4 py-2 hover:opacity-90"
+          >
+            Continue editing <ArrowRight className="w-4 h-4" />
+          </a>
+        </StickyMobileCta>
+      )}
+      {isOwnerNgo && application.status === 'revision_requested' && (
+        <StickyMobileCta hint="Donor asked you to revise.">
+          <a
+            href={`/apply/${application.grant_id}?app=${application.id}`}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] text-white text-sm font-semibold px-4 py-2 hover:opacity-90"
+          >
+            Edit + resubmit <ArrowRight className="w-4 h-4" />
+          </a>
+        </StickyMobileCta>
+      )}
     </PageShell>
   );
 }
