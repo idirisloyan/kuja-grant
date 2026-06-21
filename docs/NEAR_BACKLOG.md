@@ -584,6 +584,24 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 445-449 — Draft funnel + AI score histogram
+  per grant + review streak + tenants without grants + closing-soon
+  watchlist cron:
+  (a) `<DraftFunnelStat>` on NGO dashboard shows submitted_30d /
+  drafts_30d with conversion %, tone-coded (emerald ≥70, amber ≥40,
+  rose <40). Self-gates when zero drafts in window. (b) New donor
+  surface `<AiScoreHistogram>` on grant detail renders a 10-bin
+  histogram of received AI scores (0-9, 10-19 … 90-100). Self-gates
+  < 3 apps; donor must own the grant. (c) `<ReviewStreakTile>` on
+  reviewer reviews page shows consecutive days reviewer completed
+  ≥1 review (looking back 30 days). Self-gates < 2. (d)
+  `<TenantsWithoutGrantsCard>` on operator dashboard counts donor/ingo
+  orgs with zero grants ever published, amber border when ≥50%. (e)
+  Phase 449 cron `/api/cron/ngo-closing-soon-watchlist` finds each
+  NGO's watchlisted grants closing within 7 days that the NGO has not
+  applied to yet, sends digest with sample titles. Digests opt-out
+  gated; record_cron_run wired.
+
 - **2026-06-20** Phase 439-443 — Fastest submission + apps this
   week + reviewer AI agreement + active orgs + AI cost trend cron:
   (a) `<FastestSubmissionStat>` on the NGO dashboard shows min

@@ -2780,3 +2780,95 @@ def api_cron_ai_cost_trend():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/ngo-closing-soon-watchlist', methods=['POST'])
+def api_cron_ngo_closing_soon_watchlist():
+    """Phase 449 — Weekly reminder. For each NGO user, count grants on
+    their watchlist whose deadline is within 7 days AND they have NOT
+    yet submitted an application for that grant. Sends one digest
+    per affected user. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Grant, Application, Notification,
+            record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from app.models.watchlist import WatchlistItem
+        from datetime import datetime, timezone, timedelta
+
+        today = datetime.now(timezone.utc).date()
+        seven_days = today + timedelta(days=7)
+        ngos = User.query.filter_by(role='ngo').all()
+        sent = 0
+        for u in ngos:
+            if not u.org_id:
+                continue
+            channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+            if not channels:
+                continue
+            watched_ids = [w.target_id for w in WatchlistItem.query.filter_by(
+                user_id=u.id, kind='grant').all()]
+            if not watched_ids:
+                continue
+            closing = (Grant.query
+                       .filter(Grant.id.in_(watched_ids),
+                               Grant.deadline.isnot(None),
+                               Grant.deadline >= today,
+                               Grant.deadline <= seven_days,
+                               Grant.status.in_(['open', 'review']))
+                       .all())
+            if not closing:
+                continue
+            applied_ids = {gid for (gid,) in db.session.query(
+                Application.grant_id).filter(
+                Application.org_id == u.org_id,
+                Application.grant_id.in_([g.id for g in closing])
+            ).distinct().all()}
+            unapplied = [g for g in closing if g.id not in applied_ids]
+            if not unapplied:
+                continue
+            sample = ', '.join(g.title for g in unapplied[:2])
+            extra = f' (+{len(unapplied) - 2} more)' if len(unapplied) > 2 else ''
+            msg = (
+                f'{len(unapplied)} watchlisted grant'
+                f'{"" if len(unapplied) == 1 else "s"} close within 7 days '
+                f'and you have no draft yet: {sample}{extra}.'
+            )
+            n = Notification(
+                user_id=u.id,
+                type='closing_soon_watchlist',
+                title='Grants closing this week',
+                message=msg[:500],
+                link='/grants',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'ngos_scanned': len(ngos), 'notifications_sent': sent}
+        _rcr('ngo-closing-soon-watchlist',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ngo-closing-soon-watchlist cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ngo-closing-soon-watchlist',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

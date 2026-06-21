@@ -31,6 +31,7 @@ import { ApplicationsReceivedTable } from '@/components/grants/applications-rece
 import { AiVsHumanCard } from '@/components/grants/ai-vs-human-card';
 import { ReviewerPanelCard } from '@/components/grants/reviewer-panel-card';
 import { PeersWatching } from '@/components/grants/peers-watching';
+import { AiScoreHistogram } from '@/components/grants/ai-score-histogram';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -301,6 +302,9 @@ export default function GrantDetailClient() {
 
         {/* Phase 224 — per-criterion AI score averages across applications. */}
         {isDonor && id != null && <CriterionAveragesCard grantId={id} />}
+
+        {/* Phase 446 — 10-bin histogram of AI scores across this grant. */}
+        {isDonor && id != null && <AiScoreHistogram grantId={id} />}
 
         {/* Phase 229 — applications received mini-table (donor view). */}
         {isDonor && id != null && <ApplicationsReceivedTable grantId={id} />}

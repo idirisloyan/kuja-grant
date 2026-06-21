@@ -3695,3 +3695,110 @@ def api_dashboard_active_orgs_7d():
               .distinct().count())
     total = db.session.query(Organization.id).count()
     return jsonify({'active_orgs': active, 'total_orgs': total})
+
+
+@dashboard_bp.route('/ngo-draft-funnel', methods=['GET'])
+@login_required
+def api_dashboard_ngo_draft_funnel():
+    """Phase 445 — Drafts created in last 30 days vs how many of those
+    reached submitted_at. Exposes stalling drafts.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    drafts = (Application.query
+              .filter(Application.org_id == current_user.org_id,
+                      Application.created_at >= cutoff)
+              .count())
+    submitted = (Application.query
+                 .filter(Application.org_id == current_user.org_id,
+                         Application.created_at >= cutoff,
+                         Application.submitted_at.isnot(None))
+                 .count())
+    rate = round(100.0 * submitted / drafts, 0) if drafts else 0
+    return jsonify({
+        'drafts_30d': drafts,
+        'submitted_30d': submitted,
+        'conversion_pct': int(rate),
+    })
+
+
+@dashboard_bp.route('/grant-ai-score-histogram/<int:grant_id>', methods=['GET'])
+@login_required
+def api_dashboard_grant_ai_score_histogram(grant_id: int):
+    """Phase 446 — 10-bin histogram of AI scores across applications for
+    a single grant. Donor-only on grants they own.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    grant = Grant.query.get(grant_id)
+    if not grant:
+        return jsonify({'error': 'not found'}), 404
+    if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    rows = (Application.query
+            .filter(Application.grant_id == grant_id,
+                    Application.ai_score.isnot(None))
+            .all())
+    bins = [0] * 10
+    for a in rows:
+        try:
+            s = float(a.ai_score)
+        except (TypeError, ValueError):
+            continue
+        if s < 0 or s > 100:
+            continue
+        idx = min(9, int(s // 10))
+        bins[idx] += 1
+    return jsonify({'bins': bins, 'sample': len(rows)})
+
+
+@dashboard_bp.route('/reviewer-review-streak', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_review_streak():
+    """Phase 447 — Consecutive recent days with ≥1 completed review.
+    Looks back up to 30 days.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff)
+            .all())
+    days = {r.completed_at.date() for r in rows if r.completed_at}
+    today = datetime.now(timezone.utc).date()
+    streak = 0
+    cursor = today
+    while cursor in days:
+        streak += 1
+        cursor = cursor - timedelta(days=1)
+    return jsonify({'streak_days': streak, 'days_with_reviews': len(days)})
+
+
+@dashboard_bp.route('/tenants-without-grants', methods=['GET'])
+@login_required
+def api_dashboard_tenants_without_grants():
+    """Phase 448 — Donor-type orgs with zero grants ever published.
+    Surfaces tenants that registered but never engaged.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    donor_org_ids = (db.session.query(Organization.id)
+                     .filter(Organization.org_type.in_(['donor', 'ingo']))
+                     .all())
+    donor_ids = {r[0] for r in donor_org_ids}
+    if not donor_ids:
+        return jsonify({'tenants_without_grants': 0, 'donor_orgs': 0})
+    with_grants = (db.session.query(Grant.donor_org_id)
+                   .filter(Grant.donor_org_id.in_(list(donor_ids)))
+                   .distinct().all())
+    with_set = {r[0] for r in with_grants}
+    without = donor_ids - with_set
+    return jsonify({
+        'tenants_without_grants': len(without),
+        'donor_orgs': len(donor_ids),
+    })

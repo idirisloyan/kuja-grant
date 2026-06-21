@@ -60,6 +60,7 @@ import { NgoFeedbackThemesCard } from '@/components/dashboards/ngo-feedback-them
 import { CriterionScoreTrendCard } from '@/components/dashboards/criterion-score-trend-card';
 import { DeadlineDensityCard } from '@/components/dashboards/deadline-density-card';
 import { FastestSubmissionStat } from '@/components/dashboards/fastest-submission-stat';
+import { DraftFunnelStat } from '@/components/dashboards/draft-funnel-stat';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -199,6 +200,7 @@ export function AttentionNgoDashboard() {
       <SubmissionsThisMonthCard />
       <NgoSubmitDurationCard />
       <FastestSubmissionStat />
+      <DraftFunnelStat />
       <NgoFeedbackThemesCard />
       <CriterionScoreTrendCard />
       <DeadlineDensityCard />
