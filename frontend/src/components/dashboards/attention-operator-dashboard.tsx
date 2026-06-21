@@ -79,6 +79,7 @@ import { AiThreadsWeekStat } from '@/components/dashboards/ai-threads-week-stat'
 import { LargeDocumentsStat } from '@/components/dashboards/large-documents-stat';
 import { PushSubscriptionsStat } from '@/components/dashboards/push-subscriptions-stat';
 import { AuditEntriesTodayStat } from '@/components/dashboards/audit-entries-today-stat';
+import { SavedSearchesLifetimeStat } from '@/components/dashboards/saved-searches-lifetime-stat';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -368,6 +369,7 @@ export function AttentionOperatorDashboard() {
         <LargeDocumentsStat />
         <PushSubscriptionsStat />
         <AuditEntriesTodayStat />
+        <SavedSearchesLifetimeStat />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

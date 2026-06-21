@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 559-563 — Submitted today + starred count +
+  completed today + saved searches lifetime + donor decisions
+  weekly mirror cron:
+  (a) `<SubmittedTodayStat>` on NGO dashboard counts Application.submitted_at
+  within last 24h (emerald celebration tone).
+  (b) `<StarredCountStat>` on donor dashboard counts donor's apps
+  with is_starred=True — scalar shortlist size (distinct from
+  Phase 213 which lists them). (c) `<CompletedTodayStat>` on reviewer
+  reviews page counts reviewer's completed reviews in last 24h
+  (rolling 24h; distinct from Phase 405 which is calendar week).
+  (d) `<SavedSearchesLifetimeStat>` on operator dashboard counts
+  total SavedSearch rows — adoption signal. (e) Phase 563 cron
+  `/api/cron/donor-decisions-week-mirror` weekly donor mirror digest
+  of decisions they recorded last 7d grouped by status; honors
+  digests opt-out.
+
 - **2026-06-21** Phase 553-557 — AI calls last 7d + criteria templates
   + review variety + audit entries today + criteria-template-usage
   weekly cron:

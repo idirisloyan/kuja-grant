@@ -34,6 +34,7 @@ import { SnoozedCountStat } from '@/components/reviews/snoozed-count-stat';
 import { CommentsRateStat } from '@/components/reviews/comments-rate-stat';
 import { NextDeadlineStat } from '@/components/reviews/next-deadline-stat';
 import { ReviewVarietyStat } from '@/components/reviews/review-variety-stat';
+import { CompletedTodayStat } from '@/components/reviews/completed-today-stat';
 import { ReviewerResumeBanner } from '@/components/reviews/resume-banner';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -176,6 +177,7 @@ function ReviewerView() {
       <CommentsRateStat />
       <NextDeadlineStat />
       <ReviewVarietyStat />
+      <CompletedTodayStat />
       <MyCompletedThisWeek />
       <BandStreakTip />
       <ScoreDistributionCard />

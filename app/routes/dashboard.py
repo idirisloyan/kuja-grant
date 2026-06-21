@@ -5450,3 +5450,70 @@ def api_dashboard_admin_audit_entries_today():
              .filter(AuditChainEntry.created_at >= cutoff)
              .count())
     return jsonify({'count': count})
+
+
+@dashboard_bp.route('/ngo-submitted-today', methods=['GET'])
+@login_required
+def api_dashboard_ngo_submitted_today():
+    """Phase 559 — Count of NGO's applications with submitted_at within
+    the last 24 hours. Today's submission tally.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    count = (Application.query
+             .filter(Application.ngo_org_id == current_user.org_id,
+                     Application.submitted_at.isnot(None),
+                     Application.submitted_at >= cutoff)
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/donor-starred-count', methods=['GET'])
+@login_required
+def api_dashboard_donor_starred_count():
+    """Phase 560 — Count of donor's applications with is_starred=True.
+    Shortlist size at-a-glance. Distinct from Phase 213 (the dashboard
+    tile that lists starred apps); this is a scalar header stat.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    count = (db.session.query(Application.id)
+             .join(Grant, Application.grant_id == Grant.id)
+             .filter(Grant.donor_org_id == current_user.org_id,
+                     Application.is_starred.is_(True))
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/reviewer-completed-today', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_completed_today():
+    """Phase 561 — Count of reviewer's reviews completed in the last
+    24 hours. Distinct from Phase 405 (this calendar week) by using
+    a rolling 24h window — today's tally.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    count = (Review.query
+             .filter(Review.reviewer_user_id == current_user.id,
+                     Review.status == 'completed',
+                     Review.completed_at >= cutoff)
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/admin-saved-searches-lifetime', methods=['GET'])
+@login_required
+def api_dashboard_admin_saved_searches_lifetime():
+    """Phase 562 — Total SavedSearch rows platform-wide. Adoption
+    signal for the search alerts feature.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.saved_search import SavedSearch
+    count = SavedSearch.query.count()
+    return jsonify({'count': count})

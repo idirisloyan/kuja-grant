@@ -4368,3 +4368,85 @@ def api_cron_criteria_template_usage_week():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/donor-decisions-week-mirror', methods=['POST'])
+def api_cron_donor_decisions_week_mirror():
+    """Phase 563 — Weekly donor mirror digest: count of decisions
+    they recorded on applications in last 7 days, grouped by
+    funded/declined/etc. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Grant, Application, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from collections import defaultdict
+        from datetime import datetime, timezone, timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        rows = (db.session.query(Grant.donor_org_id, Application.status)
+                .join(Application, Application.grant_id == Grant.id)
+                .filter(Application.decision_recorded_at.isnot(None),
+                        Application.decision_recorded_at >= cutoff,
+                        Grant.donor_org_id.isnot(None))
+                .all())
+        by_org = defaultdict(lambda: defaultdict(int))
+        for donor_org_id, status in rows:
+            by_org[donor_org_id][status] += 1
+        sent = 0
+        if by_org:
+            donor_users = (User.query
+                           .filter(User.role == 'donor',
+                                   User.org_id.in_(list(by_org.keys())))
+                           .all())
+            for u in donor_users:
+                statuses = by_org.get(u.org_id, {})
+                if not statuses:
+                    continue
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                breakdown = ', '.join(f'{c} {s}' for s, c in statuses.items())
+                msg = (
+                    f'Decisions you recorded in the last 7 days: '
+                    f'{breakdown}.'
+                )
+                n = Notification(
+                    user_id=u.id,
+                    type='donor_decisions_week_mirror',
+                    title='Your decisions this week',
+                    message=msg[:500],
+                    link='/applications',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {'orgs_with_decisions': len(by_org), 'notified': sent}
+        _rcr('donor-decisions-week-mirror',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('donor-decisions-week-mirror cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('donor-decisions-week-mirror',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
