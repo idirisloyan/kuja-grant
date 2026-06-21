@@ -801,6 +801,90 @@ def api_cron_donor_closing_grants():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/ngo-watchlist-deadlines', methods=['POST'])
+def api_cron_ngo_watchlist_deadlines():
+    """Phase 431 — Weekly digest to each NGO user listing watchlisted
+    grants whose deadline falls within the next 7 days. Honors the
+    digests opt-out (Phase 326). Skips users with no upcoming
+    deadlines.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            Grant, User, Notification, record_cron_run as _rcr,
+        )
+        from app.models.watchlist import WatchlistItem
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+
+        today = datetime.now(timezone.utc).date()
+        end = today + timedelta(days=7)
+
+        rows = (db.session.query(WatchlistItem.user_id, Grant.id, Grant.title, Grant.deadline)
+                .join(Grant, db.and_(
+                    Grant.id == WatchlistItem.target_id,
+                    WatchlistItem.kind == 'grant',
+                ))
+                .filter(Grant.deadline.isnot(None),
+                        Grant.deadline >= today,
+                        Grant.deadline <= end,
+                        Grant.status.in_(['open', 'review']))
+                .all())
+        from collections import defaultdict
+        by_user = defaultdict(list)
+        for user_id, grant_id, title, deadline in rows:
+            by_user[user_id].append({'grant_id': grant_id, 'title': title, 'deadline': deadline})
+
+        sent = 0
+        for user_id, items in by_user.items():
+            channels = NotificationPreference.channels_for(user_id=user_id, category='digests')
+            if not channels:
+                continue
+            user = User.query.get(user_id)
+            if not user or user.role != 'ngo':
+                continue
+            items.sort(key=lambda x: x['deadline'])
+            top_titles = ', '.join(i['title'][:45] for i in items[:3])
+            n = Notification(
+                user_id=user_id,
+                type='watchlist_deadlines_week',
+                title=f'{len(items)} watched grant{"s" if len(items) != 1 else ""} closing this week',
+                message=f'Closing in next 7 days: {top_titles}'[:500],
+                link='/grants?watching=1',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {
+            'users_with_deadlines': len(by_user),
+            'digests_sent': sent,
+        }
+        _rcr('ngo-watchlist-deadlines',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ngo-watchlist-deadlines cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ngo-watchlist-deadlines',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/ai-dismissed-digest', methods=['POST'])
 def api_cron_ai_dismissed_digest():
     """Phase 425 — Weekly digest to admins ranking AI endpoints by

@@ -2233,6 +2233,134 @@ def api_dashboard_donor_fastest_reviewer():
     })
 
 
+@dashboard_bp.route('/ngo-deadline-density', methods=['GET'])
+@login_required
+def api_dashboard_ngo_deadline_density():
+    """Phase 427 — Count of grants this NGO is watching, bucketed by
+    deadline window (next 7d / 30d / 90d). Planning helper.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from app.models.watchlist import WatchlistItem
+    today = datetime.now(timezone.utc).date()
+    rows = (db.session.query(Grant.deadline)
+            .join(WatchlistItem, db.and_(
+                WatchlistItem.kind == 'grant',
+                WatchlistItem.target_id == Grant.id,
+            ))
+            .filter(WatchlistItem.user_id == current_user.id,
+                    Grant.deadline.isnot(None),
+                    Grant.status.in_(['open', 'review']))
+            .all())
+    buckets = {'next_7d': 0, 'next_30d': 0, 'next_90d': 0}
+    for (deadline,) in rows:
+        if not deadline:
+            continue
+        days = (deadline - today).days
+        if days < 0:
+            continue
+        if days <= 7:
+            buckets['next_7d'] += 1
+        elif days <= 30:
+            buckets['next_30d'] += 1
+        elif days <= 90:
+            buckets['next_90d'] += 1
+    return jsonify({'buckets': buckets, 'total_watching': len(rows)})
+
+
+@dashboard_bp.route('/donor-median-funded-amount', methods=['GET'])
+@login_required
+def api_dashboard_donor_median_funded_amount():
+    """Phase 428 — Median total_funding across grants where this donor
+    has at least one funded application in the last 90 days. Mirrors
+    the typical award size for the donor.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (db.session.query(Grant.total_funding, Grant.currency)
+            .join(Application, Application.grant_id == Grant.id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.status.in_(['funded', 'awarded']),
+                    Application.decision_recorded_at >= cutoff,
+                    Grant.total_funding.isnot(None))
+            .all())
+    if not rows:
+        return jsonify({'median': None, 'sample': 0, 'currency': None})
+    amounts = []
+    currencies = {}
+    for amount, cur in rows:
+        try:
+            amounts.append(float(amount))
+            cur = cur or 'USD'
+            currencies[cur] = currencies.get(cur, 0) + 1
+        except (TypeError, ValueError):
+            continue
+    if not amounts:
+        return jsonify({'median': None, 'sample': 0, 'currency': None})
+    amounts.sort()
+    n = len(amounts)
+    median = amounts[n // 2] if n % 2 else (amounts[n // 2 - 1] + amounts[n // 2]) / 2.0
+    # Pick the most common currency
+    top_currency = max(currencies, key=currencies.get) if currencies else 'USD'
+    return jsonify({
+        'median': round(median, 2),
+        'sample': n,
+        'currency': top_currency,
+    })
+
+
+@dashboard_bp.route('/reviewer-overdue-count', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_overdue_count():
+    """Phase 429 — Count of this reviewer's reviews that are still
+    in 'assigned' status and were created more than 14 days ago.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+    count = Review.query.filter(
+        Review.reviewer_user_id == current_user.id,
+        Review.status == 'assigned',
+        Review.created_at < cutoff,
+    ).count()
+    return jsonify({'overdue': count, 'cutoff_days': 14})
+
+
+@dashboard_bp.route('/cron-failure-rate', methods=['GET'])
+@login_required
+def api_dashboard_cron_failure_rate():
+    """Phase 430 — % of cron_runs in the last 24h with success=False.
+    Health signal across the entire cron fleet.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import text as _text
+    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+    try:
+        row = db.session.execute(_text(
+            "SELECT COUNT(*) AS total, "
+            "SUM(CASE WHEN success = 0 OR success = false THEN 1 ELSE 0 END) AS failed "
+            "FROM cron_runs WHERE ran_at >= :c"
+        ), {'c': cutoff}).first()
+        total = int(row.total or 0)
+        failed = int(row.failed or 0)
+    except Exception:
+        total = 0
+        failed = 0
+    if total == 0:
+        return jsonify({'total': 0, 'failed': 0, 'failure_pct': None})
+    return jsonify({
+        'total': total,
+        'failed': failed,
+        'failure_pct': round(100 * failed / total, 1),
+    })
+
+
 @dashboard_bp.route('/ngo-criterion-score-trend', methods=['GET'])
 @login_required
 def api_dashboard_ngo_criterion_score_trend():

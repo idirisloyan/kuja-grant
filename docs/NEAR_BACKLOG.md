@@ -584,6 +584,28 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 427-431 — Deadline density + median
+  funded amount + overdue assignments + cron failure rate +
+  watchlist deadlines cron:
+  (a) `<DeadlineDensityCard>` on NGO dashboard counts
+  watchlisted grants by deadline window (next 7d / 30d /
+  90d), amber when >0 in the 7d bucket. Backend
+  `GET /api/dashboard/ngo-deadline-density`. (b)
+  `<MedianFundedAmountCard>` on donor dashboard shows median
+  grant total_funding across funded apps in last 90 days,
+  with the most common currency. Backend
+  `GET /api/dashboard/donor-median-funded-amount`. (c)
+  `<OverdueCountStat>` on /reviews surfaces a rose banner
+  when the reviewer has reviews assigned >14 days ago that
+  are still in status='assigned'. Backend
+  `GET /api/dashboard/reviewer-overdue-count`. (d)
+  `<CronFailureRateCard>` on operator dashboard shows % of
+  cron_runs that failed in last 24h, rose border at >=10%.
+  Backend `GET /api/dashboard/cron-failure-rate`. (e) New
+  `POST /api/cron/ngo-watchlist-deadlines` weekly digest of
+  watchlisted grants closing in next 7 days, joined via
+  WatchlistItem. Honors digests opt-out.
+
 - **2026-06-20** Phase 421-425 — Criterion score trend + apps
   by month + queue sector mix + i18n coverage + dismissed
   AI cron:

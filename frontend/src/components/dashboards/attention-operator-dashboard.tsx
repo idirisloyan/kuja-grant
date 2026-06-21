@@ -57,6 +57,7 @@ import { SlowestCronCard } from '@/components/dashboards/slowest-cron-card';
 import { AuditChainRateCard } from '@/components/dashboards/audit-chain-rate-card';
 import { NewSignupsCard } from '@/components/dashboards/new-signups-card';
 import { I18nCoverageCard } from '@/components/dashboards/i18n-coverage-card';
+import { CronFailureRateCard } from '@/components/dashboards/cron-failure-rate-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -324,6 +325,7 @@ export function AttentionOperatorDashboard() {
         <AuditChainRateCard />
         <NewSignupsCard />
         <I18nCoverageCard />
+        <CronFailureRateCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}
