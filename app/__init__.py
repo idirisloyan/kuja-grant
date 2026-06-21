@@ -292,56 +292,101 @@ def create_app(config_name=None):
         try:
             from sqlalchemy import text, inspect as sa_inspect
             inspector = sa_inspect(db.engine)
-            app_cols = set()
-            try:
-                app_cols = {c['name'] for c in inspector.get_columns('applications')}
-            except Exception:
-                pass
-            # (column_name, ddl) — each runs in its own short-lived tx.
+            # (table, column_name, ddl) — each runs in its own short-lived tx.
+            # Covers every column added Phase 102 → Phase 308 (the range the
+            # original monolithic bootstrap had been silently dropping).
             per_column_alters = [
-                ('withdrawn_at',
+                # ── applications (Phase 145-308) ────────────────────────
+                ('applications', 'withdrawn_at',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS withdrawn_at TIMESTAMP'),
-                ('withdrawal_reason',
+                ('applications', 'withdrawal_reason',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS withdrawal_reason TEXT'),
-                ('is_starred',
+                ('applications', 'is_starred',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS is_starred BOOLEAN DEFAULT FALSE NOT NULL'),
-                ('applicant_viewed_feedback_at',
+                ('applications', 'applicant_viewed_feedback_at',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS applicant_viewed_feedback_at TIMESTAMP'),
-                ('outreach_initiated_at',
+                ('applications', 'outreach_initiated_at',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS outreach_initiated_at TIMESTAMP'),
-                ('outreach_initiated_by_user_id',
+                ('applications', 'outreach_initiated_by_user_id',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS outreach_initiated_by_user_id INTEGER'),
-                ('outreach_message_text',
+                ('applications', 'outreach_message_text',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS outreach_message_text TEXT'),
-                ('appeal_requested_at',
+                ('applications', 'appeal_requested_at',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_requested_at TIMESTAMP'),
-                ('appeal_reason_text',
+                ('applications', 'appeal_reason_text',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_reason_text TEXT'),
-                ('appeal_resolved_at',
+                ('applications', 'appeal_resolved_at',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_resolved_at TIMESTAMP'),
-                ('appeal_resolution',
+                ('applications', 'appeal_resolution',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_resolution VARCHAR(20)'),
-                ('appeal_resolution_text',
+                ('applications', 'appeal_resolution_text',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_resolution_text TEXT'),
-                ('appeal_resolved_by_user_id',
+                ('applications', 'appeal_resolved_by_user_id',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS appeal_resolved_by_user_id INTEGER'),
-                # Phase 40 — NEAR network grant columns.
-                ('ai_rubric_result_json',
+                ('applications', 'ai_rubric_result_json',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_rubric_result_json TEXT'),
-                ('budget_lines_json',
+                ('applications', 'budget_lines_json',
                  'ALTER TABLE applications ADD COLUMN IF NOT EXISTS budget_lines_json TEXT'),
+                # ── ai_call_logs (Phase 102, 108, 115) ──────────────────
+                # These columns are what /api/admin/ai-telemetry selects.
+                # Missing usd_cost (Phase 108) was breaking the endpoint
+                # with a 500 in production — the AI cost ceiling, AI cost
+                # forecast tile, and replay coverage all depend on them.
+                ('ai_call_logs', 'input_text',
+                 'ALTER TABLE ai_call_logs ADD COLUMN IF NOT EXISTS input_text TEXT'),
+                ('ai_call_logs', 'output_text',
+                 'ALTER TABLE ai_call_logs ADD COLUMN IF NOT EXISTS output_text TEXT'),
+                ('ai_call_logs', 'replay_subject_kind',
+                 'ALTER TABLE ai_call_logs ADD COLUMN IF NOT EXISTS replay_subject_kind VARCHAR(40)'),
+                ('ai_call_logs', 'replay_subject_id',
+                 'ALTER TABLE ai_call_logs ADD COLUMN IF NOT EXISTS replay_subject_id INTEGER'),
+                ('ai_call_logs', 'org_id',
+                 'ALTER TABLE ai_call_logs ADD COLUMN IF NOT EXISTS org_id INTEGER'),
+                ('ai_call_logs', 'role',
+                 'ALTER TABLE ai_call_logs ADD COLUMN IF NOT EXISTS role VARCHAR(20)'),
+                ('ai_call_logs', 'language',
+                 'ALTER TABLE ai_call_logs ADD COLUMN IF NOT EXISTS language VARCHAR(8)'),
+                ('ai_call_logs', 'usd_cost',
+                 'ALTER TABLE ai_call_logs ADD COLUMN IF NOT EXISTS usd_cost NUMERIC(12,6)'),
+                # ── reviews (Phase 221, 232, 327) ───────────────────────
+                ('reviews', 'private_notes',
+                 'ALTER TABLE reviews ADD COLUMN IF NOT EXISTS private_notes TEXT'),
+                ('reviews', 'declined_at',
+                 'ALTER TABLE reviews ADD COLUMN IF NOT EXISTS declined_at TIMESTAMP'),
+                ('reviews', 'declined_reason',
+                 'ALTER TABLE reviews ADD COLUMN IF NOT EXISTS declined_reason TEXT'),
+                ('reviews', 'snoozed_until',
+                 'ALTER TABLE reviews ADD COLUMN IF NOT EXISTS snoozed_until TIMESTAMP'),
+                # ── organizations (Phase 108, 257) ──────────────────────
+                ('organizations', 'ai_monthly_budget_usd',
+                 'ALTER TABLE organizations ADD COLUMN IF NOT EXISTS ai_monthly_budget_usd NUMERIC(12,2)'),
+                # ── grants (Phase 233) ──────────────────────────────────
+                ('grants', 'withdrawn_at',
+                 'ALTER TABLE grants ADD COLUMN IF NOT EXISTS withdrawn_at TIMESTAMP'),
+                ('grants', 'withdrawal_reason',
+                 'ALTER TABLE grants ADD COLUMN IF NOT EXISTS withdrawal_reason TEXT'),
             ]
-            for col_name, ddl in per_column_alters:
-                if col_name in app_cols:
+
+            # Cache table → existing columns once per table.
+            table_cols: dict[str, set] = {}
+            for tbl, col_name, ddl in per_column_alters:
+                if tbl not in table_cols:
+                    try:
+                        table_cols[tbl] = {
+                            c['name'] for c in inspector.get_columns(tbl)
+                        }
+                    except Exception:
+                        table_cols[tbl] = set()  # table missing — ALTER will fail too
+                if col_name in table_cols[tbl]:
                     continue
                 # IF NOT EXISTS is Postgres-only; SQLite ignores; both swallow.
                 try:
                     with db.engine.begin() as conn:
                         conn.execute(text(ddl))
-                    app.logger.info(f"per-ALTER bootstrap added: applications.{col_name}")
+                    app.logger.info(f"per-ALTER bootstrap added: {tbl}.{col_name}")
                 except Exception as col_err:
                     app.logger.warning(
-                        f"per-ALTER bootstrap failed for applications.{col_name}: {col_err}"
+                        f"per-ALTER bootstrap failed for {tbl}.{col_name}: {col_err}"
                     )
         except Exception as e:
             app.logger.warning(f"per-ALTER bootstrap skipped entirely: {e}")

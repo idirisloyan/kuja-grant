@@ -26,7 +26,7 @@ Kuja streamlines the complete grant lifecycle — from donor grant creation thro
 | Frontend | Next.js 14 / React 18 / MUI |
 | Database | PostgreSQL (production) / SQLite (development) |
 | ORM | SQLAlchemy 2.x with Alembic migrations |
-| AI | Anthropic Claude API (claude-sonnet-4-20250514) |
+| AI | Anthropic Claude API (claude-sonnet-4-6) |
 | Task Runner | Redis-backed (enterprise) / ThreadPoolExecutor (single-instance) |
 | Deployment | Railway with Gunicorn (gthread workers) |
 

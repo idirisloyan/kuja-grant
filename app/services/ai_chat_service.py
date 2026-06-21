@@ -169,7 +169,7 @@ class AIChatService:
             thread_id=thread.id,
             role='assistant',
             content=response_text.strip()[:8000],
-            model='claude-sonnet-4',
+            model='claude-sonnet-4-6',
         )
         db.session.add(assistant_msg)
         thread.updated_at = datetime.now(timezone.utc)

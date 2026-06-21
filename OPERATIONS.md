@@ -24,7 +24,7 @@
 - **Web:** Python/Flask on Gunicorn (4 workers, gevent)
 - **Database:** PostgreSQL (Railway-managed, auto-backup)
 - **Cache/Queue:** Redis (Railway-managed)
-- **AI:** Anthropic Claude API (claude-sonnet-4-20250514)
+- **AI:** Anthropic Claude API (claude-sonnet-4-6)
 - **Sanctions:** OpenSanctions API + direct UN/OFAC/EU downloads
 
 ## 2. Health Endpoints
