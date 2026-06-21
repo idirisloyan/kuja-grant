@@ -584,6 +584,24 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 439-443 — Fastest submission + apps this
+  week + reviewer AI agreement + active orgs + AI cost trend cron:
+  (a) `<FastestSubmissionStat>` on the NGO dashboard shows min
+  hours between draft create and submitted_at across the last
+  90 days. m/h/d scale-aware. Self-gates < 3 submissions.
+  (b) `<AppsThisWeekCard>` on donor attention dashboard counts
+  apps submitted to donor's grants in the last 7 days with
+  prior-week delta + arrow icon. Self-gates when both weeks
+  are zero. (c) `<AiAgreementStat>` on the reviewer reviews
+  page shows % of reviews where |human_score - ai_score| <= 5;
+  tone-coded (emerald ≥70, amber ≥50, rose <50); self-gates
+  < 5 reviews. (d) `<ActiveOrgsCard>` on the operator dashboard
+  counts distinct orgs whose users updated_at within last 7
+  days, with total-org denominator. (e) Phase 443 cron
+  `/api/cron/ai-cost-trend` compares per-tenant sum(usd_cost)
+  this 30d vs prior 30d; sends admins top 3 climbers + top 3
+  fallers with org names; digests opt-out gated; record_cron_run.
+
 - **2026-06-20** Phase 433-437 — Peers-watching social signal
   + apps-per-grant + reviewer fastest score + AI calls by hour
   + feature usage delta cron:

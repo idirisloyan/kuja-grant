@@ -14,6 +14,7 @@ import { ScoreDistributionCard } from '@/components/reviews/score-distribution-c
 import { QueueSectorMix } from '@/components/reviews/queue-sector-mix';
 import { OverdueCountStat } from '@/components/reviews/overdue-count-stat';
 import { FastestScoreStat } from '@/components/reviews/fastest-score-stat';
+import { AiAgreementStat } from '@/components/reviews/ai-agreement-stat';
 import { ReviewerResumeBanner } from '@/components/reviews/resume-banner';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -136,6 +137,7 @@ function ReviewerView() {
       <MyCompletionStat />
       <MyTurnaroundStat />
       <FastestScoreStat />
+      <AiAgreementStat />
       <MyCompletedThisWeek />
       <BandStreakTip />
       <ScoreDistributionCard />

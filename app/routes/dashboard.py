@@ -3589,3 +3589,109 @@ def api_dashboard_duplicate_orgs():
             'orgs': g,
         })
     return jsonify({'duplicates': out, 'total_groups': len(dupes)})
+
+
+@dashboard_bp.route('/ngo-fastest-submission', methods=['GET'])
+@login_required
+def api_dashboard_ngo_fastest_submission():
+    """Phase 439 — Minimum hours between draft creation and submission
+    across this NGO's submitted applications in the last 90 days.
+    Motivational benchmark; self-gated by sample size on the frontend.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (Application.query
+            .filter(Application.org_id == current_user.org_id,
+                    Application.submitted_at.isnot(None),
+                    Application.submitted_at >= cutoff,
+                    Application.created_at.isnot(None))
+            .all())
+    durations = []
+    for a in rows:
+        if not a.created_at or not a.submitted_at:
+            continue
+        hours = (a.submitted_at - a.created_at).total_seconds() / 3600.0
+        if hours >= 0:
+            durations.append(hours)
+    if not durations:
+        return jsonify({'fastest_hours': None, 'sample': 0})
+    return jsonify({
+        'fastest_hours': round(min(durations), 1),
+        'sample': len(durations),
+    })
+
+
+@dashboard_bp.route('/donor-apps-this-week', methods=['GET'])
+@login_required
+def api_dashboard_donor_apps_this_week():
+    """Phase 440 — Applications submitted to this donor's grants in the
+    last 7 days, with the prior 7 days as a comparison delta.
+    """
+    if current_user.role not in ('donor', 'admin') or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    week_ago = now - timedelta(days=7)
+    two_weeks_ago = now - timedelta(days=14)
+    q = (db.session.query(Application)
+         .join(Grant, Application.grant_id == Grant.id)
+         .filter(Grant.donor_org_id == current_user.org_id,
+                 Application.submitted_at.isnot(None)))
+    this_week = q.filter(Application.submitted_at >= week_ago,
+                         Application.submitted_at < now).count()
+    prior_week = q.filter(Application.submitted_at >= two_weeks_ago,
+                          Application.submitted_at < week_ago).count()
+    return jsonify({
+        'this_week': this_week,
+        'prior_week': prior_week,
+        'delta': this_week - prior_week,
+    })
+
+
+@dashboard_bp.route('/reviewer-ai-agreement', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_ai_agreement():
+    """Phase 441 — Percentage of this reviewer's completed reviews in the
+    last 90 days where |overall_score - application.ai_score| <= 5.
+    Self-calibration signal grounded in real scores, not stdev.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (db.session.query(Review.overall_score, Application.ai_score)
+            .join(Application, Application.id == Review.application_id)
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff,
+                    Review.overall_score.isnot(None),
+                    Application.ai_score.isnot(None))
+            .all())
+    if not rows:
+        return jsonify({'agreement_pct': None, 'sample': 0})
+    matches = sum(1 for hs, ai in rows if abs(float(hs) - float(ai)) <= 5)
+    return jsonify({
+        'agreement_pct': round(100.0 * matches / len(rows), 1),
+        'sample': len(rows),
+    })
+
+
+@dashboard_bp.route('/active-orgs-7d', methods=['GET'])
+@login_required
+def api_dashboard_active_orgs_7d():
+    """Phase 442 — Distinct org_ids represented in users.updated_at >=
+    7-day cutoff. Lightweight tenant-activity signal for admin.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    active = (db.session.query(User.org_id)
+              .filter(User.updated_at >= cutoff,
+                      User.org_id.isnot(None))
+              .distinct().count())
+    total = db.session.query(Organization.id).count()
+    return jsonify({'active_orgs': active, 'total_orgs': total})

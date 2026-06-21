@@ -2663,3 +2663,120 @@ def api_cron_reviewer_digest():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/ai-cost-trend', methods=['POST'])
+def api_cron_ai_cost_trend():
+    """Phase 443 — Monthly digest to admins. Per-tenant sum(usd_cost) on
+    ai_call_logs for the current 30-day window vs the prior 30-day window.
+    Sends admins the top 3 climbers and top 3 fallers (absolute USD
+    delta). Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Organization, Notification,
+            record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from sqlalchemy import text as _text
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        recent_start = now - timedelta(days=30)
+        prior_start = now - timedelta(days=60)
+        try:
+            recent_rows = db.session.execute(_text(
+                "SELECT org_id, COALESCE(SUM(usd_cost), 0) AS c "
+                "FROM ai_call_logs WHERE created_at >= :c AND org_id IS NOT NULL "
+                "GROUP BY org_id"
+            ), {'c': recent_start}).all()
+            prior_rows = db.session.execute(_text(
+                "SELECT org_id, COALESCE(SUM(usd_cost), 0) AS c "
+                "FROM ai_call_logs WHERE created_at >= :a AND created_at < :b "
+                "AND org_id IS NOT NULL GROUP BY org_id"
+            ), {'a': prior_start, 'b': recent_start}).all()
+        except Exception:
+            recent_rows = []
+            prior_rows = []
+
+        recent = {r.org_id: float(r.c or 0) for r in recent_rows}
+        prior = {r.org_id: float(r.c or 0) for r in prior_rows}
+        all_orgs = set(recent) | set(prior)
+        deltas = []
+        for oid in all_orgs:
+            r = recent.get(oid, 0.0)
+            p = prior.get(oid, 0.0)
+            deltas.append({'org_id': oid, 'recent': round(r, 2),
+                           'prior': round(p, 2), 'delta': round(r - p, 2)})
+
+        climbers = sorted([d for d in deltas if d['delta'] > 0],
+                          key=lambda d: d['delta'], reverse=True)[:3]
+        fallers = sorted([d for d in deltas if d['delta'] < 0],
+                         key=lambda d: d['delta'])[:3]
+
+        org_id_set = {d['org_id'] for d in climbers + fallers}
+        org_names = {}
+        if org_id_set:
+            for oid, name in db.session.query(Organization.id, Organization.name).filter(
+                    Organization.id.in_(list(org_id_set))).all():
+                org_names[oid] = name
+
+        for d in climbers + fallers:
+            d['org_name'] = org_names.get(d['org_id'], f'Org #{d["org_id"]}')
+
+        sent = 0
+        if climbers or fallers:
+            parts = []
+            for d in climbers:
+                parts.append(f'{d["org_name"]} +${d["delta"]:.2f}')
+            for d in fallers:
+                parts.append(f'{d["org_name"]} ${d["delta"]:.2f}')
+            msg = 'AI cost shifts (30d vs prior 30d): ' + ', '.join(parts)
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='ai_cost_trend',
+                    title='Monthly AI cost movers',
+                    message=msg[:500],
+                    link='/admin/ai-cost',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+
+        result = {
+            'orgs_tracked': len(all_orgs),
+            'climbers': len(climbers),
+            'fallers': len(fallers),
+            'admins_notified': sent,
+        }
+        _rcr('ai-cost-trend',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result,
+                        'climbers': climbers, 'fallers': fallers})
+    except Exception as e:
+        logger.exception('ai-cost-trend cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ai-cost-trend',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
