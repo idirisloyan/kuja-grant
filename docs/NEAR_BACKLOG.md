@@ -584,6 +584,23 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 355-359 — Trend tiles + security hygiene +
+  reviewer ergonomics + admin digest:
+  (a) `<NgoWinRateTrendCard>` on NGO dashboard compares the NGO's
+  award rate over the last 90 days vs the prior 90 days. Backend
+  `GET /api/dashboard/ngo-win-rate-trend`. Self-gates when both
+  windows have < 3 decided. (b) `<RepeatGranteesCard>` on donor
+  dashboard lists NGOs the donor has funded 2+ times. Backend
+  `GET /api/dashboard/donor-repeat-grantees`. (c)
+  `<UsersWithoutTwoFaCard>` on operator dashboard counts admin /
+  donor / reviewer users without TOTP enrolled. Backend
+  `GET /api/dashboard/users-without-2fa`. (d) `<KeyboardHelp>` on
+  /reviews/[id] opens a cheat-sheet dialog when the reviewer
+  presses `?` (skipped inside inputs/textareas). (e) New
+  `POST /api/cron/admin-weekly-events` sends each admin a weekly
+  in-app summary (new submissions, decisions, AI cost). Honors
+  Phase 326 digests opt-out.
+
 - **2026-06-20** Phase 349-353 — Per-persona surfaces + operational
   drift detectors:
   (a) `<DonorEoiCard>` on donor dashboard lists the newest 5

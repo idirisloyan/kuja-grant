@@ -1036,6 +1036,39 @@ def api_dashboard_ngo_docs_pending():
     return jsonify({'count': len(out_ids), 'application_ids': out_ids[:5]})
 
 
+@dashboard_bp.route('/donor-repeat-grantees', methods=['GET'])
+@login_required
+def api_dashboard_donor_repeat_grantees():
+    """Phase 356 — NGOs this donor has funded 2+ times. Repeat grantees
+    are good candidates for committed partnerships.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from collections import Counter
+    from app.models import Organization
+    rows = (Application.query
+            .join(Grant)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.status.in_(['funded', 'awarded']))
+            .with_entities(Application.ngo_org_id)
+            .all())
+    counts = Counter(r[0] for r in rows if r[0])
+    repeats = [(org_id, n) for org_id, n in counts.items() if n >= 2]
+    if not repeats:
+        return jsonify({'grantees': [], 'total': 0})
+    org_ids = [r[0] for r in repeats]
+    orgs_by_id = {o.id: o for o in Organization.query.filter(Organization.id.in_(org_ids)).all()}
+    out = []
+    for org_id, n in sorted(repeats, key=lambda x: x[1], reverse=True)[:6]:
+        org = orgs_by_id.get(org_id)
+        out.append({
+            'org_id': org_id,
+            'org_name': org.name if org else f'Org #{org_id}',
+            'fundings': n,
+        })
+    return jsonify({'grantees': out, 'total': len(repeats)})
+
+
 @dashboard_bp.route('/donor-expressions-of-interest', methods=['GET'])
 @login_required
 def api_dashboard_donor_expressions_of_interest():
@@ -1646,6 +1679,31 @@ def api_dashboard_stale_published_grants():
     return jsonify({'total': len(rows), 'oldest': out})
 
 
+@dashboard_bp.route('/users-without-2fa', methods=['GET'])
+@login_required
+def api_dashboard_users_without_2fa():
+    """Phase 357 — Privileged users without TOTP 2FA.
+
+    Admin-only. Surfaces admin / donor / reviewer accounts where
+    `totp_enabled` is false. Skips NGOs (most NGO users won't 2FA).
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from app.models import User
+    rows = User.query.filter(
+        User.role.in_(['admin', 'donor', 'reviewer']),
+        User.totp_enabled.is_(False),
+    ).all()
+    out = []
+    for u in rows[:5]:
+        out.append({
+            'id': u.id,
+            'name': u.name or u.email,
+            'role': u.role,
+        })
+    return jsonify({'total': len(rows), 'sample': out})
+
+
 @dashboard_bp.route('/expired-screenings', methods=['GET'])
 @login_required
 def api_dashboard_expired_screenings():
@@ -1810,6 +1868,44 @@ def api_dashboard_donor_outreach_rollup():
         'total': len(apps),
         'outreach_started': started,
         'outreach_pending': pending,
+    })
+
+
+@dashboard_bp.route('/ngo-win-rate-trend', methods=['GET'])
+@login_required
+def api_dashboard_ngo_win_rate_trend():
+    """Phase 355 — This NGO's award rate over the last 3 months vs the
+    prior 3 months. Highlights momentum or a slowdown.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    recent_start = now - timedelta(days=90)
+    prior_start = now - timedelta(days=180)
+    DECIDED = ['funded', 'awarded', 'declined', 'rejected']
+    WIN = {'funded', 'awarded'}
+
+    def _stats(start, end):
+        q = (Application.query
+             .filter(Application.ngo_org_id == current_user.org_id,
+                     Application.status.in_(DECIDED),
+                     Application.decision_recorded_at.isnot(None),
+                     Application.decision_recorded_at >= start,
+                     Application.decision_recorded_at < end)
+             .all())
+        total = len(q)
+        wins = sum(1 for a in q if a.status in WIN)
+        return total, wins
+    recent_total, recent_wins = _stats(recent_start, now)
+    prior_total, prior_wins = _stats(prior_start, recent_start)
+    def _rate(t, w):
+        return round(100 * w / t, 1) if t > 0 else None
+    return jsonify({
+        'recent_total': recent_total,
+        'recent_win_rate': _rate(recent_total, recent_wins),
+        'prior_total': prior_total,
+        'prior_win_rate': _rate(prior_total, prior_wins),
     })
 
 

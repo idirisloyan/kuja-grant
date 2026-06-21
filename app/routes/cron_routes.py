@@ -632,6 +632,91 @@ def api_cron_donor_digest():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/admin-weekly-events', methods=['POST'])
+def api_cron_admin_weekly_events():
+    """Phase 359 — Weekly system-events summary for admin users.
+
+    For each admin user: applications received this week, decisions
+    recorded, declarations activated, AI cost. Honors the Phase 326
+    digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Application, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from sqlalchemy import text as _text
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        week_ago = now - timedelta(days=7)
+
+        # System-wide counts (admins see everything).
+        received = Application.query.filter(Application.created_at >= week_ago).count()
+        decided = Application.query.filter(
+            Application.decision_recorded_at.isnot(None),
+            Application.decision_recorded_at >= week_ago,
+        ).count() if hasattr(Application, 'decision_recorded_at') else 0
+        try:
+            ai_cost = db.session.execute(_text(
+                "SELECT COALESCE(SUM(cost_usd), 0) FROM ai_call_logs WHERE created_at >= :c"
+            ), {'c': week_ago}).scalar() or 0
+            ai_cost = float(ai_cost)
+        except Exception:
+            ai_cost = 0.0
+
+        admins = User.query.filter_by(role='admin').all()
+        sent = 0
+        for u in admins:
+            channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+            if not channels:
+                continue
+            parts = []
+            if received:
+                parts.append(f'{received} new submission{"s" if received != 1 else ""}')
+            if decided:
+                parts.append(f'{decided} decided')
+            if ai_cost > 0:
+                parts.append(f'${round(ai_cost, 2)} AI spend')
+            if not parts:
+                continue
+            n = Notification(
+                user_id=u.id,
+                type='admin_weekly_events',
+                title='Weekly system summary',
+                message='; '.join(parts),
+                link='/dashboard',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'admins_scanned': len(admins), 'summaries_sent': sent}
+        _rcr('admin-weekly-events',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('admin-weekly-events cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('admin-weekly-events',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/donor-closing-grants', methods=['POST'])
 def api_cron_donor_closing_grants():
     """Phase 352 — Notify donors about their own grants closing this week.
