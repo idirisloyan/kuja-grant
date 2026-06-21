@@ -62,6 +62,7 @@ import { AiCallsByHourCard } from '@/components/dashboards/ai-calls-by-hour-card
 import { ActiveOrgsCard } from '@/components/dashboards/active-orgs-card';
 import { TenantsWithoutGrantsCard } from '@/components/dashboards/tenants-without-grants-card';
 import { UserGrowthCard } from '@/components/dashboards/user-growth-card';
+import { TopOrgsByUsersCard } from '@/components/dashboards/top-orgs-by-users-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -334,6 +335,7 @@ export function AttentionOperatorDashboard() {
         <ActiveOrgsCard />
         <TenantsWithoutGrantsCard />
         <UserGrowthCard />
+        <TopOrgsByUsersCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

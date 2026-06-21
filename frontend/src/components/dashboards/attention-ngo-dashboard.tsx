@@ -62,6 +62,7 @@ import { DeadlineDensityCard } from '@/components/dashboards/deadline-density-ca
 import { FastestSubmissionStat } from '@/components/dashboards/fastest-submission-stat';
 import { DraftFunnelStat } from '@/components/dashboards/draft-funnel-stat';
 import { DraftAgeStat } from '@/components/dashboards/draft-age-stat';
+import { CompletedAssessmentsStat } from '@/components/dashboards/completed-assessments-stat';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -203,6 +204,7 @@ export function AttentionNgoDashboard() {
       <FastestSubmissionStat />
       <DraftFunnelStat />
       <DraftAgeStat />
+      <CompletedAssessmentsStat />
       <NgoFeedbackThemesCard />
       <CriterionScoreTrendCard />
       <DeadlineDensityCard />

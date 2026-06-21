@@ -2957,3 +2957,81 @@ def api_cron_data_integrity_check():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/yesterday-submissions-digest', methods=['POST'])
+def api_cron_yesterday_submissions_digest():
+    """Phase 461 — Daily morning admin digest. Counts applications
+    submitted in the past 24h, grouped by donor org. Digests opt-out gated.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Organization, Application, Grant, Notification,
+            record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(hours=24)
+        rows = (db.session.query(Organization.id, Organization.name,
+                                  db.func.count(Application.id))
+                .join(Grant, Grant.donor_org_id == Organization.id)
+                .join(Application, Application.grant_id == Grant.id)
+                .filter(Application.submitted_at.isnot(None),
+                        Application.submitted_at >= since)
+                .group_by(Organization.id, Organization.name)
+                .all())
+        groups = [(name, int(count)) for (oid, name, count) in rows if count]
+        groups.sort(key=lambda x: x[1], reverse=True)
+        total = sum(c for _, c in groups)
+        sent = 0
+        if total > 0:
+            parts = [f'{name}: {c}' for name, c in groups[:5]]
+            extra = f' (+{len(groups) - 5} more)' if len(groups) > 5 else ''
+            msg = f'Yesterday: {total} application(s) submitted. ' + ', '.join(parts) + extra
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='yesterday_submissions',
+                    title='Yesterday\'s submissions',
+                    message=msg[:500],
+                    link='/applications',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {
+            'total_submissions': int(total),
+            'donor_orgs': len(groups),
+            'admins_notified': sent,
+        }
+        _rcr('yesterday-submissions-digest',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('yesterday-submissions-digest cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('yesterday-submissions-digest',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

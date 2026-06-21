@@ -3906,3 +3906,97 @@ def api_dashboard_admin_user_growth_month():
         'delta': delta,
         'pct_change': pct,
     })
+
+
+@dashboard_bp.route('/ngo-completed-assessments', methods=['GET'])
+@login_required
+def api_dashboard_ngo_completed_assessments():
+    """Phase 457 — Count of completed capacity assessments for this NGO
+    plus most recent completion date.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    rows = (Assessment.query
+            .filter(Assessment.org_id == current_user.org_id,
+                    Assessment.status == 'completed')
+            .all())
+    if not rows:
+        return jsonify({'completed': 0, 'most_recent': None})
+    most_recent = max(
+        (a.created_at for a in rows if a.created_at), default=None)
+    return jsonify({
+        'completed': len(rows),
+        'most_recent': most_recent.isoformat() if most_recent else None,
+    })
+
+
+@dashboard_bp.route('/donor-approval-rate-year', methods=['GET'])
+@login_required
+def api_dashboard_donor_approval_rate_year():
+    """Phase 458 — Percentage of donor's decisions year-to-date that
+    were funded vs declined. Self-gates < 3 total.
+    """
+    if current_user.role not in ('donor', 'admin') or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    year_start = datetime(datetime.now(timezone.utc).year, 1, 1, tzinfo=timezone.utc)
+    rows = (db.session.query(Application.status)
+            .join(Grant, Application.grant_id == Grant.id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.decision_recorded_at.isnot(None),
+                    Application.decision_recorded_at >= year_start)
+            .all())
+    decisions = [s for (s,) in rows]
+    if len(decisions) < 3:
+        return jsonify({'approval_pct': None, 'sample': len(decisions)})
+    funded = sum(1 for s in decisions if s in ('funded', 'awarded'))
+    return jsonify({
+        'approval_pct': round(100.0 * funded / len(decisions), 1),
+        'funded': funded,
+        'sample': len(decisions),
+    })
+
+
+@dashboard_bp.route('/reviewer-high-score-rate', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_high_score_rate():
+    """Phase 459 — Percentage of completed reviews in last 90 days with
+    overall_score >= 75. Calibration signal.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff,
+                    Review.overall_score.isnot(None))
+            .all())
+    if len(rows) < 5:
+        return jsonify({'high_score_pct': None, 'sample': len(rows)})
+    high = sum(1 for r in rows if (r.overall_score or 0) >= 75)
+    return jsonify({
+        'high_score_pct': round(100.0 * high / len(rows), 1),
+        'high_count': high,
+        'sample': len(rows),
+    })
+
+
+@dashboard_bp.route('/admin-top-orgs-by-users', methods=['GET'])
+@login_required
+def api_dashboard_admin_top_orgs_by_users():
+    """Phase 460 — Top 5 organizations ranked by their user count."""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    rows = (db.session.query(Organization.id, Organization.name,
+                              Organization.org_type, func.count(User.id))
+            .outerjoin(User, User.org_id == Organization.id)
+            .group_by(Organization.id, Organization.name, Organization.org_type)
+            .order_by(func.count(User.id).desc())
+            .limit(5)
+            .all())
+    out = [{'id': r[0], 'name': r[1], 'org_type': r[2], 'users': int(r[3] or 0)}
+           for r in rows if (r[3] or 0) > 0]
+    return jsonify({'orgs': out})

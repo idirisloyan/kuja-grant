@@ -584,6 +584,21 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 457-461 — Completed assessments + approval
+  rate + reviewer high-score rate + top orgs by users + yesterday
+  submissions digest cron:
+  (a) `<CompletedAssessmentsStat>` on NGO dashboard shows count of
+  completed capacity assessments + most recent date. Self-gates at
+  zero. (b) `<ApprovalRateCard>` on donor dashboard shows YTD
+  funded% across decisions; tone-coded (emerald ≥50, amber ≥25,
+  rose <25). Self-gates < 3 decisions. (c) `<HighScoreRateStat>`
+  on reviewer reviews page shows % of last-90d completed reviews
+  with overall_score ≥ 75. Self-gates < 5. (d) `<TopOrgsByUsersCard>`
+  on operator dashboard lists top 5 orgs by user count with bar
+  visuals. (e) Phase 461 cron `/api/cron/yesterday-submissions-digest`
+  sends admins a daily summary of past-24h submissions grouped by
+  donor. Digests opt-out gated; record_cron_run wired.
+
 - **2026-06-20** Phase 451-455 — Draft age + unassigned reviews
   + scoring time avg + user growth + data integrity cron:
   (a) `<DraftAgeStat>` on NGO dashboard shows oldest open draft
