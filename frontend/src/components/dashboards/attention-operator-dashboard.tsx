@@ -73,6 +73,7 @@ import { FailedCronsCard } from '@/components/dashboards/failed-crons-card';
 import { AiModelsTodayCard } from '@/components/dashboards/ai-models-today-card';
 import { NewOrgsThisWeekCard } from '@/components/dashboards/new-orgs-this-week-card';
 import { FeedbackThisWeekCard } from '@/components/dashboards/feedback-this-week-card';
+import { WebauthnRegistrationsStat } from '@/components/dashboards/webauthn-registrations-stat';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -356,6 +357,7 @@ export function AttentionOperatorDashboard() {
         <AiModelsTodayCard />
         <NewOrgsThisWeekCard />
         <FeedbackThisWeekCard />
+        <WebauthnRegistrationsStat />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

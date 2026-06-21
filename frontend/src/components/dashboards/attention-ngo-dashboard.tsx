@@ -73,6 +73,7 @@ import { WatchlistSizeStat } from '@/components/dashboards/watchlist-size-stat';
 import { SectorBreadthStat } from '@/components/dashboards/sector-breadth-stat';
 import { DaysSinceLastSubmissionStat } from '@/components/dashboards/days-since-last-submission-stat';
 import { SubmissionConsistencyStat } from '@/components/dashboards/submission-consistency-stat';
+import { ActiveGrantsStat } from '@/components/dashboards/active-grants-stat';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -225,6 +226,7 @@ export function AttentionNgoDashboard() {
       <SectorBreadthStat />
       <DaysSinceLastSubmissionStat />
       <SubmissionConsistencyStat />
+      <ActiveGrantsStat />
       <NgoFeedbackThemesCard />
       <CriterionScoreTrendCard />
       <DeadlineDensityCard />

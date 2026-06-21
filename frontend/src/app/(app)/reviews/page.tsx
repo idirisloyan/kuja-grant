@@ -28,6 +28,7 @@ import { PrivateNotesCoverageStat } from '@/components/reviews/private-notes-cov
 import { LongestReviewStat } from '@/components/reviews/longest-review-stat';
 import { ShortestReviewStat } from '@/components/reviews/shortest-review-stat';
 import { AvgRationaleLengthStat } from '@/components/reviews/avg-rationale-length-stat';
+import { WeeklyCadenceStat } from '@/components/reviews/weekly-cadence-stat';
 import { ReviewerResumeBanner } from '@/components/reviews/resume-banner';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -164,6 +165,7 @@ function ReviewerView() {
       <LongestReviewStat />
       <ShortestReviewStat />
       <AvgRationaleLengthStat />
+      <WeeklyCadenceStat />
       <MyCompletedThisWeek />
       <BandStreakTip />
       <ScoreDistributionCard />

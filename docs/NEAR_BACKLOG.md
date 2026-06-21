@@ -584,6 +584,24 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 523-527 — Active grants + grants without apps +
+  weekly review cadence + WebAuthn registrations + NGO decisions-this-week
+  cron:
+  (a) `<ActiveGrantsStat>` on NGO dashboard counts Application rows in
+  'funded'/'awarded'/'in_progress' for the NGO's org — the grants they
+  are actively delivering on right now (emerald tone).
+  (b) `<GrantsWithoutAppsStat>` on donor dashboard counts donor's
+  published grants with NOT EXISTS Application rows; amber tone —
+  surfaces grants that aren't getting traction.
+  (c) `<WeeklyCadenceStat>` on reviewer reviews page shows last 4
+  weeks of completed-review counts as a mini bar chart with the
+  total; self-gates total === 0. (d) `<WebauthnRegistrationsStat>`
+  on operator dashboard counts WebAuthnCredential rows in last 30d
+  — passwordless adoption pulse. (e) Phase 527 cron
+  `/api/cron/ngo-decisions-this-week` weekly NGO digest of donor
+  decisions in last 7 days grouped by status; honors digests opt-out
+  via NotificationPreference; record_cron_run telemetered.
+
 - **2026-06-21** Phase 517-521 — Submission consistency + apps without
   reviewer + average rationale length + feedback received this week
   + monthly feedback summary cron:

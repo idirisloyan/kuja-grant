@@ -4997,3 +4997,81 @@ def api_dashboard_admin_feedback_this_week():
         else:
             buckets['detractor'] += 1
     return jsonify({'total': sum(buckets.values()), 'buckets': buckets})
+
+
+@dashboard_bp.route('/ngo-active-grants', methods=['GET'])
+@login_required
+def api_dashboard_ngo_active_grants():
+    """Phase 523 — Count of NGO's applications currently in 'funded',
+    'awarded', or 'in_progress' status. The grants the NGO is
+    actively delivering on right now.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    count = (Application.query
+             .filter(Application.ngo_org_id == current_user.org_id,
+                     Application.status.in_(['funded', 'awarded', 'in_progress']))
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/donor-grants-without-applications', methods=['GET'])
+@login_required
+def api_dashboard_donor_grants_without_applications():
+    """Phase 524 — Donor's published grants ('open' or 'review') with
+    zero Application rows. Operational signal — grant didn't get
+    traction; may need promotion or scope tweak.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from sqlalchemy import not_
+    sub = db.session.query(Application.id).filter(Application.grant_id == Grant.id)
+    rows = (db.session.query(Grant.id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Grant.status.in_(['open', 'review']),
+                    not_(sub.exists()))
+            .all())
+    return jsonify({'count': len(rows)})
+
+
+@dashboard_bp.route('/reviewer-weekly-cadence', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_weekly_cadence():
+    """Phase 525 — Count of completed reviews per ISO week for the
+    last 4 weeks. List newest week first. Self-gates on the client
+    when the total across all 4 weeks is zero.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    weeks = []
+    for offset in range(4):
+        week_end = now - timedelta(days=offset * 7)
+        week_start = week_end - timedelta(days=7)
+        c = (Review.query
+             .filter(Review.reviewer_user_id == current_user.id,
+                     Review.status == 'completed',
+                     Review.completed_at >= week_start,
+                     Review.completed_at < week_end)
+             .count())
+        weeks.append({'week_offset': offset, 'count': c})
+    return jsonify({'weeks': weeks, 'total': sum(w['count'] for w in weeks)})
+
+
+@dashboard_bp.route('/admin-webauthn-registrations-this-month', methods=['GET'])
+@login_required
+def api_dashboard_admin_webauthn_registrations_this_month():
+    """Phase 526 — Count of WebAuthn credentials registered in the
+    last 30 days. Security adoption pulse — how many users took the
+    passwordless step recently.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from app.models.webauthn_credential import WebAuthnCredential
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    count = (WebAuthnCredential.query
+             .filter(WebAuthnCredential.created_at >= cutoff)
+             .count())
+    return jsonify({'count': count})

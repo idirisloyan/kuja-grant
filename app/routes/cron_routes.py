@@ -3868,3 +3868,85 @@ def api_cron_feedback_month_summary():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/ngo-decisions-this-week', methods=['POST'])
+def api_cron_ngo_decisions_this_week():
+    """Phase 527 — Weekly NGO digest of donor decisions on the NGO's
+    applications in last 7 days. Groups by status (funded, declined,
+    revision_requested). Honors 'digests' opt-out; skipped if NGO
+    received zero decisions this week.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Application, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from collections import defaultdict
+        from datetime import datetime, timezone, timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        rows = (db.session.query(Application.ngo_org_id, Application.status)
+                .filter(Application.decision_recorded_at.isnot(None),
+                        Application.decision_recorded_at >= cutoff,
+                        Application.ngo_org_id.isnot(None))
+                .all())
+        by_org = defaultdict(lambda: defaultdict(int))
+        for org_id, status in rows:
+            by_org[org_id][status] += 1
+        sent = 0
+        if by_org:
+            ngo_users = (User.query
+                         .filter(User.role == 'ngo',
+                                 User.org_id.in_(list(by_org.keys())))
+                         .all())
+            for u in ngo_users:
+                statuses = by_org.get(u.org_id, {})
+                if not statuses:
+                    continue
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                summary = ', '.join(f'{c} {s}' for s, c in statuses.items())
+                msg = (
+                    f'Decisions on your applications in the last 7 days: '
+                    f'{summary}.'
+                )
+                n = Notification(
+                    user_id=u.id,
+                    type='ngo_decisions_this_week',
+                    title='Your decisions this week',
+                    message=msg[:500],
+                    link='/applications',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {'orgs_with_decisions': len(by_org), 'ngo_notified': sent}
+        _rcr('ngo-decisions-this-week',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ngo-decisions-this-week cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ngo-decisions-this-week',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
