@@ -3460,3 +3460,86 @@ def api_cron_system_load_summary():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/stale-reviewers-digest', methods=['POST'])
+def api_cron_stale_reviewers_digest():
+    """Phase 497 — Weekly admin digest. Lists reviewers with zero
+    completed reviews in the last 30 days. Helps admins notice churn
+    risk. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Review, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(days=30)
+        reviewers = User.query.filter_by(role='reviewer').all()
+        active_ids = {
+            rid for (rid,) in db.session.query(Review.reviewer_user_id)
+            .filter(Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff)
+            .distinct().all()
+        }
+        stale = [u for u in reviewers if u.id not in active_ids]
+        sent = 0
+        if stale:
+            names = []
+            for u in stale[:5]:
+                label = u.name or u.email or f'User #{u.id}'
+                names.append(label)
+            sample = ', '.join(names)
+            extra = f' (+{len(stale) - 5} more)' if len(stale) > 5 else ''
+            msg = (
+                f'{len(stale)} reviewer{"" if len(stale) == 1 else "s"} '
+                f'completed no reviews in last 30 days: {sample}{extra}'
+            )
+            admins = User.query.filter_by(role='admin').all()
+            for a in admins:
+                channels = NotificationPreference.channels_for(user_id=a.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=a.id,
+                    type='stale_reviewers',
+                    title='Reviewers inactive last 30 days',
+                    message=msg[:500],
+                    link='/admin/reviewers-workload',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {
+            'reviewers_total': len(reviewers),
+            'stale_count': len(stale),
+            'admins_notified': sent,
+        }
+        _rcr('stale-reviewers-digest',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('stale-reviewers-digest cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('stale-reviewers-digest',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

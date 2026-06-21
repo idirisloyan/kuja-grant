@@ -584,6 +584,21 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 493-497 — Win rate this quarter + grants
+  published this month + top-tier rate + active webhooks + stale
+  reviewers cron:
+  (a) `<WinRateQuarterStat>` on NGO dashboard shows % of decisions
+  this calendar quarter that were funded; tone-coded; self-gates < 3.
+  (b) `<GrantsPublishedMonthStat>` on donor dashboard counts grants
+  this donor created since 1st of current calendar month. (c)
+  `<TopTierRateStat>` on reviewer reviews page shows % of last-90d
+  reviews with overall_score ≥ 90; self-gates < 5. (d)
+  `<ActiveWebhooksCard>` on operator dashboard shows active vs total
+  webhook count with inactive-count footer. (e) Phase 497 cron
+  `/api/cron/stale-reviewers-digest` lists reviewers with 0
+  completed reviews in last 30 days; sends admins a names sample
+  + count. Digests opt-out gated; record_cron_run wired.
+
 - **2026-06-21** Phase 487-491 — Lifetime win rate + apps YoY +
   lifetime reviews + notifications 14d sparkline + system load
   summary cron:

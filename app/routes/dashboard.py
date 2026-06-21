@@ -4488,3 +4488,92 @@ def api_dashboard_admin_notifications_14d():
         if 0 <= offset < 14:
             buckets[offset] += 1
     return jsonify({'buckets': buckets, 'total': sum(buckets)})
+
+
+@dashboard_bp.route('/ngo-win-rate-quarter', methods=['GET'])
+@login_required
+def api_dashboard_ngo_win_rate_quarter():
+    """Phase 493 — % of this NGO's decisions recorded in the current
+    calendar quarter that were funded/awarded. Self-gates < 3.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    quarter_start_month = ((now.month - 1) // 3) * 3 + 1
+    quarter_start = datetime(now.year, quarter_start_month, 1, tzinfo=timezone.utc)
+    rows = (db.session.query(Application.status)
+            .filter(Application.org_id == current_user.org_id,
+                    Application.decision_recorded_at.isnot(None),
+                    Application.decision_recorded_at >= quarter_start)
+            .all())
+    decisions = [s for (s,) in rows]
+    if len(decisions) < 3:
+        return jsonify({'win_rate_pct': None, 'sample': len(decisions)})
+    awarded = sum(1 for s in decisions if s in ('funded', 'awarded'))
+    return jsonify({
+        'win_rate_pct': round(100.0 * awarded / len(decisions), 1),
+        'awarded': awarded,
+        'sample': len(decisions),
+        'quarter_start': quarter_start.date().isoformat(),
+    })
+
+
+@dashboard_bp.route('/donor-grants-published-this-month', methods=['GET'])
+@login_required
+def api_dashboard_donor_grants_published_this_month():
+    """Phase 494 — Count of grants this donor created since first of the
+    current calendar month. Publication-pace signal.
+    """
+    if current_user.role not in ('donor', 'admin') or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    count = (Grant.query
+             .filter(Grant.donor_org_id == current_user.org_id,
+                     Grant.created_at >= month_start)
+             .count())
+    return jsonify({
+        'published_this_month': count,
+        'month_start': month_start.date().isoformat(),
+    })
+
+
+@dashboard_bp.route('/reviewer-top-tier-rate', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_top_tier_rate():
+    """Phase 495 — % of reviewer's last-90d completed reviews with
+    overall_score >= 90. Top-tier rate.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff,
+                    Review.overall_score.isnot(None))
+            .all())
+    if len(rows) < 5:
+        return jsonify({'top_tier_pct': None, 'sample': len(rows)})
+    top = sum(1 for r in rows if (r.overall_score or 0) >= 90)
+    return jsonify({
+        'top_tier_pct': round(100.0 * top / len(rows), 1),
+        'top_count': top,
+        'sample': len(rows),
+    })
+
+
+@dashboard_bp.route('/admin-active-webhooks', methods=['GET'])
+@login_required
+def api_dashboard_admin_active_webhooks():
+    """Phase 496 — Webhook integration health snapshot: active vs total."""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.webhook import Webhook
+    active = Webhook.query.filter(Webhook.active.is_(True)).count()
+    total = Webhook.query.count()
+    return jsonify({'active': active, 'total': total})

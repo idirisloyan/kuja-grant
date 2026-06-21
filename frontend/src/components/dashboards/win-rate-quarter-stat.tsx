@@ -1,0 +1,42 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Target } from 'lucide-react';
+import { api } from '@/lib/api';
+
+interface Resp {
+  win_rate_pct: number | null;
+  awarded?: number;
+  sample: number;
+  quarter_start?: string;
+}
+
+export function WinRateQuarterStat() {
+  const [data, setData] = useState<Resp | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get<Resp>('/api/dashboard/ngo-win-rate-quarter').then((r) => {
+      if (!cancelled) setData(r);
+    }).catch(() => {/* silent */});
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!data || data.win_rate_pct == null || data.sample < 3) return null;
+  const pct = data.win_rate_pct;
+  const tone = pct >= 50 ? 'text-emerald-700' : pct >= 25 ? 'text-amber-700' : 'text-rose-700';
+  const qStart = data.quarter_start ? new Date(data.quarter_start).toLocaleDateString() : null;
+
+  return (
+    <div className="rounded-md border border-border bg-card p-3 text-xs flex items-center justify-between">
+      <span className="text-muted-foreground inline-flex items-center gap-1">
+        <Target className="w-3 h-3 text-sky-600" />
+        Quarter to date{qStart ? ` (from ${qStart})` : ''}
+      </span>
+      <span className="tabular-nums">
+        Win rate <span className={`font-semibold ${tone}`}>{pct}%</span>
+        <span className="text-muted-foreground"> ({data.awarded ?? 0} of {data.sample})</span>
+      </span>
+    </div>
+  );
+}
