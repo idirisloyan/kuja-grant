@@ -70,11 +70,22 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             // localStorage unavailable — skip silently.
           }
         }
+        // Phase 614 — never block /login on a slow API call. If the
+        // bootstrap can't return in 5s the page falls back to the
+        // default Kuja brand (which is what `network: null` already
+        // renders). UAT timeouts on Railway cold-start were repeatedly
+        // ~60s; capping at 5s makes /login interactive immediately.
+        const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timeoutId = ctrl
+          ? window.setTimeout(() => ctrl.abort(), 5000)
+          : null;
         const res = await fetch(`${API_BASE}/network/current`, {
           credentials: 'include',
           headers,
+          signal: ctrl?.signal,
           // No CSRF header needed for a public GET.
         });
+        if (timeoutId !== null) window.clearTimeout(timeoutId);
         if (!res.ok) {
           set({ loading: false });
           return;

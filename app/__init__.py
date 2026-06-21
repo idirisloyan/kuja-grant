@@ -1195,7 +1195,22 @@ def _register_spa_routes(app):
         # Try exact file first (JS, CSS, images, etc.)
         file_path = os.path.join(nextjs_dir, path)
         if os.path.isfile(file_path):
-            return send_from_directory(nextjs_dir, path)
+            resp = send_from_directory(nextjs_dir, path)
+            # Phase 614 — content-hashed Next.js chunks live under
+            # _next/static/ and never collide on rebuild. Cache them for
+            # a year, immutable. /login on a second visit (UAT timeouts
+            # hit at 60s+ from bundle re-download) becomes near-instant
+            # because all the JS/CSS the page needs is already in the
+            # browser cache.
+            #
+            # Non-_next assets (PWA icons, fonts, the service worker
+            # bundle, etc.) get a shorter cache plus must-revalidate so
+            # we can ship updates within a single page reload.
+            if path.startswith('_next/static/'):
+                resp.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+            elif path.endswith(('.js', '.css', '.woff', '.woff2', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico')):
+                resp.headers['Cache-Control'] = 'public, max-age=86400, must-revalidate'
+            return resp
 
         # IMPORTANT: For hashed Next.js asset paths that don't exist, return
         # 404 instead of falling through to the SPA index. Otherwise a stale
@@ -1212,7 +1227,13 @@ def _register_spa_routes(app):
         for candidate in [f'{path}/index.html', f'{path}.html']:
             cand_path = os.path.join(nextjs_dir, candidate)
             if os.path.isfile(cand_path):
-                return send_from_directory(nextjs_dir, candidate)
+                resp = send_from_directory(nextjs_dir, candidate)
+                # Phase 614 — HTML is the deploy fingerprint. Never cache
+                # it cross-deploy or the user lands on stale chunk
+                # references. The stale-build-detector still helps for
+                # session-pinned tabs.
+                resp.headers['Cache-Control'] = 'no-store, must-revalidate'
+                return resp
 
         # Fallback: dynamic-route segments. For path like "apply/266",
         # try parent + "0" placeholder (apply/0/index.html). Walk up the
@@ -1224,13 +1245,17 @@ def _register_spa_routes(app):
             candidate_path = '/'.join(candidate_parts) + '/index.html'
             cand = os.path.join(nextjs_dir, candidate_path)
             if os.path.isfile(cand):
-                return send_from_directory(nextjs_dir, candidate_path)
+                resp = send_from_directory(nextjs_dir, candidate_path)
+                resp.headers['Cache-Control'] = 'no-store, must-revalidate'
+                return resp
 
         # Last resort: root index.html so the client can render at least
         # the shell and redirect itself.
         root_index = os.path.join(nextjs_dir, 'index.html')
         if os.path.isfile(root_index):
-            return send_from_directory(nextjs_dir, 'index.html')
+            resp = send_from_directory(nextjs_dir, 'index.html')
+            resp.headers['Cache-Control'] = 'no-store, must-revalidate'
+            return resp
         return None
 
     @app.route('/')
