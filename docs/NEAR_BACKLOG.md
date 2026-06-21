@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 541-545 — Saved searches + declined-this-month
+  + reviewer comments rate + large documents + monthly donor
+  grants-closing-month cron:
+  (a) `<SavedSearchesCountStat>` on NGO dashboard counts SavedSearch
+  rows for current user — search-alert reliance signal.
+  (b) `<DeclinedThisMonthStat>` on donor dashboard counts donor's
+  applications declined this calendar month. (c) `<CommentsRateStat>`
+  on reviewer reviews page reports % of last-30d completed reviews
+  with non-empty comments JSON; amber tone < 50%; self-gates < 3
+  sample. (d) `<LargeDocumentsStat>` on operator dashboard counts
+  Documents with file_size > 10 MB — storage cost / heavy attachment
+  signal. (e) Phase 545 cron `/api/cron/donor-grants-closing-month`
+  is a monthly last-call digest of donor's open grants with deadline
+  this calendar month; complements Phase 352 (closing-soon) and
+  Phase 449 (closing-this-week). Honors digests opt-out.
+
 - **2026-06-21** Phase 535-539 — Pipeline count + grants closing soon
   + snoozed reviews + AI threads this week + snoozed-reviews-ending-soon
   cron:

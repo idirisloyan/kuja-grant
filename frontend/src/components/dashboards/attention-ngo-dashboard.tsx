@@ -76,6 +76,7 @@ import { SubmissionConsistencyStat } from '@/components/dashboards/submission-co
 import { ActiveGrantsStat } from '@/components/dashboards/active-grants-stat';
 import { DocumentsThisMonthStat } from '@/components/dashboards/documents-this-month-stat';
 import { PipelineCountStat } from '@/components/dashboards/pipeline-count-stat';
+import { SavedSearchesCountStat } from '@/components/dashboards/saved-searches-count-stat';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -231,6 +232,7 @@ export function AttentionNgoDashboard() {
       <ActiveGrantsStat />
       <DocumentsThisMonthStat />
       <PipelineCountStat />
+      <SavedSearchesCountStat />
       <NgoFeedbackThemesCard />
       <CriterionScoreTrendCard />
       <DeadlineDensityCard />

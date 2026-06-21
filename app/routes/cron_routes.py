@@ -4114,3 +4114,91 @@ def api_cron_snoozed_reviews_ending_soon():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/donor-grants-closing-month', methods=['POST'])
+def api_cron_donor_grants_closing_month():
+    """Phase 545 — Monthly donor digest of donor's open grants with
+    deadline this calendar month. Different from Phase 352 (per-day
+    closing-soon) and Phase 449 (closing-this-week) — this is a
+    last-call planning view. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Grant, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from collections import defaultdict
+        from datetime import datetime, timezone, date
+
+        today = date.today()
+        # last day of current month
+        if today.month == 12:
+            next_month_start = date(today.year + 1, 1, 1)
+        else:
+            next_month_start = date(today.year, today.month + 1, 1)
+        rows = (db.session.query(Grant.donor_org_id, Grant.id)
+                .filter(Grant.status.in_(['open', 'review']),
+                        Grant.deadline.isnot(None),
+                        Grant.deadline >= today,
+                        Grant.deadline < next_month_start)
+                .all())
+        by_org = defaultdict(int)
+        for org_id, _ in rows:
+            if org_id is not None:
+                by_org[org_id] += 1
+        sent = 0
+        if by_org:
+            donor_users = (User.query
+                           .filter(User.role == 'donor',
+                                   User.org_id.in_(list(by_org.keys())))
+                           .all())
+            for u in donor_users:
+                n_count = by_org.get(u.org_id, 0)
+                if not n_count:
+                    continue
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                msg = (
+                    f'{n_count} of your grant{"s" if n_count != 1 else ""} '
+                    f'close{"" if n_count != 1 else "s"} this month.'
+                )
+                n = Notification(
+                    user_id=u.id,
+                    type='donor_grants_closing_month',
+                    title='Grants closing this month',
+                    message=msg[:500],
+                    link='/grants',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {'orgs_with_closing_grants': len(by_org), 'notified': sent}
+        _rcr('donor-grants-closing-month',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('donor-grants-closing-month cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('donor-grants-closing-month',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

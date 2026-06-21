@@ -5227,3 +5227,79 @@ def api_dashboard_admin_ai_threads_this_week():
              .filter(AIThread.created_at >= cutoff)
              .count())
     return jsonify({'count': count})
+
+
+@dashboard_bp.route('/ngo-saved-searches-count', methods=['GET'])
+@login_required
+def api_dashboard_ngo_saved_searches_count():
+    """Phase 541 — Count of SavedSearch rows for current_user. Quick
+    signal on how much the NGO leans on search alerts.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.saved_search import SavedSearch
+    count = SavedSearch.query.filter_by(user_id=current_user.id).count()
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/donor-declined-this-month', methods=['GET'])
+@login_required
+def api_dashboard_donor_declined_this_month():
+    """Phase 542 — Count of donor's applications transitioned to
+    'declined' this calendar month.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    count = (db.session.query(Application.id)
+             .join(Grant, Application.grant_id == Grant.id)
+             .filter(Grant.donor_org_id == current_user.org_id,
+                     Application.status == 'declined',
+                     Application.decision_recorded_at >= month_start)
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/reviewer-comments-rate', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_comments_rate():
+    """Phase 543 — Percent of reviewer's last-30d completed reviews
+    with a non-empty comments JSON. Quality signal on rationale
+    coverage. Self-gates < 3 sample on the client.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status == 'completed',
+                    Review.completed_at >= cutoff)
+            .all())
+    if not rows:
+        return jsonify({'rate': None, 'sample': 0})
+    with_comments = 0
+    for r in rows:
+        c = r.get_comments()
+        if c and any(v for v in c.values() if v):
+            with_comments += 1
+    rate = round(100 * with_comments / len(rows), 1)
+    return jsonify({'rate': rate, 'sample': len(rows)})
+
+
+@dashboard_bp.route('/admin-large-documents', methods=['GET'])
+@login_required
+def api_dashboard_admin_large_documents():
+    """Phase 544 — Count of Document rows with file_size > 10 MB.
+    Storage cost / heavy-attachment signal.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    threshold = 10 * 1024 * 1024
+    count = (Document.query
+             .filter(Document.file_size.isnot(None),
+                     Document.file_size > threshold)
+             .count())
+    return jsonify({'count': count, 'threshold_mb': 10})

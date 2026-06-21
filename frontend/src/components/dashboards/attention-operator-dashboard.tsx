@@ -76,6 +76,7 @@ import { FeedbackThisWeekCard } from '@/components/dashboards/feedback-this-week
 import { WebauthnRegistrationsStat } from '@/components/dashboards/webauthn-registrations-stat';
 import { TenantMessagesWeekStat } from '@/components/dashboards/tenant-messages-week-stat';
 import { AiThreadsWeekStat } from '@/components/dashboards/ai-threads-week-stat';
+import { LargeDocumentsStat } from '@/components/dashboards/large-documents-stat';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -362,6 +363,7 @@ export function AttentionOperatorDashboard() {
         <WebauthnRegistrationsStat />
         <TenantMessagesWeekStat />
         <AiThreadsWeekStat />
+        <LargeDocumentsStat />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}
