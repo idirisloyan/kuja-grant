@@ -584,6 +584,27 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 301-305 — SLA + appeal + calibration + integrity:
+  (a) `<SlaBreachesCard>` on operator dashboard counts applications
+  still pre-decision past the 30-day mark + lists the 3 most
+  overdue. Backend `GET /api/dashboard/sla-breaches`. (b) NGO appeal
+  flow: new `applications.appeal_requested_at + appeal_reason_text`,
+  endpoint `POST /api/applications/<id>/appeal` records the request,
+  writes to the hash-chained audit log, and notifies admin + every
+  donor user on the grant's donor org. `<AppealPanel>` on the
+  application detail page: "Request re-review" button for the owner
+  NGO; status visible to every viewer once submitted. (c)
+  `<MyCalibrationTip>` on the reviewer queue page surfaces a small
+  amber tip when the reviewer's mean is > 1.0σ from the platform
+  mean (5+ reviews). Backend `GET /api/reviews/my-calibration`.
+  (d) New `POST /api/cron/ngo-pipeline-digest`: each NGO user gets
+  one weekly Notification summarizing in-flight apps, last-7d
+  decisions, and grants closing soon. Cron health recorded via
+  `record_cron_run`. (e) `<DataIntegrityCard>` on operator
+  dashboard cheaply counts orphaned FKs across reviews/applications/
+  documents. Backend `GET /api/dashboard/data-integrity`. Self-
+  gates when zero.
+
 - **2026-06-20** Phase 295-299 — Caseload, calibration + workload signals:
   (a) `<MyCaseloadStrip>` header on /reviews — live open-count +
   completed-this-month. Backend `GET /api/reviews/my-caseload`.

@@ -130,6 +130,9 @@ function ReviewerView() {
       {/* Phase 236 — completion rate over last 90 days. */}
       <MyCompletionStat />
 
+      {/* Phase 303 — self-calibration coaching tip (only if > 1.0σ off). */}
+      <MyCalibrationTip />
+
       {/* Phase 244 — most recent completed reviews. Self-gates when none. */}
       <MyPastReviews />
 
@@ -501,6 +504,39 @@ function EmptyState({ icon: Icon, title, body }: { icon: typeof ClipboardCheck; 
       <Icon className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
       <p className="kuja-display text-xl">{title}</p>
       <p className="text-sm text-muted-foreground mt-1">{body}</p>
+    </div>
+  );
+}
+
+// Phase 303 — Self-calibration coaching tip. Only renders when this
+// reviewer's mean is > 1.0σ from the platform mean over 5+ scores.
+function MyCalibrationTip() {
+  const [data, setData] = useState<{
+    my_count?: number;
+    my_mean?: number;
+    platform_mean?: number;
+    platform_stdev?: number;
+    delta_vs_platform?: number;
+  } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.get<typeof data>('/api/reviews/my-calibration').then((r) => {
+      if (!cancelled) setData(r);
+    }).catch(() => {/* silent */});
+    return () => { cancelled = true; };
+  }, []);
+  if (!data || !data.my_count || data.my_count < 5) return null;
+  if (data.platform_stdev == null || data.delta_vs_platform == null) return null;
+  if (Math.abs(data.delta_vs_platform) <= data.platform_stdev) return null;
+  const higher = (data.delta_vs_platform ?? 0) > 0;
+  return (
+    <div className="rounded-md border border-amber-300 bg-amber-50/70 dark:bg-amber-950/20 p-3 text-xs">
+      <p className="text-amber-900 dark:text-amber-200">
+        Your average score is{' '}
+        <span className="font-semibold">{Math.abs(data.delta_vs_platform!)} points {higher ? 'higher' : 'lower'}</span>
+        {' '}than the platform mean ({data.platform_mean}%) across your last {data.my_count} reviews.
+        Consider whether your rubric calibration matches the network norm.
+      </p>
     </div>
   );
 }

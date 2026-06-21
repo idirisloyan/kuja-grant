@@ -408,6 +408,14 @@ def create_app(config_name=None):
                     conn.execute(text("ALTER TABLE applications ADD COLUMN outreach_message_text TEXT"))
                     added.append('applications.outreach_message_text')
 
+                # Phase 302 — NGO appeal flow.
+                if 'appeal_requested_at' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN appeal_requested_at TIMESTAMP"))
+                    added.append('applications.appeal_requested_at')
+                if 'appeal_reason_text' not in app_cols:
+                    conn.execute(text("ALTER TABLE applications ADD COLUMN appeal_reason_text TEXT"))
+                    added.append('applications.appeal_reason_text')
+
                 # Phase 221 — reviewer private notes.
                 rev_cols = {c['name'] for c in inspector.get_columns('reviews')} if 'reviews' in inspector.get_table_names() else set()
                 if rev_cols and 'private_notes' not in rev_cols:

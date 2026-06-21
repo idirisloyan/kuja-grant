@@ -58,6 +58,10 @@ class Application(db.Model):
     # Phase 296 — optional templated message the donor leaves for the
     # applicant when initiating outreach. Surfaced inline in the NGO view.
     outreach_message_text = db.Column(db.Text, nullable=True)
+    # Phase 302 — NGO appeal flow. On a declined/rejected app the NGO can
+    # request a re-review; admin + donor see it as a follow-up obligation.
+    appeal_requested_at = db.Column(db.DateTime, nullable=True)
+    appeal_reason_text = db.Column(db.Text, nullable=True)
 
     # Phase 40 — NEAR network grants only. Auto-populated on /submit when
     # grant.fund_window_id is set:
@@ -121,6 +125,8 @@ class Application(db.Model):
             'outreach_initiated_at': self.outreach_initiated_at.isoformat() if self.outreach_initiated_at else None,
             'outreach_initiated_by_user_id': self.outreach_initiated_by_user_id,
             'outreach_message_text': self.outreach_message_text,
+            'appeal_requested_at': self.appeal_requested_at.isoformat() if self.appeal_requested_at else None,
+            'appeal_reason_text': self.appeal_reason_text,
             'is_starred': bool(self.is_starred),
         }
         if not summary:

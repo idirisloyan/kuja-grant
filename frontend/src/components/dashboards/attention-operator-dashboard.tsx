@@ -35,6 +35,8 @@ import { AuditIntegrityCard } from '@/components/dashboards/audit-integrity-card
 import { WebhookHealthCard } from '@/components/dashboards/webhook-health-card';
 import { ReviewerCoiRollupCard } from '@/components/dashboards/reviewer-coi-rollup-card';
 import { ReviewerOutliersCard } from '@/components/dashboards/reviewer-outliers-card';
+import { SlaBreachesCard } from '@/components/dashboards/sla-breaches-card';
+import { DataIntegrityCard } from '@/components/dashboards/data-integrity-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -269,6 +271,10 @@ export function AttentionOperatorDashboard() {
         <ReviewerCoiRollupCard />
         {/* Phase 298 — reviewer calibration drift (mean score > 1.5σ from platform). */}
         <ReviewerOutliersCard />
+        {/* Phase 301 — SLA breaches: apps past expected decision deadline. */}
+        <SlaBreachesCard />
+        {/* Phase 305 — orphan FK detector. Self-gates when zero. */}
+        <DataIntegrityCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

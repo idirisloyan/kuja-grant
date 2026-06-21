@@ -477,6 +477,51 @@ def api_decline_review(review_id):
     return jsonify({'success': True})
 
 
+@reviews_bp.route('/my-calibration', methods=['GET'])
+@login_required
+@role_required('reviewer')
+def api_reviewer_my_calibration():
+    """Phase 303 — How does THIS reviewer compare to the platform mean?
+
+    Lightweight check: returns my mean + my count + the platform mean,
+    plus a delta. Frontend uses to surface a small coaching tip when
+    |delta| > 1.0σ. Self-gates client-side when count < 5 or delta within
+    tolerance.
+    """
+    import statistics
+    rows = (Review.query
+            .filter(Review.status == 'completed',
+                    Review.overall_score.isnot(None))
+            .all())
+    if len(rows) < 10:
+        return jsonify({'sample_size': len(rows), 'my_count': 0})
+    all_scores = [r.overall_score for r in rows if r.overall_score is not None]
+    platform_mean = statistics.mean(all_scores)
+    try:
+        platform_stdev = statistics.stdev(all_scores) if len(all_scores) > 1 else 0.0
+    except statistics.StatisticsError:
+        platform_stdev = 0.0
+    my_scores = [r.overall_score for r in rows
+                 if r.reviewer_user_id == current_user.id and r.overall_score is not None]
+    my_count = len(my_scores)
+    if my_count == 0:
+        return jsonify({
+            'sample_size': len(rows),
+            'my_count': 0,
+            'platform_mean': round(platform_mean, 1),
+            'platform_stdev': round(platform_stdev, 1),
+        })
+    my_mean = statistics.mean(my_scores)
+    return jsonify({
+        'sample_size': len(rows),
+        'my_count': my_count,
+        'my_mean': round(my_mean, 1),
+        'platform_mean': round(platform_mean, 1),
+        'platform_stdev': round(platform_stdev, 1),
+        'delta_vs_platform': round(my_mean - platform_mean, 1),
+    })
+
+
 @reviews_bp.route('/scoring-outliers', methods=['GET'])
 @login_required
 @role_required('admin')

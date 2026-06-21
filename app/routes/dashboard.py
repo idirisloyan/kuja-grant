@@ -954,6 +954,92 @@ def api_portfolio_risk_heatmap():
 # Phase 24C — Donor cohort analytics (your funded NGOs vs cohort).
 # ----------------------------------------------------------------------
 
+@dashboard_bp.route('/data-integrity', methods=['GET'])
+@login_required
+def api_dashboard_data_integrity():
+    """Phase 305 — Cheap orphan-reference check across core tables.
+
+    Surfaces structural drift the bootstrap ALTER pattern + FKs are
+    supposed to prevent. Admin-only. Self-gates client-side when all
+    counts are zero.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from sqlalchemy import text
+    issues = {}
+    try:
+        orphan_reviews = db.session.execute(text(
+            'SELECT COUNT(*) FROM reviews r '
+            'LEFT JOIN applications a ON a.id = r.application_id '
+            'WHERE a.id IS NULL'
+        )).scalar() or 0
+        issues['reviews_missing_application'] = int(orphan_reviews)
+    except Exception:
+        issues['reviews_missing_application'] = None
+    try:
+        orphan_apps = db.session.execute(text(
+            'SELECT COUNT(*) FROM applications a '
+            'LEFT JOIN grants g ON g.id = a.grant_id '
+            'WHERE g.id IS NULL'
+        )).scalar() or 0
+        issues['applications_missing_grant'] = int(orphan_apps)
+    except Exception:
+        issues['applications_missing_grant'] = None
+    try:
+        orphan_docs = db.session.execute(text(
+            'SELECT COUNT(*) FROM documents d '
+            'LEFT JOIN applications a ON a.id = d.application_id '
+            'WHERE a.id IS NULL AND d.application_id IS NOT NULL'
+        )).scalar() or 0
+        issues['documents_missing_application'] = int(orphan_docs)
+    except Exception:
+        issues['documents_missing_application'] = None
+    total = sum(v for v in issues.values() if isinstance(v, int))
+    return jsonify({
+        'total': total,
+        'issues': issues,
+    })
+
+
+@dashboard_bp.route('/sla-breaches', methods=['GET'])
+@login_required
+def api_dashboard_sla_breaches():
+    """Phase 301 — Applications past the expected decision deadline.
+
+    Default: 30 days after submitted_at, status still pre-decision.
+    Admin-only. Returns count + the 3 most overdue.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    sla_days = 30
+    threshold = datetime.now(timezone.utc) - timedelta(days=sla_days)
+    PRE_DECISION = ['submitted', 'under_review', 'scored']
+    overdue = (Application.query
+               .filter(Application.status.in_(PRE_DECISION),
+                       Application.submitted_at.isnot(None),
+                       Application.submitted_at <= threshold)
+               .order_by(Application.submitted_at.asc())
+               .all())
+    now = datetime.now(timezone.utc)
+    top = []
+    for a in overdue[:3]:
+        days_overdue = int((now - a.submitted_at).total_seconds() / 86400) - sla_days
+        org_name = a.ngo_org.name if a.ngo_org else None
+        top.append({
+            'application_id': a.id,
+            'ngo_org_name': org_name,
+            'grant_title': a.grant.title if a.grant else None,
+            'days_overdue': days_overdue,
+            'status': a.status,
+        })
+    return jsonify({
+        'sla_days': sla_days,
+        'total': len(overdue),
+        'most_overdue': top,
+    })
+
+
 @dashboard_bp.route('/reviewer-workload-by-donor', methods=['GET'])
 @login_required
 def api_dashboard_reviewer_workload_by_donor():

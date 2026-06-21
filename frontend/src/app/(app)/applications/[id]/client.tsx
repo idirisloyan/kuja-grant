@@ -32,6 +32,7 @@ import { NgoBudgetPanel } from '@/components/applications/ngo-budget-panel';
 import { ApplicationMessageThread } from '@/components/applications/application-message-thread';
 import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
 import { FeedbackAcknowledgement } from '@/components/apply/feedback-acknowledgement';
+import { AppealPanel } from '@/components/apply/appeal-panel';
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
 import { MicroSurvey } from '@/components/shared/micro-survey';
 import { InactivityHelp } from '@/components/shared/inactivity-help';
@@ -322,6 +323,15 @@ export default function ApplicationDetailClient() {
           outreachInitiatedAt={(application as { outreach_initiated_at?: string | null }).outreach_initiated_at ?? null}
           outreachMessageText={(application as { outreach_message_text?: string | null }).outreach_message_text ?? null}
           grantTitle={application.grant_title ?? null}
+        />
+
+        {/* Phase 302 — NGO appeal flow on declined decisions. */}
+        <AppealPanel
+          applicationId={application.id}
+          isOwnerNgo={isOwnerNgo}
+          status={application.status}
+          appealRequestedAt={(application as { appeal_requested_at?: string | null }).appeal_requested_at ?? null}
+          appealReasonText={(application as { appeal_reason_text?: string | null }).appeal_reason_text ?? null}
         />
 
         {/* 3. Main work — tabs */}

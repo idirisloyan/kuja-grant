@@ -1343,6 +1343,79 @@ def api_application_feedback_viewed(app_id):
     })
 
 
+@applications_bp.route('/<int:app_id>/appeal', methods=['POST'])
+@login_required
+def api_application_appeal(app_id):
+    """Phase 302 — NGO requests a re-review on a declined application.
+
+    Body: { reason: str (min 20, max 2000) }
+    Stamps appeal_requested_at + appeal_reason_text, logs to audit chain,
+    notifies admin + every donor user on the grant's donor org. Idempotent.
+    """
+    from app.services.audit import log_action
+    from app.models.audit_chain import AuditChainEntry
+    app_obj = db.session.get(Application, app_id)
+    if not app_obj:
+        return jsonify({'error': 'Application not found'}), 404
+    if current_user.role != 'ngo' or current_user.org_id != app_obj.ngo_org_id:
+        return jsonify({'error': 'Access denied'}), 403
+    if app_obj.status not in ('declined', 'rejected'):
+        return jsonify({'error': 'Appeal only applies to declined applications'}), 400
+    if app_obj.appeal_requested_at:
+        return jsonify({
+            'success': True,
+            'changed': False,
+            'appeal_requested_at': app_obj.appeal_requested_at.isoformat(),
+            'appeal_reason_text': app_obj.appeal_reason_text,
+        })
+    data = get_request_json() or {}
+    reason = (data.get('reason') or '').strip()[:2000]
+    if len(reason) < 20:
+        return jsonify({'error': 'Appeal reason must be at least 20 characters'}), 400
+
+    app_obj.appeal_requested_at = datetime.now(timezone.utc)
+    app_obj.appeal_reason_text = reason
+    log_action('application.appeal_requested', current_user.email,
+               'application', app_obj.id, {'reason_excerpt': reason[:200]})
+    AuditChainEntry.append(
+        action='application.appeal_requested',
+        actor_email=current_user.email,
+        subject_kind='application',
+        subject_id=app_obj.id,
+        details={'reason_excerpt': reason[:200]},
+    )
+
+    try:
+        from app.models import Notification, User
+        admins = User.query.filter_by(role='admin').all()
+        donors = []
+        if app_obj.grant:
+            donors = User.query.filter_by(org_id=app_obj.grant.donor_org_id, role='donor').all()
+        msg = (
+            f'{current_user.name or current_user.email} has requested a re-review of application '
+            f'#{app_obj.id}.'
+        )
+        for u in (admins + donors):
+            n = Notification(
+                user_id=u.id,
+                type='application_appeal',
+                title='Re-review requested',
+                message=msg[:500],
+                link=f'/applications/{app_obj.id}',
+            )
+            db.session.add(n)
+    except Exception as e:
+        logger.debug('appeal notify skipped: %s', e)
+
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'changed': True,
+        'appeal_requested_at': app_obj.appeal_requested_at.isoformat(),
+        'appeal_reason_text': reason,
+    })
+
+
 @applications_bp.route('/<int:app_id>/common-decline-reasons', methods=['GET'])
 @login_required
 def api_application_common_decline_reasons(app_id):

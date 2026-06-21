@@ -632,6 +632,92 @@ def api_cron_donor_digest():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/ngo-pipeline-digest', methods=['POST'])
+def api_cron_ngo_pipeline_digest():
+    """Phase 304 — Weekly digest for each NGO user.
+
+    For every ngo user: deadlines this week, applications under review,
+    decisions in the last 7 days. Skips users with zero activity.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Application, Grant, Notification, record_cron_run as _rcr,
+        )
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        week_ago = now - timedelta(days=7)
+        week_ahead = now + timedelta(days=7)
+
+        ngos = User.query.filter_by(role='ngo').all()
+        sent = 0
+        for u in ngos:
+            if not u.org_id:
+                continue
+            # Active in-flight apps
+            under_review = Application.query.filter(
+                Application.ngo_org_id == u.org_id,
+                Application.status.in_(['submitted', 'under_review', 'scored']),
+            ).count()
+            # Decisions in last 7 days
+            decided = Application.query.filter(
+                Application.ngo_org_id == u.org_id,
+                Application.decision_recorded_at >= week_ago,
+            ).count() if hasattr(Application, 'decision_recorded_at') else 0
+            # Open grants closing in next 7 days the NGO hasn't applied to
+            grants_closing = (Grant.query
+                              .filter(Grant.status == 'open',
+                                      Grant.deadline.isnot(None),
+                                      Grant.deadline >= now,
+                                      Grant.deadline <= week_ahead)
+                              .count())
+            if under_review + decided + grants_closing == 0:
+                continue
+            parts = []
+            if under_review:
+                parts.append(f'{under_review} under review')
+            if decided:
+                parts.append(f'{decided} decided in the past week')
+            if grants_closing:
+                parts.append(f'{grants_closing} grant{"" if grants_closing == 1 else "s"} closing soon')
+            n = Notification(
+                user_id=u.id,
+                type='ngo_pipeline_digest',
+                title='Weekly pipeline',
+                message='; '.join(parts),
+                link='/dashboard',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'ngos_scanned': len(ngos), 'digests_sent': sent}
+        _rcr('ngo-pipeline-digest',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ngo-pipeline-digest cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ngo-pipeline-digest',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/donor-followup-nudge', methods=['POST'])
 def api_cron_donor_followup_nudge():
     """Phase 287 — Nudge donors to follow up personally on stale declines.
