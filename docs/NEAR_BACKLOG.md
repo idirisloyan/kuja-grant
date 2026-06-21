@@ -584,6 +584,26 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 517-521 — Submission consistency + apps without
+  reviewer + average rationale length + feedback received this week
+  + monthly feedback summary cron:
+  (a) `<SubmissionConsistencyStat>` on NGO dashboard counts distinct
+  calendar months in the last 12 with a submission (0-12); emerald
+  tone when >= 8 — proxy for steady engagement.
+  (b) `<ApplicationsWithoutReviewerStat>` on donor dashboard counts
+  donor's applications in 'submitted'/'in_review' status with no
+  Review row (`NOT EXISTS`); amber tone when >= 5 — operational
+  staffing signal. (c) `<AvgRationaleLengthStat>` on reviewer reviews
+  page reports average word count of per-criterion comments across
+  last-30d completed reviews; self-gates < 3 sample; amber tone
+  when < 20 words/review — self-reflection signal on rationale depth.
+  (d) `<FeedbackThisWeekCard>` on operator dashboard buckets last-7d
+  UserFeedback rows by NPS (promoter/passive/detractor). (e) Phase
+  521 cron `/api/cron/feedback-month-summary` is a monthly admin
+  digest: 30d UserFeedback count + NPS + top-3 surfaces + avg score.
+  Honors NotificationPreference digests opt-out, telemetered via
+  record_cron_run.
+
 - **2026-06-21** Phase 511-515 — Days since last submission + open
   grants funding + shortest review + new orgs this week + documents
   week report cron:

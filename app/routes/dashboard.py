@@ -4891,3 +4891,109 @@ def api_dashboard_admin_new_orgs_this_week():
         'total': sum(types.values()),
         'by_type': [{'org_type': k, 'count': v} for k, v in types.most_common()],
     })
+
+
+@dashboard_bp.route('/ngo-submission-consistency', methods=['GET'])
+@login_required
+def api_dashboard_ngo_submission_consistency():
+    """Phase 517 — Number of distinct calendar months in the last 12
+    months with at least one submitted application. Range 0-12.
+    Higher is steadier engagement; gaps stand out as quiet stretches.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=365)
+    rows = (db.session.query(Application.submitted_at)
+            .filter(Application.ngo_org_id == current_user.org_id,
+                    Application.submitted_at.isnot(None),
+                    Application.submitted_at >= cutoff)
+            .all())
+    months = set()
+    for (ts,) in rows:
+        if ts is None:
+            continue
+        months.add((ts.year, ts.month))
+    return jsonify({'months_with_submission': len(months), 'sample': len(rows)})
+
+
+@dashboard_bp.route('/donor-applications-without-reviewer', methods=['GET'])
+@login_required
+def api_dashboard_donor_applications_without_reviewer():
+    """Phase 518 — Donor's applications in 'submitted' or 'in_review'
+    status that have zero Review rows assigned. Operational staffing
+    signal — applications waiting on reviewer assignment.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from sqlalchemy import not_, exists
+    sub = db.session.query(Review.id).filter(Review.application_id == Application.id)
+    rows = (db.session.query(Application.id)
+            .join(Grant, Application.grant_id == Grant.id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.status.in_(['submitted', 'in_review']),
+                    not_(sub.exists()))
+            .all())
+    return jsonify({'count': len(rows)})
+
+
+@dashboard_bp.route('/reviewer-avg-rationale-length', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_avg_rationale_length():
+    """Phase 519 — Average word count of reviewer's per-criterion
+    comments across last-30-day completed reviews. Self-reflection
+    signal on rationale depth. Self-gates < 3 sample on the client.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status == 'completed',
+                    Review.completed_at >= cutoff,
+                    Review.comments.isnot(None))
+            .all())
+    if not rows:
+        return jsonify({'avg_words': None, 'sample': 0})
+    total_words = 0
+    count = 0
+    for r in rows:
+        comments = r.get_comments()
+        if not comments:
+            continue
+        text = ' '.join(str(v) for v in comments.values() if v)
+        words = len(text.split())
+        if words > 0:
+            total_words += words
+            count += 1
+    if count == 0:
+        return jsonify({'avg_words': None, 'sample': 0})
+    return jsonify({'avg_words': round(total_words / count, 1), 'sample': count})
+
+
+@dashboard_bp.route('/admin-feedback-this-week', methods=['GET'])
+@login_required
+def api_dashboard_admin_feedback_this_week():
+    """Phase 520 — UserFeedback rows in last 7 days bucketed by NPS
+    (promoter 9-10, passive 7-8, detractor 0-6). Pulse on user mood.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from app.models.user_feedback import UserFeedback
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    rows = (db.session.query(UserFeedback.score)
+            .filter(UserFeedback.created_at >= cutoff)
+            .all())
+    buckets = {'promoter': 0, 'passive': 0, 'detractor': 0}
+    for (score,) in rows:
+        if score is None:
+            continue
+        if score >= 9:
+            buckets['promoter'] += 1
+        elif score >= 7:
+            buckets['passive'] += 1
+        else:
+            buckets['detractor'] += 1
+    return jsonify({'total': sum(buckets.values()), 'buckets': buckets})

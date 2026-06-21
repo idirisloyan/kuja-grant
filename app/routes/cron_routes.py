@@ -3782,3 +3782,89 @@ def api_cron_documents_week_report():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/feedback-month-summary', methods=['POST'])
+def api_cron_feedback_month_summary():
+    """Phase 521 — Monthly admin digest of UserFeedback last 30 days.
+    Computes count, average NPS score, and top surfaces. Honors
+    'digests' opt-out. Skipped when no feedback rows landed.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import User, Notification, record_cron_run as _rcr
+        from app.models.user_feedback import UserFeedback
+        from app.models.notification_preference import NotificationPreference
+        from collections import Counter
+        from datetime import datetime, timezone, timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        rows = (db.session.query(UserFeedback.score, UserFeedback.surface)
+                .filter(UserFeedback.created_at >= cutoff)
+                .all())
+        sent = 0
+        result_summary = {}
+        if rows:
+            scores = [s for (s, _) in rows if s is not None]
+            avg_score = round(sum(scores) / len(scores), 1) if scores else 0
+            surfaces = Counter(surf for (_, surf) in rows if surf).most_common(3)
+            promoters = sum(1 for s in scores if s >= 9)
+            detractors = sum(1 for s in scores if s <= 6)
+            nps = (
+                round(100 * (promoters - detractors) / len(scores))
+                if scores else 0
+            )
+            top = ', '.join(f'{s} ({c})' for s, c in surfaces) or 'none'
+            msg = (
+                f'Feedback last 30d: {len(rows)} entries, NPS {nps}, '
+                f'avg {avg_score}/10. Top surfaces: {top}.'
+            )
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='feedback_month_summary',
+                    title='Monthly feedback summary',
+                    message=msg[:500],
+                    link='/admin/metrics',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+            result_summary = {
+                'entries': len(rows),
+                'avg_score': avg_score,
+                'nps': nps,
+                'admins_notified': sent,
+            }
+        else:
+            result_summary = {'entries': 0, 'admins_notified': 0}
+        _rcr('feedback-month-summary',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result_summary)[:480])
+        return jsonify({'success': True, 'result': result_summary})
+    except Exception as e:
+        logger.exception('feedback-month-summary cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('feedback-month-summary',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
