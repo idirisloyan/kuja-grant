@@ -1,0 +1,82 @@
+name: Reap stuck extractions cron
+
+# Phase 618 — every 10 min, POST /api/admin/reap-stuck-extractions on
+# prod so that documents stuck in extraction_status='running' for
+# >10 min flip back to 'timed_out' and become retriable. Auto-clears
+# the team's recurring "1 document stuck" warning without anyone
+# needing to dig into the DB.
+#
+# Required repo secrets:
+#   CRON_SECRET — must match the CRON_SECRET set on Railway
+#   PROD_BASE   — defaults to the kuja prod URL if unset
+
+on:
+  schedule:
+    # Every 10 minutes. The endpoint is cheap (single indexed UPDATE)
+    # and idempotent (returns 0 on a healthy DB).
+    - cron: "*/10 * * * *"
+
+  # Manual one-shot — useful right after a worker crash to clear
+  # zombies without waiting for the next scheduled tick.
+  workflow_dispatch:
+
+jobs:
+  reap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Determine base URL
+        id: base
+        run: |
+          if [ -n "${{ secrets.PROD_BASE }}" ]; then
+            echo "url=${{ secrets.PROD_BASE }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://web-production-6f8a.up.railway.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: POST /api/admin/reap-stuck-extractions
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET repo secret is missing"
+            exit 1
+          fi
+          http_code=$(curl -s -o /tmp/body.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            -d '{}' \
+            "${BASE_URL}/api/admin/reap-stuck-extractions")
+          echo "HTTP ${http_code}"
+          cat /tmp/body.json || true
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Reap returned ${http_code}"
+            exit 1
+          fi
+
+      - name: Summarise to step output
+        if: always()
+        run: |
+          if [ -f /tmp/body.json ]; then
+            python3 - <<'PY'
+          import json, os
+          with open('/tmp/body.json') as f:
+              try:
+                  d = json.load(f)
+              except Exception:
+                  print('non-JSON body')
+                  raise SystemExit(0)
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a') as out:
+                  out.write(f"# Reap result\n\n- **reaped**: {d.get('reaped_count', 0)}\n")
+                  if d.get('reaped_document_ids'):
+                      out.write(f"- **ids**: {d['reaped_document_ids']}\n")
+          else:
+              print(json.dumps(d))
+          PY
+          fi

@@ -168,7 +168,8 @@ def api_system_health():
             checks.append({'key': 'stuck_extractions', 'status': 'warn',
                            'why': 'Documents stuck in extraction >10min — worker likely died.',
                            'current': f'{stuck} stuck',
-                           'fix': 'Inspect via /api/admin/failed-extractions; consider retry.'})
+                           'fix': ('POST /api/admin/reap-stuck-extractions to clear them '
+                                   '(the cron-reap-stuck-extractions workflow does this every 10 min).')})
         else:
             checks.append({'key': 'stuck_extractions', 'status': 'ok',
                            'why': 'No zombie extractions.', 'current': '0', 'fix': ''})
@@ -910,4 +911,76 @@ def api_test_data_inventory():
         'note': ('Read-only inventory. To delete: '
                  'railway run python scripts/prune_test_artifacts.py --dry-run '
                  'then add --confirm.'),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Phase 618 — Stuck-extraction auto-reaper.
+#
+# The system-health check warns when documents sit in extraction_status
+# 'running' for >10 minutes — a sign the worker died mid-job and left a
+# zombie row that blocks the user from retrying. Until now the team had
+# to clear those manually. This endpoint reaps them: any row that's
+# stuck >10 min flips to 'timed_out', clears the started timestamp, and
+# becomes available for retry from the UI.
+#
+# Safe to call repeatedly: returns 0 reaped on a healthy DB. Idempotent
+# enough that the GitHub Actions workflow can run it every 10 minutes.
+#
+# Trigger paths:
+#   - Admin user from the dashboard: POST + Flask-Login session
+#   - Scheduled CI: POST + Authorization: Bearer <CRON_SECRET>
+# ---------------------------------------------------------------------------
+
+from sqlalchemy import text  # noqa: E402  (import here to avoid top-level reshuffle)
+
+
+@admin_health_bp.route('/reap-stuck-extractions', methods=['POST'])
+def api_reap_stuck_extractions():
+    """Auto-reap zombie extractions stuck > threshold_minutes in 'running'."""
+    import os
+    from flask import request as flask_request
+
+    # Dual-mode auth: admin-session OR cron-secret bearer.
+    auth_hdr = (flask_request.headers.get('Authorization') or '').strip()
+    cron_secret = os.getenv('CRON_SECRET') or ''
+    is_cron = (
+        cron_secret
+        and auth_hdr.startswith('Bearer ')
+        and auth_hdr.split(' ', 1)[1] == cron_secret
+    )
+    if not is_cron:
+        # Fall back to login + admin role.
+        if not current_user.is_authenticated or current_user.role != 'admin':
+            return error_response('Admin only.', 403)
+
+    try:
+        threshold_min = int(flask_request.args.get('threshold_minutes', 10))
+        threshold_min = max(5, min(120, threshold_min))
+    except (TypeError, ValueError):
+        threshold_min = 10
+
+    # Use an inline interval to avoid driver-specific cast issues with
+    # parameterised intervals across Postgres + SQLite.
+    interval_sql = f"INTERVAL '{threshold_min} minutes'"
+    try:
+        result = db.session.execute(text(f"""
+            UPDATE documents
+               SET extraction_status = 'timed_out',
+                   extraction_started_at = NULL
+             WHERE extraction_status = 'running'
+               AND extraction_started_at < NOW() - {interval_sql}
+            RETURNING id
+        """))
+        reaped_ids = [row[0] for row in result.fetchall()]
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'Reap failed: {e}', 500)
+
+    return jsonify({
+        'success': True,
+        'reaped_count': len(reaped_ids),
+        'reaped_document_ids': reaped_ids,
+        'threshold_minutes': threshold_min,
     })

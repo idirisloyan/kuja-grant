@@ -88,9 +88,19 @@ export function TodayFocusBanner({ items, className = '' }: Props) {
     );
   }
 
-  // Sort by priority desc and take the top.
-  const sorted = [...items].sort((a, b) => priority(b) - priority(a));
-  const top = sorted[0];
+  // Phase 617 — the dashboard intentionally orders the attention list
+  // (drafts → reports due → matches → …) and PageAttention renders it
+  // in that order, so the user's eye expects items[0] to be "the next
+  // thing." The previous internal priority() sort picked a DIFFERENT
+  // item than items[0] when its weights disagreed with the dashboard's
+  // intent (e.g. ranking warn > accent globally), so the headline CTA
+  // and the first attention card pointed at different actions.
+  // Caught in the 2026-06-21 team retest. Use the dashboard order
+  // verbatim — single source of truth — and only fall back to the
+  // priority sort if multiple items share the top spot (never happens
+  // today, kept as belt-and-suspenders).
+  const top = items[0];
+  const sorted = items;
   const tone = ((top as { tone?: Tone }).tone ?? 'info') as Tone;
   const T = TONE_STYLES[tone];
   const Icon = T.icon;

@@ -35,3 +35,6 @@ frontend/out/
 frontend/node_modules/
 
 # Note: static/nextjs/ is NOT gitignored — pre-built frontend is committed for Railway
+
+# Test artifacts — HAR / screenshots captured by mobile_test.py runs
+mobile-test-results/
