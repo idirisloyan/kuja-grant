@@ -25,6 +25,7 @@ import { CompletedThisMonthStat } from '@/components/reviews/completed-this-mont
 import { LifetimeCompletedStat } from '@/components/reviews/lifetime-completed-stat';
 import { TopTierRateStat } from '@/components/reviews/top-tier-rate-stat';
 import { PrivateNotesCoverageStat } from '@/components/reviews/private-notes-coverage-stat';
+import { LongestReviewStat } from '@/components/reviews/longest-review-stat';
 import { ReviewerResumeBanner } from '@/components/reviews/resume-banner';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -158,6 +159,7 @@ function ReviewerView() {
       <LifetimeCompletedStat />
       <TopTierRateStat />
       <PrivateNotesCoverageStat />
+      <LongestReviewStat />
       <MyCompletedThisWeek />
       <BandStreakTip />
       <ScoreDistributionCard />

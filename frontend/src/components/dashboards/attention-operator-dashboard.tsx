@@ -70,6 +70,7 @@ import { DocumentsStorageCard } from '@/components/dashboards/documents-storage-
 import { Notifications14dCard } from '@/components/dashboards/notifications-14d-card';
 import { ActiveWebhooksCard } from '@/components/dashboards/active-webhooks-card';
 import { FailedCronsCard } from '@/components/dashboards/failed-crons-card';
+import { AiModelsTodayCard } from '@/components/dashboards/ai-models-today-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -350,6 +351,7 @@ export function AttentionOperatorDashboard() {
         <Notifications14dCard />
         <ActiveWebhooksCard />
         <FailedCronsCard />
+        <AiModelsTodayCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}

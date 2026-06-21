@@ -4664,3 +4664,121 @@ def api_dashboard_admin_failed_cron_runs_7d():
              .filter(CronRun.run_at >= cutoff)
              .count())
     return jsonify({'failed': failed, 'total': total})
+
+
+@dashboard_bp.route('/ngo-sector-breadth', methods=['GET'])
+@login_required
+def api_dashboard_ngo_sector_breadth():
+    """Phase 505 — Count of distinct sectors across this NGO's
+    applications. Pipeline-diversity signal.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    import json as _json
+    rows = (db.session.query(Grant.sectors)
+            .join(Application, Application.grant_id == Grant.id)
+            .filter(Application.org_id == current_user.org_id,
+                    Grant.sectors.isnot(None))
+            .distinct().all())
+    sector_set = set()
+    for (raw,) in rows:
+        if not raw:
+            continue
+        try:
+            parsed = _json.loads(raw)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(parsed, list):
+            for s in parsed:
+                if isinstance(s, str) and s.strip():
+                    sector_set.add(s.strip().lower())
+    return jsonify({'distinct_sectors': len(sector_set)})
+
+
+@dashboard_bp.route('/donor-median-grant-funding', methods=['GET'])
+@login_required
+def api_dashboard_donor_median_grant_funding():
+    """Phase 506 — Median Grant.total_funding across all grants this
+    donor has published. Distinct from Phase 428 (median funded
+    amount on Application).
+    """
+    if current_user.role not in ('donor', 'admin') or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    rows = (db.session.query(Grant.total_funding, Grant.currency)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Grant.total_funding.isnot(None))
+            .all())
+    if not rows:
+        return jsonify({'median': None, 'sample': 0, 'currency': None})
+    amounts = []
+    currency = None
+    for amt, cur in rows:
+        try:
+            amounts.append(float(amt))
+        except (TypeError, ValueError):
+            pass
+        if currency is None and cur:
+            currency = cur
+    if not amounts:
+        return jsonify({'median': None, 'sample': 0, 'currency': None})
+    amounts.sort()
+    n = len(amounts)
+    median = amounts[n // 2] if n % 2 else (amounts[n // 2 - 1] + amounts[n // 2]) / 2
+    return jsonify({
+        'median': round(median, 2),
+        'sample': n,
+        'currency': currency,
+    })
+
+
+@dashboard_bp.route('/reviewer-longest-review', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_longest_review():
+    """Phase 507 — Max hours between created_at and completed_at across
+    reviewer's last-90d completed reviews. Outlier signal.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.created_at.isnot(None),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff)
+            .all())
+    durations = []
+    for r in rows:
+        if not r.created_at or not r.completed_at:
+            continue
+        h = (r.completed_at - r.created_at).total_seconds() / 3600.0
+        if h >= 0:
+            durations.append(h)
+    if len(durations) < 3:
+        return jsonify({'longest_hours': None, 'sample': len(durations)})
+    return jsonify({
+        'longest_hours': round(max(durations), 1),
+        'sample': len(durations),
+    })
+
+
+@dashboard_bp.route('/admin-ai-models-today', methods=['GET'])
+@login_required
+def api_dashboard_admin_ai_models_today():
+    """Phase 508 — Top 5 models by ai_call_logs count in last 24h."""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from sqlalchemy import text as _text
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    try:
+        rows = db.session.execute(_text(
+            "SELECT model, COUNT(*) AS n FROM ai_call_logs "
+            "WHERE created_at >= :c AND model IS NOT NULL "
+            "GROUP BY model ORDER BY n DESC LIMIT 5"
+        ), {'c': cutoff}).all()
+    except Exception:
+        rows = []
+    out = [{'model': r.model, 'count': int(r.n or 0)} for r in rows]
+    return jsonify({'models': out})

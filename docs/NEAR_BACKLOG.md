@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 505-509 — Sector breadth + median grant
+  funding + longest review + AI models 24h + draft activity recap
+  cron:
+  (a) `<SectorBreadthStat>` on NGO dashboard counts distinct sectors
+  across this NGO's applications (parses Grant.sectors JSON).
+  (b) `<MedianGrantFundingStat>` on donor dashboard shows median
+  Grant.total_funding across all donor's published grants;
+  distinct from Phase 428 (median funded application amount).
+  (c) `<LongestReviewStat>` on reviewer reviews page shows max
+  hours between created_at and completed_at across last 90 days;
+  self-gates < 3. (d) `<AiModelsTodayCard>` on operator dashboard
+  lists top 5 models by call count in last 24 hours with bar
+  visualization. (e) Phase 509 cron `/api/cron/ngo-draft-activity-recap`
+  sends each NGO with open drafts a Friday recap (draft count +
+  oldest age in days). Digests opt-out gated; record_cron_run wired.
+
 - **2026-06-21** Phase 499-503 — Watchlist size + days since last
   grant + private-notes coverage + failed cron runs + AI cost spike
   cron:

@@ -3631,3 +3631,83 @@ def api_cron_ai_cost_spike_alert():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/ngo-draft-activity-recap', methods=['POST'])
+def api_cron_ngo_draft_activity_recap():
+    """Phase 509 — Friday cron. For NGOs with open drafts, send a recap
+    of draft count + oldest draft age in days. Helps NGOs stay aware
+    of what they have in flight. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Application, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone
+
+        ngos = User.query.filter_by(role='ngo').all()
+        sent = 0
+        now = datetime.now(timezone.utc)
+        for u in ngos:
+            if not u.org_id:
+                continue
+            channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+            if not channels:
+                continue
+            drafts = (Application.query
+                      .filter(Application.org_id == u.org_id,
+                              Application.status == 'draft',
+                              Application.created_at.isnot(None))
+                      .all())
+            if not drafts:
+                continue
+            oldest_days = 0
+            for d in drafts:
+                created = d.created_at
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                age = (now - created).days
+                if age > oldest_days:
+                    oldest_days = age
+            msg = (
+                f'You have {len(drafts)} open draft'
+                f'{"" if len(drafts) == 1 else "s"}. '
+                f'Oldest is {oldest_days} day{"" if oldest_days == 1 else "s"} old.'
+            )
+            n = Notification(
+                user_id=u.id,
+                type='draft_activity_recap',
+                title='Your open drafts',
+                message=msg[:500],
+                link='/applications',
+            )
+            db.session.add(n)
+            sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'ngos_scanned': len(ngos), 'digests_sent': sent}
+        _rcr('ngo-draft-activity-recap',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('ngo-draft-activity-recap cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ngo-draft-activity-recap',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

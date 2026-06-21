@@ -70,6 +70,7 @@ import { UnreadNotificationsStat } from '@/components/dashboards/unread-notifica
 import { LifetimeWinRateStat } from '@/components/dashboards/lifetime-win-rate-stat';
 import { WinRateQuarterStat } from '@/components/dashboards/win-rate-quarter-stat';
 import { WatchlistSizeStat } from '@/components/dashboards/watchlist-size-stat';
+import { SectorBreadthStat } from '@/components/dashboards/sector-breadth-stat';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -219,6 +220,7 @@ export function AttentionNgoDashboard() {
       <LifetimeWinRateStat />
       <WinRateQuarterStat />
       <WatchlistSizeStat />
+      <SectorBreadthStat />
       <NgoFeedbackThemesCard />
       <CriterionScoreTrendCard />
       <DeadlineDensityCard />
