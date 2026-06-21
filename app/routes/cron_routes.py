@@ -2872,3 +2872,88 @@ def api_cron_ngo_closing_soon_watchlist():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/data-integrity-check', methods=['POST'])
+def api_cron_data_integrity_check():
+    """Phase 455 — Daily quick scan for orphan rows:
+      * applications.grant_id pointing at a missing grant
+      * reviews.application_id pointing at a missing application
+    If either count > 0, notify admins. Digests opt-out gated.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from sqlalchemy import text as _text
+
+        try:
+            orphan_apps = db.session.execute(_text(
+                "SELECT COUNT(*) FROM applications a "
+                "LEFT JOIN grants g ON g.id = a.grant_id "
+                "WHERE a.grant_id IS NOT NULL AND g.id IS NULL"
+            )).scalar() or 0
+        except Exception:
+            orphan_apps = 0
+        try:
+            orphan_reviews = db.session.execute(_text(
+                "SELECT COUNT(*) FROM reviews r "
+                "LEFT JOIN applications a ON a.id = r.application_id "
+                "WHERE r.application_id IS NOT NULL AND a.id IS NULL"
+            )).scalar() or 0
+        except Exception:
+            orphan_reviews = 0
+
+        total = int(orphan_apps) + int(orphan_reviews)
+        sent = 0
+        if total > 0:
+            msg = (
+                f'Data integrity scan: {int(orphan_apps)} orphan '
+                f'application(s), {int(orphan_reviews)} orphan review(s).'
+            )
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='data_integrity',
+                    title='Data integrity orphans detected',
+                    message=msg[:500],
+                    link='/admin/observability',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {
+            'orphan_apps': int(orphan_apps),
+            'orphan_reviews': int(orphan_reviews),
+            'admins_notified': sent,
+        }
+        _rcr('data-integrity-check',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('data-integrity-check cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('data-integrity-check',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

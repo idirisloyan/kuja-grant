@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 451-455 — Draft age + unassigned reviews
+  + scoring time avg + user growth + data integrity cron:
+  (a) `<DraftAgeStat>` on NGO dashboard shows oldest open draft
+  age in days, tone-coded (rose ≥14, amber ≥7). Self-gates when
+  no open drafts. (b) `<UnassignedReviewsCard>` on donor dashboard
+  counts apps in submitted/under_review that have no reviewer yet;
+  amber border surfaces routing-bottleneck. Self-gates at zero.
+  (c) `<ScoringTimeAvgStat>` on reviewer reviews page shows mean
+  hours per review over last 30 days (scale-aware m/h/d).
+  Self-gates < 3 samples. (d) `<UserGrowthCard>` on operator
+  dashboard shows new users this 30d vs prior 30d with delta + %
+  change. (e) Phase 455 cron `/api/cron/data-integrity-check`
+  scans for orphan applications (grant_id with no grant) + orphan
+  reviews (application_id with no application); notifies admins if
+  any. Digests opt-out gated; record_cron_run wired.
+
 - **2026-06-20** Phase 445-449 — Draft funnel + AI score histogram
   per grant + review streak + tenants without grants + closing-soon
   watchlist cron:

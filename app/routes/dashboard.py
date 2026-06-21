@@ -3802,3 +3802,107 @@ def api_dashboard_tenants_without_grants():
         'tenants_without_grants': len(without),
         'donor_orgs': len(donor_ids),
     })
+
+
+@dashboard_bp.route('/ngo-oldest-draft-age', methods=['GET'])
+@login_required
+def api_dashboard_ngo_oldest_draft_age():
+    """Phase 451 — Days since the NGO's oldest open draft was created.
+    Flags drafts likely to miss grant deadlines.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    drafts = (Application.query
+              .filter(Application.org_id == current_user.org_id,
+                      Application.status == 'draft',
+                      Application.created_at.isnot(None))
+              .all())
+    if not drafts:
+        return jsonify({'oldest_days': None, 'open_drafts': 0})
+    now = datetime.now(timezone.utc)
+    oldest_days = 0
+    for d in drafts:
+        created = d.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        age = (now - created).days
+        if age > oldest_days:
+            oldest_days = age
+    return jsonify({'oldest_days': oldest_days, 'open_drafts': len(drafts)})
+
+
+@dashboard_bp.route('/donor-unassigned-reviews', methods=['GET'])
+@login_required
+def api_dashboard_donor_unassigned_reviews():
+    """Phase 452 — Applications on donor's grants in submitted/under_review
+    that have NO assigned reviewer yet. Routing-bottleneck signal.
+    """
+    if current_user.role not in ('donor', 'admin') or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    apps = (db.session.query(Application.id)
+            .join(Grant, Application.grant_id == Grant.id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.status.in_(['submitted', 'under_review']))
+            .all())
+    app_ids = [r[0] for r in apps]
+    if not app_ids:
+        return jsonify({'unassigned': 0, 'total_open': 0})
+    assigned_ids = {r[0] for r in db.session.query(Review.application_id)
+                    .filter(Review.application_id.in_(app_ids)).distinct().all()}
+    unassigned = [aid for aid in app_ids if aid not in assigned_ids]
+    return jsonify({'unassigned': len(unassigned), 'total_open': len(app_ids)})
+
+
+@dashboard_bp.route('/reviewer-scoring-time-avg', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_scoring_time_avg():
+    """Phase 453 — Mean hours per completed review across last 30 days."""
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.created_at.isnot(None),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff)
+            .all())
+    hours = []
+    for r in rows:
+        if not r.created_at or not r.completed_at:
+            continue
+        h = (r.completed_at - r.created_at).total_seconds() / 3600.0
+        if h >= 0:
+            hours.append(h)
+    if len(hours) < 3:
+        return jsonify({'mean_hours': None, 'sample': len(hours)})
+    mean = sum(hours) / len(hours)
+    return jsonify({'mean_hours': round(mean, 1), 'sample': len(hours)})
+
+
+@dashboard_bp.route('/admin-user-growth-month', methods=['GET'])
+@login_required
+def api_dashboard_admin_user_growth_month():
+    """Phase 454 — New users created this 30-day vs prior 30-day window,
+    with delta and percent change. Standard adoption signal.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    recent = now - timedelta(days=30)
+    prior = now - timedelta(days=60)
+    this_month = User.query.filter(User.created_at >= recent,
+                                   User.created_at < now).count()
+    prior_month = User.query.filter(User.created_at >= prior,
+                                    User.created_at < recent).count()
+    delta = this_month - prior_month
+    pct = round(100.0 * delta / prior_month, 1) if prior_month > 0 else None
+    return jsonify({
+        'this_month': this_month,
+        'prior_month': prior_month,
+        'delta': delta,
+        'pct_change': pct,
+    })
