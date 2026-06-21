@@ -4782,3 +4782,112 @@ def api_dashboard_admin_ai_models_today():
         rows = []
     out = [{'model': r.model, 'count': int(r.n or 0)} for r in rows]
     return jsonify({'models': out})
+
+
+@dashboard_bp.route('/ngo-days-since-last-submission', methods=['GET'])
+@login_required
+def api_dashboard_ngo_days_since_last_submission():
+    """Phase 511 — Days since this NGO's most recent application
+    submission. Activity-pulse signal.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone
+    newest = (Application.query
+              .filter(Application.org_id == current_user.org_id,
+                      Application.submitted_at.isnot(None))
+              .order_by(Application.submitted_at.desc())
+              .first())
+    if not newest or not newest.submitted_at:
+        return jsonify({'days': None})
+    submitted = newest.submitted_at
+    if submitted.tzinfo is None:
+        submitted = submitted.replace(tzinfo=timezone.utc)
+    days = (datetime.now(timezone.utc) - submitted).days
+    return jsonify({
+        'days': days,
+        'last_submitted_at': submitted.date().isoformat(),
+    })
+
+
+@dashboard_bp.route('/donor-open-grants-funding', methods=['GET'])
+@login_required
+def api_dashboard_donor_open_grants_funding():
+    """Phase 512 — Sum of Grant.total_funding across donor's grants
+    currently in open/review status. Pipeline capacity signal.
+    """
+    if current_user.role not in ('donor', 'admin') or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    rows = (db.session.query(Grant.total_funding, Grant.currency)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Grant.status.in_(['open', 'review']),
+                    Grant.total_funding.isnot(None))
+            .all())
+    total = 0.0
+    currency = None
+    for amt, cur in rows:
+        try:
+            total += float(amt)
+        except (TypeError, ValueError):
+            pass
+        if currency is None and cur:
+            currency = cur
+    return jsonify({
+        'total': round(total, 2),
+        'open_count': len(rows),
+        'currency': currency,
+    })
+
+
+@dashboard_bp.route('/reviewer-shortest-review', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_shortest_review():
+    """Phase 513 — Min hours between created_at and completed_at across
+    reviewer's last-90d completed reviews. Self-gates < 3.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (Review.query
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['submitted', 'scored', 'completed']),
+                    Review.created_at.isnot(None),
+                    Review.completed_at.isnot(None),
+                    Review.completed_at >= cutoff)
+            .all())
+    durations = []
+    for r in rows:
+        if not r.created_at or not r.completed_at:
+            continue
+        h = (r.completed_at - r.created_at).total_seconds() / 3600.0
+        if h >= 0:
+            durations.append(h)
+    if len(durations) < 3:
+        return jsonify({'shortest_hours': None, 'sample': len(durations)})
+    return jsonify({
+        'shortest_hours': round(min(durations), 2),
+        'sample': len(durations),
+    })
+
+
+@dashboard_bp.route('/admin-new-orgs-this-week', methods=['GET'])
+@login_required
+def api_dashboard_admin_new_orgs_this_week():
+    """Phase 514 — Count of Organization rows created in last 7 days,
+    broken down by org_type. Onboarding pulse signal.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from collections import Counter
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    rows = (Organization.query
+            .filter(Organization.created_at >= cutoff)
+            .with_entities(Organization.org_type)
+            .all())
+    types = Counter((t or 'unknown') for (t,) in rows)
+    return jsonify({
+        'total': sum(types.values()),
+        'by_type': [{'org_type': k, 'count': v} for k, v in types.most_common()],
+    })

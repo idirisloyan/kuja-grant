@@ -71,6 +71,7 @@ import { LifetimeWinRateStat } from '@/components/dashboards/lifetime-win-rate-s
 import { WinRateQuarterStat } from '@/components/dashboards/win-rate-quarter-stat';
 import { WatchlistSizeStat } from '@/components/dashboards/watchlist-size-stat';
 import { SectorBreadthStat } from '@/components/dashboards/sector-breadth-stat';
+import { DaysSinceLastSubmissionStat } from '@/components/dashboards/days-since-last-submission-stat';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -221,6 +222,7 @@ export function AttentionNgoDashboard() {
       <WinRateQuarterStat />
       <WatchlistSizeStat />
       <SectorBreadthStat />
+      <DaysSinceLastSubmissionStat />
       <NgoFeedbackThemesCard />
       <CriterionScoreTrendCard />
       <DeadlineDensityCard />

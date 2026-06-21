@@ -584,6 +584,27 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 511-515 — Days since last submission + open
+  grants funding + shortest review + new orgs this week + documents
+  week report cron:
+  (a) `<DaysSinceLastSubmissionStat>` on NGO dashboard reports the
+  age of the NGO's most recent Application.submitted_at; amber tone
+  when > 60 days (signal of stalled pipeline). (b) `<OpenGrantsFundingStat>`
+  on donor dashboard sums Grant.total_funding for the donor's grants
+  in 'open' or 'review' status with `open_count` and currency; the
+  pipeline value the donor still has on the market (distinct from
+  Phase 470 YTD funded). (c) `<ShortestReviewStat>` on reviewer
+  reviews page shows the fastest single review turnaround across
+  the last 90 days; scale-aware (m/h/d label) and self-gates < 3.
+  Pairs with the Phase 507 longest-review stat to bound the reviewer's
+  velocity envelope. (d) `<NewOrgsThisWeekCard>` on operator dashboard
+  shows Organization.created_at >= now-7d aggregated by org_type
+  (top 4 inline). (e) Phase 515 cron `/api/cron/documents-week-report`
+  is a weekly admin digest of Document uploads in the last 7 days —
+  honors NotificationPreference digests opt-out, telemetered via
+  record_cron_run. Self-gating: every endpoint returns 401 logged-out
+  and components hide when their threshold isn't met.
+
 - **2026-06-21** Phase 505-509 — Sector breadth + median grant
   funding + longest review + AI models 24h + draft activity recap
   cron:
