@@ -40,6 +40,7 @@ import { DonorAppealSlaCard } from '@/components/dashboards/donor-appeal-sla-car
 import { AiHumanAgreementCard } from '@/components/dashboards/ai-human-agreement-card';
 import { ReviewerTurnaroundCard } from '@/components/dashboards/reviewer-turnaround-card';
 import { DecisionsByMonthCard } from '@/components/dashboards/decisions-by-month-card';
+import { FirstTimeVsRepeatCard } from '@/components/dashboards/first-time-vs-repeat-card';
 import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
 import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
 import { PortfolioRiskHeatmap } from '@/components/dashboards/portfolio-risk-heatmap';
@@ -183,6 +184,8 @@ export function AttentionDonorDashboard() {
       <ReviewerTurnaroundCard />
       {/* Phase 332 — 6-month decisions trend (funded vs declined). */}
       <DecisionsByMonthCard />
+      {/* Phase 338 — first-time vs repeat applicant NGO mix. */}
+      <FirstTimeVsRepeatCard />
 
       {/* Phase 99 — OneNumberCard portfolio at-a-glance row. Replaces the
           metric-soup pattern with three calm numbers + one next action

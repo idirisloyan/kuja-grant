@@ -989,6 +989,111 @@ def api_dashboard_donor_appeal_sla():
     })
 
 
+@dashboard_bp.route('/ngo-docs-pending', methods=['GET'])
+@login_required
+def api_dashboard_ngo_docs_pending():
+    """Phase 340 — NGO: how many applications need a doc upload right now?
+
+    Counts distinct applications belonging to this NGO where the latest
+    'application_document_requested' notification fired AFTER the most
+    recent document upload on that application.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from app.models import Notification
+    apps = (Application.query
+            .filter_by(ngo_org_id=current_user.org_id)
+            .all())
+    if not apps:
+        return jsonify({'count': 0, 'application_ids': []})
+    app_ids = [a.id for a in apps]
+    # Latest notification per application
+    notes = (Notification.query
+             .filter(Notification.user_id.in_([u.id for u in []]),  # placeholder
+                     False)
+             .all())
+    # Simpler: find apps + notes for this user, then group.
+    notes = (Notification.query
+             .filter(Notification.type == 'application_document_requested',
+                     Notification.user_id == current_user.id)
+             .order_by(Notification.created_at.desc())
+             .all())
+    out_ids: list[int] = []
+    for a in apps:
+        # Most recent doc-request notif relevant to this app (link contains /applications/<id>)
+        link_target = f'/applications/{a.id}'
+        n = next((nn for nn in notes if (nn.link or '') == link_target), None)
+        if n is None:
+            continue
+        from app.models import Document
+        latest_doc = (Document.query
+                      .filter_by(application_id=a.id)
+                      .order_by(Document.created_at.desc())
+                      .first())
+        if latest_doc is None or (n.created_at and latest_doc.created_at
+                                  and n.created_at > latest_doc.created_at):
+            out_ids.append(a.id)
+    return jsonify({'count': len(out_ids), 'application_ids': out_ids[:5]})
+
+
+@dashboard_bp.route('/first-time-vs-repeat', methods=['GET'])
+@login_required
+def api_dashboard_first_time_vs_repeat():
+    """Phase 338 — Are recent applicants first-time or repeat?
+
+    Donor view: of NGOs whose applications were received in the last 90
+    days, what share were previously funded by this donor (= had a
+    prior awarded application).
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+
+    recent_ngo_ids = {a.ngo_org_id for a in (Application.query
+                                              .join(Grant)
+                                              .filter(Grant.donor_org_id == current_user.org_id,
+                                                      Application.created_at >= cutoff,
+                                                      Application.ngo_org_id.isnot(None))
+                                              .all())}
+    if not recent_ngo_ids:
+        return jsonify({'total': 0, 'repeat': 0, 'first_time': 0})
+
+    # Prior funded NGOs across this donor's history.
+    prior_funded = {a.ngo_org_id for a in (Application.query
+                                            .join(Grant)
+                                            .filter(Grant.donor_org_id == current_user.org_id,
+                                                    Application.created_at < cutoff,
+                                                    Application.status.in_(['funded', 'awarded']))
+                                            .all())}
+    repeat = len(recent_ngo_ids & prior_funded)
+    first_time = len(recent_ngo_ids) - repeat
+    return jsonify({
+        'total': len(recent_ngo_ids),
+        'repeat': repeat,
+        'first_time': first_time,
+        'window_days': 90,
+    })
+
+
+@dashboard_bp.route('/applications-by-status', methods=['GET'])
+@login_required
+def api_dashboard_applications_by_status():
+    """Phase 337 — Counts of applications across the system, grouped by status.
+
+    Admin-only. Used as a stacked horizontal bar on the operator dashboard.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from sqlalchemy import func
+    rows = (db.session.query(Application.status, func.count(Application.id))
+            .group_by(Application.status)
+            .all())
+    out = {row[0] or 'unknown': int(row[1]) for row in rows}
+    total = sum(out.values())
+    return jsonify({'by_status': out, 'total': total})
+
+
 @dashboard_bp.route('/decisions-by-month', methods=['GET'])
 @login_required
 def api_dashboard_decisions_by_month():

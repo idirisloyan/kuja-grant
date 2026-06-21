@@ -632,6 +632,84 @@ def api_cron_donor_digest():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/stale-draft-nudge', methods=['POST'])
+def api_cron_stale_draft_nudge():
+    """Phase 341 — Nudge NGOs about draft applications idle > 7 days.
+
+    For each draft application not edited in the last 7 days, drop one
+    in-app notification on the org's NGO users. Honors the Phase 326
+    `digests` opt-out so users who silenced summaries don't get nudged.
+    Skips duplicates within the last 14 days per (user, application).
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Application, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        week_ago = now - timedelta(days=7)
+        nudge_cutoff = now - timedelta(days=14)
+
+        drafts = (Application.query
+                  .filter(Application.status == 'draft',
+                          Application.updated_at < week_ago)
+                  .all())
+        sent = 0
+        for a in drafts:
+            ngos = User.query.filter_by(org_id=a.ngo_org_id, role='ngo').all()
+            for u in ngos:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                # Skip if we've already nudged this user about this app recently.
+                already = (Notification.query
+                           .filter(Notification.user_id == u.id,
+                                   Notification.type == 'stale_draft_nudge',
+                                   Notification.link == f'/applications/{a.id}',
+                                   Notification.created_at >= nudge_cutoff)
+                           .first())
+                if already:
+                    continue
+                title = a.grant.title if a.grant else f'Application #{a.id}'
+                n = Notification(
+                    user_id=u.id,
+                    type='stale_draft_nudge',
+                    title='Draft application going stale',
+                    message=f'Your draft for "{title}" has been idle for over a week.',
+                    link=f'/applications/{a.id}',
+                )
+                db.session.add(n)
+                sent += 1
+        if sent > 0:
+            db.session.commit()
+        result = {'drafts_checked': len(drafts), 'nudges_sent': sent}
+        _rcr('stale-draft-nudge',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('stale-draft-nudge cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('stale-draft-nudge',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/weekly-kpi-snapshot', methods=['POST'])
 def api_cron_weekly_kpi_snapshot():
     """Phase 334 — Snapshot system KPIs for the week just ended.

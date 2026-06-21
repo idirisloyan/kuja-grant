@@ -584,6 +584,27 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 337-341 — System-wide rollups + applicant
+  ergonomics + stale draft hygiene:
+  (a) `<ApplicationsByStatusCard>` on operator dashboard: stacked
+  horizontal bar of all applications grouped by status + per-status
+  count. Backend `GET /api/dashboard/applications-by-status`.
+  (b) `<FirstTimeVsRepeatCard>` on donor dashboard splits applicants
+  in the trailing 90 days into repeat (previously funded by this
+  donor) vs first-time. Backend
+  `GET /api/dashboard/first-time-vs-repeat`. (c) `<MyScoreConsistency>`
+  strip on /reviews surfaces the reviewer's std deviation across
+  completed reviews — a self-reflection signal for calibration
+  drift. Backend `GET /api/reviews/my-score-consistency`. Self-gates
+  when n < 5. (d) `<NgoDocsPendingCard>` on NGO dashboard counts
+  applications where a doc-request notification is newer than the
+  most recent doc upload — surfaces inbox debt. Backend
+  `GET /api/dashboard/ngo-docs-pending`. (e) New
+  `POST /api/cron/stale-draft-nudge` notifies NGOs about draft
+  applications idle > 7 days. Honors the Phase 326 digests opt-out;
+  dedupes within 14 days per (user, app). Cron health recorded via
+  `record_cron_run`.
+
 - **2026-06-20** Phase 331-335 — Exports + trends + onboarding clarity:
   (a) NGO bulk CSV: new `GET /api/applications/my-applications.csv`
   streams every app from the org (id, grant, status, scores,

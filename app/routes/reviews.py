@@ -486,6 +486,36 @@ def api_decline_review(review_id):
     return jsonify({'success': True})
 
 
+@reviews_bp.route('/my-score-consistency', methods=['GET'])
+@login_required
+@role_required('reviewer')
+def api_reviewer_my_score_consistency():
+    """Phase 339 — Std deviation of this reviewer's overall scores.
+
+    Higher std dev = wider variance across the rubric, which can be
+    healthy (real spread) or a calibration signal (drift across days).
+    Self-gates client-side when count < 5.
+    """
+    import statistics
+    scores = [r.overall_score for r in Review.query.filter(
+        Review.reviewer_user_id == current_user.id,
+        Review.status == 'completed',
+        Review.overall_score.isnot(None),
+    ).all() if r.overall_score is not None]
+    if not scores:
+        return jsonify({'n': 0})
+    mean = statistics.mean(scores)
+    try:
+        stdev = statistics.stdev(scores) if len(scores) > 1 else 0.0
+    except statistics.StatisticsError:
+        stdev = 0.0
+    return jsonify({
+        'n': len(scores),
+        'mean': round(mean, 1),
+        'stdev': round(stdev, 1),
+    })
+
+
 @reviews_bp.route('/my-score-history', methods=['GET'])
 @login_required
 @role_required('reviewer')

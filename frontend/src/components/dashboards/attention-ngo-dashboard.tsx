@@ -48,6 +48,7 @@ import { CompareMyAppsCard } from '@/components/dashboards/compare-my-apps-card'
 import { LossPatternsCard } from '@/components/dashboards/loss-patterns-card';
 import { NgoDecisionVelocityCard } from '@/components/dashboards/ngo-decision-velocity-card';
 import { NgoWatchlistTile } from '@/components/dashboards/ngo-watchlist-tile';
+import { NgoDocsPendingCard } from '@/components/dashboards/ngo-docs-pending-card';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -175,6 +176,8 @@ export function AttentionNgoDashboard() {
       <NgoDecisionVelocityCard />
       {/* Phase 314 — starred grants with deadline countdown. */}
       <NgoWatchlistTile />
+      {/* Phase 340 — apps needing doc upload. Self-gates when zero. */}
+      <NgoDocsPendingCard />
       {/* Phase 154 — rolling 12-month impact summary. Self-gates if zero activity. */}
       <ImpactCard />
       {/* Phase 185 — peer-anonymized win rate by sector. Self-gates

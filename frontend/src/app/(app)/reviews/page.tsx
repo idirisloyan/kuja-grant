@@ -136,6 +136,9 @@ function ReviewerView() {
       {/* Phase 311 — last 12 scores sparkline. Self-gates < 5. */}
       <MyScoreSparkline />
 
+      {/* Phase 339 — std deviation of own scores. Self-gates < 5. */}
+      <MyScoreConsistency />
+
       {/* Phase 244 — most recent completed reviews. Self-gates when none. */}
       <MyPastReviews />
 
@@ -507,6 +510,29 @@ function EmptyState({ icon: Icon, title, body }: { icon: typeof ClipboardCheck; 
       <Icon className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
       <p className="kuja-display text-xl">{title}</p>
       <p className="text-sm text-muted-foreground mt-1">{body}</p>
+    </div>
+  );
+}
+
+// Phase 339 — Std deviation of own scores across all completed reviews.
+// High variance can be healthy (real rubric spread) or a calibration
+// drift signal — render the number so the reviewer can self-reflect.
+function MyScoreConsistency() {
+  const [data, setData] = useState<{ n: number; mean?: number; stdev?: number } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.get<typeof data>('/api/reviews/my-score-consistency').then((r) => {
+      if (!cancelled) setData(r);
+    }).catch(() => {/* silent */});
+    return () => { cancelled = true; };
+  }, []);
+  if (!data || data.n < 5 || data.stdev == null) return null;
+  return (
+    <div className="rounded-md border border-border bg-card p-3 text-xs flex items-center justify-between">
+      <span className="text-muted-foreground">Your scoring variance</span>
+      <span className="tabular-nums">
+        μ {data.mean} · σ <span className="font-semibold">{data.stdev}</span> over {data.n} reviews
+      </span>
     </div>
   );
 }
