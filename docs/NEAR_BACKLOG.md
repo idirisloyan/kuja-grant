@@ -584,6 +584,21 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 529-533 — Documents this month + approvals today
+  + scoring tightness + tenant messages this week + tenant messages
+  week digest cron:
+  (a) `<DocumentsThisMonthStat>` on NGO dashboard counts Document rows
+  attached to the NGO's applications in last 30d (sky tone).
+  (b) `<ApprovalsTodayStat>` on donor dashboard counts donor's apps
+  transitioned to funded/awarded in last 24h (emerald celebration).
+  (c) `<ScoringTightnessStat>` on reviewer reviews page reports the
+  standard deviation of reviewer's overall_score across last 30d
+  completed reviews with a 'tight/moderate/spread' label; self-gates
+  < 3 sample. (d) `<TenantMessagesWeekStat>` on operator dashboard
+  counts TenantMessage rows in last 7d — broadcast engagement pulse.
+  (e) Phase 533 cron `/api/cron/tenant-messages-week-digest` weekly
+  admin digest with top-3 sender breakdown; honors digests opt-out.
+
 - **2026-06-21** Phase 523-527 — Active grants + grants without apps +
   weekly review cadence + WebAuthn registrations + NGO decisions-this-week
   cron:

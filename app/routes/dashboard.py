@@ -5075,3 +5075,84 @@ def api_dashboard_admin_webauthn_registrations_this_month():
              .filter(WebAuthnCredential.created_at >= cutoff)
              .count())
     return jsonify({'count': count})
+
+
+@dashboard_bp.route('/ngo-documents-this-month', methods=['GET'])
+@login_required
+def api_dashboard_ngo_documents_this_month():
+    """Phase 529 — Count of Document rows uploaded against this NGO's
+    applications in the last 30 days. Activity pulse on doc submission.
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    count = (db.session.query(Document.id)
+             .join(Application, Document.application_id == Application.id)
+             .filter(Application.ngo_org_id == current_user.org_id,
+                     Document.uploaded_at >= cutoff)
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/donor-approvals-today', methods=['GET'])
+@login_required
+def api_dashboard_donor_approvals_today():
+    """Phase 530 — Count of donor's applications transitioned to
+    funded/awarded in the last 24 hours. Today's win count.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    count = (db.session.query(Application.id)
+             .join(Grant, Application.grant_id == Grant.id)
+             .filter(Grant.donor_org_id == current_user.org_id,
+                     Application.status.in_(['funded', 'awarded']),
+                     Application.decision_recorded_at >= cutoff)
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/reviewer-scoring-tightness', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_scoring_tightness():
+    """Phase 531 — Standard deviation of reviewer's overall_score
+    across last-30d completed reviews. Self-reflection on judgment
+    consistency. Low std (clustered) vs high std (varied).
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    import math
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    scores = [s for (s,) in (
+        db.session.query(Review.overall_score)
+        .filter(Review.reviewer_user_id == current_user.id,
+                Review.status == 'completed',
+                Review.completed_at >= cutoff,
+                Review.overall_score.isnot(None))
+        .all()
+    ) if s is not None]
+    if len(scores) < 3:
+        return jsonify({'std_dev': None, 'sample': len(scores)})
+    mean = sum(scores) / len(scores)
+    var = sum((s - mean) ** 2 for s in scores) / len(scores)
+    return jsonify({'std_dev': round(math.sqrt(var), 1), 'sample': len(scores)})
+
+
+@dashboard_bp.route('/admin-tenant-messages-this-week', methods=['GET'])
+@login_required
+def api_dashboard_admin_tenant_messages_this_week():
+    """Phase 532 — Count of TenantMessage rows in last 7 days.
+    Engagement pulse on tenant-to-member broadcasts.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from app.models.tenant_message import TenantMessage
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    count = (TenantMessage.query
+             .filter(TenantMessage.sent_at >= cutoff)
+             .count())
+    return jsonify({'count': count})
