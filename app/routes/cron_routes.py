@@ -801,6 +801,89 @@ def api_cron_donor_closing_grants():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/ai-dismissed-digest', methods=['POST'])
+def api_cron_ai_dismissed_digest():
+    """Phase 425 — Weekly digest to admins ranking AI endpoints by
+    number of 'dismissed' helpfulness markers over the last 7 days.
+    Tracks AI suggestions users found unhelpful, so the team can
+    target prompt tuning.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Notification, record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from sqlalchemy import text as _text
+        from datetime import datetime, timezone, timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        try:
+            rows = db.session.execute(_text(
+                "SELECT endpoint, COUNT(*) AS dismissals "
+                "FROM ai_call_logs WHERE created_at >= :c "
+                "AND helpfulness = 'dismissed' "
+                "GROUP BY endpoint ORDER BY dismissals DESC LIMIT 5"
+            ), {'c': cutoff}).all()
+        except Exception:
+            rows = []
+        top = []
+        for r in rows:
+            top.append({
+                'endpoint': r.endpoint,
+                'dismissals': int(r.dismissals or 0),
+            })
+
+        sent = 0
+        if top and top[0]['dismissals'] > 0:
+            parts = [f'{t["endpoint"]} ({t["dismissals"]})' for t in top[:3]]
+            msg = 'AI dismissals last 7d: ' + ', '.join(parts)
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='ai_dismissed_digest',
+                    title='Top dismissed AI suggestions this week',
+                    message=msg[:500],
+                    link='/admin/ai-quality',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+
+        result = {
+            'endpoints_ranked': len(top),
+            'admins_notified': sent,
+        }
+        _rcr('ai-dismissed-digest',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result, 'top': top})
+    except Exception as e:
+        logger.exception('ai-dismissed-digest cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('ai-dismissed-digest',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/trust-profile-freshness', methods=['POST'])
 def api_cron_trust_profile_freshness():
     """Phase 419 — Quarterly nudge: NGOs whose Organization.assess_date

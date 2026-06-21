@@ -2233,6 +2233,169 @@ def api_dashboard_donor_fastest_reviewer():
     })
 
 
+@dashboard_bp.route('/ngo-criterion-score-trend', methods=['GET'])
+@login_required
+def api_dashboard_ngo_criterion_score_trend():
+    """Phase 421 — Average AI rubric score per criterion across this
+    NGO's last 5 submitted applications. Surfaces where the NGO is
+    consistently strong vs weak.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from collections import defaultdict
+    rows = (Application.query
+            .filter(Application.ngo_org_id == current_user.org_id,
+                    Application.submitted_at.isnot(None),
+                    Application.ai_rubric_result_json.isnot(None))
+            .order_by(Application.submitted_at.desc())
+            .limit(5)
+            .all())
+    by_criterion = defaultdict(list)
+    for a in rows:
+        rubric = a.get_ai_rubric_result() if hasattr(a, 'get_ai_rubric_result') else None
+        if not isinstance(rubric, dict):
+            continue
+        scores = rubric.get('criterion_scores') or {}
+        if not isinstance(scores, dict):
+            continue
+        for cid, payload in scores.items():
+            if isinstance(payload, dict) and 'score' in payload:
+                try:
+                    by_criterion[str(cid)].append(float(payload['score']))
+                except (TypeError, ValueError):
+                    continue
+    out = []
+    for cid, vals in by_criterion.items():
+        if not vals:
+            continue
+        out.append({
+            'criterion_id': cid,
+            'avg_score': round(sum(vals) / len(vals), 1),
+            'samples': len(vals),
+        })
+    out.sort(key=lambda x: x['avg_score'])
+    return jsonify({'criteria': out, 'sample_apps': len(rows)})
+
+
+@dashboard_bp.route('/donor-apps-by-month', methods=['GET'])
+@login_required
+def api_dashboard_donor_apps_by_month():
+    """Phase 422 — Applications received per month over the last 12
+    months across this donor's grants.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(days=365)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    rows = (Application.query
+            .join(Grant)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.submitted_at.isnot(None),
+                    Application.submitted_at >= start)
+            .with_entities(Application.submitted_at)
+            .all())
+    by_month = defaultdict(int)
+    for (submitted,) in rows:
+        if not submitted:
+            continue
+        key = submitted.strftime('%Y-%m')
+        by_month[key] += 1
+    # Build 12 contiguous month buckets ending at current month.
+    points = []
+    cursor = start
+    for _ in range(13):
+        key = cursor.strftime('%Y-%m')
+        points.append({'month': key, 'count': by_month.get(key, 0)})
+        if cursor.month == 12:
+            cursor = cursor.replace(year=cursor.year + 1, month=1)
+        else:
+            cursor = cursor.replace(month=cursor.month + 1)
+    return jsonify({'points': points})
+
+
+@dashboard_bp.route('/reviewer-queue-sector-mix', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_queue_sector_mix():
+    """Phase 423 — Reviewer queue grouped by primary grant sector.
+    Helps reviewers see what kinds of apps they're scoring.
+    """
+    if current_user.role != 'reviewer':
+        return jsonify({'error': 'access denied'}), 403
+    from collections import Counter
+    rows = (db.session.query(Grant.sectors)
+            .join(Application, Application.grant_id == Grant.id)
+            .join(Review, Review.application_id == Application.id)
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status.in_(['assigned', 'in_progress', 'reviewing']))
+            .all())
+    counts = Counter()
+    for (sectors_json,) in rows:
+        from app.utils.helpers import _json_load
+        sectors = _json_load(sectors_json) or []
+        if not sectors:
+            counts['Unspecified'] += 1
+            continue
+        # Pick first sector as primary for simplicity.
+        first = sectors[0] if isinstance(sectors, list) else None
+        label = (first or 'Unspecified') if isinstance(first, str) else 'Unspecified'
+        counts[label] += 1
+    total = sum(counts.values())
+    out = [{'sector': k, 'count': v} for k, v in counts.most_common(6)]
+    return jsonify({'sectors': out, 'total': total})
+
+
+@dashboard_bp.route('/i18n-coverage', methods=['GET'])
+@login_required
+def api_dashboard_i18n_coverage():
+    """Phase 424 — Translation key counts per locale vs the English
+    canonical. Translation-debt signal: how many keys are missing in
+    each non-English locale.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    import json
+    import os
+    from flask import current_app
+    LOCALES = ['en', 'ar', 'fr', 'es', 'sw', 'so']
+    base = os.path.join(current_app.root_path, '..', 'frontend', 'src', 'i18n')
+    counts = {}
+    en_keys = set()
+    for locale in LOCALES:
+        path = os.path.join(base, f'{locale}.json')
+        try:
+            with open(path, 'r', encoding='utf-8') as fh:
+                data = json.load(fh)
+            keys = set()
+            def _walk(node, prefix=''):
+                if isinstance(node, dict):
+                    for k, v in node.items():
+                        nk = f'{prefix}.{k}' if prefix else k
+                        if isinstance(v, dict):
+                            _walk(v, nk)
+                        else:
+                            keys.add(nk)
+            _walk(data)
+            counts[locale] = len(keys)
+            if locale == 'en':
+                en_keys = keys
+        except Exception:
+            counts[locale] = 0
+    en_total = len(en_keys)
+    coverage = {}
+    for locale, n in counts.items():
+        if en_total == 0:
+            coverage[locale] = None
+        else:
+            coverage[locale] = round(100 * n / en_total, 1)
+    return jsonify({
+        'counts': counts,
+        'coverage_pct_vs_en': coverage,
+        'en_total': en_total,
+    })
+
+
 @dashboard_bp.route('/ngo-app-reviewer-mix/<int:application_id>', methods=['GET'])
 @login_required
 def api_dashboard_ngo_app_reviewer_mix(application_id):

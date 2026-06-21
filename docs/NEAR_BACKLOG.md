@@ -584,6 +584,28 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 421-425 — Criterion score trend + apps
+  by month + queue sector mix + i18n coverage + dismissed
+  AI cron:
+  (a) `<CriterionScoreTrendCard>` on NGO dashboard averages
+  AI rubric scores per criterion across NGO's last 5
+  submitted apps. Backend
+  `GET /api/dashboard/ngo-criterion-score-trend`. (b)
+  `<AppsByMonthCard>` on donor dashboard shows applications
+  received per month over the last 12 months as a sparkline.
+  Backend `GET /api/dashboard/donor-apps-by-month`. (c)
+  `<QueueSectorMix>` on /reviews shows the reviewer's queue
+  grouped by primary grant sector (pivoted from sector-match
+  — no expertise_sectors on User). Backend
+  `GET /api/dashboard/reviewer-queue-sector-mix`. (d)
+  `<I18nCoverageCard>` on operator dashboard shows
+  translation-key coverage % per locale vs the English
+  canonical, amber when any locale <95%. Backend
+  `GET /api/dashboard/i18n-coverage`. (e) New
+  `POST /api/cron/ai-dismissed-digest` weekly digest to
+  admins ranking AI endpoints by `dismissed` helpfulness
+  markers over the last 7 days.
+
 - **2026-06-20** Phase 415-419 — Reviewer mix + review pipeline +
   score distribution + new signups + profile-freshness cron:
   (a) `<ReviewerMix>` inline on application detail page (NGO
