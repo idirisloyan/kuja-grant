@@ -78,6 +78,7 @@ import { DocumentsThisMonthStat } from '@/components/dashboards/documents-this-m
 import { PipelineCountStat } from '@/components/dashboards/pipeline-count-stat';
 import { SavedSearchesCountStat } from '@/components/dashboards/saved-searches-count-stat';
 import { DocsPendingExtractionStat } from '@/components/dashboards/docs-pending-extraction-stat';
+import { AiCalls7dStat } from '@/components/dashboards/ai-calls-7d-stat';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -235,6 +236,7 @@ export function AttentionNgoDashboard() {
       <PipelineCountStat />
       <SavedSearchesCountStat />
       <DocsPendingExtractionStat />
+      <AiCalls7dStat />
       <NgoFeedbackThemesCard />
       <CriterionScoreTrendCard />
       <DeadlineDensityCard />

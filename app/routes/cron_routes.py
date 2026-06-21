@@ -4286,3 +4286,85 @@ def api_cron_ngo_ai_usage_week():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/criteria-template-usage-week', methods=['POST'])
+def api_cron_criteria_template_usage_week():
+    """Phase 557 — Weekly admin digest of CriteriaTemplate library:
+    total templates + top-3 donor orgs by template count. Honors
+    digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Organization, Notification, record_cron_run as _rcr,
+        )
+        from app.models.criteria_template import CriteriaTemplate
+        from app.models.notification_preference import NotificationPreference
+        from collections import Counter
+
+        rows = (db.session.query(CriteriaTemplate.donor_org_id)
+                .filter(CriteriaTemplate.donor_org_id.isnot(None))
+                .all())
+        sent = 0
+        result_summary = {}
+        if rows:
+            counts = Counter(org_id for (org_id,) in rows)
+            top_ids = [org_id for org_id, _ in counts.most_common(3)]
+            orgs = {o.id: o.name for o in Organization.query.filter(Organization.id.in_(top_ids)).all()}
+            top_label = ', '.join(
+                f'{orgs.get(oid, f"org#{oid}")} ({counts[oid]})'
+                for oid in top_ids
+            ) or 'none'
+            msg = (
+                f'Criteria templates total: {len(rows)} across {len(counts)} '
+                f'orgs. Top: {top_label}.'
+            )
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='criteria_template_usage_week',
+                    title='Criteria template library — weekly',
+                    message=msg[:500],
+                    link='/admin/metrics',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+            result_summary = {
+                'templates': len(rows),
+                'orgs': len(counts),
+                'admins_notified': sent,
+            }
+        else:
+            result_summary = {'templates': 0, 'admins_notified': 0}
+        _rcr('criteria-template-usage-week',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result_summary)[:480])
+        return jsonify({'success': True, 'result': result_summary})
+    except Exception as e:
+        logger.exception('criteria-template-usage-week cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('criteria-template-usage-week',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500

@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 553-557 — AI calls last 7d + criteria templates
+  + review variety + audit entries today + criteria-template-usage
+  weekly cron:
+  (a) `<AiCalls7dStat>` on NGO dashboard counts AICallLog rows for the
+  NGO's org_id last 7d — self-adoption signal.
+  (b) `<CriteriaTemplatesCountStat>` on donor dashboard counts donor's
+  CriteriaTemplate rows — tracks investment in template library.
+  (c) `<ReviewVarietyStat>` on reviewer reviews page counts distinct
+  grants reviewed in last 30d — narrow expertise vs broad pool
+  work. (d) `<AuditEntriesTodayStat>` on operator dashboard counts
+  AuditChainEntry rows in last 24h (distinct from Phase 412 which
+  was rolling rate). (e) Phase 557 cron
+  `/api/cron/criteria-template-usage-week` weekly admin digest of
+  CriteriaTemplate library: total + top-3 donor orgs; honors digests
+  opt-out.
+
 - **2026-06-21** Phase 547-551 — Docs pending AI extraction + apps open
   > 60d + next reviewer deadline + push subscriptions + NGO AI usage
   weekly cron:

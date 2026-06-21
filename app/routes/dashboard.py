@@ -5378,3 +5378,75 @@ def api_dashboard_admin_active_push_subscriptions():
     from app.models.push_subscription import PushSubscription
     count = PushSubscription.query.count()
     return jsonify({'count': count})
+
+
+@dashboard_bp.route('/ngo-ai-calls-7d', methods=['GET'])
+@login_required
+def api_dashboard_ngo_ai_calls_7d():
+    """Phase 553 — Count of AICallLog rows attributed to NGO's org in
+    last 7 days. Self-adoption signal — does the team use the AI
+    surfaces actively?
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from app.models.ai_thread import AICallLog
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    count = (AICallLog.query
+             .filter(AICallLog.created_at >= cutoff,
+                     AICallLog.org_id == current_user.org_id)
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/donor-criteria-templates-count', methods=['GET'])
+@login_required
+def api_dashboard_donor_criteria_templates_count():
+    """Phase 554 — Count of CriteriaTemplate rows for the donor's org.
+    Tracks investment in the reusable evaluation criteria library.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.criteria_template import CriteriaTemplate
+    count = (CriteriaTemplate.query
+             .filter(CriteriaTemplate.donor_org_id == current_user.org_id)
+             .count())
+    return jsonify({'count': count})
+
+
+@dashboard_bp.route('/reviewer-review-variety', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_review_variety():
+    """Phase 555 — Count of distinct grants reviewed by current reviewer
+    in last 30d. Variety signal — narrow expertise vs broad pool work.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (db.session.query(Application.grant_id)
+            .join(Review, Review.application_id == Application.id)
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.completed_at >= cutoff,
+                    Review.status == 'completed')
+            .distinct()
+            .all())
+    return jsonify({'distinct_grants': len(rows)})
+
+
+@dashboard_bp.route('/admin-audit-entries-today', methods=['GET'])
+@login_required
+def api_dashboard_admin_audit_entries_today():
+    """Phase 556 — Count of AuditChainEntry rows in last 24 hours.
+    Daily activity pulse — distinct from Phase 412 (audit rate / day)
+    by reading current 24h instead of rolling rate.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from app.models.audit_chain import AuditChainEntry
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    count = (AuditChainEntry.query
+             .filter(AuditChainEntry.created_at >= cutoff)
+             .count())
+    return jsonify({'count': count})
