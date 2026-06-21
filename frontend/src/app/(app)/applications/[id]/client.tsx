@@ -33,6 +33,7 @@ import { ApplicationMessageThread } from '@/components/applications/application-
 import { DecisionDebriefPanel } from '@/components/apply/decision-debrief-panel';
 import { FeedbackAcknowledgement } from '@/components/apply/feedback-acknowledgement';
 import { AppealPanel } from '@/components/apply/appeal-panel';
+import { ReviewerSignal } from '@/components/applications/reviewer-signal';
 import { AIChatPanel } from '@/components/copilot/ai-chat-panel';
 import { MicroSurvey } from '@/components/shared/micro-survey';
 import { InactivityHelp } from '@/components/shared/inactivity-help';
@@ -159,6 +160,10 @@ export default function ApplicationDetailClient() {
                 applicationId={application.id}
                 onWithdrawn={() => router.refresh()}
               />
+            )}
+            {/* Phase 391 — NGO inline signal that reviewers have picked up the app. */}
+            {isOwnerNgo && ['submitted', 'under_review', 'scored'].includes(application.status) && (
+              <ReviewerSignal applicationId={application.id} />
             )}
             {/* Phase 164 — Download self-contained PDF of this application. */}
             <a

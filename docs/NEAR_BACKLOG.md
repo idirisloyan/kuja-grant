@@ -584,6 +584,29 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 391-395 — Reviewer signal + decision
+  aging + applicant context + stale notifications + zero-apps
+  nudge:
+  (a) `<ReviewerSignal>` inline on application detail page —
+  when the NGO's app has assigned/in-progress reviews but
+  isn't decided, shows "Your application has been picked up".
+  Backend `GET /api/dashboard/ngo-app-reviewer-signal/<id>`.
+  (b) `<DecisionAgingCard>` on donor dashboard shows median
+  submitted-to-decision days across the donor's last 50
+  decisions; amber border >=30d. Backend
+  `GET /api/dashboard/donor-decision-aging`. (c) New
+  `GET /api/reviews/<id>/applicant-context` returns the
+  applicant org's country, year_established, sectors,
+  verified status, and prior-funded count from this donor —
+  ready for a reviewer detail callout (UI surface deferred).
+  (d) `<StaleNotificationsCard>` on operator dashboard
+  shows count of unread notifications older than 14 days.
+  Backend `GET /api/dashboard/stale-notifications`. (e) New
+  `POST /api/cron/grants-zero-applications` notifies donors
+  whose published grants have been open 14+ days with 0
+  applications. Idempotent via `grant.zero_apps_nudged`
+  audit-chain marker.
+
 - **2026-06-20** Phase 385-389 — Submit duration + response
   completeness + low-score rationale snippets +
   auth-lockout signal + AI quality drift cron:

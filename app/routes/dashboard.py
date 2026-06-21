@@ -2233,6 +2233,95 @@ def api_dashboard_donor_fastest_reviewer():
     })
 
 
+@dashboard_bp.route('/ngo-app-reviewer-signal/<int:application_id>', methods=['GET'])
+@login_required
+def api_dashboard_ngo_app_reviewer_signal(application_id):
+    """Phase 391 — NGO inline signal: is your application currently in
+    the hands of reviewers? Returns counts of assigned/in_progress/
+    completed reviews on this app so the UI can show a soft "picked up"
+    banner before the decision is recorded.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    app_ = Application.query.get(application_id)
+    if not app_ or app_.ngo_org_id != current_user.org_id:
+        return jsonify({'error': 'not found'}), 404
+    rows = Review.query.filter_by(application_id=app_.id).all()
+    by_status = {
+        'assigned': sum(1 for r in rows if r.status == 'assigned'),
+        'in_progress': sum(1 for r in rows
+                          if r.status in ('in_progress', 'reviewing')),
+        'completed': sum(1 for r in rows
+                        if r.status in ('submitted', 'scored', 'completed')),
+    }
+    return jsonify({
+        'application_id': app_.id,
+        'total': len(rows),
+        'by_status': by_status,
+    })
+
+
+@dashboard_bp.route('/donor-decision-aging', methods=['GET'])
+@login_required
+def api_dashboard_donor_decision_aging():
+    """Phase 392 — Median days from application.submitted_at to
+    application.decision_recorded_at on this donor's last 50 decisions.
+    Amber border at >=30d on the client.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    DECIDED = ['funded', 'awarded', 'declined', 'rejected']
+    rows = (Application.query
+            .join(Grant)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.status.in_(DECIDED),
+                    Application.submitted_at.isnot(None),
+                    Application.decision_recorded_at.isnot(None))
+            .order_by(Application.decision_recorded_at.desc())
+            .limit(50)
+            .all())
+    days = []
+    for a in rows:
+        if not a.submitted_at or not a.decision_recorded_at:
+            continue
+        d = (a.decision_recorded_at - a.submitted_at).total_seconds() / 86400.0
+        if d >= 0:
+            days.append(d)
+    if not days:
+        return jsonify({'median_days': None, 'sample': 0})
+    days.sort()
+    n = len(days)
+    median = days[n // 2] if n % 2 else (days[n // 2 - 1] + days[n // 2]) / 2.0
+    return jsonify({
+        'median_days': round(median, 1),
+        'sample': n,
+    })
+
+
+@dashboard_bp.route('/stale-notifications', methods=['GET'])
+@login_required
+def api_dashboard_stale_notifications():
+    """Phase 394 — Count of unread notifications older than 14 days
+    across all users. Signal that notification inboxes are neglected.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from app.models import Notification
+    cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+    try:
+        stale = Notification.query.filter(
+            Notification.is_read.is_(False),
+            Notification.created_at < cutoff,
+        ).count()
+    except Exception:
+        stale = 0
+    return jsonify({
+        'stale_unread': stale,
+        'older_than_days': 14,
+    })
+
+
 @dashboard_bp.route('/ngo-submit-duration', methods=['GET'])
 @login_required
 def api_dashboard_ngo_submit_duration():

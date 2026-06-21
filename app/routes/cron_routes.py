@@ -801,6 +801,92 @@ def api_cron_donor_closing_grants():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/grants-zero-applications', methods=['POST'])
+def api_cron_grants_zero_applications():
+    """Phase 395 — Notify donors whose published grants have been open
+    for 14+ days with 0 applications received. Each donor gets one
+    notification per grant (one-shot via audit-chain marker).
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            Grant, Application, User, Notification, record_cron_run as _rcr,
+        )
+        from app.models.audit_chain import AuditChainEntry
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+        candidates = (Grant.query
+                      .filter(Grant.status.in_(['open', 'review']),
+                              Grant.published_at.isnot(None),
+                              Grant.published_at <= cutoff)
+                      .all())
+        nudged = 0
+        for g in candidates:
+            apps = Application.query.filter_by(grant_id=g.id).count()
+            if apps > 0:
+                continue
+            already = AuditChainEntry.query.filter_by(
+                action='grant.zero_apps_nudged',
+                subject_kind='grant',
+                subject_id=g.id,
+            ).first()
+            if already:
+                continue
+            donor_users = User.query.filter_by(role='donor', org_id=g.donor_org_id).all()
+            for u in donor_users:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='grant_zero_apps',
+                    title=f'Grant "{g.title[:60]}" has no applications yet',
+                    message='This grant has been open 14+ days without any applications. Consider reviewing the eligibility, deadline, or visibility.',
+                    link=f'/grants/{g.id}',
+                )
+                db.session.add(n)
+            AuditChainEntry.append(
+                action='grant.zero_apps_nudged',
+                actor_email='system@cron',
+                subject_kind='grant',
+                subject_id=g.id,
+                details={'donor_org_id': g.donor_org_id,
+                         'donors_notified': len(donor_users)},
+            )
+            nudged += 1
+        if nudged > 0:
+            db.session.commit()
+        result = {
+            'candidates_scanned': len(candidates),
+            'grants_nudged': nudged,
+        }
+        _rcr('grants-zero-applications',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('grants-zero-applications cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('grants-zero-applications',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/ai-quality-drift', methods=['POST'])
 def api_cron_ai_quality_drift():
     """Phase 389 — Daily AI-quality drift detector. For each donor,

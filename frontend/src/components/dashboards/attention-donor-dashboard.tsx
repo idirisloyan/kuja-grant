@@ -49,6 +49,7 @@ import { DecisionConcentrationCard } from '@/components/dashboards/decision-conc
 import { AppsByCountryCard } from '@/components/dashboards/apps-by-country-card';
 import { TimeToFirstReviewCard } from '@/components/dashboards/time-to-first-review-card';
 import { ResponseCompletenessCard } from '@/components/dashboards/response-completeness-card';
+import { DecisionAgingCard } from '@/components/dashboards/decision-aging-card';
 import { PreemptionWatchCard } from '@/components/dashboards/preemption-watch-card';
 import { CrossGrantPatternsCard } from '@/components/dashboards/cross-grant-patterns-card';
 import { PortfolioRiskHeatmap } from '@/components/dashboards/portfolio-risk-heatmap';
@@ -205,6 +206,7 @@ export function AttentionDonorDashboard() {
       <AppsByCountryCard />
       <TimeToFirstReviewCard />
       <ResponseCompletenessCard />
+      <DecisionAgingCard />
 
       {/* Phase 99 — OneNumberCard portfolio at-a-glance row. Replaces the
           metric-soup pattern with three calm numbers + one next action

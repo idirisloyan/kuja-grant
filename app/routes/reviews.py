@@ -304,6 +304,42 @@ def api_reviewer_my_turnaround():
     })
 
 
+@reviews_bp.route('/<int:application_id>/applicant-context', methods=['GET'])
+@login_required
+@role_required('reviewer', 'admin')
+def api_reviewer_applicant_context(application_id):
+    """Phase 393 — Compact applicant-org context for reviewers.
+    Returns country, year_established, sectors, and how many times the
+    same donor has funded this applicant.
+    """
+    from app.models import Organization
+    app_ = Application.query.get(application_id)
+    if not app_:
+        return jsonify({'error': 'not found'}), 404
+    org = Organization.query.get(app_.ngo_org_id)
+    if not org:
+        return jsonify({'error': 'not found'}), 404
+    donor_org_id = app_.grant.donor_org_id if app_.grant else None
+    prior_funded = 0
+    if donor_org_id:
+        prior_funded = (Application.query
+                        .join(Grant, Grant.id == Application.grant_id)
+                        .filter(Application.ngo_org_id == org.id,
+                                Grant.donor_org_id == donor_org_id,
+                                Application.status.in_(['funded', 'awarded']))
+                        .count())
+    return jsonify({
+        'success': True,
+        'org_id': org.id,
+        'name': org.name,
+        'country': org.country,
+        'year_established': org.year_established,
+        'sectors': org.get_sectors() if hasattr(org, 'get_sectors') else [],
+        'verified': bool(org.verified),
+        'prior_funded_by_donor': prior_funded,
+    })
+
+
 @reviews_bp.route('/recent-low-score-rationales', methods=['GET'])
 @login_required
 @role_required('reviewer')
