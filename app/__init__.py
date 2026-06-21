@@ -275,18 +275,101 @@ def create_app(config_name=None):
             app.logger.warning(f"Could not verify lockout columns (non-PostgreSQL or migration pending): {e}")
 
     # -----------------------------------------------------------------
-    # Robust per-ALTER bootstrap: every column gets its own transaction.
+    # Auto schema reconciliation — Phase 610.
     #
-    # Why this exists: the big monolithic block below ran every ALTER in
-    # one shared transaction. On Postgres, ANY failure aborts the whole
-    # tx — subsequent ALTERs return "current transaction is aborted" and
-    # silently no-op. We discovered prod was missing applications.withdrawn_at
-    # (Phase 145) because an earlier ALTER in the chain had failed, which
-    # poisoned every column added after it.
+    # Walks every SQLAlchemy model registered on db.Model, compares each
+    # model's columns against the live Postgres schema, and ALTERs in
+    # any columns that exist in code but not in prod. Each ALTER runs
+    # in its own db.engine.begin() transaction so one failure can't
+    # poison the rest.
     #
-    # This pass commits each ALTER independently so a single failure
-    # can't take down the rest. Only covers the post-Phase 145 columns
-    # that landed AFTER the original bootstrap got long enough to fail.
+    # Why this exists: the team kept hitting the same class of bug —
+    # ship a Phase that adds a column, forget to add a matching ALTER
+    # to the bootstrap, the production endpoint silently returns 500.
+    # Phase 607/608/609 each found another batch of missing columns.
+    # This loop eliminates the whole class — any new Column declared on
+    # a model auto-lands on next deploy.
+    #
+    # Safety: always adds as NULLABLE regardless of the model's
+    # nullable=False (the standard "add column without backfill" pattern;
+    # the ORM constraint applies to new writes, existing rows stay NULL).
+    # Skips columns with composite/array types we can't trivially
+    # generate DDL for.
+    # -----------------------------------------------------------------
+    with app.app_context():
+        try:
+            from sqlalchemy import text, inspect as sa_inspect
+            inspector = sa_inspect(db.engine)
+            dialect = db.engine.dialect
+            is_pg = dialect.name == 'postgresql'
+
+            # Walk every registered model.
+            models = list(db.Model.registry.mappers)
+            existing_tables = set(inspector.get_table_names())
+            added: list[str] = []
+            skipped: list[str] = []
+
+            for mapper in models:
+                table = mapper.local_table
+                if table is None:
+                    continue
+                tbl_name = table.name
+                # Skip tables that don't exist yet — db.create_all() handles
+                # those. The auto-reconciler only fills missing COLUMNS.
+                if tbl_name not in existing_tables:
+                    continue
+                try:
+                    live_cols = {c['name'] for c in inspector.get_columns(tbl_name)}
+                except Exception as e:
+                    app.logger.warning(f"auto-schema: cannot inspect {tbl_name}: {e}")
+                    continue
+
+                for col in table.columns:
+                    if col.name in live_cols:
+                        continue
+                    # Compile the column's type in the live dialect.
+                    try:
+                        col_type = col.type.compile(dialect=dialect)
+                    except Exception as e:
+                        skipped.append(f"{tbl_name}.{col.name} (type compile failed: {e})")
+                        continue
+                    # IF NOT EXISTS only works on Postgres ≥ 9.6.
+                    if_not_exists = 'IF NOT EXISTS ' if is_pg else ''
+                    ddl = (
+                        f'ALTER TABLE "{tbl_name}" '
+                        f'ADD COLUMN {if_not_exists}"{col.name}" {col_type}'
+                    )
+                    # Always add as NULLABLE (no NOT NULL, no default) to be
+                    # safe against populated tables. If the model demands
+                    # NOT NULL, the team should ship an explicit migration
+                    # with a backfill.
+                    try:
+                        with db.engine.begin() as conn:
+                            conn.execute(text(ddl))
+                        added.append(f"{tbl_name}.{col.name} {col_type}")
+                    except Exception as col_err:
+                        skipped.append(f"{tbl_name}.{col.name} (ALTER failed: {col_err})")
+
+            if added:
+                app.logger.info(
+                    f"auto-schema: added {len(added)} column(s): "
+                    + ", ".join(added[:20])
+                    + (f" + {len(added) - 20} more" if len(added) > 20 else "")
+                )
+            if skipped:
+                app.logger.warning(
+                    f"auto-schema: skipped {len(skipped)} column(s): "
+                    + "; ".join(skipped[:10])
+                    + (f" + {len(skipped) - 10} more" if len(skipped) > 10 else "")
+                )
+            if not added and not skipped:
+                app.logger.info("auto-schema: schema in sync with models")
+        except Exception as e:
+            app.logger.warning(f"auto-schema reconciliation failed: {e}")
+
+    # -----------------------------------------------------------------
+    # Legacy per-ALTER bootstrap (kept as a safety net, but auto-schema
+    # above is what reliably fills missing columns going forward).
     # -----------------------------------------------------------------
     with app.app_context():
         try:
