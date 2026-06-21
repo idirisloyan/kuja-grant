@@ -138,6 +138,9 @@ export default function ReviewDetailClient() {
   const [privateNotes, setPrivateNotes] = useState<string>('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [notesSaved, setNotesSaved] = useState(false);
+  // Phase 315 — last-saved timestamp so reviewer sees concrete evidence
+  // the autosave fired (instead of a flash of "Saved" they might miss).
+  const [notesSavedAt, setNotesSavedAt] = useState<Date | null>(null);
   // Phase 261 — save scores as a draft without submitting.
   const [savingDraft, setSavingDraft] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
@@ -1031,7 +1034,11 @@ export default function ReviewDetailClient() {
                   Private notes
                 </label>
                 {savingNotes && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
-                {notesSaved && !savingNotes && <span className="text-[10px] text-emerald-600">Saved</span>}
+                {notesSaved && !savingNotes && notesSavedAt && (
+                  <span className="text-[10px] text-emerald-600">
+                    Saved {notesSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
               </div>
               <textarea
                 id="private-notes"
@@ -1043,6 +1050,7 @@ export default function ReviewDetailClient() {
                   try {
                     await api.put(`/api/reviews/${reviewId}`, { private_notes: privateNotes });
                     setNotesSaved(true);
+                    setNotesSavedAt(new Date());
                   } catch {/* silent — surface via lack of "Saved" pill */}
                   finally { setSavingNotes(false); }
                 }}

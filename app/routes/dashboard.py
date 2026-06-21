@@ -954,6 +954,88 @@ def api_portfolio_risk_heatmap():
 # Phase 24C — Donor cohort analytics (your funded NGOs vs cohort).
 # ----------------------------------------------------------------------
 
+@dashboard_bp.route('/donor-appeal-sla', methods=['GET'])
+@login_required
+def api_dashboard_donor_appeal_sla():
+    """Phase 317 — Pending appeals on the donor's grants older than 7 days.
+
+    Soft accountability. Self-gates when zero.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    rows = (Application.query
+            .join(Grant)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.appeal_requested_at.isnot(None),
+                    Application.appeal_requested_at <= cutoff,
+                    Application.appeal_resolved_at.is_(None))
+            .order_by(Application.appeal_requested_at.asc())
+            .all())
+    now = datetime.now(timezone.utc)
+    out = []
+    for a in rows[:3]:
+        days_pending = int((now - a.appeal_requested_at).total_seconds() / 86400) if a.appeal_requested_at else None
+        out.append({
+            'application_id': a.id,
+            'ngo_org_name': a.ngo_org.name if a.ngo_org else None,
+            'days_pending': days_pending,
+        })
+    return jsonify({
+        'sla_days': 7,
+        'total': len(rows),
+        'oldest': out,
+    })
+
+
+@dashboard_bp.route('/appeal-stats', methods=['GET'])
+@login_required
+def api_dashboard_appeal_stats():
+    """Phase 316 — Appeal resolution rollup over the last 30 days.
+
+    Admin-only. Counts approved / declined / still-pending + median
+    days-to-resolve. Self-gates client-side when total == 0.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (Application.query
+            .filter(Application.appeal_requested_at.isnot(None),
+                    Application.appeal_requested_at >= cutoff)
+            .all())
+    approved = 0
+    declined = 0
+    pending = 0
+    resolution_days = []
+    for a in rows:
+        if a.appeal_resolved_at:
+            if a.appeal_resolution == 'approved':
+                approved += 1
+            elif a.appeal_resolution == 'declined':
+                declined += 1
+            if a.appeal_requested_at:
+                d = (a.appeal_resolved_at - a.appeal_requested_at).total_seconds() / 86400.0
+                if d >= 0:
+                    resolution_days.append(d)
+        else:
+            pending += 1
+    median = None
+    if resolution_days:
+        s = sorted(resolution_days)
+        mid = len(s) // 2
+        median = round(s[mid] if len(s) % 2 else (s[mid - 1] + s[mid]) / 2.0, 1)
+    return jsonify({
+        'window_days': 30,
+        'total': len(rows),
+        'approved': approved,
+        'declined': declined,
+        'pending': pending,
+        'median_days_to_resolve': median,
+    })
+
+
 @dashboard_bp.route('/data-integrity', methods=['GET'])
 @login_required
 def api_dashboard_data_integrity():

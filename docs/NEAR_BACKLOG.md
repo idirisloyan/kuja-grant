@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 313-317 — Appeal visibility across personas:
+  (a) `<DonorAppealsCard>` on donor dashboard surfaces pending
+  appeals on the donor's grants (backend reuses
+  `/api/applications/appeals`, now donor-scoped when caller role is
+  donor). (b) `<NgoWatchlistTile>` on NGO dashboard shows starred
+  grants with deadline countdown (overdue/today/Nd badge). Reads
+  the existing `/api/watchlist` endpoint. (c) Reviewer private-
+  notes autosave indicator upgraded — now shows "Saved 14:32"
+  with the actual save timestamp instead of a flash of "Saved".
+  (d) `<AppealStatsCard>` on operator dashboard: 30-day rollup of
+  approved / declined / pending appeals + median days-to-resolve.
+  Backend `GET /api/dashboard/appeal-stats`. (e)
+  `<DonorAppealSlaCard>` on donor dashboard lists appeals on the
+  donor's grants pending > 7 days. Soft accountability nudge.
+  Backend `GET /api/dashboard/donor-appeal-sla`.
+
 - **2026-06-20** Phase 307-311 — Appeal loop closure + trust + sparkline:
   (a) New /admin/appeals queue page lists every application with
   `appeal_requested_at` set + no resolution. Backend

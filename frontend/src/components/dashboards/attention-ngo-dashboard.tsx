@@ -47,6 +47,7 @@ import { PastDecisionsCard } from '@/components/dashboards/past-decisions-card';
 import { CompareMyAppsCard } from '@/components/dashboards/compare-my-apps-card';
 import { LossPatternsCard } from '@/components/dashboards/loss-patterns-card';
 import { NgoDecisionVelocityCard } from '@/components/dashboards/ngo-decision-velocity-card';
+import { NgoWatchlistTile } from '@/components/dashboards/ngo-watchlist-tile';
 import {
   FileText, BarChart3, ArrowRight, Sparkles, Lightbulb,
 } from 'lucide-react';
@@ -172,6 +173,8 @@ export function AttentionNgoDashboard() {
       <LossPatternsCard />
       {/* Phase 291 — median decision wait time across this NGO's apps. Self-gates when no decisions. */}
       <NgoDecisionVelocityCard />
+      {/* Phase 314 — starred grants with deadline countdown. */}
+      <NgoWatchlistTile />
       {/* Phase 154 — rolling 12-month impact summary. Self-gates if zero activity. */}
       <ImpactCard />
       {/* Phase 185 — peer-anonymized win rate by sector. Self-gates

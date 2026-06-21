@@ -1346,19 +1346,22 @@ def api_application_feedback_viewed(app_id):
 @applications_bp.route('/appeals', methods=['GET'])
 @login_required
 def api_application_appeals_queue():
-    """Phase 307 — Pending appeals across the network. Admin-only.
+    """Phase 307 — Pending appeals across the network. Admin or donor.
 
     Returns oldest-first list with applicant, donor, reason excerpt, days
-    pending. Resolved appeals are excluded.
+    pending. Resolved appeals are excluded. Phase 313 — donor scoping:
+    when called by a donor user, results are filtered to that donor's
+    own grants.
     """
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'donor'):
         return jsonify({'error': 'Access denied'}), 403
     from datetime import datetime, timezone
-    rows = (Application.query
-            .filter(Application.appeal_requested_at.isnot(None),
-                    Application.appeal_resolved_at.is_(None))
-            .order_by(Application.appeal_requested_at.asc())
-            .all())
+    q = (Application.query
+         .filter(Application.appeal_requested_at.isnot(None),
+                 Application.appeal_resolved_at.is_(None)))
+    if current_user.role == 'donor':
+        q = q.join(Grant).filter(Grant.donor_org_id == current_user.org_id)
+    rows = q.order_by(Application.appeal_requested_at.asc()).all()
     now = datetime.now(timezone.utc)
     out = []
     for a in rows:

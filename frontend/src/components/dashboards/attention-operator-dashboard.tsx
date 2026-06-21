@@ -37,6 +37,7 @@ import { ReviewerCoiRollupCard } from '@/components/dashboards/reviewer-coi-roll
 import { ReviewerOutliersCard } from '@/components/dashboards/reviewer-outliers-card';
 import { SlaBreachesCard } from '@/components/dashboards/sla-breaches-card';
 import { DataIntegrityCard } from '@/components/dashboards/data-integrity-card';
+import { AppealStatsCard } from '@/components/dashboards/appeal-stats-card';
 import { TodayFocusBanner } from '@/components/dashboards/today-focus-banner';
 import { NearOperatorConsole } from '@/components/dashboards/near-operator-console';
 import { ShieldAlert, Wallet, Activity, ArrowRight } from 'lucide-react';
@@ -275,6 +276,8 @@ export function AttentionOperatorDashboard() {
         <SlaBreachesCard />
         {/* Phase 305 — orphan FK detector. Self-gates when zero. */}
         <DataIntegrityCard />
+        {/* Phase 316 — appeal resolution stats (30d). Self-gates when zero. */}
+        <AppealStatsCard />
       </PageMain>
 
       {/* Full operator console as a collapsible — power users still have it */}
