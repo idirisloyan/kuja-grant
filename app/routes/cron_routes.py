@@ -801,6 +801,110 @@ def api_cron_donor_closing_grants():
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
 
 
+@cron_bp.route('/webhook-deliveries-health', methods=['POST'])
+def api_cron_webhook_deliveries_health():
+    """Phase 383 — Daily webhook-delivery-health summary. For each
+    organisation with active webhooks, compute success rate over the
+    last 24h. Notify admins when any org drops below 90% with >=10
+    attempts (filters out noise from tiny sample sizes).
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            Webhook, WebhookDelivery, User, Notification, Organization,
+            record_cron_run as _rcr,
+        )
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone, timedelta
+        from collections import defaultdict
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+        rows = (db.session.query(Webhook.org_id, WebhookDelivery.status_code)
+                .join(Webhook, Webhook.id == WebhookDelivery.webhook_id)
+                .filter(WebhookDelivery.delivered_at >= cutoff)
+                .all())
+        total_by_org = defaultdict(int)
+        success_by_org = defaultdict(int)
+        for org_id, status in rows:
+            if org_id is None:
+                continue
+            total_by_org[org_id] += 1
+            if status is not None and 200 <= int(status) < 300:
+                success_by_org[org_id] += 1
+
+        low_health = []
+        for org_id, total in total_by_org.items():
+            if total < 10:
+                continue
+            ok = success_by_org.get(org_id, 0)
+            rate = 100 * ok / total
+            if rate < 90:
+                low_health.append({
+                    'org_id': org_id,
+                    'total': total,
+                    'success': ok,
+                    'success_pct': round(rate, 1),
+                })
+
+        sent = 0
+        if low_health:
+            org_ids = [d['org_id'] for d in low_health]
+            orgs_by_id = {o.id: o for o in Organization.query.filter(Organization.id.in_(org_ids)).all()}
+            summary_parts = []
+            for d in low_health[:5]:
+                org = orgs_by_id.get(d['org_id'])
+                org_id = d['org_id']
+                pct = d['success_pct']
+                org_label = org.name if org else f'Org #{org_id}'
+                summary_parts.append(f'{org_label}: {pct}%')
+            msg = 'Webhook health <90% (24h): ' + ', '.join(summary_parts)
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(user_id=u.id, category='digests')
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='webhook_health_warning',
+                    title='Webhook delivery health degraded',
+                    message=msg[:500],
+                    link='/settings/webhooks',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+
+        result = {
+            'orgs_scanned': len(total_by_org),
+            'orgs_with_low_health': len(low_health),
+            'admins_notified': sent,
+        }
+        _rcr('webhook-deliveries-health',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result, 'low_health': low_health[:10]})
+    except Exception as e:
+        logger.exception('webhook-deliveries-health cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('webhook-deliveries-health',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
 @cron_bp.route('/expired-grants-auto-close', methods=['POST'])
 def api_cron_expired_grants_auto_close():
     """Phase 377 — Auto-close grants whose deadline passed more than

@@ -2233,6 +2233,120 @@ def api_dashboard_donor_fastest_reviewer():
     })
 
 
+@dashboard_bp.route('/ngo-submissions-this-month', methods=['GET'])
+@login_required
+def api_dashboard_ngo_submissions_this_month():
+    """Phase 379 — Count of applications the NGO submitted this calendar
+    month, with same-month-last-year comparison.
+    """
+    if current_user.role != 'ngo' or not current_user.org_id:
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_year_start = month_start.replace(year=month_start.year - 1)
+    if month_start.month == 12:
+        last_year_end = last_year_start.replace(year=last_year_start.year + 1, month=1)
+    else:
+        last_year_end = last_year_start.replace(month=last_year_start.month + 1)
+
+    this_month = (Application.query
+                  .filter(Application.ngo_org_id == current_user.org_id,
+                          Application.submitted_at.isnot(None),
+                          Application.submitted_at >= month_start)
+                  .count())
+    last_year = (Application.query
+                 .filter(Application.ngo_org_id == current_user.org_id,
+                         Application.submitted_at.isnot(None),
+                         Application.submitted_at >= last_year_start,
+                         Application.submitted_at < last_year_end)
+                 .count())
+    return jsonify({
+        'this_month': this_month,
+        'same_month_last_year': last_year,
+        'month_label': month_start.strftime('%B %Y'),
+    })
+
+
+@dashboard_bp.route('/donor-time-to-first-review', methods=['GET'])
+@login_required
+def api_dashboard_donor_time_to_first_review():
+    """Phase 380 — Median days from application.submitted_at to the
+    earliest review.created_at on this donor's grants over the last 90
+    days. Self-gates when fewer than 5 measurable applications.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import func as _func
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    rows = (db.session.query(
+                Application.id,
+                Application.submitted_at,
+                _func.min(Review.created_at).label('first_review_at'),
+            )
+            .join(Grant, Grant.id == Application.grant_id)
+            .join(Review, Review.application_id == Application.id)
+            .filter(Grant.donor_org_id == current_user.org_id,
+                    Application.submitted_at.isnot(None),
+                    Application.submitted_at >= cutoff)
+            .group_by(Application.id, Application.submitted_at)
+            .all())
+    days = []
+    for _, submitted, first in rows:
+        if not submitted or not first:
+            continue
+        d = (first - submitted).total_seconds() / 86400.0
+        if d >= 0:
+            days.append(d)
+    if len(days) < 5:
+        return jsonify({'median_days': None, 'sample': len(days),
+                        'reason': 'insufficient_data'})
+    days.sort()
+    n = len(days)
+    median = days[n // 2] if n % 2 else (days[n // 2 - 1] + days[n // 2]) / 2.0
+    return jsonify({
+        'median_days': round(median, 1),
+        'sample': n,
+        'window_days': 90,
+    })
+
+
+@dashboard_bp.route('/ai-replay-coverage', methods=['GET'])
+@login_required
+def api_dashboard_ai_replay_coverage():
+    """Phase 382 — % of AI calls in the last 7 days that have
+    `replay_subject_kind` populated. Auditability signal — replay-ready
+    calls can be re-run from the audit chain.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import text as _text
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    try:
+        row = db.session.execute(_text(
+            "SELECT COUNT(*) AS total, "
+            "SUM(CASE WHEN replay_subject_kind IS NOT NULL THEN 1 ELSE 0 END) AS replayable "
+            "FROM ai_call_logs WHERE created_at >= :c"
+        ), {'c': cutoff}).first()
+        total = int(row.total or 0)
+        replayable = int(row.replayable or 0)
+    except Exception:
+        total = 0
+        replayable = 0
+    if total == 0:
+        return jsonify({'window_days': 7, 'total': 0, 'replayable': 0,
+                        'coverage_pct': None})
+    pct = round(100 * replayable / total, 1)
+    return jsonify({
+        'window_days': 7,
+        'total': total,
+        'replayable': replayable,
+        'coverage_pct': pct,
+    })
+
+
 @dashboard_bp.route('/ngo-fresh-decision', methods=['GET'])
 @login_required
 def api_dashboard_ngo_fresh_decision():

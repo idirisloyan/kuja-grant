@@ -80,4 +80,11 @@ class Review(db.Model):
             'ngo_org_name': self.application.ngo_org.name if self.application and self.application.ngo_org else None,
             'application_name': f'Application #{self.application_id}',
             'score': self.overall_score,
+            # Phase 381 — surface the grant deadline so reviewer queues
+            # can flag reviews whose grant deadline is imminent.
+            'grant_deadline': (
+                self.application.grant.deadline.isoformat()
+                if self.application and self.application.grant and self.application.grant.deadline
+                else None
+            ),
         }

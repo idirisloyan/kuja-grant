@@ -238,6 +238,7 @@ export interface Review {
   application?: Application;
   reviewer_name?: string;
   grant_title?: string;
+  grant_deadline?: string | null;
   ngo_org_name?: string;
 }
 

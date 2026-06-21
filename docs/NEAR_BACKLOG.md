@@ -584,6 +584,30 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-20** Phase 379-383 — This-month submissions +
+  time-to-first-review + 24h deadline badge + AI replay
+  coverage + webhook-health cron:
+  (a) `<SubmissionsThisMonthCard>` on NGO dashboard counts
+  apps submitted this calendar month and compares to same
+  month last year. Backend
+  `GET /api/dashboard/ngo-submissions-this-month`. (b)
+  `<TimeToFirstReviewCard>` on donor dashboard shows median
+  days from `application.submitted_at` to first
+  `review.created_at` over the last 90 days; amber border
+  >=7d, gates under 5 samples. Backend
+  `GET /api/dashboard/donor-time-to-first-review`. (c)
+  Reviewer queue table now shows a rose "Due Nh" badge next
+  to the grant title when the grant deadline falls in the
+  next 24h. Backend now serialises `grant_deadline` on every
+  Review row. (d) `<AiReplayCoverageCard>` on operator
+  dashboard shows % of AI calls in the last 7 days with
+  `replay_subject_kind` set — auditability signal. Backend
+  `GET /api/dashboard/ai-replay-coverage`. (e) New
+  `POST /api/cron/webhook-deliveries-health` summarises
+  webhook delivery success per org over the last 24h and
+  notifies admins when any org with >=10 attempts drops
+  below 90% (honors digests opt-out).
+
 - **2026-06-20** Phase 373-377 — Fresh-decision banner +
   country breakdown + score-gap tip + AI failure rate +
   expired-grant auto-close (+ cost_usd typo fix):

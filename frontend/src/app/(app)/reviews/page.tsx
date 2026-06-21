@@ -216,7 +216,23 @@ function ReviewerView() {
                   <td className="px-4 py-3 font-medium text-foreground">
                     {r.ngo_org_name || t('applications.label_fallback', { n: r.application_id })}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{r.grant_title || '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      {r.grant_title || '—'}
+                      {/* Phase 381 — deadline within 24h badge */}
+                      {(() => {
+                        const dl = r.grant_deadline ? new Date(r.grant_deadline).getTime() : null;
+                        if (!dl) return null;
+                        const hoursLeft = (dl - Date.now()) / 3_600_000;
+                        if (hoursLeft <= 0 || hoursLeft > 24) return null;
+                        return (
+                          <span className="text-[10px] uppercase tracking-wider font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded px-1.5 py-0.5">
+                            Due {Math.ceil(hoursLeft)}h
+                          </span>
+                        );
+                      })()}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">{(() => {
                     const sc = describeApplicationStatus(r.status);
                     return (
