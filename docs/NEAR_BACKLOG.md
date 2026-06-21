@@ -584,6 +584,22 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 601-605 — Decision velocity from submission +
+  EOI per grant mean + review burst max + funds total + monthly
+  platform highlights cron:
+  (a) `<DecisionVelocityFromSubmissionStat>` on NGO dashboard reports
+  avg days submitted→decision_recorded for last 12 months; amber
+  > 60d; self-gates < 3 sample.
+  (b) `<EoiPerGrantMeanStat>` on donor dashboard reports avg EOI
+  count per donor's published grant — engagement signal.
+  (c) `<ReviewBurstMaxStat>` on reviewer reviews page shows peak
+  single-day completion count in last 30d (flame icon).
+  (d) `<FundsTotalStat>` on operator dashboard counts Fund rows
+  lifetime. (e) Phase 605 cron `/api/cron/platform-highlights-month`
+  monthly admin digest of platform highlights this month
+  (apps submitted, grants published, AI calls, feedback); honors
+  digests opt-out.
+
 - **2026-06-21** Phase 595-599 — AI cost YTD + first-time NGOs this
   month + COI disclosed + AI tokens today + daily watchlist
   deadlines cron:

@@ -6033,3 +6033,100 @@ def api_dashboard_admin_ai_tokens_today():
         'tokens_out': tokens_out,
         'total': tokens_in + tokens_out,
     })
+
+
+@dashboard_bp.route('/ngo-decision-velocity-from-submission', methods=['GET'])
+@login_required
+def api_dashboard_ngo_decision_velocity_from_submission():
+    """Phase 601 — Average days between submitted_at and
+    decision_recorded_at for NGO's apps in last 12 months. Personal
+    decision-cycle visibility (different from Phase 291 — that one
+    mirrors the donor's velocity, this one is NGO's wait time).
+    """
+    if current_user.role not in ('ngo', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=365)
+    rows = (db.session.query(Application.submitted_at,
+                             Application.decision_recorded_at)
+            .filter(Application.ngo_org_id == current_user.org_id,
+                    Application.submitted_at.isnot(None),
+                    Application.decision_recorded_at.isnot(None),
+                    Application.decision_recorded_at >= cutoff)
+            .all())
+    durations = []
+    for sub, dec in rows:
+        if not sub or not dec:
+            continue
+        secs = (dec - sub).total_seconds()
+        if secs > 0:
+            durations.append(secs / 86400.0)
+    if len(durations) < 3:
+        return jsonify({'avg_days': None, 'sample': len(durations)})
+    return jsonify({
+        'avg_days': round(sum(durations) / len(durations), 1),
+        'sample': len(durations),
+    })
+
+
+@dashboard_bp.route('/donor-eoi-per-grant-mean', methods=['GET'])
+@login_required
+def api_dashboard_donor_eoi_per_grant_mean():
+    """Phase 602 — Average ExpressionOfInterest count per donor's
+    published Grant. Engagement-per-grant metric.
+    """
+    if current_user.role not in ('donor', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from sqlalchemy import func
+    from app.models.expression_of_interest import ExpressionOfInterest
+    grants_count = (Grant.query
+                    .filter(Grant.donor_org_id == current_user.org_id,
+                            Grant.status.in_(['open', 'review', 'closed']))
+                    .count())
+    if grants_count == 0:
+        return jsonify({'mean': None, 'grants': 0})
+    eoi_count = (db.session.query(ExpressionOfInterest.id)
+                 .join(Grant, ExpressionOfInterest.grant_id == Grant.id)
+                 .filter(Grant.donor_org_id == current_user.org_id)
+                 .count())
+    return jsonify({
+        'mean': round(eoi_count / grants_count, 2),
+        'grants': grants_count,
+        'eois': eoi_count,
+    })
+
+
+@dashboard_bp.route('/reviewer-review-burst-max', methods=['GET'])
+@login_required
+def api_dashboard_reviewer_review_burst_max():
+    """Phase 603 — Most completed reviews on a single calendar day
+    across reviewer's last 30d. Peak output day.
+    """
+    if current_user.role not in ('reviewer', 'admin'):
+        return jsonify({'error': 'access denied'}), 403
+    from datetime import datetime, timezone, timedelta
+    from collections import Counter
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = (db.session.query(Review.completed_at)
+            .filter(Review.reviewer_user_id == current_user.id,
+                    Review.status == 'completed',
+                    Review.completed_at >= cutoff)
+            .all())
+    days = Counter((ts.year, ts.month, ts.day) for (ts,) in rows if ts)
+    if not days:
+        return jsonify({'peak': 0, 'sample': 0})
+    peak = max(days.values())
+    return jsonify({'peak': peak, 'sample': sum(days.values())})
+
+
+@dashboard_bp.route('/admin-funds-total', methods=['GET'])
+@login_required
+def api_dashboard_admin_funds_total():
+    """Phase 604 — Count Fund rows lifetime. Capacity pulse for the
+    networked-funds program.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'error': 'access denied'}), 403
+    from app.models.fund import Fund
+    count = Fund.query.count()
+    return jsonify({'count': count})

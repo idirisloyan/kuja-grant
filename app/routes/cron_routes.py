@@ -4914,3 +4914,88 @@ def api_cron_ngo_deadlines_today():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
+
+@cron_bp.route('/platform-highlights-month', methods=['POST'])
+def api_cron_platform_highlights_month():
+    """Phase 605 — Monthly admin digest with platform highlights this
+    calendar month: applications submitted, grants published, AI calls,
+    feedback entries. Honors digests opt-out.
+    """
+    if not _is_authorized():
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    import time as _time
+    _t0 = _time.time()
+    try:
+        from app.extensions import db
+        from app.models import (
+            User, Application, Grant, Notification, record_cron_run as _rcr,
+        )
+        from app.models.ai_thread import AICallLog
+        from app.models.user_feedback import UserFeedback
+        from app.models.notification_preference import NotificationPreference
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        apps = (Application.query
+                .filter(Application.submitted_at.isnot(None),
+                        Application.submitted_at >= month_start)
+                .count())
+        grants = (Grant.query
+                  .filter(Grant.status.in_(['open', 'review']),
+                          Grant.created_at >= month_start)
+                  .count())
+        ai_calls = (AICallLog.query
+                    .filter(AICallLog.created_at >= month_start)
+                    .count())
+        feedback = (UserFeedback.query
+                    .filter(UserFeedback.created_at >= month_start)
+                    .count())
+        sent = 0
+        if apps or grants or ai_calls or feedback:
+            msg = (
+                f'This month: {apps} apps submitted, {grants} grants published, '
+                f'{ai_calls} AI calls, {feedback} feedback entries.'
+            )
+            admins = User.query.filter_by(role='admin').all()
+            for u in admins:
+                channels = NotificationPreference.channels_for(
+                    user_id=u.id, category='digests'
+                )
+                if not channels:
+                    continue
+                n = Notification(
+                    user_id=u.id,
+                    type='platform_highlights_month',
+                    title='Platform highlights this month',
+                    message=msg[:500],
+                    link='/admin/metrics',
+                )
+                db.session.add(n)
+                sent += 1
+            if sent > 0:
+                db.session.commit()
+        result = {
+            'apps': apps, 'grants': grants, 'ai_calls': ai_calls,
+            'feedback': feedback, 'admins_notified': sent,
+        }
+        _rcr('platform-highlights-month',
+             duration_ms=int((_time.time() - _t0) * 1000),
+             success=True, summary=str(result)[:480])
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.exception('platform-highlights-month cron failed: %s', e)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            from app.models import record_cron_run as _rcr
+            _rcr('platform-highlights-month',
+                 duration_ms=int((_time.time() - _t0) * 1000),
+                 success=False, summary=str(e)[:480])
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
