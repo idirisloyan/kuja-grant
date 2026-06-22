@@ -620,6 +620,19 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 622 — rubric live-preview anchors target the
+  right criterion: the team flagged that anchor hrefs read
+  `#criterion-undefined` because some grants ship criteria with `id`
+  (seed shape) instead of `key`. Introduced shared
+  `frontend/src/lib/criterion-anchor.ts` (`criterionAnchorId(c, idx)`)
+  and wired it into the three sites that must agree on the anchor:
+  `SubmissionVelocityBar` (segmented bar + Continue jump),
+  `RubricLivePreview` ("jump to criterion" hrefs), and the apply page
+  wrapper `<div id="criterion-...">`. Fallback chain: `c.key` → `c.id`
+  → slugified `c.label` → `crit-<index>`. Verified locally: all 5
+  anchors and links match for a `key`-shape grant; no
+  `#criterion-undefined`.
+
 - **2026-06-21** Phase 601-605 — Decision velocity from submission +
   EOI per grant mean + review burst max + funds total + monthly
   platform highlights cron:

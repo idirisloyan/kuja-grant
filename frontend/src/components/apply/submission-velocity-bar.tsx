@@ -22,10 +22,12 @@
 import { useMemo } from 'react';
 import { Gauge, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { criterionAnchorId } from '@/lib/criterion-anchor';
 
 interface Criterion {
   key: string;
   label: string;
+  id?: string;
   weight?: number;
   max_words?: number;
 }
@@ -61,12 +63,17 @@ const STATE_BAR: Record<string, string> = {
 
 export function SubmissionVelocityBar({ criteria, responses, onJumpToCriterion }: Props) {
   const stats = useMemo(() => {
-    const per = criteria.map((c) => {
+    const per = criteria.map((c, index) => {
       const text = responses[c.key] ?? '';
       const n = wordCount(text);
       return {
-        key: c.key,
-        label: c.label || c.key,
+        // Phase 622 — anchorKey is the DOM-id-safe identifier we emit
+        // via onJumpToCriterion. Some grants ship criteria without `key`
+        // (older shape uses `id`); fall back to a stable slug rather
+        // than passing `undefined` and producing `criterion-undefined`.
+        anchorKey: criterionAnchorId(c, index),
+        responseKey: c.key,
+        label: c.label || c.key || `Criterion ${index + 1}`,
         weight: c.weight ?? 1,
         max_words: c.max_words,
         words: n,
@@ -122,7 +129,7 @@ export function SubmissionVelocityBar({ criteria, responses, onJumpToCriterion }
       >
         {per.map((p) => (
           <div
-            key={p.key}
+            key={p.anchorKey}
             className={cn('h-full rounded-sm', STATE_BAR[p.state])}
             style={{ flex: p.weight ?? 1 }}
             title={`${p.label}: ${p.words} words (${p.state})`}
@@ -133,7 +140,7 @@ export function SubmissionVelocityBar({ criteria, responses, onJumpToCriterion }
       {next && onJumpToCriterion && (
         <button
           type="button"
-          onClick={() => onJumpToCriterion(next.key)}
+          onClick={() => onJumpToCriterion(next.anchorKey)}
           className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-[hsl(var(--kuja-clay))]"
         >
           {next.state === 'empty' ? 'Start' : 'Continue'}: <strong className="text-foreground">{next.label}</strong>

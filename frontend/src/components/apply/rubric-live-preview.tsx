@@ -23,9 +23,11 @@
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { CircleHelp } from 'lucide-react';
+import { criterionAnchorId } from '@/lib/criterion-anchor';
 
 interface Criterion {
-  key: string;
+  key?: string;
+  id?: string;
   label: string;
   max_words?: number | null;
 }
@@ -87,10 +89,17 @@ function tone(score: number) {
 
 export function RubricLivePreview({ criteria, responses, className }: Props) {
   const rows = useMemo(() => {
-    return criteria.map((c) => {
-      const txt = responses[c.key] ?? '';
+    return criteria.map((c, index) => {
+      const responseKey = c.key ?? c.id ?? '';
+      const txt = responseKey ? (responses[responseKey] ?? '') : '';
       const { score, signals } = scoreFor(txt, c.max_words ?? 0);
-      return { c, score, signals, hasText: !!txt.trim() };
+      return {
+        c,
+        anchor: criterionAnchorId(c, index),
+        score,
+        signals,
+        hasText: !!txt.trim(),
+      };
     });
   }, [criteria, responses]);
 
@@ -128,11 +137,11 @@ export function RubricLivePreview({ criteria, responses, className }: Props) {
       </div>
 
       <ul className="space-y-2">
-        {rows.map(({ c, score, hasText }) => (
-          <li key={c.key} className="space-y-1">
+        {rows.map(({ c, anchor, score, hasText }) => (
+          <li key={anchor} className="space-y-1">
             <div className="flex items-center justify-between gap-2">
               <a
-                href={`#criterion-${c.key}`}
+                href={`#criterion-${anchor}`}
                 className="truncate flex-1 text-foreground hover:underline"
                 title={c.label}
               >

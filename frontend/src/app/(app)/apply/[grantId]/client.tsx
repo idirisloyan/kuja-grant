@@ -22,6 +22,7 @@ import { AIFeedbackChip } from '@/components/shared/ai-feedback-chip';
 import { FreshnessStamp } from '@/components/shared/freshness-stamp';
 import { useAutosave } from '@/lib/hooks/use-autosave';
 import { getQuestionForLabel, getPlaceholderForLabel } from '@/lib/guided-questions';
+import { criterionAnchorId } from '@/lib/criterion-anchor';
 import { SubmissionVelocityBar } from '@/components/apply/submission-velocity-bar';
 import { PastWinsPopover } from '@/components/apply/past-wins-popover';
 import { GrantQAPanel } from '@/components/grants/GrantQAPanel';
@@ -1329,7 +1330,7 @@ function ProposalStep({
         </AIToolsAccordion>
       )}
 
-      {criteria.map((c) => {
+      {criteria.map((c, idx) => {
         const text = responses[c.key] ?? '';
         const wc = wordCount(text);
         const isLoadingGuidance = guidanceLoading[c.key] || false;
@@ -1337,9 +1338,10 @@ function ProposalStep({
         const strengthen = strengthenResults[c.key];
         const isLoadingStrengthen = strengthenLoading[c.key] || false;
         const wcCls = wordCountColor(wc, c.max_words);
+        const anchor = criterionAnchorId(c, idx);
 
         return (
-          <div key={c.key} id={`criterion-${c.key}`}>
+          <div key={anchor} id={`criterion-${anchor}`}>
           <Card className="p-5">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="flex-1">
