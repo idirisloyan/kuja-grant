@@ -84,15 +84,27 @@ function heuristicAsQuestion(label: string): string {
   return `Tell us about ${normalised}.`;
 }
 
-/** Public lookup: get the natural-language question for a field key. */
-export function getQuestionForLabel(key: string, fallbackLabel?: string): string {
+/** Public lookup: get the natural-language question for a field key.
+ *
+ * 2026-06-21 — guard undefined/null key. Crashed apply page on prod
+ * for grants whose criteria came in with `id` (seed shape) instead of
+ * `key`, or were authored without a key at all. The criterion map
+ * called `key.toLowerCase()` and threw, taking the whole proposal
+ * step down with it. Now: missing key → fall back to label or empty
+ * string; never crashes.
+ */
+export function getQuestionForLabel(key: string | null | undefined, fallbackLabel?: string): string {
+  if (!key || typeof key !== 'string') {
+    return heuristicAsQuestion(fallbackLabel || '');
+  }
   const normKey = key.toLowerCase().replace(/[ -]/g, '_');
   if (QUESTION_OVERRIDES[normKey]) return QUESTION_OVERRIDES[normKey];
   return heuristicAsQuestion(fallbackLabel || key);
 }
 
 /** Public lookup: get the example placeholder for a field key. */
-export function getPlaceholderForLabel(key: string): string | null {
+export function getPlaceholderForLabel(key: string | null | undefined): string | null {
+  if (!key || typeof key !== 'string') return null;
   const normKey = key.toLowerCase().replace(/[ -]/g, '_');
   return PLACEHOLDERS[normKey] ?? null;
 }
