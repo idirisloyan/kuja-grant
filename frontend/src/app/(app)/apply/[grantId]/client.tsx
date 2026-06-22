@@ -1212,17 +1212,6 @@ function ProposalStep({
   // Phase 130 — read disclosure mode to optionally hide advanced panels.
   const [disclosureMode] = useDisclosureMode();
 
-  // Phase 619 — per-criterion overflow menu state. The 4-button AI row
-  // (Draft + Strengthen + Polish + AI Help) was the loudest piece of
-  // clutter on this page; consolidating to 1 primary action + a small
-  // "More" disclosure keeps every capability available but stops the
-  // textarea footer from looking like a tool palette. Team retest
-  // 2026-06-20 flagged "less cluttered" as the top NGO ask.
-  const [overflowOpen, setOverflowOpen] = useState<Record<string, boolean>>({});
-  const toggleOverflow = useCallback((key: string) => {
-    setOverflowOpen((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, []);
-
   if (criteria.length === 0) {
     return (
       <Card className="py-10 text-center">
@@ -1258,22 +1247,24 @@ function ProposalStep({
         </Alert>
       )}
 
-      {/* Phase 619 — utility strip. Trust badge + past-apps drawer +
-          disclosure toggle used to stack as three separate rows above
-          the rubric. Collapsed into one quiet line so the textarea is
-          closer to the top of the viewport. Trust Profile (Phase 77)
-          still reassures the NGO their portable score is attached;
-          PastApplicationsDrawer (Phase 179) and DisclosureToggle
-          (Phase 130) sit on the right as low-weight utilities. */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <TrustPortableBadge variant="compact" />
-          <span>attached automatically</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-1">
-          <PastApplicationsDrawer />
-          <DisclosureToggle />
-        </div>
+      {/* Phase 77 — Trust Profile reassurance: NGO sees their portable
+          score before they start composing. Reframes the moment from
+          'I have to convince this donor I'm trustworthy' to 'my Trust
+          Profile already does that.' */}
+      <div className="flex flex-wrap items-center gap-2">
+        <TrustPortableBadge variant="compact" />
+        <span className="text-[11px] text-muted-foreground">
+          attached automatically with this application
+        </span>
+        {/* Phase 179 — open a drawer of past awarded apps for re-use. */}
+        <PastApplicationsDrawer />
+      </div>
+
+      {/* Phase 130 — Beginner / expert disclosure toggle. Beginner mode
+          collapses the AI tools accordion so first-time NGOs aren't
+          overwhelmed by six AI helpers stacked at the top. */}
+      <div className="flex items-center justify-end">
+        <DisclosureToggle />
       </div>
 
       {/* Phase 119 — Side-by-side rubric preview. Updates per keystroke
@@ -1415,82 +1406,57 @@ function ProposalStep({
                   <ScoreRing score={guidance.quality_score} size={36} strokeWidth={3} />
                 )}
               </div>
-              {/* Phase 619 — collapsed AI controls. Smart primary button
-                  (Draft when empty, Strengthen when filled) + a small
-                  "More" disclosure for Polish + AI guidance + the
-                  alternate draft mode. Previously 4 buttons stacked
-                  horizontally; team flagged this as the loudest piece
-                  of clutter on the apply page. */}
-              {(() => {
-                const hasText = text.trim().length > 0;
-                const primaryLoading = hasText ? isLoadingStrengthen : draftLoading[c.key];
-                const primaryLabel = hasText
-                  ? (isLoadingStrengthen ? t('apply.strengthening') : t('apply.strengthen_against_criterion'))
-                  : (draftLoading[c.key] ? t('apply.drafting') : t('apply.draft_for_me'));
-                const onPrimary = hasText ? () => onStrengthenSection(c) : () => onDraftSection(c);
-                const open = overflowOpen[c.key];
-                return (
-                  <div className="flex items-center gap-2 relative">
-                    <button
-                      onClick={onPrimary}
-                      disabled={primaryLoading}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-3 py-1.5 text-xs font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50"
-                    >
-                      {primaryLoading ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-3.5 w-3.5" />
-                      )}
-                      {primaryLabel}
-                    </button>
-                    {hasText && (
-                      <button
-                        type="button"
-                        onClick={() => toggleOverflow(c.key)}
-                        aria-expanded={open}
-                        aria-label="More AI tools"
-                        className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
-                      >
-                        More {open ? '▴' : '▾'}
-                      </button>
-                    )}
-                    {hasText && open && (
-                      <div className="absolute right-0 top-full z-10 mt-1 w-56 rounded-md border border-border bg-card shadow-md p-1.5 space-y-1">
-                        <button
-                          onClick={() => { onPolishSection(c); toggleOverflow(c.key); }}
-                          disabled={text.trim().length < 30 || polishLoading[c.key]}
-                          title="Improve grammar + flow without changing meaning"
-                          className="w-full text-left inline-flex items-center gap-2 rounded px-2 py-1.5 text-xs text-foreground hover:bg-muted disabled:opacity-50"
-                        >
-                          {polishLoading[c.key] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                          {polishLoading[c.key] ? 'Polishing…' : 'Polish for clarity'}
-                        </button>
-                        <button
-                          onClick={() => { onGetGuidance(c); toggleOverflow(c.key); }}
-                          disabled={isLoadingGuidance}
-                          className="w-full text-left inline-flex items-center gap-2 rounded px-2 py-1.5 text-xs text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark-soft))]/60 disabled:opacity-50"
-                        >
-                          {isLoadingGuidance ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Sparkles className="h-3.5 w-3.5" />
-                          )}
-                          {isLoadingGuidance ? t('apply.analyzing') : t('apply.ai_help')}
-                        </button>
-                        <button
-                          onClick={() => { onDraftSection(c); toggleOverflow(c.key); }}
-                          disabled={draftLoading[c.key]}
-                          title={t('apply.draft_for_me_tooltip_filled')}
-                          className="w-full text-left inline-flex items-center gap-2 rounded px-2 py-1.5 text-xs text-foreground hover:bg-muted disabled:opacity-50"
-                        >
-                          {draftLoading[c.key] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                          {draftLoading[c.key] ? t('apply.rewriting') : t('apply.improve_with_ai')}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onDraftSection(c)}
+                  disabled={draftLoading[c.key]}
+                  title={text.trim() ? t('apply.draft_for_me_tooltip_filled') : t('apply.draft_for_me_tooltip_empty')}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  {draftLoading[c.key] ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  {draftLoading[c.key]
+                    ? (text.trim() ? t('apply.rewriting') : t('apply.drafting'))
+                    : (text.trim() ? t('apply.improve_with_ai') : t('apply.draft_for_me'))}
+                </button>
+                <button
+                  onClick={() => onStrengthenSection(c)}
+                  disabled={!text.trim() || isLoadingStrengthen}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-3 py-1.5 text-xs font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50"
+                >
+                  {isLoadingStrengthen ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  {isLoadingStrengthen ? t('apply.strengthening') : t('apply.strengthen_against_criterion')}
+                </button>
+                {/* Phase 320 — Polish for clarity (no donor lens). */}
+                <button
+                  onClick={() => onPolishSection(c)}
+                  disabled={text.trim().length < 30 || polishLoading[c.key]}
+                  title="Improve grammar + flow without changing meaning"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  {polishLoading[c.key] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {polishLoading[c.key] ? 'Polishing…' : 'Polish'}
+                </button>
+                <button
+                  onClick={() => onGetGuidance(c)}
+                  disabled={!text.trim() || isLoadingGuidance}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-spark-soft))] bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark-soft))]/80 disabled:opacity-50"
+                >
+                  {isLoadingGuidance ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  {isLoadingGuidance ? t('apply.analyzing') : t('apply.ai_help')}
+                </button>
+              </div>
             </div>
 
             {polishResults[c.key] && (
