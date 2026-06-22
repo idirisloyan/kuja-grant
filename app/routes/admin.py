@@ -764,6 +764,167 @@ def api_admin_metrics():
                         'detail': str(e)[:200]}), 500
 
 
+# ---------------------------------------------------------------------------
+# Phase 621 — Time-to-first telemetry. Answers two questions the funnel
+# rollups above can't: how long does it take a new NGO to file their
+# first application, and how long after a grant is awarded does the
+# first report land? Stalls in either of these is where NGOs churn after
+# onboarding, and the existing /admin/metrics tile only shows count
+# funnels — not duration.
+# ---------------------------------------------------------------------------
+
+def _percentile_hours(values, pct):
+    """Compute the given percentile (0-100) of a list of float hours.
+
+    Returns None on an empty list. Linear interpolation between adjacent
+    samples — good enough for an admin rollup, no numpy dependency. The
+    p50/p90 split is what the team uses to spot tails; we don't need
+    the full histogram in this endpoint.
+    """
+    if not values:
+        return None
+    s = sorted(values)
+    if len(s) == 1:
+        return round(s[0], 2)
+    k = (len(s) - 1) * (pct / 100.0)
+    lo = int(k)
+    hi = min(lo + 1, len(s) - 1)
+    frac = k - lo
+    return round(s[lo] + (s[hi] - s[lo]) * frac, 2)
+
+
+@admin_bp.route('/admin/time-to-first', methods=['GET'])
+@login_required
+def api_admin_time_to_first():
+    """Phase 621 — time-to-first-application + time-to-first-report.
+
+    Two distinct cohorts:
+      1. TTFA — for each NGO user with role='ngo' that has submitted
+         at least one application, hours from User.created_at to the
+         earliest Application.submitted_at for any application of any
+         org they belong to.
+      2. TTFR — for each (grant_id, org_id) where the org has an
+         'awarded' application, hours from that application's
+         submitted_at (proxy for grant award) to the FIRST
+         Report.submitted_at for the same grant + org.
+
+    Returns p50/p90 for each, plus sample counts so the admin can tell
+    whether the medians are based on enough signal to trust.
+
+    Query:
+      days = look-back window for the cohort. Default 90, max 365.
+             Applied to the START event (User.created_at for TTFA,
+             Application.submitted_at for TTFR).
+    """
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Admin only.'}), 403
+
+    try:
+        days = int(request.args.get('days', 90))
+        days = max(7, min(365, days))
+    except ValueError:
+        days = 90
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    from app.models import Report
+
+    # TTFA — group by user. For each NGO user created within the window,
+    # find the earliest submit across any application from their org.
+    # User → org is a direct FK (User.org_id); Application links
+    # ngo_org_id back to that org. A user with no org_id contributes no
+    # signal — they can't submit anyway.
+    ttfa_hours = []
+    try:
+        rows = (
+            db.session.query(User.id, User.created_at, db.func.min(Application.submitted_at))
+            .join(Application, Application.ngo_org_id == User.org_id)
+            .filter(User.role == 'ngo')
+            .filter(User.created_at >= cutoff)
+            .filter(User.org_id.isnot(None))
+            .filter(Application.submitted_at.isnot(None))
+            .group_by(User.id, User.created_at)
+            .all()
+        )
+        for _uid, created_at, first_sub in rows:
+            if not created_at or not first_sub:
+                continue
+            delta = (first_sub - created_at).total_seconds() / 3600.0
+            if delta >= 0:  # guard clock skew
+                ttfa_hours.append(delta)
+    except Exception as e:
+        logger.warning('TTFA rollup failed: %s', e)
+
+    # TTFR — group by (grant_id, org_id) for awarded apps. Use the
+    # awarded application's submitted_at as the "grant landed" anchor.
+    # First report for that pair = the duration we care about.
+    ttfr_hours = []
+    try:
+        # Awarded apps anchor: earliest submitted_at per (grant_id, org_id)
+        # where any of that pair's applications reached 'awarded'.
+        awarded = (
+            db.session.query(
+                Application.grant_id,
+                Application.ngo_org_id,
+                db.func.min(Application.submitted_at).label('anchor'),
+            )
+            .filter(Application.status == 'awarded')
+            .filter(Application.submitted_at.isnot(None))
+            .filter(Application.submitted_at >= cutoff)
+            .group_by(Application.grant_id, Application.ngo_org_id)
+            .all()
+        )
+        for grant_id, org_id, anchor in awarded:
+            if not anchor:
+                continue
+            first_report = (
+                db.session.query(db.func.min(Report.submitted_at))
+                .filter(Report.grant_id == grant_id)
+                .filter(Report.submitted_by_org_id == org_id)
+                .filter(Report.submitted_at.isnot(None))
+                .scalar()
+            )
+            if not first_report:
+                continue
+            delta = (first_report - anchor).total_seconds() / 3600.0
+            if delta >= 0:
+                ttfr_hours.append(delta)
+    except Exception as e:
+        logger.warning('TTFR rollup failed: %s', e)
+
+    return jsonify({
+        'success': True,
+        'window_days': days,
+        'time_to_first_application': {
+            'sample_size': len(ttfa_hours),
+            'p50_hours': _percentile_hours(ttfa_hours, 50),
+            'p90_hours': _percentile_hours(ttfa_hours, 90),
+            # Convenience day-rounded values for the UI; p50 in hours is
+            # awkward when the median is days.
+            'p50_days': round(_percentile_hours(ttfa_hours, 50) / 24.0, 1)
+                if ttfa_hours else None,
+            'p90_days': round(_percentile_hours(ttfa_hours, 90) / 24.0, 1)
+                if ttfa_hours else None,
+        },
+        'time_to_first_report': {
+            'sample_size': len(ttfr_hours),
+            'p50_hours': _percentile_hours(ttfr_hours, 50),
+            'p90_hours': _percentile_hours(ttfr_hours, 90),
+            'p50_days': round(_percentile_hours(ttfr_hours, 50) / 24.0, 1)
+                if ttfr_hours else None,
+            'p90_days': round(_percentile_hours(ttfr_hours, 90) / 24.0, 1)
+                if ttfr_hours else None,
+        },
+        'notes': {
+            'ttfa_anchor': 'User.created_at (signup)',
+            'ttfa_event': 'earliest Application.submitted_at across any org the user belongs to',
+            'ttfr_anchor': "earliest Application.submitted_at where status='awarded' (proxy for grant landed)",
+            'ttfr_event': 'earliest Report.submitted_at for the same (grant, org)',
+            'cohort_filter': f'started in last {days} days',
+        },
+    })
+
+
 @admin_bp.route('/admin/clear-all-lockouts', methods=['POST'])
 @login_required
 def api_admin_clear_all_lockouts():

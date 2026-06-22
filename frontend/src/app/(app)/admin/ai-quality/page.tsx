@@ -28,6 +28,17 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { EmptyState } from '@/components/shared/empty-state';
 
+interface LanguageRow {
+  language: string;
+  count: number;
+  median_edit_ratio: number | null;
+  // Phase 620 — per-language false-confidence fields. Defaults to 0/0 on
+  // older API responses (response shape is additive).
+  verbatim_count?: number;
+  false_confidence_count?: number;
+  false_confidence_rate_pct?: number;
+}
+
 interface SurfaceRow {
   surface: string;
   total_events: number;
@@ -35,7 +46,14 @@ interface SurfaceRow {
   mode_distribution: { verbatim: number; blended: number; rejected: number };
   false_confidence_count: number;
   false_confidence_rate_pct: number;
-  by_language: { language: string; count: number; median_edit_ratio: number | null }[];
+  by_language: LanguageRow[];
+}
+
+interface FCByLanguageRow {
+  language: string;
+  verbatim_count: number;
+  false_confidence_count: number;
+  false_confidence_rate_pct: number;
 }
 
 interface Resp {
@@ -47,6 +65,10 @@ interface Resp {
     total_events: number;
     median_edit_ratio_overall: number | null;
     false_confidence_rate_pct_overall: number;
+    // Phase 620 — global per-language FC. Sorted highest rate first, but
+    // languages with < 10 verbatim samples are demoted so a single fluke
+    // (1 verbatim → 1 FC = 100%) doesn't dominate the top of the list.
+    false_confidence_by_language?: FCByLanguageRow[];
   };
 }
 
@@ -154,6 +176,17 @@ export default function AIQualityPage() {
               />
             </div>
 
+            {/* Phase 620 — per-language false-confidence panel. This is the
+                bit the team asked for: when Somali / Swahili / Arabic
+                prompts calibrate worse than English, the overall FC tile
+                hides it. Languages are sorted by rate (≥10 verbatim
+                samples count first); low-volume rows are kept but greyed
+                so a 1-sample fluke doesn't read as "100% FC in lang X". */}
+            {data.overall.false_confidence_by_language
+              && data.overall.false_confidence_by_language.length > 0 && (
+              <FCByLanguagePanel rows={data.overall.false_confidence_by_language} />
+            )}
+
             {/* Per-surface table */}
             {data.surfaces.length === 0 ? (
               <EmptyState
@@ -203,15 +236,30 @@ export default function AIQualityPage() {
                           </div>
                         </td>
                         <td className="p-3 space-y-0.5">
-                          {s.by_language.slice(0, 4).map((lr) => (
-                            <div key={lr.language} className="flex items-center gap-1.5 text-[11px]">
-                              <Globe className="w-3 h-3 text-muted-foreground" />
-                              <span className="font-semibold">{lr.language}</span>
-                              <span className="text-muted-foreground">
-                                {lr.count} · {pct(lr.median_edit_ratio)}
-                              </span>
-                            </div>
-                          ))}
+                          {s.by_language.slice(0, 4).map((lr) => {
+                            const fcRate = lr.false_confidence_rate_pct ?? 0;
+                            const v = lr.verbatim_count ?? 0;
+                            const fcClass = v >= 5
+                              ? tone(fcRate / 100, { warn: 0.1, bad: 0.25 })
+                              : 'text-muted-foreground';
+                            return (
+                              <div key={lr.language} className="flex items-center gap-1.5 text-[11px]">
+                                <Globe className="w-3 h-3 text-muted-foreground" />
+                                <span className="font-semibold">{lr.language}</span>
+                                <span className="text-muted-foreground">
+                                  {lr.count} · {pct(lr.median_edit_ratio)}
+                                </span>
+                                {(lr.verbatim_count ?? 0) > 0 && (
+                                  <span
+                                    title={`${lr.false_confidence_count ?? 0} FC of ${v} verbatim`}
+                                    className={`rounded px-1 ${fcClass}`}
+                                  >
+                                    FC {fcRate}%
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
                           {s.by_language.length === 0 && (
                             <span className="text-muted-foreground italic">no language tag</span>
                           )}
@@ -254,6 +302,48 @@ function SummaryTile({
         {value}
       </div>
       {sub && <div className="text-[11px] text-muted-foreground mt-1">{sub}</div>}
+    </div>
+  );
+}
+
+function FCByLanguagePanel({ rows }: { rows: FCByLanguageRow[] }) {
+  // Reliability threshold for the FC rate to be visually "loud". Below
+  // this many verbatim samples we still show the row but greyed, with a
+  // small "(low sample)" suffix so the team doesn't act on noise.
+  const SIGNAL_THRESHOLD = 10;
+  return (
+    <div className="border border-border bg-card rounded-lg p-4 mb-4">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+        <Globe className="w-3.5 h-3.5" />
+        False confidence by language
+        <span className="text-[10px]">
+          (sorted highest rate first, ≥{SIGNAL_THRESHOLD} verbatim samples prioritised)
+        </span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {rows.slice(0, 8).map((r) => {
+          const reliable = r.verbatim_count >= SIGNAL_THRESHOLD;
+          const toneCls = reliable
+            ? tone(r.false_confidence_rate_pct / 100, { warn: 0.1, bad: 0.25 })
+            : 'text-muted-foreground bg-muted/40';
+          return (
+            <div
+              key={r.language}
+              className={`rounded-md border border-border p-2 ${toneCls}`}
+              title={`${r.false_confidence_count} of ${r.verbatim_count} verbatim accepts corrected`}
+            >
+              <div className="flex items-center justify-between gap-1 text-[11px] font-semibold">
+                <span className="uppercase">{r.language}</span>
+                <span>{r.false_confidence_rate_pct}%</span>
+              </div>
+              <div className="text-[10px] mt-0.5 opacity-75">
+                {r.false_confidence_count}/{r.verbatim_count} verbatim
+                {!reliable && ' · low sample'}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

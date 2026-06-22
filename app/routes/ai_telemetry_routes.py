@@ -256,6 +256,11 @@ def api_ai_false_confidence():
     surface = str(body.get('surface') or '').strip()[:80]
     item_id = str(body.get('itemId') or '').strip()[:64]
     corrected_by = str(body.get('correctedBy') or '').strip()
+    # Phase 620 — persist language on the FC event so the rollup can compute
+    # per-language false-confidence rate. Calibration drift is almost always
+    # locale-specific (Somali/Swahili/Arabic prompts diverge from English),
+    # so a single overall FC% hides the failure mode the team needs to see.
+    language = str(body.get('language') or '').strip().lower()[:8] or 'unknown'
     if not surface or corrected_by not in ('donor', 'reviewer', 'ob', 'system'):
         return jsonify({'success': True, 'ignored': True, 'reason': 'malformed'})
 
@@ -265,7 +270,9 @@ def api_ai_false_confidence():
             success=False,
             user_id=current_user.id if current_user.is_authenticated else None,
             error_code=corrected_by,
-            error_message=f'item={item_id} corrected_by={corrected_by}'[:500],
+            error_message=(
+                f'item={item_id} corrected_by={corrected_by} language={language}'
+            )[:500],
         )
         db.session.add(log)
         db.session.commit()
@@ -394,6 +401,11 @@ def api_ai_quality_rollup():
     all_ratios = []
     total_verbatim = 0
     total_fc = 0
+    # Phase 620 — track per-language verbatim + FC across all surfaces so
+    # the overall response can answer "which language is calibrating worst?"
+    # without the caller having to fan-out and sum.
+    global_verbatim_by_lang = defaultdict(int)
+    global_fc_by_lang = defaultdict(int)
     for surface, b in sorted(by_surface.items()):
         verbatim = len(b['verbatim_events'])
         blended = len(b['blended_events'])
@@ -406,6 +418,11 @@ def api_ai_quality_rollup():
         # Edit ratios — pulled from the message blob.
         ratios = []
         by_lang_ratios = defaultdict(list)
+        verbatim_by_lang = defaultdict(int)
+        for evt in b['verbatim_events']:
+            _, lang = _parse_quality_event(evt)
+            verbatim_by_lang[lang] += 1
+            global_verbatim_by_lang[lang] += 1
         for evt in b['verbatim_events'] + b['blended_events'] + b['rejected_events']:
             ratio, lang = _parse_quality_event(evt)
             if ratio is not None:
@@ -413,12 +430,33 @@ def api_ai_quality_rollup():
                 by_lang_ratios[lang].append(ratio)
         all_ratios.extend(ratios)
 
+        # Phase 620 — count false-confidence by language too.
+        fc_by_lang = defaultdict(int)
+        for evt in b['false_confidence_events']:
+            _, lang = _parse_quality_event(evt)
+            fc_by_lang[lang] += 1
+            global_fc_by_lang[lang] += 1
+
+        # Union of every language seen in any of the three signals so the
+        # caller doesn't have to merge keys; gives per-language verbatim,
+        # FC count, FC rate (verbatim → corrected), and edit ratio.
+        all_langs = set(by_lang_ratios) | set(verbatim_by_lang) | set(fc_by_lang)
         by_language = []
-        for lang, lang_ratios in by_lang_ratios.items():
+        for lang in all_langs:
+            lang_ratios = by_lang_ratios.get(lang, [])
+            v = verbatim_by_lang.get(lang, 0)
+            f = fc_by_lang.get(lang, 0)
             by_language.append({
                 'language': lang,
                 'count': len(lang_ratios),
-                'median_edit_ratio': round(_median(lang_ratios), 3) if lang_ratios else None,
+                'median_edit_ratio': (
+                    round(_median(lang_ratios), 3) if lang_ratios else None
+                ),
+                'verbatim_count': v,
+                'false_confidence_count': f,
+                'false_confidence_rate_pct': (
+                    round(100 * f / v, 1) if v else 0.0
+                ),
             })
         by_language.sort(key=lambda x: -x['count'])
 
@@ -440,6 +478,28 @@ def api_ai_quality_rollup():
             'by_language': by_language,
         })
 
+    # Phase 620 — overall per-language false-confidence so the UI can light up
+    # "Somali is 4× English" without re-traversing the per-surface array.
+    fc_by_language_overall = []
+    for lang in set(global_verbatim_by_lang) | set(global_fc_by_lang):
+        v = global_verbatim_by_lang.get(lang, 0)
+        f = global_fc_by_lang.get(lang, 0)
+        fc_by_language_overall.append({
+            'language': lang,
+            'verbatim_count': v,
+            'false_confidence_count': f,
+            'false_confidence_rate_pct': round(100 * f / v, 1) if v else 0.0,
+        })
+    # Sort highest rate first, but only among languages with enough verbatim
+    # signal to be statistically meaningful (≥10) — keeps a single fluke from
+    # showing as "100% FC in Arabic" when there was 1 sample.
+    fc_by_language_overall.sort(
+        key=lambda x: (
+            -x['false_confidence_rate_pct'] if x['verbatim_count'] >= 10 else 1,
+            -x['verbatim_count'],
+        )
+    )
+
     return jsonify({
         'success': True,
         'window_hours': hours,
@@ -450,6 +510,7 @@ def api_ai_quality_rollup():
             'median_edit_ratio_overall': round(_median(all_ratios), 3) if all_ratios else None,
             'false_confidence_rate_pct_overall':
                 round(100 * total_fc / total_verbatim, 1) if total_verbatim else 0.0,
+            'false_confidence_by_language': fc_by_language_overall,
         },
     })
 

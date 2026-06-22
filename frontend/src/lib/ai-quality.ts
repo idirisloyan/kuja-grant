@@ -96,17 +96,28 @@ export function recordAiQuality({
  * Mark a previously-accepted AI surface as having been later corrected by
  * the recipient (false-confidence signal). Backend rolls this up into the
  * "false confidence rate" metric per surface per language.
+ *
+ * Phase 620 — language is now forwarded so the admin AI-quality rollup
+ * can compute per-locale calibration drift. Defaults to navigator
+ * language if the caller doesn't pass one, but explicit is better when
+ * the surface knows the locale of the rendered content.
  */
 export function markFalseConfidence({
   surface,
   itemId,
   correctedBy,
+  language,
 }: {
   surface: string;
   itemId: string;
   correctedBy: 'donor' | 'reviewer' | 'ob' | 'system';
+  language?: string;
 }): void {
   if (typeof window === 'undefined') return;
+  const lang = (language
+    || (typeof navigator !== 'undefined' ? navigator.language : 'en')
+    || 'en'
+  ).slice(0, 8).toLowerCase();
   try {
     fetch('/api/ai-telemetry/false-confidence', {
       method: 'POST',
@@ -115,6 +126,7 @@ export function markFalseConfidence({
         surface,
         itemId,
         correctedBy,
+        language: lang,
         capturedAtISO: new Date().toISOString(),
       }),
       keepalive: true,
