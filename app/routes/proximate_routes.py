@@ -35,6 +35,7 @@ from app.models import (
     Q1_LABEL_EN, Q1_LABEL_AR, Q2_LABEL_EN, Q2_LABEL_AR, Q3_LABEL_EN, Q3_LABEL_AR,
     AuditChainEntry,
 )
+from app.utils.network import ob_required
 
 logger = logging.getLogger('kuja')
 
@@ -424,4 +425,187 @@ def api_submit_endorsement(partner_id):
         'endorsement': endorsement.to_dict(),
         'partner': partner.to_dict(),
         'state_change': state_change,
+    })
+
+
+# ---- Secretariat: bank-verify ----------------------------------------
+
+@proximate_bp.route('/partners/<int:partner_id>/bank-verify', methods=['POST'])
+@ob_required
+def api_bank_verify_partner(partner_id):
+    """Mark a partner's bank account as character-for-character
+    verified (SOP 10 §4 Step 1). If endorsements are already at the
+    trust-floor, this triggers the dd_clear transition.
+
+    OB-only — the bank verification is the secretariat's last gate
+    before disbursement readiness.
+    """
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not found'}), 404
+
+    if partner.bank_verified_at:
+        return jsonify({
+            'success': False,
+            'error': 'Bank already verified for this partner',
+        }), 409
+
+    partner.bank_verified_at = datetime.now(timezone.utc)
+    state_change = None
+    floor = partner.trust_floor_signals()
+    if floor['ready_for_dd_clear']:
+        partner.status = 'dd_clear'
+        partner.trust_tier = 'tier_1_relational'
+        partner.dd_cleared_at = datetime.now(timezone.utc)
+        state_change = 'dd_clear'
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action='proximate.partner.bank_verified',
+        actor_email=current_user.email,
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={'state_change': state_change},
+    )
+
+    # If bank verification just cleared the partner, apply the same
+    # reputation bonus the endorsement path does. Same algorithm —
+    # endorser reputation reflects ground-truth outcomes regardless of
+    # whether it was the endorsement or the bank that was the last gate.
+    if state_change == 'dd_clear':
+        AuditChainEntry.append(
+            action=f'proximate.partner.status_changed.{state_change}',
+            actor_email=current_user.email,
+            subject_kind='proximate_partner',
+            subject_id=partner.id,
+            details={'new_status': partner.status, 'trust_tier': partner.trust_tier},
+        )
+        for ce in Endorsement.query.filter_by(
+            partner_id=partner.id, coi_check_passed=True,
+        ).all():
+            contributor = Endorser.query.get(ce.endorser_id)
+            if not contributor:
+                continue
+            old = contributor.reputation_score
+            contributor.reputation_score = min(100, (contributor.reputation_score or 50) + 5)
+            if contributor.reputation_score != old:
+                AuditChainEntry.append(
+                    action='proximate.endorser.reputation_bumped',
+                    actor_email='system',
+                    subject_kind='proximate_endorser',
+                    subject_id=contributor.id,
+                    details={
+                        'from': old, 'to': contributor.reputation_score,
+                        'reason': 'partner_cleared_via_bank_verify',
+                        'partner_id': partner.id,
+                    },
+                )
+        db.session.commit()
+
+    logger.info(
+        f"Proximate: bank verified partner_id={partner.id} "
+        f"by user_id={current_user.id} state_change={state_change}"
+    )
+    return jsonify({
+        'success': True,
+        'partner': partner.to_dict(),
+        'state_change': state_change,
+    })
+
+
+# ---- Secretariat: suspend partner (SOP 13 §4) ------------------------
+
+@proximate_bp.route('/partners/<int:partner_id>/suspend', methods=['POST'])
+@ob_required
+def api_suspend_partner(partner_id):
+    """Suspend a partner per SOP 13 §4 intervention measures. Records
+    the reason on the audit chain and applies a -5 reputation penalty
+    to every endorser whose vouch is on this partner. Mirrors the
+    positive-direction Phase 631 bump.
+
+    Reputation penalty rationale: if a partner the endorser vouched
+    for fails (security review / aid diversion / SoP breach), the
+    endorser's signal was wrong. The penalty is part of the
+    ground-truth feedback loop.
+    """
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    reason = (payload.get('reason') or '').strip()
+    if not reason:
+        return jsonify({
+            'success': False, 'error': 'reason is required',
+        }), 400
+
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not found'}), 404
+
+    if partner.status == 'suspended':
+        return jsonify({
+            'success': False, 'error': 'Partner already suspended',
+        }), 409
+
+    prior_status = partner.status
+    partner.status = 'suspended'
+    # Roll back any clear state — a suspended partner is not Tier 1.
+    if partner.trust_tier == 'tier_1_relational':
+        partner.trust_tier = None
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action='proximate.partner.suspended',
+        actor_email=current_user.email,
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={
+            'reason': reason[:500],
+            'prior_status': prior_status,
+            'sop_clause': 'SOP-13-section-4',
+        },
+    )
+
+    # Reputation penalty — same magnitude as the positive bump
+    # (-5, capped at 0). Applies to every endorser whose vouch is on
+    # this partner, regardless of whether the COI check passed: the
+    # endorser still backed the wrong organisation.
+    penalised = 0
+    for e in Endorsement.query.filter_by(partner_id=partner.id).all():
+        contributor = Endorser.query.get(e.endorser_id)
+        if not contributor:
+            continue
+        old = contributor.reputation_score
+        contributor.reputation_score = max(0, (contributor.reputation_score or 50) - 5)
+        if contributor.reputation_score != old:
+            penalised += 1
+            AuditChainEntry.append(
+                action='proximate.endorser.reputation_penalised',
+                actor_email='system',
+                subject_kind='proximate_endorser',
+                subject_id=contributor.id,
+                details={
+                    'from': old, 'to': contributor.reputation_score,
+                    'reason': 'partner_suspended',
+                    'partner_id': partner.id,
+                    'partner_suspend_reason': reason[:200],
+                },
+            )
+    db.session.commit()
+
+    logger.info(
+        f"Proximate: partner suspended id={partner.id} by user_id={current_user.id} "
+        f"reason={reason!r} endorsers_penalised={penalised}"
+    )
+    return jsonify({
+        'success': True,
+        'partner': partner.to_dict(),
+        'endorsers_penalised': penalised,
     })

@@ -620,6 +620,26 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-25** Phase 632 — Proximate secretariat admin endpoints
+  (bank-verify + suspend).
+  - **POST /api/proximate/partners/<id>/bank-verify** (OB-only):
+    flips `bank_verified_at`, auto-transitions to `dd_clear` if
+    trust-floor is met. Mirrors the SOP 10 §4 Step 1 character-for-
+    character verification step. Triggers the same +5 reputation
+    bump on contributing endorsers as Phase 631's endorsement-path
+    clear (because the outcome — partner cleared for Tier 1 — is
+    the same regardless of which gate was last).
+  - **POST /api/proximate/partners/<id>/suspend** (OB-only):
+    SOP 13 §4 intervention measure. Requires a `reason`. Rolls back
+    `trust_tier` if previously cleared. Penalises every endorser
+    whose vouch is on the partner by -5 (capped at 0), regardless
+    of COI status — the endorser backed the wrong organisation.
+    Each penalty is itself an audit-chain entry with the suspend
+    reason in the payload (truncated to 200 chars).
+  - Both endpoints fully hash-chained.
+  - Smoke green (166/167, only pre-existing PHASE21D-001
+    unchanged).
+
 - **2026-06-25** Phase 630 + 631 — Proximate seed fixtures + reputation
   algorithm + audit-chain hooks.
   - **630 (seed fixtures):** `seed_proximate.py` — idempotent
