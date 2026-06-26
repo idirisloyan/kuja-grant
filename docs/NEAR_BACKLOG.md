@@ -620,6 +620,29 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-26** Phase 648 — Default OB user seeded on Proximate
+  tenant. The `@ob_required` decorator (Phase 44, retired the
+  admin shortcut at Phase 114) checks
+  `NetworkMembership.is_oversight_body=True` on an active
+  membership against the user's org. The Adeso team had no way
+  to test the secretariat happy path without one. Seed now
+  creates:
+    - Organization "Proximate Oversight Body" (org_type=ngo, SD)
+    - User ob@proximate.org / pass123 attached to that org
+    - Active NetworkMembership(is_oversight_body=True) on the
+      Proximate tenant
+  All idempotent — re-running reuses existing rows. Will land on
+  prod automatically next boot via SEED_PROXIMATE_ON_BOOT.
+  Full happy path verified end-to-end as the seeded OB user
+  (with `X-Network-Override: proximate` header for localhost
+  tenant resolution):
+    - GET  /admin/endorsers/pending           → 200, 1 endorser
+    - POST /admin/endorsers/<id>/approve      → 200, approved
+    - POST /partners/3/bank-verify            → 200
+    - POST /interventions                     → 200
+  Every action that previously returned 403 against
+  admin@kuja.org now works.
+
 - **2026-06-26** Phase 646 + 647 — Endorser KYC loop closed.
   - **646:** new `/proximate/admin/endorsers` page lists pending
     endorsers with the COI self-disclosure fields (village /

@@ -39,8 +39,9 @@ from app import create_app
 from app.extensions import db
 from app.models import (
     Network, User, Endorser, ProximatePartner, Endorsement,
-    FinancialServiceProvider,
+    FinancialServiceProvider, Organization, NetworkMembership,
 )
+from werkzeug.security import generate_password_hash
 
 app = create_app()
 
@@ -378,6 +379,67 @@ def run():
                 ))
                 action = 'created'
             print(f"  fsp {action}: {f['name']} ({f['kind']})")
+
+        # --- OB seat (Phase 648) ---------------------------------------
+        # The @ob_required decorator (app/utils/network.py:193) checks for
+        # an *active* NetworkMembership with `is_oversight_body=True`
+        # against the user's org. Platform admin role does NOT bypass
+        # this (Phase 114 retired the shortcut). Without a real OB seat,
+        # the team's UAT runs into a 403 on every secretariat action.
+        #
+        # Seed a dedicated OB org + user so the team has a one-login way
+        # to exercise the full happy path:
+        #   ob@proximate.org / pass123
+        OB_EMAIL = 'ob@proximate.org'
+        OB_ORG_NAME = 'Proximate Oversight Body'
+
+        org = Organization.query.filter_by(name=OB_ORG_NAME).first()
+        if not org:
+            org = Organization(
+                name=OB_ORG_NAME,
+                org_type='ngo',
+                country='SD',
+            )
+            db.session.add(org)
+            db.session.flush()
+            print(f"  ob org created: {OB_ORG_NAME}")
+
+        ob_user = User.query.filter_by(email=OB_EMAIL).first()
+        if not ob_user:
+            ob_user = User(
+                email=OB_EMAIL,
+                password_hash=generate_password_hash('pass123'),
+                role='ngo',
+                name='Proximate OB Seat',
+                org_id=org.id,
+            )
+            db.session.add(ob_user)
+            db.session.flush()
+            print(f"  ob user created: {OB_EMAIL}")
+        elif ob_user.org_id != org.id:
+            ob_user.org_id = org.id
+            print(f"  ob user reattached to OB org")
+
+        membership = NetworkMembership.query.filter_by(
+            network_id=proximate.id, org_id=org.id,
+        ).first()
+        if not membership:
+            membership = NetworkMembership(
+                network_id=proximate.id,
+                org_id=org.id,
+                status='active',
+                member_tier='member',
+                is_oversight_body=True,
+                joined_at=datetime.now(timezone.utc),
+            )
+            db.session.add(membership)
+            print(f"  ob membership created (is_oversight_body=True)")
+        else:
+            # Reconcile in case status/flag drifted
+            membership.status = 'active'
+            membership.is_oversight_body = True
+            if membership.joined_at is None:
+                membership.joined_at = datetime.now(timezone.utc)
 
         db.session.commit()
         print()
