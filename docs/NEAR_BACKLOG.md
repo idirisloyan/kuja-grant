@@ -620,6 +620,19 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-26** Phase 640 — Voice transcription per endorsement
+  question. New `<VoiceQuestionInput>` at
+  `frontend/src/components/proximate/voice-question-input.tsx`
+  wired beneath each of the 3 Y/N questions in the endorser
+  wizard. Tap Record → MediaRecorder captures audio → blob is
+  POSTed to `/api/whisper/transcribe` with the active language
+  code (ar/en) → returned text appended to the textarea. Endorser
+  can type directly; textarea is source of truth. On submit,
+  transcripts ship as `q1_transcript`/`q2_transcript`/
+  `q3_transcript` and persist in new model columns (capped 5000
+  chars each). Browser-verified: 3 record buttons + 3 textareas
+  render on partner 3 wizard. 7 i18n keys × 6 locales → 2243.
+
 - **2026-06-26** Phase 639 + 641 + 642 — FSP registry + auto-
   intervention + monitoring cadence.
   - **639 (FSP registry):** new `proximate_fsps` + `proximate_

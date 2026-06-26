@@ -431,6 +431,17 @@ class Endorsement(db.Model):
         db.Integer, db.ForeignKey("documents.id"), nullable=True,
     )
 
+    # Phase 640 — Whisper transcripts captured at submit time.
+    # Endorser records a short voice note per question on a low-end
+    # phone, the client transcribes via /api/whisper/transcribe, and
+    # the resulting text travels in the payload. Stored separately
+    # from the (currently unused) document fields above so the
+    # secretariat can read the transcript without needing the audio
+    # file infrastructure to be operational.
+    q1_transcript = db.Column(db.Text, nullable=True)
+    q2_transcript = db.Column(db.Text, nullable=True)
+    q3_transcript = db.Column(db.Text, nullable=True)
+
     # COI auto-check — populated at submit-time by compute_coi_signals().
     # A non-empty signals dict means the endorsement is FLAGGED; it
     # still records (audit trail) but does not count toward the
@@ -538,6 +549,11 @@ class Endorsement(db.Model):
                 "q1": self.q1_voice_doc_id,
                 "q2": self.q2_voice_doc_id,
                 "q3": self.q3_voice_doc_id,
+            },
+            "transcripts": {
+                "q1": self.q1_transcript,
+                "q2": self.q2_transcript,
+                "q3": self.q3_transcript,
             },
             "coi_check_passed": self.coi_check_passed,
             "coi_signals": self.get_coi_signals(),

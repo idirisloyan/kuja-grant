@@ -28,6 +28,7 @@ import { apiOffline, api, isQueuedResponse } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
 import { InterventionPanel } from '@/components/proximate/intervention-panel';
+import { VoiceQuestionInput } from '@/components/proximate/voice-question-input';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -113,6 +114,10 @@ export default function ProximateEndorseWizardClient() {
   const [q1, setQ1] = useState<Answer>(null);
   const [q2, setQ2] = useState<Answer>(null);
   const [q3, setQ3] = useState<Answer>(null);
+  // Phase 640 — voice transcripts per question
+  const [q1Transcript, setQ1Transcript] = useState('');
+  const [q2Transcript, setQ2Transcript] = useState('');
+  const [q3Transcript, setQ3Transcript] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<EndorseResp | null>(null);
   const [queued, setQueued] = useState(false);
@@ -145,7 +150,10 @@ export default function ProximateEndorseWizardClient() {
     try {
       const r = await apiOffline.post<EndorseResp>(
         `/api/proximate/partners/${partnerId}/endorse`,
-        { q1_real: q1, q2_trust: q2, q3_accept_aid: q3 },
+        {
+          q1_real: q1, q2_trust: q2, q3_accept_aid: q3,
+          q1_transcript: q1Transcript, q2_transcript: q2Transcript, q3_transcript: q3Transcript,
+        },
         'proximate_endorse',
       );
       if (isQueuedResponse(r)) {
@@ -468,6 +476,12 @@ export default function ProximateEndorseWizardClient() {
                 yesLabel={t('proximate.wizard.yes')}
                 noLabel={t('proximate.wizard.no')}
               />
+              <VoiceQuestionInput
+                questionId="q1"
+                transcript={q1Transcript}
+                onTranscriptChange={setQ1Transcript}
+                language={isRtl ? 'ar' : 'en'}
+              />
               <QuestionRow
                 num={2}
                 text={isRtl ? questions.q2.ar : questions.q2.en}
@@ -476,6 +490,12 @@ export default function ProximateEndorseWizardClient() {
                 yesLabel={t('proximate.wizard.yes')}
                 noLabel={t('proximate.wizard.no')}
               />
+              <VoiceQuestionInput
+                questionId="q2"
+                transcript={q2Transcript}
+                onTranscriptChange={setQ2Transcript}
+                language={isRtl ? 'ar' : 'en'}
+              />
               <QuestionRow
                 num={3}
                 text={isRtl ? questions.q3.ar : questions.q3.en}
@@ -483,6 +503,12 @@ export default function ProximateEndorseWizardClient() {
                 onChange={setQ3}
                 yesLabel={t('proximate.wizard.yes')}
                 noLabel={t('proximate.wizard.no')}
+              />
+              <VoiceQuestionInput
+                questionId="q3"
+                transcript={q3Transcript}
+                onTranscriptChange={setQ3Transcript}
+                language={isRtl ? 'ar' : 'en'}
               />
             </div>
           </Card>
