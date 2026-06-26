@@ -620,6 +620,21 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-26** Phase 645 — Disbursement method add UI on
+  partner detail. New `<DisbursementMethodsPanel>` lists every
+  attached method (with verify badge + one-click Verify for OB)
+  and provides an inline Add form for the OB. FSP picker
+  populates from `/api/proximate/fsps`; per-kind identifier
+  fields mirror the server validation exactly (bank → holder +
+  account, hawala → recipient_phone + broker_office +
+  recipient_name, mobile_money → MSISDN + holder). 18 new i18n
+  keys × 6 locales → 2280. Browser-verified end-to-end on
+  partner 3: panel renders, dropdown lists all 4 FSPs (Bank of
+  Khartoum, Gedaref Souq Hawala #4, Port Sudan Marine Hawala,
+  Sudani Mobile Money), picking hawala flips the form to the 3
+  hawala fields, submitting hits `@ob_required` which correctly
+  surfaces "Oversight Body permission required" inline.
+
 - **2026-06-26** Phase 643 + 644 — Operator dashboard +
   endorsement transcript read view.
   - **643:** new `/proximate/admin` page + `/api/proximate/overview`

@@ -30,6 +30,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { InterventionPanel } from '@/components/proximate/intervention-panel';
 import { VoiceQuestionInput } from '@/components/proximate/voice-question-input';
 import { EndorsementsPanel } from '@/components/proximate/endorsements-panel';
+import { DisbursementMethodsPanel } from '@/components/proximate/disbursement-methods-panel';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -465,6 +466,8 @@ export default function ProximateEndorseWizardClient() {
           )}
 
           <EndorsementsPanel partnerId={partnerId} />
+
+          <DisbursementMethodsPanel partnerId={partnerId} isAdmin={isAdmin} />
 
           <Card className="p-4">
             <p className="text-xs text-muted-foreground mb-4">
