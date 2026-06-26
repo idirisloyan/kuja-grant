@@ -22,8 +22,10 @@ import { cn } from '@/lib/utils';
 import {
   installAutoDrain, onDrainResult, countPending,
 } from '@/lib/offline-outbox';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 export function OfflineBanner() {
+  const { t } = useTranslation();
   const [online, setOnline] = useState<boolean>(true);
   const [showBackOnline, setShowBackOnline] = useState(false);
   const [queueSize, setQueueSize] = useState<number>(0);
@@ -77,15 +79,21 @@ export function OfflineBanner() {
       <span className="inline-flex items-center gap-2">
         {online ? (
           queueSize > 0 ? (
-            <><CloudUpload className="w-3.5 h-3.5" /> Back online — sending {queueSize} queued change{queueSize === 1 ? '' : 's'}.</>
+            <><CloudUpload className="w-3.5 h-3.5" /> {t(
+              queueSize === 1 ? 'offline.back_online_sending_one' : 'offline.back_online_sending_other',
+              { n: queueSize },
+            )}</>
           ) : (
-            <><Wifi className="w-3.5 h-3.5" /> Back online — refreshing.</>
+            <><Wifi className="w-3.5 h-3.5" /> {t('offline.back_online_refreshing')}</>
           )
         ) : (
           queueSize > 0 ? (
-            <><WifiOff className="w-3.5 h-3.5" /> You&apos;re offline. {queueSize} change{queueSize === 1 ? '' : 's'} saved on this device, will send when reconnected.</>
+            <><WifiOff className="w-3.5 h-3.5" /> {t(
+              queueSize === 1 ? 'offline.you_are_offline_queue_one' : 'offline.you_are_offline_queue_other',
+              { n: queueSize },
+            )}</>
           ) : (
-            <><WifiOff className="w-3.5 h-3.5" /> You&apos;re offline. Drafts will save locally; new actions will retry when reconnected.</>
+            <><WifiOff className="w-3.5 h-3.5" /> {t('offline.you_are_offline_no_queue')}</>
           )
         )}
       </span>

@@ -17,17 +17,21 @@ import {
   FileText, Calendar, CheckCircle2, AlertCircle, Clock, Coins,
   ChevronRight,
 } from 'lucide-react';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
-function deadlineMeta(dateStr: string | null | undefined) {
-  if (!dateStr) return { label: 'no deadline', tone: 'muted' as const };
+type T = (key: string, params?: Record<string, string | number>) => string;
+type FmtDate = (d: Date, opts?: Intl.DateTimeFormatOptions) => string;
+
+function deadlineMeta(dateStr: string | null | undefined, t: T, formatDate: FmtDate) {
+  if (!dateStr) return { label: '—', tone: 'muted' as const };
   const d = new Date(dateStr);
   const now = new Date();
   const days = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (days < 0) return { label: `overdue ${Math.abs(days)}d`, tone: 'bad' as const };
-  if (days === 0) return { label: 'due today', tone: 'bad' as const };
-  if (days <= 7) return { label: `${days}d left`, tone: 'warn' as const };
-  if (days <= 30) return { label: `${days}d left`, tone: 'muted' as const };
-  return { label: `due ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`, tone: 'muted' as const };
+  if (days < 0) return { label: t('near_reports.deadline.overdue_n_days', { n: Math.abs(days) }), tone: 'bad' as const };
+  if (days === 0) return { label: t('near_reports.deadline.due_today'), tone: 'bad' as const };
+  if (days <= 7) return { label: t('near_reports.deadline.n_days_left', { n: days }), tone: 'warn' as const };
+  if (days <= 30) return { label: t('near_reports.deadline.n_days_left', { n: days }), tone: 'muted' as const };
+  return { label: t('near_reports.deadline.due_date', { date: formatDate(d, { month: 'short', day: 'numeric' }) }), tone: 'muted' as const };
 }
 
 function statusMeta(status: string | null | undefined) {
@@ -39,6 +43,7 @@ function statusMeta(status: string | null | undefined) {
 }
 
 export function NearComplianceReporting() {
+  const { t, formatDate } = useTranslation();
   const { data: reportsData, isLoading: reportsLoading } = useReports();
   const { data: grantsData, isLoading: grantsLoading } = useGrants();
 
@@ -79,9 +84,7 @@ export function NearComplianceReporting() {
       <div className="border border-border rounded-lg bg-card p-10 text-center">
         <Coins className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-50" />
         <p className="text-sm text-muted-foreground">
-          You don&rsquo;t have any active grants yet. When NEAR&rsquo;s Oversight Body
-          shortlists you under a declaration, your grant will appear here with its
-          reporting requirements.
+          {t('near_reports.no_grants_yet')}
         </p>
       </div>
     );
@@ -91,7 +94,7 @@ export function NearComplianceReporting() {
   const totalDue = reports.filter((r) => r.status !== 'submitted' && r.status !== 'accepted').length;
   const totalOverdue = reports.filter((r) => {
     if (r.status === 'submitted' || r.status === 'accepted') return false;
-    return deadlineMeta(r.due_date).tone === 'bad';
+    return deadlineMeta(r.due_date, t, formatDate).tone === 'bad';
   }).length;
 
   return (
@@ -113,7 +116,7 @@ export function NearComplianceReporting() {
       {orphanReports.length > 0 && (
         <div className="border border-border rounded-lg bg-card p-5 space-y-3">
           <h2 className="font-semibold text-sm text-muted-foreground">
-            Other reports
+            {t('near_reports.other_reports')}
           </h2>
           <ul className="space-y-2">
             {orphanReports.map((r) => <ReportRow key={r.id} r={r} />)}
@@ -189,7 +192,8 @@ function GrantCard({ grant, reports }: { grant: Grant; reports: Report[] }) {
 }
 
 function ReportRow({ r }: { r: Report }) {
-  const deadline = deadlineMeta(r.due_date);
+  const { t, formatDate } = useTranslation();
+  const deadline = deadlineMeta(r.due_date, t, formatDate);
   const status = statusMeta(r.status);
   const statusTone =
     status.tone === 'good' ? 'text-[hsl(var(--kuja-grow))]'

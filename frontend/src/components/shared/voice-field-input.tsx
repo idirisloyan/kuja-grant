@@ -28,6 +28,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Languages, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface LangSpec {
   code: string;
@@ -83,6 +84,7 @@ export function VoiceFieldInput({
   value, onChange, fieldLabel, defaultLang = 'en-US',
   replace = false, className, variant = 'chip',
 }: Props) {
+  const { t } = useTranslation();
   const [recording, setRecording] = useState(false);
   const [open, setOpen] = useState(variant === 'expanded');
   const [lang, setLang] = useState<string>(defaultLang);
@@ -159,14 +161,14 @@ export function VoiceFieldInput({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title="Speak this field instead of typing"
+        title={t('voice.title')}
         className={cn(
           'inline-flex items-center gap-1 rounded-full border border-border bg-card text-[10px] font-semibold px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground',
           className,
         )}
       >
         <Mic className="w-3 h-3" />
-        Speak
+        {t('voice.button')}
       </button>
     );
   }
@@ -183,7 +185,7 @@ export function VoiceFieldInput({
       <header className="flex items-center justify-between gap-2 flex-wrap text-xs">
         <span className="font-semibold inline-flex items-center gap-1.5">
           <Mic className="w-3.5 h-3.5 text-[hsl(var(--kuja-clay))]" />
-          Speak {fieldLabel ? <>«{fieldLabel}»</> : 'this field'}
+          {fieldLabel ? t('voice.panel_header', { field: fieldLabel }) : t('voice.panel_header_generic')}
         </span>
         <div className="flex items-center gap-1.5">
           <Languages className="w-3 h-3 text-muted-foreground" />
@@ -235,7 +237,7 @@ export function VoiceFieldInput({
         {recording && (
           <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-[hsl(var(--kuja-flag))] animate-pulse" />
-            Listening — your words append to the field
+            {t('voice.listening')}
           </span>
         )}
         {interim && (
@@ -249,8 +251,7 @@ export function VoiceFieldInput({
         <div className="text-[11px] text-[hsl(var(--kuja-flag))]">{error}</div>
       )}
       <p className="text-[10px] text-muted-foreground">
-        Browser speech recognition. Stays on-device for English / French / Spanish /
-        Arabic / Swahili; Somali falls back to typed input.
+        {t('voice.help')}
       </p>
     </div>
   );

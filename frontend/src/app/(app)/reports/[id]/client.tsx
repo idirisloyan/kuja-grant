@@ -35,6 +35,7 @@ import { TranslateThis } from '@/components/shared/translate-this';
 import { DeadlineNegotiator } from '@/components/reports/deadline-negotiator';
 import { TimeEstimate } from '@/components/shared/time-estimate';
 import { CollapseSection } from '@/components/shared/collapse-section';
+import { PhotoEvidenceUploader } from '@/components/reports/PhotoEvidenceUploader';
 
 interface ReportDetail {
   id: number;
@@ -290,6 +291,13 @@ export default function ReportDetailClient() {
               </p>
             </CollapseSection>
           )}
+
+          {/* Phase 623 — Photo-as-evidence on the shared report detail page.
+              Previously only wired into the Kuja list-view (per-card inline);
+              NEAR + Proximate tenants now get it for free here.  Renders for
+              every status so post-decision evidence can support appeals.
+              The component itself is a closed button until clicked. */}
+          <PhotoEvidenceUploader reportId={data.id} />
 
           {/* Status pill duplicated inline for quick scan even when meta
               overflows. Uses the same TONE_PILL_CLASS so visuals match. */}

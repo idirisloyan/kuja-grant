@@ -13,6 +13,7 @@
 
 import { useEffect, useState } from 'react';
 import { Scale, CheckCircle, XCircle } from 'lucide-react';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -41,6 +42,7 @@ export function AppealPanel({
   appealResolutionText,
   viewerRole,
 }: Props) {
+  const { t } = useTranslation();
   const [requestedAt, setRequestedAt] = useState<string | null>(appealRequestedAt ?? null);
   const [reasonText, setReasonText] = useState<string | null>(appealReasonText ?? null);
   const [resolvedAt, setResolvedAt] = useState<string | null>(appealResolvedAt ?? null);
@@ -69,7 +71,7 @@ export function AppealPanel({
 
   async function submit() {
     if (draft.trim().length < 20) {
-      setErr('Please provide at least 20 characters of context.');
+      setErr(t('appeal.error.too_short'));
       return;
     }
     setSaving(true);
@@ -83,7 +85,7 @@ export function AppealPanel({
       if (r?.appeal_reason_text) setReasonText(r.appeal_reason_text);
       setOpen(false);
     } catch {
-      setErr('Could not submit appeal. Please try again.');
+      setErr(t('appeal.error.submit_failed'));
     } finally {
       setSaving(false);
     }
@@ -124,7 +126,7 @@ export function AppealPanel({
       }>
         <p className={`text-xs font-semibold inline-flex items-center gap-1.5 ${approved ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'}`}>
           {approved ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-          Appeal {approved ? 'approved' : 'declined'}
+          {approved ? t('appeal.status.approved') : t('appeal.status.declined')}
         </p>
         <p className="text-xs text-muted-foreground">
           {new Date(resolvedAt).toLocaleDateString()}

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { VoiceFieldInput } from '@/components/shared/voice-field-input';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import {
   useLatestCrisisReport, useCrisisReport, useFunds, useFund,
   useObRoster, type FundWindow, type CrisisRow, type ObRosterMember,
@@ -76,6 +77,7 @@ const EMPTY_FORM: FormState = {
 
 export function DeclarationWizard({ onClose, onCreated }: WizardProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
@@ -195,7 +197,7 @@ export function DeclarationWizard({ onClose, onCreated }: WizardProps) {
             </p>
           </div>
           {/* Phase 79 — mode toggle. Conversation default; wizard fallback. */}
-          <div className="inline-flex rounded-md border border-border text-[11px] overflow-hidden mr-2">
+          <div className="inline-flex rounded-md border border-border text-[11px] overflow-hidden me-2">
             <button
               type="button"
               onClick={() => setMode('conversation')}
@@ -212,7 +214,7 @@ export function DeclarationWizard({ onClose, onCreated }: WizardProps) {
               type="button"
               onClick={() => { setMode('wizard'); setStep(1); }}
               className={
-                'px-2.5 py-1 font-semibold border-l border-border ' +
+                'px-2.5 py-1 font-semibold border-s border-border ' +
                 (mode === 'wizard'
                   ? 'bg-[hsl(var(--kuja-clay))] text-white'
                   : 'bg-background text-muted-foreground hover:text-foreground')
@@ -235,7 +237,12 @@ export function DeclarationWizard({ onClose, onCreated }: WizardProps) {
         {mode === 'wizard' && (
         <div className="px-4 pt-3 pb-1 border-b border-border bg-muted/20">
           <ol className="flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold">
-            {(['Evidence', 'Declaration', 'Committee', 'Confirm'] as const).map((label, idx) => {
+            {([
+              { key: 'evidence',    label: t('declaration.step.evidence') },
+              { key: 'declaration', label: t('declaration.step.declaration') },
+              { key: 'committee',   label: t('declaration.step.committee') },
+              { key: 'confirm',     label: t('declaration.step.confirm') },
+            ] as const).map(({ key: stepKey, label }, idx) => {
               const n = (idx + 1) as 1 | 2 | 3 | 4;
               const isPast = step > n;
               const isCurrent = step === n;
@@ -245,7 +252,7 @@ export function DeclarationWizard({ onClose, onCreated }: WizardProps) {
                   ? 'bg-[hsl(var(--kuja-grow))]/15 text-[hsl(var(--kuja-grow))]'
                   : 'bg-muted text-muted-foreground';
               return (
-                <li key={label} className={`flex-1 px-3 py-1.5 rounded-md text-center ${cls}`}>
+                <li key={stepKey} className={`flex-1 px-3 py-1.5 rounded-md text-center ${cls}`}>
                   {n}. {label}
                 </li>
               );
@@ -344,7 +351,7 @@ function Step1Evidence({ form, setForm }: { form: FormState; setForm: (f: FormSt
           <button
             type="button"
             onClick={() => setForm({ ...form, evidence_row_id: null, evidence_report_id: null })}
-            className="ml-2 underline hover:no-underline"
+            className="ms-2 underline hover:no-underline"
           >
             Continue without evidence
           </button>
@@ -652,7 +659,7 @@ function Step3Committee({ form, setForm }: { form: FormState; setForm: (f: FormS
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="Filter by name, org, country, or email…"
-              className="w-full pl-7 pr-2 py-1.5 rounded-md border border-border bg-background text-sm"
+              className="w-full ps-7 pe-2 py-1.5 rounded-md border border-border bg-background text-sm"
             />
           </div>
 
@@ -696,7 +703,7 @@ function Step3Committee({ form, setForm }: { form: FormState; setForm: (f: FormS
           <div className="text-xs text-muted-foreground">
             {form.signer_user_ids.length} selected.
             {form.signer_user_ids.length === 1 && (
-              <span className="ml-1 text-[hsl(var(--kuja-sun))]">Single-signer flow — no peer check. Add at least one more for a credible multi-sig.</span>
+              <span className="ms-1 text-[hsl(var(--kuja-sun))]">Single-signer flow — no peer check. Add at least one more for a credible multi-sig.</span>
             )}
           </div>
         </>

@@ -24,6 +24,7 @@ import {
   AlertTriangle, AlertCircle, Info, CheckCircle2, ChevronDown, ChevronUp,
   HelpCircle, Lightbulb, Wrench, LifeBuoy,
 } from 'lucide-react';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 export type ComplianceTone = 'bad' | 'warn' | 'info' | 'good';
 
@@ -66,6 +67,7 @@ const TONE_STYLES: Record<ComplianceTone, { wrap: string; icon: typeof AlertTria
 export function ComplianceFlag({
   headline, tone = 'warn', explain, action, className = '',
 }: Props) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const T = TONE_STYLES[tone];
   const Icon = T.icon;
@@ -87,8 +89,8 @@ export function ComplianceFlag({
               className="mt-1 text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
               {open
-                ? <>Hide explanation <ChevronUp className="w-3 h-3" /></>
-                : <>What is this and how do I fix it? <ChevronDown className="w-3 h-3" /></>}
+                ? <>{t('compliance_flag.hide_explanation')} <ChevronUp className="w-3 h-3" /></>
+                : <>{t('compliance_flag.what_is_this')} <ChevronDown className="w-3 h-3" /></>}
             </button>
           )}
         </div>
@@ -140,7 +142,7 @@ function ExplainSection({
       <div className="flex items-center gap-1.5 mb-0.5 text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
         <Icon className="w-3 h-3" /> {label}
       </div>
-      <div className={`leading-relaxed text-foreground/90 pl-4 ${mono ? 'font-mono text-[11px] bg-muted/50 rounded px-2 py-1.5 whitespace-pre-wrap' : ''}`}>
+      <div className={`leading-relaxed text-foreground/90 ps-4 ${mono ? 'font-mono text-[11px] bg-muted/50 rounded px-2 py-1.5 whitespace-pre-wrap' : ''}`}>
         {children}
       </div>
     </div>

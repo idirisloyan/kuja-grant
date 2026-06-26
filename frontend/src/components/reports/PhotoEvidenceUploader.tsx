@@ -25,15 +25,16 @@ import { api } from '@/lib/api';
 import { AIStatusNotice } from '@/components/shared/ai-status-notice';
 import { useAiStatus } from '@/lib/hooks/use-ai-status';
 import { confidenceFromScore } from '@/components/shared/ai-confidence-badge';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 type PhotoKind = 'attendance' | 'receipt' | 'training' | 'site_visit' | 'other';
 
-const KINDS: { value: PhotoKind; label: string; hint: string; icon: typeof Camera }[] = [
-  { value: 'attendance', label: 'Attendance sheet', hint: 'List of who came',         icon: Users },
-  { value: 'receipt',    label: 'Receipt / invoice', hint: 'Money spent',              icon: Receipt },
-  { value: 'training',   label: 'Training photo',    hint: 'Workshop, demo, classroom', icon: ClipboardList },
-  { value: 'site_visit', label: 'Site visit',        hint: 'A place you visited',       icon: MapPin },
-  { value: 'other',      label: 'Other',             hint: 'Something else worth recording', icon: ImagePlus },
+const KIND_DEFS: { value: PhotoKind; labelKey: string; hintKey: string; icon: typeof Camera }[] = [
+  { value: 'attendance', labelKey: 'photo.kind.attendance', hintKey: 'photo.kind.attendance_hint', icon: Users },
+  { value: 'receipt',    labelKey: 'photo.kind.receipt',    hintKey: 'photo.kind.receipt_hint',    icon: Receipt },
+  { value: 'training',   labelKey: 'photo.kind.training',   hintKey: 'photo.kind.training_hint',   icon: ClipboardList },
+  { value: 'site_visit', labelKey: 'photo.kind.site_visit', hintKey: 'photo.kind.site_visit_hint', icon: MapPin },
+  { value: 'other',      labelKey: 'photo.kind.other',      hintKey: 'photo.kind.other_hint',      icon: ImagePlus },
 ];
 
 interface ExtractionResp {
@@ -61,6 +62,7 @@ interface Props {
 }
 
 export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: Props) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<PhotoKind>('attendance');
   const [preview, setPreview] = useState<string | null>(null);
@@ -74,11 +76,11 @@ export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: P
   function onPick(f: File | null) {
     if (!f) return;
     if (!f.type.startsWith('image/')) {
-      toast.error('Please pick a photo (jpg, png, webp).');
+      toast.error(t('photo.error.not_image'));
       return;
     }
     if (f.size > 5 * 1024 * 1024) {
-      toast.error('Photo is larger than 5 MB. Try a lower-resolution shot.');
+      toast.error(t('photo.error.too_large'));
       return;
     }
     setFile(f);
@@ -132,9 +134,9 @@ export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: P
         type="button"
         onClick={() => setOpen(true)}
         className={`inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--kuja-grow))]/30 bg-[hsl(var(--kuja-grow))]/5 px-3 py-1.5 text-xs font-medium text-[hsl(var(--kuja-grow))] hover:bg-[hsl(var(--kuja-grow))]/10 ${className}`}
-        title="Take a photo of an attendance sheet, receipt, or training session — Kuja extracts the details."
+        title={t('photo.add_button_title')}
       >
-        <Camera className="h-3.5 w-3.5" /> Add photo evidence
+        <Camera className="h-3.5 w-3.5" /> {t('photo.add_button')}
       </button>
     );
   }
@@ -146,9 +148,9 @@ export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: P
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-semibold text-sm flex items-center gap-2">
           <Camera className="w-4 h-4 text-[hsl(var(--kuja-grow))]" />
-          Photo evidence — point your phone, Kuja extracts the details
+          {t('photo.header')}
         </h3>
-        <button type="button" onClick={() => { setOpen(false); reset(); }} className="text-muted-foreground hover:text-foreground" aria-label="Close photo composer">
+        <button type="button" onClick={() => { setOpen(false); reset(); }} className="text-muted-foreground hover:text-foreground" aria-label={t('photo.close_button')}>
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -166,7 +168,7 @@ export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: P
 
       {/* Kind picker — chips */}
       <div className="flex flex-wrap gap-1.5">
-        {KINDS.map((K) => {
+        {KIND_DEFS.map((K) => {
           const Icon = K.icon;
           const active = K.value === kind;
           return (
@@ -181,13 +183,13 @@ export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: P
                   : 'border-border text-muted-foreground hover:text-foreground')
               }
             >
-              <Icon className="w-3 h-3" /> {K.label}
+              <Icon className="w-3 h-3" /> {t(K.labelKey)}
             </button>
           );
         })}
       </div>
       <p className="text-[11px] text-muted-foreground">
-        {KINDS.find((K) => K.value === kind)?.hint}
+        {(() => { const k = KIND_DEFS.find((K) => K.value === kind); return k ? t(k.hintKey) : ''; })()}
       </p>
 
       {/* File picker — capture="environment" opens phone rear camera */}
@@ -198,7 +200,7 @@ export function PhotoEvidenceUploader({ reportId, onApplied, className = '' }: P
           accept="image/jpeg,image/png,image/webp"
           capture="environment"
           onChange={(e) => onPick(e.target.files?.[0] ?? null)}
-          className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--kuja-grow))]/10 file:text-[hsl(var(--kuja-grow))] file:font-semibold file:px-3 file:py-1.5 hover:file:bg-[hsl(var(--kuja-grow))]/20 cursor-pointer"
+          className="block w-full text-xs text-muted-foreground file:me-3 file:rounded-md file:border-0 file:bg-[hsl(var(--kuja-grow))]/10 file:text-[hsl(var(--kuja-grow))] file:font-semibold file:px-3 file:py-1.5 hover:file:bg-[hsl(var(--kuja-grow))]/20 cursor-pointer"
         />
         <div className="text-[10px] text-muted-foreground mt-1">
           Max 5 MB. On a phone, this opens the camera directly.

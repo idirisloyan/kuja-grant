@@ -620,6 +620,30 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 624 — Arabic + RTL backfill on low-internet
+  surfaces. After the team audit, 27 customer-facing strings were
+  bypassing i18n and 8 Tailwind classes hardcoded LTR directionality.
+  Added 44 new keys to en.json + ar.json (parity maintained, 2,179
+  total), refactored OfflineBanner, PhotoEvidenceUploader,
+  VoiceFieldInput, NearComplianceReporting, DeclarationWizard,
+  AppealPanel, ComplianceFlag to use `useTranslation()`, and swapped
+  `mr/ml/pl/pr/border-l` → `me/ms/ps/pe/border-s` (logical properties).
+  Sudan / Proximate context: OfflineBanner is the lowest-bandwidth
+  surface; voice + photo are the bridges for Arabic-first low-literacy
+  field officers. Verified locally — composer header reads
+  «دليل بالصورة — وجّه هاتفك...», all 5 photo-kind chips render in
+  Arabic, `dir="rtl"` applied to root, file input uses `file:me-3`.
+
+- **2026-06-21** Phase 623 — Photo-as-evidence on the shared report
+  detail page. Audit found `PhotoEvidenceUploader` was only wired on
+  the Kuja list-view (`/reports/page.tsx:1256`); the shared detail
+  page `/reports/[id]/client.tsx` — used by both Kuja AND NEAR —
+  didn't have it. Adding it to the shared detail page unblocks
+  photo-as-evidence for NEAR users immediately and prepares the
+  Proximate Fund tenant to inherit it on day one. Verified locally:
+  composer opens, 4 kind chips render, `capture="environment"` opens
+  the rear camera on mobile.
+
 - **2026-06-21** Phase 622 — rubric live-preview anchors target the
   right criterion: the team flagged that anchor hrefs read
   `#criterion-undefined` because some grants ship criteria with `id`
