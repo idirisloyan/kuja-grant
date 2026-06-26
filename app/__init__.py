@@ -303,6 +303,20 @@ def create_app(config_name=None):
         except Exception as e:
             app.logger.warning(f"Network bootstrap skipped: {e}")
 
+        # Phase 633 — opt-in one-shot Proximate demo seed. Set
+        # SEED_PROXIMATE_ON_BOOT=true on Railway, restart once, then
+        # unset. The seed is idempotent (Phase 630) so multiple runs
+        # are safe; this is just an opt-in to avoid surprising
+        # production with demo rows on every cold start.
+        if os.getenv('SEED_PROXIMATE_ON_BOOT', '').lower() in ('true', '1', 'yes'):
+            try:
+                from seed_proximate import run as run_proximate_seed
+                app.logger.info("SEED_PROXIMATE_ON_BOOT=true — seeding Proximate demo fixtures...")
+                run_proximate_seed()
+                app.logger.info("Proximate demo seed complete.")
+            except Exception as e:
+                app.logger.warning(f"SEED_PROXIMATE_ON_BOOT failed (non-fatal): {e}")
+
     # -----------------------------------------------------------------
     # Ensure lockout columns exist (safety net for migration timing)
     # -----------------------------------------------------------------
