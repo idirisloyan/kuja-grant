@@ -620,6 +620,33 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-26** Phase 646 + 647 — Endorser KYC loop closed.
+  - **646:** new `/proximate/admin/endorsers` page lists pending
+    endorsers with the COI self-disclosure fields (village /
+    family / employer) inline. Approve is one click; Reject
+    demands a textarea reason (required server-side too) that
+    lands in the audit chain on `proximate.endorser.rejected`.
+    Operator dashboard's "Endorsers pending" tile now links
+    here. Without this, every light-KYC review (Phase 637) was
+    a curl call.
+  - **647:** new `/proximate/endorse/register` page lets any
+    authenticated user self-register as an endorser. Form
+    captures locality + country + COI fields (village, family
+    name, employer). POST is idempotent — re-submits return
+    `already_registered: true` instead of erroring. Success
+    state shows status + next steps. Linked from the inbox
+    empty state via a "Become an endorser" CTA. Without this,
+    only seeded endorsers could ever exist; the system had no
+    onboarding path.
+  - 37 new i18n keys × 6 locales → 2317. Arabic translated for
+    every visible string in both surfaces.
+  - Browser-verified end-to-end with 1 seeded pending endorser
+    (Nour al-Halawi / Halfaya / ICRC). Queue page rendered the
+    "Endorser approvals" title and surfaced @ob_required 403
+    inline (admin role ≠ per-network OB seat). Register form
+    rendered all 5 inputs + COI section + Register button at
+    /proximate/endorse/register as the logged-in admin user.
+
 - **2026-06-26** Phase 645 — Disbursement method add UI on
   partner detail. New `<DisbursementMethodsPanel>` lists every
   attached method (with verify badge + one-click Verify for OB)

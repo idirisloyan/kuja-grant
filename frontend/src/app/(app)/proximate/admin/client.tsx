@@ -23,6 +23,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { AlertTriangle, ShieldCheck, Activity, Users, FileText } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -130,18 +131,20 @@ export function ProximateAdminClient() {
                 )}
               </Card>
 
-              <Card className="p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <ShieldCheck className="w-4 h-4 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                    {t('proximate.admin.endorsers_pending')}
+              <Link href="/proximate/admin/endorsers" className="block">
+                <Card className="p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      {t('proximate.admin.endorsers_pending')}
+                    </p>
+                  </div>
+                  <p className="text-3xl font-semibold">{data.endorsers_pending}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t('proximate.admin.kyc_review_needed')}
                   </p>
-                </div>
-                <p className="text-3xl font-semibold">{data.endorsers_pending}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t('proximate.admin.kyc_review_needed')}
-                </p>
-              </Card>
+                </Card>
+              </Link>
 
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-1">

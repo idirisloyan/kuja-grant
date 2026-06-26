@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Users, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Loader2, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
@@ -96,8 +96,15 @@ export default function ProximateInboxPage() {
         )}
 
         {!loading && visible.length === 0 && (
-          <Card className="p-6 text-center">
+          <Card className="p-6 text-center space-y-3">
             <p className="text-sm text-muted-foreground">{t('proximate.inbox.empty')}</p>
+            <Link
+              href="/proximate/endorse/register"
+              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              {t('proximate.inbox.become_endorser')}
+            </Link>
           </Card>
         )}
 
