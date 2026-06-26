@@ -620,6 +620,30 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-25** Phase 635 + 636 + 637 — Intervention register +
+  capital classification + light-KYC endorser queue.
+  - **635 — Intervention register (SoP 13 §4):** new
+    `app/models/proximate_intervention.py` with kinds
+    warning/freeze/suspend and explicit response windows 24h/72h/5d.
+    Five routes: open (OB-only), list, respond, withdraw (OB-only),
+    cron-tick (CRON_SECRET-gated). Every transition hash-chained
+    (`proximate.intervention.opened.{kind}`, `.responded`,
+    `.escalated`, `.withdrawn`). Model exposes `elapsed_seconds`,
+    `remaining_seconds`, `is_expired` so UI doesn't reimplement
+    clock math.
+  - **636 — Capital classification:** added `capital_class` column
+    on `ProximatePartner` (small/medium/large, default small) per
+    SoP 13 disbursement thresholds — small < $5k, medium $5k-$50k,
+    large > $50k. `classify_capital(usd_amount)` helper exported
+    for grant-time auto-classification. Surfaces in partner.to_dict.
+    Auto-added by schema reconciler.
+  - **637 — Light-KYC endorser queue:** three new admin routes
+    under `/admin/endorsers/*` — list pending, approve, reject (with
+    reason). Approve/reject audit-chained. v1 — human review only;
+    AI assist deferred. Endorsers seeded by Phase 630 are already
+    approved, so the queue is empty in demo until real users
+    self-register.
+
 - **2026-06-25** Phase 633 + 634 — Demo seed-on-boot + secretariat
   UI on the wizard.
   - **633:** `SEED_PROXIMATE_ON_BOOT=true` env-flag triggers

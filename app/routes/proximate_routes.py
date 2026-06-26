@@ -23,6 +23,7 @@ PROXIMATE_FUND_DESIGN.md §6).
 """
 
 import logging
+import os
 
 from datetime import datetime, timezone
 from flask import Blueprint, g, jsonify, request
@@ -34,6 +35,7 @@ from app.models import (
     Network, PARTNER_STATUSES, ENDORSER_STATUSES,
     Q1_LABEL_EN, Q1_LABEL_AR, Q2_LABEL_EN, Q2_LABEL_AR, Q3_LABEL_EN, Q3_LABEL_AR,
     AuditChainEntry,
+    InterventionMeasure, INTERVENTION_KINDS,
 )
 from app.utils.network import ob_required
 
@@ -609,3 +611,285 @@ def api_suspend_partner(partner_id):
         'partner': partner.to_dict(),
         'endorsers_penalised': penalised,
     })
+
+
+# ---- Intervention register (SOP 13 §4) -------------------------------
+
+@proximate_bp.route('/interventions', methods=['POST'])
+@ob_required
+def api_open_intervention():
+    """Open a new intervention measure (warning / freeze / suspend)
+    against a partner. response_due_at auto-computed from the kind.
+    The Phase 632 /suspend endpoint is still the right tool for the
+    actual suspension transition + reputation hit; this surface is
+    the formal SOP 13 paper trail with a clock.
+    """
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    kind = (payload.get('kind') or '').strip()
+    partner_id = payload.get('partner_id')
+    reason = (payload.get('reason') or '').strip()
+
+    if kind not in INTERVENTION_KINDS:
+        return jsonify({
+            'success': False,
+            'error': f'kind must be one of {INTERVENTION_KINDS}',
+        }), 400
+    if not partner_id:
+        return jsonify({'success': False, 'error': 'partner_id required'}), 400
+    if not reason:
+        return jsonify({'success': False, 'error': 'reason required'}), 400
+
+    partner = ProximatePartner.query.filter_by(
+        id=int(partner_id), network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not found'}), 404
+
+    measure = InterventionMeasure.open_new(
+        network_id=net.id,
+        partner_id=partner.id,
+        kind=kind,
+        reason=reason,
+        opened_by_user_id=current_user.id,
+    )
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action=f'proximate.intervention.opened.{kind}',
+        actor_email=current_user.email,
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={
+            'intervention_id': measure.id,
+            'kind': kind,
+            'reason': reason[:300],
+            'response_due_at': measure.response_due_at.isoformat(),
+            'sop_clause': measure.sop_clause,
+        },
+    )
+
+    logger.info(
+        f"Proximate: intervention opened kind={kind} partner_id={partner.id} "
+        f"by user_id={current_user.id} due={measure.response_due_at.isoformat()}"
+    )
+    return jsonify({'success': True, 'intervention': measure.to_dict()})
+
+
+@proximate_bp.route('/interventions', methods=['GET'])
+@login_required
+def api_list_interventions():
+    """List interventions in this tenant. Filters: partner_id,
+    status. Default — open + escalated (the secretariat queue).
+    """
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    q = InterventionMeasure.query.filter_by(network_id=net.id)
+    partner_id = request.args.get('partner_id', type=int)
+    if partner_id:
+        q = q.filter_by(partner_id=partner_id)
+    status = request.args.get('status')
+    if status:
+        q = q.filter_by(status=status)
+    else:
+        q = q.filter(InterventionMeasure.status.in_(['open', 'escalated']))
+
+    rows = q.order_by(InterventionMeasure.response_due_at.asc()).limit(200).all()
+    return jsonify({
+        'success': True,
+        'interventions': [m.to_dict() for m in rows],
+        'total': len(rows),
+    })
+
+
+@proximate_bp.route('/interventions/<int:intervention_id>/respond', methods=['POST'])
+@login_required
+def api_respond_intervention(intervention_id):
+    """Partner or OB records a response. Closes the timer."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    notes = (payload.get('notes') or '').strip()
+    if not notes:
+        return jsonify({'success': False, 'error': 'notes required'}), 400
+
+    m = InterventionMeasure.query.filter_by(
+        id=intervention_id, network_id=net.id,
+    ).first()
+    if not m:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    if m.status != 'open':
+        return jsonify({
+            'success': False, 'error': f'Intervention is {m.status!r}, cannot respond',
+        }), 409
+
+    m.record_response(user_id=current_user.id, notes=notes)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.intervention.responded',
+        actor_email=current_user.email,
+        subject_kind='proximate_intervention',
+        subject_id=m.id,
+        details={
+            'partner_id': m.partner_id,
+            'kind': m.kind,
+            'notes': notes[:300],
+            'remaining_seconds_at_response': m.remaining_seconds,
+        },
+    )
+    return jsonify({'success': True, 'intervention': m.to_dict()})
+
+
+@proximate_bp.route('/interventions/<int:intervention_id>/withdraw', methods=['POST'])
+@ob_required
+def api_withdraw_intervention(intervention_id):
+    """OB withdraws an intervention (false alarm / resolved out-of-band)."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    m = InterventionMeasure.query.filter_by(
+        id=intervention_id, network_id=net.id,
+    ).first()
+    if not m:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    if m.status not in ('open', 'escalated'):
+        return jsonify({
+            'success': False, 'error': f'Intervention is {m.status!r}',
+        }), 409
+    m.withdraw()
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.intervention.withdrawn',
+        actor_email=current_user.email,
+        subject_kind='proximate_intervention',
+        subject_id=m.id,
+        details={'partner_id': m.partner_id, 'kind': m.kind},
+    )
+    return jsonify({'success': True, 'intervention': m.to_dict()})
+
+
+@proximate_bp.route('/interventions/cron-tick', methods=['POST'])
+def api_cron_intervention_tick():
+    """Cron-driven escalation: every open intervention past its
+    response_due_at flips to 'escalated' and is hash-chained.
+    Authorised via CRON_SECRET Bearer header (same pattern as other
+    Kuja crons). Idempotent — re-running just won't find more.
+    """
+    from flask import current_app as cap
+    secret = cap.config.get('CRON_SECRET') or os.getenv('CRON_SECRET')
+    auth = request.headers.get('Authorization', '')
+    if not secret or auth != f'Bearer {secret}':
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    from datetime import datetime as _dt, timezone as _tz
+    now = _dt.now(_tz.utc)
+    expired = InterventionMeasure.query.filter(
+        InterventionMeasure.status == 'open',
+        InterventionMeasure.response_due_at <= now,
+    ).all()
+    escalated = 0
+    for m in expired:
+        m.escalate()
+        AuditChainEntry.append(
+            action='proximate.intervention.escalated',
+            actor_email='cron',
+            subject_kind='proximate_intervention',
+            subject_id=m.id,
+            details={
+                'partner_id': m.partner_id,
+                'kind': m.kind,
+                'reason': 'response_window_expired',
+                'response_due_at': m.response_due_at.isoformat(),
+            },
+        )
+        escalated += 1
+    db.session.commit()
+    logger.info(f"Proximate cron: escalated {escalated} interventions")
+    return jsonify({'success': True, 'escalated': escalated})
+
+
+# ---- Light-KYC endorser review queue (Phase 637) ---------------------
+
+@proximate_bp.route('/admin/endorsers/pending', methods=['GET'])
+@ob_required
+def api_pending_endorsers():
+    """Return endorsers in 'pending' state — the secretariat's
+    light-KYC review queue. Includes COI signal fields (so the OB
+    can see what the endorser has self-reported) plus the doc IDs
+    for gov-ID + selfie. v1 — no AI scoring; human review only."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    rows = Endorser.query.filter_by(
+        network_id=net.id, status='pending',
+    ).order_by(Endorser.registered_at.asc()).limit(200).all()
+    return jsonify({
+        'success': True,
+        'endorsers': [e.to_dict(include_coi=True) for e in rows],
+        'total': len(rows),
+    })
+
+
+@proximate_bp.route('/admin/endorsers/<int:endorser_id>/approve', methods=['POST'])
+@ob_required
+def api_approve_endorser(endorser_id):
+    """Mark a pending endorser approved. Audit-chained."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    e = Endorser.query.filter_by(id=endorser_id, network_id=net.id).first()
+    if not e:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    if e.status != 'pending':
+        return jsonify({
+            'success': False,
+            'error': f'Endorser is {e.status!r}, can only approve pending',
+        }), 409
+    e.status = 'approved'
+    e.approved_at = datetime.now(timezone.utc)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.endorser.approved',
+        actor_email=current_user.email,
+        subject_kind='proximate_endorser',
+        subject_id=e.id,
+        details={'user_id': e.user_id, 'locality': e.locality},
+    )
+    return jsonify({'success': True, 'endorser': e.to_dict(include_coi=True)})
+
+
+@proximate_bp.route('/admin/endorsers/<int:endorser_id>/reject', methods=['POST'])
+@ob_required
+def api_reject_endorser(endorser_id):
+    """Reject a pending endorser. Records reason on the audit chain
+    (not on the model — keeps the schema minimal). v1 — no notification."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    reason = (payload.get('reason') or '').strip()
+    if not reason:
+        return jsonify({'success': False, 'error': 'reason required'}), 400
+    e = Endorser.query.filter_by(id=endorser_id, network_id=net.id).first()
+    if not e:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    if e.status != 'pending':
+        return jsonify({
+            'success': False,
+            'error': f'Endorser is {e.status!r}, can only reject pending',
+        }), 409
+    e.status = 'suspended'  # 'rejected' isn't in the vocab; suspended is the right resting state
+    e.suspended_at = datetime.now(timezone.utc)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.endorser.rejected',
+        actor_email=current_user.email,
+        subject_kind='proximate_endorser',
+        subject_id=e.id,
+        details={'user_id': e.user_id, 'reason': reason[:500]},
+    )
+    return jsonify({'success': True, 'endorser': e.to_dict(include_coi=True)})

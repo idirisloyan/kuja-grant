@@ -72,6 +72,27 @@ PARTNER_TIERS = (
     "tier_3_full",
 )
 
+# Phase 636 — capital classification per SOP 13. The disbursement
+# vehicle and oversight intensity changes by amount class. Thresholds
+# in USD-equivalent (Sudan pilot — the SoP is denominated in USD even
+# when disbursement happens in SDG or hawala).
+CAPITAL_CLASSES = ("small", "medium", "large")
+CAPITAL_CLASS_THRESHOLDS_USD = {
+    'small_max': 5_000,    # < $5k = small
+    'medium_max': 50_000,  # $5k - $50k = medium; > $50k = large
+}
+
+
+def classify_capital(usd_amount: float) -> str:
+    """Map a disbursement USD amount to its SOP 13 capital class."""
+    if usd_amount is None or usd_amount < 0:
+        return 'small'
+    if usd_amount < CAPITAL_CLASS_THRESHOLDS_USD['small_max']:
+        return 'small'
+    if usd_amount < CAPITAL_CLASS_THRESHOLDS_USD['medium_max']:
+        return 'medium'
+    return 'large'
+
 ENDORSER_STATUSES = (
     "pending",      # self-registered; awaiting light-KYC review
     "approved",     # active
@@ -136,6 +157,14 @@ class ProximatePartner(db.Model):
         db.String(40), nullable=False, default="nominated", index=True,
     )
     trust_tier = db.Column(db.String(40), nullable=True)
+
+    # Phase 636 — capital class. Defaults to 'small' (most common +
+    # safest default); secretariat sets to medium/large via the
+    # partner-detail PATCH (Phase 638+) or it's computed at
+    # disbursement time from the grant amount via classify_capital().
+    capital_class = db.Column(
+        db.String(40), nullable=False, default="small", index=True,
+    )
 
     nominated_at = db.Column(
         db.DateTime, nullable=False,
@@ -225,6 +254,7 @@ class ProximatePartner(db.Model):
             "intake_form": self.get_intake_form(),
             "status": self.status,
             "trust_tier": self.trust_tier,
+            "capital_class": self.capital_class,
             "nominated_at": self.nominated_at.isoformat() if self.nominated_at else None,
             "dd_cleared_at": self.dd_cleared_at.isoformat() if self.dd_cleared_at else None,
             "trust_floor_signals": signals,
