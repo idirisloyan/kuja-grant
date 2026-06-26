@@ -39,6 +39,7 @@ from app import create_app
 from app.extensions import db
 from app.models import (
     Network, User, Endorser, ProximatePartner, Endorsement,
+    FinancialServiceProvider,
 )
 
 app = create_app()
@@ -322,6 +323,61 @@ def run():
             print(f"  partner {action}: {f['name']} -> {p.status}"
                   f" (endorsements={len(f['endorsement_target'])},"
                   f" tier={p.trust_tier})")
+
+        # --- FSPs (Phase 639) ------------------------------------------
+        # 4 plausible Sudan FSPs — 1 bank, 2 hawala brokers, 1 mobile-
+        # money MNO. Idempotent via (network_id, name) unique constraint.
+        fsp_fixtures = [
+            {
+                'name': 'Bank of Khartoum',
+                'name_ar': 'بنك الخرطوم',
+                'kind': 'bank',
+                'locality': 'Khartoum',
+                'notes': 'Largest commercial bank in Sudan. Has a branch network across Khartoum, Gedaref, and Port Sudan.',
+            },
+            {
+                'name': 'Gedaref Souq Hawala #4',
+                'name_ar': 'حوالة سوق القضارف رقم ٤',
+                'kind': 'hawala',
+                'locality': 'Gedaref',
+                'notes': 'Trusted broker operating from the Gedaref Souq. Settlements 24h; can receive in Khartoum via partner office.',
+            },
+            {
+                'name': 'Port Sudan Marine Hawala',
+                'name_ar': 'حوالة بورتسودان البحرية',
+                'kind': 'hawala',
+                'locality': 'Port Sudan',
+                'notes': 'Coastal broker with reach into Eritrean and Saudi corridors. Useful when Khartoum banking is offline.',
+            },
+            {
+                'name': 'Sudani Mobile Money',
+                'name_ar': 'سوداني للمحفظة',
+                'kind': 'mobile_money',
+                'locality': 'national',
+                'notes': 'Sudatel mobile-money wallet. Works on basic phones via USSD. Daily limit ~SDG 50k.',
+            },
+        ]
+        for f in fsp_fixtures:
+            existing = FinancialServiceProvider.query.filter_by(
+                network_id=proximate.id, name=f['name'],
+            ).first()
+            if existing:
+                # Reconcile keys that might drift
+                existing.name_ar = f['name_ar']
+                existing.kind = f['kind']
+                existing.locality = f['locality']
+                existing.notes = f['notes']
+                existing.is_active = True
+                action = 'updated'
+            else:
+                db.session.add(FinancialServiceProvider(
+                    network_id=proximate.id,
+                    name=f['name'], name_ar=f['name_ar'], kind=f['kind'],
+                    country='SD', locality=f['locality'], notes=f['notes'],
+                    is_active=True,
+                ))
+                action = 'created'
+            print(f"  fsp {action}: {f['name']} ({f['kind']})")
 
         db.session.commit()
         print()

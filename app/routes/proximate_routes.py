@@ -36,6 +36,7 @@ from app.models import (
     Q1_LABEL_EN, Q1_LABEL_AR, Q2_LABEL_EN, Q2_LABEL_AR, Q3_LABEL_EN, Q3_LABEL_AR,
     AuditChainEntry,
     InterventionMeasure, INTERVENTION_KINDS,
+    FinancialServiceProvider, PartnerDisbursementMethod, FSP_KINDS,
 )
 from app.utils.network import ob_required
 
@@ -893,3 +894,377 @@ def api_reject_endorser(endorser_id):
         details={'user_id': e.user_id, 'reason': reason[:500]},
     )
     return jsonify({'success': True, 'endorser': e.to_dict(include_coi=True)})
+
+
+# ---- FSP registry (Phase 639) ----------------------------------------
+
+@proximate_bp.route('/fsps', methods=['GET'])
+@login_required
+def api_list_fsps():
+    """List FSPs in this tenant. Anyone authenticated can read —
+    needed by the partner-detail UI to populate the FSP dropdown."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    kind = request.args.get('kind')
+    q = FinancialServiceProvider.query.filter_by(
+        network_id=net.id, is_active=True,
+    )
+    if kind and kind in FSP_KINDS:
+        q = q.filter_by(kind=kind)
+    rows = q.order_by(
+        FinancialServiceProvider.kind, FinancialServiceProvider.name,
+    ).limit(200).all()
+    return jsonify({
+        'success': True,
+        'fsps': [f.to_dict() for f in rows],
+        'total': len(rows),
+    })
+
+
+@proximate_bp.route('/fsps', methods=['POST'])
+@ob_required
+def api_register_fsp():
+    """OB registers a new FSP — a hawala broker, mobile-money MNO,
+    or bank — into the Proximate tenant. Name is unique per network.
+    """
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    name = (payload.get('name') or '').strip()
+    kind = (payload.get('kind') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'name required'}), 400
+    if kind not in FSP_KINDS:
+        return jsonify({
+            'success': False, 'error': f'kind must be one of {FSP_KINDS}',
+        }), 400
+
+    existing = FinancialServiceProvider.query.filter_by(
+        network_id=net.id, name=name,
+    ).first()
+    if existing:
+        return jsonify({
+            'success': False, 'error': 'FSP with this name already registered',
+        }), 409
+
+    fsp = FinancialServiceProvider(
+        network_id=net.id,
+        name=name,
+        name_ar=(payload.get('name_ar') or '').strip() or None,
+        kind=kind,
+        country=(payload.get('country') or 'SD').strip(),
+        locality=(payload.get('locality') or '').strip() or None,
+        notes=(payload.get('notes') or '').strip() or None,
+        is_active=True,
+    )
+    db.session.add(fsp)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.fsp.registered',
+        actor_email=current_user.email,
+        subject_kind='proximate_fsp',
+        subject_id=fsp.id,
+        details={
+            'name': fsp.name, 'kind': fsp.kind,
+            'country': fsp.country, 'locality': fsp.locality,
+        },
+    )
+    return jsonify({'success': True, 'fsp': fsp.to_dict()})
+
+
+# ---- Partner disbursement methods ------------------------------------
+
+@proximate_bp.route('/partners/<int:partner_id>/disbursement-methods',
+                    methods=['GET'])
+@login_required
+def api_list_disbursement_methods(partner_id):
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not found'}), 404
+    rows = PartnerDisbursementMethod.query.filter_by(
+        partner_id=partner.id,
+    ).all()
+    return jsonify({
+        'success': True,
+        'methods': [m.to_dict() for m in rows],
+        'total': len(rows),
+    })
+
+
+@proximate_bp.route('/partners/<int:partner_id>/disbursement-methods',
+                    methods=['POST'])
+@ob_required
+def api_add_disbursement_method(partner_id):
+    """Attach a disbursement method to a partner. Body:
+       {fsp_id: int, identifier: dict}
+    The identifier shape depends on FSP.kind — see model docstring.
+    """
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    fsp_id = payload.get('fsp_id')
+    identifier = payload.get('identifier') or {}
+
+    if not fsp_id or not isinstance(identifier, dict):
+        return jsonify({
+            'success': False,
+            'error': 'fsp_id (int) and identifier (object) required',
+        }), 400
+
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not found'}), 404
+    fsp = FinancialServiceProvider.query.filter_by(
+        id=int(fsp_id), network_id=net.id,
+    ).first()
+    if not fsp:
+        return jsonify({'success': False, 'error': 'FSP not found'}), 404
+
+    # Per-kind minimum-fields validation. Better caught early than
+    # at disbursement time.
+    required = {
+        'bank': ('account_holder_name', 'account_number'),
+        'hawala': ('recipient_phone',),
+        'mobile_money': ('msisdn',),
+    }
+    for k in required.get(fsp.kind, ()):
+        if not identifier.get(k):
+            return jsonify({
+                'success': False,
+                'error': f'identifier.{k} required for kind={fsp.kind}',
+            }), 400
+
+    method = PartnerDisbursementMethod(
+        partner_id=partner.id, fsp_id=fsp.id, status='unverified',
+    )
+    method.set_identifier(identifier)
+    db.session.add(method)
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action='proximate.disbursement_method.added',
+        actor_email=current_user.email,
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={
+            'method_id': method.id, 'fsp_id': fsp.id,
+            'fsp_kind': fsp.kind, 'fsp_name': fsp.name,
+            # Never log the identifier in the audit chain (PII —
+            # phone numbers, account numbers). Just the FSP it ties
+            # to is enough for the trail.
+        },
+    )
+
+    return jsonify({'success': True, 'method': method.to_dict()})
+
+
+# ---- Security-driven auto-intervention (Phase 641) -------------------
+
+# Keywords that trip a freeze. Tuned to Sudan-context security
+# vocabulary — kept conservative because false-positives cost an
+# OB a manual withdraw. If the team finds we're over- or under-
+# triggering, the list is the right thing to tune (not the threshold).
+SECURITY_KEYWORDS = (
+    'attack', 'attacked',
+    'raid', 'raided',
+    'kidnap', 'kidnapped', 'abduct', 'abducted',
+    'evacuation', 'evacuated',
+    'displacement', 'displaced',
+    'shelling', 'shelled',
+    'militia',
+    'rsf ',         # Rapid Support Forces, watched for in Sudan context
+    'saf ',         # Sudanese Armed Forces
+    'aid diversion', 'diverted',
+    'arrested', 'arrest',
+    # Arabic-script equivalents for the same concepts
+    'هجوم', 'اختطاف', 'إخلاء', 'نزوح', 'قصف',
+    'تحويل المساعدات',
+)
+
+
+def _contains_security_signal(text: str | None) -> str | None:
+    """Return the first matched keyword, or None. Case-insensitive
+    substring match (kept simple — the OB-withdraw flow is the human-
+    review safety net)."""
+    if not text:
+        return None
+    lower = text.lower()
+    for kw in SECURITY_KEYWORDS:
+        if kw in lower:
+            return kw
+    return None
+
+
+@proximate_bp.route('/security-scan/cron-tick', methods=['POST'])
+def api_cron_security_scan():
+    """Scan recent monitoring-report messages / partner intake forms
+    for security keywords. For each partner with a fresh signal that
+    doesn't already have an open intervention, auto-open a freeze
+    (72h) and audit-chain. Idempotent — re-running doesn't double-fire
+    because of the open-intervention check.
+
+    CRON_SECRET-gated. Designed to run hourly alongside the
+    intervention cron.
+    """
+    from flask import current_app as cap
+    secret = cap.config.get('CRON_SECRET') or os.getenv('CRON_SECRET')
+    auth = request.headers.get('Authorization', '')
+    if not secret or auth != f'Bearer {secret}':
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    # Find Proximate networks (multi-tenancy: this cron runs per row).
+    proximate_nets = Network.query.filter_by(slug='proximate').all()
+    auto_opened = 0
+    for net in proximate_nets:
+        partners = ProximatePartner.query.filter(
+            ProximatePartner.network_id == net.id,
+            ProximatePartner.status.in_(['dd_clear', 'dd_pending']),
+        ).all()
+        for p in partners:
+            # Skip if there's already an open / escalated intervention
+            existing = InterventionMeasure.query.filter(
+                InterventionMeasure.partner_id == p.id,
+                InterventionMeasure.status.in_(['open', 'escalated']),
+            ).first()
+            if existing:
+                continue
+
+            # v1 signal source: scan the partner's intake_form notes
+            # field. Phase 642 will add monitoring reports — once
+            # those land, the scan extends to them too.
+            intake = p.get_intake_form() or {}
+            signal_text = intake.get('latest_signal') or intake.get('notes')
+            matched = _contains_security_signal(signal_text)
+            if not matched:
+                continue
+
+            # Auto-open a freeze
+            measure = InterventionMeasure.open_new(
+                network_id=net.id, partner_id=p.id, kind='freeze',
+                reason=f'Auto-flagged: security signal "{matched}" '
+                       f'detected in partner intake. '
+                       f'Human OB review required within 72h.',
+                opened_by_user_id=1,  # system user — admin
+            )
+            measure.sop_clause = 'SOP-13-section-4-auto'
+            db.session.commit()
+            AuditChainEntry.append(
+                action='proximate.intervention.opened.freeze.auto',
+                actor_email='cron-security-scan',
+                subject_kind='proximate_partner',
+                subject_id=p.id,
+                details={
+                    'intervention_id': measure.id,
+                    'keyword': matched,
+                    'sop_clause': measure.sop_clause,
+                },
+            )
+            auto_opened += 1
+
+    logger.info(f"Proximate cron: auto-opened {auto_opened} security interventions")
+    return jsonify({'success': True, 'auto_opened': auto_opened})
+
+
+# ---- Monitoring report cadence (Phase 642) ---------------------------
+
+@proximate_bp.route('/monitoring/cron-tick', methods=['POST'])
+def api_cron_monitoring():
+    """Create a monitoring-checkpoint audit-chain entry per cleared
+    partner per month per SOP 12. Lightweight v1: instead of creating
+    Report rows (which require a Grant/Application link that doesn't
+    fit the relational-validation model), we just emit an audit-chain
+    `monitoring_due` event with the cadence stamp. The Proximate
+    inbox UI can read these to render "Reporting due" tiles.
+
+    Idempotent within a calendar month — uses the audit chain to
+    self-check.
+    """
+    from flask import current_app as cap
+    from datetime import datetime as _dt, timezone as _tz
+    secret = cap.config.get('CRON_SECRET') or os.getenv('CRON_SECRET')
+    auth = request.headers.get('Authorization', '')
+    if not secret or auth != f'Bearer {secret}':
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    now = _dt.now(_tz.utc)
+    month_key = f'{now.year:04d}-{now.month:02d}'
+
+    proximate_nets = Network.query.filter_by(slug='proximate').all()
+    queued = 0
+    for net in proximate_nets:
+        cleared = ProximatePartner.query.filter_by(
+            network_id=net.id, status='dd_clear',
+        ).all()
+        for p in cleared:
+            # Has this partner already been flagged for this month?
+            # Cheap check — look back the last 5 audit rows for this
+            # subject and look for the month_key.
+            recent = AuditChainEntry.query.filter_by(
+                subject_kind='proximate_partner',
+                subject_id=p.id,
+                action='proximate.monitoring.due',
+            ).order_by(AuditChainEntry.seq.desc()).limit(5).all()
+            already_for_month = any(
+                month_key in (r.details_json or '') for r in recent
+            )
+            if already_for_month:
+                continue
+
+            AuditChainEntry.append(
+                action='proximate.monitoring.due',
+                actor_email='cron-monitoring',
+                subject_kind='proximate_partner',
+                subject_id=p.id,
+                details={
+                    'month': month_key,
+                    'sop_clause': 'SOP-12',
+                    'partner_name': p.name,
+                    'capital_class': p.capital_class,
+                },
+            )
+            queued += 1
+
+    logger.info(f"Proximate cron: queued {queued} monitoring-due flags for {month_key}")
+    return jsonify({'success': True, 'queued': queued, 'month': month_key})
+
+
+@proximate_bp.route('/disbursement-methods/<int:method_id>/verify',
+                    methods=['POST'])
+@ob_required
+def api_verify_disbursement_method(method_id):
+    """Mark a method verified — the OB has confirmed identifier
+    matches the holder via out-of-band check. Mirrors the older
+    ProximatePartner.bank_verified_at flow but per-method."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    m = PartnerDisbursementMethod.query.get(method_id)
+    if not m:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    partner = ProximatePartner.query.filter_by(
+        id=m.partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not in tenant'}), 404
+
+    m.status = 'verified'
+    m.verified_at = datetime.now(timezone.utc)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.disbursement_method.verified',
+        actor_email=current_user.email,
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={'method_id': m.id, 'fsp_id': m.fsp_id},
+    )
+    return jsonify({'success': True, 'method': m.to_dict()})

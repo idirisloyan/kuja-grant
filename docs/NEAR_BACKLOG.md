@@ -620,6 +620,32 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-26** Phase 639 + 641 + 642 — FSP registry + auto-
+  intervention + monitoring cadence.
+  - **639 (FSP registry):** new `proximate_fsps` + `proximate_
+    partner_disbursement_methods` tables. FSP kinds = bank /
+    hawala / mobile_money. Routes — list/register FSPs (OB-only),
+    list/add/verify partner disbursement methods. Per-kind
+    identifier validation. Hawala office + recipient phone is
+    first-class. Identifier NEVER logged in audit chain (PII).
+    Seed adds 4 Sudan FSPs: Bank of Khartoum, Gedaref Souq Hawala
+    #4, Port Sudan Marine Hawala, Sudani Mobile Money.
+  - **641 (security auto-intervention):** new cron-tick endpoint
+    scans Proximate partner intake_form notes for security
+    keywords (RSF/SAF, raid/attack/kidnap/displacement etc. in
+    both EN and AR script). Match → auto-opens a `freeze` (72h)
+    intervention with SOP-13-section-4-auto clause. Idempotent
+    (skips partners that already have an open intervention).
+    Hash-chained as `proximate.intervention.opened.freeze.auto`.
+  - **642 (monitoring cadence):** new cron-tick endpoint emits a
+    `proximate.monitoring.due` audit-chain entry per cleared
+    partner per calendar month per SOP 12. v1 — audit-chain
+    flag only; the Report-table integration deferred (Report
+    requires a Grant/Application link that doesn't fit the
+    relational-validation model cleanly). Inbox UI can read these
+    flags for "Reporting due" tiles.
+  - Total Proximate route count: 22 (was 15).
+
 - **2026-06-26** Phase 638 — Intervention register UI on partner
   detail page. New `<InterventionPanel>` at
   `frontend/src/components/proximate/intervention-panel.tsx`

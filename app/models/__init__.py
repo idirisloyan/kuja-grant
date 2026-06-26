@@ -78,6 +78,10 @@ from app.models.proximate_intervention import (
     InterventionMeasure, INTERVENTION_KINDS, INTERVENTION_STATUSES,
     RESPONSE_WINDOW_HOURS,
 )
+from app.models.proximate_fsp import (
+    FinancialServiceProvider, PartnerDisbursementMethod,
+    FSP_KINDS, METHOD_STATUSES,
+)
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -109,4 +113,6 @@ __all__ = [
     'Q1_LABEL_EN', 'Q1_LABEL_AR', 'Q2_LABEL_EN', 'Q2_LABEL_AR', 'Q3_LABEL_EN', 'Q3_LABEL_AR',
     'InterventionMeasure', 'INTERVENTION_KINDS', 'INTERVENTION_STATUSES',
     'RESPONSE_WINDOW_HOURS',
+    'FinancialServiceProvider', 'PartnerDisbursementMethod',
+    'FSP_KINDS', 'METHOD_STATUSES',
 ]
