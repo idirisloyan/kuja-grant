@@ -33,6 +33,7 @@ from app.models import (
     ProximatePartner, Endorser, Endorsement,
     Network, PARTNER_STATUSES, ENDORSER_STATUSES,
     Q1_LABEL_EN, Q1_LABEL_AR, Q2_LABEL_EN, Q2_LABEL_AR, Q3_LABEL_EN, Q3_LABEL_AR,
+    AuditChainEntry,
 )
 
 logger = logging.getLogger('kuja')
@@ -112,6 +113,17 @@ def api_register_endorser():
     )
     db.session.add(endorser)
     db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.endorser.registered',
+        actor_email=current_user.email,
+        subject_kind='proximate_endorser',
+        subject_id=endorser.id,
+        details={
+            'user_id': current_user.id,
+            'locality': endorser.locality,
+            'country': endorser.country,
+        },
+    )
     logger.info(
         f"Proximate: endorser registered user_id={current_user.id} "
         f"locality={endorser.locality!r}"
@@ -218,6 +230,18 @@ def api_nominate_partner():
         partner.set_intake_form(payload['intake_form'])
     db.session.add(partner)
     db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.partner.nominated',
+        actor_email=current_user.email,
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={
+            'name': partner.name,
+            'locality': partner.locality,
+            'country': partner.country,
+            'has_bank_details': bool(partner.bank_account_number),
+        },
+    )
     logger.info(
         f"Proximate: partner nominated id={partner.id} name={partner.name!r} "
         f"by user_id={current_user.id}"
@@ -329,6 +353,67 @@ def api_submit_endorsement(partner_id):
             state_change = 'dd_pending'
 
     db.session.commit()
+
+    # Audit-chain hooks — Phase 631. Best-effort: AuditChainEntry.append
+    # never raises, so a chain failure can't lose the endorsement write.
+    AuditChainEntry.append(
+        action='proximate.endorsement.submitted',
+        actor_email=current_user.email,
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={
+            'endorser_id': endorser.id,
+            'endorsement_id': endorsement.id,
+            'coi_check_passed': endorsement.coi_check_passed,
+            'coi_signals': list(signals.keys()),
+            'q1_real': payload['q1_real'],
+            'q2_trust': payload['q2_trust'],
+            'q3_accept_aid': payload['q3_accept_aid'],
+            'state_change': state_change,
+        },
+    )
+    if state_change:
+        AuditChainEntry.append(
+            action=f'proximate.partner.status_changed.{state_change}',
+            actor_email=current_user.email,
+            subject_kind='proximate_partner',
+            subject_id=partner.id,
+            details={
+                'new_status': partner.status,
+                'trust_tier': partner.trust_tier,
+                'trust_floor': partner.trust_floor_signals(),
+            },
+        )
+        # Reputation boost — Phase 631. Every endorser whose vouch
+        # contributed to a clear gets +5 (capped at 100). This is the
+        # ground-truth-feedback signal the design doc §3.1 calls for.
+        # We boost only on dd_clear (the actual outcome confirmation),
+        # not dd_pending (which is just a halfway state).
+        if state_change == 'dd_clear':
+            confirmed_endorsements = Endorsement.query.filter_by(
+                partner_id=partner.id, coi_check_passed=True,
+            ).all()
+            for ce in confirmed_endorsements:
+                contributor = Endorser.query.get(ce.endorser_id)
+                if not contributor:
+                    continue
+                old = contributor.reputation_score
+                contributor.reputation_score = min(100, (contributor.reputation_score or 50) + 5)
+                if contributor.reputation_score != old:
+                    AuditChainEntry.append(
+                        action='proximate.endorser.reputation_bumped',
+                        actor_email='system',
+                        subject_kind='proximate_endorser',
+                        subject_id=contributor.id,
+                        details={
+                            'from': old,
+                            'to': contributor.reputation_score,
+                            'reason': 'partner_cleared',
+                            'partner_id': partner.id,
+                        },
+                    )
+            db.session.commit()
+
     logger.info(
         f"Proximate: endorsement submitted partner_id={partner.id} "
         f"endorser_id={endorser.id} coi_passed={endorsement.coi_check_passed} "

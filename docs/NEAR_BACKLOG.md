@@ -620,6 +620,41 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-25** Phase 630 + 631 — Proximate seed fixtures + reputation
+  algorithm + audit-chain hooks.
+  - **630 (seed fixtures):** `seed_proximate.py` — idempotent
+    standalone script. Re-runnable. Seeds 6 endorsers (admin + 5
+    existing NGO test users, with COI signal variety so the auto-
+    check has clean + flagged paths to exercise) and 8 partners
+    across Gedaref / Sennar / Khartoum, distributed across the 5
+    status buckets (nominated x2, 1-endorsement x2, COI-flagged
+    endorsement x1, dd_pending x1, dd_clear x2). Marker-row pattern
+    means re-runs snap demo state back even if it's drifted (mirrors
+    Phase 198 UAT fixture cron on adeso-pmo-v2).
+  - **631 (reputation + audit-chain hooks):** every Proximate write
+    path now emits an `AuditChainEntry`:
+    - `proximate.endorser.registered`
+    - `proximate.partner.nominated`
+    - `proximate.endorsement.submitted` (with COI signals list +
+      state-change in the payload)
+    - `proximate.partner.status_changed.dd_pending` /
+      `.dd_clear`
+    - `proximate.endorser.reputation_bumped` (per endorser whose
+      vouch contributed to a clear)
+  - **Reputation algorithm v1:** on `dd_clear` state-change, every
+    endorser whose `coi_check_passed=true` endorsement is on the
+    partner gets +5 reputation (capped at 100). The "ground-truth
+    feedback" the design doc §3.1 calls for. v1 only handles the
+    positive direction; the negative direction (endorser repeatedly
+    backs partners that get suspended) deferred to Phase 632.
+  - **End-to-end smoke verified inline** (cookie-auth in test_client
+    was fighting Flask-Login — exercised the route's mutation
+    sequence directly): partner Gedaref Mothers Co-op transitioned
+    from `endorsements_open` → `dd_clear` on the second endorsement
+    + bank verification; Thandi's reputation 80 → 85; audit-chain
+    grew by exactly 4 entries (submission + status-change + 2
+    reputation bumps).
+
 - **2026-06-25** Phase 629 — Proximate endorser inbox + endorsement
   wizard frontend.
   - New `/proximate/endorse` page: filtered list of partners awaiting
