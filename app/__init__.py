@@ -253,6 +253,53 @@ def create_app(config_name=None):
                 db.session.add(near_net)
                 db.session.commit()
                 app.logger.info("Seeded 'near' Network row (bootstrap path)")
+
+            # Phase 627 — Proximate Fund tenant scaffold.
+            # Operates in Sudan under active conflict; default_language='ar'
+            # so the Arabic + RTL stack (Phase 624) is the first thing a new
+            # OB member sees. assessment_framework_display reads "Proximate
+            # Due Diligence (Tier 1/2/3)" mapping the existing capacity-
+            # assessment framework to SOP 6's tiered model — same internal
+            # 'kuja' framework key, different label.
+            # Membership SLA is shorter than NEAR's 60d default because
+            # Proximate's primary lane is SOP 14 fast-track (per design doc
+            # §1 north-star principle 1). The features dict carries the
+            # 'sop_14_primary' flag so the UI can default to fast-track.
+            # See docs/PROXIMATE_FUND_DESIGN.md for the design doc.
+            if not Network.query.filter_by(slug="proximate").first():
+                proximate_net = Network(
+                    slug="proximate",
+                    name="Proximate Fund",
+                    mission_short=(
+                        "Intermediary donor incubating new funds, strengthening "
+                        "existing mechanisms, and enabling partner-hosted "
+                        "mechanisms — operated by Adeso, Sudan-focused."
+                    ),
+                    brand_color_hex="#7C3AED",  # placeholder violet pending brand spec
+                    default_language="ar",
+                    home_url="https://proximate.adesoafrica.org",
+                    oversight_body_min_signers=2,
+                    membership_review_days=20,
+                    default_assessment_framework="kuja",
+                    assessment_framework_display="Proximate Due Diligence (Tier 1/2/3)",
+                    default_currency="USD",
+                    is_default=False,
+                    is_active=True,
+                )
+                proximate_net.set_host_aliases([
+                    "proximate.kuja.org",
+                    "proximate.adesoafrica.org",
+                ])
+                proximate_net.set_features({
+                    "sop_14_primary": True,
+                    "community_endorsement": True,
+                    "fsp_registry": True,
+                    "capital_classification": True,
+                    "intervention_register_timers": True,
+                })
+                db.session.add(proximate_net)
+                db.session.commit()
+                app.logger.info("Seeded 'proximate' Network row (bootstrap path)")
         except Exception as e:
             app.logger.warning(f"Network bootstrap skipped: {e}")
 
