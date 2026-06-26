@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { apiOffline, api, isQueuedResponse } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import { useAuthStore } from '@/stores/auth-store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -103,6 +104,9 @@ export default function ProximateEndorseWizardClient() {
   const { t, lang } = useTranslation();
   const isRtl = lang === 'ar';
 
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'admin';
+
   const [data, setData] = useState<PartnerResp | null>(null);
   const [loading, setLoading] = useState(true);
   const [q1, setQ1] = useState<Answer>(null);
@@ -112,6 +116,11 @@ export default function ProximateEndorseWizardClient() {
   const [result, setResult] = useState<EndorseResp | null>(null);
   const [queued, setQueued] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Phase 634 — secretariat actions
+  const [adminBusy, setAdminBusy] = useState(false);
+  const [adminMessage, setAdminMessage] = useState<string | null>(null);
+  const [suspendOpen, setSuspendOpen] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
 
   useEffect(() => {
     if (!partnerId) return;
@@ -148,6 +157,54 @@ export default function ProximateEndorseWizardClient() {
       setError(msg);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleBankVerify = async () => {
+    if (!data) return;
+    setAdminBusy(true);
+    setAdminMessage(null);
+    try {
+      const r = await api.post<{ success: boolean; partner: Partner; state_change: string | null }>(
+        `/api/proximate/partners/${partnerId}/bank-verify`,
+      );
+      setData((d) => (d ? { ...d, partner: r.partner } : d));
+      setAdminMessage(
+        r.state_change === 'dd_clear'
+          ? t('proximate.admin.bank_verified_cleared')
+          : t('proximate.admin.bank_verified'),
+      );
+    } catch (e: unknown) {
+      setAdminMessage(e instanceof Error ? e.message : t('proximate.admin.action_failed'));
+    } finally {
+      setAdminBusy(false);
+    }
+  };
+
+  const handleSuspend = async () => {
+    if (!data || !suspendReason.trim()) return;
+    setAdminBusy(true);
+    setAdminMessage(null);
+    try {
+      const r = await api.post<{ success: boolean; partner: Partner; endorsers_penalised: number }>(
+        `/api/proximate/partners/${partnerId}/suspend`,
+        { reason: suspendReason.trim() },
+      );
+      setData((d) => (d ? { ...d, partner: r.partner } : d));
+      setAdminMessage(
+        t(
+          r.endorsers_penalised === 1
+            ? 'proximate.admin.suspended_one'
+            : 'proximate.admin.suspended_other',
+          { n: r.endorsers_penalised },
+        ),
+      );
+      setSuspendOpen(false);
+      setSuspendReason('');
+    } catch (e: unknown) {
+      setAdminMessage(e instanceof Error ? e.message : t('proximate.admin.action_failed'));
+    } finally {
+      setAdminBusy(false);
     }
   };
 
@@ -316,6 +373,80 @@ export default function ProximateEndorseWizardClient() {
             <BackChevron className="w-3 h-3" />
             {t('proximate.wizard.back')}
           </button>
+
+          {isAdmin && partner.status !== 'suspended' && (
+            <Card className="p-4 border-violet-300 bg-violet-50/40 dark:bg-violet-950/20">
+              <h2 className="text-sm font-medium mb-2">
+                {t('proximate.admin.title')}
+              </h2>
+              <p className="text-xs text-muted-foreground mb-3">
+                {t('proximate.admin.subtitle')}
+              </p>
+              {adminMessage && (
+                <p className="text-xs mb-3 text-foreground bg-background border border-border rounded p-2">
+                  {adminMessage}
+                </p>
+              )}
+              <div className="flex flex-col gap-2">
+                {!partner.bank_verified_at && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBankVerify}
+                    disabled={adminBusy}
+                  >
+                    {adminBusy && <Loader2 className="w-3 h-3 animate-spin me-2" />}
+                    {t('proximate.admin.bank_verify_button')}
+                  </Button>
+                )}
+                {!suspendOpen ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSuspendOpen(true)}
+                    disabled={adminBusy}
+                    className="text-destructive border-destructive/30 hover:bg-destructive/5"
+                  >
+                    {t('proximate.admin.suspend_button')}
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <textarea
+                      value={suspendReason}
+                      onChange={(e) => setSuspendReason(e.target.value)}
+                      placeholder={t('proximate.admin.suspend_reason_placeholder')}
+                      className="w-full text-sm rounded border border-border bg-background p-2"
+                      rows={3}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        onClick={handleSuspend}
+                        disabled={adminBusy || !suspendReason.trim()}
+                        className="flex-1"
+                      >
+                        {adminBusy && <Loader2 className="w-3 h-3 animate-spin me-2" />}
+                        {t('proximate.admin.suspend_confirm')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setSuspendOpen(false); setSuspendReason(''); }}
+                        disabled={adminBusy}
+                      >
+                        {t('proximate.admin.cancel')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
 
           <Card className="p-4">
             <p className="text-xs text-muted-foreground mb-4">

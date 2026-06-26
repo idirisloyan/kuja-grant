@@ -620,6 +620,25 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-25** Phase 633 + 634 — Demo seed-on-boot + secretariat
+  UI on the wizard.
+  - **633:** `SEED_PROXIMATE_ON_BOOT=true` env-flag triggers
+    `seed_proximate.run()` after the Network bootstrap. Fired
+    successfully on prod (Railway logs show "Proximate demo seed
+    complete." — 6 endorsers, 8 partners, 9 endorsements). Idempotent,
+    so it's safe to leave on; flip it off (or just keep it on for
+    nightly demo refresh) at the team's discretion.
+  - **634:** violet "Secretariat actions" card on
+    `/proximate/endorse/[partnerId]` for admin users only — two
+    buttons ("Mark bank account verified", "Suspend partner") that
+    hit the Phase 632 endpoints. Suspend is a confirm-with-reason
+    flow (textarea + Confirm/Cancel). Browser-verified end-to-end:
+    clicking bank-verify against a partner where admin is not OB on
+    Proximate surfaces the server-side `Oversight Body permission
+    required` error in the inline message — exactly the expected
+    permission boundary (per-network OB role, Phase 44). 12 new i18n
+    keys, all 6 locales at 2220 keys.
+
 - **2026-06-25** Phase 632 — Proximate secretariat admin endpoints
   (bank-verify + suspend).
   - **POST /api/proximate/partners/<id>/bank-verify** (OB-only):
