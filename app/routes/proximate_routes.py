@@ -1271,3 +1271,124 @@ def api_verify_disbursement_method(method_id):
         details={'method_id': m.id, 'fsp_id': m.fsp_id},
     )
     return jsonify({'success': True, 'method': m.to_dict()})
+
+
+# ---- Endorsement read view (Phase 644) -------------------------------
+
+@proximate_bp.route('/partners/<int:partner_id>/endorsements',
+                    methods=['GET'])
+@login_required
+def api_list_endorsements(partner_id):
+    """List all endorsements for a partner. Returns answers +
+    transcripts so the OB can read what each endorser said about each
+    Y/N question. Without this, voice-transcribed reasoning is
+    write-only — collected at submit time and never surfaced again.
+    """
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not found'}), 404
+    rows = Endorsement.query.filter_by(
+        partner_id=partner.id,
+    ).order_by(Endorsement.created_at.desc()).all()
+    return jsonify({
+        'success': True,
+        'endorsements': [e.to_dict() for e in rows],
+        'total': len(rows),
+    })
+
+
+# ---- Operator dashboard rollup (Phase 643) ---------------------------
+
+@proximate_bp.route('/overview', methods=['GET'])
+@login_required
+def api_proximate_overview():
+    """Single-pane rollup for the OB. Returns counts the dashboard
+    needs to triage today's queue: partners by status, open
+    interventions (separating expired = needs response NOW), pending
+    endorser approvals, monitoring-due audit flags for this month,
+    recent audit events.
+
+    Read-only — open to any authenticated user in the tenant so we
+    don't have to gate the dashboard route; the per-action endpoints
+    already enforce OB role separately.
+    """
+    from datetime import datetime as _dt, timezone as _tz
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+
+    # Partners by status
+    by_status = {s: 0 for s in PARTNER_STATUSES}
+    rows = ProximatePartner.query.filter_by(network_id=net.id).all()
+    for r in rows:
+        if r.status in by_status:
+            by_status[r.status] += 1
+
+    # Open interventions — split open vs expired (past response_due_at)
+    open_interventions = InterventionMeasure.query.filter(
+        InterventionMeasure.network_id == net.id,
+        InterventionMeasure.status.in_(['open', 'escalated']),
+    ).all()
+    expired_count = sum(1 for m in open_interventions if m.is_expired)
+    open_count = len(open_interventions) - expired_count
+    escalated_count = sum(
+        1 for m in open_interventions if m.status == 'escalated'
+    )
+
+    # Pending endorser approvals
+    pending_endorsers = Endorser.query.filter_by(
+        network_id=net.id, status='pending',
+    ).count()
+
+    # Monitoring-due flags this month — count the audit-chain rows
+    # the Phase 642 cron emits.
+    now = _dt.now(_tz.utc)
+    month_key = f'{now.year:04d}-{now.month:02d}'
+    monitoring_due_rows = AuditChainEntry.query.filter_by(
+        subject_kind='proximate_partner',
+        action='proximate.monitoring.due',
+    ).order_by(AuditChainEntry.seq.desc()).limit(200).all()
+    monitoring_due_this_month = sum(
+        1 for r in monitoring_due_rows
+        if month_key in (r.details_json or '')
+    )
+
+    # FSP registry size for the OB to confirm the registry is wired
+    fsp_count = FinancialServiceProvider.query.filter_by(
+        network_id=net.id, is_active=True,
+    ).count()
+
+    # Recent audit events scoped to Proximate-flavoured actions
+    recent = AuditChainEntry.query.filter(
+        AuditChainEntry.action.like('proximate.%'),
+    ).order_by(AuditChainEntry.seq.desc()).limit(10).all()
+    recent_dicts = [{
+        'seq': r.seq,
+        'action': r.action,
+        'actor_email': r.actor_email,
+        'subject_kind': r.subject_kind,
+        'subject_id': r.subject_id,
+        'created_at': r.created_at.isoformat() if r.created_at else None,
+    } for r in recent]
+
+    return jsonify({
+        'success': True,
+        'partners_by_status': by_status,
+        'partners_total': len(rows),
+        'interventions': {
+            'open': open_count,
+            'expired': expired_count,
+            'escalated': escalated_count,
+            'total': len(open_interventions),
+        },
+        'endorsers_pending': pending_endorsers,
+        'monitoring_due_this_month': monitoring_due_this_month,
+        'fsps_registered': fsp_count,
+        'month': month_key,
+        'recent_audit': recent_dicts,
+    })

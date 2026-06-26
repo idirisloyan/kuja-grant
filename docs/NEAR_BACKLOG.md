@@ -620,6 +620,28 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-26** Phase 643 + 644 — Operator dashboard +
+  endorsement transcript read view.
+  - **643:** new `/proximate/admin` page + `/api/proximate/overview`
+    endpoint. Single-pane signal grid: partners by status (with
+    cleared callout), open interventions (expired = destructive
+    border + "past response window" callout), endorsers pending
+    light-KYC, monitoring-due flags for this calendar month,
+    registered FSP count, and the last 10 Proximate-flavoured
+    audit chain rows. Browser-verified: 4 stat tiles + 14 audit
+    rows render on dev.
+  - **644:** new `<EndorsementsPanel>` on partner detail page +
+    GET `/api/proximate/partners/<id>/endorsements`. Lists every
+    endorsement with Y/N answers per question, COI-flagged badge
+    if signals fired, "Voice transcript" badge + inline transcript
+    text per question when voice was used. Without this, the
+    Phase 640 voice work was collected at submit time and
+    immediately invisible — the OB had no way to read what an
+    endorser actually said. Browser-verified with a seeded
+    transcript on partner 3: all 3 question transcripts render
+    in the panel.
+  - 19 new i18n keys × 6 locales → 2262 keys per locale.
+
 - **2026-06-26** Phase 640 — Voice transcription per endorsement
   question. New `<VoiceQuestionInput>` at
   `frontend/src/components/proximate/voice-question-input.tsx`
