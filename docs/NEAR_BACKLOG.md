@@ -620,6 +620,38 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-21** Phase 625 + 627 — Audit-chain tenant scope
+  verification + Proximate Fund design doc v1.
+  - **625 (verification only):** confirmed that
+    `app/routes/audit_chain_routes.py` has zero `network_id`
+    filtering, `AuditChainEntry` has no `network_id` column, and the
+    `/admin/audit-chain` frontend doesn't read `useNetworkStore`. Not
+    a prod leak today (the audit-chain page is `@role_required('admin')`
+    only, and NEAR OBs use a separate role — Phase 44). Becomes a
+    real decision when Proximate ships: per-tenant chain vs shared
+    chain with read-side scoping. Decision documented in
+    `docs/PROXIMATE_FUND_DESIGN.md` §6 (recommended: per-tenant).
+  - **627 (Proximate Fund design doc v1):**
+    `docs/PROXIMATE_FUND_DESIGN.md` is the reaction surface for the
+    whole Proximate workstream. Structured as: north-star, what
+    reuses NEAR, 6 net-new modules (community endorsement is the
+    bet), per-flow walkthrough mapping each SoP step → UI surface,
+    13-week phasing, 5 open design decisions for Adeso to call.
+    SOP 14 fast-track as primary lane (not exception); Arabic-first
+    by default; hawala + mobile-money as first-class FSP types;
+    security-driven returns auto-detected. Awaiting team sign-off on
+    §2 reuse table, §3 community-endorsement shape, §6 decisions, and
+    §5 phasing.
+
+- **2026-06-21** Phase 626 — mobile_test.py parametrise by network.
+  **DEFERRED** pending Phase 627 sign-off. Rationale: parametrising
+  the mobile test before the Proximate-specific routes exist would
+  be guesswork. Once 627 lands and route paths are stable, parametrise
+  `mobile_test.py` with the actual routes (community endorsement,
+  multi-sig threshold dialog, tranche scheduler, intervention
+  register) and run cold-mobile-slow-3G against both NEAR and
+  Proximate tenants.
+
 - **2026-06-21** Phase 624 — Arabic + RTL backfill on low-internet
   surfaces. After the team audit, 27 customer-facing strings were
   bypassing i18n and 8 Tailwind classes hardcoded LTR directionality.
