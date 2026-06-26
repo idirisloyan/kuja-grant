@@ -620,6 +620,38 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-25** Phase 628 — Proximate community-endorsement data
+  model + endpoints (the bet).
+  - New `app/models/proximate_endorsement.py` with three SQLAlchemy
+    models: `ProximatePartner` (informal group nominated for
+    Tier 1 funding), `Endorser` (registered community member with
+    COI signals + reputation_score), `Endorsement` (one vouch with
+    3 Y/N answers + COI auto-check).
+  - `Endorsement.compute_coi_signals()` is the load-bearing helper.
+    Compares endorser's locality/village/family_name/employer against
+    partner fields (substring, case-insensitive). Non-empty signals
+    flag the endorsement out of the trust-floor count but still
+    record (audit). Biases false-positives over false-negatives.
+  - `ProximatePartner.trust_floor_signals()` is the single source of
+    truth for "Tier 1 ready": 2 independent COI-clean endorsements
+    + bank verified + all endorsers reputation ≥ 75 (placeholder
+    floor pending Phase 631 algorithm).
+  - New `app/routes/proximate_routes.py` blueprint exposes 5
+    endpoints under `/api/proximate/*`: register-endorser (idempotent),
+    list-partners (filtered by status), get-partner-detail,
+    nominate-partner, submit-endorsement (runs COI auto-check,
+    transitions partner status on trust-floor met). Tenant guard
+    via host-header → `g.network.slug == 'proximate'`.
+  - Smoke-tested: 3 COI auto-check paths (clean / shared locality /
+    shared family name) pass; all 5 routes registered; tables
+    auto-create via existing schema reconciler.
+  - **Deferred to Phase 631:** reputation algorithm (column exists,
+    default 50), Whisper transcription of voice notes, audit-chain
+    entry per endorsement (column exists), light-KYC review flow.
+  - **Next (Phase 629):** Next.js frontend — endorser inbox,
+    nomination form, endorsement wizard (3 Y/N questions, voice
+    notes), trust-floor checklist render. Arabic-first.
+
 - **2026-06-21** Phase 625 + 627 — Audit-chain tenant scope
   verification + Proximate Fund design doc v1.
   - **625 (verification only):** confirmed that

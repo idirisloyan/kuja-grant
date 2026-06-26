@@ -54,6 +54,7 @@ def register_blueprints(app):
     from app.routes.webauthn_routes import webauthn_bp  # Phase 26C: biometric re-auth
     from app.routes.feedback_routes import feedback_bp  # Phase 31A: micro-survey ingest
     from app.routes.network_routes import network_bp  # Phase 32: multi-tenant network context
+    from app.routes.proximate_routes import proximate_bp  # Phase 628: Proximate community endorsement
     from app.routes.network_membership_routes import network_membership_bp  # Phase 33: membership flow
     from app.routes.fund_routes import fund_bp  # Phase 34: funds + windows + rubrics
     from app.routes.crisis_monitoring_routes import crisis_bp  # Phase 35: weekly crisis monitoring
@@ -100,5 +101,6 @@ def register_blueprints(app):
                whats_new_bp, data_export_bp, integrity_bp,
                credentials_bp, passport_vc_bp, well_known_bp,
                synthetic_monitor_bp, replay_bp, tenant_health_bp,
-               donor_portfolio_qa_bp, cost_ceiling_bp, peer_snippets_bp, webhook_bp]:
+               donor_portfolio_qa_bp, cost_ceiling_bp, peer_snippets_bp, webhook_bp,
+               proximate_bp]:
         app.register_blueprint(bp)

@@ -68,6 +68,11 @@ from app.models.cron_run import CronRun, record_cron_run
 from app.models.criteria_template import CriteriaTemplate
 from app.models.kpi_snapshot import KpiSnapshot
 from app.models.expression_of_interest import ExpressionOfInterest
+from app.models.proximate_endorsement import (
+    ProximatePartner, Endorser, Endorsement,
+    PARTNER_STATUSES, PARTNER_TIERS, ENDORSER_STATUSES,
+    Q1_LABEL_EN, Q1_LABEL_AR, Q2_LABEL_EN, Q2_LABEL_AR, Q3_LABEL_EN, Q3_LABEL_AR,
+)
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -94,4 +99,7 @@ __all__ = [
     'EmergencyDeclaration', 'DeclarationSignature', 'DeclarationDocument',
     'DECLARATION_STATUSES', 'SIGNATURE_STATUSES', 'SIGNATURE_METHODS', 'DOCUMENT_KINDS',
     'MonitoringVisit', 'VISIT_MODES', 'VISIT_STATUSES',
+    'ProximatePartner', 'Endorser', 'Endorsement',
+    'PARTNER_STATUSES', 'PARTNER_TIERS', 'ENDORSER_STATUSES',
+    'Q1_LABEL_EN', 'Q1_LABEL_AR', 'Q2_LABEL_EN', 'Q2_LABEL_AR', 'Q3_LABEL_EN', 'Q3_LABEL_AR',
 ]
