@@ -27,6 +27,7 @@ import {
 import { apiOffline, api, isQueuedResponse } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
+import { InterventionPanel } from '@/components/proximate/intervention-panel';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -373,6 +374,12 @@ export default function ProximateEndorseWizardClient() {
             <BackChevron className="w-3 h-3" />
             {t('proximate.wizard.back')}
           </button>
+
+          <InterventionPanel
+            partnerId={partner.id}
+            canOpen={isAdmin}
+            canWithdraw={isAdmin}
+          />
 
           {isAdmin && partner.status !== 'suspended' && (
             <Card className="p-4 border-violet-300 bg-violet-50/40 dark:bg-violet-950/20">

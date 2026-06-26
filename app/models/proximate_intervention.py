@@ -64,6 +64,17 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _as_utc(dt: datetime | None) -> datetime | None:
+    """Coerce a (possibly naive) datetime read from the DB to UTC-aware.
+    SQLite returns naive datetimes even when we stored aware ones —
+    treat naive as UTC, since that's what we wrote."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 # ---- InterventionMeasure ---------------------------------------------
 
 class InterventionMeasure(db.Model):
@@ -186,15 +197,22 @@ class InterventionMeasure(db.Model):
 
     @property
     def is_expired(self) -> bool:
-        return self.is_open and self.response_due_at <= _now()
+        due = _as_utc(self.response_due_at)
+        return self.is_open and due is not None and due <= _now()
 
     @property
     def elapsed_seconds(self) -> int:
-        return int((_now() - self.opened_at).total_seconds())
+        opened = _as_utc(self.opened_at)
+        if opened is None:
+            return 0
+        return int((_now() - opened).total_seconds())
 
     @property
     def remaining_seconds(self) -> int:
-        return max(0, int((self.response_due_at - _now()).total_seconds()))
+        due = _as_utc(self.response_due_at)
+        if due is None:
+            return 0
+        return max(0, int((due - _now()).total_seconds()))
 
     def to_dict(self) -> dict:
         return {

@@ -620,6 +620,33 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-26** Phase 638 — Intervention register UI on partner
+  detail page. New `<InterventionPanel>` at
+  `frontend/src/components/proximate/intervention-panel.tsx`
+  surfaces every open intervention for a partner. Each row shows
+  kind badge (warning/freeze/suspend), SOP clause, live HH:MM:SS
+  countdown to `response_due_at`, reason, and (for OB) a Withdraw
+  button. Escalated rows get a destructive-tone treatment with no
+  countdown. OB users also get the "Open intervention" form
+  inline (kind dropdown + reason textarea → POST). Countdown
+  re-renders every 30s — the server is the authority for
+  `response_due_at`, so the display math is just `(due - now)`.
+  Wired into the Proximate wizard above the Secretariat actions
+  card. 16 new i18n keys EN+AR with real Arabic, all 6 locales at
+  2236.
+  - **Bug found + fixed during verification:** SQLite returned
+    naive datetimes from the `proximate_interventions` columns
+    even though we wrote aware UTC. Mixing them with `_now()`
+    (aware) in `is_expired`/`elapsed_seconds`/`remaining_seconds`
+    raised `TypeError: can't subtract offset-naive and
+    offset-aware`. Added `_as_utc()` helper that coerces naive →
+    UTC-aware before subtraction. The 3 helper props now all
+    safe.
+  - Browser-verified end-to-end with 2 seeded interventions on
+    partner 3 — warning shows `30:56:42` countdown, freeze
+    (backdated to expire) shows `00:00:00` in destructive
+    styling. Withdraw button present on both for admin.
+
 - **2026-06-25** Phase 635 + 636 + 637 — Intervention register +
   capital classification + light-KYC endorser queue.
   - **635 — Intervention register (SoP 13 §4):** new
