@@ -620,6 +620,42 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-25** Phase 629 — Proximate endorser inbox + endorsement
+  wizard frontend.
+  - New `/proximate/endorse` page: filtered list of partners awaiting
+    endorsement, "N of 2 endorsements collected" per row,
+    Arabic-aware display name (`name_ar` when `lang === 'ar'`).
+  - New `/proximate/endorse/[partnerId]` wizard: 3 Y/N questions with
+    EN+AR labels supplied by the API. Submit uses `apiOffline.post`
+    so the PWA outbox handles low-signal Sudan conditions (queued
+    state has its own confirmation screen). Static-export pattern:
+    `page.tsx` + `client.tsx` reading `window.location.pathname`
+    (same fix as `/applications/[id]`).
+  - Trust-floor checklist render (Screen 3): 3 gates — 2 independent
+    endorsements / bank verified / endorsers meet reputation floor
+    — each with a green tick or muted X. State-change callout fires
+    when `state_change === 'dd_clear'` (the partner just cleared
+    Tier 1 because of this endorsement). Separate amber callout when
+    COI auto-check flagged the endorsement (recorded for audit but
+    doesn't count toward floor).
+  - 29 i18n keys added across all 6 locales (en/ar real translations,
+    fr/sw/so/es backfilled with EN placeholders). Parity gate green
+    at 2208 keys per locale.
+  - **Browser-verified locally:** inbox shows "2 partners need
+    endorsement" subtitle + 2 partner cards (Halawa Relief Block /
+    Sennar, Gedaref Children Aid / Gedaref). Wizard renders heading,
+    3 numbered questions ("Is this organisation real…", "Do you trust
+    the leadership?", "Would you accept aid through them?"), Yes/No
+    button pairs, Submit CTA. End-to-end submission test passed
+    (admin promoted to approved endorser, q1/q2/q3 = true →
+    `coi_passed=true`, `endorsements_independent_count=1`,
+    `state_change=null` correctly — needs second endorser to clear).
+  - **Deferred to Phase 631:** voice-note attachment per question
+    (URL fields exist in the model + payload; UI uses voice-field-
+    input component, just not wired here yet), partner nomination
+    intake form UI (the API already exists, secretariat can
+    POST directly until UI lands).
+
 - **2026-06-25** Phase 628 — Proximate community-endorsement data
   model + endpoints (the bet).
   - New `app/models/proximate_endorsement.py` with three SQLAlchemy
