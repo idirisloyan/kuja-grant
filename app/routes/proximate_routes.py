@@ -1533,9 +1533,24 @@ def api_get_round(round_id):
         AuditChainEntry.created_at <= end,
     ).order_by(AuditChainEntry.seq.desc()).limit(500).all()
 
+    # Phase 656 — disbursements tagged to this round + envelope rollup
+    disbursements = ProximateDisbursement.query.filter_by(
+        network_id=net.id, round_id=r.id,
+    ).order_by(ProximateDisbursement.sent_at.desc()).all()
+    envelope_used = sum(
+        float(d.amount_usd) for d in disbursements if d.amount_usd is not None
+    )
+    envelope_total = float(r.envelope_usd) if r.envelope_usd else None
+    envelope_remaining = (
+        envelope_total - envelope_used if envelope_total is not None else None
+    )
+
     return jsonify({
         'success': True,
         'round': r.to_dict(include_signatures=True),
+        'disbursements': [d.to_dict() for d in disbursements],
+        'envelope_used': envelope_used,
+        'envelope_remaining': envelope_remaining,
         'audit_in_window': [{
             'seq': a.seq, 'action': a.action,
             'actor_email': a.actor_email,

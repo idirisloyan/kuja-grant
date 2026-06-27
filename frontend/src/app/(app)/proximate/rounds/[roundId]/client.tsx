@@ -15,7 +15,8 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Loader2, CheckCircle2, X, Lock } from 'lucide-react';
+import Link from 'next/link';
+import { Loader2, CheckCircle2, X, Lock, Banknote } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -69,10 +70,25 @@ interface AuditRow {
   created_at: string | null;
 }
 
+interface RoundDisbursement {
+  id: number;
+  partner_name: string | null;
+  partner_id: number;
+  amount_usd: number | null;
+  status: string;
+  sent_at: string | null;
+  report_due_at: string | null;
+  overdue: boolean;
+  has_report: boolean;
+}
+
 interface Resp {
   success: boolean;
   round: Round;
   audit_in_window: AuditRow[];
+  disbursements?: RoundDisbursement[];
+  envelope_used?: number;
+  envelope_remaining?: number | null;
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -390,6 +406,85 @@ export function ProximateRoundDetailClient() {
               <p className="text-xs whitespace-pre-wrap">{round.closing_summary}</p>
             </Card>
           )}
+
+          {/* Phase 656 — Disbursements rollup */}
+          {(() => {
+            const disb = data?.disbursements || [];
+            const used = data?.envelope_used || 0;
+            const total = round.envelope_usd || 0;
+            const remaining = data?.envelope_remaining ?? (total ? total - used : null);
+            const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+            return (
+              <Card className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Banknote className="w-4 h-4 text-muted-foreground" />
+                    {t('proximate.rounds.disbursements_in_round')} ({disb.length})
+                  </p>
+                  <Link
+                    href={`/proximate/disbursements/new?round=${round.id}`}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {t('proximate.rounds.disburse_more')}
+                  </Link>
+                </div>
+                {total > 0 && (
+                  <div className="mb-3">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">
+                        ${used.toLocaleString()} / ${total.toLocaleString()}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {remaining !== null
+                          ? `$${remaining.toLocaleString()} ${t('proximate.rounds.remaining')}`
+                          : ''}
+                      </span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-600 transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                {disb.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {t('proximate.rounds.no_disbursements_yet')}
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {disb.map((d) => (
+                      <li key={d.id}>
+                        <Link
+                          href={`/proximate/disbursements/${d.id}`}
+                          className="flex items-center gap-2 text-xs hover:bg-muted/30 rounded px-2 py-1.5 -mx-2"
+                        >
+                          <span className="font-medium flex-1 truncate">
+                            {d.partner_name || `Partner #${d.partner_id}`}
+                          </span>
+                          {d.amount_usd && (
+                            <span className="text-muted-foreground tabular-nums">
+                              ${d.amount_usd.toLocaleString()}
+                            </span>
+                          )}
+                          <Badge variant="outline" className={`text-[10px] ${
+                            d.status === 'verified' ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : d.status === 'flagged' ? 'bg-red-100 text-red-800 border-red-300'
+                            : d.status === 'reported' ? 'bg-blue-100 text-blue-800 border-blue-300'
+                            : d.overdue ? 'bg-red-100 text-red-800 border-red-300'
+                            : 'bg-amber-100 text-amber-800 border-amber-300'
+                          }`}>
+                            {d.status}{d.overdue ? ' · late' : ''}
+                          </Badge>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            );
+          })()}
 
           {/* Audit window */}
           <Card className="p-4">

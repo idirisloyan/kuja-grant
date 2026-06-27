@@ -41,6 +41,7 @@ interface Partner {
   status: string;
   trust_tier: string | null;
   nominated_at: string | null;
+  source?: 'self' | 'staff';
   trust_floor_signals: TrustFloor;
 }
 
@@ -128,6 +129,14 @@ export default function ProximateInboxPage() {
                             {isReady && (
                               <Badge variant="default" className="text-[10px]">
                                 {t('proximate.status.dd_clear')}
+                              </Badge>
+                            )}
+                            {p.source === 'self' && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-violet-100 text-violet-800 border-violet-300"
+                              >
+                                {t('proximate.inbox.self_nominated')}
                               </Badge>
                             )}
                           </div>

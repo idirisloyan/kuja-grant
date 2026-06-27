@@ -251,6 +251,9 @@ class ProximatePartner(db.Model):
                 self.bank_verified_at.isoformat() if self.bank_verified_at else None
             ),
             "nominated_by_user_id": self.nominated_by_user_id,
+            "source": (
+                "self" if self.nominated_by_user_id is None else "staff"
+            ),
             "intake_form": self.get_intake_form(),
             "status": self.status,
             "trust_tier": self.trust_tier,
