@@ -86,6 +86,10 @@ from app.models.proximate_round import (
     ProximateRound, ProximateRoundSignature,
     ROUND_STATUSES, ROUND_TRIGGER_TYPES, ROUND_SIGNERS_REQUIRED,
 )
+from app.models.proximate_disbursement import (
+    ProximateDisbursement,
+    DISBURSEMENT_STATUSES, DEFAULT_REPORT_WINDOW_DAYS,
+)
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -121,4 +125,6 @@ __all__ = [
     'FSP_KINDS', 'METHOD_STATUSES',
     'ProximateRound', 'ProximateRoundSignature',
     'ROUND_STATUSES', 'ROUND_TRIGGER_TYPES', 'ROUND_SIGNERS_REQUIRED',
+    'ProximateDisbursement',
+    'DISBURSEMENT_STATUSES', 'DEFAULT_REPORT_WINDOW_DAYS',
 ]

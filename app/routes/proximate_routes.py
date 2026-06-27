@@ -39,6 +39,7 @@ from app.models import (
     FinancialServiceProvider, PartnerDisbursementMethod, FSP_KINDS,
     ProximateRound, ProximateRoundSignature,
     ROUND_TRIGGER_TYPES, ROUND_SIGNERS_REQUIRED,
+    ProximateDisbursement, DEFAULT_REPORT_WINDOW_DAYS,
 )
 from app.utils.network import ob_required
 
@@ -1719,3 +1720,311 @@ def api_close_round(round_id):
         details={'summary_preview': (summary or '')[:200]},
     )
     return jsonify({'success': True, 'round': r.to_dict()})
+
+
+# =====================================================================
+# Phase 651 — Disbursements + per-disbursement reporting
+# =====================================================================
+
+@proximate_bp.route('/disbursements', methods=['GET'])
+@login_required
+def api_list_disbursements():
+    """List disbursements for the tenant. Filterable by partner_id,
+    round_id, status, overdue."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    q = ProximateDisbursement.query.filter_by(network_id=net.id)
+    partner_id = request.args.get('partner_id', type=int)
+    if partner_id:
+        q = q.filter_by(partner_id=partner_id)
+    round_id = request.args.get('round_id', type=int)
+    if round_id:
+        q = q.filter_by(round_id=round_id)
+    status = request.args.get('status')
+    if status:
+        q = q.filter_by(status=status)
+    rows = q.order_by(ProximateDisbursement.sent_at.desc()).limit(200).all()
+    return jsonify({
+        'success': True,
+        'disbursements': [d.to_dict() for d in rows],
+    })
+
+
+@proximate_bp.route('/disbursements', methods=['POST'])
+@ob_required
+def api_record_disbursement():
+    """OB records a money release to a cleared partner. Creates a
+    pending-report obligation due in DEFAULT_REPORT_WINDOW_DAYS (14)
+    and emits the audit-chain rows that drive the inbox tile + the
+    nudge cron."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    partner_id = payload.get('partner_id')
+    amount = payload.get('amount_usd')
+    if not partner_id or amount in (None, '', 0):
+        return jsonify({
+            'success': False,
+            'error': 'partner_id and amount_usd required',
+        }), 400
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not in tenant'}), 404
+    if partner.status not in ('dd_clear', 'endorsements_open', 'dd_pending'):
+        # OB-only override allowed but flag it
+        logger.warning(
+            f"Proximate: disbursement on non-cleared partner id={partner.id} status={partner.status}"
+        )
+
+    from datetime import timedelta
+    window_days = int(payload.get('report_window_days') or DEFAULT_REPORT_WINDOW_DAYS)
+    now = datetime.now(timezone.utc)
+
+    d = ProximateDisbursement(
+        network_id=net.id,
+        partner_id=partner.id,
+        round_id=payload.get('round_id'),
+        disbursement_method_id=payload.get('disbursement_method_id'),
+        amount_usd=amount,
+        purpose=(payload.get('purpose') or '').strip()[:500] or None,
+        sent_by_user_id=current_user.id,
+        sent_at=now,
+        status='pending_report',
+        report_due_at=now + timedelta(days=window_days),
+        report_token=ProximateDisbursement.make_report_token(),
+    )
+    db.session.add(d)
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action='proximate.disbursement.recorded',
+        actor_email=current_user.email,
+        subject_kind='proximate_disbursement',
+        subject_id=d.id,
+        details={
+            'partner_id': partner.id,
+            'partner_name': partner.name,
+            'amount_usd': float(d.amount_usd),
+            'round_id': d.round_id,
+            'report_due_at': d.report_due_at.isoformat(),
+        },
+    )
+    AuditChainEntry.append(
+        action='proximate.report.obligation_opened',
+        actor_email=current_user.email,
+        subject_kind='proximate_disbursement',
+        subject_id=d.id,
+        details={
+            'partner_id': partner.id,
+            'due_at': d.report_due_at.isoformat(),
+            'token_present': True,
+        },
+    )
+    logger.info(
+        f"Proximate: disbursement recorded id={d.id} partner_id={partner.id} "
+        f"amount=${float(d.amount_usd):.2f} due_at={d.report_due_at.isoformat()}"
+    )
+    return jsonify({'success': True, 'disbursement': d.to_dict()})
+
+
+@proximate_bp.route('/disbursement-reports/<token>', methods=['GET'])
+def api_get_disbursement_by_token(token):
+    """Public: resolve a report token to its disbursement so the
+    partner can see what to report on. No auth required — the token
+    IS the credential. Returns minimal partner-facing shape."""
+    d = ProximateDisbursement.query.filter_by(report_token=token).first()
+    if not d:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    return jsonify({
+        'success': True,
+        'disbursement': {
+            'id': d.id,
+            'partner_name': d.partner.name if d.partner else None,
+            'amount_usd': float(d.amount_usd) if d.amount_usd else None,
+            'purpose': d.purpose,
+            'sent_at': d.sent_at.isoformat() if d.sent_at else None,
+            'report_due_at': d.report_due_at.isoformat() if d.report_due_at else None,
+            'status': d.status,
+            'has_report': d.report_submitted_at is not None,
+        },
+    })
+
+
+@proximate_bp.route('/disbursement-reports/<token>', methods=['POST'])
+def api_submit_disbursement_report(token):
+    """Phase 652 — dual-auth report submission. The token in the URL
+    is one valid credential; an authenticated session matching the
+    disbursement's network is another. Either path produces the same
+    submission record, audited with the source field so the OB can
+    distinguish later.
+
+    Body fields (5-question minimum form):
+      activity_happened: bool      (Q1: did it happen?)
+      people_helped: int           (Q2: how many people did it help?)
+      issues: string               (Q3: any issues encountered?)
+      spend_summary: string        (Q5, optional: how the money was spent)
+      report_voice_doc_id: int     (Q4 attachment, optional)
+      report_photo_doc_id: int     (Q4 attachment, optional)
+      report_voice_transcript: string (optional transcript pre-computed by client)
+    """
+    d = ProximateDisbursement.query.filter_by(report_token=token).first()
+    auth_source = 'token'
+    if not d:
+        # Allow logged-in OB/admin to submit a report by disbursement_id
+        # as a fallback. Bot/spam not a concern here — must be auth'd.
+        if not current_user.is_authenticated:
+            return jsonify({'success': False, 'error': 'invalid token'}), 404
+        payload_probe = request.get_json(silent=True) or {}
+        dis_id = payload_probe.get('disbursement_id')
+        if not dis_id:
+            return jsonify({'success': False, 'error': 'invalid token'}), 404
+        d = ProximateDisbursement.query.get(dis_id)
+        if not d:
+            return jsonify({'success': False, 'error': 'invalid token'}), 404
+        # Tenant guard — auth'd path
+        net, err = _require_proximate_tenant()
+        if err:
+            return err
+        if d.network_id != net.id:
+            return jsonify({'success': False, 'error': 'tenant mismatch'}), 403
+        auth_source = 'session'
+    elif current_user.is_authenticated:
+        auth_source = 'session+token'
+
+    if d.report_submitted_at is not None:
+        return jsonify({
+            'success': True,
+            'already_submitted': True,
+            'disbursement': d.to_dict(),
+        })
+
+    payload = request.get_json(silent=True) or {}
+    import json as _json
+    report_blob = {
+        'activity_happened': bool(payload.get('activity_happened')),
+        'people_helped': payload.get('people_helped'),
+        'issues': (payload.get('issues') or '').strip()[:5000] or None,
+        'spend_summary': (payload.get('spend_summary') or '').strip()[:5000] or None,
+        'submitted_at': datetime.now(timezone.utc).isoformat(),
+        'source': auth_source,
+    }
+    d.report_json = _json.dumps(report_blob, ensure_ascii=False)
+    d.report_voice_doc_id = payload.get('report_voice_doc_id')
+    d.report_photo_doc_id = payload.get('report_photo_doc_id')
+    d.report_voice_transcript = (payload.get('report_voice_transcript') or '').strip() or None
+    d.report_submitted_at = datetime.now(timezone.utc)
+    d.status = 'reported'
+    db.session.commit()
+
+    actor = (
+        current_user.email if current_user.is_authenticated
+        else f'token:{token[:8]}…'
+    )
+    AuditChainEntry.append(
+        action='proximate.report.submitted',
+        actor_email=actor,
+        subject_kind='proximate_disbursement',
+        subject_id=d.id,
+        details={
+            'auth_source': auth_source,
+            'activity_happened': report_blob['activity_happened'],
+            'people_helped': report_blob['people_helped'],
+            'has_voice': bool(d.report_voice_doc_id),
+            'has_photo': bool(d.report_photo_doc_id),
+        },
+    )
+    logger.info(
+        f"Proximate: report submitted disbursement_id={d.id} "
+        f"auth_source={auth_source} partner_id={d.partner_id}"
+    )
+    return jsonify({'success': True, 'disbursement': d.to_dict()})
+
+
+@proximate_bp.route('/disbursements/<int:disbursement_id>/verify',
+                    methods=['POST'])
+@ob_required
+def api_verify_disbursement_report(disbursement_id):
+    """OB marks a submitted report verified or flagged. Closes the
+    obligation in either direction."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    d = ProximateDisbursement.query.filter_by(
+        id=disbursement_id, network_id=net.id,
+    ).first()
+    if not d:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    if d.report_submitted_at is None:
+        return jsonify({
+            'success': False, 'error': 'no report to verify yet',
+        }), 400
+    payload = request.get_json(silent=True) or {}
+    verdict = (payload.get('verdict') or 'verified').lower()
+    if verdict not in ('verified', 'flagged'):
+        return jsonify({'success': False, 'error': 'verdict must be verified|flagged'}), 400
+    note = (payload.get('note') or '').strip()[:2000] or None
+    d.status = verdict
+    db.session.commit()
+    AuditChainEntry.append(
+        action=f'proximate.report.{verdict}',
+        actor_email=current_user.email,
+        subject_kind='proximate_disbursement',
+        subject_id=d.id,
+        details={'note': note},
+    )
+    return jsonify({'success': True, 'disbursement': d.to_dict()})
+
+
+@proximate_bp.route('/monitoring/disbursement-nudge', methods=['POST'])
+def api_cron_disbursement_nudge():
+    """Phase 651 — replaces the monthly calendar cron. Scans
+    disbursements whose report obligation is overdue and emits a
+    single nudge audit row per disbursement (idempotent within a
+    day). Replaces the previous monthly-flag emission.
+    """
+    from flask import current_app as cap
+    secret = cap.config.get('CRON_SECRET') or os.getenv('CRON_SECRET')
+    auth = request.headers.get('Authorization', '')
+    if not secret or auth != f'Bearer {secret}':
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    now = datetime.now(timezone.utc)
+    day_key = now.strftime('%Y-%m-%d')
+
+    overdue = ProximateDisbursement.query.filter(
+        ProximateDisbursement.status == 'pending_report',
+        ProximateDisbursement.report_due_at < now,
+    ).all()
+    nudged = 0
+    for d in overdue:
+        # Idempotency: skip if we already nudged this disbursement today
+        recent = AuditChainEntry.query.filter_by(
+            subject_kind='proximate_disbursement',
+            subject_id=d.id,
+            action='proximate.report.overdue_nudge',
+        ).order_by(AuditChainEntry.seq.desc()).limit(3).all()
+        already_today = any(
+            day_key in (r.details_json or '') for r in recent
+        )
+        if already_today:
+            continue
+        days_overdue = (now - d.report_due_at).days
+        AuditChainEntry.append(
+            action='proximate.report.overdue_nudge',
+            actor_email='cron-monitoring',
+            subject_kind='proximate_disbursement',
+            subject_id=d.id,
+            details={
+                'day': day_key,
+                'days_overdue': days_overdue,
+                'partner_id': d.partner_id,
+                'amount_usd': float(d.amount_usd) if d.amount_usd else None,
+            },
+        )
+        nudged += 1
+    logger.info(f"Proximate cron: nudged {nudged} overdue disbursements for {day_key}")
+    return jsonify({'success': True, 'nudged': nudged, 'day': day_key})
