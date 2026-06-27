@@ -620,6 +620,26 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-27** Phase 667 — `ob2@proximate.org / pass123` added to
+  `seed_proximate.py` (commit `8a661060`). Without a second OB seat,
+  the Phase 662 $10k cosign happy path was unreachable on prod (COI
+  guard blocks the only OB from cosigning their own disbursement).
+  After the redeploy with `SEED_PROXIMATE_ON_BOOT=true` re-running
+  the seed, verified live: ob2 cosign on disbursement #1 returned
+  200, status flipped pending_cosign → pending_report, report_token
+  issued, cosigned_by_user_id (22) ≠ sent_by_user_id (21) — the COI
+  guard fires the right way around.
+
+- **2026-06-27** Phase 666 — Round report `status_counts` /
+  `status_totals_usd` extended to include `pending_cosign` +
+  `pending_cosign_usd` (commit `ab333c1d`). The dicts were
+  initialised before Phase 662 added the `pending_cosign` status,
+  so $10k+ disbursements were silently invisible in the rollup.
+  Verified live: round 1 report on prod now shows
+  `pending_cosign: 1` and `pending_cosign_usd: 15000.0`. After ob2
+  cosigned, the same surface flipped to `pending_cosign: 0,
+  pending_report: 2` as expected.
+
 - **2026-06-27** Phase 657–665 — Proximate Fund completeness sweep
   (commits `b55de3ee` + `51b69c33`). Closes the user-flagged audit
   list and ships a usable skeleton of Module 3.2 from
