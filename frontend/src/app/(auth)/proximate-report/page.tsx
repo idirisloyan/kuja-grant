@@ -21,8 +21,8 @@
  * runtime, no dynamic params.
  */
 
-import { useEffect, useState } from 'react';
-import { Loader2, CheckCircle2, Send } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Loader2, CheckCircle2, Send, Camera, Mic, X } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,6 +55,13 @@ export default function ProximateReportPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  // Phase 655 — photo + voice attachments
+  const [photoDocId, setPhotoDocId] = useState<number | null>(null);
+  const [voiceDocId, setVoiceDocId] = useState<number | null>(null);
+  const [uploadingKind, setUploadingKind] = useState<'photo' | 'voice' | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const voiceInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -81,6 +88,36 @@ export default function ProximateReportPage() {
       .finally(() => setLoading(false));
   }, [t]);
 
+  async function uploadAttachment(kind: 'photo' | 'voice', file: File) {
+    setUploadError(null);
+    setUploadingKind(kind);
+    try {
+      const fd = new FormData();
+      fd.append('kind', kind);
+      fd.append('file', file);
+      const res = await fetch(
+        `${API_BASE}/api/proximate/disbursement-reports/${encodeURIComponent(token!)}/attachment`,
+        {
+          method: 'POST',
+          headers: { 'X-Network-Override': 'proximate' },
+          body: fd,
+        }
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setUploadError(data.error || t('proximate.report.upload_failed'));
+      } else if (kind === 'photo') {
+        setPhotoDocId(data.doc_id);
+      } else {
+        setVoiceDocId(data.doc_id);
+      }
+    } catch {
+      setUploadError(t('proximate.report.upload_failed'));
+    } finally {
+      setUploadingKind(null);
+    }
+  }
+
   async function submit() {
     setSubmitError(null);
     if (happened === null) {
@@ -102,6 +139,8 @@ export default function ProximateReportPage() {
             people_helped: peopleHelped ? parseInt(peopleHelped, 10) : null,
             issues: issues.trim() || null,
             spend_summary: spendSummary.trim() || null,
+            report_photo_doc_id: photoDocId,
+            report_voice_doc_id: voiceDocId,
           }),
         }
       );
@@ -228,11 +267,110 @@ export default function ProximateReportPage() {
             />
           </div>
 
-          {/* Q4 — photo/voice deferred to Phase 654 */}
-          <div className="bg-muted/40 border border-border rounded-md p-3">
-            <p className="text-xs text-muted-foreground">
-              {t('proximate.report.q4_attachment_coming')}
+          {/* Q4 — photo + voice attachments */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              4. {t('proximate.report.q4_attachment')}
+            </label>
+            <p className="text-xs text-muted-foreground mb-2">
+              {t('proximate.report.q4_attachment_hint')}
             </p>
+
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadAttachment('photo', f);
+                e.target.value = '';
+              }}
+            />
+            <input
+              ref={voiceInputRef}
+              type="file"
+              accept="audio/*"
+              capture="user"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadAttachment('voice', f);
+                e.target.value = '';
+              }}
+            />
+
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={uploadingKind !== null}
+              >
+                {uploadingKind === 'photo' ? (
+                  <Loader2 className="w-4 h-4 me-1 animate-spin" />
+                ) : (
+                  <Camera className="w-4 h-4 me-1" />
+                )}
+                {photoDocId
+                  ? t('proximate.report.q4_photo_replace')
+                  : t('proximate.report.q4_photo_add')}
+              </Button>
+              {photoDocId !== null && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPhotoDocId(null)}
+                >
+                  <X className="w-3.5 h-3.5 me-1" />
+                  {t('proximate.report.q4_remove')}
+                </Button>
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => voiceInputRef.current?.click()}
+                disabled={uploadingKind !== null}
+              >
+                {uploadingKind === 'voice' ? (
+                  <Loader2 className="w-4 h-4 me-1 animate-spin" />
+                ) : (
+                  <Mic className="w-4 h-4 me-1" />
+                )}
+                {voiceDocId
+                  ? t('proximate.report.q4_voice_replace')
+                  : t('proximate.report.q4_voice_add')}
+              </Button>
+              {voiceDocId !== null && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setVoiceDocId(null)}
+                >
+                  <X className="w-3.5 h-3.5 me-1" />
+                  {t('proximate.report.q4_remove')}
+                </Button>
+              )}
+            </div>
+
+            {(photoDocId !== null || voiceDocId !== null) && (
+              <p className="text-xs text-emerald-700 mt-2">
+                {photoDocId !== null && voiceDocId !== null
+                  ? t('proximate.report.q4_both_attached')
+                  : photoDocId !== null
+                    ? t('proximate.report.q4_photo_attached')
+                    : t('proximate.report.q4_voice_attached')}
+              </p>
+            )}
+            {uploadError && (
+              <p className="text-xs text-red-600 mt-2">{uploadError}</p>
+            )}
           </div>
 
           {/* Q5 */}

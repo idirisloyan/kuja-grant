@@ -1901,6 +1901,113 @@ def api_get_disbursement_by_token(token):
     })
 
 
+@proximate_bp.route('/disbursement-reports/<token>/attachment', methods=['POST'])
+def api_attach_disbursement_evidence(token):
+    """Phase 655 — public file attachment endpoint for the report form.
+    Token-scoped: the URL token is the only credential. Form field
+    `kind` is 'voice' or 'photo'. The uploaded file is saved into the
+    standard UPLOAD_FOLDER and a Document row is created and linked to
+    the disbursement (report_voice_doc_id or report_photo_doc_id).
+
+    Idempotency: rejected if the disbursement is already submitted
+    (status != pending_report), since the report payload is closed at
+    that point.
+    """
+    import uuid
+    from werkzeug.utils import secure_filename
+    from flask import current_app as cap
+    from app.models import Document
+
+    d = ProximateDisbursement.query.filter_by(report_token=token).first()
+    if not d:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    if d.status != 'pending_report':
+        return jsonify({
+            'success': False,
+            'error': 'report already submitted; attachments closed',
+        }), 409
+
+    kind = (request.form.get('kind') or '').strip().lower()
+    if kind not in ('voice', 'photo'):
+        return jsonify({'success': False, 'error': 'kind must be voice|photo'}), 400
+
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'no file provided'}), 400
+    file = request.files['file']
+    if not file.filename:
+        return jsonify({'success': False, 'error': 'no file selected'}), 400
+
+    PHOTO_EXTS = {'jpg', 'jpeg', 'png', 'webp', 'gif'}
+    VOICE_EXTS = {'webm', 'ogg', 'oga', 'mp3', 'm4a', 'wav', 'aac'}
+    allowed = PHOTO_EXTS if kind == 'photo' else VOICE_EXTS
+    max_bytes = 8 * 1024 * 1024 if kind == 'photo' else 5 * 1024 * 1024
+
+    content_length = request.content_length
+    if content_length and content_length > max_bytes:
+        return jsonify({
+            'success': False,
+            'error': f'file too large ({content_length / (1024*1024):.1f} MB; max {max_bytes // (1024*1024)} MB)',
+        }), 413
+
+    original_filename = secure_filename(file.filename)
+    ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else ''
+    if ext not in allowed:
+        return jsonify({
+            'success': False,
+            'error': f'file type not allowed for {kind} (got .{ext})',
+        }), 400
+
+    stored_filename = f"proximate_{kind}_{uuid.uuid4().hex}.{ext}"
+    filepath = os.path.join(cap.config['UPLOAD_FOLDER'], stored_filename)
+    file.save(filepath)
+    file_size = os.path.getsize(filepath)
+    if file_size < 100:
+        os.remove(filepath)
+        return jsonify({'success': False, 'error': 'file too small to be valid'}), 400
+
+    mime_map = {
+        'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
+        'webp': 'image/webp', 'gif': 'image/gif',
+        'webm': 'audio/webm', 'ogg': 'audio/ogg', 'oga': 'audio/ogg',
+        'mp3': 'audio/mpeg', 'm4a': 'audio/mp4', 'wav': 'audio/wav',
+        'aac': 'audio/aac',
+    }
+    doc = Document(
+        original_filename=original_filename,
+        stored_filename=stored_filename,
+        file_size=file_size,
+        mime_type=mime_map.get(ext),
+        doc_type=f'proximate_{kind}',
+    )
+    db.session.add(doc)
+    db.session.flush()
+    if kind == 'photo':
+        d.report_photo_doc_id = doc.id
+    else:
+        d.report_voice_doc_id = doc.id
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action='proximate.report.attachment_added',
+        actor_email=f'token:{token[:8]}…',
+        subject_kind='proximate_disbursement',
+        subject_id=d.id,
+        details={
+            'kind': kind, 'doc_id': doc.id, 'size_bytes': file_size,
+        },
+    )
+    logger.info(
+        f"Proximate: report attachment doc_id={doc.id} kind={kind} "
+        f"disbursement_id={d.id}"
+    )
+    return jsonify({
+        'success': True,
+        'doc_id': doc.id,
+        'kind': kind,
+        'size_bytes': file_size,
+    })
+
+
 @proximate_bp.route('/disbursement-reports/<token>', methods=['POST'])
 def api_submit_disbursement_report(token):
     """Phase 652 — dual-auth report submission. The token in the URL
