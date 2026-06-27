@@ -1649,10 +1649,14 @@ def api_round_report(round_id):
     ).order_by(ProximateDisbursement.sent_at.asc()).all()
 
     rows = []
-    counts = {'pending_report': 0, 'reported': 0, 'verified': 0, 'flagged': 0}
+    counts = {
+        'pending_cosign': 0, 'pending_report': 0,
+        'reported': 0, 'verified': 0, 'flagged': 0,
+    }
     totals = {
         'verified_usd': 0.0, 'flagged_usd': 0.0,
         'reported_usd': 0.0, 'pending_usd': 0.0,
+        'pending_cosign_usd': 0.0,
     }
     for d in disbursements:
         partner = ProximatePartner.query.get(d.partner_id) if d.partner_id else None
@@ -1673,6 +1677,8 @@ def api_round_report(round_id):
             totals['reported_usd'] += amt
         elif d.status == 'pending_report':
             totals['pending_usd'] += amt
+        elif d.status == 'pending_cosign':
+            totals['pending_cosign_usd'] += amt
         rows.append({
             'disbursement_id': d.id,
             'partner_id': d.partner_id,
