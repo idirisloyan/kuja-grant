@@ -620,6 +620,58 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-27** Phase 657–665 — Proximate Fund completeness sweep
+  (commits `b55de3ee` + `51b69c33`). Closes the user-flagged audit
+  list and ships a usable skeleton of Module 3.2 from
+  PROXIMATE_FUND_DESIGN.md.
+  - **657** OB can SEE the photo + HEAR the voice on disbursement
+    detail. New `/disbursements/<id>/attachment/<kind>` streamer,
+    `<img>` + `<audio>` controls inline.
+  - **658** Self-nominated partners get screened automatically.
+    `_run_partner_sanctions_screen()` runs inline on the public
+    `/partners/self-nominate` POST; partner detail surfaces a red
+    banner when flagged. Verified live: "Shadow Relief Coalition"
+    self-nomination on prod (partner id 9) returned
+    `sanctions_flag: True` via the keyword screener.
+  - **659** End-of-round report — printable closing package.
+    `/api/proximate/rounds/<id>/report` returns the full bundle
+    (envelope used/remaining, per-disbursement breakdown with
+    voice transcripts + attachment flags, status counts/totals,
+    audit window + hash anchor). New `/proximate/rounds/[id]/report`
+    page renders printable HTML; window.print() saves as PDF.
+    **Hotfix Phase 665:** initial implementation referenced
+    `entry_hash` on `AuditChainEntry`; the column is `payload_hash`.
+    Surfaced as a 500 on prod the first time the OB hit the
+    report. Single-line fix in commit `51b69c33`.
+  - **660** Partner acknowledgement loop. Three new columns on
+    `ProximateDisbursement` (ack_message, ack_message_at,
+    ack_by_user_id). New `/acknowledge` OB-only endpoint. Token
+    GET response surfaces the ack so the partner sees "A message
+    from Adeso" when they return to the same URL.
+  - **661** `useTranslation` falls back to
+    `network.default_language` before 'en'. Proximate users land
+    in Arabic by default; Kuja/NEAR unchanged.
+  - **662** $10k threshold ladder. New `pending_cosign` status,
+    new `/cosign` endpoint, COI guard (sender ≠ cosigner). Token
+    only issued after both signers approve. Verified live: $15k
+    disbursement → `pending_cosign` with NO `report_token`; $2,500
+    → `pending_report` with token issued (per SoP 10 §4 Step 2).
+  - **663** Crisis Selector skeleton (Module 3.2 partial). New
+    `/api/proximate/crisis-selector` ranks
+    `CrisisMonitoringRow`s scoped to the Proximate tenant, falling
+    back to Sudan rows from any tenant during UAT. New
+    `/api/proximate/crisis-selector/<row>/brief` calls Claude for
+    a scenario-typed decision brief (incubate / strengthen /
+    enable) with a deterministic offline fallback. Honest
+    backlog: the news/signal feed ingestor stays deferred as the
+    multi-week piece.
+  - **i18n** +54 keys × 6 locales (parity 2531). Real Arabic for
+    user-facing strings; EN placeholders for fr/sw/so/es per the
+    team's EN+AR scope.
+  - **Ops:** set `SEED_PROXIMATE_ON_BOOT=true` on Railway so the
+    Proximate tenant got 8 partners + ob@proximate.org / pass123
+    on this deploy cycle.
+
 - **2026-06-26** Phase 648 — Default OB user seeded on Proximate
   tenant. The `@ob_required` decorator (Phase 44, retired the
   admin shortcut at Phase 114) checks
