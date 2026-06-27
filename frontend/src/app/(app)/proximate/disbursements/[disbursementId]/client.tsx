@@ -14,10 +14,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Loader2, Copy, Check, AlertTriangle, CheckCircle2, ArrowLeft,
+  Loader2, Copy, Check, AlertTriangle, CheckCircle2, ArrowLeft, ShieldCheck,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import { useAuthStore } from '@/stores/auth-store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -49,6 +50,7 @@ interface Disbursement {
   amount_usd: number | null;
   purpose: string | null;
   sent_at: string | null;
+  sent_by_user_id: number | null;
   status: string;
   report_due_at: string | null;
   report_submitted_at: string | null;
@@ -59,10 +61,16 @@ interface Disbursement {
   report_voice_doc_id: number | null;
   report_photo_doc_id: number | null;
   report_voice_transcript: string | null;
+  ack_message: string | null;
+  ack_message_at: string | null;
+  cosigned_by_user_id: number | null;
+  cosigned_at: string | null;
+  cosign_threshold_usd: number;
   audit: AuditRow[];
 }
 
 const STATUS_TONE: Record<string, string> = {
+  pending_cosign: 'bg-violet-100 text-violet-800 border-violet-300',
   pending_report: 'bg-amber-100 text-amber-800 border-amber-300',
   reported: 'bg-blue-100 text-blue-800 border-blue-300',
   verified: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -71,6 +79,7 @@ const STATUS_TONE: Record<string, string> = {
 
 export function ProximateDisbursementDetailClient() {
   const { t } = useTranslation();
+  const user = useAuthStore((s) => s.user);
   const [id, setId] = useState<number | null>(null);
   const [data, setData] = useState<Disbursement | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,6 +88,8 @@ export function ProximateDisbursementDetailClient() {
   const [acting, setActing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [verifyNote, setVerifyNote] = useState('');
+  const [ackText, setAckText] = useState('');
+  const [ackSending, setAckSending] = useState(false);
 
   const fetchData = useCallback(async (idNum: number) => {
     try {
@@ -105,6 +116,39 @@ export function ProximateDisbursementDetailClient() {
     setId(idNum);
     fetchData(idNum);
   }, [fetchData, t]);
+
+  async function cosign() {
+    if (!id) return;
+    setActionError(null);
+    setActing(true);
+    try {
+      await api.post(`/api/proximate/disbursements/${id}/cosign`, {});
+      await fetchData(id);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : t('proximate.disbursement.action_failed');
+      setActionError(msg);
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function sendAck() {
+    if (!id || !ackText.trim()) return;
+    setAckSending(true);
+    setActionError(null);
+    try {
+      await api.post(`/api/proximate/disbursements/${id}/acknowledge`, {
+        message: ackText.trim(),
+      });
+      await fetchData(id);
+      setAckText('');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : t('proximate.disbursement.action_failed');
+      setActionError(msg);
+    } finally {
+      setAckSending(false);
+    }
+  }
 
   async function verdict(v: 'verified' | 'flagged') {
     if (!id) return;
@@ -209,6 +253,38 @@ export function ProximateDisbursementDetailClient() {
           </div>
         </Card>
 
+        {/* Phase 662 — pending cosign banner: $10k+ disbursement awaiting second OB signer */}
+        {data.status === 'pending_cosign' && (
+          <Card className="p-4 border-violet-300 bg-violet-50 dark:bg-violet-950/30 space-y-3">
+            <div className="flex items-start gap-2">
+              <ShieldCheck className="w-5 h-5 text-violet-700 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-violet-900 dark:text-violet-200">
+                  {t('proximate.disbursement.cosign_required_title')}
+                </h3>
+                <p className="text-xs text-violet-800 dark:text-violet-300 mt-1">
+                  {t('proximate.disbursement.cosign_required_body', {
+                    amount: `$${data.cosign_threshold_usd.toLocaleString()}`,
+                  })}
+                </p>
+              </div>
+            </div>
+            {actionError && (
+              <p className="text-sm text-red-600">{actionError}</p>
+            )}
+            {user?.id === data.sent_by_user_id ? (
+              <p className="text-xs italic text-muted-foreground">
+                {t('proximate.disbursement.cosign_self_blocked')}
+              </p>
+            ) : (
+              <Button size="sm" onClick={cosign} disabled={acting}>
+                {acting ? <Loader2 className="w-4 h-4 me-1 animate-spin" /> : <ShieldCheck className="w-4 h-4 me-1" />}
+                {t('proximate.disbursement.cosign_now')}
+              </Button>
+            )}
+          </Card>
+        )}
+
         {/* Pending state — surface the partner link */}
         {data.status === 'pending_report' && data.report_token && (
           <Card className="p-4 space-y-3">
@@ -281,6 +357,43 @@ export function ProximateDisbursementDetailClient() {
                   <dd className="whitespace-pre-wrap">{data.report.spend_summary}</dd>
                 </div>
               )}
+              {data.report_photo_doc_id && id && (
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-muted-foreground mb-1.5">
+                    {t('proximate.disbursement.photo_evidence')}
+                  </dt>
+                  <dd>
+                    <a
+                      href={`/api/proximate/disbursements/${id}/attachment/photo`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`/api/proximate/disbursements/${id}/attachment/photo`}
+                        alt={t('proximate.disbursement.photo_evidence')}
+                        className="max-w-full sm:max-w-sm h-auto rounded-md border border-border"
+                      />
+                    </a>
+                  </dd>
+                </div>
+              )}
+              {data.report_voice_doc_id && id && (
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-muted-foreground mb-1.5">
+                    {t('proximate.disbursement.voice_evidence')}
+                  </dt>
+                  <dd>
+                    <audio
+                      controls
+                      preload="metadata"
+                      className="w-full max-w-md"
+                      src={`/api/proximate/disbursements/${id}/attachment/voice`}
+                    />
+                  </dd>
+                </div>
+              )}
               {data.report_voice_transcript && (
                 <div className="sm:col-span-2">
                   <dt className="text-xs text-muted-foreground">
@@ -337,6 +450,43 @@ export function ProximateDisbursementDetailClient() {
                 {t('proximate.disbursement.flag')}
               </Button>
             </div>
+          </Card>
+        )}
+
+        {/* Phase 660 — Acknowledge to partner */}
+        {(data.status === 'reported' || data.status === 'verified' || data.status === 'flagged') && (
+          <Card className="p-4 space-y-3">
+            <h3 className="text-sm font-medium">
+              {t('proximate.disbursement.ack_title')}
+            </h3>
+            {data.ack_message ? (
+              <div className="text-sm bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded p-3">
+                <p className="whitespace-pre-wrap">{data.ack_message}</p>
+                {data.ack_message_at && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {t('proximate.disbursement.ack_sent_at')} {new Date(data.ack_message_at).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  {t('proximate.disbursement.ack_hint')}
+                </p>
+                <textarea
+                  value={ackText}
+                  onChange={(e) => setAckText(e.target.value)}
+                  rows={3}
+                  maxLength={2000}
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                  placeholder={t('proximate.disbursement.ack_placeholder')}
+                />
+                <Button size="sm" onClick={sendAck} disabled={ackSending || !ackText.trim()}>
+                  {ackSending ? <Loader2 className="w-4 h-4 me-1 animate-spin" /> : null}
+                  {t('proximate.disbursement.ack_send')}
+                </Button>
+              </>
+            )}
           </Card>
         )}
 

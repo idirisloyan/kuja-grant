@@ -38,6 +38,8 @@ interface DisbursementMeta {
   report_due_at: string | null;
   status: string;
   has_report: boolean;
+  ack_message?: string | null;
+  ack_message_at?: string | null;
 }
 
 export default function ProximateReportPage() {
@@ -180,7 +182,7 @@ export default function ProximateReportPage() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-4">
           <Card className="p-8 text-center">
             <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto mb-4" />
             <h1 className="text-2xl kuja-display mb-2">
@@ -189,6 +191,47 @@ export default function ProximateReportPage() {
             <p className="text-sm text-muted-foreground">
               {t('proximate.report.thanks_body')}
             </p>
+          </Card>
+          {meta?.ack_message && (
+            <Card className="p-5 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800">
+              <h2 className="text-sm font-medium mb-2">
+                {t('proximate.report.ack_from_adeso')}
+              </h2>
+              <p className="text-sm whitespace-pre-wrap">{meta.ack_message}</p>
+              {meta.ack_message_at && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {new Date(meta.ack_message_at).toLocaleString()}
+                </p>
+              )}
+            </Card>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Re-visit after submission with an ack from Adeso — show it before the form
+  // collapses to the thanks-only screen.
+  if (meta?.has_report && meta?.ack_message) {
+    return (
+      <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+        <div className="max-w-2xl mx-auto space-y-4">
+          <Card className="p-8 text-center">
+            <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto mb-4" />
+            <h1 className="text-2xl kuja-display mb-2">
+              {t('proximate.report.already_submitted')}
+            </h1>
+          </Card>
+          <Card className="p-5 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800">
+            <h2 className="text-sm font-medium mb-2">
+              {t('proximate.report.ack_from_adeso')}
+            </h2>
+            <p className="text-sm whitespace-pre-wrap">{meta.ack_message}</p>
+            {meta.ack_message_at && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {new Date(meta.ack_message_at).toLocaleString()}
+              </p>
+            )}
           </Card>
         </div>
       </div>

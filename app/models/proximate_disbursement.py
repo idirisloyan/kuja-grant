@@ -16,6 +16,7 @@ from datetime import datetime, timezone, timedelta
 from app.extensions import db
 
 DISBURSEMENT_STATUSES = (
+    "pending_cosign",   # >=$10k threshold; awaits second OB signer
     "pending_report",   # released, partner has not submitted report
     "reported",         # partner submitted, OB has not yet reviewed
     "verified",         # OB read and accepted the report
@@ -23,6 +24,11 @@ DISBURSEMENT_STATUSES = (
 )
 
 DEFAULT_REPORT_WINDOW_DAYS = 14
+
+# SOP 10 §4 Step 2: disbursements at or above this threshold require a
+# second authorised signer before money moves. Below it, the OB can
+# release single-handed.
+COSIGN_THRESHOLD_USD = 10_000.0
 
 
 class ProximateDisbursement(db.Model):
@@ -75,6 +81,18 @@ class ProximateDisbursement(db.Model):
     report_photo_doc_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=True)
     report_voice_transcript = db.Column(db.Text, nullable=True)
 
+    # Phase 660 — Adeso acknowledgement back to the partner. Surfaces on
+    # the same token URL the partner returns to.
+    ack_message = db.Column(db.Text, nullable=True)
+    ack_message_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    ack_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    # Phase 662 — $10k threshold ladder: second signer required when
+    # status is pending_cosign. The original sender (sent_by_user_id)
+    # cannot be the cosigner — COI guard enforced at the route layer.
+    cosigned_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    cosigned_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
     created_at = db.Column(
         db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -122,4 +140,13 @@ class ProximateDisbursement(db.Model):
             'overdue': self.is_overdue(),
             'report_token': self.report_token,
             'has_report': self.report_submitted_at is not None,
+            'ack_message': self.ack_message,
+            'ack_message_at': (
+                self.ack_message_at.isoformat() if self.ack_message_at else None
+            ),
+            'cosigned_by_user_id': self.cosigned_by_user_id,
+            'cosigned_at': (
+                self.cosigned_at.isoformat() if self.cosigned_at else None
+            ),
+            'cosign_threshold_usd': COSIGN_THRESHOLD_USD,
         }

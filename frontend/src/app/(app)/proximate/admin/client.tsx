@@ -24,7 +24,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ShieldCheck, Activity, Users, FileText, Banknote, Coins, UserPlus } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Activity, Users, FileText, Banknote, Coins, UserPlus, Flame } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
@@ -201,6 +201,19 @@ export function ProximateAdminClient() {
                   </div>
                   <p className="text-sm font-medium">
                     {t('proximate.admin.tile_self_nominate_sub')}
+                  </p>
+                </Card>
+              </Link>
+              <Link href="/proximate/crisis-selector" className="block">
+                <Card className="p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Flame className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      {t('proximate.admin.tile_crisis_selector')}
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium">
+                    {t('proximate.admin.tile_crisis_selector_sub')}
                   </p>
                 </Card>
               </Link>

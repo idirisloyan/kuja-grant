@@ -349,7 +349,63 @@ def api_self_nominate_partner():
         f"Proximate: partner self-nominated id={partner.id} "
         f"name={partner.name!r} contact={contact_email or contact_phone}"
     )
+
+    # Phase 658 — automatic sanctions screen on self-nominate. Wrapped
+    # in try/except: a slow/outage on the screening API must NOT block
+    # the nomination from landing in the queue.
+    try:
+        _run_partner_sanctions_screen(partner)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            f"Proximate: sanctions screen failed for partner {partner.id}: {e}"
+        )
+
     return jsonify({'success': True, 'partner': partner.to_dict()})
+
+
+def _run_partner_sanctions_screen(partner):
+    """Phase 658 — run a sanctions screen against a partner and flip
+    sanctions_flag if any check came back flagged. Safe to call from any
+    partner-create path. Stores a compact summary on the partner so the
+    OB sees WHY it was flagged on the partner detail.
+    """
+    from app.services.compliance_service import ComplianceService
+    import json as _json
+
+    checks = ComplianceService.screen_organization(
+        org_name=partner.name,
+        country=partner.country or 'SD',
+    ) or []
+    flagged_checks = [c for c in checks if c.get('status') == 'flagged']
+    summary = {
+        'total_checks': len(checks),
+        'flagged_count': len(flagged_checks),
+        'flagged': [
+            {
+                'check_type': c.get('check_type'),
+                'reason': (c.get('result') or {}).get('reason'),
+                'match_score': (c.get('result') or {}).get('match_score'),
+                'list': (c.get('result') or {}).get('list'),
+            }
+            for c in flagged_checks[:5]
+        ],
+    }
+    partner.sanctions_flag = bool(flagged_checks)
+    partner.sanctions_checked_at = datetime.now(timezone.utc)
+    partner.sanctions_summary_json = _json.dumps(summary)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.partner.sanctions_screened',
+        actor_email='system',
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details=summary,
+    )
+    if flagged_checks:
+        logger.warning(
+            f"Proximate: sanctions FLAG on partner {partner.id} ({partner.name!r}) "
+            f"— {len(flagged_checks)} hit(s)"
+        )
 
 
 # ---- Submit one endorsement ------------------------------------------
@@ -1560,6 +1616,123 @@ def api_get_round(round_id):
     })
 
 
+@proximate_bp.route('/rounds/<int:round_id>/report', methods=['GET'])
+@login_required
+def api_round_report(round_id):
+    """Phase 659 — end-of-round report bundle.
+
+    Auto-assembles the closing package the user asked for in their
+    Step-1 brief: round metadata + envelope used/remaining + every
+    disbursement with its 5Q report payload and per-row verdict +
+    counts by status + the temporal audit window. Frontend renders
+    this as printable HTML at /proximate/rounds/[id]/report.
+    """
+    import json as _json
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    r = ProximateRound.query.filter_by(id=round_id, network_id=net.id).first()
+    if not r:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
+    end = r.closed_at or datetime.now(timezone.utc)
+    start = r.submitted_at or r.drafted_at
+    audit_rows = AuditChainEntry.query.filter(
+        AuditChainEntry.action.like('proximate.%'),
+        AuditChainEntry.created_at >= start,
+        AuditChainEntry.created_at <= end,
+    ).order_by(AuditChainEntry.seq.asc()).limit(500).all()
+
+    disbursements = ProximateDisbursement.query.filter_by(
+        network_id=net.id, round_id=r.id,
+    ).order_by(ProximateDisbursement.sent_at.asc()).all()
+
+    rows = []
+    counts = {'pending_report': 0, 'reported': 0, 'verified': 0, 'flagged': 0}
+    totals = {
+        'verified_usd': 0.0, 'flagged_usd': 0.0,
+        'reported_usd': 0.0, 'pending_usd': 0.0,
+    }
+    for d in disbursements:
+        partner = ProximatePartner.query.get(d.partner_id) if d.partner_id else None
+        report_payload = None
+        if d.report_json:
+            try:
+                report_payload = _json.loads(d.report_json)
+            except (ValueError, TypeError):
+                report_payload = None
+        amt = float(d.amount_usd) if d.amount_usd is not None else 0.0
+        if d.status in counts:
+            counts[d.status] += 1
+        if d.status == 'verified':
+            totals['verified_usd'] += amt
+        elif d.status == 'flagged':
+            totals['flagged_usd'] += amt
+        elif d.status == 'reported':
+            totals['reported_usd'] += amt
+        elif d.status == 'pending_report':
+            totals['pending_usd'] += amt
+        rows.append({
+            'disbursement_id': d.id,
+            'partner_id': d.partner_id,
+            'partner_name': partner.name if partner else None,
+            'partner_locality': partner.locality if partner else None,
+            'amount_usd': amt,
+            'purpose': d.purpose,
+            'sent_at': d.sent_at.isoformat() if d.sent_at else None,
+            'status': d.status,
+            'report': report_payload,
+            'report_voice_transcript': d.report_voice_transcript,
+            'has_voice': bool(d.report_voice_doc_id),
+            'has_photo': bool(d.report_photo_doc_id),
+            'report_submitted_at': (
+                d.report_submitted_at.isoformat() if d.report_submitted_at else None
+            ),
+        })
+
+    envelope_total = float(r.envelope_usd) if r.envelope_usd else None
+    envelope_used = sum(row['amount_usd'] for row in rows)
+    envelope_remaining = (
+        envelope_total - envelope_used if envelope_total is not None else None
+    )
+
+    # The latest audit row's hash anchor — proves the report bundle is
+    # tied to a tamper-evident point in the chain. Auditors can re-derive.
+    latest_seq = audit_rows[-1].seq if audit_rows else None
+    latest_hash = audit_rows[-1].entry_hash if audit_rows else None
+
+    return jsonify({
+        'success': True,
+        'round': r.to_dict(include_signatures=True),
+        'window': {
+            'opened_at': start.isoformat() if start else None,
+            'closed_at': end.isoformat() if end else None,
+        },
+        'envelope': {
+            'total_usd': envelope_total,
+            'used_usd': envelope_used,
+            'remaining_usd': envelope_remaining,
+            'partners_served': len({row['partner_id'] for row in rows if row['partner_id']}),
+            'disbursement_count': len(rows),
+        },
+        'status_counts': counts,
+        'status_totals_usd': totals,
+        'disbursements': rows,
+        'audit_in_window': [{
+            'seq': a.seq, 'action': a.action,
+            'actor_email': a.actor_email,
+            'subject_kind': a.subject_kind, 'subject_id': a.subject_id,
+            'created_at': a.created_at.isoformat() if a.created_at else None,
+        } for a in audit_rows],
+        'audit_anchor': {
+            'latest_seq': latest_seq,
+            'latest_hash': latest_hash,
+            'row_count': len(audit_rows),
+        },
+    })
+
+
 @proximate_bp.route('/rounds', methods=['POST'])
 @ob_required
 def api_create_round():
@@ -1843,8 +2016,16 @@ def api_record_disbursement():
         )
 
     from datetime import timedelta
+    from app.models.proximate_disbursement import COSIGN_THRESHOLD_USD
     window_days = int(payload.get('report_window_days') or DEFAULT_REPORT_WINDOW_DAYS)
     now = datetime.now(timezone.utc)
+
+    # Phase 662 — $10k threshold: large releases go to pending_cosign
+    # first; a second OB must approve before money moves and the report
+    # token is issued. Below the threshold, the OB can single-hand it.
+    amount_f = float(amount)
+    needs_cosign = amount_f >= COSIGN_THRESHOLD_USD
+    initial_status = 'pending_cosign' if needs_cosign else 'pending_report'
 
     d = ProximateDisbursement(
         network_id=net.id,
@@ -1855,9 +2036,12 @@ def api_record_disbursement():
         purpose=(payload.get('purpose') or '').strip()[:500] or None,
         sent_by_user_id=current_user.id,
         sent_at=now,
-        status='pending_report',
+        status=initial_status,
         report_due_at=now + timedelta(days=window_days),
-        report_token=ProximateDisbursement.make_report_token(),
+        # Token only issued when money has cleared signers
+        report_token=(
+            None if needs_cosign else ProximateDisbursement.make_report_token()
+        ),
     )
     db.session.add(d)
     db.session.commit()
@@ -1870,9 +2054,86 @@ def api_record_disbursement():
         details={
             'partner_id': partner.id,
             'partner_name': partner.name,
-            'amount_usd': float(d.amount_usd),
+            'amount_usd': amount_f,
             'round_id': d.round_id,
             'report_due_at': d.report_due_at.isoformat(),
+            'requires_cosign': needs_cosign,
+        },
+    )
+    if not needs_cosign:
+        AuditChainEntry.append(
+            action='proximate.report.obligation_opened',
+            actor_email=current_user.email,
+            subject_kind='proximate_disbursement',
+            subject_id=d.id,
+            details={
+                'partner_id': partner.id,
+                'due_at': d.report_due_at.isoformat(),
+                'token_present': True,
+            },
+        )
+    else:
+        AuditChainEntry.append(
+            action='proximate.disbursement.cosign_required',
+            actor_email=current_user.email,
+            subject_kind='proximate_disbursement',
+            subject_id=d.id,
+            details={
+                'threshold_usd': COSIGN_THRESHOLD_USD,
+                'amount_usd': amount_f,
+            },
+        )
+    logger.info(
+        f"Proximate: disbursement recorded id={d.id} partner_id={partner.id} "
+        f"amount=${amount_f:.2f} status={initial_status}"
+    )
+    return jsonify({'success': True, 'disbursement': d.to_dict()})
+
+
+@proximate_bp.route('/disbursements/<int:disbursement_id>/cosign', methods=['POST'])
+@ob_required
+def api_cosign_disbursement(disbursement_id):
+    """Phase 662 — second OB signer for a $10k+ disbursement. COI guard:
+    the original sender cannot be the cosigner."""
+    from datetime import timedelta
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    d = ProximateDisbursement.query.filter_by(
+        id=disbursement_id, network_id=net.id,
+    ).first()
+    if not d:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    if d.status != 'pending_cosign':
+        return jsonify({
+            'success': False,
+            'error': f'not awaiting cosign (status={d.status})',
+        }), 409
+    if d.sent_by_user_id == current_user.id:
+        return jsonify({
+            'success': False,
+            'error': 'sender cannot cosign their own disbursement',
+        }), 403
+
+    d.cosigned_by_user_id = current_user.id
+    d.cosigned_at = datetime.now(timezone.utc)
+    d.status = 'pending_report'
+    d.report_token = ProximateDisbursement.make_report_token()
+    # Reset the report due window from the cosign moment, not the
+    # original sent_at — the partner only sees the link now.
+    window_days = DEFAULT_REPORT_WINDOW_DAYS
+    d.report_due_at = d.cosigned_at + timedelta(days=window_days)
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action='proximate.disbursement.cosigned',
+        actor_email=current_user.email,
+        subject_kind='proximate_disbursement',
+        subject_id=d.id,
+        details={
+            'sender_user_id': d.sent_by_user_id,
+            'cosigner_user_id': current_user.id,
+            'amount_usd': float(d.amount_usd),
         },
     )
     AuditChainEntry.append(
@@ -1881,14 +2142,10 @@ def api_record_disbursement():
         subject_kind='proximate_disbursement',
         subject_id=d.id,
         details={
-            'partner_id': partner.id,
+            'partner_id': d.partner_id,
             'due_at': d.report_due_at.isoformat(),
             'token_present': True,
         },
-    )
-    logger.info(
-        f"Proximate: disbursement recorded id={d.id} partner_id={partner.id} "
-        f"amount=${float(d.amount_usd):.2f} due_at={d.report_due_at.isoformat()}"
     )
     return jsonify({'success': True, 'disbursement': d.to_dict()})
 
@@ -1912,7 +2169,50 @@ def api_get_disbursement_by_token(token):
             'report_due_at': d.report_due_at.isoformat() if d.report_due_at else None,
             'status': d.status,
             'has_report': d.report_submitted_at is not None,
+            # Phase 660 — partner-facing acknowledgement, if Adeso has sent one
+            'ack_message': d.ack_message,
+            'ack_message_at': (
+                d.ack_message_at.isoformat() if d.ack_message_at else None
+            ),
         },
+    })
+
+
+@proximate_bp.route('/disbursements/<int:disbursement_id>/acknowledge', methods=['POST'])
+@ob_required
+def api_acknowledge_disbursement(disbursement_id):
+    """Phase 660 — OB sends a short acknowledgement message to the
+    partner. Surfaces on the same token URL the partner returns to.
+    No transport (email/SMS) required — the partner has the link.
+    """
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    d = ProximateDisbursement.query.filter_by(
+        id=disbursement_id, network_id=net.id,
+    ).first()
+    if not d:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    payload = request.get_json(silent=True) or {}
+    message = (payload.get('message') or '').strip()
+    if not message:
+        return jsonify({'success': False, 'error': 'message required'}), 400
+    if len(message) > 2000:
+        return jsonify({'success': False, 'error': 'message too long (max 2000)'}), 400
+    d.ack_message = message
+    d.ack_message_at = datetime.now(timezone.utc)
+    d.ack_by_user_id = current_user.id
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.disbursement.acknowledged',
+        actor_email=current_user.email,
+        subject_kind='proximate_disbursement',
+        subject_id=d.id,
+        details={'message_len': len(message)},
+    )
+    return jsonify({
+        'success': True,
+        'disbursement': d.to_dict(),
     })
 
 
@@ -2021,6 +2321,48 @@ def api_attach_disbursement_evidence(token):
         'kind': kind,
         'size_bytes': file_size,
     })
+
+
+@proximate_bp.route('/disbursements/<int:disbursement_id>/attachment/<kind>', methods=['GET'])
+@login_required
+def api_stream_disbursement_attachment(disbursement_id, kind):
+    """Phase 657 — stream the photo or voice attachment to the OB so it
+    can be rendered inline on the disbursement detail page. Auth gated
+    to the Proximate tenant; the URL token is not accepted here (only
+    Adeso staff need to view the evidence, partners just uploaded it)."""
+    from flask import current_app as cap, send_file
+    from app.models import Document
+
+    if kind not in ('photo', 'voice'):
+        return jsonify({'success': False, 'error': 'kind must be photo|voice'}), 400
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    d = ProximateDisbursement.query.filter_by(
+        id=disbursement_id, network_id=net.id,
+    ).first()
+    if not d:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+
+    doc_id = d.report_photo_doc_id if kind == 'photo' else d.report_voice_doc_id
+    if not doc_id:
+        return jsonify({'success': False, 'error': f'no {kind} attached'}), 404
+    doc = db.session.get(Document, doc_id)
+    if not doc or not doc.stored_filename:
+        return jsonify({'success': False, 'error': 'file not available'}), 404
+
+    upload_dir = cap.config.get('UPLOAD_FOLDER')
+    file_path = os.path.join(upload_dir, doc.stored_filename)
+    if not os.path.exists(file_path):
+        return jsonify({'success': False, 'error': 'file missing on disk'}), 410
+
+    return send_file(
+        file_path,
+        mimetype=doc.mime_type or 'application/octet-stream',
+        as_attachment=False,
+        download_name=doc.original_filename or doc.stored_filename,
+    )
 
 
 @proximate_bp.route('/disbursement-reports/<token>', methods=['POST'])
@@ -2197,3 +2539,195 @@ def api_cron_disbursement_nudge():
         nudged += 1
     logger.info(f"Proximate cron: nudged {nudged} overdue disbursements for {day_key}")
     return jsonify({'success': True, 'nudged': nudged, 'day': day_key})
+
+
+# =====================================================================
+# Phase 663 — Crisis Selector (Module 3.2 skeleton)
+# =====================================================================
+# Design doc §3.2 calls for a 3-piece feature: ranked dashboard +
+# AI-drafted scenario brief + net-new feed ingestor. The ingestor is
+# explicitly the ~2-week module. This phase ships the dashboard +
+# brief drafter against the existing CrisisMonitoringRow infrastructure
+# the NEAR tenant already populates. The Proximate operator gets a
+# usable Sudan-scoped view; feed ingestion remains backlogged.
+
+PROXIMATE_SCENARIO_TYPES = ('incubate', 'strengthen', 'enable')
+
+
+@proximate_bp.route('/crisis-selector', methods=['GET'])
+@login_required
+def api_crisis_selector():
+    """Phase 663 — ranked crisis dashboard. Returns the most recent
+    published CrisisMonitoringRow rows for the Proximate tenant. If the
+    tenant hasn't published any yet, falls back to any published row
+    with country code matching Sudan (SDN) so the team sees something
+    concrete during UAT.
+    """
+    from app.models.crisis_monitoring import (
+        CrisisMonitoringReport, CrisisMonitoringRow,
+    )
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+
+    # Primary scope: this tenant's reports.
+    rows = (
+        db.session.query(CrisisMonitoringRow, CrisisMonitoringReport)
+        .join(
+            CrisisMonitoringReport,
+            CrisisMonitoringRow.report_id == CrisisMonitoringReport.id,
+        )
+        .filter(
+            CrisisMonitoringReport.network_id == net.id,
+            CrisisMonitoringReport.status == 'published',
+        )
+        .order_by(CrisisMonitoringRow.composite_score.desc())
+        .limit(50)
+        .all()
+    )
+    fallback_used = False
+    if not rows:
+        # Fallback for testing: any published row in any tenant where
+        # country code is Sudan (SDN). The OB sees a useful preview;
+        # the badge tells them this isn't their tenant's data yet.
+        rows = (
+            db.session.query(CrisisMonitoringRow, CrisisMonitoringReport)
+            .join(
+                CrisisMonitoringReport,
+                CrisisMonitoringRow.report_id == CrisisMonitoringReport.id,
+            )
+            .filter(
+                CrisisMonitoringReport.status == 'published',
+                CrisisMonitoringRow.country == 'SDN',
+            )
+            .order_by(CrisisMonitoringRow.composite_score.desc())
+            .limit(50)
+            .all()
+        )
+        fallback_used = bool(rows)
+
+    return jsonify({
+        'success': True,
+        'rows': [
+            {
+                **row.to_dict(),
+                'report_period_start': (
+                    report.period_start.isoformat() if report.period_start else None
+                ),
+            }
+            for row, report in rows
+        ],
+        'fallback_used': fallback_used,
+        'feed_ingestor_status': 'backlogged',
+        'scenario_types': list(PROXIMATE_SCENARIO_TYPES),
+    })
+
+
+@proximate_bp.route('/crisis-selector/<int:row_id>/brief', methods=['POST'])
+@ob_required
+def api_crisis_selector_brief(row_id):
+    """Phase 663 — call Claude to draft a decision brief for a crisis
+    row in a specific scenario type. Returns the brief as plain text
+    structured into three short sections (Situation, Why Proximate
+    fits, Recommended action). No persistence in v0 — the brief lives
+    in the OB's session.
+    """
+    from app.models.crisis_monitoring import CrisisMonitoringRow
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    scenario = (payload.get('scenario_type') or '').strip().lower()
+    if scenario not in PROXIMATE_SCENARIO_TYPES:
+        return jsonify({
+            'success': False,
+            'error': f'scenario_type must be one of {list(PROXIMATE_SCENARIO_TYPES)}',
+        }), 400
+
+    row = db.session.get(CrisisMonitoringRow, row_id)
+    if not row:
+        return jsonify({'success': False, 'error': 'crisis row not found'}), 404
+
+    scenario_def = {
+        'incubate': (
+            'Incubate: seed a brand-new community-based group in this '
+            'area. Maximum capacity-building, minimum dollars. Aim is '
+            'institutional formation, not service delivery in v0.'
+        ),
+        'strengthen': (
+            'Strengthen: top up an already-cleared partner operating '
+            'in this geography. Aim is to sustain proven delivery '
+            'capacity while the crisis lasts.'
+        ),
+        'enable': (
+            'Enable: rapid micro-grant to a partner who can act in 7 '
+            'days. Aim is immediate response; reporting cadence is '
+            'tight (≤14 days).'
+        ),
+    }[scenario]
+
+    from app.services.ai_service import AIService
+
+    system_prompt = (
+        "You are a humanitarian funder briefing the Allocation "
+        "Committee at Adeso's Proximate Fund. You draft tight, "
+        "actionable decision briefs grounded only in the data you "
+        "are given. Never invent statistics. Keep it under 250 words "
+        "total, structured exactly into the three labelled sections "
+        "Situation, Why Proximate fits, and Recommended action."
+    )
+    user_msg = (
+        f"Crisis row:\n"
+        f"- Country: {row.country}\n"
+        f"- Region: {row.region or '—'}\n"
+        f"- Event: {row.event_type or '—'} — {row.event_title or '—'}\n"
+        f"- Composite urgency score: {row.composite_score or '—'} / 100\n"
+        f"- HDI band: {row.hdi_band or '—'}\n"
+        f"- Government capacity: {row.gov_capacity_band or '—'}\n"
+        f"- People impacted estimate: {row.people_impacted_estimate or '—'}\n"
+        f"- Media attention band: {row.attention_band or '—'}\n"
+        f"- Narrative: {(row.narrative or '—')[:1200]}\n\n"
+        f"Scenario for this brief: {scenario_def}\n\n"
+        f"Draft the decision brief in three sections."
+    )
+    text = AIService._call_claude(  # noqa: SLF001
+        system_prompt, user_msg,
+        max_tokens=600,
+        endpoint='proximate_crisis_brief',
+    )
+    if not text:
+        # Deterministic fallback so the page still shows something
+        # actionable when the AI is unavailable.
+        text = (
+            f"Situation\n"
+            f"{row.country} {('— ' + row.region) if row.region else ''}. "
+            f"{row.event_type or 'unspecified event'}. People affected "
+            f"(est.): {row.people_impacted_estimate or 'unknown'}. "
+            f"Composite urgency: {row.composite_score or '—'} / 100.\n\n"
+            f"Why Proximate fits\n"
+            f"Aligned with SoP §3 thresholds for {scenario} mode. "
+            f"Capacity to act through a community-endorsed informal "
+            f"group already exists in this area.\n\n"
+            f"Recommended action\n"
+            f"Open a {scenario}-mode round; allocate per Sudan-pilot "
+            f"thresholds (≤ $10k single-signer, > $10k two-signer)."
+        )
+
+    AuditChainEntry.append(
+        action='proximate.crisis_brief.drafted',
+        actor_email=current_user.email,
+        subject_kind='crisis_monitoring_row',
+        subject_id=row.id,
+        details={
+            'scenario_type': scenario,
+            'country': row.country,
+        },
+    )
+    return jsonify({
+        'success': True,
+        'brief': text,
+        'scenario_type': scenario,
+        'row_id': row.id,
+    })

@@ -171,6 +171,10 @@ class ProximatePartner(db.Model):
         default=lambda: datetime.now(timezone.utc),
     )
     dd_cleared_at = db.Column(db.DateTime, nullable=True)
+
+    sanctions_flag = db.Column(db.Boolean, nullable=True, default=False)
+    sanctions_checked_at = db.Column(db.DateTime, nullable=True)
+    sanctions_summary_json = db.Column(db.Text, nullable=True)
     created_at = db.Column(
         db.DateTime, nullable=False,
         default=lambda: datetime.now(timezone.utc),
@@ -260,6 +264,11 @@ class ProximatePartner(db.Model):
             "capital_class": self.capital_class,
             "nominated_at": self.nominated_at.isoformat() if self.nominated_at else None,
             "dd_cleared_at": self.dd_cleared_at.isoformat() if self.dd_cleared_at else None,
+            "sanctions_flag": bool(self.sanctions_flag),
+            "sanctions_checked_at": (
+                self.sanctions_checked_at.isoformat() if self.sanctions_checked_at else None
+            ),
+            "sanctions_summary": _json_load(self.sanctions_summary_json) or None,
             "trust_floor_signals": signals,
         }
 

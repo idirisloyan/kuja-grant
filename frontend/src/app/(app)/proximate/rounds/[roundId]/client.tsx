@@ -416,17 +416,25 @@ export function ProximateRoundDetailClient() {
             const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
             return (
               <Card className="p-4">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                   <p className="text-sm font-medium flex items-center gap-2">
                     <Banknote className="w-4 h-4 text-muted-foreground" />
                     {t('proximate.rounds.disbursements_in_round')} ({disb.length})
                   </p>
-                  <Link
-                    href={`/proximate/disbursements/new?round=${round.id}`}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    {t('proximate.rounds.disburse_more')}
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href={`/proximate/rounds/${round.id}/report`}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {t('proximate.rounds.download_report')}
+                    </Link>
+                    <Link
+                      href={`/proximate/disbursements/new?round=${round.id}`}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {t('proximate.rounds.disburse_more')}
+                    </Link>
+                  </div>
                 </div>
                 {total > 0 && (
                   <div className="mb-3">

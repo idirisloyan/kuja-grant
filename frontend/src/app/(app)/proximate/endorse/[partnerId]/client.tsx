@@ -48,6 +48,19 @@ interface TrustFloor {
   ready_for_dd_clear: boolean;
 }
 
+interface SanctionsHit {
+  check_type?: string;
+  reason?: string;
+  match_score?: number;
+  list?: string;
+}
+
+interface SanctionsSummary {
+  total_checks: number;
+  flagged_count: number;
+  flagged: SanctionsHit[];
+}
+
 interface Partner {
   id: number;
   name: string;
@@ -56,6 +69,9 @@ interface Partner {
   status: string;
   trust_tier: string | null;
   bank_verified_at: string | null;
+  sanctions_flag?: boolean;
+  sanctions_checked_at?: string | null;
+  sanctions_summary?: SanctionsSummary | null;
   trust_floor_signals: TrustFloor;
 }
 
@@ -384,6 +400,33 @@ export default function ProximateEndorseWizardClient() {
             <BackChevron className="w-3 h-3" />
             {t('proximate.wizard.back')}
           </button>
+
+          {partner.sanctions_flag && (
+            <Card className="p-4 border-red-400 bg-red-50 dark:bg-red-950/30">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-700 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-red-800 dark:text-red-300">
+                    {t('proximate.partner.sanctions_flag_title')}
+                  </h3>
+                  <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                    {t('proximate.partner.sanctions_flag_body')}
+                  </p>
+                  {partner.sanctions_summary?.flagged?.length ? (
+                    <ul className="text-xs text-red-700 dark:text-red-300 mt-2 list-disc ps-5 space-y-0.5">
+                      {partner.sanctions_summary.flagged.slice(0, 3).map((h, i) => (
+                        <li key={i}>
+                          {h.list || h.check_type}
+                          {h.match_score !== undefined ? ` (${h.match_score}%)` : ''}
+                          {h.reason ? ` — ${h.reason}` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              </div>
+            </Card>
+          )}
 
           <InterventionPanel
             partnerId={partner.id}
