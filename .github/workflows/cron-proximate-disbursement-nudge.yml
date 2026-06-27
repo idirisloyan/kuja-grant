@@ -1,0 +1,84 @@
+name: Daily Proximate disbursement-report nudge cron
+
+# Phase 651 — replaces the calendar-month SoP 12 cadence with a
+# per-disbursement reminder. Scans every Proximate disbursement still
+# in pending_report past its report_due_at and emits one
+# proximate.report.overdue_nudge audit row per disbursement per day
+# (the endpoint dedups by day_key in the audit chain).
+#
+# Required repo secrets:
+#   CRON_SECRET — must match the CRON_SECRET set on Railway
+#   PROD_BASE   — optional override of the base URL
+
+on:
+  # Daily at 04:00 UTC — picks up overdue reports from the previous
+  # day's tail and lands the nudge in the OB's audit feed before EAT
+  # Monday-Friday morning standup. Avoids the noisy 03:00 UTC window
+  # already used by the UAT-fixtures cron and the 06:00 window used by
+  # the weekly Crisis Monitoring Report.
+  schedule:
+    - cron: "0 4 * * *"
+
+  # Manual trigger for ad-hoc re-runs (e.g. after a deploy or to verify
+  # the cron wiring from the GitHub UI).
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Determine base URL
+        id: base
+        run: |
+          if [ -n "${{ secrets.PROD_BASE }}" ]; then
+            echo "url=${{ secrets.PROD_BASE }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://web-production-6f8a.up.railway.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: POST /api/proximate/monitoring/disbursement-nudge
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET repo secret is missing — add it under Settings → Secrets and variables → Actions, matching the Railway env var."
+            exit 1
+          fi
+          http_code=$(curl -s -o /tmp/body.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            "${BASE_URL}/api/proximate/monitoring/disbursement-nudge")
+          echo "HTTP ${http_code}"
+          cat /tmp/body.json || true
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Proximate disbursement-nudge cron returned ${http_code}"
+            exit 1
+          fi
+
+      - name: Summarise run output
+        if: always()
+        run: |
+          if [ -f /tmp/body.json ]; then
+            python3 - <<'PY'
+          import json, os
+          with open('/tmp/body.json') as f:
+              try:
+                  d = json.load(f)
+              except Exception:
+                  print('Cron returned non-JSON body')
+                  raise SystemExit(0)
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if not summary:
+              print(json.dumps(d, indent=2))
+              raise SystemExit(0)
+          with open(summary, 'a') as out:
+              out.write('# Proximate disbursement-nudge cron\n\n')
+              out.write(f'- **Day**: {d.get("day")}\n')
+              out.write(f'- **Disbursements nudged**: {d.get("nudged")}\n')
+          PY
+          fi

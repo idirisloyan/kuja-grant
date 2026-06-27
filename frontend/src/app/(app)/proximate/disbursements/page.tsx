@@ -98,9 +98,9 @@ export default function ProximateDisbursementsPage() {
           <ul className="space-y-2">
             {rows.map((d) => (
               <li key={d.id}>
-                <Card className="p-4">
+                <Card className="p-4 hover:bg-muted/30 transition-colors">
                   <div className="flex items-start gap-3 flex-wrap">
-                    <div className="flex-1 min-w-0">
+                    <Link href={`/proximate/disbursements/${d.id}`} className="flex-1 min-w-0 block">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-medium truncate">
                           {d.partner_name || `Partner #${d.partner_id}`}
@@ -126,12 +126,12 @@ export default function ProximateDisbursementsPage() {
                           <span>· {t('proximate.disbursements.due')} {new Date(d.report_due_at).toLocaleDateString()}</span>
                         )}
                       </div>
-                    </div>
+                    </Link>
                     {d.report_token && d.status === 'pending_report' && (
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => copyReportUrl(d)}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); copyReportUrl(d); }}
                       >
                         {copied === d.id ? (
                           <Check className="w-3.5 h-3.5 me-1" />

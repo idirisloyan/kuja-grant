@@ -1751,6 +1751,53 @@ def api_list_disbursements():
     })
 
 
+@proximate_bp.route('/disbursements/<int:disbursement_id>', methods=['GET'])
+@login_required
+def api_get_disbursement(disbursement_id):
+    """Detail for one disbursement, including the partner's submitted
+    report payload (if any) and the audit-chain rows scoped to this
+    disbursement's lifecycle."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    d = ProximateDisbursement.query.filter_by(
+        id=disbursement_id, network_id=net.id,
+    ).first()
+    if not d:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    payload = d.to_dict()
+    if d.report_json:
+        import json as _json
+        try:
+            payload['report'] = _json.loads(d.report_json)
+        except (ValueError, TypeError):
+            payload['report'] = None
+    else:
+        payload['report'] = None
+    payload['report_voice_doc_id'] = d.report_voice_doc_id
+    payload['report_photo_doc_id'] = d.report_photo_doc_id
+    payload['report_voice_transcript'] = d.report_voice_transcript
+
+    audit_rows = AuditChainEntry.query.filter(
+        AuditChainEntry.subject_kind == 'proximate_disbursement',
+        AuditChainEntry.subject_id == d.id,
+    ).order_by(AuditChainEntry.seq.asc()).limit(100).all()
+    import json as _json2
+    payload['audit'] = [
+        {
+            'seq': r.seq,
+            'action': r.action,
+            'actor_email': r.actor_email,
+            'created_at': r.created_at.isoformat() if r.created_at else None,
+            'details': (
+                _json2.loads(r.details_json) if r.details_json else {}
+            ),
+        }
+        for r in audit_rows
+    ]
+    return jsonify({'success': True, 'disbursement': payload})
+
+
 @proximate_bp.route('/disbursements', methods=['POST'])
 @ob_required
 def api_record_disbursement():

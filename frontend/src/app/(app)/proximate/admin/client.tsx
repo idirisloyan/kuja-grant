@@ -24,7 +24,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ShieldCheck, Activity, Users, FileText } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Activity, Users, FileText, Banknote, Coins, UserPlus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
@@ -160,6 +160,50 @@ export function ProximateAdminClient() {
                   {data.month}
                 </p>
               </Card>
+            </div>
+
+            {/* Workflow tiles — Phase 654: surface the new flows so the OB
+                doesn't have to type URLs. */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Link href="/proximate/rounds" className="block">
+                <Card className="p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Coins className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      {t('proximate.admin.tile_rounds')}
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium">
+                    {t('proximate.admin.tile_rounds_sub')}
+                  </p>
+                </Card>
+              </Link>
+              <Link href="/proximate/disbursements" className="block">
+                <Card className="p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Banknote className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      {t('proximate.admin.tile_disbursements')}
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium">
+                    {t('proximate.admin.tile_disbursements_sub')}
+                  </p>
+                </Card>
+              </Link>
+              <Link href="/proximate-nominate" className="block" target="_blank">
+                <Card className="p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-2 mb-1">
+                    <UserPlus className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      {t('proximate.admin.tile_self_nominate')}
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium">
+                    {t('proximate.admin.tile_self_nominate_sub')}
+                  </p>
+                </Card>
+              </Link>
             </div>
 
             {/* Partners by status — secondary detail */}
