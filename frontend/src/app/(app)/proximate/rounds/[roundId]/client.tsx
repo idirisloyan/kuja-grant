@@ -1,0 +1,422 @@
+'use client';
+
+/**
+ * Round detail — Phase 649.
+ *
+ * Shows the round, the signature roster, and the action buttons the
+ * current OB user can take depending on status:
+ *   draft     → Submit for review (drafter only)
+ *   in_review → Sign / Reject (any OB)
+ *   active    → Close round (any OB)
+ *
+ * Temporal audit-chain rows in the round's window are listed below so
+ * the OB can see what happened during the cycle (the eventual end-of-
+ * round PDF aggregates this same data).
+ */
+
+import { useEffect, useState } from 'react';
+import { Loader2, CheckCircle2, X, Lock } from 'lucide-react';
+import { api } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  PageShell, PageHeader, PageMain,
+} from '@/components/layout/page-shell';
+
+interface Signature {
+  id: number;
+  user_id: number;
+  status: string;
+  declared_no_coi: boolean | null;
+  note: string | null;
+  acted_at: string | null;
+}
+
+interface Round {
+  id: number;
+  title: string;
+  title_ar: string | null;
+  trigger_type: string;
+  trigger_summary: string | null;
+  donor_name: string | null;
+  envelope_usd: number | null;
+  expected_duration_days: number | null;
+  target_country: string;
+  target_region: string | null;
+  status: string;
+  drafted_by_user_id: number;
+  drafted_at: string | null;
+  submitted_at: string | null;
+  activated_at: string | null;
+  closed_at: string | null;
+  cancellation_reason: string | null;
+  closing_summary: string | null;
+  signed_count: number;
+  signers_required: number;
+  ready_for_activation: boolean;
+  signatures: Signature[];
+}
+
+interface AuditRow {
+  seq: number;
+  action: string;
+  actor_email: string;
+  subject_kind: string;
+  subject_id: number;
+  created_at: string | null;
+}
+
+interface Resp {
+  success: boolean;
+  round: Round;
+  audit_in_window: AuditRow[];
+}
+
+const STATUS_TONE: Record<string, string> = {
+  draft: 'bg-muted text-muted-foreground',
+  in_review: 'bg-amber-100 text-amber-800 border-amber-300',
+  active: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  closed: 'bg-blue-100 text-blue-800 border-blue-300',
+  cancelled: 'bg-red-100 text-red-800 border-red-300',
+};
+
+export function ProximateRoundDetailClient() {
+  const { t } = useTranslation();
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'admin';
+
+  const [roundId, setRoundId] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    const m = window.location.pathname.match(/\/proximate\/rounds\/(\d+)/);
+    return m && m[1] !== '0' ? m[1] : '';
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const m = window.location.pathname.match(/\/proximate\/rounds\/(\d+)/);
+    if (m && m[1] !== '0' && m[1] !== roundId) setRoundId(m[1]);
+  }, [roundId]);
+
+  const [data, setData] = useState<Resp | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState('');
+  const [closing, setClosing] = useState(false);
+  const [closingSummary, setClosingSummary] = useState('');
+
+  const refresh = async () => {
+    if (!roundId) return;
+    setLoading(true);
+    try {
+      const r = await api.get<Resp>(`/api/proximate/rounds/${roundId}`);
+      setData(r);
+    } catch {
+      setError(t('proximate.rounds.load_failed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundId]);
+
+  const round = data?.round;
+
+  const callAction = async (path: string, body?: object) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/api/proximate/rounds/${roundId}/${path}`, body || {});
+      setRejecting(false);
+      setClosing(false);
+      setReason('');
+      setClosingSummary('');
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('proximate.rounds.action_failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading || !round) {
+    return (
+      <PageShell>
+        <PageMain>
+          <p className="text-sm text-muted-foreground flex items-center gap-2">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            {t('proximate.rounds.loading_detail')}
+          </p>
+        </PageMain>
+      </PageShell>
+    );
+  }
+
+  const userAlreadySigned = round.signatures.some(
+    (s) => s.user_id === user?.id && s.status !== 'pending',
+  );
+
+  return (
+    <PageShell>
+      <PageHeader
+        title={round.title}
+        subtitle={round.title_ar || ''}
+      />
+      <PageMain>
+        <div className="space-y-4">
+          {/* Status + meta */}
+          <Card className="p-4 space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="outline" className={STATUS_TONE[round.status]}>
+                {round.status}
+              </Badge>
+              {round.status === 'in_review' && (
+                <span className="text-xs text-muted-foreground">
+                  {round.signed_count}/{round.signers_required} {t('proximate.rounds.signed')}
+                </span>
+              )}
+            </div>
+            <dl className="grid grid-cols-1 sm:grid-cols-3 gap-y-2 gap-x-4 text-xs">
+              <div>
+                <dt className="text-muted-foreground">{t('proximate.rounds.trigger')}</dt>
+                <dd className="font-medium">{round.trigger_type}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">{t('proximate.rounds.donor')}</dt>
+                <dd className="font-medium">{round.donor_name || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">{t('proximate.rounds.envelope')}</dt>
+                <dd className="font-medium">
+                  {round.envelope_usd ? `$${round.envelope_usd.toLocaleString()}` : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">{t('proximate.rounds.region')}</dt>
+                <dd className="font-medium">{round.target_region || round.target_country}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">{t('proximate.rounds.duration')}</dt>
+                <dd className="font-medium">
+                  {round.expected_duration_days ? `${round.expected_duration_days}d` : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">{t('proximate.rounds.drafted')}</dt>
+                <dd className="font-medium">
+                  {round.drafted_at ? new Date(round.drafted_at).toLocaleDateString() : '—'}
+                </dd>
+              </div>
+            </dl>
+            {round.trigger_summary && (
+              <p className="text-sm border-t pt-2">{round.trigger_summary}</p>
+            )}
+          </Card>
+
+          {/* Actions */}
+          {isAdmin && (
+            <Card className="p-4 space-y-3">
+              <p className="text-sm font-medium">{t('proximate.rounds.actions')}</p>
+
+              {round.status === 'draft' && (
+                <Button
+                  onClick={() => callAction('submit')}
+                  disabled={busy}
+                  size="sm"
+                >
+                  {busy && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
+                  {t('proximate.rounds.submit_for_review')}
+                </Button>
+              )}
+
+              {round.status === 'in_review' && !userAlreadySigned && (
+                <div className="space-y-2">
+                  <Button
+                    onClick={() => callAction('sign', { declared_no_coi: true })}
+                    disabled={busy}
+                    size="sm"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 me-1" />
+                    {t('proximate.rounds.sign_no_coi')}
+                  </Button>
+                  <Button
+                    onClick={() => callAction('sign', { declared_no_coi: false, note: 'Recusing' })}
+                    disabled={busy}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {t('proximate.rounds.recuse')}
+                  </Button>
+                  {!rejecting ? (
+                    <Button
+                      onClick={() => setRejecting(true)}
+                      disabled={busy}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <X className="w-3.5 h-3.5 me-1" />
+                      {t('proximate.rounds.reject')}
+                    </Button>
+                  ) : (
+                    <div className="space-y-2 border-t pt-3">
+                      <label className="text-xs text-muted-foreground block">
+                        {t('proximate.rounds.reject_reason')}
+                      </label>
+                      <textarea
+                        className="w-full text-sm rounded-md border bg-background p-2 min-h-[64px]"
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => callAction('sign', { reject_reason: reason })}
+                          disabled={busy || !reason.trim()}
+                        >
+                          {t('proximate.rounds.confirm_reject')}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => { setRejecting(false); setReason(''); }}
+                        >
+                          {t('proximate.rounds.cancel')}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {round.status === 'in_review' && userAlreadySigned && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  {t('proximate.rounds.you_already_responded')}
+                </p>
+              )}
+
+              {round.status === 'active' && (
+                <>
+                  {!closing ? (
+                    <Button
+                      onClick={() => setClosing(true)}
+                      disabled={busy}
+                      size="sm"
+                      variant="outline"
+                    >
+                      {t('proximate.rounds.close_round')}
+                    </Button>
+                  ) : (
+                    <div className="space-y-2 border-t pt-3">
+                      <label className="text-xs text-muted-foreground block">
+                        {t('proximate.rounds.closing_summary')}
+                      </label>
+                      <textarea
+                        className="w-full text-sm rounded-md border bg-background p-2 min-h-[80px]"
+                        value={closingSummary}
+                        onChange={(e) => setClosingSummary(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => callAction('close', { summary: closingSummary })}
+                          disabled={busy}
+                        >
+                          {t('proximate.rounds.confirm_close')}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => { setClosing(false); setClosingSummary(''); }}
+                        >
+                          {t('proximate.rounds.cancel')}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {error && <p className="text-xs text-destructive">{error}</p>}
+            </Card>
+          )}
+
+          {/* Signatures */}
+          <Card className="p-4">
+            <p className="text-sm font-medium mb-3">
+              {t('proximate.rounds.signatures')} ({round.signatures.length})
+            </p>
+            {round.signatures.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {t('proximate.rounds.no_signatures')}
+              </p>
+            ) : (
+              <ul className="space-y-1.5 text-xs">
+                {round.signatures.map((s) => (
+                  <li key={s.id} className="flex items-center gap-2">
+                    <span className="text-muted-foreground">{t('proximate.rounds.signer')} #{s.user_id}</span>
+                    <Badge variant="outline" className="text-[10px]">{s.status}</Badge>
+                    {s.acted_at && (
+                      <span className="text-muted-foreground ms-auto">
+                        {new Date(s.acted_at).toLocaleDateString()}
+                      </span>
+                    )}
+                    {s.note && <span className="text-muted-foreground italic">— {s.note}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          {/* Cancellation / closing summary */}
+          {round.cancellation_reason && (
+            <Card className="p-4 border-destructive">
+              <p className="text-sm font-medium mb-1 text-destructive">
+                {t('proximate.rounds.cancellation')}
+              </p>
+              <p className="text-xs">{round.cancellation_reason}</p>
+            </Card>
+          )}
+          {round.closing_summary && (
+            <Card className="p-4">
+              <p className="text-sm font-medium mb-1">{t('proximate.rounds.closed')}</p>
+              <p className="text-xs whitespace-pre-wrap">{round.closing_summary}</p>
+            </Card>
+          )}
+
+          {/* Audit window */}
+          <Card className="p-4">
+            <p className="text-sm font-medium mb-3">
+              {t('proximate.rounds.activity')} ({data?.audit_in_window?.length || 0})
+            </p>
+            {(!data?.audit_in_window || data.audit_in_window.length === 0) ? (
+              <p className="text-xs text-muted-foreground">
+                {t('proximate.rounds.no_activity')}
+              </p>
+            ) : (
+              <ul className="space-y-1 text-xs">
+                {data.audit_in_window.slice(0, 30).map((a) => (
+                  <li key={a.seq} className="flex items-center gap-2">
+                    <span className="text-muted-foreground tabular-nums">#{a.seq}</span>
+                    <span className="font-mono">{a.action}</span>
+                    <span className="text-muted-foreground">
+                      ({a.subject_kind} #{a.subject_id})
+                    </span>
+                    <span className="text-muted-foreground ms-auto">{a.actor_email}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      </PageMain>
+    </PageShell>
+  );
+}

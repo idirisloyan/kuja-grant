@@ -37,6 +37,8 @@ from app.models import (
     AuditChainEntry,
     InterventionMeasure, INTERVENTION_KINDS,
     FinancialServiceProvider, PartnerDisbursementMethod, FSP_KINDS,
+    ProximateRound, ProximateRoundSignature,
+    ROUND_TRIGGER_TYPES, ROUND_SIGNERS_REQUIRED,
 )
 from app.utils.network import ob_required
 
@@ -1392,3 +1394,232 @@ def api_proximate_overview():
         'month': month_key,
         'recent_audit': recent_dicts,
     })
+
+
+# ---- Funding Rounds (Phase 649) --------------------------------------
+
+@proximate_bp.route('/rounds', methods=['GET'])
+@login_required
+def api_list_rounds():
+    """List rounds in this tenant, newest first."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    rows = ProximateRound.query.filter_by(network_id=net.id).order_by(
+        ProximateRound.drafted_at.desc(),
+    ).limit(200).all()
+    return jsonify({
+        'success': True,
+        'rounds': [r.to_dict() for r in rows],
+        'total': len(rows),
+    })
+
+
+@proximate_bp.route('/rounds/<int:round_id>', methods=['GET'])
+@login_required
+def api_get_round(round_id):
+    """Round detail + signatures + temporal audit window."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    r = ProximateRound.query.filter_by(id=round_id, network_id=net.id).first()
+    if not r:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
+    # Temporal linkage — fetch audit-chain rows between submitted_at and
+    # closed_at (or now). This is what end-of-round reports key off.
+    end = r.closed_at or datetime.now(timezone.utc)
+    start = r.submitted_at or r.drafted_at
+    audit_rows = AuditChainEntry.query.filter(
+        AuditChainEntry.action.like('proximate.%'),
+        AuditChainEntry.created_at >= start,
+        AuditChainEntry.created_at <= end,
+    ).order_by(AuditChainEntry.seq.desc()).limit(500).all()
+
+    return jsonify({
+        'success': True,
+        'round': r.to_dict(include_signatures=True),
+        'audit_in_window': [{
+            'seq': a.seq, 'action': a.action,
+            'actor_email': a.actor_email,
+            'subject_kind': a.subject_kind, 'subject_id': a.subject_id,
+            'created_at': a.created_at.isoformat() if a.created_at else None,
+        } for a in audit_rows],
+    })
+
+
+@proximate_bp.route('/rounds', methods=['POST'])
+@ob_required
+def api_create_round():
+    """OB drafts a new round. Lands in `draft` status; must be submitted
+    next, then signed by 2 OB members to activate."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    title = (payload.get('title') or '').strip()
+    trigger = (payload.get('trigger_type') or '').strip()
+    if not title:
+        return jsonify({'success': False, 'error': 'title required'}), 400
+    if trigger not in ROUND_TRIGGER_TYPES:
+        return jsonify({
+            'success': False,
+            'error': f'trigger_type must be one of {ROUND_TRIGGER_TYPES}',
+        }), 400
+
+    r = ProximateRound(
+        network_id=net.id,
+        title=title[:300],
+        title_ar=(payload.get('title_ar') or '').strip()[:300] or None,
+        trigger_type=trigger,
+        trigger_summary=(payload.get('trigger_summary') or '').strip() or None,
+        donor_name=(payload.get('donor_name') or '').strip() or None,
+        envelope_usd=payload.get('envelope_usd'),
+        expected_duration_days=payload.get('expected_duration_days'),
+        target_country=(payload.get('target_country') or 'SD').strip(),
+        target_region=(payload.get('target_region') or '').strip() or None,
+        drafted_by_user_id=current_user.id,
+    )
+    db.session.add(r)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.round.drafted',
+        actor_email=current_user.email,
+        subject_kind='proximate_round',
+        subject_id=r.id,
+        details={'title': r.title, 'trigger': r.trigger_type,
+                 'envelope_usd': r.envelope_usd},
+    )
+    return jsonify({'success': True, 'round': r.to_dict()})
+
+
+@proximate_bp.route('/rounds/<int:round_id>/submit', methods=['POST'])
+@ob_required
+def api_submit_round(round_id):
+    """Drafter flips the round into in_review; signatures can begin."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    r = ProximateRound.query.filter_by(id=round_id, network_id=net.id).first()
+    if not r:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    try:
+        r.submit()
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 409
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.round.submitted',
+        actor_email=current_user.email,
+        subject_kind='proximate_round',
+        subject_id=r.id,
+        details={'status': r.status},
+    )
+    return jsonify({'success': True, 'round': r.to_dict()})
+
+
+@proximate_bp.route('/rounds/<int:round_id>/sign', methods=['POST'])
+@ob_required
+def api_sign_round(round_id):
+    """Current OB user affirms or recuses on a round. If `reject_reason` is
+    given, the whole round is cancelled instead. Reaching the signer floor
+    auto-activates the round."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    r = ProximateRound.query.filter_by(id=round_id, network_id=net.id).first()
+    if not r:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    if r.status != 'in_review':
+        return jsonify({
+            'success': False,
+            'error': f'Round is {r.status!r}; only in_review accepts signatures',
+        }), 409
+
+    payload = request.get_json(silent=True) or {}
+    reject_reason = (payload.get('reject_reason') or '').strip()
+    declared_no_coi = bool(payload.get('declared_no_coi'))
+    note = (payload.get('note') or '').strip() or None
+
+    sig = ProximateRoundSignature.query.filter_by(
+        round_id=r.id, user_id=current_user.id,
+    ).first()
+    if not sig:
+        sig = ProximateRoundSignature(
+            round_id=r.id, user_id=current_user.id,
+        )
+        db.session.add(sig)
+        db.session.flush()
+    if sig.status != 'pending':
+        return jsonify({
+            'success': False,
+            'error': f'You already responded ({sig.status!r})',
+        }), 409
+
+    if reject_reason:
+        sig.reject(reason=reject_reason)
+        r.cancel(reason=f'Rejected by {current_user.email}: {reject_reason}')
+        db.session.commit()
+        AuditChainEntry.append(
+            action='proximate.round.rejected',
+            actor_email=current_user.email,
+            subject_kind='proximate_round',
+            subject_id=r.id,
+            details={'reason': reject_reason[:500]},
+        )
+        return jsonify({
+            'success': True, 'round': r.to_dict(include_signatures=True),
+        })
+
+    sig.sign(declared_no_coi=declared_no_coi, note=note)
+    audit_action = 'proximate.round.signed' if sig.status == 'signed' else 'proximate.round.recused'
+    db.session.commit()
+    AuditChainEntry.append(
+        action=audit_action,
+        actor_email=current_user.email,
+        subject_kind='proximate_round',
+        subject_id=r.id,
+        details={'signed_count': r.signed_count,
+                 'required': ROUND_SIGNERS_REQUIRED},
+    )
+    # Auto-activate if threshold met
+    if r.ready_for_activation:
+        r.activate()
+        db.session.commit()
+        AuditChainEntry.append(
+            action='proximate.round.activated',
+            actor_email=current_user.email,
+            subject_kind='proximate_round',
+            subject_id=r.id,
+            details={'signed_count': r.signed_count},
+        )
+    return jsonify({
+        'success': True, 'round': r.to_dict(include_signatures=True),
+    })
+
+
+@proximate_bp.route('/rounds/<int:round_id>/close', methods=['POST'])
+@ob_required
+def api_close_round(round_id):
+    """OB closes an active round. Anchors the cycle end; subsequent audit
+    rows belong to the next round."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    r = ProximateRound.query.filter_by(id=round_id, network_id=net.id).first()
+    if not r:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    summary = (request.get_json(silent=True) or {}).get('summary', '')
+    try:
+        r.close(summary=summary)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 409
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.round.closed',
+        actor_email=current_user.email,
+        subject_kind='proximate_round',
+        subject_id=r.id,
+        details={'summary_preview': (summary or '')[:200]},
+    )
+    return jsonify({'success': True, 'round': r.to_dict()})
