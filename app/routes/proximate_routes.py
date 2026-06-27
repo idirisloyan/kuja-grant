@@ -1700,7 +1700,7 @@ def api_round_report(round_id):
     # The latest audit row's hash anchor — proves the report bundle is
     # tied to a tamper-evident point in the chain. Auditors can re-derive.
     latest_seq = audit_rows[-1].seq if audit_rows else None
-    latest_hash = audit_rows[-1].entry_hash if audit_rows else None
+    latest_hash = audit_rows[-1].payload_hash if audit_rows else None
 
     return jsonify({
         'success': True,
