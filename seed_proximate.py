@@ -441,6 +441,27 @@ def run():
             if membership.joined_at is None:
                 membership.joined_at = datetime.now(timezone.utc)
 
+        # Second OB seat — without one, the cosign happy-path for the
+        # $10k+ threshold ladder (Phase 662) cannot be exercised end-to-end,
+        # because the COI guard blocks the sender from cosigning their own
+        # disbursement. Same email pattern; same org so the membership
+        # already covers both.
+        OB2_EMAIL = 'ob2@proximate.org'
+        ob2_user = User.query.filter_by(email=OB2_EMAIL).first()
+        if not ob2_user:
+            ob2_user = User(
+                email=OB2_EMAIL,
+                password_hash=generate_password_hash('pass123'),
+                role='ngo',
+                name='Proximate OB Cosigner',
+                org_id=org.id,
+            )
+            db.session.add(ob2_user)
+            print(f"  ob2 user created: {OB2_EMAIL}")
+        elif ob2_user.org_id != org.id:
+            ob2_user.org_id = org.id
+            print(f"  ob2 user reattached to OB org")
+
         db.session.commit()
         print()
         print(f"Done. Proximate now has:")
