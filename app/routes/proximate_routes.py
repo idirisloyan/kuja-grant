@@ -255,6 +255,102 @@ def api_nominate_partner():
     return jsonify({'success': True, 'partner': partner.to_dict()})
 
 
+# ---- Public partner self-nominate (Phase 650) ------------------------
+
+@proximate_bp.route('/partners/self-nominate', methods=['POST'])
+def api_self_nominate_partner():
+    """Public endpoint: a community group puts itself forward without
+    needing a Kuja login. Lands in 'nominated' status alongside
+    Adeso-staff nominations; the secretariat decides whether to open
+    endorsements. No bank fields accepted from the public form — those
+    are captured later by the secretariat under their authenticated
+    session.
+
+    Rate-limit guard: reject if an identical (name, contact_phone)
+    pair was nominated in the last 24h. Naïve but catches double-taps
+    and basic spam without needing infra.
+    """
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+
+    name = (payload.get('name') or '').strip()
+    if not name or len(name) < 2 or len(name) > 200:
+        return jsonify({
+            'success': False, 'error': 'name is required (2-200 chars)',
+        }), 400
+
+    contact_phone = (payload.get('contact_phone') or '').strip() or None
+    contact_email = (payload.get('contact_email') or '').strip() or None
+    if not contact_phone and not contact_email:
+        return jsonify({
+            'success': False,
+            'error': 'at least one contact (phone or email) is required',
+        }), 400
+
+    # Honeypot field — bots fill every input; humans don't see this one
+    if (payload.get('website') or '').strip():
+        return jsonify({'success': False, 'error': 'spam detected'}), 400
+
+    # Dedup window
+    from datetime import timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    if contact_phone:
+        recent = ProximatePartner.query.filter(
+            ProximatePartner.network_id == net.id,
+            ProximatePartner.name == name,
+            ProximatePartner.contact_phone == contact_phone,
+            ProximatePartner.created_at >= cutoff,
+        ).first()
+        if recent:
+            return jsonify({
+                'success': True,
+                'partner': recent.to_dict(),
+                'already_nominated': True,
+            })
+
+    partner = ProximatePartner(
+        network_id=net.id,
+        name=name,
+        name_ar=(payload.get('name_ar') or '').strip() or None,
+        locality=(payload.get('locality') or '').strip() or None,
+        country=(payload.get('country') or 'SD').strip(),
+        contact_phone=contact_phone,
+        contact_email=contact_email,
+        nominated_by_user_id=None,  # self-nominated, no logged-in user
+        status='nominated',
+    )
+    # Stash the free-text "what does your group do" into intake_form so
+    # the secretariat can read it during triage.
+    description = (payload.get('description') or '').strip()
+    if description:
+        partner.set_intake_form({
+            'description': description[:2000],
+            'source': 'self_nominated',
+        })
+    db.session.add(partner)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.partner.self_nominated',
+        actor_email=contact_email or f'phone:{contact_phone}' or 'anonymous',
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={
+            'name': partner.name,
+            'locality': partner.locality,
+            'country': partner.country,
+            'has_email': bool(contact_email),
+            'has_phone': bool(contact_phone),
+        },
+    )
+    logger.info(
+        f"Proximate: partner self-nominated id={partner.id} "
+        f"name={partner.name!r} contact={contact_email or contact_phone}"
+    )
+    return jsonify({'success': True, 'partner': partner.to_dict()})
+
+
 # ---- Submit one endorsement ------------------------------------------
 
 @proximate_bp.route('/partners/<int:partner_id>/endorse', methods=['POST'])
