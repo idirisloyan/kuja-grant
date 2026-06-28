@@ -3797,10 +3797,8 @@ def api_outcomes_rollup():
         return err
 
     # Resolve caller's allowed round scope
-    is_ob = getattr(current_user, 'role', '') == 'admin' or current_user.is_authenticated and any(
-        m for m in getattr(current_user, 'network_memberships', [])
-        if m.network_id == net.id and m.is_oversight_body
-    )
+    from app.utils.network import is_oversight_body_member
+    is_ob = is_oversight_body_member(current_user)
     donor = ProximateDonor.query.filter_by(
         network_id=net.id, primary_user_id=current_user.id,
     ).first()
