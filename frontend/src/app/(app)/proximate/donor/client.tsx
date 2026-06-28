@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Loader2, ExternalLink, FileText, AlertTriangle } from 'lucide-react';
+import { Loader2, ExternalLink, FileText, AlertTriangle, MessageCircle, Send } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -314,9 +314,76 @@ export function ProximateDonorClient() {
         )}
       </section>
 
+      <AskBox />
+
       <p className="text-xs text-muted-foreground pt-4 border-t">
         {t('proximate.donor.footer_honest_scope')}
       </p>
     </div>
+  );
+}
+
+function AskBox() {
+  const { t } = useTranslation();
+  const [q, setQ] = useState('');
+  const [a, setA] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [meta, setMeta] = useState<{ fallback_used?: boolean; rounds_scope?: number[] } | null>(null);
+
+  async function ask() {
+    if (!q.trim()) return;
+    setBusy(true);
+    setErr(null);
+    setA(null);
+    try {
+      const r = await api.post<{ answer: string; meta?: { fallback_used?: boolean; rounds_scope?: number[] } }>(
+        '/api/proximate/donors/me/ask',
+        { question: q.trim() },
+      );
+      setA(r.answer);
+      setMeta(r.meta || null);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : 'failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-4 space-y-3">
+      <h3 className="text-sm font-medium flex items-center gap-2">
+        <MessageCircle className="w-4 h-4" />
+        {t('proximate.donor.ask_title')}
+      </h3>
+      <p className="text-xs text-muted-foreground">{t('proximate.donor.ask_hint')}</p>
+      <div className="flex gap-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && q.trim() && !busy) ask();
+          }}
+          placeholder={t('proximate.donor.ask_placeholder')}
+          maxLength={1000}
+          className="flex-1 h-10 px-3 text-sm bg-background border border-border rounded-md"
+          disabled={busy}
+        />
+        <Button onClick={ask} disabled={busy || !q.trim()} size="sm">
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+        </Button>
+      </div>
+      {err && <p className="text-sm text-red-600">{err}</p>}
+      {a && (
+        <div className="mt-2 p-3 bg-muted/50 rounded-md text-sm whitespace-pre-wrap">
+          {a}
+          {meta?.fallback_used && (
+            <p className="text-xs text-amber-700 mt-2">
+              {t('proximate.donor.ask_fallback_note')}
+            </p>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }

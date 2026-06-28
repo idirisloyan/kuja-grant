@@ -3480,6 +3480,165 @@ def api_donor_unsubscribe():
     return jsonify({'success': True, 'donor': donor.to_dict()})
 
 
+@proximate_bp.route('/donors/me/ask', methods=['POST'])
+@login_required
+def api_donor_ask():
+    """Phase 683 — donor AI Q&A scoped to their subscribed rounds.
+
+    The donor asks a free-form question; we build a compact context
+    bundle (per-round stats + recent audit events + outcome summary)
+    and call CopilotService. Replay-logged so the OB can audit what
+    AI told donors.
+
+    Honest scope: this is grounded ONLY in the donor's subscribed
+    rounds (or the fallback all-rounds-listing). It will not answer
+    questions about partners outside that scope; the prompt says so.
+    """
+    from app.models import ProximateOutcomeAttestation
+    from app.services.copilot_service import CopilotService
+    from app.services.replay_service import log_replayable_ai_call
+
+    donor, err = _require_donor()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    question = (payload.get('question') or '').strip()
+    if not question:
+        return jsonify({'success': False, 'error': 'question required'}), 400
+    if len(question) > 1000:
+        return jsonify({
+            'success': False, 'error': 'question too long (max 1000)',
+        }), 400
+
+    subscribed = donor.subscribed_round_ids()
+    rounds_q = ProximateRound.query.filter_by(network_id=donor.network_id)
+    if subscribed:
+        rounds_q = rounds_q.filter(ProximateRound.id.in_(subscribed))
+    rounds = rounds_q.order_by(ProximateRound.created_at.desc()).limit(8).all()
+
+    if not rounds:
+        return jsonify({
+            'success': True,
+            'answer': (
+                "I don't have any rounds to look at yet. Once you "
+                "subscribe to a round (or the OB seeds one), I can "
+                "answer questions about it."
+            ),
+            'meta': {'grounded': False},
+        })
+
+    # Compact context bundle. Keep small so we stay within prompt cache.
+    ctx_rounds = []
+    for r in rounds:
+        dis = ProximateDisbursement.query.filter_by(
+            network_id=donor.network_id, round_id=r.id,
+        ).all()
+        outcomes = ProximateOutcomeAttestation.query.filter_by(
+            network_id=donor.network_id, round_id=r.id,
+        ).all()
+        status_counts = {}
+        partners = set()
+        disbursed = 0.0
+        for d in dis:
+            status_counts[d.status] = status_counts.get(d.status, 0) + 1
+            partners.add(d.partner_id)
+            if d.status in ('pending_report', 'reported', 'verified', 'flagged'):
+                disbursed += float(d.amount_usd or 0)
+        ctx_rounds.append({
+            'id': r.id,
+            'title': r.title,
+            'status': r.status,
+            'trigger': r.trigger_type,
+            'envelope_usd': float(r.envelope_usd) if r.envelope_usd else 0,
+            'disbursed_usd': disbursed,
+            'partners_served': len(partners),
+            'status_counts': status_counts,
+            'outcome_total': len(outcomes),
+            'outcome_attested': sum(1 for o in outcomes if o.submitted_at),
+            'outcome_verified': sum(1 for o in outcomes if o.status == 'verified'),
+            'flagged_count': status_counts.get('flagged', 0),
+        })
+
+    import json as _json
+    system = (
+        "You are the Proximate Fund donor portal AI assistant. You answer "
+        "questions about a single donor's subscribed funding rounds using "
+        "ONLY the structured data provided. Rules:\n"
+        "1. Cite specific round titles and numbers from the data when "
+        "making claims. Never invent figures.\n"
+        "2. If the donor's question is not answerable from the data "
+        "provided, say so clearly. Do not speculate.\n"
+        "3. Be concise — donors are busy. 3-5 sentences typical.\n"
+        "4. Stay neutral on partners — do not endorse or judge specific "
+        "partners; only describe what the data shows.\n"
+        "5. If the question is about a round, partner, or disbursement "
+        "outside this donor's scope, redirect them to ask Adeso directly."
+    )
+    user_msg = (
+        f"Donor: {donor.display_name}\n\n"
+        f"Subscribed rounds data:\n{_json.dumps(ctx_rounds, indent=2)}\n\n"
+        f"Question: {question}"
+    )
+
+    t0_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    result = CopilotService._call(
+        system=system, user=user_msg, max_tokens=600, lang='en',
+    )
+    elapsed_ms = int(datetime.now(timezone.utc).timestamp() * 1000) - t0_ms
+
+    if not result.get('ok'):
+        return jsonify({
+            'success': False,
+            'error': result.get('message') or 'AI unavailable',
+            'code': result.get('code'),
+        }), 503
+
+    answer = (result.get('text') or '').strip()
+
+    # Replay log so OB can audit what AI told donors
+    try:
+        call_id = log_replayable_ai_call(
+            endpoint='proximate_donor_ask',
+            inputs={
+                'donor_id': donor.id,
+                'question': question,
+                'rounds_count': len(ctx_rounds),
+            },
+            outputs={'answer': answer},
+            latency_ms=elapsed_ms,
+            org_id=donor.org_id,
+            user_id=donor.primary_user_id,
+        )
+    except Exception:
+        call_id = None
+        logger.exception('Failed to log proximate_donor_ask replay row')
+
+    AuditChainEntry.append(
+        action='proximate.donor.asked',
+        actor_email=current_user.email,
+        subject_kind='proximate_donor',
+        subject_id=donor.id,
+        details={
+            'question_len': len(question),
+            'answer_len': len(answer),
+            'rounds_scope': [r['id'] for r in ctx_rounds],
+            'call_id': call_id,
+        },
+    )
+
+    return jsonify({
+        'success': True,
+        'answer': answer,
+        'meta': {
+            'grounded': True,
+            'rounds_scope': [r['id'] for r in ctx_rounds],
+            'latency_ms': elapsed_ms,
+            'call_id': call_id,
+            'fallback_used': result.get('meta', {}).get('fallback_used', False),
+        },
+    })
+
+
 @proximate_bp.route('/donors/me/dashboard', methods=['GET'])
 @login_required
 def api_donor_dashboard():
