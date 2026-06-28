@@ -33,12 +33,23 @@ export function Header() {
   // platform compatibility. Override the role label so the avatar
   // menu shows the right persona ("Proximate donor", "Oversight body")
   // instead of "Ngo".
-  const { persona } = useProximatePersona();
+  const { persona, displayName } = useProximatePersona();
   const roleLabel = persona && persona !== 'none'
     ? (persona === 'ob' ? 'Oversight body'
         : persona === 'admin' ? 'Proximate operator'
         : 'Proximate donor')
     : (user?.role ?? 'user');
+  // Phase 697 v3 — prefer persona's display_name over user.name when
+  // persona is set. The reviewer reported seeing "Proximate Donor Demo"
+  // briefly in the header right after logging in as ob@proximate.org —
+  // that's the donor's name lingering from the previous session's
+  // localStorage-cached auth state. The persona endpoint resolves
+  // server-side from the live session cookie, so its display_name is
+  // always accurate for the current user. Fall back to user.name only
+  // when persona is unloaded (Kuja/NEAR tenants, or pre-fetch race).
+  const displayedName = (persona && persona !== 'none' && displayName)
+    ? displayName
+    : user.name;
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
@@ -70,7 +81,7 @@ export function Header() {
   if (!user) return null;
 
   const currentLang = supportedLanguages.find((l) => l.code === language) ?? supportedLanguages[0];
-  const initials = (user.name ?? user.email ?? 'U').split(' ').map((s) => s[0]).join('').slice(0, 2).toUpperCase();
+  const initials = (displayedName ?? user.email ?? 'U').split(' ').map((s) => s[0]).join('').slice(0, 2).toUpperCase();
 
   return (
     <header
@@ -232,7 +243,7 @@ export function Header() {
               {initials}
             </div>
             <div className="hidden sm:block text-left leading-tight">
-              <div className="text-sm font-medium text-foreground truncate max-w-[140px]">{user.name}</div>
+              <div className="text-sm font-medium text-foreground truncate max-w-[140px]">{displayedName}</div>
               <div className="text-[11px] text-muted-foreground capitalize">{roleLabel}</div>
             </div>
           </button>
@@ -242,7 +253,7 @@ export function Header() {
               className="absolute right-0 mt-1 w-52 rounded-lg border border-border bg-popover shadow-lg overflow-hidden z-50"
             >
               <div className="px-3 py-2.5 border-b border-border">
-                <div className="text-sm font-medium text-foreground truncate">{user.name}</div>
+                <div className="text-sm font-medium text-foreground truncate">{displayedName}</div>
                 <div className="text-[11px] text-muted-foreground truncate">{user.email}</div>
               </div>
               <a

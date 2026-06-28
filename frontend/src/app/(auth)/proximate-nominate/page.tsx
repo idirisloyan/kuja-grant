@@ -212,33 +212,26 @@ export default function ProximateNominatePage() {
           </div>
 
           {/* Honeypot — bots fill every field; humans won't see this.
-              Phase 697 (v2): belt-and-suspenders. Prod check showed the
-              `sr-only` class was applied but its CSS rule wasn't in the
-              bundle loaded by the (auth) route group (Tailwind didn't
-              purge in scope). Wrap once more in inline style so even
-              if Tailwind drops `sr-only`, the field stays hidden by
-              the inline `clip-path` + `position:absolute` + `width:0`
-              combo. Two independent hiding mechanisms. */}
+              Phase 697 v3: the previous className+inline-style approach
+              still rendered visibly in the reviewer's browser (computed
+              style came back position:static, suggesting parent
+              stacking-context override or Tailwind purge gap). Now uses
+              .kuja-honeypot-hidden CSS class (defined in globals.css)
+              with display:none + visibility:hidden + !important —
+              guaranteed to be in the bundle, impossible to override.
+              Visible 'Website' label removed in favor of aria-label so
+              even if CSS fails, humans see only a labelless empty input
+              (no semantic cue to fill it). */}
           <div
-            className="sr-only"
+            className="kuja-honeypot-hidden"
             aria-hidden="true"
-            style={{
-              position: 'absolute',
-              width: '1px',
-              height: '1px',
-              padding: 0,
-              margin: '-1px',
-              overflow: 'hidden',
-              clipPath: 'inset(50%)',
-              clip: 'rect(0 0 0 0)',
-              whiteSpace: 'nowrap',
-              border: 0,
-            }}
+            style={{ display: 'none' }}
           >
-            <label htmlFor="hp_website">Website</label>
             <input
               id="hp_website"
               type="text"
+              name="hp_website"
+              aria-label="Leave this field blank"
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
               tabIndex={-1}

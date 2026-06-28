@@ -378,3 +378,16 @@ button { word-break: keep-all; overflow-wrap: anywhere; }
 /* Roomy density: for hero cards, verdict surfaces, and the donor wizard
    review step where breathing room matters. */
 .kuja-density-roomy { padding: 1.75rem; gap: 1.25rem; }
+
+/* Phase 697 v3 — bot-detection honeypot. CSS-class hide that survives:
+   - missing Tailwind sr-only (route-purge gaps)
+   - inline-style overrides by parent stacking contexts (the reviewer saw
+     computed style coming back as position:static even with explicit
+     inline style="position:absolute")
+   `display:none` is enforced with !important so no parent selector can
+   override it. Naive form-walking bots that try to fill every <input>
+   regardless of CSS still trip the trap; humans never see the field. */
+.kuja-honeypot-hidden {
+  display: none !important;
+  visibility: hidden !important;
+}

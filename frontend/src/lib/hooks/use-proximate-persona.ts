@@ -37,9 +37,13 @@ export function useProximatePersona(): {
   const isProximate = network?.slug === 'proximate';
   const shouldFetch = isProximate && !!user;
 
+  // Phase 697 v3 — include user.id in the SWR key so the cache can't
+  // leak across sessions. Reviewer saw the previous donor's display
+  // name in the header right after logging in as OB; that's stale
+  // persona cache keyed on the URL alone.
   const { data, isLoading } = useSWR<PersonaResp>(
-    shouldFetch ? '/proximate/persona/me' : null,
-    (url: string) => api.get<PersonaResp>(url),
+    shouldFetch ? ['/proximate/persona/me', user?.id] : null,
+    ([url]) => api.get<PersonaResp>(url),
     { revalidateOnFocus: false, dedupingInterval: 5 * 60 * 1000 },
   );
 
