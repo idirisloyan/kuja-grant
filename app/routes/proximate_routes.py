@@ -3715,12 +3715,20 @@ def api_endorser_portal_lookup(token):
         # there's a hard conflict (shared family/village) we want them
         # to know up-front. Endorsement still records, but doesn't count.
         signals = Endorsement.compute_coi_signals(partner=p, endorser=endorser)
+        # Pull a short summary from the intake form JSON if present.
+        summary = ''
+        try:
+            import json as _json
+            form = _json.loads(p.intake_form_json) if p.intake_form_json else {}
+            summary = (form.get('description_ar') or form.get('description') or '')[:280]
+        except (ValueError, TypeError):
+            summary = ''
         pending.append({
             'partner_id': p.id,
             'partner_name': p.name,
             'partner_name_ar': p.name_ar,
             'locality': p.locality,
-            'intake_summary_ar': (p.intake_summary or '')[:280],
+            'intake_summary_ar': summary,
             'coi_signals': list(signals.keys()),  # empty = clean
         })
 
