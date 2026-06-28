@@ -211,10 +211,28 @@ export default function ProximateNominatePage() {
             />
           </div>
 
-          {/* Honeypot — bots fill every field; humans won't see this */}
-          <div style={{ position: 'absolute', left: '-9999px', opacity: 0 }} aria-hidden="true">
-            <label>Website (leave blank)</label>
+          {/* Honeypot — bots fill every field; humans won't see this.
+              Phase 692: use the bulletproof clip technique. The previous
+              `left:-9999px` approach reportedly surfaced as a visible
+              "Website (leave blank)" field on Arabic/RTL mobile widths,
+              where `left` semantics get re-mapped by some browsers. */}
+          <div
+            style={{
+              position: 'absolute',
+              width: '1px',
+              height: '1px',
+              padding: 0,
+              margin: '-1px',
+              overflow: 'hidden',
+              clip: 'rect(0, 0, 0, 0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
+            aria-hidden="true"
+          >
+            <label htmlFor="hp_website">Website</label>
             <input
+              id="hp_website"
               type="text"
               value={website}
               onChange={(e) => setWebsite(e.target.value)}

@@ -72,8 +72,13 @@ export function JourneyRail() {
   // layout shouldn't render there — defensive in case a route slips in.
   const onDashboard = pathname === '/dashboard' || pathname === '/dashboard/';
   const onAuthPath = pathname?.startsWith('/login') || pathname?.startsWith('/network/join');
+  // Phase 695: hide on any Proximate route. The Proximate tenant has
+  // its own personas (OB, donor, operator) that are seeded under
+  // User.role='ngo' for platform-level compatibility, so the role
+  // check alone leaks NGO chrome onto Proximate donor/OB pages.
+  const onProximatePath = pathname?.startsWith('/proximate');
 
-  const shouldFetch = isNgo && !dismissed && !onDashboard && !onAuthPath;
+  const shouldFetch = isNgo && !dismissed && !onDashboard && !onAuthPath && !onProximatePath;
 
   const { data } = useSWR<JourneyResp>(
     shouldFetch ? '/journey/me' : null,

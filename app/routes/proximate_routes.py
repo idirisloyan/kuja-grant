@@ -150,10 +150,25 @@ def api_list_partners():
     """List Proximate partners. Filters: status, ready_for_endorsement.
     Returns each partner with their trust-floor signals — that's what
     the endorser inbox renders (wireframe Screen 1).
+
+    Phase 693 scope gate: this surface returns partner PII (name,
+    contact, sanctions summary, status), which donors should not
+    see — they get aggregate counts via `/donors/me/dashboard` and
+    `/outcomes/rollup`. Restricted to OB + admin. Donors get 403
+    with a hint pointing at their proper endpoints.
     """
+    from app.utils.network import is_oversight_body_member
+
     net, err = _require_proximate_tenant()
     if err:
         return err
+
+    if not is_oversight_body_member(current_user):
+        return jsonify({
+            'success': False,
+            'error': 'forbidden — donors use /donors/me/dashboard for portfolio data',
+            'code': 'donor_scope',
+        }), 403
 
     q = ProximatePartner.query.filter_by(network_id=net.id)
     status = request.args.get('status')
@@ -3829,7 +3844,14 @@ def api_donor_ask():
         })
 
     # Compact context bundle. Keep small so we stay within prompt cache.
+    # Phase 694: also include the *computed* rollup metrics the donor
+    # dashboard surfaces — attestation_rate, verification_rate,
+    # sustained_impact_avg_pct — so the AI can answer questions about
+    # them with numbers instead of "I don't know." Reuses the same
+    # _outcome_rollup_stats helper the dashboard uses, so the AI's
+    # answer and the UI tile are always in lock-step.
     ctx_rounds = []
+    portfolio_outcomes = []
     for r in rounds:
         dis = ProximateDisbursement.query.filter_by(
             network_id=donor.network_id, round_id=r.id,
@@ -3837,6 +3859,7 @@ def api_donor_ask():
         outcomes = ProximateOutcomeAttestation.query.filter_by(
             network_id=donor.network_id, round_id=r.id,
         ).all()
+        portfolio_outcomes.extend(outcomes)
         status_counts = {}
         partners = set()
         disbursed = 0.0
@@ -3845,6 +3868,7 @@ def api_donor_ask():
             partners.add(d.partner_id)
             if d.status in ('pending_report', 'reported', 'verified', 'flagged'):
                 disbursed += float(d.amount_usd or 0)
+        round_outcome_stats = _outcome_rollup_stats(outcomes)
         ctx_rounds.append({
             'id': r.id,
             'title': r.title,
@@ -3854,11 +3878,18 @@ def api_donor_ask():
             'disbursed_usd': disbursed,
             'partners_served': len(partners),
             'status_counts': status_counts,
-            'outcome_total': len(outcomes),
-            'outcome_attested': sum(1 for o in outcomes if o.submitted_at),
-            'outcome_verified': sum(1 for o in outcomes if o.status == 'verified'),
+            'outcome_total': round_outcome_stats['total'],
+            'outcome_attested': round_outcome_stats['submitted'],
+            'outcome_verified': round_outcome_stats['verified'],
+            'outcome_disputed': round_outcome_stats['disputed'],
+            'attestation_rate_pct': round_outcome_stats['attestation_rate'],
+            'verification_rate_pct': round_outcome_stats['verification_rate'],
+            'sustained_impact_avg_pct': round_outcome_stats[
+                'sustained_impact_avg_pct'
+            ],
             'flagged_count': status_counts.get('flagged', 0),
         })
+    portfolio_stats = _outcome_rollup_stats(portfolio_outcomes)
 
     import json as _json
     system = (
@@ -3877,7 +3908,9 @@ def api_donor_ask():
     )
     user_msg = (
         f"Donor: {donor.display_name}\n\n"
-        f"Subscribed rounds data:\n{_json.dumps(ctx_rounds, indent=2)}\n\n"
+        f"Portfolio-wide outcome rollup (across all subscribed rounds):\n"
+        f"{_json.dumps(portfolio_stats, indent=2)}\n\n"
+        f"Per-round detail:\n{_json.dumps(ctx_rounds, indent=2)}\n\n"
         f"Question: {question}"
     )
 
