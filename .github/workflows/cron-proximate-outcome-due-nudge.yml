@@ -1,0 +1,81 @@
+name: Daily Proximate outcome-due nudge cron
+
+# Phase 678 — 90-day outcome attestation nudge. Scans every Proximate
+# outcome obligation still in `pending` past its due_at and emits one
+# proximate.outcome.overdue_nudge audit row per attestation per day
+# (the endpoint dedups by day_key in the audit chain). Sibling to
+# disbursement-nudge but on a different schedule slot to avoid clobbering
+# the same minute.
+#
+# Required repo secrets:
+#   CRON_SECRET — must match the CRON_SECRET set on Railway
+#   PROD_BASE   — optional override of the base URL
+
+on:
+  # Daily at 04:15 UTC — 15 minutes after the disbursement-nudge so the
+  # two crons don't collide on the same Railway worker boot. Lands in
+  # the OB feed before EAT Monday-Friday standup.
+  schedule:
+    - cron: "15 4 * * *"
+
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Determine base URL
+        id: base
+        run: |
+          if [ -n "${{ secrets.PROD_BASE }}" ]; then
+            echo "url=${{ secrets.PROD_BASE }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://web-production-6f8a.up.railway.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: POST /api/proximate/monitoring/outcome-due-nudge
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET repo secret is missing — add it under Settings → Secrets and variables → Actions, matching the Railway env var."
+            exit 1
+          fi
+          http_code=$(curl -s -o /tmp/body.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            "${BASE_URL}/api/proximate/monitoring/outcome-due-nudge")
+          echo "HTTP ${http_code}"
+          cat /tmp/body.json || true
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Proximate outcome-due-nudge cron returned ${http_code}"
+            exit 1
+          fi
+
+      - name: Summarise run output
+        if: always()
+        run: |
+          if [ -f /tmp/body.json ]; then
+            python3 - <<'PY'
+          import json, os
+          with open('/tmp/body.json') as f:
+              try:
+                  d = json.load(f)
+              except Exception:
+                  print('Cron returned non-JSON body')
+                  raise SystemExit(0)
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if not summary:
+              print(json.dumps(d, indent=2))
+              raise SystemExit(0)
+          with open(summary, 'a') as out:
+              out.write('# Proximate outcome-due-nudge cron\n\n')
+              out.write(f'- **Day**: {d.get("day")}\n')
+              out.write(f'- **Attestations nudged**: {d.get("nudged")}\n')
+          PY
+          fi

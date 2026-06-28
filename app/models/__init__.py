@@ -90,6 +90,10 @@ from app.models.proximate_disbursement import (
     ProximateDisbursement,
     DISBURSEMENT_STATUSES, DEFAULT_REPORT_WINDOW_DAYS,
 )
+from app.models.proximate_outcome import (
+    ProximateOutcomeAttestation,
+    OUTCOME_STATUSES, DEFAULT_OUTCOME_WINDOW_DAYS,
+)
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',

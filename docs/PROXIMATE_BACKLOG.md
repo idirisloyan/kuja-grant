@@ -1,0 +1,253 @@
+# Proximate Fund — Living Backlog
+
+> Single source of truth for what's outstanding on the **Proximate Fund**
+> tenant of the Kuja Grant Management platform. Maintained alongside the
+> code: every commit that *defers*, *picks up*, or *completes* an item
+> here must update this file in the same commit.
+>
+> Why a separate file from `NEAR_BACKLOG.md`: Proximate is a distinct
+> tenant with its own SoP (Sudan-conflict-aware, Arabic-first, relational-
+> validation) and the team needs to scan its backlog without wading
+> through NEAR items.
+>
+> See also: [docs/PROXIMATE_FUND_DESIGN.md](PROXIMATE_FUND_DESIGN.md),
+> `seed_proximate.py`, `memory/proximate_prod_state_2026-06-27.md`.
+
+Updated 2026-06-27.
+
+---
+
+## In flight — current session
+Phase 678–688 — donor portal + outcomes loop. Driven autonomously this
+session; entries move to "Completed" below as each ships.
+
+- [ ] **Phase 678** — Outcome obligation model + 90-day cron
+- [ ] **Phase 679** — Partner outcome attestation form (`/proximate-outcome?t=<token>`)
+- [ ] **Phase 680** — OB-side outcome verdict surface on disbursement detail
+- [ ] **Phase 681** — `ProximateDonor` model + admin-registered donor membership
+- [ ] **Phase 682** — Donor portal dashboard (`/proximate/donor`)
+- [ ] **Phase 683** — Donor AI Q&A ("ask about my grant")
+- [ ] **Phase 684** — Outcome AI rollup + counterfactual clustering
+- [ ] **Phase 685** — Quarterly counterfactual prompt cron
+- [ ] **Phase 686** — Donor co-funding (multi-donor round; restricted earmarks)
+- [ ] **Phase 687** — Donor impact retrospective auto-email (blocks on SMTP)
+- [ ] **Phase 688** — i18n + smoke + build + deploy + verify
+
+---
+
+## High priority (next sprint candidates)
+
+### Partner mini-portal (long-lived token)
+- **Why:** partners today are write-only via the per-disbursement token.
+  Once a partner has 3+ disbursements they want to see their own story,
+  pending obligations, Adeso ack messages, and historical outcome data.
+- **Action:** issue a partner-level long-lived token at clearance, mount
+  `/proximate-partner?t=<token>` listing all disbursements + outcome
+  attestations + acknowledgements + next obligations.
+
+### SMS fallback for partners without WhatsApp
+- **Why:** ~30% of Sudan rural users don't have WhatsApp. Today the only
+  share path is the WhatsApp deep-link from Phase 669. Those partners
+  can't receive the token URL.
+- **Action:** add Twilio (or Africa's Talking) integration scoped to the
+  Proximate network. Same token URL via SMS body. Cost is per-message
+  so admin-only trigger, not auto-fire.
+
+### Voice-only end-to-end flow for low-literacy partners
+- **Why:** Phase 669 wires Whisper for inbound voice notes, but the form
+  still requires literacy to read the 5 questions.
+- **Action:** TTS the questions in Arabic (Sudanese dialect prioritised),
+  serve as `<audio>` elements, capture answer-by-answer voice, transcribe
+  each. Zero text required for partners.
+
+### Quarterly Fiduciary Board pack
+- **Why:** design doc §3.6 explicitly mentions this. Board reviews the
+  fund's posture quarterly; today they get nothing structured.
+- **Action:** auto-assemble a quarterly PDF: FSP performance + endorser
+  concentration risk + sanctions drift + tranche-vs-actual variance +
+  independence-rule violations. Reuses Phase 671 reportlab path.
+
+### Sanctions re-screening cron
+- **Why:** Phase 658 screens at self-nominate. The Sudan sanctions
+  landscape shifts; cleared partners can become flagged after weeks.
+- **Action:** weekly cron re-runs `ComplianceService.screen_organization`
+  on every cleared partner; flips `sanctions_flag` if new hits; emits
+  audit + nudges the OB.
+
+### Verifier-attest UI surface
+- **Why:** Phase 673 ships the endpoints but the assigned verifier has
+  no page to land on. They get a user_id and an email in the OB's hand.
+- **Action:** issue a verifier-scoped token URL at assign time; new
+  `/proximate-verify?t=<token>` page lets them attest (confirmed |
+  disputed + notes) without needing a Kuja login.
+
+---
+
+## Medium priority
+
+### Capital ring-fencing engine (enforce, not just classify)
+- **Why:** Phase 636 added the small/medium/large classification, but
+  the engine doesn't *enforce* tier limits. A small-tier partner can
+  receive a $50k disbursement today without explicit tier upgrade.
+- **Action:** hard-cap by capital_class at the disbursement create
+  endpoint; require explicit tier-upgrade workflow with OB sign-off
+  before raising the cap.
+
+### Partner-tier graduation workflow
+- **Why:** Tier 1 (relational) → Tier 2 (lite DD) → Tier 3 (full DD)
+  is in the design doc but not codified. Partners stay at their initial
+  tier indefinitely.
+- **Action:** explicit triggers (e.g. 3+ verified disbursements + 0
+  flags → eligible for Tier 2 upgrade). OB action with Board sign-off.
+
+### FSP performance scoring + auto-flag
+- **Why:** Phase 668 marks failed routes but there's no aggregate FSP
+  scoring. The OB has no signal "FSP X is trending bad."
+- **Action:** per-FSP rolling success rate + median latency + recent
+  failure modes. Auto-flag FSPs that drop below threshold.
+
+### Plan-B FSP auto-suggest (not just CTA)
+- **Why:** Phase 668 surfaces a "View alternate routes" link but
+  doesn't pick. The OB has to evaluate manually.
+- **Action:** rank alternates by FSP score (above) excluding the failed
+  route. Suggest the top one inline with one-click "use this route."
+
+### Tranche scheduler progress UI + auto-linking
+- **Why:** Phase 670 is annotation only. Disbursements aren't linked to
+  tranches; no "tranche 2 is 65% released" visualisation.
+- **Action:** disbursement create UI lets the OB pick which tranche it
+  pays into. Round detail surfaces planned vs released per tranche.
+
+### Whisper failure surfacing
+- **Why:** Phase 669 fails silently. OB has no signal whether a missing
+  transcript means "audio was bad" or "service was down."
+- **Action:** track `report_voice_transcript_status` ∈ {pending, ok,
+  failed_too_short, failed_api, failed_no_key}. Surface on OB UI.
+
+### Outcome attestation backfill from existing disbursements
+- **Why:** Phase 678 only creates obligations for *new* disbursements.
+  Existing verified/flagged ones never get an outcome ask.
+- **Action:** one-off migration to create outcome obligation rows for
+  every closed disbursement older than 90 days, due_at=now+7d.
+
+---
+
+## Low priority / nice-to-have
+
+### AI compliance coach for partners
+- AI gently asks SoP-required follow-ups before partner submits their 5Q.
+  E.g. "you said no issues — did the funds reach the planned
+  beneficiaries within 7 days?"
+
+### Anonymous peer review
+- Every partner sees 3 anonymised peer reports per quarter; rates "would
+  I recommend a similar disbursement?" Builds peer signal for the
+  Allocation Committee.
+
+### Real-time risk scoring per disbursement
+- Score updates as audit chain grows. OB sees "high risk" disbursements
+  flagged before opening them.
+
+### Donor matchmaker AI
+- AI matches logged crisis signals to donor patterns. "Donor X funded 3
+  similar situations in 2025; suggest pitching this round."
+
+### Endorser concentration risk dashboard
+- Surface endorsers who vouched for >N% of partners in a single district.
+  Possible collusion signal.
+
+### Multi-tenant audit-chain visualiser (`/proximate/audit-chain`)
+- Walk the chain, show hash links, let auditor verify integrity in-browser
+  without downloading the JSON dump.
+
+---
+
+## Cross-tenant lifts (Proximate primitives → Kuja platform)
+
+These items would benefit Kuja Marketplace + NEAR, not just Proximate.
+Treat as future Kuja-level work, not Proximate work.
+
+### Auto sanctions screening as a Network primitive
+- Phase 658 wires it only to `/proximate/partners/self-nominate`. Every
+  tenant's intake should get it.
+
+### WhatsApp share for any token URL
+- Phase 669 button is Proximate-only. Generalise to any token-credentialed
+  URL (Kuja decision emails, NEAR membership invites, etc.).
+
+### Server-side voice transcription for any application/report
+- Phase 669 wires Whisper to Proximate voice attachments. Generalise
+  to Kuja application voice + report voice paths.
+
+### Audit-chain hash anchors in JSON downloads
+- Phase 659 includes the audit anchor in the round report. Extend to
+  every Kuja JSON export so "this report wasn't tampered with after
+  Adeso published it" becomes a generic guarantee.
+
+### Multi-tier cosign ladder as Network setting
+- Phase 668 ladder is hard-coded for Proximate. Generalise to a
+  per-Network `cosign_ladder_json` so NEAR can use it for emergency
+  declaration ladder, etc.
+
+---
+
+## Explicitly deferred (with reason + date)
+
+### Self-service donor signup → admin-registered only (deferred 2026-06-27)
+- **Why:** needs a vetting/KYC story Adeso should design before code
+  lands. v0 ships with admin-only `POST /api/proximate/donors`.
+
+### Donor-direct partner messaging → kept through OB (deferred 2026-06-27)
+- **Why:** invites scope creep into governance; OB should remain the
+  intermediary. Donors get ack visibility via the portal, but message
+  composition stays OB's.
+
+### Real-time WebSocket dashboards → polling at 30s (deferred 2026-06-27)
+- **Why:** polling is fine for v0. WebSocket adds infra cost +
+  complexity for marginal UX win at current scale (<50 partners).
+
+### Mobile-native donor app → web only (deferred 2026-06-27)
+- **Why:** web works on phones. Native app is premature optimisation
+  at v0 donor scale.
+
+### News/signal feed ingestor for Crisis Selector (deferred 2026-06-27)
+- **Why:** genuinely multi-week external integration work; needs the
+  team's input on which feeds (OCHA, ReliefWeb, ACLED, etc.). Phase
+  674 ships manual signal entry as the v0 stand-in.
+
+### Full per-tenant audit chain refactor (deferred 2026-06-27)
+- **Why:** touches ~100 emitter call sites. Phase 672 ships v0 column
+  + opt-in `network_id`. Full migration warrants a dedicated session
+  with explicit chain re-verification.
+
+### fr/sw/so/es real translations (deferred 2026-06-27)
+- **Why:** translator work, not engineering. Phase 675 ships English
+  placeholders for parity gate. Team prioritised EN+AR for first cut.
+
+### Third-party verifier — separate model (deferred 2026-06-27)
+- **Why:** Phase 673 v0 reuses the Endorser pool for the verifier pool.
+  Real verifiers are conceptually different (third party, may not be
+  community insiders). Promotion to a separate `ProximateVerifier`
+  model can wait until v0 surfaces real friction.
+
+---
+
+## Operational TODOs (team owes the system)
+
+- [ ] DNS for `proximate.kuja.org` so the team doesn't need
+      `X-Network-Override: proximate` header for testing
+- [ ] SMTP env var on Railway (`SENDGRID_API_KEY` or `SMTP_HOST/*`)
+      — without this, no Proximate emails fire. Blocks Phase 687.
+- [ ] `CRON_SECRET` GitHub repo secret — without this the
+      disbursement-nudge cron + outcome-due-nudge cron (Phase 678)
+      both 403
+
+---
+
+## Completed (rolling log, newest first)
+
+See `docs/NEAR_BACKLOG.md` "Completed" section for Phase 627–677
+completions — those were logged there during the Proximate work in
+2026-06-26 and 2026-06-27 before this dedicated backlog file existed.
+
+Going forward, Proximate-only completions land here.

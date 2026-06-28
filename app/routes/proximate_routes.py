@@ -2925,7 +2925,54 @@ def api_verify_disbursement_report(disbursement_id):
         subject_id=d.id,
         details={'note': note, 'flagged_reason': flagged_reason},
     )
-    return jsonify({'success': True, 'disbursement': d.to_dict()})
+
+    # Phase 678 — spawn the 90-day outcome attestation obligation. The
+    # partner gets a long-form token URL they can return to at the
+    # 3-month mark to record whether the money actually helped.
+    outcome = _spawn_outcome_obligation(d, net)
+    return jsonify({
+        'success': True,
+        'disbursement': d.to_dict(),
+        'outcome_obligation': outcome.to_dict() if outcome else None,
+    })
+
+
+def _spawn_outcome_obligation(d, net):
+    """Phase 678 helper — idempotently create the 90-day outcome
+    attestation row for a disbursement that just closed."""
+    from app.models import ProximateOutcomeAttestation
+    existing = ProximateOutcomeAttestation.query.filter_by(
+        disbursement_id=d.id,
+    ).first()
+    if existing:
+        return existing
+    base_at = d.sent_at or datetime.now(timezone.utc)
+    if base_at.tzinfo is None:
+        base_at = base_at.replace(tzinfo=timezone.utc)
+    due_at = base_at + timedelta(days=90)
+    row = ProximateOutcomeAttestation(
+        network_id=net.id,
+        disbursement_id=d.id,
+        partner_id=d.partner_id,
+        round_id=d.round_id,
+        due_at=due_at,
+        report_token=ProximateOutcomeAttestation.make_report_token(),
+        status='pending',
+    )
+    db.session.add(row)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.outcome.spawned',
+        actor_email='system',
+        subject_kind='proximate_outcome_attestation',
+        subject_id=row.id,
+        details={
+            'disbursement_id': d.id,
+            'partner_id': d.partner_id,
+            'due_at': due_at.isoformat(),
+        },
+    )
+    return row
 
 
 @proximate_bp.route('/partners/<int:partner_id>/alternate-routes', methods=['GET'])
@@ -3041,6 +3088,65 @@ def api_cron_disbursement_nudge():
         )
         nudged += 1
     logger.info(f"Proximate cron: nudged {nudged} overdue disbursements for {day_key}")
+    return jsonify({'success': True, 'nudged': nudged, 'day': day_key})
+
+
+@proximate_bp.route('/monitoring/outcome-due-nudge', methods=['POST'])
+def api_cron_outcome_due_nudge():
+    """Phase 678 — 90-day outcome attestation nudge. Scans pending
+    outcome obligations that have crossed their due_at and emits one
+    nudge audit row per day per obligation. The partner still has
+    a long-lived token URL, but the OB sees overdue rows in the
+    operator dashboard.
+    """
+    from app.models import ProximateOutcomeAttestation
+    from flask import current_app as cap
+    secret = cap.config.get('CRON_SECRET') or os.getenv('CRON_SECRET')
+    auth = request.headers.get('Authorization', '')
+    if not secret or auth != f'Bearer {secret}':
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    now = datetime.now(timezone.utc)
+    day_key = now.strftime('%Y-%m-%d')
+
+    overdue = ProximateOutcomeAttestation.query.filter(
+        ProximateOutcomeAttestation.status == 'pending',
+        ProximateOutcomeAttestation.due_at < now,
+    ).all()
+    nudged = 0
+    for o in overdue:
+        recent = AuditChainEntry.query.filter_by(
+            subject_kind='proximate_outcome_attestation',
+            subject_id=o.id,
+            action='proximate.outcome.overdue_nudge',
+        ).order_by(AuditChainEntry.seq.desc()).limit(3).all()
+        already_today = any(
+            day_key in (r.details_json or '') for r in recent
+        )
+        if already_today:
+            continue
+        due = (
+            o.due_at.replace(tzinfo=timezone.utc)
+            if o.due_at.tzinfo is None else o.due_at
+        )
+        days_overdue = (now - due).days
+        AuditChainEntry.append(
+            action='proximate.outcome.overdue_nudge',
+            actor_email='cron-monitoring',
+            subject_kind='proximate_outcome_attestation',
+            subject_id=o.id,
+            details={
+                'day': day_key,
+                'days_overdue': days_overdue,
+                'disbursement_id': o.disbursement_id,
+                'partner_id': o.partner_id,
+            },
+        )
+        nudged += 1
+    logger.info(
+        f"Proximate cron: nudged {nudged} overdue outcome attestations "
+        f"for {day_key}"
+    )
     return jsonify({'success': True, 'nudged': nudged, 'day': day_key})
 
 
