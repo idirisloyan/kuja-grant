@@ -49,17 +49,21 @@ interface Round {
   target_country: string;
   target_region: string | null;
   status: string;
-  drafted_by_user_id: number;
+  // Phase 703 — Donor-safe API shape (Phase 702) omits operator-only
+  // fields. Treat as optional so /proximate/rounds/<id> can render for
+  // donors. The page also persona-gates the operator-only sections so
+  // these are never read for donors anyway.
+  drafted_by_user_id?: number;
   drafted_at: string | null;
   submitted_at: string | null;
   activated_at: string | null;
   closed_at: string | null;
-  cancellation_reason: string | null;
-  closing_summary: string | null;
+  cancellation_reason?: string | null;
+  closing_summary?: string | null;
   signed_count: number;
   signers_required: number;
-  ready_for_activation: boolean;
-  signatures: Signature[];
+  ready_for_activation?: boolean;
+  signatures?: Signature[];
 }
 
 interface AuditRow {
@@ -86,8 +90,12 @@ interface RoundDisbursement {
 interface Resp {
   success: boolean;
   round: Round;
-  audit_in_window: AuditRow[];
+  // Phase 703 — Donor-safe API shape (Phase 702) omits operator-only
+  // fields. audit_in_window and disbursements are present only for OB.
+  // Donors get disbursements_count instead of the full list.
+  audit_in_window?: AuditRow[];
   disbursements?: RoundDisbursement[];
+  disbursements_count?: number;
   envelope_used?: number;
   envelope_remaining?: number | null;
 }
@@ -180,7 +188,13 @@ export function ProximateRoundDetailClient() {
     );
   }
 
-  const userAlreadySigned = round.signatures.some(
+  // Phase 703 — defensive defaults for the donor-safe shape. The
+  // Phase 702 backend strips signatures + audit_in_window + disbursements
+  // for non-OB callers; .some() on undefined crashed the donor page.
+  const signatures = round.signatures ?? [];
+  const auditWindow = data?.audit_in_window ?? [];
+  const disbursementsList = data?.disbursements ?? [];
+  const userAlreadySigned = signatures.some(
     (s) => s.user_id === user?.id && s.status !== 'pending',
   );
 
@@ -466,18 +480,19 @@ export function ProximateRoundDetailClient() {
             </Card>
           )}
 
-          {/* Signatures */}
+          {/* Signatures — operator-only; donors don't see committee names */}
+          {isOperator && (
           <Card className="p-4">
             <p className="text-sm font-medium mb-3">
-              {t('proximate.rounds.signatures')} ({round.signatures.length})
+              {t('proximate.rounds.signatures')} ({signatures.length})
             </p>
-            {round.signatures.length === 0 ? (
+            {signatures.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 {t('proximate.rounds.no_signatures')}
               </p>
             ) : (
               <ul className="space-y-1.5 text-xs">
-                {round.signatures.map((s) => (
+                {signatures.map((s) => (
                   <li key={s.id} className="flex items-center gap-2">
                     <span className="text-muted-foreground">{t('proximate.rounds.signer')} #{s.user_id}</span>
                     <Badge variant="outline" className="text-[10px]">{s.status}</Badge>
@@ -492,6 +507,7 @@ export function ProximateRoundDetailClient() {
               </ul>
             )}
           </Card>
+          )}
 
           {/* Cancellation / closing summary */}
           {round.cancellation_reason && (
@@ -594,9 +610,17 @@ export function ProximateRoundDetailClient() {
             );
           })()}
 
-          {/* Phase 656 — Disbursements rollup */}
+          {/* Phase 656 — Disbursements rollup.
+              Phase 703 — donor-safe variant. Donors see envelope rollup +
+              count only (no per-row partner detail or "Disburse more"
+              CTA). The donor-safe API returns `disbursements_count`
+              instead of `disbursements`. */}
           {(() => {
-            const disb = data?.disbursements || [];
+            const disb = disbursementsList;
+            const donorCount =
+              typeof data?.disbursements_count === 'number'
+                ? data.disbursements_count
+                : disb.length;
             const used = data?.envelope_used || 0;
             const total = round.envelope_usd || 0;
             const remaining = data?.envelope_remaining ?? (total ? total - used : null);
@@ -606,7 +630,7 @@ export function ProximateRoundDetailClient() {
                 <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                   <p className="text-sm font-medium flex items-center gap-2">
                     <Banknote className="w-4 h-4 text-muted-foreground" />
-                    {t('proximate.rounds.disbursements_in_round')} ({disb.length})
+                    {t('proximate.rounds.disbursements_in_round')} ({donorCount})
                   </p>
                   <div className="flex items-center gap-3">
                     <Link
@@ -615,12 +639,14 @@ export function ProximateRoundDetailClient() {
                     >
                       {t('proximate.rounds.download_report')}
                     </Link>
-                    <Link
-                      href={`/proximate/disbursements/new?round=${round.id}`}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      {t('proximate.rounds.disburse_more')}
-                    </Link>
+                    {isOperator && (
+                      <Link
+                        href={`/proximate/disbursements/new?round=${round.id}`}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        {t('proximate.rounds.disburse_more')}
+                      </Link>
+                    )}
                   </div>
                 </div>
                 {total > 0 && (
@@ -643,56 +669,62 @@ export function ProximateRoundDetailClient() {
                     </div>
                   </div>
                 )}
-                {disb.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    {t('proximate.rounds.no_disbursements_yet')}
-                  </p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {disb.map((d) => (
-                      <li key={d.id}>
-                        <Link
-                          href={`/proximate/disbursements/${d.id}`}
-                          className="flex items-center gap-2 text-xs hover:bg-muted/30 rounded px-2 py-1.5 -mx-2"
-                        >
-                          <span className="font-medium flex-1 truncate">
-                            {d.partner_name || `Partner #${d.partner_id}`}
-                          </span>
-                          {d.amount_usd && (
-                            <span className="text-muted-foreground tabular-nums">
-                              ${d.amount_usd.toLocaleString()}
+                {isOperator && (
+                  disb.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t('proximate.rounds.no_disbursements_yet')}
+                    </p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {disb.map((d) => (
+                        <li key={d.id}>
+                          <Link
+                            href={`/proximate/disbursements/${d.id}`}
+                            className="flex items-center gap-2 text-xs hover:bg-muted/30 rounded px-2 py-1.5 -mx-2"
+                          >
+                            <span className="font-medium flex-1 truncate">
+                              {d.partner_name || `Partner #${d.partner_id}`}
                             </span>
-                          )}
-                          <Badge variant="outline" className={`text-[10px] ${
-                            d.status === 'verified' ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                            : d.status === 'flagged' ? 'bg-red-100 text-red-800 border-red-300'
-                            : d.status === 'reported' ? 'bg-blue-100 text-blue-800 border-blue-300'
-                            : d.overdue ? 'bg-red-100 text-red-800 border-red-300'
-                            : 'bg-amber-100 text-amber-800 border-amber-300'
-                          }`}>
-                            {d.status}{d.overdue ? ' · late' : ''}
-                          </Badge>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                            {d.amount_usd && (
+                              <span className="text-muted-foreground tabular-nums">
+                                ${d.amount_usd.toLocaleString()}
+                              </span>
+                            )}
+                            <Badge variant="outline" className={`text-[10px] ${
+                              d.status === 'verified' ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : d.status === 'flagged' ? 'bg-red-100 text-red-800 border-red-300'
+                              : d.status === 'reported' ? 'bg-blue-100 text-blue-800 border-blue-300'
+                              : d.overdue ? 'bg-red-100 text-red-800 border-red-300'
+                              : 'bg-amber-100 text-amber-800 border-amber-300'
+                            }`}>
+                              {d.status}{d.overdue ? ' · late' : ''}
+                            </Badge>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )
                 )}
               </Card>
             );
           })()}
 
-          {/* Audit window */}
+          {/* Audit window — operator-only.
+              Phase 703 — donor-safe API doesn't return audit_in_window.
+              Donors get the audit_anchor_seq on the round PDF for
+              tamper-evident verification instead. */}
+          {isOperator && (
           <Card className="p-4">
             <p className="text-sm font-medium mb-3">
-              {t('proximate.rounds.activity')} ({data?.audit_in_window?.length || 0})
+              {t('proximate.rounds.activity')} ({auditWindow.length})
             </p>
-            {(!data?.audit_in_window || data.audit_in_window.length === 0) ? (
+            {auditWindow.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 {t('proximate.rounds.no_activity')}
               </p>
             ) : (
               <ul className="space-y-1 text-xs">
-                {data.audit_in_window.slice(0, 30).map((a) => (
+                {auditWindow.slice(0, 30).map((a) => (
                   <li key={a.seq} className="flex items-center gap-2">
                     <span className="text-muted-foreground tabular-nums">#{a.seq}</span>
                     <span className="font-mono">{a.action}</span>
@@ -705,6 +737,7 @@ export function ProximateRoundDetailClient() {
               </ul>
             )}
           </Card>
+          )}
         </div>
       </PageMain>
     </PageShell>
