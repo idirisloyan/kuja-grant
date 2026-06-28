@@ -241,6 +241,10 @@ def run():
             e.country = 'SD'
             e.reputation_score = f['reputation_score']
             e.status = 'approved'
+            # Phase 700 — mint no-login portal token for seeded endorsers.
+            if not e.public_token:
+                import secrets
+                e.public_token = secrets.token_urlsafe(32)
             if not e.approved_at:
                 e.approved_at = datetime.now(timezone.utc)
             endorser_by_email[f['email']] = e

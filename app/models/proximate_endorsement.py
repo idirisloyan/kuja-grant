@@ -344,6 +344,14 @@ class Endorser(db.Model):
         db.String(40), nullable=False, default="pending", index=True,
     )
 
+    # Phase 700 — public access token for the no-shell endorser page
+    # at /proximate-endorse?t=<token>. Issued at approval; token IS the
+    # credential. Mirrors the pattern shipped in Phase 689 for partner
+    # mini-portal. Reviewer feedback was that endorsement still felt
+    # like an "authenticated platform page"; this lets the endorser
+    # do the whole thing from a WhatsApp link without ever logging in.
+    public_token = db.Column(db.String(64), nullable=True, unique=True, index=True)
+
     registered_at = db.Column(
         db.DateTime, nullable=False,
         default=lambda: datetime.now(timezone.utc),

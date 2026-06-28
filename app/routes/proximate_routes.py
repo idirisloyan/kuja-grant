@@ -1056,6 +1056,12 @@ def api_approve_endorser(endorser_id):
         }), 409
     e.status = 'approved'
     e.approved_at = datetime.now(timezone.utc)
+    # Phase 700 — mint the no-login portal token at approval. The OB
+    # shares this URL via WhatsApp; endorser uses the page without
+    # ever creating a password / signing in.
+    if not e.public_token:
+        import secrets
+        e.public_token = secrets.token_urlsafe(32)
     db.session.commit()
     AuditChainEntry.append(
         action='proximate.endorser.approved',
@@ -1064,7 +1070,12 @@ def api_approve_endorser(endorser_id):
         subject_id=e.id,
         details={'user_id': e.user_id, 'locality': e.locality},
     )
-    return jsonify({'success': True, 'endorser': e.to_dict(include_coi=True)})
+    base = request.host_url.rstrip('/')
+    return jsonify({
+        'success': True,
+        'endorser': e.to_dict(include_coi=True),
+        'portal_url': f'{base}/proximate-endorse?t={e.public_token}',
+    })
 
 
 @proximate_bp.route('/admin/endorsers/<int:endorser_id>/reject', methods=['POST'])
@@ -3630,6 +3641,307 @@ def api_issue_partner_mini_portal_link(partner_id):
         'success': True,
         'token': token,
         'url': f'{base}/proximate-partner?t={token}',
+    })
+
+
+# =====================================================================
+# Phase 700 — Public token endorsement portal (no-login flow)
+# =====================================================================
+# Reviewer feedback after the 9.5/10 retest: the endorser experience
+# still felt like an authenticated platform page. This adds the sixth
+# token-credentialed surface so endorsers can do the entire flow from
+# a WhatsApp link — same pattern as the partner mini-portal (Phase 689).
+#
+# Token is minted at endorser approval (or on first-share by OB). The
+# URL goes out via WhatsApp; the static-export page at
+# /proximate-endorse?t=<token> shows the endorser's pending invitations
+# and lets them submit the 3 Y/N answers + voice notes without logging
+# in. Server-side authentication is the token alone — same security
+# posture as the existing 5 token surfaces.
+
+
+def _ensure_endorser_public_token(endorser) -> str:
+    """Mint or return the endorser's no-login portal token. Idempotent."""
+    if not endorser.public_token:
+        import secrets
+        endorser.public_token = secrets.token_urlsafe(32)
+        db.session.commit()
+    return endorser.public_token
+
+
+@proximate_bp.route('/endorser-portal/<token>', methods=['GET'])
+def api_endorser_portal_lookup(token):
+    """Public lookup. Token IS the credential.
+
+    Returns the endorser's identity + the partners they can endorse
+    right now (those in nominated / endorsements_open / dd_pending
+    states that this endorser hasn't already endorsed and where the COI
+    auto-check would pass server-side).
+    """
+    endorser = Endorser.query.filter_by(public_token=token).first()
+    if not endorser:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+
+    if endorser.status != 'approved':
+        return jsonify({
+            'success': False,
+            'error': f'endorser status is {endorser.status!r}; must be approved',
+        }), 403
+
+    # Find partners awaiting endorsement in this network. Pre-filter by
+    # status so the inbox shows only actionable items.
+    actionable_statuses = ('nominated', 'endorsements_open', 'dd_pending')
+    existing = {
+        e.partner_id for e in Endorsement.query.filter_by(
+            endorser_id=endorser.id,
+        ).all()
+    }
+    candidates = (
+        ProximatePartner.query
+        .filter(
+            ProximatePartner.network_id == endorser.network_id,
+            ProximatePartner.status.in_(actionable_statuses),
+        )
+        .order_by(ProximatePartner.nominated_at.desc().nullslast())
+        .limit(50)
+        .all()
+    )
+
+    pending = []
+    for p in candidates:
+        if p.id in existing:
+            continue
+        # Surface COI signals to the endorser before they answer; if
+        # there's a hard conflict (shared family/village) we want them
+        # to know up-front. Endorsement still records, but doesn't count.
+        signals = Endorsement.compute_coi_signals(partner=p, endorser=endorser)
+        pending.append({
+            'partner_id': p.id,
+            'partner_name': p.name,
+            'partner_name_ar': p.name_ar,
+            'locality': p.locality,
+            'intake_summary_ar': (p.intake_summary or '')[:280],
+            'coi_signals': list(signals.keys()),  # empty = clean
+        })
+
+    return jsonify({
+        'success': True,
+        'endorser': {
+            'id': endorser.id,
+            'reputation_score': endorser.reputation_score,
+            'endorsements_count': endorser.endorsements_count,
+            'locality': endorser.locality,
+        },
+        'pending_endorsements': pending,
+    })
+
+
+@proximate_bp.route(
+    '/endorser-portal/<token>/partners/<int:partner_id>/endorse',
+    methods=['POST'],
+)
+def api_endorser_portal_submit(token, partner_id):
+    """Public submit. Token authenticates the endorser; no login.
+
+    Same business logic as api_submit_endorsement: COI auto-check,
+    audit-chain entry, partner-status transition, reputation bump on
+    dd_clear. Surfaced via the no-shell /proximate-endorse?t=<token>
+    page so partners experience this as a 3-question form, not a
+    platform login.
+    """
+    endorser = Endorser.query.filter_by(public_token=token).first()
+    if not endorser:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    if endorser.status != 'approved':
+        return jsonify({
+            'success': False, 'error': 'endorser not approved',
+        }), 403
+
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=endorser.network_id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'partner not found'}), 404
+
+    if Endorsement.query.filter_by(
+        partner_id=partner.id, endorser_id=endorser.id,
+    ).first():
+        return jsonify({
+            'success': False,
+            'error': 'already endorsed',
+        }), 409
+
+    payload = request.get_json(silent=True) or {}
+    for q in ('q1_real', 'q2_trust', 'q3_accept_aid'):
+        if q not in payload:
+            return jsonify({
+                'success': False, 'error': f'missing answer: {q}',
+            }), 400
+        if not isinstance(payload[q], bool):
+            return jsonify({
+                'success': False, 'error': f'{q} must be boolean',
+            }), 400
+
+    signals = Endorsement.compute_coi_signals(partner=partner, endorser=endorser)
+    endorsement = Endorsement(
+        partner_id=partner.id,
+        endorser_id=endorser.id,
+        q1_real=payload['q1_real'],
+        q2_trust=payload['q2_trust'],
+        q3_accept_aid=payload['q3_accept_aid'],
+        q1_transcript=(payload.get('q1_transcript') or '').strip()[:5000] or None,
+        q2_transcript=(payload.get('q2_transcript') or '').strip()[:5000] or None,
+        q3_transcript=(payload.get('q3_transcript') or '').strip()[:5000] or None,
+        coi_check_passed=(not signals),
+        location_lat=payload.get('location_lat'),
+        location_lng=payload.get('location_lng'),
+    )
+    endorsement.set_coi_signals(signals)
+    db.session.add(endorsement)
+    endorser.endorsements_count = (endorser.endorsements_count or 0) + 1
+    db.session.flush()
+
+    floor = partner.trust_floor_signals()
+    state_change = None
+    if floor['ready_for_dd_clear']:
+        partner.status = 'dd_clear'
+        partner.trust_tier = 'tier_1_relational'
+        partner.dd_cleared_at = datetime.now(timezone.utc)
+        state_change = 'dd_clear'
+    elif floor['endorsements_ok'] and not floor['bank_verified']:
+        if partner.status in ('nominated', 'endorsements_open'):
+            partner.status = 'dd_pending'
+            state_change = 'dd_pending'
+
+    db.session.commit()
+
+    # Audit-chain — token-portal endorsement is flagged with
+    # submitted_via=token_url so auditors can distinguish from the
+    # logged-in path.
+    AuditChainEntry.append(
+        action='proximate.endorsement.submitted',
+        actor_email=None,  # no user session — anonymous token holder
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={
+            'endorser_id': endorser.id,
+            'endorsement_id': endorsement.id,
+            'coi_check_passed': endorsement.coi_check_passed,
+            'coi_signals': list(signals.keys()),
+            'q1_real': payload['q1_real'],
+            'q2_trust': payload['q2_trust'],
+            'q3_accept_aid': payload['q3_accept_aid'],
+            'state_change': state_change,
+            'submitted_via': 'token_url',
+        },
+    )
+    if state_change:
+        AuditChainEntry.append(
+            action=f'proximate.partner.status_changed.{state_change}',
+            actor_email=None,
+            subject_kind='proximate_partner',
+            subject_id=partner.id,
+            details={
+                'new_status': partner.status,
+                'trust_tier': partner.trust_tier,
+                'submitted_via': 'token_url',
+            },
+        )
+
+    return jsonify({
+        'success': True,
+        'endorsement_id': endorsement.id,
+        'coi_check_passed': endorsement.coi_check_passed,
+        'partner_status': partner.status,
+        'state_change': state_change,
+    })
+
+
+@proximate_bp.route(
+    '/admin/endorsers/<int:endorser_id>/portal-link', methods=['POST'],
+)
+@ob_required
+def api_issue_endorser_portal_link(endorser_id):
+    """OB endpoint — mint or fetch the endorser's no-login portal token
+    and the shareable URL. Idempotent. Used by the Share Hub UI; the
+    OB then pastes this into WhatsApp.
+    """
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    endorser = Endorser.query.filter_by(
+        id=endorser_id, network_id=net.id,
+    ).first()
+    if not endorser:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    if endorser.status != 'approved':
+        return jsonify({
+            'success': False,
+            'error': f'endorser status is {endorser.status!r}',
+        }), 400
+    token = _ensure_endorser_public_token(endorser)
+    base = request.host_url.rstrip('/')
+    return jsonify({
+        'success': True,
+        'token': token,
+        'url': f'{base}/proximate-endorse?t={token}',
+    })
+
+
+# =====================================================================
+# Phase 700 — Audit chain read endpoint (resolves reviewer mismatch)
+# =====================================================================
+# The design doc v3 §11 advertises GET /api/proximate/audit-chain;
+# this implements it. Tenant-scoped (per Phase 672) so an external
+# Proximate auditor walks only Proximate's rows. Read-only.
+
+
+@proximate_bp.route('/audit-chain', methods=['GET'])
+@login_required
+def api_proximate_audit_chain():
+    """Return the most recent audit-chain rows scoped to this tenant.
+
+    Tenant scope: rows with network_id=current tenant OR rows where
+    subject_kind starts with 'proximate' (covers legacy rows written
+    before Phase 672 backfilled network_id).
+    """
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+
+    limit = max(1, min(int(request.args.get('limit', 100) or 100), 500))
+    offset = max(0, int(request.args.get('offset', 0) or 0))
+
+    q = AuditChainEntry.query.filter(
+        db.or_(
+            AuditChainEntry.network_id == net.id,
+            AuditChainEntry.subject_kind.like('proximate_%'),
+            AuditChainEntry.action.like('proximate.%'),
+        )
+    ).order_by(AuditChainEntry.seq.desc())
+
+    total = q.count()
+    rows = q.limit(limit).offset(offset).all()
+
+    return jsonify({
+        'success': True,
+        'total': total,
+        'limit': limit,
+        'offset': offset,
+        'entries': [
+            {
+                'seq': r.seq,
+                'prev_hash': r.prev_hash,
+                'payload_hash': r.payload_hash,
+                'action': r.action,
+                'actor_email': r.actor_email,
+                'subject_kind': r.subject_kind,
+                'subject_id': r.subject_id,
+                'created_at': r.created_at.isoformat() if r.created_at else None,
+                'network_id': r.network_id,
+            }
+            for r in rows
+        ],
     })
 
 
