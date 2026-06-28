@@ -21,8 +21,8 @@ Updated 2026-06-27.
 Phase 678–688 — donor portal + outcomes loop. Driven autonomously this
 session; entries move to "Completed" below as each ships.
 
-- [ ] **Phase 678** — Outcome obligation model + 90-day cron
-- [ ] **Phase 679** — Partner outcome attestation form (`/proximate-outcome?t=<token>`)
+- [x] **Phase 678** — Outcome obligation model + 90-day cron (commit 3c6bb54e + 98563e5c timedelta hotfix; verify auto-spawns the 90-day attestation row)
+- [x] **Phase 679** — Partner outcome attestation form (`/proximate-outcome?t=<token>`); commit 98563e5c; live token URL verified on prod with Arabic round-trip
 - [ ] **Phase 680** — OB-side outcome verdict surface on disbursement detail
 - [ ] **Phase 681** — `ProximateDonor` model + admin-registered donor membership
 - [ ] **Phase 682** — Donor portal dashboard (`/proximate/donor`)
