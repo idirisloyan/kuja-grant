@@ -3208,6 +3208,12 @@ def api_submit_outcome_attestation(token):
     o.voice_doc_id = payload.get('voice_doc_id')
     o.photo_doc_id = payload.get('photo_doc_id')
     o.voice_transcript = (payload.get('voice_transcript') or '').strip() or None
+    # Phase 685 — partner can submit their counterfactual reflection
+    # alongside the 3 core questions, OR return later via the same
+    # token URL to add it. We accept both paths here.
+    reflection = (payload.get('counterfactual_reflection') or '').strip()
+    if reflection:
+        o.counterfactual_reflection = reflection[:5000]
     o.submitted_at = datetime.now(timezone.utc)
     o.submitted_via = 'session' if auth_source != 'token' else 'token'
     o.status = 'submitted'
@@ -4036,6 +4042,73 @@ def api_cron_disbursement_nudge():
         nudged += 1
     logger.info(f"Proximate cron: nudged {nudged} overdue disbursements for {day_key}")
     return jsonify({'success': True, 'nudged': nudged, 'day': day_key})
+
+
+@proximate_bp.route('/monitoring/quarterly-counterfactual-prompt', methods=['POST'])
+def api_cron_quarterly_counterfactual_prompt():
+    """Phase 685 — quarterly counterfactual prompt cron.
+
+    Finds outcome attestations where the partner has submitted the
+    3-question form but hasn't yet provided a counterfactual reflection
+    ('what would have happened without this disbursement?'). Emits one
+    nudge audit row per attestation per quarter so the OB can see who
+    still owes a reflection and the partner sees it on next visit to
+    their token URL.
+
+    Why quarterly (not monthly): reflection answers are most useful
+    when the partner has time to step back from operations. Quarterly
+    also avoids burnout if rounds run hot.
+    """
+    from app.models import ProximateOutcomeAttestation
+    from flask import current_app as cap
+    secret = cap.config.get('CRON_SECRET') or os.getenv('CRON_SECRET')
+    auth = request.headers.get('Authorization', '')
+    if not secret or auth != f'Bearer {secret}':
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    now = datetime.now(timezone.utc)
+    quarter_key = f'{now.year}Q{((now.month - 1) // 3) + 1}'
+    cutoff = now - timedelta(days=30)
+
+    targets = ProximateOutcomeAttestation.query.filter(
+        ProximateOutcomeAttestation.submitted_at.isnot(None),
+        ProximateOutcomeAttestation.submitted_at < cutoff,
+        ProximateOutcomeAttestation.counterfactual_reflection.is_(None),
+    ).all()
+    nudged = 0
+    for o in targets:
+        recent = AuditChainEntry.query.filter_by(
+            subject_kind='proximate_outcome_attestation',
+            subject_id=o.id,
+            action='proximate.counterfactual.prompt',
+        ).order_by(AuditChainEntry.seq.desc()).limit(4).all()
+        already_this_quarter = any(
+            quarter_key in (r.details_json or '') for r in recent
+        )
+        if already_this_quarter:
+            continue
+        AuditChainEntry.append(
+            action='proximate.counterfactual.prompt',
+            actor_email='cron-monitoring',
+            subject_kind='proximate_outcome_attestation',
+            subject_id=o.id,
+            details={
+                'quarter': quarter_key,
+                'disbursement_id': o.disbursement_id,
+                'partner_id': o.partner_id,
+                'days_since_submitted': (now - o.submitted_at.replace(
+                    tzinfo=timezone.utc
+                ) if o.submitted_at.tzinfo is None else now - o.submitted_at).days,
+            },
+        )
+        nudged += 1
+    logger.info(
+        f'Proximate cron: quarterly counterfactual prompt {quarter_key} '
+        f'nudged {nudged} attestations'
+    )
+    return jsonify({
+        'success': True, 'nudged': nudged, 'quarter': quarter_key,
+    })
 
 
 @proximate_bp.route('/monitoring/outcome-due-nudge', methods=['POST'])

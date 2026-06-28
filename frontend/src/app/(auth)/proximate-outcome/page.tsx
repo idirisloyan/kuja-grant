@@ -47,6 +47,7 @@ export default function ProximateOutcomePage() {
   const [totalIntended, setTotalIntended] = useState('');
   const [sustained, setSustained] = useState('');
   const [notSustained, setNotSustained] = useState('');
+  const [counterfactual, setCounterfactual] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -130,6 +131,7 @@ export default function ProximateOutcomePage() {
             total_intended_n: totalIntended ? parseInt(totalIntended, 10) : null,
             sustained: sustained.trim() || null,
             not_sustained: notSustained.trim() || null,
+            counterfactual_reflection: counterfactual.trim() || null,
             voice_doc_id: voiceDocId,
             photo_doc_id: photoDocId,
           }),
@@ -290,10 +292,28 @@ export default function ProximateOutcomePage() {
             />
           </div>
 
-          {/* Photo + voice (optional) */}
+          {/* Q4 — counterfactual reflection (optional but valuable) */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              4. {t('proximate.outcome.q4_evidence')} {t('proximate.outcome.optional')}
+              4. {t('proximate.outcome.q4_counterfactual')} {t('proximate.outcome.optional')}
+            </label>
+            <p className="text-xs text-muted-foreground mb-2">
+              {t('proximate.outcome.q4_counterfactual_hint')}
+            </p>
+            <textarea
+              value={counterfactual}
+              onChange={(e) => setCounterfactual(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+              rows={3}
+              maxLength={5000}
+              placeholder={t('proximate.outcome.q4_counterfactual_placeholder')}
+            />
+          </div>
+
+          {/* Q5 — Photo + voice (optional) */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              5. {t('proximate.outcome.q4_evidence')} {t('proximate.outcome.optional')}
             </label>
             <input
               ref={photoInputRef}
