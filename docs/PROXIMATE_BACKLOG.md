@@ -74,12 +74,13 @@ session; entries move to "Completed" below as each ships.
   Emits `proximate.partner.sanctions_rescreen_flagged` on clean→flagged
   transitions so the OB has one signal to act on.
 
-### Verifier-attest UI surface
-- **Why:** Phase 673 ships the endpoints but the assigned verifier has
-  no page to land on. They get a user_id and an email in the OB's hand.
-- **Action:** issue a verifier-scoped token URL at assign time; new
-  `/proximate-verify?t=<token>` page lets them attest (confirmed |
-  disputed + notes) without needing a Kuja login.
+### ~~Verifier-attest UI surface~~ — shipped Phase 691 (2026-06-27)
+- Done. Token issued at assign time on Phase 673 endpoint; idempotent.
+  `/proximate-verify?t=<token>` shows the disbursement context + a
+  two-button confirmed/disputed + notes form. Token rejects POST
+  once a verdict is recorded (one-shot). Audit row
+  `proximate.disbursement.verifier_attested` with submitted_via=
+  token_url.
 
 ---
 
@@ -245,6 +246,15 @@ Treat as future Kuja-level work, not Proximate work.
 ---
 
 ## Completed (rolling log, newest first)
+
+- **Phase 691 — Verifier-attest token URL** (2026-06-27). Phase 673
+  shipped the assign-verifier + verifier-attest endpoints but no UI.
+  Now: assign-verifier issues a long-lived per-disbursement
+  `verifier_token` and returns the share URL. New public
+  `/proximate-verify?t=<token>` page shows disbursement context +
+  confirmed/disputed two-button form + notes. Token rejects POST
+  once a verdict is set (one-shot semantics). Audit row
+  `proximate.disbursement.verifier_attested`.
 
 - **Phase 690 — Sanctions re-screening cron** (2026-06-27). Weekly
   GHA cron `cron-proximate-sanctions-rescreen.yml` POSTs `/api/

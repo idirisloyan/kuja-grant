@@ -2564,6 +2564,11 @@ def api_assign_verifier(disbursement_id):
     picked = random.choice(eligible)
     d.verifier_user_id = picked.user_id
     d.verifier_assigned_at = datetime.now(timezone.utc)
+    # Phase 691 — issue verifier token URL so the verifier can attest
+    # without needing a Kuja login. Idempotent re-assigns reuse it.
+    if not d.verifier_token:
+        import secrets as _secrets
+        d.verifier_token = _secrets.token_urlsafe(32)
     db.session.commit()
 
     AuditChainEntry.append(
@@ -2577,11 +2582,92 @@ def api_assign_verifier(disbursement_id):
             'eligible_pool_size': len(eligible),
         },
     )
+    base = request.host_url.rstrip('/')
     return jsonify({
         'success': True,
         'verifier_user_id': picked.user_id,
         'verifier_endorser_id': picked.id,
         'verifier_name': picked.full_name if hasattr(picked, 'full_name') else None,
+        'verifier_url': f'{base}/proximate-verify?t={d.verifier_token}',
+    })
+
+
+# =====================================================================
+# Phase 691 — Verifier mini-portal (token URL)
+# =====================================================================
+# The verifier gets one URL emailed/WhatsApp'd to them at assign time.
+# No login required. They see the disbursement context + the OB's
+# recorded verdict (if any) + a simple confirmed/disputed + notes form.
+
+
+@proximate_bp.route('/verify-attest/<token>', methods=['GET'])
+def api_verifier_attest_lookup(token):
+    """Public lookup. Verifier sees the disbursement context they need
+    to make an independent attestation."""
+    d = ProximateDisbursement.query.filter_by(verifier_token=token).first()
+    if not d:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    return jsonify({
+        'success': True,
+        'disbursement': {
+            'id': d.id,
+            'amount_usd': float(d.amount_usd) if d.amount_usd else None,
+            'purpose': d.purpose,
+            'status': d.status,
+            'sent_at': d.sent_at.isoformat() if d.sent_at else None,
+            'partner_name': d.partner.name if d.partner else None,
+            'verifier_verdict': d.verifier_verdict,
+            'verifier_notes': d.verifier_notes,
+            'verifier_attested_at': (
+                d.verifier_attested_at.isoformat()
+                if d.verifier_attested_at else None
+            ),
+            'verified_by_ob': d.status == 'verified',
+            'flagged_by_ob': d.status == 'flagged',
+        },
+    })
+
+
+@proximate_bp.route('/verify-attest/<token>', methods=['POST'])
+def api_verifier_attest_submit(token):
+    """Public attest. Token IS the credential. Once a verdict is
+    recorded the token rejects further submits."""
+    d = ProximateDisbursement.query.filter_by(verifier_token=token).first()
+    if not d:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    if d.verifier_verdict:
+        return jsonify({
+            'success': False,
+            'error': 'already attested',
+            'verdict': d.verifier_verdict,
+        }), 409
+    body = request.get_json() or {}
+    verdict = (body.get('verdict') or '').strip().lower()
+    if verdict not in ('confirmed', 'disputed'):
+        return jsonify({
+            'success': False,
+            'error': 'verdict must be confirmed or disputed',
+        }), 400
+    notes = (body.get('notes') or '').strip()
+    d.verifier_verdict = verdict
+    d.verifier_notes = notes or None
+    d.verifier_attested_at = datetime.now(timezone.utc)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.disbursement.verifier_attested',
+        actor_email=f'verifier_user_{d.verifier_user_id}',
+        subject_kind='proximate_disbursement',
+        subject_id=d.id,
+        details={
+            'verdict': verdict,
+            'has_notes': bool(notes),
+            'submitted_via': 'token_url',
+        },
+    )
+    return jsonify({
+        'success': True,
+        'verdict': verdict,
+        'attested_at': d.verifier_attested_at.isoformat(),
     })
 
 

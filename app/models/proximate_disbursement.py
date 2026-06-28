@@ -131,6 +131,9 @@ class ProximateDisbursement(db.Model):
     verifier_verdict = db.Column(db.String(20), nullable=True)  # 'confirmed' | 'disputed'
     verifier_notes = db.Column(db.Text, nullable=True)
     verifier_attested_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    # Phase 691 — token-credentialed URL for the assigned verifier so
+    # they can attest without a Kuja login. Issued at assign time.
+    verifier_token = db.Column(db.String(64), nullable=True, unique=True, index=True)
 
     created_at = db.Column(
         db.DateTime(timezone=True),
