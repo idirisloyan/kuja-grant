@@ -1824,6 +1824,64 @@ def api_update_tranche_schedule(round_id):
     })
 
 
+@proximate_bp.route('/rounds/<int:round_id>/donor-shares', methods=['PUT'])
+@ob_required
+def api_update_donor_shares(round_id):
+    """Phase 686 — set or replace the donor shares on a round.
+
+    Body: {shares: [{donor_id, committed_usd, restricted_to_partner_id?,
+                     restricted_to_purpose?}]}
+    Sum of committed_usd ideally equals envelope_usd. Restricted shares
+    earmark capital for a specific partner — subsequent disbursements
+    to that partner validate against the remaining restricted budget
+    via ProximateRound.restricted_remaining_for().
+    """
+    from app.models import ProximateDonor
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    r = ProximateRound.query.filter_by(id=round_id, network_id=net.id).first()
+    if not r:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    payload = request.get_json(silent=True) or {}
+    shares = payload.get('shares')
+    if not isinstance(shares, list):
+        return jsonify({
+            'success': False, 'error': 'shares must be a list',
+        }), 400
+
+    # Validate that every donor_id belongs to this network.
+    donor_ids = {int(s['donor_id']) for s in shares
+                 if isinstance(s, dict) and s.get('donor_id') is not None}
+    if donor_ids:
+        valid = {d.id for d in ProximateDonor.query.filter(
+            ProximateDonor.network_id == net.id,
+            ProximateDonor.id.in_(donor_ids),
+        ).all()}
+        unknown = donor_ids - valid
+        if unknown:
+            return jsonify({
+                'success': False,
+                'error': f'unknown donor_id(s) for this network: {sorted(unknown)}',
+            }), 400
+
+    r.set_donor_shares(shares)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.round.donor_shares_updated',
+        actor_email=current_user.email,
+        subject_kind='proximate_round',
+        subject_id=r.id,
+        details={
+            'n_shares': len(r._donor_shares()),
+            'committed_total_usd': sum(
+                s.get('committed_usd', 0) for s in r._donor_shares()
+            ),
+        },
+    )
+    return jsonify({'success': True, 'donor_shares': r._donor_shares()})
+
+
 @proximate_bp.route('/rounds/<int:round_id>/report', methods=['GET'])
 @login_required
 def api_round_report(round_id):
@@ -2336,6 +2394,38 @@ def api_record_disbursement():
     # one cosigner; at $50k+ two; at $200k+ three. Snapshot the count
     # so the rule is locked at create time.
     amount_f = float(amount)
+
+    # Phase 686 — donor restricted-share validation. If the round has
+    # any donor share restricted to this partner, the new disbursement
+    # must fit within the remaining restricted budget.
+    round_id_arg = payload.get('round_id')
+    if round_id_arg:
+        round_row = ProximateRound.query.filter_by(
+            id=round_id_arg, network_id=net.id,
+        ).first()
+        if round_row and round_row.donor_shares_json:
+            disbursed_to_partner = sum(
+                float(x.amount_usd or 0)
+                for x in ProximateDisbursement.query.filter_by(
+                    network_id=net.id, round_id=round_row.id, partner_id=partner.id,
+                ).all()
+                if x.status in ('pending_report', 'reported', 'verified', 'flagged')
+            )
+            restriction = round_row.restricted_remaining_for(
+                partner.id, disbursed_to_partner,
+            )
+            if restriction['has_restriction'] and amount_f > restriction['remaining']:
+                return jsonify({
+                    'success': False,
+                    'error': (
+                        f'donor restriction exceeded: ${amount_f:,.0f} requested but '
+                        f'only ${restriction["remaining"]:,.0f} of the '
+                        f'${restriction["restricted_total"]:,.0f} restricted budget '
+                        f'remains for this partner'
+                    ),
+                    'restriction': restriction,
+                }), 422
+
     n_cosigners_needed = cosigners_required_for(amount_f)
     needs_cosign = n_cosigners_needed > 0
     initial_status = 'pending_cosign' if needs_cosign else 'pending_report'

@@ -72,6 +72,12 @@ class ProximateRound(db.Model):
     # {label, target_amount_usd, target_date (ISO), notes}. Pure annotation
     # for v1; disbursements aren't auto-linked to specific tranches.
     tranche_schedule_json = db.Column(db.Text, nullable=True)
+    # Phase 686 — donor co-funding shares. JSON list of:
+    # {donor_id, committed_usd, restricted_to_partner_id?, restricted_to_purpose?}
+    # Sum of committed_usd should equal envelope_usd for a fully-pledged
+    # round. Disbursements to a partner with a restricted share validate
+    # that the new amount fits within remaining restricted budget.
+    donor_shares_json = db.Column(db.Text, nullable=True)
     target_region = db.Column(db.String(120), nullable=True)
 
     status = db.Column(
@@ -163,6 +169,57 @@ class ProximateRound(db.Model):
         except (ValueError, TypeError):
             return []
 
+    def _donor_shares(self) -> list:
+        if not self.donor_shares_json:
+            return []
+        import json as _json
+        try:
+            v = _json.loads(self.donor_shares_json)
+            return v if isinstance(v, list) else []
+        except (ValueError, TypeError):
+            return []
+
+    def set_donor_shares(self, shares: list) -> None:
+        """Phase 686 — replace the round's donor shares with the
+        given list. Coerces fields, drops anything malformed."""
+        import json as _json
+        clean = []
+        for s in (shares or []):
+            try:
+                did = int(s.get('donor_id'))
+                amt = float(s.get('committed_usd') or 0)
+            except (TypeError, ValueError):
+                continue
+            entry = {'donor_id': did, 'committed_usd': amt}
+            rp = s.get('restricted_to_partner_id')
+            if rp is not None:
+                try:
+                    entry['restricted_to_partner_id'] = int(rp)
+                except (TypeError, ValueError):
+                    pass
+            rpurp = (s.get('restricted_to_purpose') or '').strip()
+            if rpurp:
+                entry['restricted_to_purpose'] = rpurp[:200]
+            clean.append(entry)
+        self.donor_shares_json = _json.dumps(clean) if clean else None
+
+    def restricted_remaining_for(self, partner_id: int, disbursed_to_partner: float) -> dict:
+        """Phase 686 — compute remaining restricted budget for a
+        partner across all donor shares that earmark for them.
+        Returns {has_restriction, restricted_total, remaining}.
+        If no donor restricts to this partner, has_restriction is False.
+        """
+        shares = self._donor_shares()
+        restricted_total = sum(
+            float(s.get('committed_usd') or 0) for s in shares
+            if s.get('restricted_to_partner_id') == partner_id
+        )
+        return {
+            'has_restriction': restricted_total > 0,
+            'restricted_total': restricted_total,
+            'remaining': max(0.0, restricted_total - disbursed_to_partner),
+        }
+
     def to_dict(self, *, include_signatures: bool = False) -> dict:
         data = {
             "id": self.id,
@@ -175,6 +232,7 @@ class ProximateRound(db.Model):
             "envelope_usd": self.envelope_usd,
             "expected_duration_days": self.expected_duration_days,
             "tranche_schedule": self._tranche_schedule(),
+            "donor_shares": self._donor_shares(),
             "target_country": self.target_country,
             "target_region": self.target_region,
             "status": self.status,
