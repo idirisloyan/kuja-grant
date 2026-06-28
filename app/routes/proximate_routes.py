@@ -3414,6 +3414,125 @@ def api_attach_outcome_evidence(token):
 
 
 # =====================================================================
+# Phase 689 — Partner mini-portal (long-lived token URL)
+# =====================================================================
+# Partners with multiple disbursements need one place to see their
+# whole story: every release, every report obligation, every OB
+# acknowledgement, every outcome attestation. The mini-portal is
+# that surface — token-credentialed like the per-disbursement
+# report URL, but scoped to the partner.
+
+
+def _ensure_partner_mini_portal_token(partner) -> str:
+    """Idempotent — generates the token on first call, persists it,
+    returns it. Subsequent calls return the existing token."""
+    if not partner.mini_portal_token:
+        import secrets
+        partner.mini_portal_token = secrets.token_urlsafe(32)
+        db.session.commit()
+    return partner.mini_portal_token
+
+
+@proximate_bp.route('/partner-mini-portal/<token>', methods=['GET'])
+def api_partner_mini_portal(token):
+    """Public mini-portal lookup. Token IS the credential.
+
+    Returns the partner's profile + every disbursement + every
+    outcome attestation + the most recent acknowledgement chain.
+    No login required.
+    """
+    from app.models import ProximateOutcomeAttestation
+    partner = ProximatePartner.query.filter_by(
+        mini_portal_token=token,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+
+    dis = (
+        ProximateDisbursement.query
+        .filter_by(partner_id=partner.id)
+        .order_by(ProximateDisbursement.sent_at.desc().nullslast())
+        .all()
+    )
+    out = ProximateOutcomeAttestation.query.filter_by(
+        partner_id=partner.id,
+    ).all()
+    out_by_dis_id = {o.disbursement_id: o for o in out}
+
+    disbursements = []
+    for d in dis:
+        o = out_by_dis_id.get(d.id)
+        disbursements.append({
+            'id': d.id,
+            'amount_usd': float(d.amount_usd) if d.amount_usd else None,
+            'purpose': d.purpose,
+            'status': d.status,
+            'sent_at': d.sent_at.isoformat() if d.sent_at else None,
+            'report_due_at': (
+                d.report_due_at.isoformat() if d.report_due_at else None
+            ),
+            'report_submitted_at': (
+                d.report_submitted_at.isoformat()
+                if d.report_submitted_at else None
+            ),
+            'report_token': d.report_token,
+            'ack_message': d.ack_message,
+            'ack_message_at': (
+                d.ack_message_at.isoformat() if d.ack_message_at else None
+            ),
+            'outcome': {
+                'id': o.id,
+                'status': o.status,
+                'due_at': o.due_at.isoformat() if o.due_at else None,
+                'submitted_at': (
+                    o.submitted_at.isoformat() if o.submitted_at else None
+                ),
+                'report_token': o.report_token,
+                'has_counterfactual': bool(o.counterfactual_reflection),
+                'ack_message': o.ack_message,
+            } if o else None,
+        })
+
+    return jsonify({
+        'success': True,
+        'partner': {
+            'id': partner.id,
+            'name': partner.name,
+            'status': partner.status,
+            'capital_class': getattr(partner, 'capital_class', None),
+            'dd_cleared_at': (
+                partner.dd_cleared_at.isoformat()
+                if partner.dd_cleared_at else None
+            ),
+        },
+        'disbursements': disbursements,
+    })
+
+
+@proximate_bp.route('/partners/<int:partner_id>/mini-portal-link', methods=['POST'])
+@ob_required
+def api_issue_partner_mini_portal_link(partner_id):
+    """OB endpoint — generate or fetch the mini-portal token and the
+    sharable URL. Idempotent: returns the existing token if one is
+    already issued."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    token = _ensure_partner_mini_portal_token(partner)
+    base = request.host_url.rstrip('/')
+    return jsonify({
+        'success': True,
+        'token': token,
+        'url': f'{base}/proximate-partner?t={token}',
+    })
+
+
+# =====================================================================
 # Phase 681 — Proximate donor registration (admin only)
 # =====================================================================
 # Donors are admin-registered (no self-service signup in v0 — needs a

@@ -175,6 +175,11 @@ class ProximatePartner(db.Model):
     sanctions_flag = db.Column(db.Boolean, nullable=True, default=False)
     sanctions_checked_at = db.Column(db.DateTime, nullable=True)
     sanctions_summary_json = db.Column(db.Text, nullable=True)
+    # Phase 689 — long-lived partner mini-portal token. Issued at
+    # clearance; partner uses it on /proximate-partner?t=<token> to
+    # see all their disbursements + outcome obligations + acks
+    # without needing a Kuja login.
+    mini_portal_token = db.Column(db.String(64), nullable=True, unique=True, index=True)
     created_at = db.Column(
         db.DateTime, nullable=False,
         default=lambda: datetime.now(timezone.utc),
