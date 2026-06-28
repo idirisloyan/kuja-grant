@@ -235,17 +235,107 @@ Treat as future Kuja-level work, not Proximate work.
 
 ## Operational TODOs (team owes the system)
 
-- [ ] DNS for `proximate.kuja.org` so the team doesn't need
-      `X-Network-Override: proximate` header for testing
-- [ ] SMTP env var on Railway (`SENDGRID_API_KEY` or `SMTP_HOST/*`)
-      — without this, no Proximate emails fire. Blocks Phase 687.
-- [ ] `CRON_SECRET` GitHub repo secret — without this the
-      disbursement-nudge cron + outcome-due-nudge cron (Phase 678)
-      both 403
+These five are not engineering work — they're configuration/account
+setup that needs Adeso ops to action. Cited in the v2 design doc §13.
+
+### DNS for `proximate.kuja.org`
+- **Why:** team currently must send `X-Network-Override: proximate`
+  header to access the tenant. DNS is the single bookmarkable URL.
+- **Owner:** Adeso domain admin (Cloudflare or similar).
+- **Action:** CNAME `proximate.kuja.org` →
+  `web-production-6f8a.up.railway.app`. Once set, the host-header
+  middleware (Phase 32) routes automatically.
+- **Blocks:** clean partner/donor URL sharing; the test plan still
+  works without it.
+
+### SMTP env var on Railway
+- **Why:** Phase 687 cron emits a "ready" audit row, but the OB
+  still sends retrospective PDFs manually. SMS / WhatsApp likewise
+  require operational backbone. No transactional emails fire today.
+- **Owner:** Adeso ops + Railway env var dashboard.
+- **Action:** set one of `SENDGRID_API_KEY`, `RESEND_API_KEY`, or
+  `SMTP_HOST` + `SMTP_PORT` + `SMTP_USER` + `SMTP_PASS` on the
+  Railway service env. App-side wiring is already in place via the
+  existing notification service.
+- **Blocks:** auto-send for Phase 687 retrospectives, decision
+  emails for Phase 308 appeal-respond, partner-flagged-via-rescreen
+  notification (Phase 690).
+
+### `CRON_SECRET` GitHub repo secret
+- **Why:** every bearer-auth cron (Phase 651, 678, 685, 687, 690 +
+  Phase 44B) checks `Authorization: Bearer <CRON_SECRET>` and the
+  Railway env var must match what GitHub Actions sends.
+- **Owner:** GitHub Settings → Secrets and variables → Actions →
+  New repository secret named `CRON_SECRET`. Use the same value
+  set on Railway under the service env vars (or generate a fresh
+  `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+  and set both sides).
+- **Action:** add the GitHub repo secret; verify the next scheduled
+  run returns 200 in the workflow logs.
+- **Blocks:** all 6 monitoring crons currently 403 in GitHub
+  Actions until set.
+
+### SMS fallback for partners without WhatsApp
+- **Why:** ~30% of Sudan rural users don't have WhatsApp. Today
+  the only share path is the WhatsApp deep-link (Phase 669). Those
+  partners can't receive token URLs (report, outcome, mini-portal).
+- **Owner:** Adeso ops + Twilio (or Africa's Talking) account setup.
+- **Action:** Adeso opens an SMS-provider account; provides
+  `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` (or the
+  Africa's Talking equivalents) as Railway env vars. Per-message
+  cost decision pending: who pays per outbound SMS — fund overhead
+  or per-disbursement budget line?
+- **Blocks:** reach for the ~30% of Sudan rural partners without
+  WhatsApp; admin-only trigger, not auto-fire.
+- **Engineering effort once unblocked:** ~1 day. Wire the SMS body
+  to the same token URLs; admin-trigger button on partner detail.
+
+### Voice-only end-to-end flow for low-literacy partners
+- **Why:** Phase 669 wires inbound voice via Whisper, but the form
+  still requires reading the 5 questions. Zero-text participation
+  requires TTS the questions in Sudanese-dialect Arabic.
+- **Owner:** Adeso product + a voice-model choice (ElevenLabs?
+  Azure Speech? Open-source Coqui?).
+- **Action:** Adeso picks the voice model (cost + quality + dialect
+  trade-off). Provides API key as Railway env var. The questions
+  + status copy already exist in Arabic (Phase 661).
+- **Blocks:** zero-text partner participation for the lowest-
+  literacy end of the cohort.
+- **Engineering effort once unblocked:** ~3 days. Synthesise once,
+  cache the audio, serve as `<audio>` elements; capture answer-by-
+  answer voice via existing Phase 71 voice recorder; transcribe
+  via Phase 669 Whisper. Pure assembly; no new primitive.
 
 ---
 
 ## Completed (rolling log, newest first)
+
+- **Phase 696 — Proximate persona refactor** (2026-06-27). Donor + OB
+  + Adeso operator users on Proximate are seeded with
+  `User.role='ngo'` for platform compatibility; the shell rendered
+  NGO-flavored nav and labels for them. Added
+  `GET /api/proximate/persona/me` returning
+  `{persona: 'donor'|'ob'|'admin'|'none', display_name}`. New
+  `useProximatePersona()` SWR hook reads it. Sidebar branches to
+  a Proximate-specific `proximateProfile()` (donor → portal +
+  rounds + Ask AI; OB/admin → operator dashboard + partners +
+  disbursements + rounds + endorser queue + crisis selector + audit
+  chain). Header avatar label shows "Proximate donor", "Oversight
+  body", or "Proximate operator" instead of "Ngo".
+
+- **Phases 692-695 — punch list from independent prod review** (2026-06-27).
+  - 692: honeypot on `/proximate-nominate` switched to bulletproof
+    clip technique (was visible as "Website (leave blank)" in
+    Arabic/RTL mobile widths).
+  - 693: `/api/proximate/partners` PII surface gated to OB only
+    (was readable by any logged-in tenant user including donors).
+  - 694: donor AI Q&A now includes computed dashboard metrics
+    (`attestation_rate_pct`, `verification_rate_pct`,
+    `sustained_impact_avg_pct`) via `_outcome_rollup_stats()` —
+    same helper the dashboard tile uses. Verified on prod: AI
+    answered "75.0%" matching the tile (was "unavailable").
+  - 695: NGO `JourneyRail` hidden on `/proximate/*` paths so the
+    "funding journey" rail stops leaking onto donor + OB pages.
 
 - **Phase 691 — Verifier-attest token URL** (2026-06-27). Phase 673
   shipped the assign-verifier + verifier-attest endpoints but no UI.

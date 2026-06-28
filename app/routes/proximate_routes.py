@@ -3738,6 +3738,68 @@ def api_list_donors():
     })
 
 
+@proximate_bp.route('/persona/me', methods=['GET'])
+@login_required
+def api_my_persona():
+    """Phase 696 — resolve the current user's Proximate persona.
+
+    Donor and OB users are seeded with User.role='ngo' for platform
+    compatibility, which means the frontend's role-driven nav chrome
+    leaks NGO surfaces onto donor/OB pages. This endpoint returns
+    {persona: 'donor' | 'ob' | 'admin' | 'none', display_name,
+    network_id} so the shell can swap to Proximate-specific nav +
+    role label.
+
+    Returns 'none' (not 404) when the user has no Proximate role
+    so the frontend can cache the answer instead of erroring.
+    """
+    from app.models import ProximateDonor
+    from app.utils.network import is_oversight_body_member
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+
+    # Platform admin first — they get OB-level access too
+    if getattr(current_user, 'role', '') == 'admin':
+        return jsonify({
+            'success': True,
+            'persona': 'admin',
+            'display_name': current_user.name or current_user.email,
+            'network_id': net.id,
+            'network_slug': 'proximate',
+        })
+
+    if is_oversight_body_member(current_user):
+        return jsonify({
+            'success': True,
+            'persona': 'ob',
+            'display_name': current_user.name or current_user.email,
+            'network_id': net.id,
+            'network_slug': 'proximate',
+        })
+
+    donor = ProximateDonor.query.filter_by(
+        network_id=net.id, primary_user_id=current_user.id,
+    ).first()
+    if donor:
+        return jsonify({
+            'success': True,
+            'persona': 'donor',
+            'display_name': donor.display_name or current_user.name,
+            'network_id': net.id,
+            'network_slug': 'proximate',
+        })
+
+    return jsonify({
+        'success': True,
+        'persona': 'none',
+        'display_name': current_user.name,
+        'network_id': net.id,
+        'network_slug': 'proximate',
+    })
+
+
 @proximate_bp.route('/donors/me', methods=['GET'])
 @login_required
 def api_my_donor():

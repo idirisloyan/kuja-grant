@@ -41,6 +41,7 @@ import { useUIStore } from '@/stores/ui-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import { useProximatePersona, type ProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { cn } from '@/lib/utils';
 
 import {
@@ -48,7 +49,7 @@ import {
   Briefcase, Star, ShieldCheck, ClipboardList,
   ChevronLeft, ChevronRight, X, MessageSquare, Inbox,
   Users, Siren, Wallet, Activity, Award, Lightbulb, Settings as SettingsIcon,
-  HelpCircle,
+  HelpCircle, HandCoins, Send, Sparkles, MapPin,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
@@ -83,14 +84,22 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   const user = useAuthStore((s) => s.user);
   const network = useNetworkStore((s) => s.network);
   const isNearFlavor = !!network?.slug && network.slug !== 'kuja';
+  const isProximateFlavor = network?.slug === 'proximate';
   const role: UserRole = (user?.role as UserRole) ?? 'ngo';
+  // Phase 696 — Proximate donors/OB are seeded with role='ngo' for
+  // platform compatibility. The persona endpoint resolves their actual
+  // Proximate-side persona so the nav matches the work they're
+  // actually doing here.
+  const { persona } = useProximatePersona();
 
   // Close mobile sidebar on route change
   useEffect(() => {
     setMobileSidebarOpen(false);
   }, [pathname, setMobileSidebarOpen]);
 
-  const profile = pickNavProfile(role, isNearFlavor, t);
+  const profile = isProximateFlavor && persona && persona !== 'none'
+    ? proximateProfile(persona, t)
+    : pickNavProfile(role, isNearFlavor, t);
   const currentWidth = sidebarCollapsed ? collapsedWidth : width;
 
   const body = (
@@ -433,6 +442,68 @@ function nearProfile(role: UserRole, t: T): NavProfile {
         ],
         secondary: [
           { icon: SettingsIcon,    label: 'Settings',                 href: '/settings/notifications' },
+        ],
+      };
+  }
+}
+
+/* --------------------------- Proximate flavor --------------------------- */
+//
+// Phase 696 — Proximate-specific nav. Donor/OB/admin users on the
+// Proximate tenant are seeded with User.role='ngo' for platform
+// compatibility, so the nearProfile fall-through served them NGO chrome.
+// The Proximate persona endpoint resolves the actual role and this
+// function maps it to the surfaces they actually work in.
+
+function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
+  switch (persona) {
+    case 'donor':
+      // Donor doesn't see partner PII (Phase 693 gate) — their work is
+      // portfolio-level: rounds they fund, outcome rollups, ask the AI.
+      return {
+        primary: [
+          { icon: LayoutDashboard, label: 'Donor portal',     href: '/proximate/donor' },
+          { icon: HandCoins,       label: 'Rounds',           href: '/proximate/rounds' },
+          { icon: Sparkles,        label: 'Ask AI',           href: '/proximate/donor#ask' },
+        ],
+        secondary: [
+          { icon: SettingsIcon,    label: 'Settings',         href: '/settings/notifications' },
+        ],
+      };
+
+    case 'ob':
+    case 'admin':
+      // OB + Adeso ops — full operator surface. Operator dashboard,
+      // partners (Phase 693 PII-allowed), disbursements, rounds,
+      // endorser approval queue, crisis selector.
+      return {
+        primary: [
+          { icon: LayoutDashboard, label: 'Operator dashboard', href: '/proximate/admin' },
+          { icon: Users,           label: 'Partners',           href: '/proximate/admin' },
+          { icon: Send,            label: 'Disbursements',      href: '/proximate/disbursements' },
+          { icon: HandCoins,       label: 'Rounds',             href: '/proximate/rounds' },
+          { icon: ClipboardCheck,  label: 'Endorsers',          href: '/proximate/admin/endorsers' },
+          { icon: MapPin,          label: 'Crisis Selector',    href: '/proximate/crisis-selector' },
+        ],
+        secondary: [
+          { icon: ShieldCheck,     label: 'Audit chain',        href: '/admin/audit-chain' },
+          { icon: Activity,        label: t('nav.observability'), href: '/observability' },
+          { icon: SettingsIcon,    label: 'Settings',           href: '/settings/notifications' },
+        ],
+      };
+
+    case 'none':
+    default:
+      // No Proximate persona — fall back to the (likely) NGO-flavored
+      // nav. This branch is rarely hit because the sidebar caller
+      // already checks `persona && persona !== 'none'` before invoking
+      // this function, but exists as a defensive default.
+      return {
+        primary: [
+          { icon: LayoutDashboard, label: t('nav.dashboard'),  href: '/dashboard' },
+        ],
+        secondary: [
+          { icon: SettingsIcon,    label: 'Settings',          href: '/settings/notifications' },
         ],
       };
   }

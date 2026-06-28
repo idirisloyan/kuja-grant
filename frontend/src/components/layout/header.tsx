@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useUIStore } from '@/stores/ui-store';
 import { useNetworkStore } from '@/stores/network-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { supportedLanguages } from '@/i18n';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +29,16 @@ export function Header() {
   const { setMobileSidebarOpen, lowBandwidth, toggleLowBandwidth } = useUIStore();
   const { t } = useTranslation();
   const network = useNetworkStore((s) => s.network);
+  // Phase 696 — Proximate donors/OB are seeded as User.role='ngo' for
+  // platform compatibility. Override the role label so the avatar
+  // menu shows the right persona ("Proximate donor", "Oversight body")
+  // instead of "Ngo".
+  const { persona } = useProximatePersona();
+  const roleLabel = persona && persona !== 'none'
+    ? (persona === 'ob' ? 'Oversight body'
+        : persona === 'admin' ? 'Proximate operator'
+        : 'Proximate donor')
+    : (user?.role ?? 'user');
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
@@ -222,7 +233,7 @@ export function Header() {
             </div>
             <div className="hidden sm:block text-left leading-tight">
               <div className="text-sm font-medium text-foreground truncate max-w-[140px]">{user.name}</div>
-              <div className="text-[11px] text-muted-foreground capitalize">{user.role}</div>
+              <div className="text-[11px] text-muted-foreground capitalize">{roleLabel}</div>
             </div>
           </button>
           {userMenuOpen && (
