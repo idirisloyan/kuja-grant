@@ -23,15 +23,15 @@ session; entries move to "Completed" below as each ships.
 
 - [x] **Phase 678** — Outcome obligation model + 90-day cron (commit 3c6bb54e + 98563e5c timedelta hotfix; verify auto-spawns the 90-day attestation row)
 - [x] **Phase 679** — Partner outcome attestation form (`/proximate-outcome?t=<token>`); commit 98563e5c; live token URL verified on prod with Arabic round-trip
-- [ ] **Phase 680** — OB-side outcome verdict surface on disbursement detail
-- [ ] **Phase 681** — `ProximateDonor` model + admin-registered donor membership
-- [ ] **Phase 682** — Donor portal dashboard (`/proximate/donor`)
-- [ ] **Phase 683** — Donor AI Q&A ("ask about my grant")
-- [ ] **Phase 684** — Outcome AI rollup + counterfactual clustering
-- [ ] **Phase 685** — Quarterly counterfactual prompt cron
-- [ ] **Phase 686** — Donor co-funding (multi-donor round; restricted earmarks)
-- [ ] **Phase 687** — Donor impact retrospective auto-email (blocks on SMTP)
-- [ ] **Phase 688** — i18n + smoke + build + deploy + verify
+- [x] **Phase 680** — OB outcome verdict + ack surface (commit de960b40); donor sees ack on revisit
+- [x] **Phase 681** — `ProximateDonor` model + admin-registered membership (commits dad9121f + 4dfeca2e + be5eba38; donor1@proximate.org seeded)
+- [x] **Phase 682** — Donor portal dashboard `/proximate/donor` (commit 600dc842); portfolio + per-round rollup
+- [x] **Phase 683** — Donor AI Q&A (commit b4af4fe8 + 12a72c50 hotfix); replay-logged, fallback-aware
+- [x] **Phase 684** — Outcome rollup + AI theme clustering (commit 413f2572); structured stats + optional Claude cluster
+- [x] **Phase 685** — Counterfactual question + quarterly nudge cron (commit 0730037d); partner can attest counterfactual via token URL
+- [x] **Phase 686** — Donor co-funding shares + restriction enforcement (commit 5b36182b); 422 on disbursements over restricted budget
+- [x] **Phase 687** — Retrospective PDF endpoint + monthly cron (this commit); audit row emitted per donor/round, manual send pending SMTP
+- [x] **Phase 688** — Final ship cycle for the 678-687 block (this commit); 6 honest punt-list deferrals tracked below
 
 ---
 

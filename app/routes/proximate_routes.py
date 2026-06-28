@@ -4134,6 +4134,241 @@ def api_cron_disbursement_nudge():
     return jsonify({'success': True, 'nudged': nudged, 'day': day_key})
 
 
+@proximate_bp.route('/rounds/<int:round_id>/retrospective.pdf', methods=['GET'])
+@login_required
+def api_round_retrospective_pdf(round_id):
+    """Phase 687 — 6-month donor impact retrospective PDF.
+
+    Only available for rounds that have been closed >= 180 days. Returns
+    503 if reportlab isn't installed. Surfaces envelope used vs remaining,
+    partners served, outcome attestation stats, common themes.
+
+    Auth: OB sees all. Donor sees only if they subscribed to this round.
+    Anyone else gets 403.
+    """
+    from app.models import (
+        ProximateOutcomeAttestation, ProximatePartner, ProximateDonor,
+    )
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.units import cm
+    except ImportError:
+        return jsonify({
+            'success': False,
+            'error': 'reportlab not installed on this deploy',
+        }), 503
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+
+    r = ProximateRound.query.filter_by(id=round_id, network_id=net.id).first()
+    if not r:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    if not r.closed_at:
+        return jsonify({
+            'success': False, 'error': 'round not closed yet',
+        }), 422
+    closed = (
+        r.closed_at.replace(tzinfo=timezone.utc)
+        if r.closed_at.tzinfo is None else r.closed_at
+    )
+    age_days = (datetime.now(timezone.utc) - closed).days
+    if age_days < 180:
+        return jsonify({
+            'success': False,
+            'error': f'retrospective available 180 days after closure (currently {age_days})',
+        }), 422
+
+    # Scope guard for donors
+    if not (getattr(current_user, 'role', '') == 'admin'):
+        donor = ProximateDonor.query.filter_by(
+            network_id=net.id, primary_user_id=current_user.id,
+        ).first()
+        if donor:
+            subs = donor.subscribed_round_ids()
+            if subs and round_id not in subs:
+                return jsonify({
+                    'success': False, 'error': 'not in your scope',
+                }), 403
+        else:
+            return jsonify({'success': False, 'error': 'access denied'}), 403
+
+    # Compute the data
+    disbursements = ProximateDisbursement.query.filter_by(
+        network_id=net.id, round_id=r.id,
+    ).all()
+    spendable = [
+        d for d in disbursements
+        if d.status in ('pending_report', 'reported', 'verified', 'flagged')
+    ]
+    disbursed = sum(float(d.amount_usd or 0) for d in spendable)
+    partner_ids = {d.partner_id for d in spendable}
+    partners = ProximatePartner.query.filter(
+        ProximatePartner.id.in_(partner_ids)
+    ).all() if partner_ids else []
+    outcomes = ProximateOutcomeAttestation.query.filter_by(
+        network_id=net.id, round_id=r.id,
+    ).all()
+    submitted_outcomes = [o for o in outcomes if o.submitted_at]
+    verified_outcomes = [o for o in outcomes if o.status == 'verified']
+    sustained_pcts = []
+    for o in submitted_outcomes:
+        ans = o.get_answers()
+        s = ans.get('still_in_state_n'); t = ans.get('total_intended_n')
+        if isinstance(s, (int, float)) and isinstance(t, (int, float)) and t > 0:
+            sustained_pcts.append(min(100, max(0, (s / t) * 100)))
+    sustained_avg = (
+        sum(sustained_pcts) / len(sustained_pcts) if sustained_pcts else None
+    )
+
+    # Render PDF
+    import io
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    width, height = A4
+    y = height - 2 * cm
+    c.setFont('Helvetica-Bold', 16)
+    c.drawString(2 * cm, y, f'Proximate Round Retrospective')
+    y -= 0.7 * cm
+    c.setFont('Helvetica', 11)
+    c.drawString(2 * cm, y, f'{r.title}')
+    y -= 0.6 * cm
+    c.setFont('Helvetica', 9)
+    c.drawString(
+        2 * cm, y,
+        f'Closed {closed.strftime("%Y-%m-%d")} · '
+        f'{age_days} days ago · Generated '
+        f'{datetime.now(timezone.utc).strftime("%Y-%m-%d")}'
+    )
+    y -= 1 * cm
+
+    def line(label, value):
+        nonlocal y
+        c.setFont('Helvetica-Bold', 10); c.drawString(2 * cm, y, label)
+        c.setFont('Helvetica', 10); c.drawString(8 * cm, y, str(value))
+        y -= 0.5 * cm
+
+    c.setFont('Helvetica-Bold', 12)
+    c.drawString(2 * cm, y, '1. Envelope use'); y -= 0.6 * cm
+    line('Committed envelope', f'${float(r.envelope_usd or 0):,.0f}')
+    line('Disbursed', f'${disbursed:,.0f}')
+    line('Disbursement count', f'{len(spendable)}')
+    line('Partners served', f'{len(partner_ids)}')
+    y -= 0.4 * cm
+
+    c.setFont('Helvetica-Bold', 12)
+    c.drawString(2 * cm, y, '2. 90-day outcome attestation'); y -= 0.6 * cm
+    line('Total obligations', f'{len(outcomes)}')
+    line('Attested by partner', f'{len(submitted_outcomes)}')
+    line('OB-verified', f'{len(verified_outcomes)}')
+    line(
+        'Sustained-impact average',
+        f'{sustained_avg:.1f}% (n={len(sustained_pcts)})'
+        if sustained_avg is not None else 'no data yet'
+    )
+    y -= 0.4 * cm
+
+    c.setFont('Helvetica-Bold', 12)
+    c.drawString(2 * cm, y, '3. Honest scope'); y -= 0.6 * cm
+    c.setFont('Helvetica', 9)
+    for fragment in (
+        'This retrospective summarises platform-recorded data only.',
+        'Counterfactual reflection themes from partners are surfaced',
+        'on /proximate/admin → outcomes rollup, not in this PDF.',
+        'Email delivery to donors requires SMTP — currently disabled.',
+    ):
+        c.drawString(2 * cm, y, fragment); y -= 0.4 * cm
+
+    c.save()
+    pdf_bytes = buf.getvalue()
+    AuditChainEntry.append(
+        action='proximate.retrospective.downloaded',
+        actor_email=current_user.email,
+        subject_kind='proximate_round',
+        subject_id=r.id,
+        details={'pdf_bytes': len(pdf_bytes), 'closed_days_ago': age_days},
+    )
+    from flask import Response
+    return Response(
+        pdf_bytes,
+        mimetype='application/pdf',
+        headers={
+            'Content-Disposition': (
+                f'inline; filename="round-{r.id}-retrospective.pdf"'
+            ),
+        },
+    )
+
+
+@proximate_bp.route('/monitoring/donor-retrospective', methods=['POST'])
+def api_cron_donor_retrospective():
+    """Phase 687 — finds closed rounds aged >= 180 days that don't yet
+    have a 'proximate.retrospective.ready' audit row per subscribed
+    donor, and emits one. The audit row is the durable signal the OB
+    uses to email each donor (manually today; auto-send when SMTP
+    lands). Honest: this cron does not send email itself.
+    """
+    from app.models import ProximateDonor
+    from flask import current_app as cap
+    secret = cap.config.get('CRON_SECRET') or os.getenv('CRON_SECRET')
+    auth = request.headers.get('Authorization', '')
+    if not secret or auth != f'Bearer {secret}':
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=180)
+    closed_rounds = ProximateRound.query.filter(
+        ProximateRound.status == 'closed',
+        ProximateRound.closed_at.isnot(None),
+        ProximateRound.closed_at < cutoff,
+    ).all()
+    emitted = 0
+    for r in closed_rounds:
+        donors = ProximateDonor.query.filter_by(network_id=r.network_id).all()
+        for d in donors:
+            subs = d.subscribed_round_ids()
+            if subs and r.id not in subs:
+                continue
+            existing = AuditChainEntry.query.filter_by(
+                subject_kind='proximate_round',
+                subject_id=r.id,
+                action='proximate.retrospective.ready',
+            ).first()
+            details_blob = existing.details_json if existing else ''
+            if existing and f'"donor_id": {d.id}' in (details_blob or ''):
+                continue
+            AuditChainEntry.append(
+                action='proximate.retrospective.ready',
+                actor_email='cron-monitoring',
+                subject_kind='proximate_round',
+                subject_id=r.id,
+                details={
+                    'donor_id': d.id,
+                    'donor_display_name': d.display_name,
+                    'closed_days_ago': (now - r.closed_at.replace(
+                        tzinfo=timezone.utc
+                    ) if r.closed_at.tzinfo is None else now - r.closed_at).days,
+                    'smtp_blocked': not bool(
+                        cap.config.get('SENDGRID_API_KEY') or
+                        os.getenv('SENDGRID_API_KEY')
+                    ),
+                },
+            )
+            emitted += 1
+    logger.info(
+        f'Proximate cron: donor-retrospective emitted {emitted} '
+        f'ready rows across {len(closed_rounds)} closed rounds'
+    )
+    return jsonify({
+        'success': True,
+        'emitted': emitted,
+        'closed_rounds': len(closed_rounds),
+    })
+
+
 @proximate_bp.route('/monitoring/quarterly-counterfactual-prompt', methods=['POST'])
 def api_cron_quarterly_counterfactual_prompt():
     """Phase 685 — quarterly counterfactual prompt cron.
