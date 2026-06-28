@@ -61,6 +61,44 @@ session; entries move to "Completed" below as each ships.
   serve as `<audio>` elements, capture answer-by-answer voice, transcribe
   each. Zero text required for partners.
 
+### WhatsApp Business API (programmatic outbound)
+- **Why:** today's WhatsApp is manual deep-link shares only — Phase
+  669 added the button on disbursement detail (Phase 698 added it to
+  the outcome attestation row). The OB still picks the contact and
+  hits send for each one. Reach the ~30% of Sudan rural users without
+  WhatsApp is a separate gap (SMS fallback above).
+- **Owner:** Adeso ops + Meta Cloud API account (or Twilio WhatsApp).
+  Pick the provider — cost per template message + template approval
+  cadence (24h–7d per template via Meta).
+- **Action:** Adeso opens a WhatsApp Business sender, gets templates
+  pre-approved for: token-URL share, report-due nudge, outcome-due
+  nudge, retrospective-ready notification. Provides credentials as
+  Railway env vars.
+- **Engineering effort once unblocked:** ~2 days. Wire the existing
+  cron emit-points (Phase 651, 678, 685, 687, 690) to dispatch a
+  template message instead of just an audit row. Same approach as
+  the SMTP punt below.
+
+### Sudanese-Arabic native-speaker translation review
+- **Why:** all 490 Proximate i18n keys have real Arabic — but the
+  copy is MSA (fusha). Sudanese rural partners *understand* MSA but
+  it doesn't feel native. The voice-only Arabic flow item below is
+  the dialect-blocked one; this is the *static-string* dialect gap.
+  The Phase 698 donor-AI dialect instruction handles the
+  conversational surface; this item handles the static UI.
+- **Owner:** Adeso engages a Sudanese-Arabic translator or community
+  reviewer. Same operational shape as the "real fr/sw/so/es
+  translations" item — translator work, not engineering.
+- **Action:** Translator walks the `proximate.*` keys in `ar.json`,
+  flags where Sudanese-dialect substitutions would land more
+  naturally for partner-facing surfaces (`proximate.nominate.*`,
+  `proximate.outcome.*`, `proximate.partner.*`, `proximate.report.*`).
+  Adeso-OB-facing strings (`proximate.admin.*`, sidebar nav) can
+  stay MSA — register is correct for that audience.
+- **Engineering effort once unblocked:** ~30 minutes per key x 100
+  partner-facing keys = ~2 days. Pure replace-strings, no schema
+  change.
+
 ### Quarterly Fiduciary Board pack
 - **Why:** design doc §3.6 explicitly mentions this. Board reviews the
   fund's posture quarterly; today they get nothing structured.
@@ -309,6 +347,30 @@ setup that needs Adeso ops to action. Cited in the v2 design doc §13.
 ---
 
 ## Completed (rolling log, newest first)
+
+- **Phase 698 — WhatsApp share on outcome attestation + Sudanese
+  AI dialect** (2026-06-28). Two cheap wins, plus honest scope of
+  what's still pending:
+  - **WhatsApp share on outcome row** — propagated the same wa.me
+    deep-link button that was on the report-token row (Phase 669)
+    to the outcome-attestation row on disbursement detail. The
+    other two intended targets (verifier-assign UI,
+    mini-portal-issue UI) need new OB UI surfaces first — not a
+    cheap propagation, backlogged.
+  - **Sudanese-Arabic dialect on donor AI Q&A** — added rule #6
+    to the donor Q&A system prompt: if the donor writes in Arabic,
+    reply in conversational Sudanese, not MSA. No-op for
+    English/MSA queries. Outcome-cluster and Crisis-brief AI
+    surfaces kept in MSA/English (output is for OB/Allocation
+    Committee — MSA is the right register there).
+  - **Honest disclosure added to backlog:** the existing 490
+    Proximate Arabic strings are MSA — not yet native-speaker
+    vetted, no Sudanese-dialect pass. New backlog item:
+    "Sudanese-Arabic native-speaker translation review".
+  - **New backlog item:** "WhatsApp Business API (programmatic
+    outbound)" — paired with the SMS-fallback gap, same shape:
+    Adeso ops + account decision blocks it, not engineering.
+
 
 - **Phase 696 — Proximate persona refactor** (2026-06-27). Donor + OB
   + Adeso operator users on Proximate are seeded with

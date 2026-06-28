@@ -648,13 +648,25 @@ export function ProximateDisbursementDetailClient() {
                 <p className="text-muted-foreground">
                   {t('proximate.outcome.share_link_hint')}
                 </p>
-                <div className="flex gap-2">
-                  <code className="flex-1 truncate bg-muted px-2 py-1 rounded text-xs">
+                <div className="flex gap-2 flex-wrap">
+                  <code className="flex-1 min-w-[200px] truncate bg-muted px-2 py-1 rounded text-xs">
                     {`${typeof window !== 'undefined' ? window.location.origin : ''}/proximate-outcome?t=${data.outcome.report_token}`}
                   </code>
                   <Button size="sm" variant="outline" onClick={copyOutcomeUrl}>
                     {t('proximate.disbursement.copy')}
                   </Button>
+                  {/* Phase 698 — WhatsApp share for outcome attestation
+                      token (parity with the report-token share row above). */}
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `${t('proximate.disbursement.whatsapp_lead')} ${typeof window !== 'undefined' ? window.location.origin : ''}/proximate-outcome?t=${data.outcome.report_token}`,
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 h-8 text-xs font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                  >
+                    {t('proximate.disbursement.share_via_whatsapp')}
+                  </a>
                 </div>
               </div>
             )}

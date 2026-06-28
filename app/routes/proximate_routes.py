@@ -3966,7 +3966,16 @@ def api_donor_ask():
         "4. Stay neutral on partners — do not endorse or judge specific "
         "partners; only describe what the data shows.\n"
         "5. If the question is about a round, partner, or disbursement "
-        "outside this donor's scope, redirect them to ask Adeso directly."
+        "outside this donor's scope, redirect them to ask Adeso directly.\n"
+        # Phase 698 — Sudanese-dialect cheap win. If the donor asks in
+        # Arabic (dialect or MSA), reply in conversational Sudanese
+        # Arabic, not MSA — the Fund operates in Sudan and the dialect
+        # feels native to the audience. If they ask in MSA explicitly
+        # or in English, stay in their register.
+        "6. Language match: if the donor writes in Arabic, reply in "
+        "conversational Sudanese Arabic (colloquial), not formal MSA. "
+        "If they write in English (or any other language), stay in "
+        "that language. Match the donor's register, not the default."
     )
     user_msg = (
         f"Donor: {donor.display_name}\n\n"
