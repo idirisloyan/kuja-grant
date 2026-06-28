@@ -37,13 +37,14 @@ session; entries move to "Completed" below as each ships.
 
 ## High priority (next sprint candidates)
 
-### Partner mini-portal (long-lived token)
-- **Why:** partners today are write-only via the per-disbursement token.
-  Once a partner has 3+ disbursements they want to see their own story,
-  pending obligations, Adeso ack messages, and historical outcome data.
-- **Action:** issue a partner-level long-lived token at clearance, mount
-  `/proximate-partner?t=<token>` listing all disbursements + outcome
-  attestations + acknowledgements + next obligations.
+### ~~Partner mini-portal (long-lived token)~~ — shipped Phase 689 (2026-06-27)
+- Done in commit 8ed8b463. Verified on prod against partner #8
+  (Khartoum Sisters Mutual Aid) returning 9 disbursements with the
+  full outcome join. Idempotent OB-issued token. Static page renders.
+- Punt list:
+  - No SMS/email of the URL (OB shares it manually for v0)
+  - No auto-issue at clearance — OB requests when they need it
+  - Partner can't update profile from the portal (read-only v0)
 
 ### SMS fallback for partners without WhatsApp
 - **Why:** ~30% of Sudan rural users don't have WhatsApp. Today the only
@@ -245,6 +246,13 @@ Treat as future Kuja-level work, not Proximate work.
 ---
 
 ## Completed (rolling log, newest first)
+
+- **Phase 689 — Partner mini-portal** (2026-06-27, commit 8ed8b463).
+  Long-lived per-partner token URL `/proximate-partner?t=<token>` shows
+  all disbursements + linked outcome attestations + ack messages from
+  both layers. OB issues the token via `POST /api/proximate/partners/
+  <id>/mini-portal-link` (idempotent). Verified end-to-end on prod
+  with Khartoum Sisters Mutual Aid (9 disbursements, mixed outcomes).
 
 See `docs/NEAR_BACKLOG.md` "Completed" section for Phase 627–677
 completions — those were logged there during the Proximate work in
