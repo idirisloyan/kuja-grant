@@ -40,6 +40,7 @@ from app.extensions import db
 from app.models import (
     Network, User, Endorser, ProximatePartner, Endorsement,
     FinancialServiceProvider, Organization, NetworkMembership,
+    ProximateDonor,
 )
 from werkzeug.security import generate_password_hash
 
@@ -466,7 +467,6 @@ def run():
         # Idempotent: if donor1 user + ProximateDonor row exist they
         # are reused. The donor's org is a separate "Demo Donor" org
         # so the user-org wiring matches the real-world pattern.
-        from app.models import Organization, ProximateDonor
         DONOR_EMAIL = 'donor1@proximate.org'
         donor_user = User.query.filter_by(email=DONOR_EMAIL).first()
         donor_org = Organization.query.filter_by(
