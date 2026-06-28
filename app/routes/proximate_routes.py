@@ -3480,6 +3480,107 @@ def api_donor_unsubscribe():
     return jsonify({'success': True, 'donor': donor.to_dict()})
 
 
+@proximate_bp.route('/donors/me/dashboard', methods=['GET'])
+@login_required
+def api_donor_dashboard():
+    """Phase 682 — single-fetch portal payload. Returns the donor's
+    subscribed rounds with per-round envelope/disbursed/outcome stats,
+    plus a portfolio-level rollup. The portal page hydrates from this
+    one endpoint; no per-round drill-down request is needed for the
+    landing view.
+
+    Honest scope: if the donor has no `subscribed_round_ids`, this
+    falls back to listing ALL rounds in the tenant. Subscriptions are
+    a v0 surface; the v1 will require an explicit subscribe before
+    the donor sees anything (per the Phase 686 co-funding gate).
+    """
+    from app.models import (
+        ProximateOutcomeAttestation, ProximatePartner,
+    )
+    donor, err = _require_donor()
+    if err:
+        return err
+
+    subscribed = donor.subscribed_round_ids()
+    q = ProximateRound.query.filter_by(network_id=donor.network_id)
+    if subscribed:
+        q = q.filter(ProximateRound.id.in_(subscribed))
+    rounds = q.order_by(ProximateRound.created_at.desc()).all()
+
+    out_rounds = []
+    portfolio = {
+        'envelope_usd': 0.0,
+        'disbursed_usd': 0.0,
+        'partners_served': set(),
+        'disbursement_count': 0,
+        'outcome_attested': 0,
+        'outcome_verified': 0,
+        'outcome_pending': 0,
+        'flagged_count': 0,
+    }
+    for r in rounds:
+        dis = ProximateDisbursement.query.filter_by(
+            network_id=donor.network_id, round_id=r.id,
+        ).all()
+        status_counts = {}
+        status_totals = {}
+        partners = set()
+        disbursed_usd = 0.0
+        for d in dis:
+            status_counts[d.status] = status_counts.get(d.status, 0) + 1
+            amt = float(d.amount_usd) if d.amount_usd else 0.0
+            status_totals[d.status] = status_totals.get(d.status, 0.0) + amt
+            partners.add(d.partner_id)
+            if d.status in ('pending_report', 'reported', 'verified', 'flagged'):
+                disbursed_usd += amt
+
+        outcomes = ProximateOutcomeAttestation.query.filter_by(
+            network_id=donor.network_id, round_id=r.id,
+        ).all()
+        outcome_attested = sum(1 for o in outcomes if o.submitted_at)
+        outcome_verified = sum(1 for o in outcomes if o.status == 'verified')
+        outcome_pending = sum(1 for o in outcomes if o.status == 'pending')
+
+        env_usd = float(r.envelope_usd) if r.envelope_usd else 0.0
+        out_rounds.append({
+            'id': r.id,
+            'title': r.title,
+            'status': r.status,
+            'trigger_type': r.trigger_type,
+            'envelope_usd': env_usd,
+            'disbursed_usd': disbursed_usd,
+            'disbursement_count': len(dis),
+            'status_counts': status_counts,
+            'status_totals_usd': status_totals,
+            'partners_served': len(partners),
+            'flagged_count': status_counts.get('flagged', 0),
+            'outcome_attested': outcome_attested,
+            'outcome_verified': outcome_verified,
+            'outcome_pending': outcome_pending,
+            'outcome_total': len(outcomes),
+            'created_at': r.created_at.isoformat() if r.created_at else None,
+            'report_pdf_url': f'/api/proximate/rounds/{r.id}/report.pdf',
+        })
+
+        portfolio['envelope_usd'] += env_usd
+        portfolio['disbursed_usd'] += disbursed_usd
+        portfolio['partners_served'].update(partners)
+        portfolio['disbursement_count'] += len(dis)
+        portfolio['outcome_attested'] += outcome_attested
+        portfolio['outcome_verified'] += outcome_verified
+        portfolio['outcome_pending'] += outcome_pending
+        portfolio['flagged_count'] += status_counts.get('flagged', 0)
+
+    portfolio['partners_served'] = len(portfolio['partners_served'])
+    return jsonify({
+        'success': True,
+        'donor': donor.to_dict(),
+        'using_fallback_listing': not subscribed,
+        'rounds': out_rounds,
+        'portfolio': portfolio,
+    })
+
+
 @proximate_bp.route('/partners/<int:partner_id>/alternate-routes', methods=['GET'])
 @login_required
 def api_partner_alternate_routes(partner_id):
