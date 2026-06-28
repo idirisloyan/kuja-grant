@@ -3634,6 +3634,193 @@ def api_donor_ask():
     })
 
 
+# =====================================================================
+# Phase 684 — Outcome rollup + counterfactual clustering
+# =====================================================================
+# Aggregates outcome attestation data for a round (or portfolio) into
+# structured stats — coverage %, sustained-impact %, partner-level
+# breakdowns — and uses Claude to cluster the free-text `sustained`,
+# `not_sustained`, and `counterfactual_reflection` fields into themes.
+#
+# Surfaces on both OB admin (Phase 685 cron prompts later) and the
+# donor portal — same endpoint, scoped by caller.
+
+
+def _outcome_rollup_stats(outcomes):
+    """Pure stats — no AI call. Used by both the rollup endpoint and
+    the Phase 682 dashboard payload."""
+    total = len(outcomes)
+    submitted = [o for o in outcomes if o.submitted_at]
+    verified = [o for o in outcomes if o.status == 'verified']
+    disputed = [o for o in outcomes if o.status == 'disputed']
+    sustained_pcts = []
+    for o in submitted:
+        ans = o.get_answers()
+        s = ans.get('still_in_state_n')
+        t = ans.get('total_intended_n')
+        if isinstance(s, (int, float)) and isinstance(t, (int, float)) and t > 0:
+            sustained_pcts.append(min(100, max(0, (s / t) * 100)))
+    return {
+        'total': total,
+        'submitted': len(submitted),
+        'verified': len(verified),
+        'disputed': len(disputed),
+        'attestation_rate': (
+            round(len(submitted) / total * 100, 1) if total else 0
+        ),
+        'verification_rate': (
+            round(len(verified) / len(submitted) * 100, 1) if submitted else 0
+        ),
+        'sustained_impact_avg_pct': (
+            round(sum(sustained_pcts) / len(sustained_pcts), 1)
+            if sustained_pcts else None
+        ),
+        'sustained_sample_size': len(sustained_pcts),
+    }
+
+
+@proximate_bp.route('/outcomes/rollup', methods=['GET'])
+@login_required
+def api_outcomes_rollup():
+    """Phase 684 — structured rollup over outcome attestations.
+
+    Query params:
+      round_id (optional) — narrow to one round
+      cluster=true (optional) — also run AI theme clustering on free-text
+
+    Auth:
+      OB sees the full tenant scope.
+      Donor sees only their subscribed rounds (or all if fallback).
+    """
+    from app.models import ProximateOutcomeAttestation, ProximateDonor
+    from app.services.copilot_service import CopilotService
+    from app.services.replay_service import log_replayable_ai_call
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+
+    # Resolve caller's allowed round scope
+    is_ob = getattr(current_user, 'role', '') == 'admin' or current_user.is_authenticated and any(
+        m for m in getattr(current_user, 'network_memberships', [])
+        if m.network_id == net.id and m.is_oversight_body
+    )
+    donor = ProximateDonor.query.filter_by(
+        network_id=net.id, primary_user_id=current_user.id,
+    ).first()
+    if not is_ob and not donor:
+        return jsonify({
+            'success': False, 'error': 'access denied',
+        }), 403
+
+    round_id_arg = request.args.get('round_id', type=int)
+    allowed_round_ids = None
+    if donor and not is_ob:
+        subs = donor.subscribed_round_ids()
+        allowed_round_ids = set(subs) if subs else None  # None = all rounds
+
+    outcomes_q = ProximateOutcomeAttestation.query.filter_by(network_id=net.id)
+    if round_id_arg:
+        if allowed_round_ids is not None and round_id_arg not in allowed_round_ids:
+            return jsonify({
+                'success': False, 'error': 'round not in your scope',
+            }), 403
+        outcomes_q = outcomes_q.filter_by(round_id=round_id_arg)
+    elif allowed_round_ids is not None:
+        outcomes_q = outcomes_q.filter(
+            ProximateOutcomeAttestation.round_id.in_(allowed_round_ids)
+        )
+    outcomes = outcomes_q.all()
+
+    stats = _outcome_rollup_stats(outcomes)
+
+    # Pull the free-text fields for optional clustering.
+    submitted = [o for o in outcomes if o.submitted_at]
+    snippets = []
+    for o in submitted:
+        ans = o.get_answers()
+        if ans.get('sustained'):
+            snippets.append({
+                'kind': 'sustained',
+                'text': str(ans['sustained'])[:500],
+                'outcome_id': o.id,
+            })
+        if ans.get('not_sustained'):
+            snippets.append({
+                'kind': 'not_sustained',
+                'text': str(ans['not_sustained'])[:500],
+                'outcome_id': o.id,
+            })
+        if o.counterfactual_reflection:
+            snippets.append({
+                'kind': 'counterfactual',
+                'text': o.counterfactual_reflection[:500],
+                'outcome_id': o.id,
+            })
+
+    want_cluster = request.args.get('cluster', '').lower() in ('1', 'true', 'yes')
+    themes = None
+    cluster_meta = None
+    if want_cluster and snippets:
+        import json as _json
+        system = (
+            "You cluster short partner attestations into themes. "
+            "Return STRICT JSON shape: {themes: [{label, count, kind, "
+            "example_outcome_ids: [int]}]}. Rules:\n"
+            "1. Use 3-7 themes. Cluster similar attestations together.\n"
+            "2. `label` is 2-5 words describing the theme.\n"
+            "3. `kind` is one of: sustained, not_sustained, counterfactual.\n"
+            "4. `count` is how many snippets fit this theme.\n"
+            "5. `example_outcome_ids` lists up to 3 representative IDs.\n"
+            "6. Do not invent themes that aren't represented in the data."
+        )
+        user_msg = (
+            f"Snippets to cluster:\n{_json.dumps(snippets, indent=2)}\n\n"
+            "Output STRICT JSON only, no commentary."
+        )
+        t0 = int(datetime.now(timezone.utc).timestamp() * 1000)
+        result = CopilotService._call(
+            system=system, user=user_msg, max_tokens=800, lang='en',
+        )
+        elapsed = int(datetime.now(timezone.utc).timestamp() * 1000) - t0
+        if result.get('ok'):
+            raw = ((result.get('data') or {}).get('text') or '').strip()
+            try:
+                parsed = _json.loads(raw)
+                themes = parsed.get('themes', [])
+            except (ValueError, TypeError):
+                themes = None
+            try:
+                call_id = log_replayable_ai_call(
+                    endpoint='proximate_outcome_cluster',
+                    user_id=current_user.id,
+                    input_text=f'{len(snippets)} snippets',
+                    output_text=raw[:2000],
+                    duration_ms=elapsed,
+                )
+            except Exception:
+                call_id = None
+            cluster_meta = {
+                'snippets_clustered': len(snippets),
+                'latency_ms': elapsed,
+                'fallback_used': result.get('meta', {}).get('fallback_used', False),
+                'call_id': call_id,
+            }
+
+    return jsonify({
+        'success': True,
+        'scope': {
+            'round_id': round_id_arg,
+            'is_ob': is_ob,
+            'donor_id': donor.id if donor else None,
+        },
+        'stats': stats,
+        'themes': themes,
+        'cluster_meta': cluster_meta,
+        'snippet_count': len(snippets),
+    })
+
+
 @proximate_bp.route('/donors/me/dashboard', methods=['GET'])
 @login_required
 def api_donor_dashboard():
