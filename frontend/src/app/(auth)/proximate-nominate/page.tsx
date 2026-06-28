@@ -212,13 +212,29 @@ export default function ProximateNominatePage() {
           </div>
 
           {/* Honeypot — bots fill every field; humans won't see this.
-              Phase 697: switched from inline-style clip technique to
-              Tailwind's `sr-only` class because the reviewer still saw
-              the label render visibly even with the inline approach.
-              `sr-only` is the codebase's battle-tested visually-hidden
-              pattern — used by the page's "Skip to main content" link
-              and every accessible widget. */}
-          <div className="sr-only" aria-hidden="true">
+              Phase 697 (v2): belt-and-suspenders. Prod check showed the
+              `sr-only` class was applied but its CSS rule wasn't in the
+              bundle loaded by the (auth) route group (Tailwind didn't
+              purge in scope). Wrap once more in inline style so even
+              if Tailwind drops `sr-only`, the field stays hidden by
+              the inline `clip-path` + `position:absolute` + `width:0`
+              combo. Two independent hiding mechanisms. */}
+          <div
+            className="sr-only"
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              width: '1px',
+              height: '1px',
+              padding: 0,
+              margin: '-1px',
+              overflow: 'hidden',
+              clipPath: 'inset(50%)',
+              clip: 'rect(0 0 0 0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
+          >
             <label htmlFor="hp_website">Website</label>
             <input
               id="hp_website"
