@@ -25,7 +25,7 @@ PROXIMATE_FUND_DESIGN.md §6).
 import logging
 import os
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import Blueprint, g, jsonify, request
 from flask_login import login_required, current_user
 
@@ -2973,6 +2973,253 @@ def _spawn_outcome_obligation(d, net):
         },
     )
     return row
+
+
+# =====================================================================
+# Phase 679 — Partner outcome attestation form (90-day follow-up)
+# =====================================================================
+# Token-credentialed URL the partner returns to at the 3-month mark.
+# Same dual-auth pattern as Phase 652 disbursement-reports.
+#
+# Form is intentionally short — 3 questions, voice + photo optional.
+# The point is to capture sustained-impact data, not produce another
+# narrative report.
+
+
+@proximate_bp.route('/outcome-attestations/<token>', methods=['GET'])
+def api_get_outcome_by_token(token):
+    """Public: resolve an outcome token to its attestation row so the
+    partner can see what to attest. Token IS the credential."""
+    from app.models import ProximateOutcomeAttestation
+    o = ProximateOutcomeAttestation.query.filter_by(
+        report_token=token,
+    ).first()
+    if not o:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    d = ProximateDisbursement.query.get(o.disbursement_id)
+    return jsonify({
+        'success': True,
+        'outcome': {
+            'id': o.id,
+            'status': o.status,
+            'due_at': o.due_at.isoformat() if o.due_at else None,
+            'spawned_at': o.spawned_at.isoformat() if o.spawned_at else None,
+            'submitted_at': (
+                o.submitted_at.isoformat() if o.submitted_at else None
+            ),
+            'answers': o.get_answers(),
+            'voice_transcript': o.voice_transcript,
+            'counterfactual_reflection': o.counterfactual_reflection,
+            'ack_message': o.ack_message,
+            'ack_message_at': (
+                o.ack_message_at.isoformat() if o.ack_message_at else None
+            ),
+            'partner_name': d.partner.name if d and d.partner else None,
+            'disbursement_amount_usd': (
+                float(d.amount_usd) if d and d.amount_usd else None
+            ),
+            'disbursement_sent_at': (
+                d.sent_at.isoformat() if d and d.sent_at else None
+            ),
+            'disbursement_purpose': d.purpose if d else None,
+        },
+    })
+
+
+@proximate_bp.route('/outcome-attestations/<token>', methods=['POST'])
+def api_submit_outcome_attestation(token):
+    """Phase 679 — partner attests to 90-day sustained outcome.
+
+    Body (3 short questions, all optional individually but at least
+    one must be present):
+      still_in_state_n: int      (Q1: how many of those originally
+                                  helped are still in the same state?)
+      total_intended_n: int      (Q1 denominator — partner's own count)
+      sustained: string          (Q2: what sustained? — free text)
+      not_sustained: string      (Q3: what did NOT sustain + what they
+                                  would do differently)
+      voice_doc_id: int          (optional voice attachment)
+      photo_doc_id: int          (optional photo attachment)
+      voice_transcript: string   (optional client-side transcript)
+    """
+    from app.models import ProximateOutcomeAttestation
+    o = ProximateOutcomeAttestation.query.filter_by(
+        report_token=token,
+    ).first()
+    auth_source = 'token'
+    if not o:
+        # Session fallback: authed user can submit by outcome id
+        if not current_user.is_authenticated:
+            return jsonify({'success': False, 'error': 'invalid token'}), 404
+        payload_probe = request.get_json(silent=True) or {}
+        oid = payload_probe.get('outcome_id')
+        if not oid:
+            return jsonify({'success': False, 'error': 'invalid token'}), 404
+        o = ProximateOutcomeAttestation.query.get(oid)
+        if not o:
+            return jsonify({'success': False, 'error': 'invalid token'}), 404
+        net, err = _require_proximate_tenant()
+        if err:
+            return err
+        if o.network_id != net.id:
+            return jsonify({'success': False, 'error': 'tenant mismatch'}), 403
+        auth_source = 'session'
+    elif current_user.is_authenticated:
+        auth_source = 'session+token'
+
+    if o.submitted_at is not None:
+        return jsonify({
+            'success': True,
+            'already_submitted': True,
+            'outcome': o.to_dict(),
+        })
+
+    import json as _json
+    payload = request.get_json(silent=True) or {}
+
+    def _int_or_none(v):
+        try:
+            return int(v) if v not in (None, '') else None
+        except (TypeError, ValueError):
+            return None
+
+    answers = {
+        'still_in_state_n': _int_or_none(payload.get('still_in_state_n')),
+        'total_intended_n': _int_or_none(payload.get('total_intended_n')),
+        'sustained': (payload.get('sustained') or '').strip()[:5000] or None,
+        'not_sustained': (payload.get('not_sustained') or '').strip()[:5000] or None,
+        'submitted_at': datetime.now(timezone.utc).isoformat(),
+        'source': auth_source,
+    }
+
+    # Require at least ONE meaningful answer so we don't capture empty
+    # attestations. The partner can submit minimal data — the absence
+    # of any of them is meaningful and we want to surface it on the OB
+    # side, but a fully-empty submission is a UI bug, not a signal.
+    has_signal = (
+        answers['still_in_state_n'] is not None
+        or answers['sustained']
+        or answers['not_sustained']
+        or payload.get('voice_doc_id')
+        or payload.get('photo_doc_id')
+    )
+    if not has_signal:
+        return jsonify({
+            'success': False,
+            'error': 'attestation requires at least one answer or attachment',
+        }), 400
+
+    o.answers_json = _json.dumps(answers, ensure_ascii=False)
+    o.voice_doc_id = payload.get('voice_doc_id')
+    o.photo_doc_id = payload.get('photo_doc_id')
+    o.voice_transcript = (payload.get('voice_transcript') or '').strip() or None
+    o.submitted_at = datetime.now(timezone.utc)
+    o.submitted_via = 'session' if auth_source != 'token' else 'token'
+    o.status = 'submitted'
+    db.session.commit()
+
+    actor = (
+        current_user.email if current_user.is_authenticated
+        else f'token:{token[:8]}…'
+    )
+    AuditChainEntry.append(
+        action='proximate.outcome.submitted',
+        actor_email=actor,
+        subject_kind='proximate_outcome_attestation',
+        subject_id=o.id,
+        details={
+            'auth_source': auth_source,
+            'still_in_state_n': answers['still_in_state_n'],
+            'has_voice': bool(o.voice_doc_id),
+            'has_photo': bool(o.photo_doc_id),
+        },
+    )
+    return jsonify({'success': True, 'outcome': o.to_dict()})
+
+
+@proximate_bp.route('/outcome-attestations/<token>/attachment', methods=['POST'])
+def api_attach_outcome_evidence(token):
+    """Token-scoped attachment endpoint for the outcome form. Same
+    Document+UPLOAD_FOLDER pattern as Phase 655 disbursement-reports
+    attachment. `kind` ∈ {voice, photo}."""
+    import uuid
+    from werkzeug.utils import secure_filename
+    from flask import current_app as cap
+    from app.models import Document, ProximateOutcomeAttestation
+
+    o = ProximateOutcomeAttestation.query.filter_by(
+        report_token=token,
+    ).first()
+    if not o:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    if o.submitted_at is not None:
+        return jsonify({
+            'success': False,
+            'error': 'attestation already submitted; attachments closed',
+        }), 409
+
+    kind = (request.form.get('kind') or '').strip().lower()
+    if kind not in ('voice', 'photo'):
+        return jsonify({'success': False, 'error': 'kind must be voice|photo'}), 400
+
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'no file provided'}), 400
+    file = request.files['file']
+    if not file.filename:
+        return jsonify({'success': False, 'error': 'no file selected'}), 400
+
+    PHOTO_EXTS = {'jpg', 'jpeg', 'png', 'webp', 'gif'}
+    VOICE_EXTS = {'webm', 'ogg', 'oga', 'mp3', 'm4a', 'wav', 'aac'}
+    allowed = PHOTO_EXTS if kind == 'photo' else VOICE_EXTS
+    max_bytes = 8 * 1024 * 1024 if kind == 'photo' else 5 * 1024 * 1024
+
+    content_length = request.content_length
+    if content_length and content_length > max_bytes:
+        return jsonify({
+            'success': False,
+            'error': f'file too large (max {max_bytes // (1024*1024)} MB)',
+        }), 413
+
+    original_filename = secure_filename(file.filename)
+    ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else ''
+    if ext not in allowed:
+        return jsonify({
+            'success': False,
+            'error': f'file type not allowed for {kind} (got .{ext})',
+        }), 400
+
+    upload_folder = cap.config.get('UPLOAD_FOLDER') or os.getenv(
+        'UPLOAD_FOLDER', '/tmp/uploads'
+    )
+    os.makedirs(upload_folder, exist_ok=True)
+    stored_filename = f'outcome_{o.id}_{kind}_{uuid.uuid4().hex[:8]}.{ext}'
+    file_path = os.path.join(upload_folder, stored_filename)
+    file.save(file_path)
+    file_size = os.path.getsize(file_path)
+
+    doc = Document(
+        filename=stored_filename,
+        original_filename=original_filename,
+        doc_type=f'proximate_outcome_{kind}',
+        file_path=file_path,
+        file_size=file_size,
+        mime_type=file.mimetype,
+        org_id=o.partner_id,
+    )
+    db.session.add(doc)
+    db.session.flush()
+    if kind == 'voice':
+        o.voice_doc_id = doc.id
+    else:
+        o.photo_doc_id = doc.id
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'document_id': doc.id,
+        'kind': kind,
+        'size': file_size,
+    })
 
 
 @proximate_bp.route('/partners/<int:partner_id>/alternate-routes', methods=['GET'])
