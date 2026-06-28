@@ -620,6 +620,48 @@ flip them on quickly.
 
 ## Completed (rolling log, newest first)
 
+- **2026-06-27** Phase 668–677 — Proximate Fund 2nd completeness sweep
+  (commits `a8ee2c75` + `29fead56`). Closes EVERY remaining
+  design-doc gap I'd called out after Phase 666. Honest punt list
+  documented inline.
+  - **668** Allocation Committee tier ladder ($10k→1, $50k→2,
+    $200k→3 cosigners) + Plan-B FSP fallback (`/partners/<id>/
+    alternate-routes` lists methods, marks the ones tied to recently
+    flagged disbursements with `route_failure_security` reason).
+    Verified live: $60k → `cosigners_required=2`, no token issued.
+  - **669** Voice attachments auto-fire Whisper transcribe in the
+    background. WhatsApp `wa.me/?text=` share button on the
+    pending-report card. ISF (SoP §3) annotation checkbox in the
+    disbursement-create wizard; flag travels in the audit row.
+  - **670** Tranche scheduler: `PUT /rounds/<id>/tranche-schedule`
+    stores `[{label, target_amount_usd, target_date, notes}]` as
+    JSON on the round. Investigator independence rule: an OB
+    cannot respond to an intervention for a partner they nominated
+    or endorsed (422 with `conflict_roles`).
+  - **671** Server-side PDF: `GET /rounds/<id>/report.pdf` uses
+    reportlab to render a one-page A4 summary; 503 if reportlab
+    missing. Verified live: 200 application/pdf, 2.1KB.
+  - **672** Per-tenant audit chain v0: `network_id` column on
+    `AuditChainEntry`, auto-filled from `g.network` when set,
+    excluded from canonical hash so existing chains keep verifying.
+    Honest: existing emitters stay un-scoped until each call site
+    migrates; full refactor remains backlog (multi-week).
+  - **673** Third-party verifier v0: random pick from approved
+    Endorser pool excluding the partner's own endorsers + sender +
+    every cosigner + the partner's nominator (COI guard). New
+    `/disbursements/<id>/assign-verifier` (OB) and
+    `/disbursements/<id>/verifier-attest` (assignee only). Three-eyes
+    principle: attestation captured alongside OB verdict.
+  - **674** Manual `CrisisSignal` entry from any tenant user; logged
+    signals show in the Crisis Selector list. Phase 677 (commit
+    `29fead56`) folded signals into the `/crisis-selector` response
+    too, so `fallback_used` flips to false when the tenant has any
+    signals. Real news-feed ingestor remains explicitly multi-week
+    on backlog.
+  - **675** fr/sw/so/es Proximate-namespaced backfill from en.json
+    (placeholders), parity now 2561 × 6 locales. Real EN+AR for
+    every new string this sweep.
+
 - **2026-06-27** Phase 667 — `ob2@proximate.org / pass123` added to
   `seed_proximate.py` (commit `8a661060`). Without a second OB seat,
   the Phase 662 $10k cosign happy path was unreachable on prod (COI
