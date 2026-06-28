@@ -3593,21 +3593,16 @@ def api_donor_ask():
             'code': result.get('code'),
         }), 503
 
-    answer = (result.get('text') or '').strip()
+    # CopilotService returns {'ok': True, 'data': {'text': ...}, 'meta': {...}}
+    answer = ((result.get('data') or {}).get('text') or '').strip()
 
-    # Replay log so OB can audit what AI told donors
     try:
         call_id = log_replayable_ai_call(
             endpoint='proximate_donor_ask',
-            inputs={
-                'donor_id': donor.id,
-                'question': question,
-                'rounds_count': len(ctx_rounds),
-            },
-            outputs={'answer': answer},
-            latency_ms=elapsed_ms,
-            org_id=donor.org_id,
             user_id=donor.primary_user_id,
+            input_text=question,
+            output_text=answer,
+            duration_ms=elapsed_ms,
         )
     except Exception:
         call_id = None
