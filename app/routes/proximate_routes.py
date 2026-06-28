@@ -3317,6 +3317,169 @@ def api_attach_outcome_evidence(token):
     })
 
 
+# =====================================================================
+# Phase 681 — Proximate donor registration (admin only)
+# =====================================================================
+# Donors are admin-registered (no self-service signup in v0 — needs a
+# KYC story Adeso designs separately). Registration creates a
+# ProximateDonor row tied to a user; the donor portal (Phase 682)
+# reads from this table and the user authenticates normally.
+
+
+def _require_donor():
+    """Return (donor_row, error_response). The currently-logged-in
+    user must have a ProximateDonor row scoped to the active network."""
+    from app.models import ProximateDonor
+    net, err = _require_proximate_tenant()
+    if err:
+        return None, err
+    donor = ProximateDonor.query.filter_by(
+        network_id=net.id, primary_user_id=current_user.id,
+    ).first()
+    if not donor:
+        return None, (jsonify({
+            'success': False, 'error': 'donor registration required',
+        }), 403)
+    return donor, None
+
+
+@proximate_bp.route('/donors', methods=['POST'])
+@ob_required
+def api_register_donor():
+    """Phase 681 — admin/OB registers a funder as a Proximate donor."""
+    from app.models import ProximateDonor, User
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    primary_user_id = payload.get('primary_user_id')
+    if not primary_user_id:
+        return jsonify({
+            'success': False, 'error': 'primary_user_id required',
+        }), 400
+    user = User.query.get(int(primary_user_id))
+    if not user:
+        return jsonify({'success': False, 'error': 'user not found'}), 404
+    display_name = (payload.get('display_name') or '').strip()[:200]
+    if not display_name:
+        return jsonify({
+            'success': False, 'error': 'display_name required',
+        }), 400
+
+    existing = ProximateDonor.query.filter_by(
+        network_id=net.id, primary_user_id=user.id,
+    ).first()
+    if existing:
+        return jsonify({
+            'success': True, 'already_registered': True,
+            'donor': existing.to_dict(),
+        })
+
+    donor = ProximateDonor(
+        network_id=net.id,
+        org_id=getattr(user, 'org_id', None) or payload.get('org_id'),
+        primary_user_id=user.id,
+        display_name=display_name,
+        contact_email=(payload.get('contact_email') or user.email)[:200],
+        auto_email_closing_pack=bool(
+            payload.get('auto_email_closing_pack', True)
+        ),
+        registered_by_user_id=current_user.id,
+    )
+    subs = payload.get('subscribed_round_ids') or []
+    if subs:
+        donor.set_subscribed_round_ids(subs)
+    db.session.add(donor)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.donor.registered',
+        actor_email=current_user.email,
+        subject_kind='proximate_donor',
+        subject_id=donor.id,
+        details={
+            'display_name': donor.display_name,
+            'primary_user_id': donor.primary_user_id,
+            'subscribed_count': len(donor.subscribed_round_ids()),
+        },
+    )
+    return jsonify({'success': True, 'donor': donor.to_dict()})
+
+
+@proximate_bp.route('/donors', methods=['GET'])
+@ob_required
+def api_list_donors():
+    """OB-facing list of donors registered on the Proximate tenant."""
+    from app.models import ProximateDonor
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    donors = ProximateDonor.query.filter_by(
+        network_id=net.id,
+    ).order_by(ProximateDonor.created_at.desc()).all()
+    return jsonify({
+        'success': True,
+        'donors': [d.to_dict() for d in donors],
+    })
+
+
+@proximate_bp.route('/donors/me', methods=['GET'])
+@login_required
+def api_my_donor():
+    """Currently-logged-in user's own donor row, if any. Returns 404
+    if the user is not a registered donor on this tenant — the
+    portal uses that to redirect to a 'request access' page."""
+    from app.models import ProximateDonor
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    donor = ProximateDonor.query.filter_by(
+        network_id=net.id, primary_user_id=current_user.id,
+    ).first()
+    if not donor:
+        return jsonify({'success': False, 'error': 'not a donor'}), 404
+    return jsonify({'success': True, 'donor': donor.to_dict()})
+
+
+@proximate_bp.route('/donors/me/subscribe', methods=['POST'])
+@login_required
+def api_donor_subscribe():
+    """The donor opts into following one or more rounds."""
+    donor, err = _require_donor()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    add = payload.get('round_ids') or []
+    if not isinstance(add, list) or not add:
+        return jsonify({
+            'success': False, 'error': 'round_ids list required',
+        }), 400
+    current = set(donor.subscribed_round_ids())
+    current.update(int(x) for x in add if x is not None)
+    donor.set_subscribed_round_ids(list(current))
+    db.session.commit()
+    return jsonify({'success': True, 'donor': donor.to_dict()})
+
+
+@proximate_bp.route('/donors/me/unsubscribe', methods=['POST'])
+@login_required
+def api_donor_unsubscribe():
+    """The donor drops a round from their watchlist."""
+    donor, err = _require_donor()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    drop = payload.get('round_ids') or []
+    if not isinstance(drop, list) or not drop:
+        return jsonify({
+            'success': False, 'error': 'round_ids list required',
+        }), 400
+    current = set(donor.subscribed_round_ids())
+    current.difference_update(int(x) for x in drop if x is not None)
+    donor.set_subscribed_round_ids(list(current))
+    db.session.commit()
+    return jsonify({'success': True, 'donor': donor.to_dict()})
+
+
 @proximate_bp.route('/partners/<int:partner_id>/alternate-routes', methods=['GET'])
 @login_required
 def api_partner_alternate_routes(partner_id):

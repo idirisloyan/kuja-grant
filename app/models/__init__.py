@@ -94,6 +94,7 @@ from app.models.proximate_outcome import (
     ProximateOutcomeAttestation,
     OUTCOME_STATUSES, DEFAULT_OUTCOME_WINDOW_DAYS,
 )
+from app.models.proximate_donor import ProximateDonor
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',

@@ -462,6 +462,56 @@ def run():
             ob2_user.org_id = org.id
             print(f"  ob2 user reattached to OB org")
 
+        # Phase 681 — seed a Proximate donor for portal verification.
+        # Idempotent: if donor1 user + ProximateDonor row exist they
+        # are reused. The donor's org is a separate "Demo Donor" org
+        # so the user-org wiring matches the real-world pattern.
+        from app.models import Organization, ProximateDonor
+        DONOR_EMAIL = 'donor1@proximate.org'
+        donor_user = User.query.filter_by(email=DONOR_EMAIL).first()
+        donor_org = Organization.query.filter_by(
+            name='Demo Donor Foundation',
+        ).first()
+        if not donor_org:
+            donor_org = Organization(
+                name='Demo Donor Foundation',
+                organization_type='donor',
+                country='Sudan',
+            )
+            db.session.add(donor_org)
+            db.session.flush()
+            print(f"  donor org created: Demo Donor Foundation")
+        if not donor_user:
+            donor_user = User(
+                email=DONOR_EMAIL,
+                password_hash=generate_password_hash('pass123'),
+                role='ngo',
+                name='Proximate Donor Demo',
+                org_id=donor_org.id,
+            )
+            db.session.add(donor_user)
+            db.session.flush()
+            print(f"  donor user created: {DONOR_EMAIL}")
+        elif donor_user.org_id != donor_org.id:
+            donor_user.org_id = donor_org.id
+
+        donor_row = ProximateDonor.query.filter_by(
+            network_id=proximate.id,
+            primary_user_id=donor_user.id,
+        ).first()
+        if not donor_row:
+            donor_row = ProximateDonor(
+                network_id=proximate.id,
+                org_id=donor_org.id,
+                primary_user_id=donor_user.id,
+                display_name='Demo Donor Foundation',
+                contact_email=DONOR_EMAIL,
+                auto_email_closing_pack=True,
+                registered_by_user_id=ob_user.id,
+            )
+            db.session.add(donor_row)
+            print(f"  donor row created for {DONOR_EMAIL}")
+
         db.session.commit()
         print()
         print(f"Done. Proximate now has:")
