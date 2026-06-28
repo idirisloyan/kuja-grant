@@ -49,7 +49,7 @@ export function Header() {
   // when persona is unloaded (Kuja/NEAR tenants, or pre-fetch race).
   const displayedName = (persona && persona !== 'none' && displayName)
     ? displayName
-    : user.name;
+    : (user?.name ?? '');
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
