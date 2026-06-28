@@ -509,6 +509,91 @@ export function ProximateRoundDetailClient() {
             </Card>
           )}
 
+          {/* Phase 702 — Closing pack eligibility panel.
+              Reviewer feedback: retrospective PDF returns 422 when the
+              round is draft, with no UI hint why. This panel makes
+              eligibility explicit: each artifact shows status (locked
+              with reason, available now with link, or already
+              generated). */}
+          {(() => {
+            const isActive = round.status === 'active';
+            const isClosed = round.status === 'closed';
+            const isLater = isActive || isClosed;
+            const items: Array<{
+              label: string;
+              available: boolean;
+              reason: string;
+              href?: string;
+            }> = [
+              {
+                label: t('proximate.rounds.pack_report_pdf') || 'Round report PDF',
+                available: isLater,
+                reason: isLater
+                  ? (t('proximate.rounds.pack_available') || 'Available now.')
+                  : (t('proximate.rounds.pack_locked_until_active')
+                      || 'Available once the round is active.'),
+                href: isLater
+                  ? `/api/proximate/rounds/${round.id}/report.pdf`
+                  : undefined,
+              },
+              {
+                label: t('proximate.rounds.pack_retrospective_pdf')
+                  || 'Donor retrospective PDF (90-day)',
+                available: isClosed,
+                reason: isClosed
+                  ? (t('proximate.rounds.pack_available') || 'Available now.')
+                  : isActive
+                    ? (t('proximate.rounds.pack_locked_until_closed')
+                        || 'Available once the round is closed (90 days after first disbursement).')
+                    : (t('proximate.rounds.pack_locked_until_active')
+                        || 'Available once the round is active.'),
+              },
+              {
+                label: t('proximate.rounds.pack_audit_bundle')
+                  || 'Audit-chain bundle (JSONL)',
+                available: isLater,
+                reason: isLater
+                  ? (t('proximate.rounds.pack_available') || 'Available now.')
+                  : (t('proximate.rounds.pack_locked_until_active')
+                      || 'Available once the round is active.'),
+              },
+            ];
+            return (
+              <Card className="p-4">
+                <p className="text-sm font-medium mb-2">
+                  {t('proximate.rounds.closing_pack') || 'Closing pack'}
+                </p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  {t('proximate.rounds.closing_pack_sub')
+                    || 'Artifacts the OB and donors receive at the end of the round.'}
+                </p>
+                <ul className="space-y-2 text-xs">
+                  {items.map((it) => (
+                    <li key={it.label} className="flex items-start gap-2">
+                      <span className={`inline-block w-3.5 h-3.5 rounded-full mt-0.5 ${
+                        it.available ? 'bg-emerald-500' : 'bg-muted-foreground/30'
+                      }`} />
+                      <div className="flex-1">
+                        <div className="font-medium">{it.label}</div>
+                        <div className="text-muted-foreground">{it.reason}</div>
+                      </div>
+                      {it.available && it.href && (
+                        <a
+                          href={it.href}
+                          className="text-primary hover:underline whitespace-nowrap"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {t('proximate.rounds.pack_download') || 'Download'}
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            );
+          })()}
+
           {/* Phase 656 — Disbursements rollup */}
           {(() => {
             const disb = data?.disbursements || [];

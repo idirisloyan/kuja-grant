@@ -1658,19 +1658,61 @@ def api_get_round(round_id):
         envelope_total - envelope_used if envelope_total is not None else None
     )
 
+    # Phase 702 — donor-safe shape. Reviewer flagged that donors
+    # could read this endpoint and see operational detail (signatures,
+    # cancellation reason, full audit window, per-disbursement
+    # purposes). For non-OB callers, strip those fields and return
+    # only what the donor needs to verify their portfolio: envelope
+    # rollup, disbursement count + amounts, status, anchor seq.
+    is_ob = _user_is_ob(net)
+    if is_ob:
+        return jsonify({
+            'success': True,
+            'round': r.to_dict(include_signatures=True),
+            'disbursements': [d.to_dict() for d in disbursements],
+            'envelope_used': envelope_used,
+            'envelope_remaining': envelope_remaining,
+            'audit_in_window': [{
+                'seq': a.seq, 'action': a.action,
+                'actor_email': a.actor_email,
+                'subject_kind': a.subject_kind, 'subject_id': a.subject_id,
+                'created_at': a.created_at.isoformat() if a.created_at else None,
+            } for a in audit_rows],
+        })
+    # Donor / non-OB shape: omits signatures (PII), actor_email
+    # (operator emails), cancellation_reason, audit window, and
+    # individual disbursement purpose / partner names. Returns just
+    # the round meta + envelope numbers + disbursement count.
+    rd = r.to_dict(include_signatures=False)
+    for sensitive in (
+        'cancellation_reason', 'closing_summary',
+        'drafted_by_user_id', 'signatures',
+    ):
+        rd.pop(sensitive, None)
     return jsonify({
         'success': True,
-        'round': r.to_dict(include_signatures=True),
-        'disbursements': [d.to_dict() for d in disbursements],
+        'round': rd,
+        'disbursements_count': len(disbursements),
         'envelope_used': envelope_used,
         'envelope_remaining': envelope_remaining,
-        'audit_in_window': [{
-            'seq': a.seq, 'action': a.action,
-            'actor_email': a.actor_email,
-            'subject_kind': a.subject_kind, 'subject_id': a.subject_id,
-            'created_at': a.created_at.isoformat() if a.created_at else None,
-        } for a in audit_rows],
+        'audit_anchor_seq': max((a.seq for a in audit_rows), default=None),
     })
+
+
+def _user_is_ob(net) -> bool:
+    """Helper — is the current user an OB (or admin) for this tenant?
+    Used by endpoints that should serve a donor-safe shape to donors
+    but full operator detail to OB."""
+    try:
+        from app.models import NetworkMembership
+        if getattr(current_user, 'role', None) == 'admin':
+            return True
+        m = NetworkMembership.query.filter_by(
+            network_id=net.id, user_id=current_user.id,
+        ).first()
+        return bool(m and m.network_role == 'oversight_body')
+    except Exception:
+        return False
 
 
 @proximate_bp.route('/rounds/<int:round_id>/report.pdf', methods=['GET'])
@@ -2213,10 +2255,17 @@ def api_close_round(round_id):
 # =====================================================================
 
 @proximate_bp.route('/disbursements', methods=['GET'])
-@login_required
+@ob_required
 def api_list_disbursements():
     """List disbursements for the tenant. Filterable by partner_id,
-    round_id, status, overdue."""
+    round_id, status, overdue.
+
+    Phase 702 — gated to @ob_required. Reviewer flagged the prior
+    @login_required: donors could still GET this and read every
+    partner's disbursement detail (purpose, amount, status, partner
+    name) via API even with the UI hidden. Donors get their portfolio
+    rollup via /donors/me — that's the right donor surface.
+    """
     net, err = _require_proximate_tenant()
     if err:
         return err
