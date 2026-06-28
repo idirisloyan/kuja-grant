@@ -475,7 +475,7 @@ def run():
         if not donor_org:
             donor_org = Organization(
                 name='Demo Donor Foundation',
-                organization_type='donor',
+                org_type='donor',
                 country='Sudan',
             )
             db.session.add(donor_org)
