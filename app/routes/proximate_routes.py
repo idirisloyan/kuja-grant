@@ -3176,6 +3176,19 @@ def api_crisis_selector():
         )
         fallback_used = bool(rows)
 
+    # Phase 674 — fold in member-submitted crisis signals so they show
+    # alongside the structured CrisisMonitoringRows. Signals are simpler
+    # (no composite_score) but they're what makes the dashboard light up
+    # for the Proximate tenant today.
+    from app.models.crisis_monitoring import CrisisSignal
+    signals = (
+        CrisisSignal.query
+        .filter_by(network_id=net.id)
+        .order_by(CrisisSignal.submitted_at.desc())
+        .limit(50)
+        .all()
+    )
+
     return jsonify({
         'success': True,
         'rows': [
@@ -3184,10 +3197,14 @@ def api_crisis_selector():
                 'report_period_start': (
                     report.period_start.isoformat() if report.period_start else None
                 ),
+                'source': 'monitoring_row',
             }
             for row, report in rows
         ],
-        'fallback_used': fallback_used,
+        'signals': [
+            {**s.to_dict(), 'source': 'manual_signal'} for s in signals
+        ],
+        'fallback_used': fallback_used and not signals,
         'feed_ingestor_status': 'backlogged',
         'scenario_types': list(PROXIMATE_SCENARIO_TYPES),
     })
