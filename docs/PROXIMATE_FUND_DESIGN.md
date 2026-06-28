@@ -1,16 +1,19 @@
-# Proximate Fund — Design Document v1 (draft for sign-off)
+# Proximate Fund — Design Document v2 (as-designed + as-built)
 
-> **Status:** Draft. Author: 2026-06-21. Audience: Idiris, Adeso ops,
-> Proximate secretariat.
+> **Status:** v1 design (§1–9) signed off 2026-06-21. v2 (§10–14)
+> documents what was actually built 2026-06-21 → 2026-06-27 and the
+> cross-tenant platform features that emerged. Audience: Idiris,
+> Adeso ops, Proximate secretariat, prospective donors.
 >
-> This document maps every product surface back to a specific clause in
-> the Proximate SoP. Where it says "reuses NEAR component X" the
-> implementation already exists in this codebase. Where it says
-> "net-new", that's a build line item.
+> §1–9 are the **design intent** snapshot — preserved for posterity
+> as the contract we built against. §10 onwards is the **build
+> reality** — Phase 627 → Phase 691 mapped back to design clauses,
+> plus an honest punt list of what's still pending.
 >
-> Every claim about scope and effort in §5 is conditional on the team's
-> reaction to §3 and §4 — if a flow looks wrong, the timeline below is
-> wrong too.
+> v1 estimated ~13 weeks for the 6 net-new modules. Build sprint
+> shipped a working tenant on prod in ~6 days, but two modules
+> (Crisis Selector feed ingestor, hard capital ring-fence engine)
+> are explicit deferrals — see §13.
 
 ---
 
@@ -357,3 +360,372 @@ Sign-off (or pushback) on:
 Once those four answers land, I'll build wireframes for §3.1
 (community endorsement) before any code, and the rest follows from
 the SoP clauses directly.
+
+---
+
+# Part Two — As built
+
+> Below is the build reality 2026-06-21 → 2026-06-27. Every section
+> maps back to a §3 module from the v1 design above. Phase numbers
+> reference commits in `kuja-grant/main`; the punt list in §13 is
+> deliberately explicit.
+
+---
+
+## 10. Automation shipped — Phase 627 → Phase 691
+
+The full list of phases is in `docs/PROXIMATE_BACKLOG.md` "Completed"
+section. This section groups them by the design clause they satisfy.
+
+### 10.1 §3.1 Community endorsement — shipped
+
+| Phase | What | Closes design clause |
+|---|---|---|
+| 628 | `ProximatePartner` + `ProximateEndorsement` models + endpoints | Endorser onboarding, partner intake |
+| 629 | Endorser inbox + 3-question wizard with voice | The form itself |
+| 630 | Seed test fixtures (8 partners, 2 cleared) | — |
+| 631 | Reputation algorithm + audit-chain per endorsement | Reputation feedback |
+| 637 | Light-KYC review queue for new endorsers | Endorser approval |
+| 640 | Voice transcription per endorsement question | Voice-note hash |
+| 644 | Read transcripts on endorsement detail | OB review |
+| 646 | OB endorser approval queue UI | OB decision |
+| 647 | Endorser self-register form | Anyone can apply |
+| 650 | Hybrid partner nomination (self-nominate path) | Net-add to design |
+| 658 | Sanctions auto-screen on self-nominate | COI + Sybil-protection gate |
+
+**Outcome:** the design's "bet" is live. Two cleared partners
+(Khartoum Sisters Mutual Aid, Sennar Children Outreach) on prod.
+Reputation scoring + 6-12 month ground-truth check pending real data.
+
+### 10.2 §3.2 Crisis Selector — partial (deferred ingestor)
+
+| Phase | What | Closes design clause |
+|---|---|---|
+| 663 | Crisis Selector dashboard skeleton | Ranked dashboard |
+| 674 | Manual crisis signal entry (v0 deepening) | Stand-in for feed |
+| 677 | Backend `feed_ingestor_status='backlogged'` flag | Honest UX signal |
+
+**Outcome:** dashboard renders against cross-tenant Sudan fallback
+rows. Feed ingestor (ReliefWeb + OCHA + ACLED + IFRC) explicitly
+deferred — multi-week external-integration work that needs Adeso to
+pick the feed sources first.
+
+### 10.3 §3.3 Capital classification — partial (deferred ring-fence)
+
+| Phase | What | Closes design clause |
+|---|---|---|
+| 636 | Sudan SoP-13 small/medium/large classification | Classification ladder |
+| 686 | Donor co-funding shares + restriction enforcement on disbursement create | Restricted-capital enforcement |
+
+**Outcome:** disbursements over a partner's restricted budget return
+422 with a dollar-precise error (verified on prod: partner with
+$1,200+ prior disbursements got "only $0 of $500 remains"). Tier-
+upgrade hard-cap (small partner can't receive a $50k disbursement
+today without explicit upgrade) is backlog.
+
+### 10.4 §3.4 Multi-sig + Allocation Committee ladder — shipped
+
+| Phase | What | Closes design clause |
+|---|---|---|
+| 662 | $10k threshold on disbursement multi-sig | Single-signer cutoff |
+| 668 | Multi-tier cosign ladder ($60k → 2 cosigners) + Plan-B FSP fallback | Decision-rights table |
+
+**COI guards verified on prod:**
+- Sender cannot cosign their own disbursement → 403
+- Cosign by ob2 (not sender) → 200 flips pending_cosign → pending_report
+
+### 10.5 §3.5 Milestone tranche scheduler — partial
+
+| Phase | What | Closes design clause |
+|---|---|---|
+| 670 | Tranche scheduler endpoint + Independence rule on investigator | Per-tranche planning |
+| 651 | Per-disbursement reporting (replaces monthly calendar) | Tranche-locked reporting |
+| 652 | Token-link + login report submission (dual auth) | Partner reports without login |
+
+**Outcome:** annotation-level schedule. Auto-linking disbursement →
+tranche (so "tranche 2 is 65% released" can render) is backlog.
+
+### 10.6 §3.6 Intervention register + FSP registry — shipped
+
+| Phase | What | Closes design clause |
+|---|---|---|
+| 635 | Intervention register with SoP 13 §4 response timers | Hard-timer stopwatch |
+| 638 | Intervention register UI on partner detail | Surface the timers |
+| 639 | FSP registry (hawala + mobile money first-class) | FSP entity model |
+| 641 | Security-driven auto-intervention | Auto-flag on FSP failure |
+| 645 | Disbursement method add UI on partner detail | OB-side FSP management |
+| 673 | Third-party verifier role v0 | Verifier model + endpoints |
+| 691 | Verifier-attest token URL `/proximate-verify?t=<token>` | Verifier doesn't need a Kuja login |
+
+### 10.7 Net-add beyond v1 — donor portal + outcomes loop
+
+Not in the v1 plan. Built Phases 678–688 after the partner +
+disbursement loop was complete because Adeso asked "what's the
+shortest path to a donor saying yes."
+
+- **Outcome obligation** — auto-spawns 90 days after verify
+- **Partner outcome form** `/proximate-outcome?t=<token>` — 3
+  questions + counterfactual + voice/photo
+- **OB verdict + ack loop** — partner sees ack on revisit
+- **Donor model + admin-registered membership** — `donor1@proximate.org`
+  seeded via SEED_PROXIMATE_ON_BOOT
+- **Donor portfolio dashboard** `/proximate/donor` — portfolio +
+  per-round rollup + closing PDF links
+- **Donor AI Q&A** — grounded in tenant data, replay-logged with
+  `call_id` (5777, 5778, 5790 confirmed on prod)
+- **Outcome rollup + AI theme clustering**
+- **Counterfactual quarterly cron**
+- **Retrospective PDF (180-day age gate)** + monthly cron
+
+### 10.8 Net-add — partner mini-portal (Phase 689)
+
+`/proximate-partner?t=<token>` — long-lived per-partner URL listing
+all disbursements + outcome attestations + ack messages from both
+layers. Verified on prod with Khartoum Sisters Mutual Aid: 9
+disbursements, mixed statuses (verified, pending_report), outcomes
+joined correctly (submitted/verified/pending/no_outcome).
+
+### 10.9 Net-add — weekly sanctions re-screen (Phase 690)
+
+Cleared partners can drift into sanctions as the Sudan list changes.
+Monday 03:00 UTC cron re-runs `ComplianceService.screen_organization`
+on every `dd_clear` partner. 6-day per-partner rate limit via
+`sanctions_checked_at`. Emits audit row
+`proximate.partner.sanctions_rescreen_flagged` only on clean →
+flagged transitions, so OB has one signal per drift event.
+
+### 10.10 Token-credentialed URL surfaces — 5 of them
+
+| URL | Phase | Purpose |
+|---|---|---|
+| `/proximate-nominate` | 650 | Self-nominate partner intake |
+| `/proximate-report?t=<token>` | 652 | Partner submits 14-day disbursement report |
+| `/proximate-outcome?t=<token>` | 679 | Partner attests 90-day outcome |
+| `/proximate-partner?t=<token>` | 689 | Partner sees full disbursement + outcome history |
+| `/proximate-verify?t=<token>` | 691 | Third-party verifier records confirmed/disputed |
+
+All five accept a token (or login session, where applicable) — no
+Kuja account required for partners or verifiers.
+
+### 10.11 Continuous-monitoring crons — 6 scheduled
+
+| Cron | Cadence | Phase | Bearer-auth |
+|---|---|---|---|
+| Crisis monitoring report | Weekly | 44B | yes |
+| Disbursement report-due nudge | Daily | 651 | yes |
+| Outcome attestation due nudge | Daily 04:15 UTC | 678 | yes |
+| Quarterly counterfactual prompt | 1st of quarter, 05:00 UTC | 685 | yes |
+| Monthly donor retrospective | 1st of month, 06:00 UTC | 687 | yes |
+| Weekly sanctions re-screen | Mondays 03:00 UTC | 690 | yes |
+
+All wired via GitHub Actions cron with `CRON_SECRET` repo secret →
+`Authorization: Bearer` header → server-side gate. Step-summary
+output written to GitHub workflow summary for OB review.
+
+---
+
+## 11. Cross-tenant platform features — what makes Kuja viable, fundable, and trusted beyond Proximate
+
+Proximate was a forcing function. Many of the features built for it
+have become generic platform primitives that any tenant inherits.
+The fundability story for Adeso isn't just "we built Proximate" —
+it's "we built primitives that let us build a Proximate-shaped fund
+in any conflict context within ~1 sprint."
+
+### 11.1 Verifiability without bureaucracy — the audit story
+
+- **Hash-chained `AuditChainEntry`** — every state transition leaves
+  a tamper-evident row. Verifier walks the chain independently.
+- **Per-tenant audit chain scope v0** (Phase 672) — Proximate's
+  auditor walks Proximate's rows, doesn't see Marketplace or NEAR.
+- **Audit-chain entity drill-in** (Phase 61) — click any entity,
+  see its full history across the chain.
+- **Audit-chain integrity dashboard** (Phase 279) — system tile
+  showing rows/day, newest-entry age, hash continuity.
+- **Audit-chain rate tile** (Phase 412), **integrity check tile**
+  (Phase 466), **download CTA** (Phase 131).
+- **Audit anchor in JSON exports** (Phase 659) — every round report
+  download includes a `payload_hash` from the audit chain so
+  donors can prove the file wasn't edited post-publication.
+- **AI replay logging** (Phase 115) — every AI call captures
+  `input_text`, `output_text`, `duration_ms`, `user_id`, `endpoint`
+  into a replay table. Donors can audit AI-assisted decisions.
+- **AI call_id surfaced per surface** (Phases 200, 201) — chip on
+  every AI output lets users mark accepted / edited / dismissed.
+- **AI false-confidence rate dashboard** (Phase 620) — surfaces
+  cases where AI said high-confidence but human disagreed.
+- **Cron health monitor** (Phase 153) + **failed cron runs tile**
+  (Phase 502) + **slowest-cron-in-24h tile** (Phase 406).
+- **Time-to-first-app + time-to-first-report telemetry**
+  (Phase 621) — the platform measures itself against onboarding.
+
+### 11.2 Fundability — what donors need before they write checks
+
+- **Server-side PDF generation** (Phase 671 round report, Phase 687
+  donor retrospective) — donors get a hash-anchored PDF, not a
+  screenshot.
+- **Donor portfolio dashboard** (Phase 682) — single-fetch
+  endpoint: envelope, disbursed %, partners, 90-day attestation
+  rate, flagged warnings.
+- **Donor AI Q&A grounded in tenant data** (Phase 683) — Sonnet
+  with replay logging; donors can ask "which partners delivered
+  on time last quarter" and get an answer they can audit.
+- **Outcome attestation pipeline** (Phases 678–680) — closes the
+  trust loop. Partner attests at 90 days; OB sets a verdict; donor
+  sees the verdict in the portfolio dashboard.
+- **Counterfactual question on outcome** (Phase 685) — "would this
+  have happened without the funding?" The honest-answer field.
+- **Donor co-funding restriction enforcement** (Phase 686) — when
+  Donor A's $50k is geographically restricted to South Kordofan,
+  the engine refuses any disbursement that would exceed it.
+- **Token-credentialed report URLs** (Phases 652, 679, 689, 691) —
+  donors, partners, verifiers don't need Kuja accounts. Lowers
+  friction; raises participation rate.
+- **Verifiable Credentials issuer** (Phase VC) — Ed25519-signed
+  cleared-status credentials. A partner can present their clearance
+  to a second funder without that funder needing access to Kuja.
+- **Per-tenant AI cost ceiling + threshold notifications** (Phase
+  108) — Adeso doesn't get surprise AI bills; donors fund
+  predictably.
+- **Synthetic production monitoring** (Phase 101) — uptime
+  evidence; not just a status page, scheduled real requests.
+- **Tenant health dashboard** (Phase 106) — single view per network
+  of where it's working and where it's not.
+
+### 11.3 Trust + integrity — beyond a single fund
+
+- **5-framework capacity assessment** (Kuja, STEP, UN-HACT, CHS,
+  NUPAS) — Trust Profile portable across networks (Phase 77).
+- **Live sanctions screening** — OpenSanctions + UN XML + OFAC +
+  EU CSV fallback. Auto-runs on self-nomination (Phase 658),
+  re-runs weekly (Phase 690).
+- **Live registry verification** — 7 African countries supported.
+- **WebAuthn signing** (Phase 24) — hardware-key signing of OB
+  decisions. Audit chain captures the WebAuthn assertion.
+- **TOTP enrolment with real QR codes** (Phase 118).
+- **COI auto-recuse** (Phase 289) — reviewers who disclose a
+  conflict are auto-removed from the assignment.
+- **Independence rule** on investigator and verifier (Phases 670,
+  673) — random assignment from an eligible pool that excludes
+  signers and prior endorsers.
+- **Sender-cannot-cosign guard** (Phase 668) — multi-sig gate
+  rejects when the signer is also the sender.
+- **AI quality drift summary** (Phase 389) — surfaces if AI
+  outputs are degrading over time so OB can intervene.
+- **Multi-tier cosign ladder** (Phase 668) — $10k, $100k, $500k
+  thresholds. Same component reused across NEAR emergency
+  declarations and Proximate disbursements.
+
+### 11.4 Resilience — operating where infrastructure doesn't
+
+- **PWA service worker + IndexedDB outbox + offline status UX**
+  (Phases 162–164) — OB members sign decisions offline; they sync
+  when reconnected.
+- **Default-Arabic UI + RTL** (Phases 624 + 661) — Proximate users
+  default to Arabic; English is the toggle.
+- **6-locale i18n parity** — en, ar, fr, sw, so, es. 2669 keys.
+  Build fails if any key is missing from any locale.
+- **Voice-on-fields with Whisper transcription** (Phases 71, 640,
+  669) — partners speak; system transcribes.
+- **Photo-as-evidence** (Phase 72) — photo upload from any field.
+- **Sticky-mobile CTA primitive** (Phase 612) — mobile-first call
+  to action that doesn't get lost under the keyboard.
+- **Schema auto-reconciliation on boot** (Phase 610) — new model
+  columns appear on Railway without manual migrations. Critical
+  for ship cadence in a multi-tenant system.
+
+### 11.5 Ecosystem extensibility — not a closed system
+
+- **Outbound webhooks** with retry queue + signature verification
+  (Phases 143–178) — any external system can subscribe to events.
+- **Per-org webhook event filter** (Phase 173) — donors subscribe
+  to their own grants' events; partners subscribe to theirs.
+- **Webhook delivery log + per-hook history** (Phase 165).
+- **Tenant switcher UI** for X-Network-Override (Phase 0) — Adeso
+  staff can act in any tenant context.
+- **Custom criteria template library** (Phase 189) — networks can
+  publish rubric templates; other networks can apply them.
+- **ICS calendar export** of deadlines (Phase 127) — donors and
+  partners subscribe in Apple Calendar / Google Calendar / Outlook.
+- **Per-application PDF export** (Phase 159), **org-level data
+  export ZIP** (Phase 191) — partners own their data.
+
+---
+
+## 12. Scoreboard vs the original 13-week plan
+
+| Module (v1 design) | Designed effort | Built |
+|---|---|---|
+| §3.1 Community endorsement (the bet) | 4 weeks | Shipped Phases 628–650 |
+| §3.2 Crisis selector | 2 weeks | Dashboard skeleton + manual entry; feed ingestor deferred |
+| §3.3 Capital classification | 2 weeks | Classification shipped; hard ring-fence engine = backlog |
+| §3.4 Multi-sig ladder | 1 week | Shipped Phases 662 + 668 with Plan-B fallback |
+| §3.5 Milestone tranche scheduler | 2 weeks | Annotation-level shipped (Phase 670); auto-link UI = backlog |
+| §3.6 Intervention register + FSP registry | 2 weeks | Both shipped (Phases 635–639) |
+| §3.6 Verifier UI surface | implicit | Shipped Phase 673 + 691 |
+| Donor portal + outcomes loop | not in v1 plan | Net-add, shipped Phases 678–688 |
+| Partner mini-portal | not in v1 plan | Net-add, shipped Phase 689 |
+| Sanctions re-screening cron | not in v1 plan | Net-add, shipped Phase 690 |
+
+---
+
+## 13. Honest punt list — still pending, with reasons
+
+These are explicit deferrals. Each has a why and a roughly-how.
+
+| Item | Why deferred | What it unblocks |
+|---|---|---|
+| News-feed ingestor for Crisis Selector | Multi-week external integration; needs Adeso to pick ReliefWeb / OCHA / ACLED / IFRC | Full §3.2 — today's Crisis Selector reads cross-tenant Sudan fallback rows |
+| Hard capital ring-fencing engine (tier caps) | Phase 636 classifies; enforcement at disbursement create = backlog | True §3.3 |
+| Partner-tier graduation workflow | Triggers (e.g., 3 verified + 0 flags → Tier 2 eligible) need explicit Adeso policy | Tier 1 → 2 → 3 progression |
+| FSP performance scoring + auto-flag | Phase 668 marks failed routes; aggregate per-FSP score = backlog | "FSP X is trending bad" signal |
+| Plan-B FSP auto-suggest | Phase 668 surfaces "View alternates"; auto-rank + pick = backlog | One-click route swap |
+| Tranche progress UI + auto-link | Phase 670 annotates; disbursement→tranche link + "65% released" viz = backlog | True §3.5 |
+| Whisper failure surfacing | Today fails silently; need `report_voice_transcript_status` enum | OB knows if voice missing was bad audio or no API key |
+| Outcome attestation backfill | Phase 678 spawns for new verifies only | Existing closed disbursements get an outcome ask too |
+| Quarterly Fiduciary Board pack auto-assembly | Reuses Phase 671 reportlab path; needs Board template | True SoP 13 §5 obligation |
+| SMS fallback for partners without WhatsApp | Twilio integration; per-message cost decision pending | Reach the ~30% of Sudan rural users without WhatsApp |
+| Voice-only flow for low-literacy partners | TTS the questions in Sudanese Arabic; needs voice-model choice | Zero-text partner participation |
+| Full per-tenant audit chain refactor | ~100 emitter call sites; Phase 672 v0 only | Auditor independence across tenants |
+| Real fr/sw/so/es translations | Translator work, not engineering; parity ships EN placeholders | Sub-Saharan + Latin America deployment |
+| SMTP delivery on Railway | Operational env var; Phase 687 cron emits "ready" signal, OB sends manually | Auto-send retrospective PDFs |
+| DNS for proximate.kuja.org | Operational; today uses X-Network-Override header | Direct partner / donor URL bookmarking |
+
+---
+
+## 14. Status snapshot — 2026-06-27
+
+- **Live URL:** https://web-production-6f8a.up.railway.app (multi-tenant)
+- **Proximate access:** `X-Network-Override: proximate` header (DNS pending)
+- **Test accounts seeded via `SEED_PROXIMATE_ON_BOOT=true`:**
+  - `ob@proximate.org / pass123` — primary OB
+  - `ob2@proximate.org / pass123` — second OB seat (cosign happy path)
+  - `donor1@proximate.org / pass123` — Demo Donor Foundation
+- **Seeded fixtures:** 8 partners across 4 status states, 9
+  disbursements through the full pipeline, 4 outcome attestations
+  with mixed verdicts, 1 verifier attestation recorded via
+  token URL.
+- **i18n:** 2669 keys × 6 locales, parity-gated in CI.
+- **Audit chain:** hash-chained, per-tenant scope v0 (Phase 672).
+- **AI replay:** every Claude / Whisper call logged with `call_id`,
+  surfaced on each surface for accept/edit/dismiss telemetry.
+- **6 monitoring crons** scheduled in GitHub Actions, all bearer-
+  auth via `CRON_SECRET`.
+- **5 token-credentialed URL surfaces** for partners, donors,
+  verifiers — no Kuja login required.
+
+The Proximate Fund tenant is operational end-to-end on prod. The
+v1 design's "bet" — community-endorsed informal groups receiving
+hash-anchored funding with token-credentialed reporting and
+independent third-party verification — is demonstrable today
+against the seeded fixtures.
+
+Next gating questions for Adeso:
+1. Open the v1 deferred items (§13)? Each unlocks specific scope.
+2. Open a second Sudan state for the closed pilot, or stay in one?
+3. Provision SMTP on Railway to unblock auto-send for retrospective
+   PDFs.
+4. Provision DNS for `proximate.kuja.org`.
+
+Build cadence to date: ~6 days, ~64 phases. Reproducible for the
+next tenant.
