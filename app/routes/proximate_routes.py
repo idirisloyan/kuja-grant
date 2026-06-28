@@ -1700,17 +1700,15 @@ def api_get_round(round_id):
 
 
 def _user_is_ob(net) -> bool:
-    """Helper — is the current user an OB (or admin) for this tenant?
-    Used by endpoints that should serve a donor-safe shape to donors
-    but full operator detail to OB."""
+    """Helper — is the current user an OB (or platform admin) for this
+    tenant? Used by endpoints that should serve a donor-safe shape to
+    donors but full operator detail to OB. Delegates to the canonical
+    is_oversight_body_member helper used by @ob_required."""
     try:
-        from app.models import NetworkMembership
         if getattr(current_user, 'role', None) == 'admin':
             return True
-        m = NetworkMembership.query.filter_by(
-            network_id=net.id, user_id=current_user.id,
-        ).first()
-        return bool(m and m.network_role == 'oversight_body')
+        from app.utils.network import is_oversight_body_member
+        return is_oversight_body_member(current_user)
     except Exception:
         return False
 
