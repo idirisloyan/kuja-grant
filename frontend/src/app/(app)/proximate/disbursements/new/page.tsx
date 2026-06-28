@@ -56,6 +56,9 @@ export default function ProximateDisbursementNewPage() {
   const [amount, setAmount] = useState<string>('');
   const [purpose, setPurpose] = useState<string>('');
   const [windowDays, setWindowDays] = useState<string>('14');
+  // Phase 669 — ISF (SoP §3) annotation. OB confirms the partner cleared
+  // the Internally Stratified Funding gate. Recorded as audit metadata.
+  const [isfCleared, setIsfCleared] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CreateResp['disbursement'] | null>(null);
@@ -91,6 +94,7 @@ export default function ProximateDisbursementNewPage() {
         amount_usd: parseFloat(amount),
         purpose: purpose.trim() || undefined,
         report_window_days: parseInt(windowDays, 10) || 14,
+        isf_cleared: isfCleared,
       });
       if (!res.success || !res.disbursement) {
         setError(res.error || t('proximate.disbursements.create_failed'));
@@ -264,6 +268,22 @@ export default function ProximateDisbursementNewPage() {
               placeholder={t('proximate.disbursements.field_purpose_placeholder')}
             />
           </div>
+
+          {/* Phase 669 — ISF annotation (SoP §3) */}
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isfCleared}
+              onChange={(e) => setIsfCleared(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="text-xs">
+              <strong>{t('proximate.disbursements.isf_label')}</strong>
+              <span className="block text-muted-foreground mt-0.5">
+                {t('proximate.disbursements.isf_hint')}
+              </span>
+            </span>
+          </label>
 
           {error && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">

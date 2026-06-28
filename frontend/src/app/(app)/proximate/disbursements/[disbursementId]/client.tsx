@@ -66,6 +66,10 @@ interface Disbursement {
   cosigned_by_user_id: number | null;
   cosigned_at: string | null;
   cosign_threshold_usd: number;
+  cosigners_required: number;
+  cosigners_count: number;
+  cosigners_extra: { user_id: number; cosigned_at: string }[];
+  flagged_reason: string | null;
   audit: AuditRow[];
 }
 
@@ -253,7 +257,7 @@ export function ProximateDisbursementDetailClient() {
           </div>
         </Card>
 
-        {/* Phase 662 — pending cosign banner: $10k+ disbursement awaiting second OB signer */}
+        {/* Phase 662 + Phase 668 — pending cosign banner with ladder progress */}
         {data.status === 'pending_cosign' && (
           <Card className="p-4 border-violet-300 bg-violet-50 dark:bg-violet-950/30 space-y-3">
             <div className="flex items-start gap-2">
@@ -263,8 +267,9 @@ export function ProximateDisbursementDetailClient() {
                   {t('proximate.disbursement.cosign_required_title')}
                 </h3>
                 <p className="text-xs text-violet-800 dark:text-violet-300 mt-1">
-                  {t('proximate.disbursement.cosign_required_body', {
-                    amount: `$${data.cosign_threshold_usd.toLocaleString()}`,
+                  {t('proximate.disbursement.cosign_progress', {
+                    have: data.cosigners_count,
+                    need: data.cosigners_required,
                   })}
                 </p>
               </div>
@@ -276,12 +281,40 @@ export function ProximateDisbursementDetailClient() {
               <p className="text-xs italic text-muted-foreground">
                 {t('proximate.disbursement.cosign_self_blocked')}
               </p>
+            ) : (data.cosigned_by_user_id === user?.id ||
+                 data.cosigners_extra.some((e) => e.user_id === user?.id)) ? (
+              <p className="text-xs italic text-muted-foreground">
+                {t('proximate.disbursement.cosign_already_signed')}
+              </p>
             ) : (
               <Button size="sm" onClick={cosign} disabled={acting}>
                 {acting ? <Loader2 className="w-4 h-4 me-1 animate-spin" /> : <ShieldCheck className="w-4 h-4 me-1" />}
                 {t('proximate.disbursement.cosign_now')}
               </Button>
             )}
+          </Card>
+        )}
+
+        {/* Phase 668 — Plan-B FSP banner when a disbursement was flagged for route failure */}
+        {data.status === 'flagged' && data.flagged_reason === 'route_failure_security' && (
+          <Card className="p-4 border-amber-300 bg-amber-50 dark:bg-amber-950/30 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                  {t('proximate.disbursement.planb_title')}
+                </h3>
+                <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">
+                  {t('proximate.disbursement.planb_body')}
+                </p>
+                <Link
+                  href={`/proximate/endorse/${data.partner_id}#routes`}
+                  className="inline-flex items-center gap-1 text-xs text-amber-900 dark:text-amber-200 mt-2 hover:underline"
+                >
+                  {t('proximate.disbursement.planb_view_routes')} →
+                </Link>
+              </div>
+            </div>
           </Card>
         )}
 
@@ -296,16 +329,27 @@ export function ProximateDisbursementDetailClient() {
                 {t('proximate.disbursement.awaiting_hint')}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <input
                 type="text"
                 readOnly
                 value={partnerLink}
-                className="flex-1 h-10 px-3 text-xs bg-muted border border-border rounded-md font-mono"
+                className="flex-1 min-w-[200px] h-10 px-3 text-xs bg-muted border border-border rounded-md font-mono"
               />
               <Button size="sm" variant="outline" onClick={copyReportUrl}>
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               </Button>
+              {/* Phase 669 — WhatsApp share. Opens the wa.me deep-link with the token URL */}
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `${t('proximate.disbursement.whatsapp_lead')} ${partnerLink}`,
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 h-10 text-xs font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                {t('proximate.disbursement.share_via_whatsapp')}
+              </a>
             </div>
           </Card>
         )}

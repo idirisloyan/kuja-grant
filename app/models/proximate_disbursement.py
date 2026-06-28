@@ -25,10 +25,28 @@ DISBURSEMENT_STATUSES = (
 
 DEFAULT_REPORT_WINDOW_DAYS = 14
 
-# SOP 10 §4 Step 2: disbursements at or above this threshold require a
-# second authorised signer before money moves. Below it, the OB can
-# release single-handed.
-COSIGN_THRESHOLD_USD = 10_000.0
+# SOP 10 §4 Step 2: Allocation Committee tier ladder. Each row is
+# (min_amount_usd_inclusive, cosigners_required_in_addition_to_sender).
+# Releases below the first threshold need zero cosigners (sender alone).
+# Lookup: find the highest threshold the amount meets-or-exceeds.
+COSIGN_LADDER_USD = (
+    (10_000.0, 1),   # $10k+: one cosigner (the original Phase 662 rule)
+    (50_000.0, 2),   # $50k+: two cosigners
+    (200_000.0, 3),  # $200k+: three cosigners (full Allocation Committee)
+)
+
+# Kept for back-compat with Phase 662 callers; equals the first ladder row.
+COSIGN_THRESHOLD_USD = COSIGN_LADDER_USD[0][0]
+
+
+def cosigners_required_for(amount_usd: float) -> int:
+    """Return the number of cosigners (additional to the sender) required
+    by SOP 10 §4 Step 2 for a disbursement of the given size."""
+    required = 0
+    for threshold, n in COSIGN_LADDER_USD:
+        if amount_usd >= threshold:
+            required = n
+    return required
 
 
 class ProximateDisbursement(db.Model):
@@ -93,6 +111,27 @@ class ProximateDisbursement(db.Model):
     cosigned_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     cosigned_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
+    # Phase 668 — multi-tier ladder. cosigners_required is snapshotted at
+    # create time so the rule applied to this disbursement is fixed even
+    # if the ladder later changes. cosigners_extra_json holds the second
+    # and later cosigners as a JSON list of {user_id, cosigned_at}.
+    cosigners_required = db.Column(db.Integer, nullable=True, default=0)
+    cosigners_extra_json = db.Column(db.Text, nullable=True)
+
+    # Phase 668 — Plan-B FSP fallback. When the OB flags a disbursement,
+    # they can tag a reason; security-driven route failures unlock a
+    # 'Try alternate FSP' suggestion on the partner detail.
+    flagged_reason = db.Column(db.String(80), nullable=True)
+
+    # Phase 673 — third-party verifier (SoP §10 §5). A randomly-assigned
+    # endorser (NOT one of the partner's own endorsers, NOT a signer)
+    # attests independently to the disbursement's on-the-ground reality.
+    verifier_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    verifier_assigned_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    verifier_verdict = db.Column(db.String(20), nullable=True)  # 'confirmed' | 'disputed'
+    verifier_notes = db.Column(db.Text, nullable=True)
+    verifier_attested_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
     created_at = db.Column(
         db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -149,4 +188,47 @@ class ProximateDisbursement(db.Model):
                 self.cosigned_at.isoformat() if self.cosigned_at else None
             ),
             'cosign_threshold_usd': COSIGN_THRESHOLD_USD,
+            'cosigners_required': self.cosigners_required or 0,
+            'cosigners_count': self._cosigners_count(),
+            'cosigners_extra': self._cosigners_extra(),
+            'flagged_reason': self.flagged_reason,
+            'verifier_user_id': self.verifier_user_id,
+            'verifier_assigned_at': (
+                self.verifier_assigned_at.isoformat() if self.verifier_assigned_at else None
+            ),
+            'verifier_verdict': self.verifier_verdict,
+            'verifier_notes': self.verifier_notes,
+            'verifier_attested_at': (
+                self.verifier_attested_at.isoformat() if self.verifier_attested_at else None
+            ),
         }
+
+    def _cosigners_extra(self):
+        if not self.cosigners_extra_json:
+            return []
+        import json as _json
+        try:
+            v = _json.loads(self.cosigners_extra_json)
+            return v if isinstance(v, list) else []
+        except (ValueError, TypeError):
+            return []
+
+    def _cosigners_count(self) -> int:
+        """How many cosignatures have been collected (1st + extras)."""
+        n = 1 if self.cosigned_by_user_id else 0
+        n += len(self._cosigners_extra())
+        return n
+
+    def append_cosigner(self, user_id: int) -> None:
+        """Append a cosigner. The 1st lands on the legacy
+        cosigned_by_user_id column; the 2nd and later land in
+        cosigners_extra_json. Caller is responsible for COI checks."""
+        import json as _json
+        now = datetime.now(timezone.utc).isoformat()
+        if not self.cosigned_by_user_id:
+            self.cosigned_by_user_id = user_id
+            self.cosigned_at = datetime.now(timezone.utc)
+            return
+        extras = self._cosigners_extra()
+        extras.append({'user_id': user_id, 'cosigned_at': now})
+        self.cosigners_extra_json = _json.dumps(extras)

@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Flame, Sparkles } from 'lucide-react';
+import { Loader2, Flame, Sparkles, Plus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
@@ -57,6 +57,38 @@ export default function CrisisSelectorPage() {
   const [briefing, setBriefing] = useState(false);
   const [briefScenario, setBriefScenario] = useState<string>('strengthen');
   const [briefError, setBriefError] = useState<string | null>(null);
+  // Phase 674 — manual crisis signal entry
+  const [showSignalForm, setShowSignalForm] = useState(false);
+  const [signalDescription, setSignalDescription] = useState('');
+  const [signalEvent, setSignalEvent] = useState('');
+  const [signalCountry, setSignalCountry] = useState('SDN');
+  const [signalSaving, setSignalSaving] = useState(false);
+  const [signalError, setSignalError] = useState<string | null>(null);
+
+  async function logSignal() {
+    if (!signalDescription.trim() || signalDescription.trim().length < 5) {
+      setSignalError(t('proximate.crisis_signal.description_required'));
+      return;
+    }
+    setSignalSaving(true);
+    setSignalError(null);
+    try {
+      await api.post('/api/proximate/crisis-signals', {
+        country: signalCountry,
+        event_type: signalEvent || undefined,
+        description: signalDescription,
+      });
+      setSignalDescription('');
+      setSignalEvent('');
+      setShowSignalForm(false);
+      // Reload to refresh row list.
+      load();
+    } catch (e: unknown) {
+      setSignalError(e instanceof Error ? e.message : 'failed');
+    } finally {
+      setSignalSaving(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,6 +138,56 @@ export default function CrisisSelectorPage() {
             </p>
           </Card>
         )}
+
+        {/* Phase 674 — manual crisis signal entry */}
+        <Card className="p-4 space-y-3">
+          {!showSignalForm ? (
+            <Button size="sm" variant="outline" onClick={() => setShowSignalForm(true)}>
+              <Plus className="w-3.5 h-3.5 me-1" />
+              {t('proximate.crisis_signal.log_signal')}
+            </Button>
+          ) : (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">{t('proximate.crisis_signal.heading')}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                <input
+                  type="text"
+                  value={signalCountry}
+                  onChange={(e) => setSignalCountry(e.target.value.toUpperCase().slice(0, 3))}
+                  placeholder="SDN"
+                  className="px-3 py-2 bg-background border border-border rounded-md font-mono"
+                />
+                <input
+                  type="text"
+                  value={signalEvent}
+                  onChange={(e) => setSignalEvent(e.target.value)}
+                  placeholder={t('proximate.crisis_signal.event_type_placeholder')}
+                  className="sm:col-span-2 px-3 py-2 bg-background border border-border rounded-md"
+                />
+              </div>
+              <textarea
+                value={signalDescription}
+                onChange={(e) => setSignalDescription(e.target.value)}
+                rows={3}
+                maxLength={5000}
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                placeholder={t('proximate.crisis_signal.description_placeholder')}
+              />
+              {signalError && (
+                <p className="text-xs text-red-600">{signalError}</p>
+              )}
+              <div className="flex gap-2">
+                <Button size="sm" onClick={logSignal} disabled={signalSaving}>
+                  {signalSaving ? <Loader2 className="w-3.5 h-3.5 me-1 animate-spin" /> : null}
+                  {t('proximate.crisis_signal.log')}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setShowSignalForm(false)}>
+                  {t('proximate.crisis_signal.cancel')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
 
         {loading && (
           <p className="text-sm text-muted-foreground flex items-center gap-2">

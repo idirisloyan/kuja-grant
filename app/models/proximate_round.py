@@ -68,6 +68,10 @@ class ProximateRound(db.Model):
     envelope_usd = db.Column(db.Float, nullable=True)
     expected_duration_days = db.Column(db.Integer, nullable=True)
     target_country = db.Column(db.String(3), nullable=False, default="SD")
+    # Phase 670 — tranche plan stored as JSON list of
+    # {label, target_amount_usd, target_date (ISO), notes}. Pure annotation
+    # for v1; disbursements aren't auto-linked to specific tranches.
+    tranche_schedule_json = db.Column(db.Text, nullable=True)
     target_region = db.Column(db.String(120), nullable=True)
 
     status = db.Column(
@@ -149,6 +153,16 @@ class ProximateRound(db.Model):
 
     # ---- serialization --------------------------------------------------
 
+    def _tranche_schedule(self) -> list:
+        if not self.tranche_schedule_json:
+            return []
+        import json as _json
+        try:
+            v = _json.loads(self.tranche_schedule_json)
+            return v if isinstance(v, list) else []
+        except (ValueError, TypeError):
+            return []
+
     def to_dict(self, *, include_signatures: bool = False) -> dict:
         data = {
             "id": self.id,
@@ -160,6 +174,7 @@ class ProximateRound(db.Model):
             "donor_name": self.donor_name,
             "envelope_usd": self.envelope_usd,
             "expected_duration_days": self.expected_duration_days,
+            "tranche_schedule": self._tranche_schedule(),
             "target_country": self.target_country,
             "target_region": self.target_region,
             "status": self.status,

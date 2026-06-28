@@ -40,6 +40,11 @@ class AuditChainEntry(db.Model):
     subject_id = db.Column(db.Integer, nullable=True)
     details_json = db.Column(db.Text, nullable=True)
 
+    # Phase 672 v0 — per-tenant scope. Filled in from g.network on append.
+    # Existing emitters that don't pass network_id stay un-scoped (NULL)
+    # until each call site is migrated; honest limitation, not a fix.
+    network_id = db.Column(db.Integer, nullable=True, index=True)
+
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     @staticmethod
@@ -50,13 +55,30 @@ class AuditChainEntry(db.Model):
     @classmethod
     def append(cls, *, action: str, actor_email: str | None,
                subject_kind: str | None, subject_id: int | None,
-               details: dict | None = None) -> 'AuditChainEntry':
+               details: dict | None = None,
+               network_id: int | None = None) -> 'AuditChainEntry':
         """Append a new entry, hashing in the previous tail's payload_hash.
+
+        Phase 672 v0 — opt-in per-tenant scope: pass network_id explicitly
+        or set g.network upstream; the column gets backfilled. The hash
+        chain stays global for now (rebuilding per-tenant chains would
+        invalidate every existing hash anchor); only the column changes
+        so queries can filter cleanly.
 
         Best-effort — never raises, never blocks the caller. If anything
         fails we log to stderr and return None (no chain entry created).
         """
         try:
+            # Derive network_id from g.network if not passed explicitly.
+            if network_id is None:
+                try:
+                    from flask import g
+                    net = getattr(g, 'network', None)
+                    if net is not None and getattr(net, 'id', None):
+                        network_id = net.id
+                except Exception:
+                    pass
+
             tail = cls.query.order_by(cls.seq.desc()).first()
             seq = (tail.seq + 1) if tail else 1
             prev_hash = tail.payload_hash if tail else None
@@ -70,6 +92,8 @@ class AuditChainEntry(db.Model):
                 'details': details or {},
                 # No timestamp in the canonical hash — would make replay
                 # awkward across timezones. created_at is non-canonical metadata.
+                # network_id deliberately excluded from the canonical hash so
+                # existing chains keep verifying after Phase 672 lands.
             }
             payload_hash = hashlib.sha256(
                 cls._canonical(payload).encode('utf-8')
@@ -83,6 +107,7 @@ class AuditChainEntry(db.Model):
                 subject_kind=subject_kind,
                 subject_id=subject_id,
                 details_json=json.dumps(details or {}, default=str)[:8000],
+                network_id=network_id,
             )
             db.session.add(entry)
             db.session.commit()
