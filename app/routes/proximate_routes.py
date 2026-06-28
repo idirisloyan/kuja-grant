@@ -4612,6 +4612,63 @@ def api_cron_outcome_due_nudge():
     return jsonify({'success': True, 'nudged': nudged, 'day': day_key})
 
 
+@proximate_bp.route('/monitoring/sanctions-rescreen', methods=['POST'])
+def api_cron_sanctions_rescreen():
+    """Phase 690 — weekly re-screen of every dd_clear partner against
+    sanctions lists. Sudan sanctions landscape shifts; a partner cleared
+    six weeks ago can show up on a new list today.
+
+    Rate-limited per partner via sanctions_checked_at: skips anyone
+    screened in the last 6 days. Emits 'proximate.partner.sanctions_
+    rescreen_flagged' whenever a previously-clean partner flips to
+    flagged so the OB has a single audit signal to react to.
+    """
+    from flask import current_app as cap
+    secret = cap.config.get('CRON_SECRET') or os.getenv('CRON_SECRET')
+    auth = request.headers.get('Authorization', '')
+    if not secret or auth != f'Bearer {secret}':
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    now = datetime.now(timezone.utc)
+    stale_threshold = now - timedelta(days=6)
+    candidates = ProximatePartner.query.filter(
+        ProximatePartner.status == 'dd_clear',
+    ).all()
+    rescreened = 0
+    newly_flagged = 0
+    skipped_recent = 0
+    for p in candidates:
+        if p.sanctions_checked_at and p.sanctions_checked_at >= stale_threshold:
+            skipped_recent += 1
+            continue
+        prev_flag = bool(p.sanctions_flag)
+        _run_partner_sanctions_screen(p)
+        rescreened += 1
+        if p.sanctions_flag and not prev_flag:
+            newly_flagged += 1
+            AuditChainEntry.append(
+                action='proximate.partner.sanctions_rescreen_flagged',
+                actor_email='cron-monitoring',
+                subject_kind='proximate_partner',
+                subject_id=p.id,
+                details={
+                    'partner_name': p.name,
+                    'rescreen_day': now.strftime('%Y-%m-%d'),
+                },
+            )
+    logger.info(
+        f'Proximate cron: sanctions rescreened {rescreened} partners, '
+        f'newly flagged {newly_flagged}, skipped recent {skipped_recent}'
+    )
+    return jsonify({
+        'success': True,
+        'rescreened': rescreened,
+        'newly_flagged': newly_flagged,
+        'skipped_recent': skipped_recent,
+        'day': now.strftime('%Y-%m-%d'),
+    })
+
+
 # =====================================================================
 # Phase 663 — Crisis Selector (Module 3.2 skeleton)
 # =====================================================================

@@ -68,12 +68,11 @@ session; entries move to "Completed" below as each ships.
   concentration risk + sanctions drift + tranche-vs-actual variance +
   independence-rule violations. Reuses Phase 671 reportlab path.
 
-### Sanctions re-screening cron
-- **Why:** Phase 658 screens at self-nominate. The Sudan sanctions
-  landscape shifts; cleared partners can become flagged after weeks.
-- **Action:** weekly cron re-runs `ComplianceService.screen_organization`
-  on every cleared partner; flips `sanctions_flag` if new hits; emits
-  audit + nudges the OB.
+### ~~Sanctions re-screening cron~~ — shipped Phase 690 (2026-06-27)
+- Done. Weekly GHA cron POSTs `/monitoring/sanctions-rescreen`
+  (bearer-auth). 6-day per-partner rate limit via `sanctions_checked_at`.
+  Emits `proximate.partner.sanctions_rescreen_flagged` on clean→flagged
+  transitions so the OB has one signal to act on.
 
 ### Verifier-attest UI surface
 - **Why:** Phase 673 ships the endpoints but the assigned verifier has
@@ -246,6 +245,13 @@ Treat as future Kuja-level work, not Proximate work.
 ---
 
 ## Completed (rolling log, newest first)
+
+- **Phase 690 — Sanctions re-screening cron** (2026-06-27). Weekly
+  GHA cron `cron-proximate-sanctions-rescreen.yml` POSTs `/api/
+  proximate/monitoring/sanctions-rescreen` (bearer-auth). Iterates
+  every dd_clear partner, skips any rescreened in last 6 days,
+  emits a flag-flip audit row whenever a clean partner becomes
+  flagged. No-op for now (no actual list drift since Phase 658).
 
 - **Phase 689 — Partner mini-portal** (2026-06-27, commit 8ed8b463).
   Long-lived per-partner token URL `/proximate-partner?t=<token>` shows
