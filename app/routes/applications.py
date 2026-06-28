@@ -321,14 +321,13 @@ def api_create_application():
     if not grant:
         return jsonify({'error': 'Grant not found', 'success': False}), 404
 
-    if grant.status != 'open':
-        return jsonify({'error': 'This grant is not currently accepting applications', 'success': False}), 400
-
-    # Check deadline
-    if grant.deadline and grant.deadline < date.today():
-        return jsonify({'error': 'The application deadline has passed', 'success': False}), 400
-
-    # Check for existing application
+    # Phase 697 — duplicate check FIRST. "You already applied" is a
+    # truer answer than "the grant is now closed" — the NGO did the
+    # right thing once and the system should tell them where the
+    # existing app lives. Before this reorder the smoke test
+    # PHASE21D-001 saw 400 instead of 409 whenever the grant had
+    # since closed (which is most of the time on prod, since the
+    # test runs against grants that already have applications).
     existing = Application.query.filter_by(
         grant_id=grant_id, ngo_org_id=current_user.org_id
     ).first()
@@ -338,6 +337,13 @@ def api_create_application():
             'existing_application_id': existing.id,
             'success': False,
         }), 409
+
+    if grant.status != 'open':
+        return jsonify({'error': 'This grant is not currently accepting applications', 'success': False}), 400
+
+    # Check deadline
+    if grant.deadline and grant.deadline < date.today():
+        return jsonify({'error': 'The application deadline has passed', 'success': False}), 400
 
     application = Application(
         grant_id=grant_id,

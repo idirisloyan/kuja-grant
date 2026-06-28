@@ -212,24 +212,13 @@ export default function ProximateNominatePage() {
           </div>
 
           {/* Honeypot — bots fill every field; humans won't see this.
-              Phase 692: use the bulletproof clip technique. The previous
-              `left:-9999px` approach reportedly surfaced as a visible
-              "Website (leave blank)" field on Arabic/RTL mobile widths,
-              where `left` semantics get re-mapped by some browsers. */}
-          <div
-            style={{
-              position: 'absolute',
-              width: '1px',
-              height: '1px',
-              padding: 0,
-              margin: '-1px',
-              overflow: 'hidden',
-              clip: 'rect(0, 0, 0, 0)',
-              whiteSpace: 'nowrap',
-              border: 0,
-            }}
-            aria-hidden="true"
-          >
+              Phase 697: switched from inline-style clip technique to
+              Tailwind's `sr-only` class because the reviewer still saw
+              the label render visibly even with the inline approach.
+              `sr-only` is the codebase's battle-tested visually-hidden
+              pattern — used by the page's "Skip to main content" link
+              and every accessible widget. */}
+          <div className="sr-only" aria-hidden="true">
             <label htmlFor="hp_website">Website</label>
             <input
               id="hp_website"

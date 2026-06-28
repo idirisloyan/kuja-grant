@@ -4251,6 +4251,14 @@ def api_donor_dashboard():
         'outcome_attested': 0,
         'outcome_verified': 0,
         'outcome_pending': 0,
+        # Phase 697 — explicit denominator for the attestation_rate
+        # tile. Previously the frontend divided outcome_attested by
+        # disbursement_count, which is wrong: an obligation row
+        # spawns only at "verify" (Phase 678), so older disbursements
+        # never had one. The reviewer saw 3/9 = 33% on the top card
+        # while round cards showed 3/4 = 75% — same denominator
+        # mismatch. outcome_total is the correct denominator.
+        'outcome_total': 0,
         'flagged_count': 0,
     }
     for r in rounds:
@@ -4304,6 +4312,7 @@ def api_donor_dashboard():
         portfolio['outcome_attested'] += outcome_attested
         portfolio['outcome_verified'] += outcome_verified
         portfolio['outcome_pending'] += outcome_pending
+        portfolio['outcome_total'] += len(outcomes)
         portfolio['flagged_count'] += status_counts.get('flagged', 0)
 
     portfolio['partners_served'] = len(portfolio['partners_served'])

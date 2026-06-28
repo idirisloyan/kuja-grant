@@ -56,6 +56,13 @@ interface Portfolio {
   outcome_attested: number;
   outcome_verified: number;
   outcome_pending: number;
+  // Phase 697 — explicit denominator for the portfolio attestation
+  // rate tile. The denominator must match the per-round card
+  // (`outcome_total`), not `disbursement_count` — an obligation row
+  // is spawned only at "verify" (Phase 678), so older disbursements
+  // never had one. Old code: 3/9 = 33%. New code: 3/4 = 75% (matches
+  // the round card).
+  outcome_total: number;
   flagged_count: number;
 }
 
@@ -132,7 +139,10 @@ export function ProximateDonorClient() {
   }
 
   const { donor, rounds, portfolio, using_fallback_listing } = data;
-  const outcomeRate = pct(portfolio.outcome_attested, portfolio.disbursement_count);
+  // Phase 697 — divide by outcome_total (number of obligation rows),
+  // NOT disbursement_count. Matches the per-round card's math so the
+  // top-card and round-card percentages can't drift apart.
+  const outcomeRate = pct(portfolio.outcome_attested, portfolio.outcome_total);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
@@ -189,7 +199,7 @@ export function ProximateDonorClient() {
             {outcomeRate != null ? `${outcomeRate}%` : '—'}
           </p>
           <p className="text-xs text-muted-foreground">
-            {portfolio.outcome_attested}/{portfolio.disbursement_count}{' '}
+            {portfolio.outcome_attested}/{portfolio.outcome_total}{' '}
             {t('proximate.donor.attested')}
           </p>
         </Card>

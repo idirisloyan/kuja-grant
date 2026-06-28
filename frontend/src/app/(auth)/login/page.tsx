@@ -114,11 +114,37 @@ export default function LoginPage() {
       const success = await login(submittedEmail, submittedPassword);
       if (success) {
         toast.success(t('toast.welcome_back'));
+        // Phase 697: persona-aware landing. The Proximate tenant's OB
+        // and donor users are seeded with User.role='ngo' for platform
+        // compat, so /dashboard/ rendered NGO chrome for them. Read
+        // the Proximate persona endpoint with the freshly-set session
+        // cookie and route to the right home:
+        //   ob/admin -> /proximate/admin (operator console)
+        //   donor    -> /proximate/donor (portfolio + Ask AI)
+        //   none/non-Proximate -> /dashboard/ (existing default)
+        // A 404/error or any other status falls through to /dashboard.
+        let target = '/dashboard/';
+        try {
+          const apiBase = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
+          const r = await fetch(`${apiBase}/api/proximate/persona/me`, {
+            credentials: 'include',
+            headers: { 'X-Network-Override': 'proximate' },
+          });
+          if (r.ok) {
+            const body = await r.json();
+            if (body?.persona === 'donor') target = '/proximate/donor';
+            else if (body?.persona === 'ob' || body?.persona === 'admin') {
+              target = '/proximate/admin';
+            }
+          }
+        } catch {
+          /* network noise — fall through to /dashboard/ */
+        }
         // Hard navigate — next/router.replace inside a static export
         // sometimes stalls when the target layout runs its own session
         // check on mount. window.location guarantees the full shell
         // reload with the authenticated cookie set.
-        window.location.href = '/dashboard/';
+        window.location.href = target;
       } else {
         toast.error(t('toast.invalid_credentials'));
       }
