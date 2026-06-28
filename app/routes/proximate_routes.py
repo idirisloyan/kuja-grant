@@ -3905,9 +3905,17 @@ def api_issue_endorser_portal_link(endorser_id):
 
 
 @proximate_bp.route('/audit-chain', methods=['GET'])
-@login_required
+@ob_required
 def api_proximate_audit_chain():
     """Return the most recent audit-chain rows scoped to this tenant.
+
+    Phase 701 — gated to @ob_required. Reviewer flagged the prior
+    @login_required as a leak: donors could read raw actor emails and
+    intervention subjects. Donors do not need raw chain access — the
+    round-report PDF carries a donor-safe audit anchor for portfolio
+    transparency. If a donor-safe audit view becomes a real ask, add
+    a separate /donor-audit endpoint that filters actor_email and
+    intervention-related actions.
 
     Tenant scope: rows with network_id=current tenant OR rows where
     subject_kind starts with 'proximate' (covers legacy rows written

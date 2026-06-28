@@ -176,6 +176,16 @@ export function ProximateAdminClient() {
                   <p className="text-sm font-medium">
                     {t('proximate.admin.tile_rounds_sub')}
                   </p>
+                  {/* Phase 701 — surface the round-create CTA on the
+                      operator dashboard. Reviewer noted no obvious
+                      "New round" entry point from /proximate/admin. */}
+                  <Link
+                    href="/proximate/rounds/new"
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:underline"
+                  >
+                    + {t('proximate.rounds.new') || 'Start new round'}
+                  </Link>
                 </Card>
               </Link>
               <Link href="/proximate/disbursements" className="block">

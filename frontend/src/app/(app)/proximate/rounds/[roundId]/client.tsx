@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { Loader2, CheckCircle2, X, Lock, Banknote } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
+import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -102,7 +103,12 @@ const STATUS_TONE: Record<string, string> = {
 export function ProximateRoundDetailClient() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'admin';
+  // Phase 701 — Proximate OBs are seeded with User.role='ngo' for
+  // platform compat. Use persona, not user.role. Reviewer's
+  // "Submit/Sign actions not visible" was this bug.
+  const { persona } = useProximatePersona();
+  const isOperator =
+    persona === 'ob' || persona === 'admin' || user?.role === 'admin';
 
   const [roundId, setRoundId] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
@@ -186,6 +192,102 @@ export function ProximateRoundDetailClient() {
       />
       <PageMain>
         <div className="space-y-4">
+          {/* Phase 701 — Stage banner + next-action CTA.
+              Reviewer feedback: the backend supports draft → submit →
+              sign → active → closed but the UI made none of that
+              obvious. The banner + "what's next" CTA makes the round
+              authorization pipeline self-explanatory. */}
+          {(() => {
+            const stages = [
+              { key: 'draft',     label: t('proximate.rounds.stage_draft')     || 'Draft' },
+              { key: 'in_review', label: t('proximate.rounds.stage_in_review') || 'Awaiting signatures' },
+              { key: 'active',    label: t('proximate.rounds.stage_active')    || 'Active' },
+              { key: 'closed',    label: t('proximate.rounds.stage_closed')    || 'Closed' },
+            ];
+            const isCancelled = round.status === 'cancelled';
+            const currentIdx = isCancelled
+              ? -1
+              : stages.findIndex((s) => s.key === round.status);
+            const nextActionForOB = (() => {
+              if (round.status === 'draft') {
+                return {
+                  label: t('proximate.rounds.next_submit') || 'Submit for OB review',
+                  onClick: () => callAction('submit'),
+                };
+              }
+              if (round.status === 'in_review' && !userAlreadySigned) {
+                return {
+                  label: t('proximate.rounds.next_sign') || 'Sign this round (no COI)',
+                  onClick: () => callAction('sign', { declared_no_coi: true }),
+                };
+              }
+              if (round.status === 'active' && !closing) {
+                return {
+                  label: t('proximate.rounds.next_close') || 'Close round',
+                  onClick: () => setClosing(true),
+                };
+              }
+              return null;
+            })();
+            return (
+              <Card className={`p-4 ${isCancelled ? 'border-red-300' : 'border-emerald-200'}`}>
+                {/* Stepper */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                  {stages.map((s, i) => {
+                    const past = !isCancelled && i < currentIdx;
+                    const here = !isCancelled && i === currentIdx;
+                    return (
+                      <div key={s.key} className="flex items-center gap-1.5 shrink-0">
+                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs ${
+                          here ? 'bg-emerald-600 text-white font-semibold'
+                          : past ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-muted text-muted-foreground'
+                        }`}>
+                          <span className={`inline-block w-4 h-4 rounded-full text-[10px] leading-4 text-center ${
+                            here ? 'bg-white text-emerald-600'
+                            : past ? 'bg-emerald-600 text-white'
+                            : 'bg-background border'
+                          }`}>{past ? '✓' : i + 1}</span>
+                          {s.label}
+                        </div>
+                        {i < stages.length - 1 && (
+                          <span className={`w-3 h-px ${past ? 'bg-emerald-600' : 'bg-muted-foreground/30'}`} />
+                        )}
+                      </div>
+                    );
+                  })}
+                  {isCancelled && (
+                    <span className="ms-2 text-xs px-2 py-1 rounded-md bg-red-100 text-red-700 font-semibold">
+                      {t('proximate.rounds.stage_cancelled') || 'Cancelled'}
+                    </span>
+                  )}
+                </div>
+                {/* Next-action CTA, only for OBs and only when an
+                    action is actually available right now. */}
+                {isOperator && nextActionForOB && (
+                  <div className="mt-3 pt-3 border-t flex items-center justify-between gap-3 flex-wrap">
+                    <div className="text-xs text-muted-foreground">
+                      {t('proximate.rounds.whats_next') || 'What\'s next:'}
+                    </div>
+                    <Button onClick={nextActionForOB.onClick} disabled={busy} size="sm">
+                      {busy && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
+                      {nextActionForOB.label}
+                    </Button>
+                  </div>
+                )}
+                {round.status === 'in_review' && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {round.signed_count}/{round.signers_required}{' '}
+                    {t('proximate.rounds.signers_collected') || 'signers collected'}
+                    {round.ready_for_activation
+                      ? ` — ${t('proximate.rounds.ready_to_activate') || 'ready to activate'}`
+                      : ''}
+                  </p>
+                )}
+              </Card>
+            );
+          })()}
+
           {/* Status + meta */}
           <Card className="p-4 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
@@ -236,7 +338,7 @@ export function ProximateRoundDetailClient() {
           </Card>
 
           {/* Actions */}
-          {isAdmin && (
+          {isOperator && (
             <Card className="p-4 space-y-3">
               <p className="text-sm font-medium">{t('proximate.rounds.actions')}</p>
 

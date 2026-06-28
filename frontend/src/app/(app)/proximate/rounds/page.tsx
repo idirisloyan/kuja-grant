@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { Loader2, Plus, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
+import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,7 +48,13 @@ const STATUS_TONE: Record<string, string> = {
 export default function ProximateRoundsPage() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'admin';
+  // Phase 701 — Proximate OBs are seeded with User.role='ngo' for
+  // platform compat, so user.role==='admin' is false even for OB.
+  // Use the persona hook (same fix pattern as the header in Phase 697).
+  // Reviewer's "no New round CTA visible" was this exact bug.
+  const { persona } = useProximatePersona();
+  const isOperator =
+    persona === 'ob' || persona === 'admin' || user?.role === 'admin';
   const [rounds, setRounds] = useState<Round[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -65,11 +72,11 @@ export default function ProximateRoundsPage() {
       <PageHeader
         title={t('proximate.rounds.title')}
         subtitle={t('proximate.rounds.subtitle')}
-        primaryAction={isAdmin ? (
+        primaryAction={isOperator ? (
           <Link href="/proximate/rounds/new">
             <Button size="sm">
               <Plus className="w-3.5 h-3.5 me-1" />
-              {t('proximate.rounds.new')}
+              {t('proximate.rounds.new') || 'Start new round'}
             </Button>
           </Link>
         ) : undefined}
@@ -82,10 +89,18 @@ export default function ProximateRoundsPage() {
           </p>
         )}
         {rounds !== null && rounds.length === 0 && !loading && (
-          <Card className="p-6 text-center">
+          <Card className="p-8 text-center space-y-3">
             <p className="text-sm text-muted-foreground">
-              {t('proximate.rounds.empty')}
+              {t('proximate.rounds.empty') || 'No funding rounds yet.'}
             </p>
+            {isOperator && (
+              <Link href="/proximate/rounds/new" className="inline-block">
+                <Button>
+                  <Plus className="w-4 h-4 me-1.5" />
+                  {t('proximate.rounds.new') || 'Start new round'}
+                </Button>
+              </Link>
+            )}
           </Card>
         )}
         {rounds !== null && rounds.length > 0 && (

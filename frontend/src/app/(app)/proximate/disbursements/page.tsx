@@ -13,6 +13,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, Plus, Copy, Check } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth-store';
+import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,18 +47,56 @@ const STATUS_TONE: Record<string, string> = {
 
 export default function ProximateDisbursementsPage() {
   const { t } = useTranslation();
+  const user = useAuthStore((s) => s.user);
+  // Phase 701 — Disbursements is an OB-only operator surface. Reviewer
+  // flagged: donors could navigate here via URL paste and see the
+  // "Record disbursement" UI (POSTs are server-gated, but UI shouldn't
+  // tease an action the user can't take).
+  const { persona, isLoading: personaLoading } = useProximatePersona();
+  const isOperator =
+    persona === 'ob' || persona === 'admin' || user?.role === 'admin';
+  const isDonor = persona === 'donor';
+
   const [rows, setRows] = useState<Disbursement[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<number | null>(null);
 
   useEffect(() => {
+    if (!isOperator) return; // Don't even fetch — donors aren't supposed to see this.
     let cancelled = false;
     api.get<{ disbursements: Disbursement[] }>('/api/proximate/disbursements')
       .then((r) => { if (!cancelled) setRows(r.disbursements || []); })
       .catch(() => { if (!cancelled) setRows([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [isOperator]);
+
+  // Donor gate: show a friendly "OB only" panel and a link back to
+  // the donor portal. Operator UI is never rendered for donors.
+  if (!personaLoading && isDonor) {
+    return (
+      <PageShell>
+        <PageMain>
+          <Card className="p-6 max-w-md mx-auto text-center space-y-3">
+            <p className="text-sm font-medium">
+              {t('proximate.disbursements.donor_blocked_title')
+                || 'This page is for the Oversight Body.'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {t('proximate.disbursements.donor_blocked_body')
+                || 'Disbursement operations are handled by Adeso. Your portfolio view is over here.'}
+            </p>
+            <Link href="/proximate/donor">
+              <Button size="sm">
+                {t('proximate.disbursements.go_to_donor_portal')
+                  || 'Go to donor portal'}
+              </Button>
+            </Link>
+          </Card>
+        </PageMain>
+      </PageShell>
+    );
+  }
 
   function copyReportUrl(d: Disbursement) {
     if (!d.report_token) return;
@@ -71,14 +111,14 @@ export default function ProximateDisbursementsPage() {
       <PageHeader
         title={t('proximate.disbursements.title')}
         subtitle={t('proximate.disbursements.subtitle')}
-        primaryAction={
+        primaryAction={isOperator ? (
           <Link href="/proximate/disbursements/new">
             <Button size="sm">
               <Plus className="w-3.5 h-3.5 me-1" />
               {t('proximate.disbursements.new')}
             </Button>
           </Link>
-        }
+        ) : undefined}
       />
       <PageMain>
         {loading && (
