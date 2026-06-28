@@ -2197,7 +2197,102 @@ def api_get_disbursement(disbursement_id):
         }
         for r in audit_rows
     ]
+
+    # Phase 680 — fold the 90-day outcome attestation into the
+    # disbursement detail payload. The OB-facing page now has
+    # everything it needs in one fetch.
+    from app.models import ProximateOutcomeAttestation
+    o = ProximateOutcomeAttestation.query.filter_by(
+        disbursement_id=d.id,
+    ).first()
+    payload['outcome'] = o.to_dict() if o else None
+
     return jsonify({'success': True, 'disbursement': payload})
+
+
+@proximate_bp.route('/outcome-attestations/<int:outcome_id>/verdict', methods=['POST'])
+@ob_required
+def api_set_outcome_verdict(outcome_id):
+    """Phase 680 — OB reviews the partner's 90-day attestation and
+    records a verdict ∈ {verified, disputed}, with optional notes."""
+    from app.models import ProximateOutcomeAttestation
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    o = ProximateOutcomeAttestation.query.filter_by(
+        id=outcome_id, network_id=net.id,
+    ).first()
+    if not o:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    if o.submitted_at is None:
+        return jsonify({
+            'success': False,
+            'error': 'partner has not yet attested',
+        }), 400
+    payload = request.get_json(silent=True) or {}
+    verdict = (payload.get('verdict') or 'verified').lower()
+    if verdict not in ('verified', 'disputed'):
+        return jsonify({
+            'success': False,
+            'error': 'verdict must be verified|disputed',
+        }), 400
+    notes = (payload.get('notes') or '').strip()[:2000] or None
+    o.status = verdict
+    o.verdict_by_user_id = current_user.id
+    o.verdict_at = datetime.now(timezone.utc)
+    o.verdict_notes = notes
+    db.session.commit()
+    AuditChainEntry.append(
+        action=f'proximate.outcome.{verdict}',
+        actor_email=current_user.email,
+        subject_kind='proximate_outcome_attestation',
+        subject_id=o.id,
+        details={
+            'disbursement_id': o.disbursement_id,
+            'partner_id': o.partner_id,
+            'notes_len': len(notes) if notes else 0,
+        },
+    )
+    return jsonify({'success': True, 'outcome': o.to_dict()})
+
+
+@proximate_bp.route('/outcome-attestations/<int:outcome_id>/ack', methods=['POST'])
+@ob_required
+def api_ack_outcome(outcome_id):
+    """Phase 680 — OB writes an acknowledgement message that appears
+    on the partner's outcome URL the next time they visit it.
+    Mirrors the Phase 660 disbursement acknowledgement pattern."""
+    from app.models import ProximateOutcomeAttestation
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    o = ProximateOutcomeAttestation.query.filter_by(
+        id=outcome_id, network_id=net.id,
+    ).first()
+    if not o:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    payload = request.get_json(silent=True) or {}
+    message = (payload.get('message') or '').strip()
+    if not message:
+        return jsonify({'success': False, 'error': 'message required'}), 400
+    if len(message) > 2000:
+        return jsonify({
+            'success': False, 'error': 'message too long (max 2000)',
+        }), 400
+    o.ack_message = message
+    o.ack_message_at = datetime.now(timezone.utc)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.outcome.acknowledged',
+        actor_email=current_user.email,
+        subject_kind='proximate_outcome_attestation',
+        subject_id=o.id,
+        details={
+            'message_len': len(message),
+            'partner_id': o.partner_id,
+        },
+    )
+    return jsonify({'success': True, 'outcome': o.to_dict()})
 
 
 @proximate_bp.route('/disbursements', methods=['POST'])

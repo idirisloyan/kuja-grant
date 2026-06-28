@@ -71,6 +71,33 @@ interface Disbursement {
   cosigners_extra: { user_id: number; cosigned_at: string }[];
   flagged_reason: string | null;
   audit: AuditRow[];
+  outcome: OutcomeAttestation | null;
+}
+
+interface OutcomeAttestation {
+  id: number;
+  status: string;
+  due_at: string | null;
+  spawned_at: string | null;
+  submitted_at: string | null;
+  submitted_via: string | null;
+  overdue: boolean;
+  report_token: string | null;
+  answers: {
+    still_in_state_n?: number | null;
+    total_intended_n?: number | null;
+    sustained?: string | null;
+    not_sustained?: string | null;
+  };
+  voice_doc_id: number | null;
+  photo_doc_id: number | null;
+  voice_transcript: string | null;
+  counterfactual_reflection: string | null;
+  verdict_by_user_id: number | null;
+  verdict_at: string | null;
+  verdict_notes: string | null;
+  ack_message: string | null;
+  ack_message_at: string | null;
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -171,6 +198,52 @@ export function ProximateDisbursementDetailClient() {
     } finally {
       setActing(false);
     }
+  }
+
+  // Phase 680 — OB outcome verdict + ack actions
+  const [outcomeVerdictNote, setOutcomeVerdictNote] = useState('');
+  const [outcomeAckText, setOutcomeAckText] = useState('');
+  const [outcomeActing, setOutcomeActing] = useState(false);
+  async function setOutcomeVerdict(v: 'verified' | 'disputed') {
+    if (!data?.outcome) return;
+    setActionError(null);
+    setOutcomeActing(true);
+    try {
+      await api.post(
+        `/api/proximate/outcome-attestations/${data.outcome.id}/verdict`,
+        { verdict: v, notes: outcomeVerdictNote.trim() || undefined },
+      );
+      if (id) await fetchData(id);
+      setOutcomeVerdictNote('');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : t('proximate.disbursement.action_failed');
+      setActionError(msg);
+    } finally {
+      setOutcomeActing(false);
+    }
+  }
+  async function sendOutcomeAck() {
+    if (!data?.outcome || !outcomeAckText.trim()) return;
+    setActionError(null);
+    setOutcomeActing(true);
+    try {
+      await api.post(
+        `/api/proximate/outcome-attestations/${data.outcome.id}/ack`,
+        { message: outcomeAckText.trim() },
+      );
+      if (id) await fetchData(id);
+      setOutcomeAckText('');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : t('proximate.disbursement.action_failed');
+      setActionError(msg);
+    } finally {
+      setOutcomeActing(false);
+    }
+  }
+  function copyOutcomeUrl() {
+    if (!data?.outcome?.report_token) return;
+    const url = `${window.location.origin}/proximate-outcome?t=${data.outcome.report_token}`;
+    navigator.clipboard?.writeText(url).catch(() => {});
   }
 
   function copyReportUrl() {
@@ -530,6 +603,189 @@ export function ProximateDisbursementDetailClient() {
                   {t('proximate.disbursement.ack_send')}
                 </Button>
               </>
+            )}
+          </Card>
+        )}
+
+        {/* Phase 680 — 90-day outcome attestation */}
+        {data.outcome && (
+          <Card className="p-4 space-y-3">
+            <div className="flex items-start justify-between gap-2 flex-wrap">
+              <div>
+                <h3 className="text-sm font-medium">
+                  {t('proximate.outcome.card_title')}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {data.outcome.due_at
+                    ? t('proximate.outcome.due_at_prefix') +
+                      ' ' +
+                      new Date(data.outcome.due_at).toLocaleDateString()
+                    : ''}
+                  {data.outcome.overdue && (
+                    <span className="ms-2 text-red-600">
+                      {t('proximate.outcome.overdue_badge')}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <span
+                className={`text-xs px-2 py-1 rounded border ${
+                  data.outcome.status === 'verified'
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : data.outcome.status === 'disputed'
+                      ? 'bg-red-100 text-red-800 border-red-300'
+                      : data.outcome.status === 'submitted'
+                        ? 'bg-blue-100 text-blue-800 border-blue-300'
+                        : 'bg-amber-100 text-amber-800 border-amber-300'
+                }`}
+              >
+                {t(`proximate.outcome.status_${data.outcome.status}`)}
+              </span>
+            </div>
+
+            {data.outcome.status === 'pending' && data.outcome.report_token && (
+              <div className="text-xs space-y-2">
+                <p className="text-muted-foreground">
+                  {t('proximate.outcome.share_link_hint')}
+                </p>
+                <div className="flex gap-2">
+                  <code className="flex-1 truncate bg-muted px-2 py-1 rounded text-xs">
+                    {`${typeof window !== 'undefined' ? window.location.origin : ''}/proximate-outcome?t=${data.outcome.report_token}`}
+                  </code>
+                  <Button size="sm" variant="outline" onClick={copyOutcomeUrl}>
+                    {t('proximate.disbursement.copy')}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {data.outcome.submitted_at && (
+              <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-muted-foreground">
+                    {t('proximate.outcome.q1_still_in_state')}
+                  </dt>
+                  <dd>
+                    {data.outcome.answers.still_in_state_n ?? '—'}
+                    {' '}
+                    {t('proximate.outcome.q1_of')}{' '}
+                    {data.outcome.answers.total_intended_n ?? '—'}
+                  </dd>
+                </div>
+                {data.outcome.answers.sustained && (
+                  <div className="sm:col-span-2">
+                    <dt className="text-xs text-muted-foreground">
+                      {t('proximate.outcome.q2_sustained')}
+                    </dt>
+                    <dd className="whitespace-pre-wrap text-sm">
+                      {data.outcome.answers.sustained}
+                    </dd>
+                  </div>
+                )}
+                {data.outcome.answers.not_sustained && (
+                  <div className="sm:col-span-2">
+                    <dt className="text-xs text-muted-foreground">
+                      {t('proximate.outcome.q3_not_sustained')}
+                    </dt>
+                    <dd className="whitespace-pre-wrap text-sm">
+                      {data.outcome.answers.not_sustained}
+                    </dd>
+                  </div>
+                )}
+                <div className="sm:col-span-2 text-xs text-muted-foreground">
+                  {t('proximate.outcome.submitted_at')}{' '}
+                  {new Date(data.outcome.submitted_at).toLocaleString()}
+                  {data.outcome.submitted_via && (
+                    <span> · {data.outcome.submitted_via}</span>
+                  )}
+                </div>
+              </dl>
+            )}
+
+            {data.outcome.status === 'submitted' && (
+              <div className="space-y-2 border-t pt-3">
+                <h4 className="text-sm font-medium">
+                  {t('proximate.outcome.your_verdict')}
+                </h4>
+                <textarea
+                  value={outcomeVerdictNote}
+                  onChange={(e) => setOutcomeVerdictNote(e.target.value)}
+                  rows={2}
+                  maxLength={2000}
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                  placeholder={t('proximate.outcome.verdict_note_placeholder')}
+                />
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    onClick={() => setOutcomeVerdict('verified')}
+                    disabled={outcomeActing}
+                  >
+                    {outcomeActing ? (
+                      <Loader2 className="w-4 h-4 me-1 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 me-1" />
+                    )}
+                    {t('proximate.outcome.verify')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setOutcomeVerdict('disputed')}
+                    disabled={outcomeActing}
+                  >
+                    <AlertTriangle className="w-4 h-4 me-1 text-red-600" />
+                    {t('proximate.outcome.dispute')}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {data.outcome.verdict_notes && (
+              <div className="text-xs text-muted-foreground border-t pt-2">
+                <span className="font-medium">{t('proximate.outcome.verdict_notes')}: </span>
+                {data.outcome.verdict_notes}
+              </div>
+            )}
+
+            {data.outcome.submitted_at && (
+              <div className="border-t pt-3">
+                <h4 className="text-sm font-medium mb-2">
+                  {t('proximate.outcome.ack_title')}
+                </h4>
+                {data.outcome.ack_message ? (
+                  <div className="text-sm bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded p-3">
+                    <p className="whitespace-pre-wrap">{data.outcome.ack_message}</p>
+                    {data.outcome.ack_message_at && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {new Date(data.outcome.ack_message_at).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <textarea
+                      value={outcomeAckText}
+                      onChange={(e) => setOutcomeAckText(e.target.value)}
+                      rows={2}
+                      maxLength={2000}
+                      className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                      placeholder={t('proximate.outcome.ack_placeholder')}
+                    />
+                    <Button
+                      size="sm"
+                      className="mt-2"
+                      onClick={sendOutcomeAck}
+                      disabled={outcomeActing || !outcomeAckText.trim()}
+                    >
+                      {outcomeActing ? (
+                        <Loader2 className="w-4 h-4 me-1 animate-spin" />
+                      ) : null}
+                      {t('proximate.outcome.ack_send')}
+                    </Button>
+                  </>
+                )}
+              </div>
             )}
           </Card>
         )}
