@@ -3986,6 +3986,34 @@ def api_proximate_audit_chain():
     total = q.count()
     rows = q.limit(limit).offset(offset).all()
 
+    # Phase 704 — JSONL export for the closing-pack audit bundle.
+    # ?format=jsonl returns one JSON object per line, with a download
+    # filename. Same tenant-scoped query as JSON; the OB downloads
+    # this from the closing-pack panel on round detail.
+    if request.args.get('format') == 'jsonl':
+        from flask import Response
+        import json as _json
+        def _stream():
+            for r in q.order_by(AuditChainEntry.seq.asc()).all():
+                yield _json.dumps({
+                    'seq': r.seq,
+                    'prev_hash': r.prev_hash,
+                    'payload_hash': r.payload_hash,
+                    'action': r.action,
+                    'actor_email': r.actor_email,
+                    'subject_kind': r.subject_kind,
+                    'subject_id': r.subject_id,
+                    'created_at': r.created_at.isoformat() if r.created_at else None,
+                    'network_id': r.network_id,
+                }) + '\n'
+        return Response(
+            _stream(), mimetype='application/x-ndjson',
+            headers={
+                'Content-Disposition':
+                    f'attachment; filename="proximate-audit-chain-network{net.id}.jsonl"',
+            },
+        )
+
     return jsonify({
         'success': True,
         'total': total,

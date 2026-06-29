@@ -21,6 +21,7 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -535,6 +536,22 @@ export function ProximateRoundDetailClient() {
             const isActive = round.status === 'active';
             const isClosed = round.status === 'closed';
             const isLater = isActive || isClosed;
+            // Phase 704 — retrospective PDF is gated at 180 days
+            // past closure (server-side enforced in
+            // api_round_retrospective_pdf). Show the link only when
+            // both close + age threshold are met; otherwise show a
+            // truthful "available N more days after close" message.
+            const closedAt = round.closed_at ? new Date(round.closed_at) : null;
+            const daysSinceClose = closedAt
+              ? Math.floor((Date.now() - closedAt.getTime()) / 86_400_000)
+              : null;
+            const RETROSPECTIVE_GATE_DAYS = 180;
+            const retroReady = isClosed
+              && daysSinceClose !== null
+              && daysSinceClose >= RETROSPECTIVE_GATE_DAYS;
+            const retroDaysRemaining = isClosed && daysSinceClose !== null
+              ? Math.max(0, RETROSPECTIVE_GATE_DAYS - daysSinceClose)
+              : null;
             const items: Array<{
               label: string;
               available: boolean;
@@ -554,15 +571,26 @@ export function ProximateRoundDetailClient() {
               },
               {
                 label: t('proximate.rounds.pack_retrospective_pdf')
-                  || 'Donor retrospective PDF (90-day)',
-                available: isClosed,
-                reason: isClosed
+                  || 'Donor retrospective PDF (180-day)',
+                available: retroReady,
+                reason: retroReady
                   ? (t('proximate.rounds.pack_available') || 'Available now.')
-                  : isActive
-                    ? (t('proximate.rounds.pack_locked_until_closed')
-                        || 'Available once the round is closed (90 days after first disbursement).')
-                    : (t('proximate.rounds.pack_locked_until_active')
-                        || 'Available once the round is active.'),
+                  : isClosed
+                    ? (
+                        retroDaysRemaining && retroDaysRemaining > 0
+                          ? `${t('proximate.rounds.pack_retro_wait')
+                              || 'Available'} ${retroDaysRemaining} ${t('proximate.rounds.pack_retro_wait_unit')
+                                || 'more days after closure.'}`
+                          : (t('proximate.rounds.pack_available') || 'Available now.')
+                      )
+                    : isActive
+                      ? (t('proximate.rounds.pack_retro_after_close')
+                          || 'Available 180 days after the round closes.')
+                      : (t('proximate.rounds.pack_locked_until_active')
+                          || 'Available once the round is active.'),
+                href: retroReady
+                  ? `/api/proximate/rounds/${round.id}/retrospective.pdf`
+                  : undefined,
               },
               {
                 label: t('proximate.rounds.pack_audit_bundle')
@@ -572,6 +600,9 @@ export function ProximateRoundDetailClient() {
                   ? (t('proximate.rounds.pack_available') || 'Available now.')
                   : (t('proximate.rounds.pack_locked_until_active')
                       || 'Available once the round is active.'),
+                href: isLater
+                  ? '/api/proximate/audit-chain?format=jsonl&limit=500'
+                  : undefined,
               },
             ];
             return (
@@ -724,16 +755,28 @@ export function ProximateRoundDetailClient() {
               </p>
             ) : (
               <ul className="space-y-1 text-xs">
-                {auditWindow.slice(0, 30).map((a) => (
+                {auditWindow.slice(0, 30).map((a) => {
+                  const label = labelForProximateAction(a.action);
+                  const isKnown = label !== a.action;
+                  return (
                   <li key={a.seq} className="flex items-center gap-2">
                     <span className="text-muted-foreground tabular-nums">#{a.seq}</span>
-                    <span className="font-mono">{a.action}</span>
+                    {/* Phase 704 — human label when we know one,
+                        raw mono code as the fallback so the chain
+                        is never silently mis-rendered. Hover the
+                        label to see the underlying action code. */}
+                    {isKnown ? (
+                      <span title={a.action}>{label}</span>
+                    ) : (
+                      <span className="font-mono">{a.action}</span>
+                    )}
                     <span className="text-muted-foreground">
                       ({a.subject_kind} #{a.subject_id})
                     </span>
                     <span className="text-muted-foreground ms-auto">{a.actor_email}</span>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </Card>
