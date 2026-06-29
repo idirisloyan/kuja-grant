@@ -48,6 +48,11 @@ export const PROXIMATE_ACTION_LABELS: Record<string, string> = {
   'proximate.report.verified': 'Report verified by OB',
   'proximate.report.acknowledged': 'OB sent acknowledgement',
 
+  // Disbursement-side acknowledgement (Phase 660) — partner
+  // acknowledges receipt of disbursed funds. Was missing from
+  // the label map so showed raw on the round audit list.
+  'proximate.disbursement.acknowledged': 'Partner acknowledged disbursement',
+
   // Outcomes
   'proximate.outcome.spawned': 'Outcome obligation spawned',
   'proximate.outcome.submitted': 'Partner submitted outcome',

@@ -50,6 +50,11 @@ logger = logging.getLogger('kuja')
 
 SOFT_DEADLINE_S = 3.0
 HARD_DEADLINE_S = 10.0
+# Phase 707 — login is the canary for worker-pool saturation.
+# When AI sync calls block gunicorn workers, /api/health stays fast
+# (no DB) but auth wedges. A login that takes more than this is a
+# warning even if it eventually succeeds.
+LOGIN_SOFT_DEADLINE_S = 2.0
 DEFAULT_BASE_URL = 'https://web-production-6f8a.up.railway.app'
 
 
@@ -114,15 +119,40 @@ class _Probe:
             return r.status_code, note
         return self._timed('health', fn)
 
-    def login(self, email: str, password: str, label: str) -> ProbeResult:
+    def login(
+        self, email: str, password: str, label: str,
+        network: str | None = None,
+    ) -> ProbeResult:
+        """POST /api/auth/login. Phase 707 — `network` sends the
+        X-Network-Override header so tenant-scoped login paths get
+        exercised. Also flags slow logins separately because login is
+        the canary endpoint for worker-pool saturation: when
+        /api/health stays green but auth slows, the synthetic monitor
+        is the only thing that notices."""
         def fn():
+            headers = {}
+            if network:
+                headers['X-Network-Override'] = network
             r = self.s.post(
                 f'{self.base}/api/auth/login',
                 json={'email': email, 'password': password},
+                headers=headers,
                 timeout=HARD_DEADLINE_S,
             )
             return r.status_code, f'user={email}'
-        return self._timed(f'login.{label}', fn)
+        result = self._timed(f'login.{label}', fn)
+        # Login-specific slow detection — tighter than the default
+        # 3s soft deadline because a 4-5s login means the worker pool
+        # is partially wedged even if every request eventually
+        # succeeds.
+        if result.ok and result.duration_ms / 1000.0 > LOGIN_SOFT_DEADLINE_S:
+            result.slow = True
+            if not result.note:
+                result.note = ''
+            result.note = (
+                f"{result.note} | slow_login>{LOGIN_SOFT_DEADLINE_S:.1f}s"
+            ).strip(' |')
+        return result
 
     def get_json(self, path: str, label: str, expect: str | None = None) -> ProbeResult:
         def fn():
@@ -177,6 +207,12 @@ class SyntheticMonitor:
         with requests.Session() as fresh:
             probe = _Probe(fresh, base_url)
             result.probes.append(probe.health())
+            # Phase 707 — /api/ready does a SELECT 1, so it shares
+            # the gunicorn worker pool with auth and is_a true wedge
+            # detector. The reviewer saw /api/health stay 0.3ms
+            # while logins hung; /api/ready would have wedged with
+            # them and surfaced the saturation.
+            result.probes.append(probe.public_get('/api/ready', 'ready'))
             result.probes.append(probe.public_get('/.well-known/did.json', 'did_doc'))
             result.probes.append(probe.public_get(
                 '/api/credentials/status-list/2021', 'status_list',
@@ -195,6 +231,20 @@ class SyntheticMonitor:
             probe = _Probe(donor, base_url)
             result.probes.append(probe.login(donor_email, donor_password, 'donor'))
             result.probes.append(probe.get_json('/api/applications?status=submitted', 'donor_reviews_pending'))
+
+        # Phase 707 — Proximate-tenant login probe. The reviewer found
+        # /api/health stayed green while ob@proximate.org logins
+        # hung; without a tenant-scoped probe the monitor would have
+        # missed it. Disable by clearing KUJA_SYN_PROXIMATE_EMAIL.
+        prox_email = os.environ.get('KUJA_SYN_PROXIMATE_EMAIL', 'ob@proximate.org')
+        prox_password = os.environ.get('KUJA_SYN_PROXIMATE_PASSWORD', 'pass123')
+        if prox_email:
+            with requests.Session() as prox:
+                probe = _Probe(prox, base_url)
+                result.probes.append(probe.login(
+                    prox_email, prox_password, 'proximate_ob',
+                    network='proximate',
+                ))
 
         for p in result.probes:
             if not p.ok:
