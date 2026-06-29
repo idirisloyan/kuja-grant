@@ -222,7 +222,14 @@ class SyntheticMonitor:
         with requests.Session() as ngo:
             probe = _Probe(ngo, base_url)
             result.probes.append(probe.login(ngo_email, ngo_password, 'ngo'))
-            result.probes.append(probe.get_json('/api/dashboard', 'ngo_dashboard'))
+            # Phase 707 followup — bare /api/dashboard was never wired
+            # (all dashboard routes are subpaths). /api/dashboard/today
+            # is the canonical role-aware NGO landing surface
+            # (Phase 82). Hits TodayBriefingService → walks DB →
+            # returns the briefing the user sees on /dashboard.
+            result.probes.append(probe.get_json(
+                '/api/dashboard/today', 'ngo_dashboard', expect='role',
+            ))
             result.probes.append(probe.get_json('/api/applications', 'ngo_apps_list'))
             result.probes.append(probe.get_json('/api/reports/upcoming', 'ngo_reports_upcoming'))
 
