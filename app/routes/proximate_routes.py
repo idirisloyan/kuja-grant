@@ -3993,21 +3993,30 @@ def api_proximate_audit_chain():
     if request.args.get('format') == 'jsonl':
         from flask import Response
         import json as _json
-        def _stream():
-            for r in q.order_by(AuditChainEntry.seq.asc()).all():
-                yield _json.dumps({
-                    'seq': r.seq,
-                    'prev_hash': r.prev_hash,
-                    'payload_hash': r.payload_hash,
-                    'action': r.action,
-                    'actor_email': r.actor_email,
-                    'subject_kind': r.subject_kind,
-                    'subject_id': r.subject_id,
-                    'created_at': r.created_at.isoformat() if r.created_at else None,
-                    'network_id': r.network_id,
-                }) + '\n'
+        # Materialize rows BEFORE building the response — the streaming
+        # generator runs after the request context teardown otherwise,
+        # and the SQLAlchemy session is gone. Caps at limit/offset like
+        # the JSON path.
+        export_rows = (
+            q.order_by(AuditChainEntry.seq.asc())
+            .limit(limit).offset(offset).all()
+        )
+        body = '\n'.join(
+            _json.dumps({
+                'seq': r.seq,
+                'prev_hash': r.prev_hash,
+                'payload_hash': r.payload_hash,
+                'action': r.action,
+                'actor_email': r.actor_email,
+                'subject_kind': r.subject_kind,
+                'subject_id': r.subject_id,
+                'created_at': r.created_at.isoformat() if r.created_at else None,
+                'network_id': r.network_id,
+            })
+            for r in export_rows
+        ) + ('\n' if export_rows else '')
         return Response(
-            _stream(), mimetype='application/x-ndjson',
+            body, mimetype='application/x-ndjson',
             headers={
                 'Content-Disposition':
                     f'attachment; filename="proximate-audit-chain-network{net.id}.jsonl"',
