@@ -4024,6 +4024,13 @@ def api_dashboard_ngo_unread_messages():
 def api_dashboard_donor_applicants_this_quarter():
     """Phase 464 — Distinct applicant org_ids on donor's grants in the
     current calendar quarter. Pipeline-diversity signal.
+
+    Phase 705 — wrap in try/except after a live UAT reproduced a 500
+    on the Kuja Marketplace donor dashboard. Per Phase 109 the
+    grants.donor_org_id has a NOT NULL constraint, but legacy data or
+    a race during a partial seed can still yield query errors. A tile
+    should never break the dashboard — return 0 with an empty state
+    instead.
     """
     if current_user.role not in ('donor', 'admin') or not current_user.org_id:
         return jsonify({'error': 'access denied'}), 403
@@ -4031,12 +4038,28 @@ def api_dashboard_donor_applicants_this_quarter():
     now = datetime.now(timezone.utc)
     quarter_start_month = ((now.month - 1) // 3) * 3 + 1
     quarter_start = datetime(now.year, quarter_start_month, 1, tzinfo=timezone.utc)
-    distinct_count = (db.session.query(Application.org_id)
-                      .join(Grant, Application.grant_id == Grant.id)
-                      .filter(Grant.donor_org_id == current_user.org_id,
-                              Application.submitted_at.isnot(None),
-                              Application.submitted_at >= quarter_start)
-                      .distinct().count())
+    try:
+        distinct_count = (db.session.query(Application.org_id)
+                          .join(Grant, Application.grant_id == Grant.id)
+                          .filter(Grant.donor_org_id == current_user.org_id,
+                                  Application.submitted_at.isnot(None),
+                                  Application.submitted_at >= quarter_start)
+                          .distinct().count())
+    except Exception as e:
+        logger = logging.getLogger('kuja')
+        logger.warning(
+            'donor-applicants-this-quarter query failed: %r '
+            '(user_id=%s, org_id=%s)',
+            e, getattr(current_user, 'id', None),
+            getattr(current_user, 'org_id', None),
+        )
+        # Rollback so subsequent requests on the same connection don't
+        # inherit a poisoned session.
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        distinct_count = 0
     return jsonify({
         'applicants': distinct_count,
         'quarter_start': quarter_start.date().isoformat(),

@@ -19,6 +19,7 @@ import {
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
+import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -820,7 +821,19 @@ export function ProximateDisbursementDetailClient() {
                       {new Date(row.created_at).toLocaleString()}
                     </span>
                   )}
-                  <span className="font-medium text-foreground">{row.action}</span>
+                  {/* Phase 705 — human label when known, raw mono
+                      code as fallback (so the chain is never silently
+                      mis-rendered). Same util as the round detail
+                      audit window. Hover shows the action code. */}
+                  {(() => {
+                    const lbl = labelForProximateAction(row.action);
+                    const isKnown = lbl !== row.action;
+                    return isKnown ? (
+                      <span className="font-medium text-foreground" title={row.action}>{lbl}</span>
+                    ) : (
+                      <span className="font-medium text-foreground font-mono">{row.action}</span>
+                    );
+                  })()}
                   {row.actor_email && <span>· {row.actor_email}</span>}
                 </li>
               ))}

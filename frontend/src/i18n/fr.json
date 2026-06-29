@@ -1928,6 +1928,7 @@
   "proximate.rounds.action_failed": "Action failed.",
   "proximate.rounds.actions": "Actions",
   "proximate.rounds.activity": "Activity in round window",
+  "proximate.rounds.admin_cannot_sign": "Signing is for OB roster members only — you are signed in as platform admin.",
   "proximate.rounds.cancel": "Cancel",
   "proximate.rounds.cancellation": "Cancellation reason",
   "proximate.rounds.close_round": "Close round",

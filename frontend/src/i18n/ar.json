@@ -1928,6 +1928,7 @@
   "proximate.rounds.action_failed": "فشل الإجراء.",
   "proximate.rounds.actions": "الإجراءات",
   "proximate.rounds.activity": "النشاط في نافذة الدورة",
+  "proximate.rounds.admin_cannot_sign": "التوقيع لأعضاء هيئة الإشراف فقط — أنت داخل بصفة مدير منصة.",
   "proximate.rounds.cancel": "إلغاء",
   "proximate.rounds.cancellation": "سبب الإلغاء",
   "proximate.rounds.close_round": "إغلاق الدورة",

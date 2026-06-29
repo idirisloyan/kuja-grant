@@ -118,6 +118,12 @@ export function ProximateRoundDetailClient() {
   const { persona } = useProximatePersona();
   const isOperator =
     persona === 'ob' || persona === 'admin' || user?.role === 'admin';
+  // Phase 705 — only true OBs can sign rounds. Platform admins see
+  // the operator surface (general visibility into the round) but the
+  // backend @ob_required gate rejects signing because admin isn't on
+  // the OB roster (Phase 114 retired the admin override). Hiding the
+  // Sign button here matches what the backend allows.
+  const canSign = persona === 'ob';
 
   const [roundId, setRoundId] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
@@ -230,7 +236,7 @@ export function ProximateRoundDetailClient() {
                   onClick: () => callAction('submit'),
                 };
               }
-              if (round.status === 'in_review' && !userAlreadySigned) {
+              if (round.status === 'in_review' && !userAlreadySigned && canSign) {
                 return {
                   label: t('proximate.rounds.next_sign') || 'Sign this round (no COI)',
                   onClick: () => callAction('sign', { declared_no_coi: true }),
@@ -368,7 +374,7 @@ export function ProximateRoundDetailClient() {
                 </Button>
               )}
 
-              {round.status === 'in_review' && !userAlreadySigned && (
+              {round.status === 'in_review' && !userAlreadySigned && canSign && (
                 <div className="space-y-2">
                   <Button
                     onClick={() => callAction('sign', { declared_no_coi: true })}
@@ -432,6 +438,18 @@ export function ProximateRoundDetailClient() {
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Lock className="w-3 h-3" />
                   {t('proximate.rounds.you_already_responded')}
+                </p>
+              )}
+
+              {/* Phase 705 — platform admin sees the operator surface
+                  but isn't on the OB roster, so the backend rejects
+                  signing. Make that explicit instead of showing a
+                  Sign button that 403s on click. */}
+              {round.status === 'in_review' && !canSign && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  {t('proximate.rounds.admin_cannot_sign')
+                    || 'Signing is for OB roster members only — you are signed in as platform admin.'}
                 </p>
               )}
 
