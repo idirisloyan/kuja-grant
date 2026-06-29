@@ -83,8 +83,18 @@ class AIChatService:
     def post_message(
         cls, *, thread: AIThread, user_text: str, user_role: str,
         user_language: str = 'en',
+        network_slug: str | None = None,
+        network_name: str | None = None,
     ) -> dict:
-        """Append user msg, call Claude with context, append response."""
+        """Append user msg, call Claude with context, append response.
+
+        Phase 706 — `network_slug` and `network_name` adapt the system
+        prompt to the active tenant. Reviewer flagged that Proximate
+        sessions were getting generic Kuja Marketplace advice. When
+        network_slug == 'proximate' the copilot speaks as the Proximate
+        Fund assistant and uses Sudan / community-endorsement vocabulary
+        instead of the default 'grants / applications' framing.
+        """
         user_text = (user_text or '').strip()[:MAX_USER_MESSAGE_CHARS]
         if not user_text:
             return {'success': False, 'reason': 'empty_message'}
@@ -117,24 +127,63 @@ class AIChatService:
         scope_context = cls._build_scope_context(
             scope_kind=thread.scope_kind, scope_id=thread.scope_id,
         )
-        system_prompt = (
-            "You are Kuja's grant-management co-pilot, embedded in a "
-            "sustained chat thread with a single user. Be concise, "
-            "specific, and helpful. Match the user's language. Don't "
-            "repeat the question back. When unsure, say so.\n\n"
-            f"User role: {user_role}\n"
-            f"User language: {user_language}\n"
-            f"Conversation scope: {thread.scope_kind or 'global'}"
-            f"{' #' + str(thread.scope_id) if thread.scope_id else ''}\n"
-        )
+        # Phase 706 — tenant-aware system prompt. Proximate users get
+        # Proximate Fund context; everyone else gets the default
+        # grant-management framing. Kept as a switch (not multi-arm)
+        # because Proximate is the only diverged tenant right now —
+        # add elifs as other tenants pick up unique vocabulary.
+        if (network_slug or '').lower() == 'proximate':
+            system_prompt = (
+                "You are the AI assistant for the Proximate Fund — a "
+                "Sudan-context humanitarian fund operated by Adeso. "
+                "You support community-endorsed informal groups, not "
+                "the wider Kuja Marketplace. Vocabulary: partner, "
+                "endorser, disbursement, outcome attestation, "
+                "verifier, intervention, OB (Oversight Body), round, "
+                "tranche, FSP. NOT 'grant application', NOT "
+                "'rubric', NOT 'reviewer'.\n\n"
+                "Reply in conversational Sudanese Arabic when the "
+                "user writes in Arabic; mirror their register "
+                "(English / French / etc.) otherwise.\n\n"
+                "Be concise, specific, helpful. Don't repeat the "
+                "question back. When unsure, say so.\n\n"
+                f"User role: {user_role}\n"
+                f"User language: {user_language}\n"
+                f"Conversation scope: {thread.scope_kind or 'global'}"
+                f"{' #' + str(thread.scope_id) if thread.scope_id else ''}\n"
+            )
+        else:
+            system_prompt = (
+                "You are Kuja's grant-management co-pilot, embedded in a "
+                "sustained chat thread with a single user. Be concise, "
+                "specific, and helpful. Match the user's language. Don't "
+                "repeat the question back. When unsure, say so.\n\n"
+                f"User role: {user_role}\n"
+                f"User language: {user_language}\n"
+                f"Conversation scope: {thread.scope_kind or 'global'}"
+                f"{' #' + str(thread.scope_id) if thread.scope_id else ''}\n"
+            )
         if scope_context:
             system_prompt += f"\nScope context:\n{scope_context}\n"
-        system_prompt += (
-            "\nDiscipline: never invent grant amounts, status, or "
-            "scores you can't see in the context above. If asked about "
-            "data not in the context, say 'I don't have that loaded in "
-            "this thread — try the corresponding page.'"
-        )
+        # Discipline line — wording adapts to tenant so the "what
+        # might not be loaded" example doesn't mention grants in a
+        # Proximate session.
+        if (network_slug or '').lower() == 'proximate':
+            system_prompt += (
+                "\nDiscipline: never invent disbursement amounts, "
+                "partner statuses, or audit details you can't see in "
+                "the context above. If asked about data not in the "
+                "context, say 'I don't have that loaded in this "
+                "thread — try the corresponding page in the operator "
+                "dashboard.'"
+            )
+        else:
+            system_prompt += (
+                "\nDiscipline: never invent grant amounts, status, or "
+                "scores you can't see in the context above. If asked about "
+                "data not in the context, say 'I don't have that loaded in "
+                "this thread — try the corresponding page.'"
+            )
 
         # 4. Call Claude (multi-turn). _call_claude_messages was added
         # in Phase 24B if it didn't already exist — use the existing

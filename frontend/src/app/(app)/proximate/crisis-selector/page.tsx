@@ -47,6 +47,25 @@ interface Resp {
   scenario_types: string[];
 }
 
+// Phase 706 — Crisis signals are the OB-logged raw observations
+// from /api/proximate/crisis-signals. Distinct from CrisisRow which
+// is a curated CrisisMonitoringRow. Showing them on the same page
+// closes the "I logged it, where did it go?" gap.
+interface CrisisSignal {
+  id: number;
+  country: string;
+  event_type: string | null;
+  description: string;
+  status: string;
+  submitted_at: string | null;
+  submitted_by_user_id: number | null;
+}
+
+interface SignalsResp {
+  success: boolean;
+  signals: CrisisSignal[];
+}
+
 export default function CrisisSelectorPage() {
   const { t } = useTranslation();
   const [data, setData] = useState<Resp | null>(null);
@@ -64,6 +83,11 @@ export default function CrisisSelectorPage() {
   const [signalCountry, setSignalCountry] = useState('SDN');
   const [signalSaving, setSignalSaving] = useState(false);
   const [signalError, setSignalError] = useState<string | null>(null);
+  // Phase 706 — pending signals visibility. Reviewer found that
+  // logging a signal looked like nothing happened because the page
+  // only re-fetched the published-rows endpoint. Now we also fetch
+  // /crisis-signals after each submit and render them on top.
+  const [signals, setSignals] = useState<CrisisSignal[]>([]);
 
   async function logSignal() {
     if (!signalDescription.trim() || signalDescription.trim().length < 5) {
@@ -93,8 +117,21 @@ export default function CrisisSelectorPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await api.get<Resp>('/api/proximate/crisis-selector');
-      setData(r);
+      // Phase 706 — fetch both endpoints in parallel: published rows
+      // (curated) AND raw signals (OB-logged observations). Either
+      // failing is non-fatal for the other.
+      const [rowsR, signalsR] = await Promise.allSettled([
+        api.get<Resp>('/api/proximate/crisis-selector'),
+        api.get<SignalsResp>('/api/proximate/crisis-signals'),
+      ]);
+      if (rowsR.status === 'fulfilled') setData(rowsR.value);
+      else throw rowsR.reason;
+      if (signalsR.status === 'fulfilled') {
+        setSignals(signalsR.value.signals || []);
+      } else {
+        // Signal-endpoint failure shouldn't break the page.
+        setSignals([]);
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'load failed');
     } finally {
@@ -188,6 +225,62 @@ export default function CrisisSelectorPage() {
             </div>
           )}
         </Card>
+
+        {/* Phase 706 — pending crisis signals (raw OB-logged
+            observations). Reviewer flagged the signal entry felt
+            dead — submit succeeded but nothing showed up. Now it's
+            right here above the curated rows. */}
+        {signals.length > 0 && (
+          <Card className="p-4 space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-sm font-medium">
+                {t('proximate.crisis_signal.pending_heading')
+                  || 'Pending signals'} ({signals.length})
+              </p>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                {t('proximate.crisis_signal.pending_subline')
+                  || 'OB-logged. Triage to publish.'}
+              </p>
+            </div>
+            <ul className="space-y-1.5">
+              {signals.slice(0, 8).map((sig) => (
+                <li key={sig.id} className="text-xs flex items-start gap-2">
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] mt-0.5 ${
+                      sig.status === 'pending'
+                        ? 'bg-amber-100 text-amber-800 border-amber-300'
+                        : sig.status === 'triaged'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {sig.status}
+                  </Badge>
+                  <span className="font-mono text-muted-foreground">
+                    {sig.country}
+                  </span>
+                  {sig.event_type && (
+                    <span className="text-muted-foreground">
+                      · {sig.event_type}
+                    </span>
+                  )}
+                  <span className="flex-1 line-clamp-2">{sig.description}</span>
+                  {sig.submitted_at && (
+                    <span className="text-muted-foreground whitespace-nowrap text-[10px]">
+                      {new Date(sig.submitted_at).toLocaleDateString()}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {signals.length > 8 && (
+              <p className="text-[10px] text-muted-foreground">
+                +{signals.length - 8} {t('proximate.crisis_signal.more') || 'more'}
+              </p>
+            )}
+          </Card>
+        )}
 
         {loading && (
           <p className="text-sm text-muted-foreground flex items-center gap-2">

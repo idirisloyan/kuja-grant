@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, g
 from flask_login import login_required, current_user
 from app.extensions import db
 from app.models import Grant, Application, Report, Document, Organization
@@ -2249,10 +2249,15 @@ def api_ai_thread_post(thread_id):
     if not content:
         return jsonify({'success': False, 'error': 'content required'}), 400
 
+    # Phase 706 — pass the active tenant's slug/name so the chat
+    # system prompt can adapt to Proximate vs Marketplace vocabulary.
+    _net = getattr(g, 'network', None)
     result = AIChatService.post_message(
         thread=thread, user_text=content,
         user_role=current_user.role,
         user_language=getattr(current_user, 'language', 'en') or 'en',
+        network_slug=getattr(_net, 'slug', None) if _net else None,
+        network_name=getattr(_net, 'name', None) if _net else None,
     )
     if not result.get('success'):
         return jsonify(result), 503
