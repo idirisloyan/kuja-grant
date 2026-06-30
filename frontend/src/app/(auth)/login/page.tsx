@@ -20,6 +20,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { Loader2, Mail, Lock, Building2, Wallet, Star, Sparkles, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { TenantSwitcher } from '@/components/tenant-switcher';
 
 const INPUT_CLS =
   'block w-full h-10 pl-9 pr-3 text-sm bg-background text-foreground ' +
@@ -61,51 +62,81 @@ export default function LoginPage() {
     );
   }, []);
 
-  // NEAR is a closed network: a single Oversight Body runs the fund,
-  // members are NGOs. There is no separate donor role (NEAR is the
-  // donor) and no independent reviewer role (the OB does review).
-  // Showing the Kuja demo trio (NGO / Donor / Reviewer) for the NEAR
-  // tenant is misleading — only two personas exist in NEAR's model.
-  const demoAccounts = isNetworkTenant
-    ? [
-        {
-          label: `${tenantName} operator`,
-          email: 'admin@kuja.org',
-          icon: Star,
-          accent: tenantBrandDark,
-          description: 'Oversight Body — sees all funds, declarations, members',
-        },
-        {
-          label: `${tenantName} member (NGO)`,
-          email: 'fatima@amani.org',
-          icon: Building2,
-          accent: 'hsl(var(--kuja-grow))',
-          description: 'Amani Foundation — own assessments, grants, reports',
-        },
-      ]
-    : [
-        {
-          label: t('auth.role_ngo'),
-          email: 'fatima@amani.org',
-          icon: Building2,
-          accent: 'hsl(var(--kuja-grow))',
-          description: 'Amani Foundation',
-        },
-        {
-          label: t('auth.role_donor'),
-          email: 'sarah@globalhealth.org',
-          icon: Wallet,
-          accent: 'hsl(var(--kuja-clay-dark))',
-          description: 'Global Health Fund',
-        },
-        {
-          label: t('auth.role_reviewer'),
-          email: 'james@reviewer.org',
-          icon: Star,
-          accent: 'hsl(var(--kuja-sun))',
-          description: 'Independent Reviewer',
-        },
-      ];
+  // Phase 708 — three tenants now have distinct demo identity sets.
+  //   Kuja Marketplace: NGO / Donor / Reviewer (the original trio).
+  //   NEAR (closed network, OB runs the fund + NGO members are the
+  //         only counter-party — no separate donor or reviewer roles).
+  //   Proximate (Sudan humanitarian fund — OB + donor + token-credentialled
+  //         partner who never logs in; we expose OB + donor only).
+  // The TenantSwitcher above the card lets the demo viewer flip between
+  // them in-place without having to remember URL query params.
+  const tenantSlug = (network?.slug || 'kuja').toLowerCase();
+  let demoAccounts: {
+    label: string;
+    email: string;
+    icon: typeof Building2;
+    accent: string;
+    description: string;
+  }[];
+  if (tenantSlug === 'proximate') {
+    demoAccounts = [
+      {
+        label: 'Proximate OB',
+        email: 'ob@proximate.org',
+        icon: Star,
+        accent: tenantBrandDark,
+        description: 'Oversight Body — partners, disbursements, audit chain',
+      },
+      {
+        label: 'Proximate donor',
+        email: 'donor1@proximate.org',
+        icon: Wallet,
+        accent: 'hsl(var(--kuja-clay-dark))',
+        description: 'Demo Donor Foundation — portfolio + Ask AI',
+      },
+    ];
+  } else if (isNetworkTenant) {
+    demoAccounts = [
+      {
+        label: `${tenantName} operator`,
+        email: 'admin@kuja.org',
+        icon: Star,
+        accent: tenantBrandDark,
+        description: 'Oversight Body — sees all funds, declarations, members',
+      },
+      {
+        label: `${tenantName} member (NGO)`,
+        email: 'fatima@amani.org',
+        icon: Building2,
+        accent: 'hsl(var(--kuja-grow))',
+        description: 'Amani Foundation — own assessments, grants, reports',
+      },
+    ];
+  } else {
+    demoAccounts = [
+      {
+        label: t('auth.role_ngo'),
+        email: 'fatima@amani.org',
+        icon: Building2,
+        accent: 'hsl(var(--kuja-grow))',
+        description: 'Amani Foundation',
+      },
+      {
+        label: t('auth.role_donor'),
+        email: 'sarah@globalhealth.org',
+        icon: Wallet,
+        accent: 'hsl(var(--kuja-clay-dark))',
+        description: 'Global Health Fund',
+      },
+      {
+        label: t('auth.role_reviewer'),
+        email: 'james@reviewer.org',
+        icon: Star,
+        accent: 'hsl(var(--kuja-sun))',
+        description: 'Independent Reviewer',
+      },
+    ];
+  }
 
   const attemptLogin = async (submittedEmail: string, submittedPassword: string) => {
     setIsLoading(true);
@@ -265,10 +296,19 @@ export default function LoginPage() {
         {/* RIGHT — Login card */}
         <div className="lg:col-span-3">
           <div className="rounded-2xl bg-white/95 backdrop-blur border border-white/20 shadow-2xl p-6 lg:p-8">
+            {/* Phase 708 — Tenant switcher above the heading. Flips
+                branding + demo accounts in place; localStorage carries
+                X-Network-Override on every subsequent API call. */}
+            <div className="mb-4">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+                Sign in to
+              </div>
+              <TenantSwitcher />
+            </div>
             <div className="mb-6">
               <h2 className="kuja-display text-2xl text-foreground">Sign in</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Welcome back. Pick up where you left off.
+                Welcome back to {tenantName}.
               </p>
             </div>
 
