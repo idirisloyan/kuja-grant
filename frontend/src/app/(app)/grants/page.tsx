@@ -3,6 +3,12 @@
 /**
  * Grants list — shadcn + Tailwind rewrite.
  * Search, sector filters, sort, role-aware copy (NGO: Browse / Donor: My Grants).
+ *
+ * Phase 723 — Proximate tenant redirect. This is the Kuja/NEAR NGO
+ * marketplace surface. Proximate OB users land here by mistake because
+ * they think "grants" means their inbound donor grants — the actual
+ * surface for that is /proximate/grants. Redirect silently so they
+ * always end up in the right place.
  */
 
 import { useState, useMemo, useEffect } from 'react';
@@ -72,6 +78,22 @@ export default function GrantsPage() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
+
+  // Phase 723 — Proximate tenant redirect. If the caller is inside the
+  // Proximate flavor, /grants is the wrong surface for them; the right
+  // one is /proximate/grants (Adeso's inbound grants from institutional
+  // donors). Silent client-side hop so a mis-navigated URL doesn't
+  // dump them in the NGO marketplace.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const override = localStorage.getItem('kuja_network_override');
+      if (override === 'proximate') {
+        router.replace('/proximate/grants');
+      }
+    } catch { /* ignore */ }
+  }, [router]);
+
   const [searchQuery, setSearchQuery] = useUrlState('q', '');
   // Phase 251 — remember last query in localStorage so the next visit
   // pre-fills the search box if the URL doesn't carry a `?q=`.
