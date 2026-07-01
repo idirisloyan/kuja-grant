@@ -1713,6 +1713,170 @@ def _user_is_ob(net) -> bool:
         return False
 
 
+# =========================================================================
+# Phase 710b — Round participants + Donor lookup endpoints
+# =========================================================================
+
+@proximate_bp.route('/donors', methods=['GET'])
+@login_required
+def api_proximate_donors():
+    """Donor registry for the new-round donor picker + admin surfaces.
+    Returns a flat list of {id, display_name, contact_email} for the
+    current Proximate tenant."""
+    from app.models import ProximateDonor
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    rows = (ProximateDonor.query
+            .filter_by(network_id=net.id)
+            .order_by(ProximateDonor.display_name.asc())
+            .all())
+    return jsonify({
+        'success': True,
+        'donors': [
+            {
+                'id': d.id,
+                'display_name': d.display_name,
+                'contact_email': d.contact_email,
+            }
+            for d in rows
+        ],
+    })
+
+
+@proximate_bp.route('/rounds/<int:round_id>/participants', methods=['GET'])
+@login_required
+def api_round_participants(round_id):
+    """Return the round's partner roster with per-partner stage.
+    Used by the round dashboard's roster section (Phase 711)."""
+    from app.models import (
+        ProximateRound, ProximateRoundParticipant, ProximatePartner,
+    )
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    round_row = ProximateRound.query.filter_by(
+        id=round_id, network_id=net.id,
+    ).first()
+    if not round_row:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+
+    rows = (ProximateRoundParticipant.query
+            .filter_by(round_id=round_row.id)
+            .join(ProximatePartner,
+                  ProximatePartner.id == ProximateRoundParticipant.partner_id)
+            .order_by(ProximatePartner.name.asc())
+            .all())
+    partners_by_id = {
+        p.id: p for p in ProximatePartner.query.filter(
+            ProximatePartner.id.in_([r.partner_id for r in rows] or [0])
+        ).all()
+    }
+    return jsonify({
+        'success': True,
+        'round_id': round_row.id,
+        'round_title': round_row.title,
+        'participants': [
+            {
+                'id': r.id,
+                'partner_id': r.partner_id,
+                'partner_name': (
+                    partners_by_id[r.partner_id].name
+                    if r.partner_id in partners_by_id else None
+                ),
+                'partner_locality': (
+                    partners_by_id[r.partner_id].locality
+                    if r.partner_id in partners_by_id else None
+                ),
+                'partner_status': (
+                    partners_by_id[r.partner_id].status
+                    if r.partner_id in partners_by_id else None
+                ),
+                'stage': r.stage,
+                'notes': r.notes,
+                'added_at': r.added_at.isoformat() if r.added_at else None,
+            }
+            for r in rows
+        ],
+    })
+
+
+@proximate_bp.route('/rounds/<int:round_id>/participants', methods=['POST'])
+@login_required
+def api_round_participants_add(round_id):
+    """Add a partner to this round. OB-only. Body: {partner_id, notes?}"""
+    from app.models import (
+        ProximateRound, ProximateRoundParticipant, ProximatePartner,
+    )
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    if not _user_is_ob(net):
+        return jsonify({'success': False, 'error': 'ob only'}), 403
+    round_row = ProximateRound.query.filter_by(
+        id=round_id, network_id=net.id,
+    ).first()
+    if not round_row:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    body = get_request_json() or {}
+    partner_id = body.get('partner_id')
+    if not partner_id:
+        return jsonify({'success': False, 'error': 'partner_id required'}), 400
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'partner not in tenant'}), 400
+    existing = ProximateRoundParticipant.query.filter_by(
+        round_id=round_row.id, partner_id=partner.id,
+    ).first()
+    if existing:
+        return jsonify({
+            'success': True, 'participant_id': existing.id,
+            'already_present': True,
+        })
+    row = ProximateRoundParticipant(
+        round_id=round_row.id, partner_id=partner.id,
+        stage='planned',
+        notes=(body.get('notes') or '')[:2000] or None,
+        added_by_user_id=current_user.id,
+    )
+    db.session.add(row)
+    db.session.commit()
+    return jsonify({
+        'success': True, 'participant_id': row.id,
+        'already_present': False,
+    })
+
+
+@proximate_bp.route(
+    '/rounds/<int:round_id>/participants/<int:participant_id>',
+    methods=['DELETE'],
+)
+@login_required
+def api_round_participants_remove(round_id, participant_id):
+    """Remove a partner from the round. OB-only."""
+    from app.models import ProximateRound, ProximateRoundParticipant
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    if not _user_is_ob(net):
+        return jsonify({'success': False, 'error': 'ob only'}), 403
+    round_row = ProximateRound.query.filter_by(
+        id=round_id, network_id=net.id,
+    ).first()
+    if not round_row:
+        return jsonify({'success': False, 'error': 'round not found'}), 404
+    row = ProximateRoundParticipant.query.filter_by(
+        id=participant_id, round_id=round_row.id,
+    ).first()
+    if not row:
+        return jsonify({'success': False, 'error': 'participant not found'}), 404
+    db.session.delete(row)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
 @proximate_bp.route('/rounds/<int:round_id>/report.pdf', methods=['GET'])
 @login_required
 def api_round_report_pdf(round_id):

@@ -40,7 +40,7 @@ from app.extensions import db
 from app.models import (
     Network, User, Endorser, ProximatePartner, Endorsement,
     FinancialServiceProvider, Organization, NetworkMembership,
-    ProximateDonor,
+    ProximateDonor, ProximateRound, ProximateRoundParticipant,
 )
 from werkzeug.security import generate_password_hash
 
@@ -87,6 +87,27 @@ ENDORSER_FIXTURES = [
         'locality': 'Khartoum', 'village_name': 'Khartoum-2',
         'family_name': 'Ngoma', 'employer': 'Ubuntu Solidarity',
         'reputation_score': 80,
+    },
+    # Phase 714 — three additional endorsers so the pool feels real
+    # for demos and the independence rule on verifier has genuine
+    # rotation options.
+    {
+        'email': 'sarah@globalhealth.org',
+        'locality': 'Kassala', 'village_name': 'Kassala Town',
+        'family_name': 'Adam', 'employer': 'Global Health',
+        'reputation_score': 74,
+    },
+    {
+        'email': 'james@reviewer.org',
+        'locality': 'Port Sudan', 'village_name': 'Port Sudan Central',
+        'family_name': 'Adan', 'employer': 'Reviewer Independent',
+        'reputation_score': 88,
+    },
+    {
+        'email': 'grace@childrenfirst.org',
+        'locality': 'Wad Madani', 'village_name': 'Wad Madani East',
+        'family_name': 'Barre', 'employer': 'Children First',
+        'reputation_score': 79,
     },
 ]
 
@@ -197,6 +218,142 @@ PARTNER_FIXTURES = [
         'endorsement_target': [
             ('fatima@amani.org', True, True, True),   # Gedaref, no COI
             ('peter@hopebridges.org', True, True, True),  # Gedaref, no COI
+        ],
+    },
+    # Phase 714 — three additional partners for round-roster demos
+    {
+        'name': 'Kassala East Farmers Circle',
+        'name_ar': 'حلقة مزارعي شرق كسلا',
+        'locality': 'Kassala',
+        'bank_account_holder_name': 'Kassala East Farmers Circle',
+        'bank_name': 'Agricultural Bank of Sudan',
+        'target_status': 'dd_clear',
+        'endorsement_target': [
+            ('sarah@globalhealth.org', True, True, True),
+            ('grace@childrenfirst.org', True, True, True),
+        ],
+    },
+    {
+        'name': 'Port Sudan Fisherfolk Union',
+        'name_ar': 'اتحاد صيادي بورسودان',
+        'locality': 'Port Sudan',
+        'bank_account_holder_name': 'Port Sudan Fisherfolk Union',
+        'bank_name': 'Bank of Khartoum',
+        'target_status': 'dd_clear',
+        'endorsement_target': [
+            ('admin@kuja.org', True, True, True),
+            ('sarah@globalhealth.org', True, True, True),
+        ],
+    },
+    {
+        'name': 'Wad Madani Youth Solidarity',
+        'name_ar': 'تضامن شباب ود مدني',
+        'locality': 'Wad Madani',
+        'bank_account_holder_name': 'Wad Madani Youth Solidarity',
+        'bank_name': 'Faisal Islamic Bank',
+        'target_status': 'endorsements_open_pending',
+        'endorsement_target': [
+            ('grace@childrenfirst.org', True, True, True),
+        ],
+    },
+]
+
+
+# Phase 714 — additional donors so the donor picker on new-round has
+# a real registry to choose from and donor portfolios exercise the
+# multi-donor pattern. Each donor gets an org + a login user + a
+# ProximateDonor row. Login: pass123 for all.
+EXTRA_DONORS = [
+    {
+        'email': 'donor2@sudanemergency.org',
+        'org_name': 'Sudan Emergency Trust',
+        'user_name': 'Sudan Emergency Trust Ops',
+        'display_name': 'Sudan Emergency Trust',
+    },
+    {
+        'email': 'donor3@adesorapid.org',
+        'org_name': 'Adeso Rapid Response Fund',
+        'user_name': 'Adeso Rapid Response Ops',
+        'display_name': 'Adeso Rapid Response Fund',
+    },
+    {
+        'email': 'donor4@ihfsudan.org',
+        'org_name': 'IHF Sudan Country Envelope',
+        'user_name': 'IHF Sudan Envelope Ops',
+        'display_name': 'IHF Sudan Country Envelope',
+    },
+    {
+        'email': 'donor5@bilateralx.org',
+        'org_name': 'Bilateral Fund X',
+        'user_name': 'Bilateral Fund X Ops',
+        'display_name': 'Bilateral Fund X',
+    },
+]
+
+
+# Phase 714 — 3 seeded rounds spanning the round lifecycle. Each round
+# names its donor by display_name (resolved to donor_id at seed time)
+# and lists its partner roster by partner name (resolved to partner_id).
+# `stages` per participant lets the demo show the roster mid-flight
+# without needing to run disbursements to prove state.
+ROUND_FIXTURES = [
+    {
+        # closed round — retrospective view; all partners disbursed +
+        # attested, some verified. Good for the donor portal demo.
+        'title': 'Kassala Rapid Cash — Round 1',
+        'title_ar': 'كسلا الطوارئ النقدية — الجولة الأولى',
+        'trigger_type': 'disaster',
+        'trigger_summary': 'Flash flooding across Kassala in April 2026 displaced ~18k households. This round covered emergency cash to informal groups already active on-site.',
+        'donor_display_name': 'Sudan Emergency Trust',
+        'envelope_usd': 45000.0,
+        'expected_duration_days': 60,
+        'target_country': 'SD',
+        'target_region': 'Kassala',
+        'status': 'closed',
+        'closing_summary': 'All partners disbursed on time; 2 of 3 outcomes verified by independent verifier; 1 outcome pending third-party sign-off but partner attestation received.',
+        'roster': [
+            ('Kassala East Farmers Circle', 'verified'),
+            ('Port Sudan Fisherfolk Union', 'verified'),
+            ('Sennar Children Outreach', 'attested'),
+        ],
+    },
+    {
+        # active round — partners in mid-flight, some disbursed, one
+        # planned. This is where OB spends most of the working day.
+        'title': 'Gedaref Winterisation — Round 2',
+        'title_ar': 'التدفئة الشتوية في القضارف — الجولة الثانية',
+        'trigger_type': 'programme',
+        'trigger_summary': 'Winter shelter + heating kits for informal groups in Gedaref who have absorbed IDPs from Khartoum State. Multi-tranche release.',
+        'donor_display_name': 'Adeso Rapid Response Fund',
+        'envelope_usd': 32000.0,
+        'expected_duration_days': 90,
+        'target_country': 'SD',
+        'target_region': 'Gedaref',
+        'status': 'active',
+        'roster': [
+            ('Khartoum Sisters Mutual Aid', 'disbursed'),
+            ('East Gedaref Volunteers', 'bank_verified'),
+            ('Gedaref Mothers Co-op', 'endorsement_open'),
+            ('New Hope Family Network', 'planned'),
+        ],
+    },
+    {
+        # draft round — OB is planning; roster staged but signatures
+        # not yet collected. Good for showing the "before it starts"
+        # experience.
+        'title': 'Wad Madani Youth Programme — Round 3 (draft)',
+        'title_ar': 'برنامج شباب ود مدني — الجولة الثالثة (مسودة)',
+        'trigger_type': 'donor',
+        'trigger_summary': 'Adeso-donor co-designed programme for youth-led informal groups in Wad Madani. Draft envelope pending Fiduciary Board sign-off.',
+        'donor_display_name': 'IHF Sudan Country Envelope',
+        'envelope_usd': 22000.0,
+        'expected_duration_days': 120,
+        'target_country': 'SD',
+        'target_region': 'Wad Madani',
+        'status': 'draft',
+        'roster': [
+            ('Wad Madani Youth Solidarity', 'planned'),
+            ('Sennar Riverside Aid', 'planned'),
         ],
     },
 ]
@@ -516,12 +673,130 @@ def run():
             db.session.add(donor_row)
             print(f"  donor row created for {DONOR_EMAIL}")
 
+        # Phase 714 — extra donors so the round donor picker has a
+        # realistic registry to render.
+        donor_display_to_row = {}
+        # Seed the existing 'Demo Donor Foundation' into the lookup.
+        first_donor = ProximateDonor.query.filter_by(
+            network_id=proximate.id, primary_user_id=donor_user.id,
+        ).first()
+        if first_donor:
+            donor_display_to_row[first_donor.display_name] = first_donor
+
+        for d in EXTRA_DONORS:
+            org = Organization.query.filter_by(name=d['org_name']).first()
+            if not org:
+                org = Organization(
+                    name=d['org_name'], org_type='donor', country='Sudan',
+                )
+                db.session.add(org)
+                db.session.flush()
+            u = User.query.filter_by(email=d['email']).first()
+            if not u:
+                u = User(
+                    email=d['email'],
+                    password_hash=generate_password_hash('pass123'),
+                    role='ngo', name=d['user_name'], org_id=org.id,
+                )
+                db.session.add(u)
+                db.session.flush()
+                print(f"  extra donor user created: {d['email']}")
+            elif u.org_id != org.id:
+                u.org_id = org.id
+            row = ProximateDonor.query.filter_by(
+                network_id=proximate.id, primary_user_id=u.id,
+            ).first()
+            if not row:
+                row = ProximateDonor(
+                    network_id=proximate.id, org_id=org.id,
+                    primary_user_id=u.id,
+                    display_name=d['display_name'],
+                    contact_email=d['email'],
+                    auto_email_closing_pack=True,
+                    registered_by_user_id=ob_user.id,
+                )
+                db.session.add(row)
+                db.session.flush()
+                print(f"  extra donor row created: {d['display_name']}")
+            donor_display_to_row[d['display_name']] = row
+
+        # Phase 714 — seeded rounds with participant rosters.
+        # Idempotent by title. Roster snapshot re-runs snap partner
+        # stages back to the fixture value (safe because these are demo
+        # rows — production round rosters are OB-managed, never touched
+        # by the seed).
+        partner_by_name = {
+            p.name: p for p in ProximatePartner.query.filter_by(
+                network_id=proximate.id,
+            ).all()
+        }
+        for rf in ROUND_FIXTURES:
+            round_row = ProximateRound.query.filter_by(
+                network_id=proximate.id, title=rf['title'],
+            ).first()
+            donor_row = donor_display_to_row.get(rf['donor_display_name'])
+            if not round_row:
+                round_row = ProximateRound(
+                    network_id=proximate.id,
+                    title=rf['title'],
+                    title_ar=rf.get('title_ar'),
+                    trigger_type=rf['trigger_type'],
+                    trigger_summary=rf['trigger_summary'],
+                    donor_id=donor_row.id if donor_row else None,
+                    donor_name=rf['donor_display_name'],
+                    envelope_usd=rf['envelope_usd'],
+                    expected_duration_days=rf['expected_duration_days'],
+                    target_country=rf['target_country'],
+                    target_region=rf['target_region'],
+                    status=rf['status'],
+                    drafted_by_user_id=ob_user.id,
+                    drafted_at=datetime.now(timezone.utc) - timedelta(days=30),
+                    closing_summary=rf.get('closing_summary'),
+                )
+                if rf['status'] in ('active', 'closed'):
+                    round_row.submitted_at = round_row.drafted_at + timedelta(days=1)
+                    round_row.activated_at = round_row.drafted_at + timedelta(days=3)
+                if rf['status'] == 'closed':
+                    round_row.closed_at = round_row.drafted_at + timedelta(days=25)
+                db.session.add(round_row)
+                db.session.flush()
+                print(f"  round created: {rf['title']} [{rf['status']}]")
+            else:
+                # Reconcile donor link + closing summary so re-runs snap.
+                if donor_row:
+                    round_row.donor_id = donor_row.id
+                    round_row.donor_name = rf['donor_display_name']
+                round_row.envelope_usd = rf['envelope_usd']
+                round_row.status = rf['status']
+                if rf.get('closing_summary'):
+                    round_row.closing_summary = rf['closing_summary']
+
+            # Reconcile the roster.
+            for partner_name, stage in rf['roster']:
+                partner = partner_by_name.get(partner_name)
+                if not partner:
+                    print(f"    WARN: partner '{partner_name}' not seeded yet, skipping")
+                    continue
+                existing = ProximateRoundParticipant.query.filter_by(
+                    round_id=round_row.id, partner_id=partner.id,
+                ).first()
+                if not existing:
+                    db.session.add(ProximateRoundParticipant(
+                        round_id=round_row.id, partner_id=partner.id,
+                        stage=stage, added_by_user_id=ob_user.id,
+                    ))
+                else:
+                    existing.stage = stage
+
         db.session.commit()
         print()
         print(f"Done. Proximate now has:")
         print(f"  Endorsers : {Endorser.query.filter_by(network_id=proximate.id).count()}")
         print(f"  Partners  : {ProximatePartner.query.filter_by(network_id=proximate.id).count()}")
         print(f"  Endorsements: {Endorsement.query.join(ProximatePartner).filter(ProximatePartner.network_id == proximate.id).count()}")
+        print(f"  Donors    : {ProximateDonor.query.filter_by(network_id=proximate.id).count()}")
+        print(f"  Rounds    : {ProximateRound.query.filter_by(network_id=proximate.id).count()}")
+        print(f"  Participants: {ProximateRoundParticipant.query.join(ProximateRound).filter(ProximateRound.network_id == proximate.id).count()}")
         print()
         print(f"  Demo URLs:")
         print(f"    /proximate/endorse           — endorser inbox")
