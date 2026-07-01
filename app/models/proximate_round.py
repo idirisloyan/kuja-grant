@@ -64,6 +64,16 @@ class ProximateRound(db.Model):
     trigger_type = db.Column(db.String(40), nullable=False)  # disaster / donor / programme
     trigger_summary = db.Column(db.Text, nullable=True)
 
+    # Phase 710 — donor is now a first-class FK to ProximateDonor.
+    # `donor_name` is retained as a display cache so historical rows
+    # keep rendering; new rows should always set donor_id and the
+    # denormalized name is regenerated from the linked donor.
+    donor_id = db.Column(
+        db.Integer,
+        db.ForeignKey("proximate_donors.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     donor_name = db.Column(db.String(200), nullable=True)
     envelope_usd = db.Column(db.Float, nullable=True)
     expected_duration_days = db.Column(db.Integer, nullable=True)
@@ -228,6 +238,7 @@ class ProximateRound(db.Model):
             "title_ar": self.title_ar,
             "trigger_type": self.trigger_type,
             "trigger_summary": self.trigger_summary,
+            "donor_id": self.donor_id,
             "donor_name": self.donor_name,
             "envelope_usd": self.envelope_usd,
             "expected_duration_days": self.expected_duration_days,
@@ -311,4 +322,87 @@ class ProximateRoundSignature(db.Model):
             "declared_no_coi": self.declared_no_coi,
             "note": self.note,
             "acted_at": self.acted_at.isoformat() if self.acted_at else None,
+        }
+
+
+# ===============================================================
+# ProximateRoundParticipant — Phase 710
+# ===============================================================
+
+# Round → partner roster. Prior to Phase 710 the set of partners in a
+# round was inferred by querying disbursements after the fact. That
+# made round planning impossible ("who's supposed to be in this
+# round?" had no answer until money moved). Explicit participant rows
+# solve it: OB adds partners at draft time, tracks stage per partner,
+# renders roster on the round detail page.
+
+PARTICIPANT_STAGES = (
+    "planned",           # roster entry only
+    "endorsement_open",  # endorser links shared
+    "endorsed",          # 2+ endorsements collected
+    "bank_verified",     # ready to disburse
+    "disbursed",         # first tranche sent
+    "reported",          # 14-day partner report received
+    "attested",          # 90-day outcome attested
+    "verified",          # third-party verifier confirmed
+    "withdrawn",         # removed from the round
+)
+
+
+class ProximateRoundParticipant(db.Model):
+    """A partner enrolled in a Proximate round.
+
+    One row per (round, partner). The `stage` is the OB's snapshot of
+    where this partner sits in the round's lifecycle — computed by the
+    round-detail endpoint from the underlying endorsement / bank /
+    disbursement / report / outcome / verifier state, but persisted
+    here as a cache so the roster page loads instantly."""
+
+    __tablename__ = "proximate_round_participants"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "round_id", "partner_id",
+            name="uq_proximate_round_participant",
+        ),
+        db.Index(
+            "ix_proximate_round_participant_stage",
+            "round_id", "stage",
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    round_id = db.Column(
+        db.Integer,
+        db.ForeignKey("proximate_rounds.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    partner_id = db.Column(
+        db.Integer,
+        db.ForeignKey("proximate_partners.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+
+    stage = db.Column(
+        db.String(30), nullable=False, default="planned",
+    )
+    notes = db.Column(db.Text, nullable=True)
+
+    added_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=True,
+    )
+    added_at = db.Column(db.DateTime, nullable=False, default=_now)
+    updated_at = db.Column(
+        db.DateTime, nullable=False, default=_now, onupdate=_now,
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "round_id": self.round_id,
+            "partner_id": self.partner_id,
+            "stage": self.stage,
+            "notes": self.notes,
+            "added_by_user_id": self.added_by_user_id,
+            "added_at": self.added_at.isoformat() if self.added_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

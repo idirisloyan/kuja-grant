@@ -83,8 +83,9 @@ from app.models.proximate_fsp import (
     FSP_KINDS, METHOD_STATUSES,
 )
 from app.models.proximate_round import (
-    ProximateRound, ProximateRoundSignature,
+    ProximateRound, ProximateRoundSignature, ProximateRoundParticipant,
     ROUND_STATUSES, ROUND_TRIGGER_TYPES, ROUND_SIGNERS_REQUIRED,
+    PARTICIPANT_STAGES,
 )
 from app.models.proximate_disbursement import (
     ProximateDisbursement,
@@ -128,7 +129,8 @@ __all__ = [
     'RESPONSE_WINDOW_HOURS',
     'FinancialServiceProvider', 'PartnerDisbursementMethod',
     'FSP_KINDS', 'METHOD_STATUSES',
-    'ProximateRound', 'ProximateRoundSignature',
+    'ProximateRound', 'ProximateRoundSignature', 'ProximateRoundParticipant',
+    'PARTICIPANT_STAGES',
     'ROUND_STATUSES', 'ROUND_TRIGGER_TYPES', 'ROUND_SIGNERS_REQUIRED',
     'ProximateDisbursement',
     'DISBURSEMENT_STATUSES', 'DEFAULT_REPORT_WINDOW_DAYS',

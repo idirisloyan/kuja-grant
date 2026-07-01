@@ -97,8 +97,16 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
     setMobileSidebarOpen(false);
   }, [pathname, setMobileSidebarOpen]);
 
-  const profile = isProximateFlavor && persona && persona !== 'none'
-    ? proximateProfile(persona, t)
+  // Phase 709 — when inside the Proximate tenant, ALWAYS use the
+  // Proximate nav — no marketplace fallback. Prior logic fell through
+  // to pickNavProfile() while SWR was loading (persona === null) and
+  // for any user without a resolved Proximate persona (persona ===
+  // 'none'), leaking Kuja-marketplace items (Browse grants, Trust
+  // Profile, Capacity Assessment) into the Proximate shell. Now we
+  // treat null/loading and 'none' identically: minimal Proximate shell
+  // — no Kuja links, no persona confusion.
+  const profile = isProximateFlavor
+    ? proximateProfile(persona ?? 'none', t)
     : pickNavProfile(role, isNearFlavor, t);
   const currentWidth = sidebarCollapsed ? collapsedWidth : width;
 
@@ -494,16 +502,20 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
 
     case 'none':
     default:
-      // No Proximate persona — fall back to the (likely) NGO-flavored
-      // nav. This branch is rarely hit because the sidebar caller
-      // already checks `persona && persona !== 'none'` before invoking
-      // this function, but exists as a defensive default.
+      // Phase 709 — persona is either loading OR the user has no
+      // Proximate access. Show a truly minimal Proximate-branded
+      // shell. NEVER link to /dashboard (the Kuja marketplace surface)
+      // — that's the leak the user reported. Only /proximate/donor
+      // (which enforces its own persona gate server-side) and
+      // Settings. If the user genuinely doesn't have Proximate access
+      // they'll bounce off the donor page and can switch tenants via
+      // the TenantSwitcher on /login.
       return {
         primary: [
-          { icon: LayoutDashboard, label: t('nav.dashboard'),  href: '/dashboard' },
+          { icon: LayoutDashboard, label: 'Proximate home', href: '/proximate/donor' },
         ],
         secondary: [
-          { icon: SettingsIcon,    label: 'Settings',          href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',       href: '/settings/notifications' },
         ],
       };
   }
