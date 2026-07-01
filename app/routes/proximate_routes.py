@@ -591,6 +591,17 @@ def api_submit_endorsement(partner_id):
                     )
             db.session.commit()
 
+    # Phase 715a — participant-stage auto-compute. Endorsement trust-
+    # floor crossings bump this partner in every active round they're in.
+    if state_change == 'dd_pending':
+        _bump_participant_stage_for_partner_across_active_rounds(
+            net.id, partner.id, 'endorsed', current_user.id,
+        )
+    elif state_change == 'dd_clear':
+        _bump_participant_stage_for_partner_across_active_rounds(
+            net.id, partner.id, 'bank_verified', current_user.id,
+        )
+
     logger.info(
         f"Proximate: endorsement submitted partner_id={partner.id} "
         f"endorser_id={endorser.id} coi_passed={endorsement.coi_check_passed} "
@@ -1714,6 +1725,100 @@ def _user_is_ob(net) -> bool:
 
 
 # =========================================================================
+# Phase 715a — Participant stage auto-compute helper
+# =========================================================================
+
+def _bump_participant_stage(
+    round_id, partner_id, target_stage: str,
+    actor_user_id=None,
+):
+    """Advance a round-participant's stage forward. Idempotent and
+    best-effort — a failed bump is logged but never raises.
+
+    Rules:
+      • None round_id or partner_id → no-op (disbursement not tied to a round).
+      • Row missing → auto-create at target_stage (roster catches up to
+        a real-world action the OB took without adding the partner first).
+      • Row present at a stage AT-OR-BEYOND target → no-op (stages only
+        advance; never regress). Uses PARTICIPANT_STAGES ordering.
+      • Row at an earlier stage → advance to target_stage + commit.
+    """
+    if not round_id or not partner_id:
+        return
+    from app.models import ProximateRoundParticipant
+    from app.models.proximate_round import PARTICIPANT_STAGES
+    if target_stage not in PARTICIPANT_STAGES:
+        return
+    try:
+        row = ProximateRoundParticipant.query.filter_by(
+            round_id=round_id, partner_id=partner_id,
+        ).first()
+        target_idx = PARTICIPANT_STAGES.index(target_stage)
+        if row is None:
+            row = ProximateRoundParticipant(
+                round_id=round_id, partner_id=partner_id,
+                stage=target_stage, added_by_user_id=actor_user_id,
+            )
+            db.session.add(row)
+            db.session.commit()
+            return
+        current_idx = (
+            PARTICIPANT_STAGES.index(row.stage)
+            if row.stage in PARTICIPANT_STAGES else -1
+        )
+        if target_idx > current_idx:
+            row.stage = target_stage
+            db.session.commit()
+    except Exception as e:  # pragma: no cover — telemetry only
+        db.session.rollback()
+        try:
+            logger.warning(
+                f"Proximate: participant stage bump failed "
+                f"round={round_id} partner={partner_id} "
+                f"target={target_stage} err={e}"
+            )
+        except Exception:
+            pass
+
+
+def _bump_participant_stage_for_partner_across_active_rounds(
+    net_id, partner_id, target_stage: str, actor_user_id=None,
+):
+    """Bump this partner's stage in every ACTIVE round they participate
+    in. Used by partner-level events (endorsement threshold reached,
+    bank verified) that affect all rounds simultaneously."""
+    if not partner_id:
+        return
+    try:
+        from app.models import (
+            ProximateRound, ProximateRoundParticipant,
+        )
+        active_round_ids = [
+            r.id for r in ProximateRound.query.filter_by(
+                network_id=net_id, status='active',
+            ).all()
+        ]
+        if not active_round_ids:
+            return
+        rows = ProximateRoundParticipant.query.filter(
+            ProximateRoundParticipant.partner_id == partner_id,
+            ProximateRoundParticipant.round_id.in_(active_round_ids),
+        ).all()
+        for row in rows:
+            _bump_participant_stage(
+                row.round_id, partner_id, target_stage, actor_user_id,
+            )
+    except Exception as e:  # pragma: no cover
+        try:
+            logger.warning(
+                f"Proximate: cross-round stage bump failed "
+                f"partner={partner_id} target={target_stage} err={e}"
+            )
+        except Exception:
+            pass
+
+
+# =========================================================================
 # Phase 710b — Round participants + Donor lookup endpoints
 # =========================================================================
 
@@ -2406,6 +2511,16 @@ def api_sign_round(round_id):
             subject_id=r.id,
             details={'signed_count': r.signed_count},
         )
+        # Phase 715a — activation opens the endorsement window for every
+        # planned participant. Idempotent; safe if roster is empty.
+        from app.models import ProximateRoundParticipant
+        planned = ProximateRoundParticipant.query.filter_by(
+            round_id=r.id, stage='planned',
+        ).all()
+        for p in planned:
+            _bump_participant_stage(
+                r.id, p.partner_id, 'endorsement_open', current_user.id,
+            )
     return jsonify({
         'success': True, 'round': r.to_dict(include_signatures=True),
     })
@@ -2755,6 +2870,18 @@ def api_record_disbursement():
                 'cosigners_required': n_cosigners_needed,
             },
         )
+    # Phase 715a — a real money release advances the partner's roster
+    # stage to `disbursed`. If the disbursement still needs cosigners,
+    # we hold at `bank_verified` and let the cosign endpoint bump.
+    if not needs_cosign:
+        _bump_participant_stage(
+            d.round_id, partner.id, 'disbursed', current_user.id,
+        )
+    else:
+        _bump_participant_stage(
+            d.round_id, partner.id, 'bank_verified', current_user.id,
+        )
+
     logger.info(
         f"Proximate: disbursement recorded id={d.id} partner_id={partner.id} "
         f"amount=${amount_f:.2f} status={initial_status}"
@@ -2927,6 +3054,11 @@ def api_verifier_attest_submit(token):
             'submitted_via': 'token_url',
         },
     )
+    # Phase 715a — third-party confirmed verdict advances to `verified`.
+    # Disputed verdicts do NOT advance the stage — they represent an open
+    # question, not a completed step.
+    if verdict == 'confirmed':
+        _bump_participant_stage(d.round_id, d.partner_id, 'verified')
     return jsonify({
         'success': True,
         'verdict': verdict,
@@ -2980,6 +3112,11 @@ def api_verifier_attest(disbursement_id):
             'notes_len': len(notes or ''),
         },
     )
+    # Phase 715a — see api_verifier_attest_submit for the same rule.
+    if verdict == 'confirmed':
+        _bump_participant_stage(
+            d.round_id, d.partner_id, 'verified', current_user.id,
+        )
     return jsonify({'success': True, 'disbursement': d.to_dict()})
 
 
@@ -3406,6 +3543,12 @@ def api_submit_disbursement_report(token):
             'has_photo': bool(d.report_photo_doc_id),
         },
     )
+    # Phase 715a — 14-day report locks in the roster's `reported` stage.
+    _bump_participant_stage(
+        d.round_id, d.partner_id, 'reported',
+        current_user.id if current_user.is_authenticated else None,
+    )
+
     logger.info(
         f"Proximate: report submitted disbursement_id={d.id} "
         f"auth_source={auth_source} partner_id={d.partner_id}"
@@ -3673,6 +3816,11 @@ def api_submit_outcome_attestation(token):
             'has_voice': bool(o.voice_doc_id),
             'has_photo': bool(o.photo_doc_id),
         },
+    )
+    # Phase 715a — 90-day attestation moves the partner to `attested`.
+    _bump_participant_stage(
+        o.round_id, o.partner_id, 'attested',
+        current_user.id if current_user.is_authenticated else None,
     )
     return jsonify({'success': True, 'outcome': o.to_dict()})
 

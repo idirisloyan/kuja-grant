@@ -16,7 +16,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, CheckCircle2, X, Lock, Banknote, Users } from 'lucide-react';
+import { Loader2, CheckCircle2, X, Lock, Banknote, Users, UserPlus, Plus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
@@ -178,28 +178,70 @@ export function ProximateRoundDetailClient() {
 
   // Phase 711 — participant fetch. Non-blocking: if it 403s (donor
   // persona) or 404s (round has none) the card just renders empty.
-  useEffect(() => {
+  // Extracted so the add-partner dialog (Phase 715b) can refresh
+  // the roster in-place after a POST.
+  const refreshParticipants = async () => {
     if (!roundId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await api.get<{
-          success: boolean;
-          participants: {
-            id: number; partner_id: number;
-            partner_name: string | null;
-            partner_locality: string | null;
-            partner_status: string | null;
-            stage: string; notes: string | null;
-          }[];
-        }>(`/api/proximate/rounds/${roundId}/participants`);
-        if (!cancelled && r?.participants) setParticipants(r.participants);
-      } catch {
-        if (!cancelled) setParticipants([]);
-      }
-    })();
-    return () => { cancelled = true; };
+    try {
+      const r = await api.get<{
+        success: boolean;
+        participants: {
+          id: number; partner_id: number;
+          partner_name: string | null;
+          partner_locality: string | null;
+          partner_status: string | null;
+          stage: string; notes: string | null;
+        }[];
+      }>(`/api/proximate/rounds/${roundId}/participants`);
+      if (r?.participants) setParticipants(r.participants);
+    } catch {
+      setParticipants((prev) => prev);
+    }
+  };
+  useEffect(() => {
+    void refreshParticipants();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundId]);
+
+  // Phase 715b — Add-partner dialog state. Loaded lazily on open so
+  // opening the round page doesn't fetch the full partner registry.
+  const [showAddPartner, setShowAddPartner] = useState(false);
+  const [availablePartners, setAvailablePartners] = useState<{
+    id: number; name: string; locality: string | null; status: string;
+  }[] | null>(null);
+  const [addingId, setAddingId] = useState<number | null>(null);
+  const [addFilter, setAddFilter] = useState('');
+
+  const openAddPartner = async () => {
+    setShowAddPartner(true);
+    if (availablePartners !== null) return;
+    try {
+      const r = await api.get<{
+        success: boolean;
+        partners: {
+          id: number; name: string; locality: string | null; status: string;
+        }[];
+      }>('/api/proximate/partners');
+      setAvailablePartners(r?.partners || []);
+    } catch {
+      setAvailablePartners([]);
+    }
+  };
+
+  const addPartnerToRound = async (partnerId: number) => {
+    setAddingId(partnerId);
+    try {
+      await api.post(
+        `/api/proximate/rounds/${roundId}/participants`,
+        { partner_id: partnerId },
+      );
+      await refreshParticipants();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('proximate.rounds.action_failed'));
+    } finally {
+      setAddingId(null);
+    }
+  };
 
   const round = data?.round;
 
@@ -705,17 +747,45 @@ export function ProximateRoundDetailClient() {
               partner with a stage pill and a WhatsApp-share button for
               the endorser link. Donors see the roster too (partner
               names + stages), just no share button. */}
-          {participants.length > 0 && (
+          {(() => {
+            // Phase 715b — roster is now visible for OB whenever the
+            // round is in a roster-mutable state (draft/active) even
+            // if empty, so there's a place for the "Add partner" CTA.
+            // For donor/non-OB personas the roster only appears when
+            // there's something to see (the original behaviour).
+            const rosterMutable =
+              !!round && (round.status === 'draft' || round.status === 'active');
+            const showRoster =
+              participants.length > 0 || (isOperator && rosterMutable);
+            if (!showRoster) return null;
+            return (
             <Card className="p-4">
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <p className="text-sm font-medium flex items-center gap-2">
                   <Users className="w-4 h-4 text-muted-foreground" />
                   Partner roster ({participants.length})
                 </p>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Stage per partner
-                </p>
+                <div className="flex items-center gap-2">
+                  {isOperator && rosterMutable && (
+                    <button
+                      type="button"
+                      onClick={openAddPartner}
+                      className="text-[11px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      Add partner
+                    </button>
+                  )}
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Stage per partner
+                  </p>
+                </div>
               </div>
+              {participants.length === 0 && (
+                <p className="text-xs text-muted-foreground italic py-4 text-center">
+                  No partners on the roster yet. Click <span className="font-medium">Add partner</span> to enrol the first NGO.
+                </p>
+              )}
               <ul className="space-y-1.5">
                 {participants.map((p) => {
                   const stageStyles: Record<string, string> = {
@@ -779,6 +849,112 @@ export function ProximateRoundDetailClient() {
                 round auto-updates.
               </p>
             </Card>
+            );
+          })()}
+
+          {/* Phase 715b — Add-partner dialog. Renders as a lightweight
+              inline modal so we don't need to pull in a Dialog primitive.
+              Lists tenant partners not already on this round's roster.
+              Clicking a row POSTs to /participants and refreshes the
+              roster in place. */}
+          {showAddPartner && (
+            <div
+              className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+              onClick={() => setShowAddPartner(false)}
+            >
+              <div
+                className="bg-background rounded-lg shadow-xl border max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between p-4 border-b">
+                  <p className="text-sm font-medium">Add partner to round</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPartner(false)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="p-4 border-b">
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Filter by name…"
+                    value={addFilter}
+                    onChange={(e) => setAddFilter(e.target.value)}
+                    className="w-full text-sm rounded-md border bg-background p-2"
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {availablePartners === null && (
+                    <p className="text-xs text-muted-foreground p-4 text-center">
+                      Loading partners…
+                    </p>
+                  )}
+                  {availablePartners !== null && (() => {
+                    const onRoster = new Set(
+                      participants.map((p) => p.partner_id),
+                    );
+                    const filterLc = addFilter.trim().toLowerCase();
+                    const eligible = availablePartners
+                      .filter((p) => !onRoster.has(p.id))
+                      .filter((p) =>
+                        !filterLc
+                          ? true
+                          : p.name.toLowerCase().includes(filterLc)
+                            || (p.locality || '').toLowerCase().includes(filterLc),
+                      );
+                    if (eligible.length === 0) {
+                      return (
+                        <p className="text-xs text-muted-foreground p-4 text-center">
+                          {addFilter.trim()
+                            ? 'No partners match your filter.'
+                            : 'All tenant partners are already on the roster.'}
+                        </p>
+                      );
+                    }
+                    return (
+                      <ul className="divide-y">
+                        {eligible.map((p) => (
+                          <li
+                            key={p.id}
+                            className="flex items-center gap-2 p-3 hover:bg-muted/40"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {p.name}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {[p.locality, p.status].filter(Boolean).join(' · ')}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={addingId === p.id}
+                              onClick={() => addPartnerToRound(p.id)}
+                              className="text-[11px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                            >
+                              {addingId === p.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Plus className="w-3 h-3" />
+                              )}
+                              Add
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    );
+                  })()}
+                </div>
+                <div className="p-3 border-t bg-muted/30">
+                  <p className="text-[10px] text-muted-foreground">
+                    Partners land on the roster at stage <span className="font-mono">planned</span>. Stage auto-advances as endorsements, disbursements, and reports come in.
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Phase 656 — Disbursements rollup.
