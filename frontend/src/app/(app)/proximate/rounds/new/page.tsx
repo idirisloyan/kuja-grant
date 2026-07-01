@@ -8,7 +8,7 @@
  * the round goes active.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -19,6 +19,12 @@ import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
 
+interface DonorOption {
+  id: number;
+  display_name: string;
+  contact_email: string;
+}
+
 export default function NewProximateRoundPage() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -26,12 +32,37 @@ export default function NewProximateRoundPage() {
   const [titleAr, setTitleAr] = useState('');
   const [trigger, setTrigger] = useState<'disaster' | 'donor_commitment' | 'programme_cycle'>('disaster');
   const [triggerSummary, setTriggerSummary] = useState('');
-  const [donor, setDonor] = useState('');
+  // Phase 711b — donor is now a FK, not free text. donorId feeds the
+  // POST body; donorName is only used to preserve display for legacy
+  // donors that aren't in the registry (empty string in the normal
+  // case since donorId is set).
+  const [donorId, setDonorId] = useState<number | ''>('');
+  const [donorOptions, setDonorOptions] = useState<DonorOption[]>([]);
   const [envelope, setEnvelope] = useState('');
   const [duration, setDuration] = useState('');
   const [region, setRegion] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Load the donor registry on mount so the OB never has to remember
+  // spellings. Non-blocking — an empty registry falls back to a
+  // disabled dropdown with a "no donors registered" placeholder.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await api.get<{
+          success: boolean;
+          donors: DonorOption[];
+        }>('/api/proximate/donors');
+        if (!cancelled && r?.donors) setDonorOptions(r.donors);
+      } catch {
+        // Silent — the dropdown stays empty and the OB can still
+        // submit; backend accepts null donor_id.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const submit = async () => {
     setError(null);
@@ -41,6 +72,9 @@ export default function NewProximateRoundPage() {
     }
     setSubmitting(true);
     try {
+      // Denormalize the picked donor's display name so historical
+      // rows keep rendering even if the FK is nulled later.
+      const picked = donorOptions.find((d) => d.id === donorId);
       const resp = await api.post<{ round: { id: number } }>(
         '/api/proximate/rounds',
         {
@@ -48,7 +82,8 @@ export default function NewProximateRoundPage() {
           title_ar: titleAr.trim() || null,
           trigger_type: trigger,
           trigger_summary: triggerSummary.trim() || null,
-          donor_name: donor.trim() || null,
+          donor_id: donorId === '' ? null : donorId,
+          donor_name: picked ? picked.display_name : null,
           envelope_usd: envelope ? Number(envelope) : null,
           expected_duration_days: duration ? Number(duration) : null,
           target_country: 'SD',
@@ -129,12 +164,30 @@ export default function NewProximateRoundPage() {
               <label className="text-xs text-muted-foreground block mb-1">
                 {t('proximate.rounds.field_donor')}
               </label>
-              <input
-                type="text"
+              {/* Phase 711b — donor picker fed from
+                  /api/proximate/donors. Falls back to a plain-looking
+                  disabled select when the registry is empty so the
+                  OB knows to register a donor first instead of
+                  silently drafting a donor-less round. */}
+              <select
                 className="w-full text-sm rounded-md border bg-background p-2"
-                value={donor}
-                onChange={(e) => setDonor(e.target.value)}
-              />
+                value={donorId}
+                onChange={(e) =>
+                  setDonorId(e.target.value === '' ? '' : Number(e.target.value))
+                }
+                disabled={donorOptions.length === 0}
+              >
+                <option value="">
+                  {donorOptions.length === 0
+                    ? 'No donors registered yet'
+                    : '— select donor —'}
+                </option>
+                {donorOptions.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.display_name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">

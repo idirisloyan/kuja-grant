@@ -2254,13 +2254,39 @@ def api_create_round():
             'error': f'trigger_type must be one of {ROUND_TRIGGER_TYPES}',
         }), 400
 
+    # Phase 711b — donor is a FK now, backfilled donor_name for
+    # display. If the picker submitted a donor_id, look it up + trust
+    # its display_name over any client-supplied name to keep the two
+    # in sync. Free-text donor_name still accepted for backwards
+    # compatibility with older callers.
+    donor_id_raw = payload.get('donor_id')
+    donor_id = None
+    donor_name = (payload.get('donor_name') or '').strip() or None
+    if donor_id_raw is not None:
+        try:
+            donor_id = int(donor_id_raw)
+        except (TypeError, ValueError):
+            donor_id = None
+    if donor_id is not None:
+        from app.models import ProximateDonor
+        d = ProximateDonor.query.filter_by(
+            id=donor_id, network_id=net.id,
+        ).first()
+        if d is None:
+            return jsonify({
+                'success': False,
+                'error': 'donor_id not in this tenant',
+            }), 400
+        donor_name = d.display_name
+
     r = ProximateRound(
         network_id=net.id,
         title=title[:300],
         title_ar=(payload.get('title_ar') or '').strip()[:300] or None,
         trigger_type=trigger,
         trigger_summary=(payload.get('trigger_summary') or '').strip() or None,
-        donor_name=(payload.get('donor_name') or '').strip() or None,
+        donor_id=donor_id,
+        donor_name=donor_name,
         envelope_usd=payload.get('envelope_usd'),
         expected_duration_days=payload.get('expected_duration_days'),
         target_country=(payload.get('target_country') or 'SD').strip(),
