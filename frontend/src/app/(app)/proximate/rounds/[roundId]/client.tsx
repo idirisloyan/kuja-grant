@@ -243,6 +243,60 @@ export function ProximateRoundDetailClient() {
     }
   };
 
+  // Phase 716a — Invite endorser modal state. OB fills in name + phone
+  // → generates a per-elder invite token → returns a shareable WhatsApp
+  // URL the elder can open cold (no login).
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [invitePartnerId, setInvitePartnerId] = useState<number | null>(null);
+  const [invitePartnerName, setInvitePartnerName] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [invitePhone, setInvitePhone] = useState('');
+  const [inviteLocality, setInviteLocality] = useState('');
+  const [inviteNote, setInviteNote] = useState('');
+  const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{
+    inviteToken: string;
+    shareUrl: string;
+    waHref: string;
+  } | null>(null);
+
+  const openInviteEndorser = (partnerId: number, partnerName: string) => {
+    setInvitePartnerId(partnerId);
+    setInvitePartnerName(partnerName);
+    setInviteName('');
+    setInvitePhone('');
+    setInviteLocality('');
+    setInviteNote('');
+    setInviteResult(null);
+    setInviteOpen(true);
+  };
+
+  const submitInvite = async () => {
+    if (!invitePartnerId || !inviteName.trim()) return;
+    setInviteSubmitting(true);
+    try {
+      const r = await api.post<{
+        success: boolean;
+        invite: { invite_token: string };
+      }>(`/api/proximate/partners/${invitePartnerId}/endorser-invites`, {
+        invitee_name: inviteName.trim(),
+        invitee_phone: invitePhone.trim() || null,
+        invitee_locality: inviteLocality.trim() || null,
+        note: inviteNote.trim() || null,
+      });
+      const token = r.invite.invite_token;
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const shareUrl = `${origin}/proximate-endorse-invite?t=${token}`;
+      const waText = `Salaam ${inviteName.trim()}. Adeso is asking you to endorse ${invitePartnerName} for the current Proximate round. Please open: ${shareUrl}`;
+      const waHref = `https://wa.me/${(invitePhone.trim() || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(waText)}`;
+      setInviteResult({ inviteToken: token, shareUrl, waHref });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('proximate.rounds.action_failed'));
+    } finally {
+      setInviteSubmitting(false);
+    }
+  };
+
   const round = data?.round;
 
   const callAction = async (path: string, body?: object) => {
@@ -831,14 +885,24 @@ export function ProximateRoundDetailClient() {
                       >
                         {p.stage.replace(/_/g, ' ')}
                       </Badge>
-                      <a
-                        href={waHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
-                      >
-                        Share endorser link
-                      </a>
+                      {isOperator ? (
+                        <button
+                          type="button"
+                          onClick={() => openInviteEndorser(p.partner_id, p.partner_name || `Partner #${p.partner_id}`)}
+                          className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
+                        >
+                          Invite endorser
+                        </button>
+                      ) : (
+                        <a
+                          href={waHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
+                        >
+                          Share endorser link
+                        </a>
+                      )}
                     </li>
                   );
                 })}
@@ -953,6 +1017,161 @@ export function ProximateRoundDetailClient() {
                     Partners land on the roster at stage <span className="font-mono">planned</span>. Stage auto-advances as endorsements, disbursements, and reports come in.
                   </p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Phase 716a — Invite endorser modal. OB provides elder's
+              name + phone; backend mints a per-invite token; modal
+              swaps to a share panel with WhatsApp CTA. */}
+          {inviteOpen && (
+            <div
+              className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+              onClick={() => setInviteOpen(false)}
+            >
+              <div
+                className="bg-background rounded-lg shadow-xl border max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between p-4 border-b">
+                  <div>
+                    <p className="text-sm font-medium">Invite endorser</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      for {invitePartnerName}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setInviteOpen(false)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                {!inviteResult ? (
+                  <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">
+                        Elder&apos;s name *
+                      </label>
+                      <input
+                        type="text"
+                        autoFocus
+                        className="w-full text-sm rounded-md border bg-background p-2"
+                        value={inviteName}
+                        onChange={(e) => setInviteName(e.target.value)}
+                        placeholder="e.g. Sarah Musa"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">
+                        Phone (for WhatsApp)
+                      </label>
+                      <input
+                        type="tel"
+                        className="w-full text-sm rounded-md border bg-background p-2"
+                        value={invitePhone}
+                        onChange={(e) => setInvitePhone(e.target.value)}
+                        placeholder="+249…"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">
+                        Locality
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full text-sm rounded-md border bg-background p-2"
+                        value={inviteLocality}
+                        onChange={(e) => setInviteLocality(e.target.value)}
+                        placeholder="e.g. Kassala"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">
+                        Note (shown to the elder)
+                      </label>
+                      <textarea
+                        className="w-full text-sm rounded-md border bg-background p-2 min-h-[70px]"
+                        value={inviteNote}
+                        onChange={(e) => setInviteNote(e.target.value)}
+                        placeholder="e.g. Because you know the Kassala community"
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        onClick={submitInvite}
+                        disabled={inviteSubmitting || !inviteName.trim()}
+                      >
+                        {inviteSubmitting && <Loader2 className="w-4 h-4 animate-spin me-2" />}
+                        Generate invite
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => setInviteOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+                    <div className="rounded-md border border-emerald-300 bg-emerald-50 p-3">
+                      <p className="text-sm font-medium text-emerald-800">
+                        Invitation ready
+                      </p>
+                      <p className="text-[11px] text-emerald-700 mt-1">
+                        Send this link to {inviteName} — they can open it on their phone with no login.
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">
+                        Shareable URL
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        className="w-full text-xs rounded-md border bg-muted/40 p-2 font-mono"
+                        value={inviteResult.shareUrl}
+                        onFocus={(e) => e.currentTarget.select()}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <a
+                        href={inviteResult.waHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full inline-flex items-center justify-center gap-2 py-2 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
+                      >
+                        Open in WhatsApp
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(inviteResult.shareUrl);
+                        }}
+                        className="w-full py-2 rounded-md border bg-background text-sm hover:bg-muted/40"
+                      >
+                        Copy link
+                      </button>
+                    </div>
+                    <div className="pt-2 border-t">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInviteResult(null);
+                          setInviteName('');
+                          setInvitePhone('');
+                          setInviteLocality('');
+                          setInviteNote('');
+                        }}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        + Invite another endorser for this partner
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -24,6 +24,7 @@ PROXIMATE_FUND_DESIGN.md §6).
 
 import logging
 import os
+import secrets
 
 from datetime import datetime, timezone, timedelta
 from flask import Blueprint, g, jsonify, request
@@ -1980,6 +1981,222 @@ def api_round_participants_remove(round_id, participant_id):
     db.session.delete(row)
     db.session.commit()
     return jsonify({'success': True})
+
+
+# =========================================================================
+# Phase 716a — Zero-login endorser invites (per SoP + partner-flow parity)
+# =========================================================================
+
+@proximate_bp.route(
+    '/partners/<int:partner_id>/endorser-invites', methods=['POST'],
+)
+@login_required
+def api_create_endorser_invite(partner_id):
+    """OB issues a per-elder invite to endorse this partner.
+    Body: {invitee_name (required), invitee_phone?, invitee_email?,
+    invitee_locality?, note?}. Returns the invite + the shareable URL."""
+    from app.models import ProximateEndorserInvite, ProximatePartner
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    if not _user_is_ob(net):
+        return jsonify({'success': False, 'error': 'ob only'}), 403
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'partner not in tenant'}), 404
+    body = get_request_json() or {}
+    name = (body.get('invitee_name') or '').strip()
+    if not name:
+        return jsonify({
+            'success': False, 'error': 'invitee_name required',
+        }), 400
+    inv = ProximateEndorserInvite(
+        partner_id=partner.id,
+        invitee_name=name[:200],
+        invitee_phone=(body.get('invitee_phone') or '').strip()[:50] or None,
+        invitee_email=(body.get('invitee_email') or '').strip()[:200] or None,
+        invitee_locality=(body.get('invitee_locality') or '').strip()[:120] or None,
+        note=(body.get('note') or '').strip()[:2000] or None,
+        created_by_user_id=current_user.id,
+    )
+    db.session.add(inv)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.endorser_invite.created',
+        actor_email=current_user.email,
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={
+            'invite_id': inv.id,
+            'invitee_name': inv.invitee_name,
+            'invitee_phone': inv.invitee_phone,
+        },
+    )
+    return jsonify({
+        'success': True,
+        'invite': inv.to_dict(include_token=True),
+        'partner_name': partner.name,
+    })
+
+
+@proximate_bp.route('/endorser-invites/<token>', methods=['GET'])
+def api_get_endorser_invite(token):
+    """Public. Elder opens the shared URL cold — this returns enough
+    context for the wizard to render (partner name, locality, OB note)
+    without exposing internal partner detail."""
+    from app.models import ProximateEndorserInvite, ProximatePartner
+    inv = ProximateEndorserInvite.query.filter_by(
+        invite_token=token,
+    ).first()
+    if not inv:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    if inv.used_at is not None:
+        return jsonify({
+            'success': False, 'error': 'already_used',
+            'used_at': inv.used_at.isoformat(),
+        }), 409
+    partner = ProximatePartner.query.get(inv.partner_id)
+    if not partner:
+        return jsonify({'success': False, 'error': 'partner missing'}), 404
+    return jsonify({
+        'success': True,
+        'invite': {
+            'invitee_name': inv.invitee_name,
+            'invitee_locality': inv.invitee_locality,
+            'note': inv.note,
+        },
+        'partner': {
+            'id': partner.id,
+            'name': partner.name,
+            'name_ar': partner.name_ar,
+            'locality': partner.locality,
+            'intake_summary_ar': partner.intake_summary_ar,
+        },
+    })
+
+
+@proximate_bp.route('/endorser-invites/<token>', methods=['POST'])
+def api_submit_endorser_invite(token):
+    """Public. Elder submits the endorsement. Body: {q1_real, q2_trust,
+    q3_accept_aid} — same shape as the login-based endorsement flow.
+    Auto-provisions a User + Endorser under the hood so downstream
+    reputation + trust-floor logic keeps working."""
+    from app.models import (
+        ProximateEndorserInvite, ProximatePartner, User, Endorser,
+        Endorsement,
+    )
+    inv = ProximateEndorserInvite.query.filter_by(
+        invite_token=token,
+    ).first()
+    if not inv:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    if inv.used_at is not None:
+        return jsonify({
+            'success': False, 'error': 'already_used',
+        }), 409
+
+    partner = ProximatePartner.query.get(inv.partner_id)
+    if not partner:
+        return jsonify({'success': False, 'error': 'partner missing'}), 404
+
+    payload = request.get_json(silent=True) or {}
+    for q in ('q1_real', 'q2_trust', 'q3_accept_aid'):
+        if q not in payload or not isinstance(payload[q], bool):
+            return jsonify({
+                'success': False, 'error': f'{q} must be boolean',
+            }), 400
+
+    # Auto-provision User + Endorser under the hood. Placeholder email
+    # uses the invite token so it's unique and doesn't collide with a
+    # real user. Login is disabled — password_hash stays null.
+    from werkzeug.security import generate_password_hash
+    placeholder_email = f'invite-{inv.invite_token[:12]}@proximate.invited'
+    user = User(
+        email=placeholder_email,
+        password_hash=generate_password_hash(secrets.token_hex(24)),
+        role='ngo',
+        first_name=inv.invitee_name.split(' ')[0][:50] if inv.invitee_name else 'Endorser',
+        last_name=' '.join(inv.invitee_name.split(' ')[1:])[:50] or 'Invited',
+        is_active=True,
+    )
+    db.session.add(user)
+    db.session.flush()
+
+    endorser = Endorser(
+        network_id=partner.network_id,
+        user_id=user.id,
+        locality=inv.invitee_locality or partner.locality,
+        country='SD',
+        status='approved',  # invite IS the OB approval
+        reputation_score=50,
+    )
+    db.session.add(endorser)
+    db.session.flush()
+
+    # Compute COI signals + create endorsement — same path as login flow.
+    signals = Endorsement.compute_coi_signals(
+        partner=partner, endorser=endorser,
+    )
+    endorsement = Endorsement(
+        partner_id=partner.id,
+        endorser_id=endorser.id,
+        q1_real=payload['q1_real'],
+        q2_trust=payload['q2_trust'],
+        q3_accept_aid=payload['q3_accept_aid'],
+        coi_check_passed=(not signals),
+    )
+    endorsement.set_coi_signals(signals)
+    db.session.add(endorsement)
+    endorser.endorsements_count = 1
+    db.session.flush()
+
+    # Trust floor transition — same rules as api_submit_endorsement.
+    floor = partner.trust_floor_signals()
+    state_change = None
+    if floor['ready_for_dd_clear']:
+        partner.status = 'dd_clear'
+        partner.trust_tier = 'tier_1_relational'
+        partner.dd_cleared_at = datetime.now(timezone.utc)
+        state_change = 'dd_clear'
+    elif floor['endorsements_ok'] and not floor['bank_verified']:
+        if partner.status in ('nominated', 'endorsements_open'):
+            partner.status = 'dd_pending'
+            state_change = 'dd_pending'
+
+    inv.used_at = datetime.now(timezone.utc)
+    inv.endorsement_id = endorsement.id
+    inv.endorser_id = endorser.id
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action='proximate.endorsement.submitted_via_invite',
+        actor_email=f'invite:{inv.invite_token[:8]}…',
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={
+            'invite_id': inv.id,
+            'invitee_name': inv.invitee_name,
+            'endorsement_id': endorsement.id,
+            'coi_check_passed': endorsement.coi_check_passed,
+            'coi_signals': list(signals.keys()),
+            'state_change': state_change,
+        },
+    )
+    if state_change == 'dd_pending':
+        _bump_participant_stage_for_partner_across_active_rounds(
+            partner.network_id, partner.id, 'endorsed', None,
+        )
+    elif state_change == 'dd_clear':
+        _bump_participant_stage_for_partner_across_active_rounds(
+            partner.network_id, partner.id, 'bank_verified', None,
+        )
+    return jsonify({
+        'success': True,
+        'partner_name': partner.name,
+        'state_change': state_change,
+    })
 
 
 @proximate_bp.route('/rounds/<int:round_id>/report.pdf', methods=['GET'])
