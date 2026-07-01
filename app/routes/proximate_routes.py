@@ -265,6 +265,16 @@ def api_nominate_partner():
             'has_bank_details': bool(partner.bank_account_number),
         },
     )
+    # Phase 716 DD sweep — sanctions screen runs on ALL nomination
+    # paths, not just self-nominate (Phase 658 was only the public form).
+    # Same OpenSanctions + UN/OFAC/EU/WB coverage as the self-nominate
+    # path. Runs synchronously — < 2s for a clean lookup.
+    try:
+        _run_partner_sanctions_screen(partner)
+    except Exception as e:
+        logger.warning(
+            f"Proximate: sanctions screen failed on nomination id={partner.id} err={e}"
+        )
     logger.info(
         f"Proximate: partner nominated id={partner.id} name={partner.name!r} "
         f"by user_id={current_user.id}"
