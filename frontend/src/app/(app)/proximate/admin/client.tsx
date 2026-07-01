@@ -27,6 +27,7 @@ import Link from 'next/link';
 import { AlertTriangle, ShieldCheck, Activity, Users, FileText, Banknote, Coins, UserPlus, Flame } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -62,6 +63,19 @@ export function ProximateAdminClient() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { persona, isLoading: personaLoading } = useProximatePersona();
+
+  // Phase 713 — persona-aware redirect. A donor landing on
+  // /proximate/admin used to see "Access denied" — needlessly hostile
+  // when the same login has a valid landing surface at
+  // /proximate/donor. Silently redirect so the demo viewer never
+  // sees a wrong-persona wall.
+  useEffect(() => {
+    if (personaLoading) return;
+    if (persona === 'donor' && typeof window !== 'undefined') {
+      window.location.replace('/proximate/donor');
+    }
+  }, [persona, personaLoading]);
 
   useEffect(() => {
     let cancelled = false;

@@ -16,7 +16,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, CheckCircle2, X, Lock, Banknote } from 'lucide-react';
+import { Loader2, CheckCircle2, X, Lock, Banknote, Users } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
@@ -144,6 +144,19 @@ export function ProximateRoundDetailClient() {
   const [reason, setReason] = useState('');
   const [closing, setClosing] = useState(false);
   const [closingSummary, setClosingSummary] = useState('');
+  // Phase 711 — Round participant roster. Loaded lazily after the
+  // round detail lands so the initial render isn't blocked. Empty
+  // array is fine — the roster card just renders a "no participants
+  // yet" empty state in that case.
+  const [participants, setParticipants] = useState<{
+    id: number;
+    partner_id: number;
+    partner_name: string | null;
+    partner_locality: string | null;
+    partner_status: string | null;
+    stage: string;
+    notes: string | null;
+  }[]>([]);
 
   const refresh = async () => {
     if (!roundId) return;
@@ -161,6 +174,31 @@ export function ProximateRoundDetailClient() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundId]);
+
+  // Phase 711 — participant fetch. Non-blocking: if it 403s (donor
+  // persona) or 404s (round has none) the card just renders empty.
+  useEffect(() => {
+    if (!roundId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await api.get<{
+          success: boolean;
+          participants: {
+            id: number; partner_id: number;
+            partner_name: string | null;
+            partner_locality: string | null;
+            partner_status: string | null;
+            stage: string; notes: string | null;
+          }[];
+        }>(`/api/proximate/rounds/${roundId}/participants`);
+        if (!cancelled && r?.participants) setParticipants(r.participants);
+      } catch {
+        if (!cancelled) setParticipants([]);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [roundId]);
 
   const round = data?.round;
@@ -658,6 +696,90 @@ export function ProximateRoundDetailClient() {
               </Card>
             );
           })()}
+
+          {/* Phase 711 — Partner Roster.
+              User feedback: "it is not clear how you tie a round to
+              NGO's...should show visual representation of the stage of
+              the round...be able to click and drill down." This card
+              answers "who is in this round" — one row per participating
+              partner with a stage pill and a WhatsApp-share button for
+              the endorser link. Donors see the roster too (partner
+              names + stages), just no share button. */}
+          {participants.length > 0 && (
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  Partner roster ({participants.length})
+                </p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Stage per partner
+                </p>
+              </div>
+              <ul className="space-y-1.5">
+                {participants.map((p) => {
+                  const stageStyles: Record<string, string> = {
+                    planned: 'bg-muted text-muted-foreground border-border',
+                    endorsement_open: 'bg-amber-100 text-amber-800 border-amber-300',
+                    endorsed: 'bg-blue-100 text-blue-800 border-blue-300',
+                    bank_verified: 'bg-sky-100 text-sky-800 border-sky-300',
+                    disbursed: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                    reported: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                    attested: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                    verified: 'bg-emerald-200 text-emerald-900 border-emerald-400 font-semibold',
+                    withdrawn: 'bg-rose-100 text-rose-800 border-rose-300',
+                  };
+                  const stageCls = stageStyles[p.stage] || stageStyles.planned;
+                  const partnerHref = `/proximate/admin?partner=${p.partner_id}`;
+                  const endorseUrl = typeof window !== 'undefined'
+                    ? `${window.location.origin}/proximate/endorse/${p.partner_id}`
+                    : `/proximate/endorse/${p.partner_id}`;
+                  const waText = `Please endorse this Proximate partner for our current round: ${p.partner_name || 'partner'}. Open: ${endorseUrl}`;
+                  const waHref = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+                  return (
+                    <li
+                      key={p.id}
+                      className="flex items-center gap-2 py-1.5 border-b border-border/60 last:border-b-0 flex-wrap"
+                    >
+                      <Link
+                        href={partnerHref}
+                        className="flex-1 min-w-0 text-sm hover:underline"
+                      >
+                        <span className="font-medium truncate block">
+                          {p.partner_name || `Partner #${p.partner_id}`}
+                        </span>
+                        {p.partner_locality && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {p.partner_locality}
+                            {p.partner_status ? ` · ${p.partner_status}` : ''}
+                          </span>
+                        )}
+                      </Link>
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] ${stageCls}`}
+                      >
+                        {p.stage.replace(/_/g, ' ')}
+                      </Badge>
+                      <a
+                        href={waHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
+                      >
+                        Share endorser link
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="text-[10px] text-muted-foreground mt-2">
+                Click a partner to open detail. Share the endorser link
+                via WhatsApp — the recipient opens it, endorses, and the
+                round auto-updates.
+              </p>
+            </Card>
+          )}
 
           {/* Phase 656 — Disbursements rollup.
               Phase 703 — donor-safe variant. Donors see envelope rollup +
