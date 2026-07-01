@@ -96,6 +96,7 @@ from app.models.proximate_outcome import (
     OUTCOME_STATUSES, DEFAULT_OUTCOME_WINDOW_DAYS,
 )
 from app.models.proximate_donor import ProximateDonor
+from app.models.proximate_endorser_invite import ProximateEndorserInvite
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -134,4 +135,5 @@ __all__ = [
     'ROUND_STATUSES', 'ROUND_TRIGGER_TYPES', 'ROUND_SIGNERS_REQUIRED',
     'ProximateDisbursement',
     'DISBURSEMENT_STATUSES', 'DEFAULT_REPORT_WINDOW_DAYS',
+    'ProximateEndorserInvite',
 ]
