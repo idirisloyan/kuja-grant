@@ -962,9 +962,37 @@ def run():
 
         # Lookup helpers for donors + rounds by name.
         donors_by_email = {}
-        for d in ProximateDonor.query.filter_by(network_id=proximate.id).all():
+        donors_ordered = ProximateDonor.query.filter_by(
+            network_id=proximate.id,
+        ).order_by(ProximateDonor.id.asc()).all()
+        for d in donors_ordered:
             if d.contact_email:
-                donors_by_email[d.contact_email] = d
+                donors_by_email[d.contact_email.lower().strip()] = d
+        # Also index by the user's email (Phase 723 fix — the earlier
+        # seed relied on contact_email matching, which silently failed
+        # when donors were created without that field populated).
+        try:
+            from app.models import User as _User
+            user_by_email = {
+                u.email.lower().strip(): u
+                for u in _User.query.filter(
+                    _User.email.in_([g['donor_email'] for g in GRANT_FIXTURES])
+                ).all() if u.email
+            }
+            for gf in GRANT_FIXTURES:
+                key = gf['donor_email'].lower().strip()
+                if key in donors_by_email:
+                    continue
+                u = user_by_email.get(key)
+                if u:
+                    d = ProximateDonor.query.filter_by(
+                        network_id=proximate.id, primary_user_id=u.id,
+                    ).first()
+                    if d:
+                        donors_by_email[key] = d
+        except Exception as _e:
+            print(f"    WARN: user→donor index failed: {_e}")
+
         rounds_by_title = {
             r.title: r for r in ProximateRound.query.filter_by(
                 network_id=proximate.id,
@@ -973,10 +1001,19 @@ def run():
 
         grants_created = 0
         allocations_created = 0
-        for gf in GRANT_FIXTURES:
-            donor = donors_by_email.get(gf['donor_email'])
+        for gf_i, gf in enumerate(GRANT_FIXTURES):
+            key = gf['donor_email'].lower().strip()
+            donor = donors_by_email.get(key)
             if not donor:
-                print(f"    WARN: donor '{gf['donor_email']}' not found — skipping grant '{gf['title']}'")
+                # Ordered-index fallback so grants ALWAYS seed even if
+                # donor emails don't line up. Better a demo-tagged grant
+                # than a silent skip.
+                if gf_i < len(donors_ordered):
+                    donor = donors_ordered[gf_i]
+                    print(f"    NOTE: donor '{gf['donor_email']}' not matched by email — "
+                          f"falling back to donor #{donor.id} ({donor.display_name!r})")
+            if not donor:
+                print(f"    WARN: no donor available for grant '{gf['title']}' — skipping")
                 continue
             existing = ProximateGrant.query.filter_by(
                 network_id=proximate.id, donor_grant_ref=gf['donor_grant_ref'],

@@ -2236,7 +2236,7 @@ def api_list_grants():
     is_donor_persona = not _user_is_ob(net)
     if is_donor_persona:
         my_donor = ProximateDonor.query.filter_by(
-            network_id=net.id, user_id=current_user.id,
+            network_id=net.id, primary_user_id=current_user.id,
         ).first()
         if not my_donor:
             return jsonify({'success': True, 'grants': []})
@@ -2268,7 +2268,7 @@ def api_get_grant(grant_id):
     if not _user_is_ob(net):
         from app.models import ProximateDonor
         my_donor = ProximateDonor.query.filter_by(
-            network_id=net.id, user_id=current_user.id,
+            network_id=net.id, primary_user_id=current_user.id,
         ).first()
         if not my_donor or g.donor_id != my_donor.id:
             return jsonify({'success': False, 'error': 'not authorised'}), 403
