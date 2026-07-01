@@ -1061,10 +1061,31 @@ def run():
                 db.session.flush()
                 grants_created += 1
 
-            # Allocations to rounds.
+            # Allocations to rounds. Case-insensitive match so a stray
+            # capitalisation doesn't silently drop the allocation.
+            rounds_by_title_ci = {
+                (r.title or '').strip().lower(): r for r in rounds_by_title.values()
+            }
             for round_title, amount in gf.get('allocate_to_rounds', []):
                 round_row = rounds_by_title.get(round_title)
                 if not round_row:
+                    round_row = rounds_by_title_ci.get(round_title.strip().lower())
+                if not round_row:
+                    # Fallback: fuzzy contains-match so 'Kassala Rapid Cash'
+                    # still matches 'Kassala Rapid-Cash Response' or a
+                    # trailing region tag.
+                    key_lc = round_title.strip().lower()
+                    for r in rounds_by_title.values():
+                        if key_lc in (r.title or '').lower():
+                            round_row = r
+                            break
+                if not round_row:
+                    print(
+                        f"    WARN: round '{round_title}' not found for "
+                        f"grant '{gf['title']}' — skipping allocation "
+                        f"(${amount:,}). Available rounds: "
+                        f"{list(rounds_by_title.keys())}"
+                    )
                     continue
                 existing_alloc = ProximateGrantAllocation.query.filter_by(
                     grant_id=grant_row.id, round_id=round_row.id,
@@ -1076,6 +1097,10 @@ def run():
                         amount_usd=amount,
                     ))
                     allocations_created += 1
+                    print(
+                        f"    Allocation: {gf['donor_grant_ref']} → "
+                        f"'{round_row.title}' = ${amount:,.0f}"
+                    )
 
             # Reporting calendar entries. Idempotent by (grant, type,
             # period_start). Populates the calendar so UAT can see the

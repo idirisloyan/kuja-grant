@@ -83,8 +83,22 @@ const reportStatusStyles: Record<string, string> = {
 };
 
 export function ProximateGrantDetailClient() {
-  const params = useParams();
-  const grantId = params?.grantId as string;
+  // Phase 725 — useParams() returns the pre-generated static stub ('0')
+  // under output:export, so any real grantId in the URL was being
+  // shadowed and the client fetched /grants/0. Read directly from
+  // window.location.pathname instead — same pattern as the working
+  // /proximate/rounds/[roundId] detail page.
+  const [grantId, setGrantId] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    const m = window.location.pathname.match(/\/grants\/(\d+)/);
+    return m ? m[1] : '';
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const m = window.location.pathname.match(/\/grants\/(\d+)/);
+    if (m && m[1] !== '0' && m[1] !== grantId) setGrantId(m[1]);
+  }, [grantId]);
+
   const [data, setData] = useState<GrantResp | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,8 +106,9 @@ export function ProximateGrantDetailClient() {
   const isOb = persona === 'ob' || persona === 'admin';
 
   useEffect(() => {
-    if (!grantId) return;
+    if (!grantId || grantId === '0') return;
     let cancelled = false;
+    setLoading(true);
     api.get<GrantResp>(`/api/proximate/grants/${grantId}`)
       .then((r) => { if (!cancelled) setData(r); })
       .catch(() => { if (!cancelled) setError('Failed to load grant.'); })
