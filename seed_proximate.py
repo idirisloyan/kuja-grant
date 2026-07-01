@@ -41,7 +41,7 @@ from app.models import (
     Network, User, Endorser, ProximatePartner, Endorsement,
     FinancialServiceProvider, Organization, NetworkMembership,
     ProximateDonor, ProximateRound, ProximateRoundParticipant,
-    ProximateGrant, ProximateGrantAllocation,
+    ProximateGrant, ProximateGrantAllocation, ProximateGrantReport,
 )
 from werkzeug.security import generate_password_hash
 
@@ -820,6 +820,41 @@ def run():
                     ('Gedaref Winterisation', 350_000),
                     ('Wad Madani Youth Solidarity', 180_000),
                 ],
+                # AI-extracted from the signed PDF. Format mirrors what
+                # grant_agreement_unpack_service.py returns.
+                'extracted': {
+                    'donor': 'Sudan Localization Trust',
+                    'agreement_date': '2026-01-15',
+                    'total_amount': '$5,000,000 USD',
+                    'duration_months': 36,
+                    'key_deliverables': [
+                        {'title': 'Fund 10+ community-led rounds', 'target': 10, 'unit': 'rounds'},
+                        {'title': 'Reach 15,000 households', 'target': 15000, 'unit': 'households'},
+                        {'title': 'Quarterly impact narrative', 'target': 12, 'unit': 'reports'},
+                        {'title': 'Annual audited financial statement', 'target': 3, 'unit': 'audits'},
+                    ],
+                    'reporting_requirements': [
+                        {'type': 'financial', 'cadence': 'quarterly', 'due_days_after_period': 45},
+                        {'type': 'impact_narrative', 'cadence': 'quarterly', 'due_days_after_period': 45},
+                        {'type': 'annual_audit', 'cadence': 'annual', 'due_days_after_period': 90},
+                    ],
+                    'restrictions_verbatim': (
+                        "Funds may only be deployed in the Republic of Sudan (\"Territory\") "
+                        "for community-led response in the sectors of cash transfers, food "
+                        "security, and shelter. No sub-grants to intermediaries."
+                    ),
+                    'compliance_flags': [
+                        'sanctions_screening_required_all_partners',
+                        'independent_audit_required_annual',
+                        'anti_fraud_hotline_reference_in_reports',
+                    ],
+                    'extraction_confidence': 0.94,
+                },
+                'reports_to_seed': [
+                    {'type': 'quarterly', 'period_start': _date(2026, 1, 15), 'period_end': _date(2026, 3, 31), 'due_date': _date(2026, 5, 15), 'status': 'accepted'},
+                    {'type': 'quarterly', 'period_start': _date(2026, 4, 1), 'period_end': _date(2026, 6, 30), 'due_date': _date(2026, 8, 15), 'status': 'submitted'},
+                    {'type': 'quarterly', 'period_start': _date(2026, 7, 1), 'period_end': _date(2026, 9, 30), 'due_date': _date(2026, 11, 15), 'status': 'pending'},
+                ],
             },
             {
                 'donor_email': 'donor2@proximate.org',
@@ -841,6 +876,35 @@ def run():
                     ('Kassala Rapid Cash', 240_000),
                     ('Wad Madani Youth Solidarity', 120_000),
                 ],
+                'extracted': {
+                    'donor': 'Bill & Melinda Gates Foundation — Humanitarian Response',
+                    'agreement_date': '2026-03-01',
+                    'total_amount': '$3,000,000 USD',
+                    'duration_months': 22,
+                    'key_deliverables': [
+                        {'title': 'Rapid response capability (< 72h from crisis signal)', 'target': 72, 'unit': 'hours'},
+                        {'title': 'Serve 8,000 households in rapid-onset crises', 'target': 8000, 'unit': 'households'},
+                        {'title': 'Semi-annual outcome verification', 'target': 4, 'unit': 'reports'},
+                    ],
+                    'reporting_requirements': [
+                        {'type': 'financial', 'cadence': 'semi_annual', 'due_days_after_period': 30},
+                        {'type': 'outcome_verification', 'cadence': 'semi_annual', 'due_days_after_period': 60},
+                    ],
+                    'restrictions_verbatim': (
+                        "Funds restricted to emergency cash and WASH interventions in Sudan. "
+                        "Response initiation required within 72 hours of a verified crisis signal."
+                    ),
+                    'compliance_flags': [
+                        'sanctions_screening_required_all_partners',
+                        '72_hour_response_sla',
+                        'third_party_outcome_verification',
+                    ],
+                    'extraction_confidence': 0.91,
+                },
+                'reports_to_seed': [
+                    {'type': 'semi_annual', 'period_start': _date(2026, 3, 1), 'period_end': _date(2026, 8, 31), 'due_date': _date(2026, 9, 30), 'status': 'submitted'},
+                    {'type': 'semi_annual', 'period_start': _date(2026, 9, 1), 'period_end': _date(2027, 2, 28), 'due_date': _date(2027, 3, 30), 'status': 'pending'},
+                ],
             },
             {
                 'donor_email': 'donor3@proximate.org',
@@ -860,6 +924,38 @@ def run():
                 'signed': True,
                 'allocate_to_rounds': [
                     ('Kassala Rapid Cash', 150_000),
+                ],
+                'extracted': {
+                    'donor': 'European Commission — ECHO Sudan Window',
+                    'agreement_date': '2026-04-01',
+                    'total_amount': '€1,850,000 EUR (≈ $2M USD)',
+                    'duration_months': 12,
+                    'key_deliverables': [
+                        {'title': 'Cash-based interventions in eastern Sudan', 'target': 1, 'unit': 'programme'},
+                        {'title': 'Protection mainstreaming per ECHO DG guidance', 'target': 1, 'unit': 'compliance_certification'},
+                        {'title': 'Annual narrative + financial report', 'target': 1, 'unit': 'reports'},
+                    ],
+                    'reporting_requirements': [
+                        {'type': 'interim_narrative', 'cadence': 'semi_annual', 'due_days_after_period': 60},
+                        {'type': 'final_narrative_and_financial', 'cadence': 'annual', 'due_days_after_period': 90},
+                        {'type': 'audit_certificate', 'cadence': 'final_only', 'due_days_after_period': 120},
+                    ],
+                    'restrictions_verbatim': (
+                        "Actions must comply with the EU Humanitarian Aid Regulation "
+                        "(EC 1257/96) and ECHO's Humanitarian Implementation Plan for Sudan. "
+                        "Geographic focus on Kassala and Gedaref states."
+                    ),
+                    'compliance_flags': [
+                        'echo_visibility_requirements',
+                        'protection_mainstreaming_mandatory',
+                        'audit_certificate_required',
+                        'eu_procurement_rules_apply',
+                    ],
+                    'extraction_confidence': 0.88,
+                },
+                'reports_to_seed': [
+                    {'type': 'interim_narrative', 'period_start': _date(2026, 4, 1), 'period_end': _date(2026, 9, 30), 'due_date': _date(2026, 11, 30), 'status': 'drafting'},
+                    {'type': 'final_narrative_and_financial', 'period_start': _date(2026, 4, 1), 'period_end': _date(2027, 3, 31), 'due_date': _date(2027, 6, 30), 'status': 'pending'},
                 ],
             },
         ]
@@ -887,6 +983,12 @@ def run():
             ).first()
             if existing:
                 grant_row = existing
+                # Backfill extracted_json even for pre-existing grants
+                # so re-seeding refreshes the AI-extraction demo data.
+                if gf.get('extracted') and not grant_row.extracted_json:
+                    grant_row.extracted_json = _json_seed.dumps(gf['extracted'])
+                    grant_row.extracted_at = datetime.now(timezone.utc)
+                    grant_row.extracted_model = 'claude-opus-4-7-seed'
             else:
                 grant_row = ProximateGrant(
                     network_id=proximate.id,
@@ -901,6 +1003,17 @@ def run():
                     end_date=gf['end_date'],
                     reporting_cadence=gf['reporting_cadence'],
                     restrictions_json=_json_seed.dumps(gf['restrictions']),
+                    extracted_json=(
+                        _json_seed.dumps(gf['extracted'])
+                        if gf.get('extracted') else None
+                    ),
+                    extracted_at=(
+                        datetime.now(timezone.utc)
+                        if gf.get('extracted') else None
+                    ),
+                    extracted_model=(
+                        'claude-opus-4-7-seed' if gf.get('extracted') else None
+                    ),
                     status=gf['status'],
                     signed_at=(
                         datetime.now(timezone.utc) if gf.get('signed') else None
@@ -926,6 +1039,34 @@ def run():
                         amount_usd=amount,
                     ))
                     allocations_created += 1
+
+            # Reporting calendar entries. Idempotent by (grant, type,
+            # period_start). Populates the calendar so UAT can see the
+            # overdue/upcoming/submitted mix on grant detail.
+            for rf in gf.get('reports_to_seed', []):
+                existing_rep = ProximateGrantReport.query.filter_by(
+                    grant_id=grant_row.id,
+                    report_type=rf['type'],
+                    period_start=rf['period_start'],
+                ).first()
+                if not existing_rep:
+                    db.session.add(ProximateGrantReport(
+                        grant_id=grant_row.id,
+                        report_type=rf['type'],
+                        period_start=rf['period_start'],
+                        period_end=rf['period_end'],
+                        due_date=rf['due_date'],
+                        status=rf['status'],
+                        submitted_at=(
+                            datetime.now(timezone.utc)
+                            if rf['status'] in ('submitted', 'accepted')
+                            else None
+                        ),
+                        donor_ack_at=(
+                            datetime.now(timezone.utc)
+                            if rf['status'] == 'accepted' else None
+                        ),
+                    ))
 
         db.session.commit()
         if grants_created:

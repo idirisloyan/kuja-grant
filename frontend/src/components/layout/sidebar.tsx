@@ -486,18 +486,19 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
       // endorser approval queue, crisis selector.
       return {
         primary: [
-          { icon: LayoutDashboard, label: 'Operator dashboard', href: '/proximate/admin' },
-          { icon: FileText,        label: 'Adeso grants',       href: '/proximate/grants' },
-          { icon: Users,           label: 'Partners',           href: '/proximate/admin' },
-          { icon: Send,            label: 'Disbursements',      href: '/proximate/disbursements' },
-          { icon: HandCoins,       label: 'Rounds',             href: '/proximate/rounds' },
-          { icon: ClipboardCheck,  label: 'Endorsers',          href: '/proximate/admin/endorsers' },
-          { icon: MapPin,          label: 'Crisis Selector',    href: '/proximate/crisis-selector' },
+          { icon: LayoutDashboard, label: 'Dashboard',           href: '/proximate/admin' },
+          { icon: FileText,        label: 'Grants from donors',  href: '/proximate/grants' },
+          { icon: HandCoins,       label: 'Rounds & disbursements', href: '/proximate/rounds' },
+          { icon: Users,           label: 'Partners',            href: '/proximate/admin/partners' },
+          { icon: ClipboardCheck,  label: 'Endorsers',           href: '/proximate/admin/endorsers' },
+          { icon: BarChart3,       label: 'Donor view',          href: '/proximate/donor' },
         ],
         secondary: [
-          { icon: ShieldCheck,     label: 'Audit chain',        href: '/admin/audit-chain' },
+          { icon: MapPin,          label: 'Crisis signals',      href: '/proximate/crisis-selector' },
+          { icon: Send,            label: 'All disbursements',   href: '/proximate/disbursements' },
+          { icon: ShieldCheck,     label: 'Audit chain',         href: '/admin/audit-chain' },
           { icon: Activity,        label: t('nav.observability'), href: '/observability' },
-          { icon: SettingsIcon,    label: 'Settings',           href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',            href: '/settings/notifications' },
         ],
       };
 
