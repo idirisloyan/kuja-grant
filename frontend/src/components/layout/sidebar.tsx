@@ -487,6 +487,7 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
       return {
         primary: [
           { icon: LayoutDashboard, label: 'Operator dashboard', href: '/proximate/admin' },
+          { icon: FileText,        label: 'Adeso grants',       href: '/proximate/grants' },
           { icon: Users,           label: 'Partners',           href: '/proximate/admin' },
           { icon: Send,            label: 'Disbursements',      href: '/proximate/disbursements' },
           { icon: HandCoins,       label: 'Rounds',             href: '/proximate/rounds' },

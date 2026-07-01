@@ -41,6 +41,7 @@ from app.models import (
     Network, User, Endorser, ProximatePartner, Endorsement,
     FinancialServiceProvider, Organization, NetworkMembership,
     ProximateDonor, ProximateRound, ProximateRoundParticipant,
+    ProximateGrant, ProximateGrantAllocation,
 )
 from werkzeug.security import generate_password_hash
 
@@ -789,6 +790,149 @@ def run():
                     existing.stage = stage
 
         db.session.commit()
+
+        # ------------------------------------------------------------------
+        # Phase 721 — Seed Adeso's 3 inbound grants + round allocations.
+        # ------------------------------------------------------------------
+        import json as _json_seed
+        from datetime import date as _date
+
+        # Grant fixtures — the 3 donors funding Proximate Fund.
+        # Ordered so we can pair with the first 3 seeded ProximateDonor rows.
+        GRANT_FIXTURES = [
+            {
+                'donor_email': 'donor@proximate.org',
+                'title': 'Sudan Localization Fund 2026-2028',
+                'donor_grant_ref': 'SLT-2026-0847',
+                'amount_committed_usd': 5_000_000,
+                'amount_received_usd': 2_100_000,
+                'start_date': _date(2026, 1, 15),
+                'end_date': _date(2028, 12, 31),
+                'reporting_cadence': 'quarterly',
+                'restrictions': {
+                    'geographies': ['SD'],
+                    'sectors': ['cash', 'food', 'shelter'],
+                    'purpose': 'Direct cash transfers and localization capacity for Sudanese informal groups.',
+                },
+                'status': 'active',
+                'signed': True,
+                'allocate_to_rounds': [
+                    ('Gedaref Winterisation', 350_000),
+                    ('Wad Madani Youth Solidarity', 180_000),
+                ],
+            },
+            {
+                'donor_email': 'donor2@proximate.org',
+                'title': 'Rapid Emergency Response Sudan',
+                'donor_grant_ref': 'GATES-HR-2026-2019',
+                'amount_committed_usd': 3_000_000,
+                'amount_received_usd': 1_500_000,
+                'start_date': _date(2026, 3, 1),
+                'end_date': _date(2027, 12, 31),
+                'reporting_cadence': 'semi_annual',
+                'restrictions': {
+                    'geographies': ['SD'],
+                    'sectors': ['emergency_cash', 'wash'],
+                    'purpose': 'Rapid-onset humanitarian cash response with community-led targeting.',
+                },
+                'status': 'active',
+                'signed': True,
+                'allocate_to_rounds': [
+                    ('Kassala Rapid Cash', 240_000),
+                    ('Wad Madani Youth Solidarity', 120_000),
+                ],
+            },
+            {
+                'donor_email': 'donor3@proximate.org',
+                'title': 'EU Humanitarian Aid — Sudan Localisation Window',
+                'donor_grant_ref': 'ECHO/-AF/BUD/2026/91007',
+                'amount_committed_usd': 2_000_000,
+                'amount_received_usd': 1_000_000,
+                'start_date': _date(2026, 4, 1),
+                'end_date': _date(2027, 3, 31),
+                'reporting_cadence': 'annual',
+                'restrictions': {
+                    'geographies': ['SD'],
+                    'sectors': ['cash', 'protection'],
+                    'purpose': 'Support to community-led emergency response in eastern Sudan.',
+                },
+                'status': 'active',
+                'signed': True,
+                'allocate_to_rounds': [
+                    ('Kassala Rapid Cash', 150_000),
+                ],
+            },
+        ]
+
+        # Lookup helpers for donors + rounds by name.
+        donors_by_email = {}
+        for d in ProximateDonor.query.filter_by(network_id=proximate.id).all():
+            if d.contact_email:
+                donors_by_email[d.contact_email] = d
+        rounds_by_title = {
+            r.title: r for r in ProximateRound.query.filter_by(
+                network_id=proximate.id,
+            ).all()
+        }
+
+        grants_created = 0
+        allocations_created = 0
+        for gf in GRANT_FIXTURES:
+            donor = donors_by_email.get(gf['donor_email'])
+            if not donor:
+                print(f"    WARN: donor '{gf['donor_email']}' not found — skipping grant '{gf['title']}'")
+                continue
+            existing = ProximateGrant.query.filter_by(
+                network_id=proximate.id, donor_grant_ref=gf['donor_grant_ref'],
+            ).first()
+            if existing:
+                grant_row = existing
+            else:
+                grant_row = ProximateGrant(
+                    network_id=proximate.id,
+                    donor_id=donor.id,
+                    donor_name_cache=donor.display_name,
+                    title=gf['title'],
+                    donor_grant_ref=gf['donor_grant_ref'],
+                    amount_committed_usd=gf['amount_committed_usd'],
+                    amount_received_usd=gf['amount_received_usd'],
+                    currency='USD',
+                    start_date=gf['start_date'],
+                    end_date=gf['end_date'],
+                    reporting_cadence=gf['reporting_cadence'],
+                    restrictions_json=_json_seed.dumps(gf['restrictions']),
+                    status=gf['status'],
+                    signed_at=(
+                        datetime.now(timezone.utc) if gf.get('signed') else None
+                    ),
+                    created_by_user_id=ob_user.id,
+                )
+                db.session.add(grant_row)
+                db.session.flush()
+                grants_created += 1
+
+            # Allocations to rounds.
+            for round_title, amount in gf.get('allocate_to_rounds', []):
+                round_row = rounds_by_title.get(round_title)
+                if not round_row:
+                    continue
+                existing_alloc = ProximateGrantAllocation.query.filter_by(
+                    grant_id=grant_row.id, round_id=round_row.id,
+                ).first()
+                if not existing_alloc:
+                    db.session.add(ProximateGrantAllocation(
+                        grant_id=grant_row.id,
+                        round_id=round_row.id,
+                        amount_usd=amount,
+                    ))
+                    allocations_created += 1
+
+        db.session.commit()
+        if grants_created:
+            print(f"  Grants created: {grants_created}")
+        if allocations_created:
+            print(f"  Allocations created: {allocations_created}")
+
         print()
         print(f"Done. Proximate now has:")
         print(f"  Endorsers : {Endorser.query.filter_by(network_id=proximate.id).count()}")
@@ -797,6 +941,8 @@ def run():
         print(f"  Donors    : {ProximateDonor.query.filter_by(network_id=proximate.id).count()}")
         print(f"  Rounds    : {ProximateRound.query.filter_by(network_id=proximate.id).count()}")
         print(f"  Participants: {ProximateRoundParticipant.query.join(ProximateRound).filter(ProximateRound.network_id == proximate.id).count()}")
+        print(f"  Grants    : {ProximateGrant.query.filter_by(network_id=proximate.id).count()}")
+        print(f"  Allocations: {ProximateGrantAllocation.query.join(ProximateGrant).filter(ProximateGrant.network_id == proximate.id).count()}")
         print()
         print(f"  Demo URLs:")
         print(f"    /proximate/endorse           — endorser inbox")

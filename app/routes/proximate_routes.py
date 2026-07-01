@@ -2209,6 +2209,297 @@ def api_submit_endorser_invite(token):
     })
 
 
+# =========================================================================
+# Phase 721 — Adeso's inbound-grant management
+#
+# Adeso doesn't APPLY to grants — the grants are already signed with
+# donors. This surface lets Adeso:
+#   1. Upload the signed agreement (or record it manually for demo)
+#   2. Review AI-extracted terms
+#   3. Track compliance + reporting obligations
+#   4. Allocate rounds from the grant (traced back via
+#      ProximateGrantAllocation)
+# =========================================================================
+
+@proximate_bp.route('/grants', methods=['GET'])
+@login_required
+def api_list_grants():
+    """List all inbound Adeso grants in this tenant. OB-only for the
+    full view; donor persona gets scoped to their own grants."""
+    from app.models import ProximateGrant
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    q = ProximateGrant.query.filter_by(network_id=net.id)
+    # Donor persona: only THEIR grants. OB / admin: all.
+    from app.models import ProximateDonor
+    is_donor_persona = not _user_is_ob(net)
+    if is_donor_persona:
+        my_donor = ProximateDonor.query.filter_by(
+            network_id=net.id, user_id=current_user.id,
+        ).first()
+        if not my_donor:
+            return jsonify({'success': True, 'grants': []})
+        q = q.filter_by(donor_id=my_donor.id)
+    rows = q.order_by(ProximateGrant.created_at.desc()).all()
+    return jsonify({
+        'success': True,
+        'grants': [r.to_dict() for r in rows],
+    })
+
+
+@proximate_bp.route('/grants/<int:grant_id>', methods=['GET'])
+@login_required
+def api_get_grant(grant_id):
+    """Full grant detail including allocations + reports history."""
+    from app.models import (
+        ProximateGrant, ProximateGrantAllocation, ProximateGrantReport,
+        ProximateRound,
+    )
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    g = ProximateGrant.query.filter_by(
+        id=grant_id, network_id=net.id,
+    ).first()
+    if not g:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    # Donor scope check.
+    if not _user_is_ob(net):
+        from app.models import ProximateDonor
+        my_donor = ProximateDonor.query.filter_by(
+            network_id=net.id, user_id=current_user.id,
+        ).first()
+        if not my_donor or g.donor_id != my_donor.id:
+            return jsonify({'success': False, 'error': 'not authorised'}), 403
+
+    allocations = ProximateGrantAllocation.query.filter_by(
+        grant_id=g.id,
+    ).all()
+    round_ids = [a.round_id for a in allocations]
+    rounds = {
+        r.id: r for r in ProximateRound.query.filter(
+            ProximateRound.id.in_(round_ids or [0])
+        ).all()
+    }
+    reports = ProximateGrantReport.query.filter_by(
+        grant_id=g.id,
+    ).order_by(ProximateGrantReport.due_date.asc()).all()
+
+    return jsonify({
+        'success': True,
+        'grant': g.to_dict(include_extracted=_user_is_ob(net)),
+        'allocations': [
+            {
+                **a.to_dict(),
+                'round_title': (
+                    rounds[a.round_id].title
+                    if a.round_id in rounds else f'Round #{a.round_id}'
+                ),
+                'round_status': (
+                    rounds[a.round_id].status
+                    if a.round_id in rounds else None
+                ),
+            }
+            for a in allocations
+        ],
+        'reports': [r.to_dict() for r in reports],
+    })
+
+
+@proximate_bp.route('/grants', methods=['POST'])
+@login_required
+def api_create_grant():
+    """Create a new grant record (OB-only). For now this accepts the
+    extracted terms directly — a PDF-upload + AI-extract wizard lands
+    in Phase 721b. Body:
+      title, donor_id, donor_grant_ref, amount_committed_usd,
+      currency, start_date, end_date, reporting_cadence,
+      restrictions {geographies, sectors, purpose}, signed_at
+    """
+    from app.models import ProximateGrant, ProximateDonor
+    import json as _json
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    if not _user_is_ob(net):
+        return jsonify({'success': False, 'error': 'ob only'}), 403
+    body = get_request_json() or {}
+    title = (body.get('title') or '').strip()
+    if not title:
+        return jsonify({'success': False, 'error': 'title required'}), 400
+    donor_id = body.get('donor_id')
+    donor_name = None
+    if donor_id:
+        donor = ProximateDonor.query.filter_by(
+            id=donor_id, network_id=net.id,
+        ).first()
+        if not donor:
+            return jsonify({
+                'success': False, 'error': 'donor not in tenant',
+            }), 400
+        donor_name = donor.display_name
+
+    def _parse_date(v):
+        if not v:
+            return None
+        from datetime import date
+        try:
+            y, m, d = str(v).split('-')[:3]
+            return date(int(y), int(m), int(d))
+        except (ValueError, TypeError):
+            return None
+
+    g = ProximateGrant(
+        network_id=net.id,
+        donor_id=donor_id,
+        donor_name_cache=donor_name,
+        title=title[:300],
+        donor_grant_ref=(body.get('donor_grant_ref') or '').strip()[:120] or None,
+        amount_committed_usd=body.get('amount_committed_usd'),
+        currency=(body.get('currency') or 'USD')[:3],
+        start_date=_parse_date(body.get('start_date')),
+        end_date=_parse_date(body.get('end_date')),
+        reporting_cadence=(body.get('reporting_cadence') or 'quarterly'),
+        restrictions_json=(
+            _json.dumps(body['restrictions'])
+            if isinstance(body.get('restrictions'), dict) else None
+        ),
+        signed_at=(
+            datetime.now(timezone.utc)
+            if body.get('signed_at') else None
+        ),
+        status=(body.get('status') or 'active'),
+        created_by_user_id=current_user.id,
+    )
+    db.session.add(g)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.grant.created',
+        actor_email=current_user.email,
+        subject_kind='proximate_grant',
+        subject_id=g.id,
+        details={
+            'title': g.title,
+            'donor_id': g.donor_id,
+            'amount_committed_usd': g.amount_committed_usd,
+            'status': g.status,
+        },
+    )
+    return jsonify({'success': True, 'grant': g.to_dict()})
+
+
+@proximate_bp.route('/grants/<int:grant_id>', methods=['PUT'])
+@login_required
+def api_update_grant(grant_id):
+    """OB edits a grant (e.g. after reviewing AI extraction)."""
+    from app.models import ProximateGrant
+    import json as _json
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    if not _user_is_ob(net):
+        return jsonify({'success': False, 'error': 'ob only'}), 403
+    g = ProximateGrant.query.filter_by(
+        id=grant_id, network_id=net.id,
+    ).first()
+    if not g:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    body = get_request_json() or {}
+    for field in (
+        'title', 'donor_grant_ref', 'currency', 'reporting_cadence', 'status',
+    ):
+        if field in body:
+            v = body[field]
+            if isinstance(v, str):
+                v = v.strip()
+                v = v[:300] if field == 'title' else v
+            setattr(g, field, v)
+    for field in ('amount_committed_usd', 'amount_received_usd'):
+        if field in body and body[field] is not None:
+            try:
+                setattr(g, field, float(body[field]))
+            except (ValueError, TypeError):
+                pass
+    if 'restrictions' in body and isinstance(body['restrictions'], dict):
+        g.restrictions_json = _json.dumps(body['restrictions'])
+    db.session.commit()
+    return jsonify({'success': True, 'grant': g.to_dict()})
+
+
+@proximate_bp.route(
+    '/grants/<int:grant_id>/allocations', methods=['POST'],
+)
+@login_required
+def api_add_grant_allocation(grant_id):
+    """Allocate an amount from grant to a round. OB-only.
+    Body: {round_id, amount_usd, notes?}"""
+    from app.models import (
+        ProximateGrant, ProximateGrantAllocation, ProximateRound,
+    )
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    if not _user_is_ob(net):
+        return jsonify({'success': False, 'error': 'ob only'}), 403
+    g = ProximateGrant.query.filter_by(
+        id=grant_id, network_id=net.id,
+    ).first()
+    if not g:
+        return jsonify({'success': False, 'error': 'grant not found'}), 404
+    body = get_request_json() or {}
+    round_id = body.get('round_id')
+    amount = body.get('amount_usd')
+    if not round_id or amount in (None, ''):
+        return jsonify({
+            'success': False,
+            'error': 'round_id and amount_usd required',
+        }), 400
+    round_row = ProximateRound.query.filter_by(
+        id=round_id, network_id=net.id,
+    ).first()
+    if not round_row:
+        return jsonify({'success': False, 'error': 'round not in tenant'}), 400
+    try:
+        amount_f = float(amount)
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'error': 'amount_usd must be number'}), 400
+    if amount_f > g.amount_remaining_usd:
+        return jsonify({
+            'success': False,
+            'error': (
+                f'insufficient grant balance: ${amount_f:,.0f} requested '
+                f'but only ${g.amount_remaining_usd:,.0f} remains uncommitted'
+            ),
+        }), 422
+    existing = ProximateGrantAllocation.query.filter_by(
+        round_id=round_row.id, grant_id=g.id,
+    ).first()
+    if existing:
+        return jsonify({
+            'success': False,
+            'error': 'this round is already allocated from this grant',
+        }), 409
+    row = ProximateGrantAllocation(
+        round_id=round_row.id, grant_id=g.id,
+        amount_usd=amount_f,
+        notes=(body.get('notes') or '').strip()[:2000] or None,
+    )
+    db.session.add(row)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.grant.allocated_to_round',
+        actor_email=current_user.email,
+        subject_kind='proximate_grant',
+        subject_id=g.id,
+        details={
+            'round_id': round_row.id,
+            'amount_usd': amount_f,
+        },
+    )
+    return jsonify({'success': True, 'allocation': row.to_dict()})
+
+
 @proximate_bp.route('/rounds/<int:round_id>/report.pdf', methods=['GET'])
 @login_required
 def api_round_report_pdf(round_id):

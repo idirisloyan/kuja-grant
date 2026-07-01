@@ -97,6 +97,12 @@ from app.models.proximate_outcome import (
 )
 from app.models.proximate_donor import ProximateDonor
 from app.models.proximate_endorser_invite import ProximateEndorserInvite
+from app.models.proximate_grant import (
+    ProximateGrant, ProximateGrantAllocation, ProximateGrantReport,
+    GRANT_STATUSES as PROXIMATE_GRANT_STATUSES,
+    REPORTING_CADENCES as PROXIMATE_GRANT_REPORTING_CADENCES,
+    REPORT_STATUSES as PROXIMATE_GRANT_REPORT_STATUSES,
+)
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -136,4 +142,7 @@ __all__ = [
     'ProximateDisbursement',
     'DISBURSEMENT_STATUSES', 'DEFAULT_REPORT_WINDOW_DAYS',
     'ProximateEndorserInvite',
+    'ProximateGrant', 'ProximateGrantAllocation', 'ProximateGrantReport',
+    'PROXIMATE_GRANT_STATUSES', 'PROXIMATE_GRANT_REPORTING_CADENCES',
+    'PROXIMATE_GRANT_REPORT_STATUSES',
 ]
