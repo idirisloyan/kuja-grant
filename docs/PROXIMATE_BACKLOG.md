@@ -704,9 +704,22 @@ detail-page ID bug and allocation seeding fixed in 64cd8927.
       signed_agreement_doc_id). Scanned PDFs without a text layer get a
       clear 422 telling the OB to OCR first. Punt list: re-extract on an
       existing grant (PUT accepts `extracted` but no UI); no OCR.
-- [ ] **Phase 721c — AI-drafted donor reports.** Draft the quarterly/
-      annual report body from real round/disbursement/outcome data,
-      human-editable (same shape as Kuja report drafting).
+- [x] **Phase 721c — AI-drafted donor reports.** SHIPPED 2026-07-05.
+      `POST /grants/<gid>/reports/<rid>/draft` gathers REAL data
+      (allocations → rounds → period disbursements → partner reports →
+      outcome signals), Claude drafts the four sections the 721d scorer
+      grades (prompt forbids invented numbers; zero-activity periods
+      say so plainly). Draft always lands in `ai_draft_json`; copied to
+      `content_json` only when no human content exists. Plus the
+      missing report lifecycle: `PUT /grants/<gid>/reports/<rid>`
+      edits content + guarded status transitions (pending/drafting →
+      submitted → accepted/revision_requested; empty reports can't be
+      submitted; submitted_at/donor_ack_at stamped). Grant detail UI:
+      Draft-with-AI / Edit buttons on pending rows, inline section
+      editor, Save draft + Submit to donor. OB sees report content
+      inline on grant detail; donors still see scores/status only.
+      Full loop now: extract → allocate → draft → edit → submit →
+      score — every step live on prod.
 - [x] **Phase 721d — Compliance-per-requirement scoring.** SHIPPED
       2026-07-05. Two halves:
       • **Deliverables vs targets** — `GET /grants/<id>/compliance`

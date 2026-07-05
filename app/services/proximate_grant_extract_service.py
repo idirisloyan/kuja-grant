@@ -132,6 +132,125 @@ def extract_agreement_terms(*, doc_text: str, filename: str = '') -> dict | None
     }
 
 
+def draft_grant_report(*, grant, report) -> dict | None:
+    """Phase 721c — draft a donor report body from REAL system data.
+
+    Gathers the grant's allocations → rounds → disbursements (within
+    the report period where dated) → outcome attestations, hands the
+    aggregate to Claude, and returns section dicts in the same shape
+    the 721d scorer grades (executive_summary, financial_summary,
+    impact_narrative, compliance_note). Numbers in the draft come from
+    the aggregate — the prompt forbids inventing figures."""
+    import json as _json
+    from datetime import datetime, time, timezone as _tz
+    try:
+        from app.services.ai_service import AIService
+    except Exception:
+        return None
+    from app.extensions import db
+    from app.models import (
+        ProximateGrantAllocation, ProximateRound, ProximateDisbursement,
+    )
+
+    allocations = ProximateGrantAllocation.query.filter_by(
+        grant_id=grant.id,
+    ).all()
+    round_ids = [a.round_id for a in allocations]
+    rounds = ProximateRound.query.filter(
+        ProximateRound.id.in_(round_ids or [0]),
+    ).all()
+    disbursements = ProximateDisbursement.query.filter(
+        ProximateDisbursement.round_id.in_(round_ids or [0]),
+    ).all()
+
+    def _in_period(dt) -> bool:
+        if not dt or not report.period_start or not report.period_end:
+            return True  # undated rows / open periods count
+        start = datetime.combine(report.period_start, time.min, tzinfo=_tz.utc)
+        end = datetime.combine(report.period_end, time.max, tzinfo=_tz.utc)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_tz.utc)
+        return start <= dt <= end
+
+    period_disb = [d for d in disbursements if _in_period(d.sent_at)]
+    total_disbursed = sum(float(d.amount_usd or 0) for d in period_disb)
+    partners = {d.partner_id for d in period_disb if d.partner_id}
+    reported = [d for d in period_disb if d.report_submitted_at]
+    attested = [
+        d for d in period_disb
+        if getattr(d, 'outcome_attested_at', None)
+        or getattr(d, 'verifier_verdict', None)
+    ]
+
+    extracted = grant._extracted() if hasattr(grant, '_extracted') else {}
+    facts = {
+        'grant_title': grant.title,
+        'donor': grant.donor_name_cache,
+        'report_type': report.report_type,
+        'period': f'{report.period_start} to {report.period_end}',
+        'amount_committed_usd': grant.amount_committed_usd,
+        'amount_allocated_usd_lifetime': grant.amount_allocated_usd,
+        'rounds_funded': [
+            {'title': r.title, 'status': r.status} for r in rounds
+        ],
+        'period_disbursements_count': len(period_disb),
+        'period_disbursed_usd': total_disbursed,
+        'distinct_partners_in_period': len(partners),
+        'partner_reports_received': len(reported),
+        'disbursements_with_outcome_signal': len(attested),
+        'donor_requirements': extracted.get('reporting_requirements') or [],
+        'compliance_flags': extracted.get('compliance_flags') or [],
+        'restrictions_verbatim': (extracted.get('restrictions_verbatim') or '')[:600],
+    }
+
+    system_prompt = (
+        "You draft donor reports for Adeso's Proximate Fund. Write the "
+        "four sections from the FACTS provided — never invent numbers, "
+        "partner names, or events that are not in the facts. Where the "
+        "facts show zero activity, say so plainly and explain what that "
+        "means (e.g. the round is still in endorsement stage). Address "
+        "every compliance flag the donor requires (sanctions screening "
+        "status, anti-fraud hotline reference, restriction adherence). "
+        "Professional, concrete, first person plural ('we disbursed…'). "
+        "3-6 sentences per section. This is a DRAFT a human will edit."
+    )
+    user_message = (
+        f"FACTS:\n{_json.dumps(facts, indent=1, default=str)}\n\n"
+        "Draft the report via the draft_report tool."
+    )
+
+    parsed = AIService._call_claude_tool(
+        system_prompt,
+        user_message,
+        tool_name='draft_report',
+        tool_description='Four-section donor report draft from system facts.',
+        tool_schema={
+            'type': 'object',
+            'properties': {
+                'executive_summary': {'type': 'string'},
+                'financial_summary': {'type': 'string'},
+                'impact_narrative': {'type': 'string'},
+                'compliance_note': {'type': 'string'},
+            },
+            'required': [
+                'executive_summary', 'financial_summary',
+                'impact_narrative', 'compliance_note',
+            ],
+        },
+        max_tokens=2000,
+        endpoint='proximate_report_draft',
+    )
+    if not parsed:
+        return None
+    return {
+        k: str(parsed.get(k) or '').strip()[:4000]
+        for k in (
+            'executive_summary', 'financial_summary',
+            'impact_narrative', 'compliance_note',
+        )
+    }
+
+
 def score_report_compliance(*, grant, report) -> list | None:
     """Phase 721d — score one donor report against the grant's extracted
     requirements. Returns the per-requirement score list (the shape

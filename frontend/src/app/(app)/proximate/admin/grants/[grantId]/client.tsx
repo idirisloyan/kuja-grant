@@ -75,6 +75,7 @@ interface ReportRow {
   compliance_score: RequirementScore[];
   submitted_at: string | null;
   donor_ack_at: string | null;
+  content?: Record<string, string>;
 }
 
 interface DeliverableProgress {
@@ -85,6 +86,38 @@ interface DeliverableProgress {
   current: number | null;
   source: string;
   pct: number | null;
+}
+
+function ReportActions({ r, draftingId, onDraft, onEdit }: {
+  r: ReportRow;
+  draftingId: number | null;
+  onDraft: (id: number) => void;
+  onEdit: (r: ReportRow) => void;
+}) {
+  const hasContent = !!r.content && Object.keys(r.content).length > 0;
+  return (
+    <span className="flex items-center gap-1">
+      <button
+        onClick={() => onDraft(r.id)}
+        disabled={draftingId !== null}
+        className="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-md border hover:bg-muted disabled:opacity-50"
+        title="AI drafts this report from real round and disbursement data"
+      >
+        {draftingId === r.id
+          ? <Loader2 className="w-3 h-3 animate-spin" />
+          : <Sparkles className="w-3 h-3" />}
+        {hasContent ? 'Re-draft' : 'Draft with AI'}
+      </button>
+      {hasContent && (
+        <button
+          onClick={() => onEdit(r)}
+          className="text-[10px] px-2 py-0.5 rounded-md border hover:bg-muted"
+        >
+          Edit
+        </button>
+      )}
+    </span>
+  );
 }
 
 function avgScore(scores: RequirementScore[]): number | null {
@@ -173,6 +206,56 @@ export function ProximateGrantDetailClient() {
       setScoreError(e instanceof Error ? e.message : 'Scoring failed.');
     } finally {
       setScoringId(null);
+    }
+  }
+
+  // Phase 721c — report drafting + editing
+  const [draftingId, setDraftingId] = useState<number | null>(null);
+  const [editorId, setEditorId] = useState<number | null>(null);
+  const [editorSections, setEditorSections] = useState<Record<string, string>>({});
+  const [savingReport, setSavingReport] = useState(false);
+
+  async function draftReport(reportId: number) {
+    setDraftingId(reportId);
+    setScoreError(null);
+    try {
+      const r = await api.post<{ success: boolean; report: ReportRow }>(
+        `/api/proximate/grants/${grantId}/reports/${reportId}/draft`, {},
+      );
+      setEditorId(reportId);
+      setEditorSections(r.report.content || {});
+      loadAll();
+    } catch (e: unknown) {
+      setScoreError(e instanceof Error ? e.message : 'Drafting failed.');
+    } finally {
+      setDraftingId(null);
+    }
+  }
+
+  function openEditor(r: ReportRow) {
+    setEditorId(r.id);
+    setEditorSections(r.content || {
+      executive_summary: '', financial_summary: '',
+      impact_narrative: '', compliance_note: '',
+    });
+  }
+
+  async function saveReport(reportId: number, submit: boolean) {
+    setSavingReport(true);
+    setScoreError(null);
+    try {
+      await api.put(
+        `/api/proximate/grants/${grantId}/reports/${reportId}`,
+        submit
+          ? { content: editorSections, status: 'submitted' }
+          : { content: editorSections },
+      );
+      if (submit) setEditorId(null);
+      loadAll();
+    } catch (e: unknown) {
+      setScoreError(e instanceof Error ? e.message : 'Save failed.');
+    } finally {
+      setSavingReport(false);
     }
   }
 
@@ -440,8 +523,18 @@ export function ProximateGrantDetailClient() {
                 </p>
                 <ul className="text-xs space-y-1">
                   {overdue.map((r) => (
-                    <li key={r.id}>
-                      {r.report_type} · due {r.due_date}
+                    <li key={r.id} className="flex items-center gap-2">
+                      <span className="flex-1">
+                        {r.report_type} · due {r.due_date}
+                      </span>
+                      {isOb && (
+                        <ReportActions
+                          r={r}
+                          draftingId={draftingId}
+                          onDraft={draftReport}
+                          onEdit={openEditor}
+                        />
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -461,6 +554,14 @@ export function ProximateGrantDetailClient() {
                       <span className="flex-1">
                         {r.report_type} · due {r.due_date}
                       </span>
+                      {isOb && (
+                        <ReportActions
+                          r={r}
+                          draftingId={draftingId}
+                          onDraft={draftReport}
+                          onEdit={openEditor}
+                        />
+                      )}
                       <Badge
                         variant="outline"
                         className={`text-[10px] ${reportStatusStyles[r.status] || ''}`}
@@ -472,6 +573,61 @@ export function ProximateGrantDetailClient() {
                 </ul>
               </div>
             )}
+
+            {/* Phase 721c — inline section editor */}
+            {isOb && editorId !== null && (
+              <div className="mb-3 p-3 rounded-md border bg-muted/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold">
+                    Editing report #{editorId} — AI drafts from real round
+                    data; review every line before submitting.
+                  </p>
+                  <button
+                    onClick={() => setEditorId(null)}
+                    className="text-xs text-muted-foreground hover:underline"
+                  >
+                    Close
+                  </button>
+                </div>
+                {Object.entries(editorSections).map(([key, value]) => (
+                  <label key={key} className="block">
+                    <span className="text-[10px] uppercase text-muted-foreground">
+                      {key.replace(/_/g, ' ')}
+                    </span>
+                    <textarea
+                      value={value}
+                      onChange={(e) =>
+                        setEditorSections((prev) => ({
+                          ...prev, [key]: e.target.value,
+                        }))
+                      }
+                      rows={3}
+                      className="mt-0.5 w-full px-2 py-1.5 text-xs border rounded-md bg-background"
+                    />
+                  </label>
+                ))}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => saveReport(editorId, false)}
+                    disabled={savingReport}
+                    className="text-xs px-3 py-1.5 rounded-md border hover:bg-muted disabled:opacity-50"
+                  >
+                    Save draft
+                  </button>
+                  <button
+                    onClick={() => saveReport(editorId, true)}
+                    disabled={savingReport}
+                    className="text-xs px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {savingReport
+                      ? <Loader2 className="w-3 h-3 animate-spin inline me-1" />
+                      : null}
+                    Submit to donor
+                  </button>
+                </div>
+              </div>
+            )}
+
             {submitted.length > 0 && (
               <div>
                 <p className="text-xs font-medium mb-2 text-muted-foreground uppercase">

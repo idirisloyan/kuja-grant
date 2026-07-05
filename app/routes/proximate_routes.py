@@ -2332,9 +2332,10 @@ def api_get_grant(grant_id):
         grant_id=g.id,
     ).order_by(ProximateGrantReport.due_date.asc()).all()
 
+    is_ob_viewer = _user_is_ob(net)
     return jsonify({
         'success': True,
-        'grant': g.to_dict(include_extracted=_user_is_ob(net)),
+        'grant': g.to_dict(include_extracted=is_ob_viewer),
         'allocations': [
             {
                 **a.to_dict(),
@@ -2349,7 +2350,9 @@ def api_get_grant(grant_id):
             }
             for a in allocations
         ],
-        'reports': [r.to_dict() for r in reports],
+        # OB gets report content inline so the 721c editor can open
+        # without a per-report fetch; donors see scores + status only.
+        'reports': [r.to_dict(include_content=is_ob_viewer) for r in reports],
     })
 
 
@@ -2606,6 +2609,128 @@ def api_set_deliverable_progress(grant_id):
         details={'index': idx, 'value': value},
     )
     return jsonify({'success': True})
+
+
+@proximate_bp.route(
+    '/grants/<int:grant_id>/reports/<int:report_id>/draft', methods=['POST'],
+)
+@login_required
+def api_draft_grant_report(grant_id, report_id):
+    """Phase 721c — AI drafts the report body from real allocation /
+    disbursement / outcome data. OB-only. The draft lands in
+    ai_draft_json (always inspectable) and is copied into content_json
+    only when no human content exists yet — a human edit is never
+    silently overwritten."""
+    import json as _json
+    from app.models import ProximateGrant, ProximateGrantReport
+    from app.services.proximate_grant_extract_service import (
+        draft_grant_report,
+    )
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    if not _user_is_ob(net):
+        return jsonify({'success': False, 'error': 'ob only'}), 403
+    g = ProximateGrant.query.filter_by(id=grant_id, network_id=net.id).first()
+    if not g:
+        return jsonify({'success': False, 'error': 'grant not found'}), 404
+    r = ProximateGrantReport.query.filter_by(
+        id=report_id, grant_id=g.id,
+    ).first()
+    if not r:
+        return jsonify({'success': False, 'error': 'report not found'}), 404
+    draft = draft_grant_report(grant=g, report=r)
+    if draft is None:
+        return jsonify({
+            'success': False,
+            'error': 'AI drafting unavailable right now — try again shortly.',
+        }), 503
+    r.ai_draft_json = _json.dumps(draft)
+    r.ai_draft_at = datetime.now(timezone.utc)
+    if not r.content_json:
+        r.content_json = r.ai_draft_json
+    if r.status == 'pending':
+        r.status = 'drafting'
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.grant_report.ai_drafted',
+        actor_email=current_user.email,
+        subject_kind='proximate_grant_report',
+        subject_id=r.id,
+        details={'grant_id': g.id, 'sections': list(draft.keys())},
+    )
+    return jsonify({'success': True, 'report': r.to_dict(include_content=True)})
+
+
+@proximate_bp.route(
+    '/grants/<int:grant_id>/reports/<int:report_id>', methods=['PUT'],
+)
+@login_required
+def api_update_grant_report(grant_id, report_id):
+    """Phase 721c — OB edits report content and moves it through its
+    lifecycle. Body: {content?: dict, status?: str}. Allowed status
+    moves: pending/drafting→drafting|submitted, submitted→accepted|
+    revision_requested (donor feedback recorded by OB), revision_
+    requested→drafting|submitted."""
+    import json as _json
+    from app.models import ProximateGrant, ProximateGrantReport
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    if not _user_is_ob(net):
+        return jsonify({'success': False, 'error': 'ob only'}), 403
+    g = ProximateGrant.query.filter_by(id=grant_id, network_id=net.id).first()
+    if not g:
+        return jsonify({'success': False, 'error': 'grant not found'}), 404
+    r = ProximateGrantReport.query.filter_by(
+        id=report_id, grant_id=g.id,
+    ).first()
+    if not r:
+        return jsonify({'success': False, 'error': 'report not found'}), 404
+    body = get_request_json() or {}
+
+    if isinstance(body.get('content'), dict):
+        r.content_json = _json.dumps({
+            str(k)[:60]: str(v)[:6000] for k, v in body['content'].items()
+        })
+
+    new_status = body.get('status')
+    if new_status:
+        allowed = {
+            'pending': {'drafting', 'submitted'},
+            'drafting': {'submitted'},
+            'submitted': {'accepted', 'revision_requested'},
+            'revision_requested': {'drafting', 'submitted'},
+        }
+        if new_status not in allowed.get(r.status, set()):
+            return jsonify({
+                'success': False,
+                'error': f'cannot move {r.status} → {new_status}',
+            }), 422
+        if new_status == 'submitted' and not r.content_json:
+            return jsonify({
+                'success': False,
+                'error': 'cannot submit an empty report — draft or write content first',
+            }), 422
+        r.status = new_status
+        if new_status == 'submitted':
+            r.submitted_at = datetime.now(timezone.utc)
+            r.submitted_by_user_id = current_user.id
+        if new_status == 'accepted':
+            r.donor_ack_at = datetime.now(timezone.utc)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.grant_report.updated',
+        actor_email=current_user.email,
+        subject_kind='proximate_grant_report',
+        subject_id=r.id,
+        details={
+            'grant_id': g.id,
+            'content_edited': isinstance(body.get('content'), dict),
+            'status': r.status,
+        },
+    )
+    return jsonify({'success': True, 'report': r.to_dict(include_content=True)})
 
 
 @proximate_bp.route(
