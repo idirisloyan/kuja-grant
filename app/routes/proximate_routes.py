@@ -474,6 +474,91 @@ def _run_partner_sanctions_screen(partner):
         )
 
 
+def _run_named_sanctions_screen(entity, *, display_name, subject_kind,
+                                audit_action):
+    """Phase 716 DD sweep — generic sanctions screen for any entity
+    carrying (sanctions_flag, sanctions_checked_at,
+    sanctions_summary_json) columns: endorsers, FSPs/hawala brokers.
+    Same OpenSanctions coverage as the partner screen. Best-effort:
+    callers wrap in try/except so a screening outage never blocks the
+    business action."""
+    from app.services.compliance_service import ComplianceService
+    import json as _json
+
+    checks = ComplianceService.screen_organization(
+        org_name=display_name,
+        country=getattr(entity, 'country', None) or 'SD',
+    ) or []
+    flagged_checks = [c for c in checks if c.get('status') == 'flagged']
+    summary = {
+        'screened_name': display_name,
+        'total_checks': len(checks),
+        'flagged_count': len(flagged_checks),
+        'flagged': [
+            {
+                'check_type': c.get('check_type'),
+                'reason': (c.get('result') or {}).get('reason'),
+                'match_score': (c.get('result') or {}).get('match_score'),
+                'list': (c.get('result') or {}).get('list'),
+            }
+            for c in flagged_checks[:5]
+        ],
+    }
+    entity.sanctions_flag = bool(flagged_checks)
+    entity.sanctions_checked_at = datetime.now(timezone.utc)
+    entity.sanctions_summary_json = _json.dumps(summary)
+    db.session.commit()
+    AuditChainEntry.append(
+        action=audit_action,
+        actor_email='system',
+        subject_kind=subject_kind,
+        subject_id=entity.id,
+        details=summary,
+    )
+    if flagged_checks:
+        logger.warning(
+            f"Proximate: sanctions FLAG on {subject_kind} {entity.id} "
+            f"({display_name!r}) — {len(flagged_checks)} hit(s)"
+        )
+
+
+_SUDAN_FORMS = ('SD', 'SDN', 'SUDAN')
+_SOUTH_SUDAN_FORMS = ('SS', 'SSD', 'SOUTH SUDAN')
+
+
+def _grant_geo_ok(partner_country, geographies):
+    """Phase 721g — does the partner's country satisfy a grant's
+    geographic restriction list? Restrictions come from AI extraction
+    of agreement prose, so entries range from ISO codes ('SD') to
+    phrases ('Sudan (Gedaref and Kassala states)'). Sudan and South
+    Sudan are distinct jurisdictions — 'Sudan' as a substring of
+    'South Sudan' must never produce a match in either direction."""
+    if not geographies:
+        return True
+    pc = (partner_country or 'SD').strip().upper()
+    if pc in _SOUTH_SUDAN_FORMS:
+        pc = 'SOUTH SUDAN'
+    elif pc in _SUDAN_FORMS:
+        pc = 'SUDAN'
+    for geo in geographies:
+        gu = str(geo).strip().upper()
+        if gu in _SOUTH_SUDAN_FORMS:
+            gu = 'SOUTH SUDAN'
+        elif gu in _SUDAN_FORMS:
+            gu = 'SUDAN'
+        if gu == pc:
+            return True
+        if 'SOUTH SUDAN' in gu:
+            if pc == 'SOUTH SUDAN':
+                return True
+            continue  # never let 'SUDAN' match inside 'SOUTH SUDAN'
+        if pc == 'SUDAN' and 'SUDAN' in gu:
+            return True  # e.g. 'Sudan (Gedaref and Kassala states)'
+        if pc != 'SUDAN' and pc != 'SOUTH SUDAN' and (pc in gu or gu in pc):
+            return True  # e.g. 'KE' vs 'KENYA'
+    return False
+
+
 # ---- Submit one endorsement ------------------------------------------
 
 @proximate_bp.route('/partners/<int:partner_id>/endorse', methods=['POST'])
@@ -1131,6 +1216,28 @@ def api_approve_endorser(endorser_id):
         import secrets
         e.public_token = secrets.token_urlsafe(32)
     db.session.commit()
+
+    # Phase 716 DD sweep — sanctions screen at approval time. Flags
+    # surface on the endorser record and the audit chain; per SoP §4
+    # a hit informs the OB rather than hard-blocking (approval already
+    # happened — the OB sees the flag and can suspend).
+    try:
+        from app.models import User as _User
+        screen_user = db.session.get(_User, e.user_id)
+        screen_name = (
+            f'{screen_user.first_name or ""} {screen_user.last_name or ""}'.strip()
+            if screen_user else f'endorser-{e.id}'
+        )
+        if screen_name:
+            _run_named_sanctions_screen(
+                e, display_name=screen_name,
+                subject_kind='proximate_endorser',
+                audit_action='proximate.endorser.sanctions_screened',
+            )
+    except Exception as _se:  # noqa: BLE001
+        logger.warning(
+            f"Proximate: endorser sanctions screen failed for {e.id}: {_se}"
+        )
     AuditChainEntry.append(
         action='proximate.endorser.approved',
         actor_email=current_user.email,
@@ -1244,6 +1351,20 @@ def api_register_fsp():
     )
     db.session.add(fsp)
     db.session.commit()
+
+    # Phase 716 DD sweep — hawala brokers and MNOs move Adeso's money;
+    # screen them like partners. Best-effort, never blocks registration.
+    try:
+        _run_named_sanctions_screen(
+            fsp, display_name=fsp.name,
+            subject_kind='proximate_fsp',
+            audit_action='proximate.fsp.sanctions_screened',
+        )
+    except Exception as _se:  # noqa: BLE001
+        logger.warning(
+            f"Proximate: FSP sanctions screen failed for {fsp.id}: {_se}"
+        )
+
     AuditChainEntry.append(
         action='proximate.fsp.registered',
         actor_email=current_user.email,
@@ -2248,6 +2369,22 @@ def api_submit_endorser_invite(token):
         _bump_participant_stage_for_partner_across_active_rounds(
             partner.network_id, partner.id, 'bank_verified', None,
         )
+
+    # Phase 716 DD sweep — the invite bypasses the approval queue (the
+    # invite IS approval), so it must not bypass the sanctions screen.
+    try:
+        if inv.invitee_name:
+            _run_named_sanctions_screen(
+                endorser, display_name=inv.invitee_name,
+                subject_kind='proximate_endorser',
+                audit_action='proximate.endorser.sanctions_screened',
+            )
+    except Exception as _se:  # noqa: BLE001
+        logger.warning(
+            f"Proximate: invite endorser sanctions screen failed "
+            f"for {endorser.id}: {_se}"
+        )
+
     return jsonify({
         'success': True,
         'partner_name': partner.name,
@@ -3809,6 +3946,37 @@ def api_record_disbursement():
                     'restriction': restriction,
                 }), 422
 
+    # Phase 721g — donor grant restriction enforcement. Every grant
+    # funding this round carries geographic restrictions extracted from
+    # the signed agreement; a disbursement to a partner outside those
+    # geographies is a compliance breach, so it's a hard 422 here.
+    if round_id_arg:
+        from app.models import ProximateGrantAllocation, ProximateGrant
+
+        funding_grants = (
+            ProximateGrant.query
+            .join(
+                ProximateGrantAllocation,
+                ProximateGrantAllocation.grant_id == ProximateGrant.id,
+            )
+            .filter(ProximateGrantAllocation.round_id == round_id_arg)
+            .all()
+        )
+        for fg in funding_grants:
+            geos = (fg._restrictions() or {}).get('geographies') or []
+            if not _grant_geo_ok(partner.country, geos):
+                return jsonify({
+                    'success': False,
+                    'error': (
+                        f'grant restriction violation: "{fg.title}" '
+                        f'(ref {fg.donor_grant_ref or "-"}) restricts funds to '
+                        f'{", ".join(map(str, geos))}, but partner '
+                        f'{partner.name!r} is registered in '
+                        f'{partner.country or "?"}'
+                    ),
+                    'grant_id': fg.id,
+                }), 422
+
     n_cosigners_needed = cosigners_required_for(amount_f)
     needs_cosign = n_cosigners_needed > 0
     initial_status = 'pending_cosign' if needs_cosign else 'pending_report'
@@ -3832,6 +4000,75 @@ def api_record_disbursement():
     )
     db.session.add(d)
     db.session.commit()
+
+    # Phase 716 DD sweep — adverse media screening for disbursements at
+    # or above the $10k tier (matches the cosign ladder threshold; no
+    # reason to hit a web-search AI call for a $200 release). Runs in
+    # the background so it never delays the disbursement.
+    if amount_f >= 10000:
+        try:
+            from app.utils.background import submit_task
+            from flask import current_app as _ca
+            _app = _ca._get_current_object()
+            _pid = partner.id
+            _did = d.id
+
+            def _run_adverse_media():
+                with _app.app_context():
+                    try:
+                        import json as _json
+                        from app.services.adverse_media_service import (
+                            AdverseMediaService,
+                        )
+                        p = ProximatePartner.query.get(_pid)
+                        if not p:
+                            return
+                        result = AdverseMediaService.screen(
+                            org_name=p.name,
+                            country=p.country or 'SD',
+                        ) or {}
+                        verdict = result.get('verdict') or result.get('status')
+                        intake = p.get_intake_form()
+                        intake['adverse_media'] = {
+                            'verdict': verdict,
+                            'high_count': result.get('high_count'),
+                            'medium_count': result.get('medium_count'),
+                            'source': result.get('source'),
+                            'checked_at': datetime.now(timezone.utc).isoformat(),
+                            'trigger_disbursement_id': _did,
+                        }
+                        p.set_intake_form(intake)
+                        db.session.commit()
+                        AuditChainEntry.append(
+                            action=(
+                                'proximate.partner.adverse_media_flagged'
+                                if verdict == 'flagged'
+                                else 'proximate.partner.adverse_media_screened'
+                            ),
+                            actor_email='system',
+                            subject_kind='proximate_partner',
+                            subject_id=p.id,
+                            details=intake['adverse_media'],
+                        )
+                        if verdict == 'flagged':
+                            logger.warning(
+                                f"Proximate: ADVERSE MEDIA flag on partner "
+                                f"{p.id} ({p.name!r}) triggered by "
+                                f"disbursement {_did}"
+                            )
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning(
+                            f"Proximate adverse media screen failed for "
+                            f"partner {_pid}: {e}"
+                        )
+            submit_task(
+                _run_adverse_media, task_type='proximate_adverse_media',
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                f"Proximate adverse media schedule failed for "
+                f"disbursement {d.id}: {e}"
+            )
 
     # Phase 669 — ISF annotation flag travels with the audit row so
     # auditors can later confirm the OB attested to the SoP §3 gate.
@@ -6625,6 +6862,128 @@ def api_cron_sanctions_rescreen():
         'newly_flagged': newly_flagged,
         'skipped_recent': skipped_recent,
         'day': now.strftime('%Y-%m-%d'),
+    })
+
+
+@proximate_bp.route('/monitoring/grant-reporting', methods=['POST'])
+def api_cron_grant_reporting():
+    """Phase 721e — daily grant-reporting cron (bearer CRON_SECRET).
+
+    Two jobs per active grant with a recurring cadence:
+      1. Ensure the NEXT report row exists — computed from the latest
+         period_end (or the grant start date), one period ahead, with
+         due_date = period_end + the donor's due-days (from extracted
+         reporting_requirements, default 45). Idempotent by
+         (grant, type, period_start), same key the seeder uses.
+      2. Reminders — pending/drafting reports due within 30/14/3 days
+         get one audit row per band (deduped by checking for an
+         existing row is skipped for v0 simplicity; the cron runs daily
+         so each band fires on consecutive days within its window —
+         acceptable noise until WhatsApp auto-sends land in 717-b).
+    Also refreshes grant.reporting_next_due_at for the list surfaces.
+    """
+    from flask import current_app as cap
+    from datetime import date
+    from dateutil.relativedelta import relativedelta
+    from app.models import ProximateGrant, ProximateGrantReport
+    secret = cap.config.get('CRON_SECRET') or os.getenv('CRON_SECRET')
+    auth = request.headers.get('Authorization', '')
+    if not secret or auth != f'Bearer {secret}':
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+
+    CADENCE_MONTHS = {
+        'monthly': 1, 'quarterly': 3, 'semi_annual': 6, 'annual': 12,
+    }
+    today = date.today()
+    created = 0
+    reminders = 0
+    grants = ProximateGrant.query.filter_by(status='active').all()
+    for g in grants:
+        months = CADENCE_MONTHS.get(g.reporting_cadence)
+        if months:
+            last = (
+                ProximateGrantReport.query
+                .filter_by(grant_id=g.id)
+                .order_by(ProximateGrantReport.period_end.desc())
+                .first()
+            )
+            period_start = (
+                (last.period_end + timedelta(days=1))
+                if last and last.period_end else (g.start_date or today)
+            )
+            period_end = period_start + relativedelta(months=months) - timedelta(days=1)
+            # Only pre-create once the period has started (no far-future
+            # rows) and stop at the grant end date.
+            if (
+                period_start <= today
+                and (not g.end_date or period_start <= g.end_date)
+            ):
+                exists = ProximateGrantReport.query.filter_by(
+                    grant_id=g.id,
+                    report_type=g.reporting_cadence,
+                    period_start=period_start,
+                ).first()
+                if not exists:
+                    due_days = 45
+                    reqs = (g._extracted() or {}).get('reporting_requirements') or []
+                    matching = [
+                        r.get('due_days_after_period') for r in reqs
+                        if r.get('cadence') == g.reporting_cadence
+                        and r.get('due_days_after_period')
+                    ]
+                    if matching:
+                        due_days = min(matching)
+                    db.session.add(ProximateGrantReport(
+                        grant_id=g.id,
+                        report_type=g.reporting_cadence,
+                        period_start=period_start,
+                        period_end=period_end,
+                        due_date=period_end + timedelta(days=due_days),
+                        status='pending',
+                    ))
+                    created += 1
+
+        # Reminders + next-due refresh
+        open_reports = ProximateGrantReport.query.filter(
+            ProximateGrantReport.grant_id == g.id,
+            ProximateGrantReport.status.in_(('pending', 'drafting')),
+            ProximateGrantReport.due_date.isnot(None),
+        ).all()
+        next_due = None
+        for r in open_reports:
+            days_left = (r.due_date - today).days
+            if days_left in (30, 14, 3, 0):
+                reminders += 1
+                AuditChainEntry.append(
+                    action='proximate.grant_report.due_reminder',
+                    actor_email='cron-monitoring',
+                    subject_kind='proximate_grant_report',
+                    subject_id=r.id,
+                    details={
+                        'grant_id': g.id,
+                        'grant_title': g.title,
+                        'report_type': r.report_type,
+                        'due_date': r.due_date.isoformat(),
+                        'days_left': days_left,
+                    },
+                )
+            if next_due is None or r.due_date < next_due:
+                next_due = r.due_date
+        g.reporting_next_due_at = (
+            datetime.combine(next_due, datetime.min.time())
+            if next_due else None
+        )
+    db.session.commit()
+    logger.info(
+        f'Proximate cron: grant reporting — {created} report row(s) '
+        f'created, {reminders} reminder(s) emitted across {len(grants)} '
+        f'active grants'
+    )
+    return jsonify({
+        'success': True,
+        'grants_walked': len(grants),
+        'reports_created': created,
+        'reminders': reminders,
     })
 
 

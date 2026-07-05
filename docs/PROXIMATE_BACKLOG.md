@@ -553,18 +553,31 @@ Trust-building for future donors + the public.
 
 **Should-have — Phase 716 DD guardrail sweep (files in the "High
 priority — operational" list below)**
-- [ ] Verify `api_cron_sanctions_rescreen` walks Proximate partners
-      (not just Kuja orgs). Rescreen cadence 90 days.
-- [ ] Run sanctions on OB-nominated partners (currently only auto-runs
-      on self-nominate per Phase 658 — audit gap).
-- [ ] Endorser sanctions check at approval time (light-KYC currently
-      no name-list check).
-- [ ] Wire Kuja's `AdverseMediaScreening` to Proximate partners
-      receiving > $10k in a round (matches the tier ladder — no
-      reason to hit the API for a $200 disbursement).
+- [x] VERIFIED 2026-07-05: `api_cron_sanctions_rescreen` walks
+      Proximate `dd_clear` partners (skips any rescreened < 6 days
+      ago) — Phase 690 shipped this; weekly GHA cadence, not 90 days,
+      which is stricter. No change needed.
+- [x] SHIPPED (7c0daa76): sanctions run on OB-nominated partners too
+      (all nomination paths screen).
+- [x] SHIPPED 2026-07-05: endorser sanctions screen at approval time
+      AND on invite-accept (invites bypass the approval queue so they
+      must not bypass screening). New columns sanctions_flag /
+      sanctions_checked_at / sanctions_summary_json on `endorsers`;
+      generic `_run_named_sanctions_screen` helper; audit row per
+      screen; informs, never blocks (try/except).
+- [x] SHIPPED 2026-07-05: `AdverseMediaService.screen` runs in a
+      background task on any disbursement ≥ $10k (tier-ladder match);
+      result lands in `partner.intake_form_json['adverse_media']` +
+      audit row (`.adverse_media_flagged` when verdict flagged).
+- [x] SHIPPED 2026-07-05 (same batch): FSPs (hawala brokers + MNOs)
+      screened at registration — same 3 sanctions columns on
+      `proximate_fsps`, same helper. Locally verified live against
+      OpenSanctions (5 checks on a test broker).
 - [ ] Surface hits as interventions (Phase 635 register), not hard
       gates — SoP §4 keeps the door open, OB decides after seeing
-      evidence.
+      evidence. PARTIAL: every screen now writes an audit-chain row
+      and flags the entity; auto-opening an intervention register row
+      on flag is the remaining wiring.
 
 **Should-have — Phase 717 WhatsApp Cloud API (defer until manual
 share flow strains)**
@@ -740,15 +753,33 @@ detail-page ID bug and allocation seeding fixed in 64cd8927.
       Punt list: no auto-score on submit (OB triggers manually);
       household-type deliverables have no system source until partner
       reports carry beneficiary counts (future join).
-- [ ] **Phase 721e — Reporting cron.** Reminders 30/14/3 days before a
-      report due date; auto-generate the next pending report per the
-      grant's cadence; surface on the deadline calendar (.ics).
+- [x] **Phase 721e — Reporting cron — SHIPPED 2026-07-05.**
+      `POST /api/proximate/monitoring/grant-reporting` (bearer
+      CRON_SECRET) + daily GHA workflow
+      `cron-proximate-grant-reporting.yml` (04:00 UTC). Per active
+      grant with a recurring cadence: creates the next pending report
+      row (idempotent by grant/type/period_start; period from last
+      period_end+1 else start_date; due = period_end + min due_days
+      from extracted reporting_requirements else 45; only once the
+      period has started and before end_date), emits due-reminder
+      audit rows at 30/14/3/0-day bands, refreshes
+      `reporting_next_due_at`. Locally verified: recreates deleted
+      pending rows, second run creates zero, reminder fires in-band.
+      NOTE: GHA job 403s until the team adds the CRON_SECRET repo
+      secret (same blocker as the other Proximate crons).
+      Punt: .ics calendar surface not included.
 - [ ] **Phase 721f — Donor Pack PDF.** Extend the Phase 671 end-of-round
       PDF to grant-timeline scope: financial reconciliation, impact
       narrative, embedded photo/voice evidence from partner reports.
-- [ ] **Phase 721g — Restriction enforcement at disbursement time.**
-      A round funded by grant X must respect grant X's geo/sector
-      restrictions (extends the Phase 686 restricted-share validation).
+- [x] **Phase 721g — Restriction enforcement at disbursement time —
+      SHIPPED 2026-07-05.** `api_record_disbursement` joins every
+      grant funding the round (via allocations) and hard-422s when the
+      partner's country falls outside the grant's extracted
+      `geographies` (names grant + ref + geo list in the error).
+      Matching via `_grant_geo_ok`: ISO-code + prose aliases, Sudan ≠
+      South Sudan in both substring directions (18-case unit suite).
+      Sector restrictions not enforced yet (rounds carry no sector
+      field to compare against — future item).
 
 ## Small state-machine gaps (from Phase 715, filed 2026-07-05)
 
@@ -788,6 +819,10 @@ detail-page ID bug and allocation seeding fixed in 64cd8927.
       `/proximate-endorse-invite` page + roster "Invite endorser" modal.
       The spec section above predates the ship.
 - [x] **Phase 716 DD sweep, first item — SHIPPED** (7c0daa76): sanctions
-      screen now runs on OB-nominated partners too. Remaining sweep
-      items (endorser sanctions at approval, adverse media > $10k,
-      rescreen-cron verification, hawala-agent screening) still open.
+      screen now runs on OB-nominated partners too.
+- [x] **Phase 716 DD sweep, remainder — SHIPPED 2026-07-05**: endorser
+      sanctions at approval + invite-accept, adverse media > $10k
+      (background), FSP/hawala screening at registration, rescreen-cron
+      verified (Phase 690 already covers Proximate partners weekly).
+      See the sweep checklist above for detail. Only the
+      flag→intervention-register auto-wiring remains open.

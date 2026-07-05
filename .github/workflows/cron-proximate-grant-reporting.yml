@@ -1,0 +1,40 @@
+name: Daily Proximate grant-reporting cron
+
+# Phase 721e — keeps the donor reporting calendar alive:
+#   1. auto-creates the next pending report row per active grant's
+#      cadence (idempotent),
+#   2. emits due-date reminders at 30/14/3/0 days,
+#   3. refreshes grant.reporting_next_due_at.
+#
+# Required repo secrets:
+#   CRON_SECRET — must match the CRON_SECRET set on Railway
+#   PROD_BASE   — optional override of the base URL
+
+on:
+  # Daily at 04:00 UTC (off-peak in East Africa)
+  schedule:
+    - cron: "0 4 * * *"
+
+  workflow_dispatch:
+
+jobs:
+  grant-reporting:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST grant-reporting cron endpoint
+        run: |
+          BASE="${{ secrets.PROD_BASE }}"
+          if [ -z "$BASE" ]; then
+            BASE="https://web-production-6f8a.up.railway.app"
+          fi
+          code=$(curl -s -o /tmp/out.json -w "%{http_code}" \
+            -X POST "$BASE/api/proximate/monitoring/grant-reporting" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            -H "X-Network-Override: proximate")
+          cat /tmp/out.json
+          if [ "$code" != "200" ]; then
+            echo "cron endpoint returned $code"
+            exit 1
+          fi

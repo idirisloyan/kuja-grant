@@ -73,6 +73,12 @@ class FinancialServiceProvider(db.Model):
     # operating-hours window; MNOs may have a settlement window etc.
     notes = db.Column(db.Text, nullable=True)
 
+    # Phase 716 DD sweep — hawala brokers and MNOs are screened against
+    # sanctions lists at registration, same as partners.
+    sanctions_flag = db.Column(db.Boolean, nullable=True, default=False)
+    sanctions_checked_at = db.Column(db.DateTime, nullable=True)
+    sanctions_summary_json = db.Column(db.Text, nullable=True)
+
     is_active = db.Column(db.Boolean, nullable=False, default=True)
 
     created_at = db.Column(db.DateTime, nullable=False, default=_now)

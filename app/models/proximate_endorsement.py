@@ -352,6 +352,12 @@ class Endorser(db.Model):
     # do the whole thing from a WhatsApp link without ever logging in.
     public_token = db.Column(db.String(64), nullable=True, unique=True, index=True)
 
+    # Phase 716 DD sweep — sanctions screen at approval time (and on
+    # invite auto-provision). Same shape as ProximatePartner's fields.
+    sanctions_flag = db.Column(db.Boolean, nullable=True, default=False)
+    sanctions_checked_at = db.Column(db.DateTime, nullable=True)
+    sanctions_summary_json = db.Column(db.Text, nullable=True)
+
     registered_at = db.Column(
         db.DateTime, nullable=False,
         default=lambda: datetime.now(timezone.utc),
