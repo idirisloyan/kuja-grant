@@ -851,8 +851,52 @@ def run():
                     'extraction_confidence': 0.94,
                 },
                 'reports_to_seed': [
-                    {'type': 'quarterly', 'period_start': _date(2026, 1, 15), 'period_end': _date(2026, 3, 31), 'due_date': _date(2026, 5, 15), 'status': 'accepted'},
-                    {'type': 'quarterly', 'period_start': _date(2026, 4, 1), 'period_end': _date(2026, 6, 30), 'due_date': _date(2026, 8, 15), 'status': 'submitted'},
+                    # Q1 — a STRONG report (touches every requirement +
+                    # compliance flag) so the 721d AI scorer has a
+                    # high-scoring example for UAT.
+                    {'type': 'quarterly', 'period_start': _date(2026, 1, 15), 'period_end': _date(2026, 3, 31), 'due_date': _date(2026, 5, 15), 'status': 'accepted',
+                     'content': {
+                         'executive_summary': (
+                             'In Q1 the Proximate Fund deployed $410,000 across two '
+                             'community-led rounds in Khartoum and Kassala states, '
+                             'reaching 1,830 households through 14 vetted community '
+                             'partners. All activity remained within the Republic of '
+                             'Sudan in the cash transfer and food security sectors, '
+                             'with no sub-grants to intermediaries.'),
+                         'financial_summary': (
+                             'Budget vs actual: $410,000 disbursed of $450,000 '
+                             'planned (91%). Direct partner disbursements $362,000; '
+                             'FSP fees $9,400; monitoring and verification $21,600; '
+                             'indirect support costs $17,000 (4.1% of spend, within '
+                             'cap). Full transaction ledger with audit-chain hashes '
+                             'attached as Annex A.'),
+                         'impact_narrative': (
+                             '1,830 households received assistance: 1,210 via cash '
+                             'transfers (avg $190/household), 620 via food security '
+                             'support. 92% of post-distribution reports were '
+                             'community-verified within 14 days. Two partner voice '
+                             'testimonies and 34 geotagged photos are included in '
+                             'the evidence annex.'),
+                         'compliance_note': (
+                             'All 14 partners were screened against UN, EU, US OFAC '
+                             'and World Bank lists before disbursement; zero hits. '
+                             'The Adeso anti-fraud hotline is referenced on every '
+                             'partner-facing document and in each report annex. No '
+                             'suspected diversion incidents this quarter.'),
+                     }},
+                    # Q2 — a deliberately WEAK report (vague financials,
+                    # no anti-fraud reference, no screening note) so the
+                    # scorer visibly flags gaps — the honest-machine demo.
+                    {'type': 'quarterly', 'period_start': _date(2026, 4, 1), 'period_end': _date(2026, 6, 30), 'due_date': _date(2026, 8, 15), 'status': 'submitted',
+                     'content': {
+                         'executive_summary': (
+                             'Activities continued well in Q2. More households were '
+                             'reached and the programme is on track overall.'),
+                         'impact_narrative': (
+                             'Partners in several localities carried out '
+                             'distributions. Feedback from communities has been '
+                             'positive and further rounds are planned.'),
+                     }},
                     {'type': 'quarterly', 'period_start': _date(2026, 7, 1), 'period_end': _date(2026, 9, 30), 'due_date': _date(2026, 11, 15), 'status': 'pending'},
                 ],
             },
@@ -1119,6 +1163,10 @@ def run():
                         period_end=rf['period_end'],
                         due_date=rf['due_date'],
                         status=rf['status'],
+                        content_json=(
+                            _json_seed.dumps(rf['content'])
+                            if rf.get('content') else None
+                        ),
                         submitted_at=(
                             datetime.now(timezone.utc)
                             if rf['status'] in ('submitted', 'accepted')
@@ -1129,6 +1177,11 @@ def run():
                             if rf['status'] == 'accepted' else None
                         ),
                     ))
+                elif rf.get('content') and not existing_rep.content_json:
+                    # Phase 721d backfill — reports seeded before content
+                    # fixtures existed get their body on next boot so the
+                    # AI compliance scorer has something to grade.
+                    existing_rep.content_json = _json_seed.dumps(rf['content'])
 
         db.session.commit()
         if grants_created:
