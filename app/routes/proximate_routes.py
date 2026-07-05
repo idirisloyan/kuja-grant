@@ -2487,6 +2487,183 @@ def api_update_grant(grant_id):
     return jsonify({'success': True, 'grant': g.to_dict()})
 
 
+@proximate_bp.route('/grants/<int:grant_id>/compliance', methods=['GET'])
+@login_required
+def api_grant_compliance(grant_id):
+    """Phase 721d — deliverables vs targets, computed from live system
+    data where possible, OB-entered otherwise.
+
+    Auto sources:
+      • unit mentions 'round'  → count of rounds allocated from this grant
+      • unit mentions report/audit/brief → submitted+accepted report count
+    Everything else reads the OB-entered value from
+    deliverable_progress_json ('manual'), or shows 'untracked'."""
+    import json as _json
+    from app.models import (
+        ProximateGrant, ProximateGrantAllocation, ProximateGrantReport,
+    )
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    g = ProximateGrant.query.filter_by(id=grant_id, network_id=net.id).first()
+    if not g:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    # Donor scope: same rule as grant detail.
+    if not _user_is_ob(net):
+        from app.models import ProximateDonor
+        my_donor = ProximateDonor.query.filter_by(
+            network_id=net.id, primary_user_id=current_user.id,
+        ).first()
+        if not my_donor or g.donor_id != my_donor.id:
+            return jsonify({'success': False, 'error': 'not authorised'}), 403
+
+    extracted = g._extracted()
+    deliverables = extracted.get('key_deliverables') or []
+    manual = {}
+    if g.deliverable_progress_json:
+        try:
+            manual = _json.loads(g.deliverable_progress_json) or {}
+        except (ValueError, TypeError):
+            manual = {}
+
+    rounds_count = (
+        db.session.query(ProximateGrantAllocation.round_id)
+        .filter_by(grant_id=g.id).distinct().count()
+    )
+    reports_done = ProximateGrantReport.query.filter(
+        ProximateGrantReport.grant_id == g.id,
+        ProximateGrantReport.status.in_(('submitted', 'accepted')),
+    ).count()
+
+    out = []
+    for i, d in enumerate(deliverables):
+        unit = (d.get('unit') or '').lower()
+        target = d.get('target')
+        current, source = None, 'untracked'
+        if 'round' in unit:
+            current, source = rounds_count, 'auto:rounds'
+        elif any(k in unit for k in ('report', 'audit', 'brief')):
+            current, source = reports_done, 'auto:reports'
+        elif str(i) in manual:
+            current, source = manual[str(i)], 'manual'
+        pct = None
+        try:
+            if current is not None and target:
+                pct = min(100, round(float(current) / float(target) * 100))
+        except (ValueError, TypeError, ZeroDivisionError):
+            pct = None
+        out.append({
+            'index': i,
+            'title': d.get('title'),
+            'target': target,
+            'unit': d.get('unit'),
+            'current': current,
+            'source': source,
+            'pct': pct,
+        })
+    return jsonify({'success': True, 'deliverables': out})
+
+
+@proximate_bp.route(
+    '/grants/<int:grant_id>/deliverable-progress', methods=['PUT'],
+)
+@login_required
+def api_set_deliverable_progress(grant_id):
+    """Phase 721d — OB records current progress for a deliverable the
+    system can't compute. Body: {index: int, value: number}."""
+    import json as _json
+    from app.models import ProximateGrant
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    if not _user_is_ob(net):
+        return jsonify({'success': False, 'error': 'ob only'}), 403
+    g = ProximateGrant.query.filter_by(id=grant_id, network_id=net.id).first()
+    if not g:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    body = get_request_json() or {}
+    try:
+        idx = int(body.get('index'))
+        value = float(body.get('value'))
+    except (ValueError, TypeError):
+        return jsonify({
+            'success': False, 'error': 'index and numeric value required',
+        }), 400
+    progress = {}
+    if g.deliverable_progress_json:
+        try:
+            progress = _json.loads(g.deliverable_progress_json) or {}
+        except (ValueError, TypeError):
+            progress = {}
+    progress[str(idx)] = value
+    g.deliverable_progress_json = _json.dumps(progress)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.grant.deliverable_progress_set',
+        actor_email=current_user.email,
+        subject_kind='proximate_grant',
+        subject_id=g.id,
+        details={'index': idx, 'value': value},
+    )
+    return jsonify({'success': True})
+
+
+@proximate_bp.route(
+    '/grants/<int:grant_id>/reports/<int:report_id>/score', methods=['POST'],
+)
+@login_required
+def api_score_grant_report(grant_id, report_id):
+    """Phase 721d — AI scores one donor report against the grant's
+    extracted requirements. OB-only; re-running overwrites the previous
+    score. The donor persona sees the result on the grant detail —
+    prescreened, scored deliverables are the selling point."""
+    import json as _json
+    from app.models import ProximateGrant, ProximateGrantReport
+    from app.services.proximate_grant_extract_service import (
+        score_report_compliance,
+    )
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    if not _user_is_ob(net):
+        return jsonify({'success': False, 'error': 'ob only'}), 403
+    g = ProximateGrant.query.filter_by(id=grant_id, network_id=net.id).first()
+    if not g:
+        return jsonify({'success': False, 'error': 'grant not found'}), 404
+    r = ProximateGrantReport.query.filter_by(
+        id=report_id, grant_id=g.id,
+    ).first()
+    if not r:
+        return jsonify({'success': False, 'error': 'report not found'}), 404
+    if not r.content_json and not r.ai_draft_json:
+        return jsonify({
+            'success': False,
+            'error': 'report has no content to score yet',
+        }), 422
+    scores = score_report_compliance(grant=g, report=r)
+    if scores is None:
+        return jsonify({
+            'success': False,
+            'error': 'AI scoring unavailable right now — try again shortly.',
+        }), 503
+    r.compliance_score_json = _json.dumps(scores)
+    r.compliance_scored_at = datetime.now(timezone.utc)
+    db.session.commit()
+    avg = round(sum(s['score'] for s in scores) / len(scores)) if scores else None
+    AuditChainEntry.append(
+        action='proximate.grant_report.compliance_scored',
+        actor_email=current_user.email,
+        subject_kind='proximate_grant_report',
+        subject_id=r.id,
+        details={
+            'grant_id': g.id,
+            'requirements_scored': len(scores),
+            'average_score': avg,
+        },
+    )
+    return jsonify({'success': True, 'report': r.to_dict()})
+
+
 @proximate_bp.route('/grants/extract-agreement', methods=['POST'])
 @login_required
 def api_extract_grant_agreement():

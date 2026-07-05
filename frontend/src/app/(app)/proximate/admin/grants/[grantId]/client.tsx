@@ -6,11 +6,11 @@
  * Terms, allocations, reports history, next-report tile.
  */
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Loader2, FileText, Calendar, DollarSign, AlertCircle, CheckCircle2, MapPin,
+  Target, Sparkles,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
@@ -54,17 +54,48 @@ interface GrantResp {
     round_title: string;
     round_status: string | null;
   }[];
-  reports: {
-    id: number;
-    report_type: string;
-    period_start: string | null;
-    period_end: string | null;
-    due_date: string | null;
-    status: string;
-    compliance_score: unknown[];
-    submitted_at: string | null;
-    donor_ack_at: string | null;
-  }[];
+  reports: ReportRow[];
+}
+
+interface RequirementScore {
+  requirement_id: string;
+  requirement: string;
+  score: number;
+  verdict: 'met' | 'partial' | 'missing';
+  why: string;
+}
+
+interface ReportRow {
+  id: number;
+  report_type: string;
+  period_start: string | null;
+  period_end: string | null;
+  due_date: string | null;
+  status: string;
+  compliance_score: RequirementScore[];
+  submitted_at: string | null;
+  donor_ack_at: string | null;
+}
+
+interface DeliverableProgress {
+  index: number;
+  title: string | null;
+  target: number | null;
+  unit: string | null;
+  current: number | null;
+  source: string;
+  pct: number | null;
+}
+
+function avgScore(scores: RequirementScore[]): number | null {
+  if (!scores?.length) return null;
+  return Math.round(scores.reduce((a, s) => a + (s.score || 0), 0) / scores.length);
+}
+
+function scoreBadgeCls(v: number): string {
+  if (v >= 80) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+  if (v >= 55) return 'bg-amber-100 text-amber-800 border-amber-300';
+  return 'bg-rose-100 text-rose-800 border-rose-300';
 }
 
 function fmtUsd(v: number | null | undefined): string {
@@ -105,16 +136,61 @@ export function ProximateGrantDetailClient() {
   const { persona } = useProximatePersona();
   const isOb = persona === 'ob' || persona === 'admin';
 
-  useEffect(() => {
+  // Phase 721d — deliverables vs targets + report scoring
+  const [deliverables, setDeliverables] = useState<DeliverableProgress[]>([]);
+  const [scoringId, setScoringId] = useState<number | null>(null);
+  const [scoreError, setScoreError] = useState<string | null>(null);
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editVal, setEditVal] = useState('');
+
+  const loadAll = useCallback(() => {
     if (!grantId || grantId === '0') return;
-    let cancelled = false;
-    setLoading(true);
     api.get<GrantResp>(`/api/proximate/grants/${grantId}`)
-      .then((r) => { if (!cancelled) setData(r); })
-      .catch(() => { if (!cancelled) setError('Failed to load grant.'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((r) => setData(r))
+      .catch(() => setError('Failed to load grant.'))
+      .finally(() => setLoading(false));
+    api.get<{ success: boolean; deliverables: DeliverableProgress[] }>(
+      `/api/proximate/grants/${grantId}/compliance`,
+    )
+      .then((r) => setDeliverables(r.deliverables || []))
+      .catch(() => {});
   }, [grantId]);
+
+  useEffect(() => {
+    setLoading(true);
+    loadAll();
+  }, [loadAll]);
+
+  async function scoreReport(reportId: number) {
+    setScoringId(reportId);
+    setScoreError(null);
+    try {
+      await api.post(
+        `/api/proximate/grants/${grantId}/reports/${reportId}/score`, {},
+      );
+      loadAll();
+    } catch (e: unknown) {
+      setScoreError(e instanceof Error ? e.message : 'Scoring failed.');
+    } finally {
+      setScoringId(null);
+    }
+  }
+
+  async function saveProgress(index: number) {
+    const v = Number(editVal);
+    if (Number.isNaN(v)) return;
+    try {
+      await api.put(
+        `/api/proximate/grants/${grantId}/deliverable-progress`,
+        { index, value: v },
+      );
+      setEditIdx(null);
+      setEditVal('');
+      loadAll();
+    } catch {
+      setEditIdx(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -194,6 +270,90 @@ export function ProximateGrantDetailClient() {
               <p className="text-2xl font-semibold">{fmtUsd(g.amount_remaining_usd)}</p>
             </Card>
           </div>
+
+          {/* Phase 721d — deliverables vs targets */}
+          {deliverables.length > 0 && (
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Target className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm font-medium">Deliverables vs targets</p>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                What the agreement commits Adeso to, against live system data.
+              </p>
+              <ul className="space-y-3">
+                {deliverables.map((d) => (
+                  <li key={d.index}>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <p className="text-sm flex-1 min-w-0">{d.title}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-mono">
+                          {d.current !== null ? d.current.toLocaleString() : '—'}
+                          {' / '}
+                          {d.target !== null && d.target !== undefined
+                            ? d.target.toLocaleString() : '?'}
+                          {d.unit ? ` ${d.unit}` : ''}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px]"
+                          title={
+                            d.source === 'auto:rounds'
+                              ? 'Counted from rounds allocated from this grant'
+                              : d.source === 'auto:reports'
+                                ? 'Counted from submitted donor reports'
+                                : d.source === 'manual'
+                                  ? 'Entered by the Oversight Body'
+                                  : 'Not tracked yet — enter a value'
+                          }
+                        >
+                          {d.source.startsWith('auto') ? 'live' : d.source}
+                        </Badge>
+                        {isOb && !d.source.startsWith('auto') && (
+                          editIdx === d.index ? (
+                            <span className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                value={editVal}
+                                onChange={(e) => setEditVal(e.target.value)}
+                                className="w-24 h-7 px-2 text-xs border rounded-md bg-background"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => saveProgress(d.index)}
+                                className="text-xs px-2 py-1 rounded-md bg-emerald-600 text-white"
+                              >
+                                Save
+                              </button>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setEditIdx(d.index);
+                                setEditVal(d.current !== null ? String(d.current) : '');
+                              }}
+                              className="text-xs text-emerald-700 hover:underline"
+                            >
+                              {d.current === null ? 'Enter progress' : 'Update'}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={`h-full ${
+                          (d.pct ?? 0) >= 100 ? 'bg-emerald-500'
+                            : (d.pct ?? 0) >= 50 ? 'bg-sky-500' : 'bg-amber-500'
+                        }`}
+                        style={{ width: `${d.pct ?? 0}%` }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
           {/* Terms */}
           <Card className="p-4">
@@ -317,23 +477,84 @@ export function ProximateGrantDetailClient() {
                 <p className="text-xs font-medium mb-2 text-muted-foreground uppercase">
                   Submitted
                 </p>
+                {scoreError && (
+                  <p className="text-xs text-rose-700 mb-2">{scoreError}</p>
+                )}
                 <ul className="text-xs space-y-1.5">
-                  {submitted.map((r) => (
-                    <li
-                      key={r.id}
-                      className="flex items-center gap-2 border-b border-border/60 pb-1.5 last:border-b-0"
-                    >
-                      <span className="flex-1">
-                        {r.report_type} · {r.period_start} – {r.period_end}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] ${reportStatusStyles[r.status] || ''}`}
+                  {submitted.map((r) => {
+                    const avg = avgScore(r.compliance_score);
+                    return (
+                      <li
+                        key={r.id}
+                        className="border-b border-border/60 pb-1.5 last:border-b-0"
                       >
-                        {r.status}
-                      </Badge>
-                    </li>
-                  ))}
+                        <div className="flex items-center gap-2">
+                          <span className="flex-1">
+                            {r.report_type} · {r.period_start} – {r.period_end}
+                          </span>
+                          {avg !== null && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] font-mono ${scoreBadgeCls(avg)}`}
+                              title="Average AI compliance score across donor requirements"
+                            >
+                              {avg}/100
+                            </Badge>
+                          )}
+                          {isOb && (
+                            <button
+                              onClick={() => scoreReport(r.id)}
+                              disabled={scoringId !== null}
+                              className="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-md border hover:bg-muted disabled:opacity-50"
+                              title="AI scores this report against the donor's extracted requirements"
+                            >
+                              {scoringId === r.id
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : <Sparkles className="w-3 h-3" />}
+                              {avg !== null ? 'Re-score' : 'Score with AI'}
+                            </button>
+                          )}
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] ${reportStatusStyles[r.status] || ''}`}
+                          >
+                            {r.status}
+                          </Badge>
+                        </div>
+                        {r.compliance_score?.length > 0 && (
+                          <details className="mt-1 ms-2">
+                            <summary className="cursor-pointer text-[10px] text-muted-foreground hover:underline">
+                              {r.compliance_score.length} requirement
+                              {r.compliance_score.length === 1 ? '' : 's'} scored —
+                              {' '}
+                              {r.compliance_score.filter((s) => s.verdict === 'met').length} met,
+                              {' '}
+                              {r.compliance_score.filter((s) => s.verdict === 'partial').length} partial,
+                              {' '}
+                              {r.compliance_score.filter((s) => s.verdict === 'missing').length} missing
+                            </summary>
+                            <ul className="mt-1.5 space-y-1.5">
+                              {r.compliance_score.map((s, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[10px] font-mono shrink-0 ${scoreBadgeCls(s.score)}`}
+                                  >
+                                    {s.score}
+                                  </Badge>
+                                  <span className="min-w-0">
+                                    <span className="font-medium">{s.requirement}</span>
+                                    {' — '}
+                                    <span className="text-muted-foreground">{s.why}</span>
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}

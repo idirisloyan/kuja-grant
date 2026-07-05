@@ -119,6 +119,11 @@ class ProximateGrant(db.Model):
     extracted_at = db.Column(db.DateTime, nullable=True)
     extracted_model = db.Column(db.String(120), nullable=True)
 
+    # Phase 721d — OB-entered progress for deliverables the system can't
+    # compute (e.g. households reached). {"0": 4200, "2": 1} keyed by the
+    # deliverable's index in extracted key_deliverables.
+    deliverable_progress_json = db.Column(db.Text, nullable=True)
+
     # The signed PDF itself.
     signed_agreement_doc_id = db.Column(
         db.Integer, db.ForeignKey('documents.id'), nullable=True,

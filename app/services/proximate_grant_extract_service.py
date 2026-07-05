@@ -132,6 +132,110 @@ def extract_agreement_terms(*, doc_text: str, filename: str = '') -> dict | None
     }
 
 
+def score_report_compliance(*, grant, report) -> list | None:
+    """Phase 721d — score one donor report against the grant's extracted
+    requirements. Returns the per-requirement score list (the shape
+    `ProximateGrantReport.compliance_score_json` stores) or None when AI
+    is unavailable.
+
+    Scores three things: (1) each extracted reporting requirement that
+    applies to this report type — content completeness + timeliness,
+    (2) reporting-relevant compliance flags (e.g. anti-fraud reference),
+    (3) adherence to the donor's restrictions in the narrative."""
+    import json as _json
+    try:
+        from app.services.ai_service import AIService
+    except Exception:
+        return None
+
+    extracted = grant._extracted() if hasattr(grant, '_extracted') else {}
+    content = report._content() if hasattr(report, '_content') else {}
+    if not content and report.ai_draft_json:
+        try:
+            content = _json.loads(report.ai_draft_json) or {}
+        except (ValueError, TypeError):
+            content = {}
+
+    system_prompt = (
+        "You are a donor-compliance officer at Adeso reviewing a report "
+        "BEFORE it goes to the institutional donor. Be strict — the donor "
+        "will read this against the signed agreement. For every "
+        "requirement give a 0-100 score, a verdict (met / partial / "
+        "missing), and one concrete sentence on why — citing what is "
+        "present or absent in the report content. Timeliness counts: a "
+        "report submitted after its due date cannot score above 70 on "
+        "the matching cadence requirement. If the report content is "
+        "empty or unrelated to a requirement, verdict is missing with a "
+        "score under 30. Do not invent content that is not there."
+    )
+    user_message = (
+        f"GRANT: {grant.title} (donor: {grant.donor_name_cache or '-'}, "
+        f"cadence: {grant.reporting_cadence})\n\n"
+        f"EXTRACTED REQUIREMENTS:\n"
+        f"{_json.dumps(extracted.get('reporting_requirements') or [], indent=1)}\n\n"
+        f"COMPLIANCE FLAGS:\n"
+        f"{_json.dumps(extracted.get('compliance_flags') or [], indent=1)}\n\n"
+        f"RESTRICTIONS (verbatim): "
+        f"{(extracted.get('restrictions_verbatim') or '')[:800]}\n\n"
+        f"REPORT UNDER REVIEW: type={report.report_type}, "
+        f"period={report.period_start}..{report.period_end}, "
+        f"due={report.due_date}, submitted={report.submitted_at}, "
+        f"status={report.status}\n\n"
+        f"REPORT CONTENT:\n{_json.dumps(content, indent=1)[:8000]}\n\n"
+        "Score every applicable requirement via the score_compliance tool."
+    )
+
+    parsed = AIService._call_claude_tool(
+        system_prompt,
+        user_message,
+        tool_name='score_compliance',
+        tool_description='Per-requirement compliance scores for a donor report.',
+        tool_schema={
+            'type': 'object',
+            'properties': {
+                'scores': {
+                    'type': 'array',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'requirement_id': {
+                                'type': 'string',
+                                'description': 'snake_case id, e.g. financial_semi_annual, anti_fraud_reference, restrictions_adherence',
+                            },
+                            'requirement': {'type': 'string',
+                                            'description': 'One-line human label'},
+                            'score': {'type': 'integer'},
+                            'verdict': {'type': 'string',
+                                        'enum': ['met', 'partial', 'missing']},
+                            'why': {'type': 'string'},
+                        },
+                        'required': ['requirement_id', 'requirement', 'score', 'verdict', 'why'],
+                    },
+                },
+            },
+            'required': ['scores'],
+        },
+        max_tokens=2500,
+        endpoint='proximate_report_compliance_score',
+    )
+    if not parsed:
+        return None
+    scores = parsed.get('scores') or []
+    out = []
+    for s in scores[:20]:
+        try:
+            out.append({
+                'requirement_id': str(s.get('requirement_id') or '')[:80],
+                'requirement': str(s.get('requirement') or '')[:200],
+                'score': max(0, min(100, int(s.get('score') or 0))),
+                'verdict': s.get('verdict') if s.get('verdict') in ('met', 'partial', 'missing') else 'partial',
+                'why': str(s.get('why') or '')[:500],
+            })
+        except (ValueError, TypeError):
+            continue
+    return out
+
+
 def _tool_schema() -> dict:
     cadences = ['monthly', 'quarterly', 'semi_annual', 'annual', 'one_time']
     return {

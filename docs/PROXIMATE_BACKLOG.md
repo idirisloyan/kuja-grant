@@ -707,10 +707,26 @@ detail-page ID bug and allocation seeding fixed in 64cd8927.
 - [ ] **Phase 721c — AI-drafted donor reports.** Draft the quarterly/
       annual report body from real round/disbursement/outcome data,
       human-editable (same shape as Kuja report drafting).
-- [ ] **Phase 721d — Compliance-per-requirement scoring.** Score each
-      report section against the donor's extracted requirements
-      (reuses Kuja auto-rubric machinery). Donor side sees prescreened,
-      scored deliverables — the core selling point.
+- [x] **Phase 721d — Compliance-per-requirement scoring.** SHIPPED
+      2026-07-05. Two halves:
+      • **Deliverables vs targets** — `GET /grants/<id>/compliance`
+        computes progress per extracted deliverable from LIVE system
+        data (rounds → distinct allocations; reports/audits/briefs →
+        submitted+accepted report count); everything else is OB-entered
+        via `PUT /grants/<id>/deliverable-progress` (new
+        `deliverable_progress_json` column, auto-ALTERed by Phase 610).
+        Progress bars + live/manual source badges on grant detail.
+      • **AI report scoring** — `POST /grants/<gid>/reports/<rid>/score`
+        (OB-only) scores the report against extracted reporting
+        requirements + compliance flags + restrictions; strict prompt
+        (late submission caps at 70, empty content → missing).
+        Per-requirement 0-100 + verdict + why into
+        `compliance_score_json`; average badge + met/partial/missing
+        expander on report rows — visible to the donor persona too
+        (prescreened, scored deliverables = the selling point).
+      Punt list: no auto-score on submit (OB triggers manually);
+      household-type deliverables have no system source until partner
+      reports carry beneficiary counts (future join).
 - [ ] **Phase 721e — Reporting cron.** Reminders 30/14/3 days before a
       report due date; auto-generate the next pending report per the
       grant's cadence; surface on the deadline calendar (.ics).
