@@ -12,7 +12,11 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Flame, Sparkles, Plus } from 'lucide-react';
+import Link from 'next/link';
+import {
+  Loader2, Flame, Sparkles, Plus, Radio, ClipboardCheck, Rocket,
+  ArrowRight,
+} from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
@@ -168,6 +172,34 @@ export default function CrisisSelectorPage() {
         icon={Flame}
       />
       <PageMain>
+        {/* What is this page? UAT 2026-06-30: "Crisis selector is poor.
+            Not clear what it is or how it works." Answer the three
+            questions before showing any data. */}
+        <Card className="p-4 bg-muted/30">
+          <p className="text-sm font-medium mb-1">
+            {t('proximate.crisis_selector.explainer_title')}
+          </p>
+          <p className="text-xs text-muted-foreground mb-3">
+            {t('proximate.crisis_selector.explainer_body')}
+          </p>
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-background">
+              <Radio className="w-3 h-3 text-amber-600" />
+              {t('proximate.crisis_selector.step_signal')}
+            </span>
+            <ArrowRight className="w-3 h-3 text-muted-foreground rtl:rotate-180" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-background">
+              <ClipboardCheck className="w-3 h-3 text-sky-600" />
+              {t('proximate.crisis_selector.step_review')}
+            </span>
+            <ArrowRight className="w-3 h-3 text-muted-foreground rtl:rotate-180" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-background">
+              <Rocket className="w-3 h-3 text-emerald-600" />
+              {t('proximate.crisis_selector.step_round')}
+            </span>
+          </div>
+        </Card>
+
         {data?.fallback_used && (
           <Card className="p-3 bg-amber-50 dark:bg-amber-950/30 border-amber-200">
             <p className="text-xs text-amber-800 dark:text-amber-300">
@@ -271,6 +303,15 @@ export default function CrisisSelectorPage() {
                       {new Date(sig.submitted_at).toLocaleDateString()}
                     </span>
                   )}
+                  <Link
+                    href={`/proximate/rounds/new?trigger=disaster&title=${encodeURIComponent(
+                      `${sig.country} — ${(sig.event_type || 'emergency response')}`,
+                    )}&summary=${encodeURIComponent(sig.description.slice(0, 500))}&region=${encodeURIComponent(sig.country)}`}
+                    className="text-[10px] text-emerald-700 hover:underline whitespace-nowrap inline-flex items-center gap-0.5"
+                  >
+                    <Rocket className="w-3 h-3" />
+                    {t('proximate.crisis_signal.start_round')}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -335,7 +376,18 @@ export default function CrisisSelectorPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border">
-                  <span className="text-xs text-muted-foreground">
+                  <Link
+                    href={`/proximate/rounds/new?trigger=disaster&title=${encodeURIComponent(
+                      row.event_title || `${row.country} emergency response`,
+                    )}&summary=${encodeURIComponent(
+                      (row.narrative || row.event_title || '').slice(0, 500),
+                    )}&region=${encodeURIComponent(row.region || row.country || '')}`}
+                    className="text-xs inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-emerald-600 text-white font-medium hover:bg-emerald-700"
+                  >
+                    <Rocket className="w-3 h-3" />
+                    {t('proximate.crisis_selector.start_round')}
+                  </Link>
+                  <span className="text-xs text-muted-foreground ms-1">
                     {t('proximate.crisis_selector.draft_brief_as')}:
                   </span>
                   {(data.scenario_types || []).map((s) => (

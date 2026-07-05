@@ -697,11 +697,18 @@ pages, seeded grants/allocations/reports — commits 50df0d03..64cd8927).
 Status notes from the 2026-07-01 UAT retest: list + donor scoping work;
 detail-page ID bug and allocation seeding fixed in 64cd8927.
 
-- [ ] **Phase 721b — PDF upload → AI extraction wizard.** Upload the
-      actual signed agreement, run `grant_agreement_unpack_service.py`,
-      show extracted terms in a review/edit/accept wizard. The seeded
-      `extracted_json` mimics the output shape but no PDF has actually
-      been parsed yet. THE priority item — this is the demo that sells.
+- [x] **Phase 721b — PDF upload → AI extraction wizard.** SHIPPED
+      2026-07-05. New `proximate_grant_extract_service.py` (Proximate-
+      specific schema matching the seeded `extracted_json` shape, not
+      the Kuja unpack service which is coupled to Kuja's Grant model) +
+      `POST /grants/extract-agreement` (OB-only, PDF ≤15MB, PyPDF2 text
+      → Claude structured extraction, donor-registry auto-match, audit
+      row) + wizard page `/proximate/admin/grants/new` (upload → extract
+      w/ staged progress copy → review/edit/delete/add every section →
+      accept creates the grant with extracted_json +
+      signed_agreement_doc_id). Scanned PDFs without a text layer get a
+      clear 422 telling the OB to OCR first. Punt list: re-extract on an
+      existing grant (PUT accepts `extracted` but no UI); no OCR.
 - [ ] **Phase 721c — AI-drafted donor reports.** Draft the quarterly/
       annual report body from real round/disbursement/outcome data,
       human-editable (same shape as Kuja report drafting).
@@ -721,20 +728,21 @@ detail-page ID bug and allocation seeding fixed in 64cd8927.
 
 ## Small state-machine gaps (from Phase 715, filed 2026-07-05)
 
-- [ ] Cosign clearance doesn't re-bump the roster stage: a disbursement
-      created pending-cosign parks the participant at `bank_verified`;
-      when the final cosigner clears it, `api_cosign_disbursement`
-      should bump to `disbursed`.
-- [ ] `withdrawn` participant stage is never auto-set when a partner is
-      suspended or removed from a round mid-flight.
+- [x] SHIPPED 2026-07-05: `api_cosign_disbursement` now bumps the
+      roster to `disbursed` when the final cosigner clears (was parked
+      at `bank_verified`).
+- [x] SHIPPED 2026-07-05: partner suspension auto-sets `withdrawn` on
+      their roster rows across active rounds (existing rows only —
+      suspension never adds a partner to a round).
 
 ## Crisis Selector clarity (UAT feedback 2026-06-30)
 
-- [ ] Demoted to secondary nav in Phase 722, but the page itself still
-      doesn't explain what it is or how it works. Add a purpose header
-      ("early-warning signals that justify opening a round"), a
-      how-it-feeds-rounds diagram, and a "start a round from this
-      signal" action.
+- [x] SHIPPED 2026-07-05: purpose explainer card ("early-warning
+      signals that justify opening a funding round" + 3-step
+      signal→review→round strip, EN+AR i18n keys in all 6 locales) and
+      a "Start a round from this signal" action on every curated row
+      and pending signal — prefills `/proximate/rounds/new` (title,
+      trigger, summary, region) via query params.
 
 ## Status corrections (2026-07-05)
 

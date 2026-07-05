@@ -798,6 +798,12 @@ def api_suspend_partner(partner_id):
             )
     db.session.commit()
 
+    # Phase 715 gap fix — a suspended partner is out of every active
+    # round; mark their roster rows withdrawn (existing rows only).
+    _bump_participant_stage_for_partner_across_active_rounds(
+        net.id, partner.id, 'withdrawn', current_user.id,
+    )
+
     logger.info(
         f"Proximate: partner suspended id={partner.id} by user_id={current_user.id} "
         f"reason={reason!r} endorsers_penalised={penalised}"
@@ -2372,6 +2378,17 @@ def api_create_grant():
         status=(body.get('status') or 'active'),
         created_by_user_id=current_user.id,
     )
+    # Phase 721b — the wizard passes the accepted (possibly OB-edited)
+    # extraction alongside the stored agreement document.
+    if isinstance(body.get('extracted'), dict):
+        g.extracted_json = _json.dumps(body['extracted'])
+        g.extracted_at = datetime.now(timezone.utc)
+        g.extracted_model = (body.get('extracted_model') or '')[:80] or None
+    if body.get('signed_agreement_doc_id'):
+        try:
+            g.signed_agreement_doc_id = int(body['signed_agreement_doc_id'])
+        except (ValueError, TypeError):
+            pass
     db.session.add(g)
     db.session.commit()
     AuditChainEntry.append(
@@ -2423,8 +2440,136 @@ def api_update_grant(grant_id):
                 pass
     if 'restrictions' in body and isinstance(body['restrictions'], dict):
         g.restrictions_json = _json.dumps(body['restrictions'])
+    if isinstance(body.get('extracted'), dict):
+        g.extracted_json = _json.dumps(body['extracted'])
+        g.extracted_at = datetime.now(timezone.utc)
     db.session.commit()
     return jsonify({'success': True, 'grant': g.to_dict()})
+
+
+@proximate_bp.route('/grants/extract-agreement', methods=['POST'])
+@login_required
+def api_extract_grant_agreement():
+    """Phase 721b — upload the signed grant agreement PDF and run AI
+    extraction. OB-only. Multipart: file (text-based PDF, max 15 MB).
+
+    Returns the extracted terms + stored document_id for the review
+    wizard. Nothing is persisted to a grant here — the OB reviews,
+    edits, and accepts via POST /grants (passing `extracted` +
+    `signed_agreement_doc_id`)."""
+    import uuid as _uuid
+    from flask import current_app as cap
+    from werkzeug.utils import secure_filename
+    from app.models import Document, ProximateDonor
+    from app.services.proximate_grant_extract_service import (
+        extract_pdf_text, extract_agreement_terms, EXTRACT_MODEL,
+    )
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    if not _user_is_ob(net):
+        return jsonify({'success': False, 'error': 'ob only'}), 403
+
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'no file provided'}), 400
+    file = request.files['file']
+    if not file.filename:
+        return jsonify({'success': False, 'error': 'no file selected'}), 400
+
+    max_bytes = 15 * 1024 * 1024
+    if request.content_length and request.content_length > max_bytes:
+        return jsonify({
+            'success': False,
+            'error': 'file too large (max 15 MB)',
+        }), 413
+
+    original_filename = secure_filename(file.filename)
+    ext = (original_filename.rsplit('.', 1)[-1].lower()
+           if '.' in original_filename else '')
+    if ext != 'pdf':
+        return jsonify({
+            'success': False,
+            'error': 'only PDF agreements are supported (got .%s)' % (ext or '?'),
+        }), 400
+
+    stored_filename = f"proximate_agreement_{_uuid.uuid4().hex}.pdf"
+    filepath = os.path.join(cap.config['UPLOAD_FOLDER'], stored_filename)
+    file.save(filepath)
+    file_size = os.path.getsize(filepath)
+    with open(filepath, 'rb') as fcheck:
+        if not fcheck.read(5).startswith(b'%PDF'):
+            os.remove(filepath)
+            return jsonify({
+                'success': False, 'error': 'file is not a valid PDF',
+            }), 400
+
+    doc_text = extract_pdf_text(filepath)
+    if len(doc_text) < 300:
+        os.remove(filepath)
+        return jsonify({
+            'success': False,
+            'error': (
+                'No readable text in this PDF — it looks like a scan '
+                'without an OCR text layer. Export the agreement as a '
+                'text PDF (or run OCR) and upload again.'
+            ),
+        }), 422
+
+    extracted = extract_agreement_terms(
+        doc_text=doc_text, filename=original_filename,
+    )
+    if extracted is None:
+        os.remove(filepath)
+        return jsonify({
+            'success': False,
+            'error': 'AI extraction is unavailable right now — try again shortly.',
+        }), 503
+
+    doc = Document(
+        original_filename=original_filename,
+        stored_filename=stored_filename,
+        file_size=file_size,
+        mime_type='application/pdf',
+        doc_type='proximate_grant_agreement',
+    )
+    db.session.add(doc)
+    db.session.commit()
+
+    # Best-effort donor match against the registry so the wizard can
+    # pre-select; OB can always override.
+    donor_match = None
+    donor_name = (extracted.get('donor') or '').strip().lower()
+    if donor_name:
+        for d in ProximateDonor.query.filter_by(network_id=net.id).all():
+            dn = (d.display_name or '').strip().lower()
+            if dn and (dn in donor_name or donor_name in dn):
+                donor_match = {'id': d.id, 'display_name': d.display_name}
+                break
+
+    AuditChainEntry.append(
+        action='proximate.grant.agreement_extracted',
+        actor_email=current_user.email,
+        subject_kind='document',
+        subject_id=doc.id,
+        details={
+            'filename': original_filename,
+            'size_bytes': file_size,
+            'text_chars': len(doc_text),
+            'extraction_confidence': extracted.get('extraction_confidence'),
+            'model': EXTRACT_MODEL,
+        },
+    )
+    logger.info(
+        f"Proximate: agreement extracted doc_id={doc.id} "
+        f"confidence={extracted.get('extraction_confidence')}"
+    )
+    return jsonify({
+        'success': True,
+        'document_id': doc.id,
+        'extracted': extracted,
+        'extracted_model': EXTRACT_MODEL,
+        'donor_match': donor_match,
+    })
 
 
 @proximate_bp.route(
@@ -3716,6 +3861,11 @@ def api_cosign_disbursement(disbursement_id):
                 'due_at': d.report_due_at.isoformat(),
                 'token_present': True,
             },
+        )
+        # Phase 715 gap fix — a disbursement created pending-cosign parked
+        # the roster at bank_verified; final cosign means the money moves.
+        _bump_participant_stage(
+            d.round_id, d.partner_id, 'disbursed', current_user.id,
         )
     return jsonify({'success': True, 'disbursement': d.to_dict()})
 

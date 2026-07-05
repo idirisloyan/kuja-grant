@@ -44,6 +44,25 @@ export default function NewProximateRoundPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Crisis Selector hand-off — "Start a round from this signal" links
+  // here with prefills in the query string. window.location (not
+  // useSearchParams) because this page is statically exported.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search);
+    const pTitle = q.get('title');
+    const pSummary = q.get('summary');
+    const pRegion = q.get('region');
+    const pTrigger = q.get('trigger');
+    if (pTitle) setTitle(pTitle.slice(0, 200));
+    if (pSummary) setTriggerSummary(pSummary.slice(0, 2000));
+    if (pRegion) setRegion(pRegion.slice(0, 120));
+    if (pTrigger === 'disaster' || pTrigger === 'donor_commitment'
+        || pTrigger === 'programme_cycle') {
+      setTrigger(pTrigger);
+    }
+  }, []);
+
   // Load the donor registry on mount so the OB never has to remember
   // spellings. Non-blocking — an empty registry falls back to a
   // disabled dropdown with a "no donors registered" placeholder.
