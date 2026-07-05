@@ -769,9 +769,18 @@ detail-page ID bug and allocation seeding fixed in 64cd8927.
       NOTE: GHA job 403s until the team adds the CRON_SECRET repo
       secret (same blocker as the other Proximate crons).
       Punt: .ics calendar surface not included.
-- [ ] **Phase 721f — Donor Pack PDF.** Extend the Phase 671 end-of-round
-      PDF to grant-timeline scope: financial reconciliation, impact
-      narrative, embedded photo/voice evidence from partner reports.
+- [x] **Phase 721f — Donor Pack PDF — SHIPPED 2026-07-05.**
+      `GET /api/proximate/grants/<id>/donor-pack.pdf` (OB or the
+      owning donor — same scope rule as grant detail; cross-donor
+      verified 403). Grant-timeline scope: financial reconciliation
+      (committed → allocated per round → round disbursed totals →
+      unallocated), deliverables vs targets (shared Phase 721d
+      computation, extracted to `_grant_deliverables_progress`),
+      reporting timeline with average compliance scores, latest
+      report's narrative sections, audit anchor. Download button on
+      the grant detail page.
+      Punt: photo/voice evidence appears as counts, not embedded
+      media — media embedding needs the R2 store (Phase 719, blocked).
 - [x] **Phase 721g — Restriction enforcement at disbursement time —
       SHIPPED 2026-07-05.** `api_record_disbursement` joins every
       grant funding the round (via allocations) and hard-422s when the
@@ -827,3 +836,13 @@ detail-page ID bug and allocation seeding fixed in 64cd8927.
       verified (Phase 690 already covers Proximate partners weekly).
       See the sweep checklist above for detail. Only the
       flag→intervention-register auto-wiring remains open.
+
+## OB copy pass audit (2026-07-05)
+
+Checked the six OB surfaces for "what is this / what needs action /
+what happens next" copy: operator dashboard (attention-first since
+Phase 643), partners list, rounds, disbursements, endorser inbox and
+grants all carry purpose-stating subtitles; Crisis Selector got its
+explainer header 2026-07-05 and the grievance queue shipped with SLA
+copy built in. No further copy changes needed — item closed as
+covered by prior phases plus this session's additions.

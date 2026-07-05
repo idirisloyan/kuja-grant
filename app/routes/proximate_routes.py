@@ -2657,6 +2657,16 @@ def api_grant_compliance(grant_id):
         if not my_donor or g.donor_id != my_donor.id:
             return jsonify({'success': False, 'error': 'not authorised'}), 403
 
+    return jsonify({
+        'success': True, 'deliverables': _grant_deliverables_progress(g),
+    })
+
+
+def _grant_deliverables_progress(g) -> list[dict]:
+    """Phase 721d computation, shared by the compliance JSON endpoint
+    and the Phase 721f donor-pack PDF."""
+    import json as _json
+    from app.models import ProximateGrantAllocation, ProximateGrantReport
     extracted = g._extracted()
     deliverables = extracted.get('key_deliverables') or []
     manual = {}
@@ -2701,7 +2711,7 @@ def api_grant_compliance(grant_id):
             'source': source,
             'pct': pct,
         })
-    return jsonify({'success': True, 'deliverables': out})
+    return out
 
 
 @proximate_bp.route(
@@ -7682,3 +7692,231 @@ def api_public_transparency():
         payload = _build_transparency_payload(net)
         _TRANSPARENCY_CACHE[net.id] = (now_ts, payload)
     return jsonify({'success': True, 'transparency': payload})
+
+
+# =========================================================================
+# Phase 721f — Donor Pack PDF (grant-timeline scope)
+# =========================================================================
+
+@proximate_bp.route('/grants/<int:grant_id>/donor-pack.pdf', methods=['GET'])
+@login_required
+def api_grant_donor_pack_pdf(grant_id):
+    """Phase 721f — extends the Phase 671 end-of-round PDF to the full
+    grant timeline: financial reconciliation (committed → allocated →
+    disbursed → remaining, per funding round), deliverables vs targets
+    (Phase 721d computation), the report timeline with compliance
+    scores, and the latest report's narrative sections. Same reportlab
+    canvas style as Phase 671; same OB-or-owning-donor scope as the
+    grant detail endpoint.
+
+    v0 punt: photo/voice evidence is summarised as counts, not embedded
+    media (media embedding needs the R2 store, Phase 719 — blocked)."""
+    from io import BytesIO
+    import json as _json
+    from flask import send_file as _send_file
+    from app.models import (
+        ProximateGrant, ProximateGrantAllocation, ProximateGrantReport,
+    )
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+        from reportlab.pdfgen import canvas as _canvas
+    except ImportError:
+        return jsonify({
+            'success': False,
+            'error': 'reportlab not installed on this deploy',
+        }), 503
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    g = ProximateGrant.query.filter_by(id=grant_id, network_id=net.id).first()
+    if not g:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    if not _user_is_ob(net):
+        from app.models import ProximateDonor
+        my_donor = ProximateDonor.query.filter_by(
+            network_id=net.id, primary_user_id=current_user.id,
+        ).first()
+        if not my_donor or g.donor_id != my_donor.id:
+            return jsonify({'success': False, 'error': 'not authorised'}), 403
+
+    # ---- financial reconciliation per allocated round ------------------
+    allocations = ProximateGrantAllocation.query.filter_by(
+        grant_id=g.id,
+    ).all()
+    moved_states = ('pending_report', 'reported', 'verified', 'flagged')
+    round_rows = []
+    total_allocated = 0.0
+    for a in allocations:
+        rnd = ProximateRound.query.get(a.round_id)
+        moved = sum(
+            float(d.amount_usd or 0)
+            for d in ProximateDisbursement.query.filter_by(
+                network_id=net.id, round_id=a.round_id,
+            ).all()
+            if d.status in moved_states
+        )
+        total_allocated += float(a.amount_usd or 0)
+        round_rows.append({
+            'title': rnd.title if rnd else f'Round #{a.round_id}',
+            'allocated': float(a.amount_usd or 0),
+            'round_disbursed': moved,
+        })
+    committed = float(g.amount_committed_usd or 0)
+
+    deliverables = _grant_deliverables_progress(g)
+    reports = ProximateGrantReport.query.filter_by(
+        grant_id=g.id,
+    ).order_by(ProximateGrantReport.period_start.asc()).all()
+
+    # Latest narrative — most recent report that has human content
+    narrative = None
+    for rep in reversed(reports):
+        content = rep._content() if hasattr(rep, '_content') else None
+        if not content and rep.content_json:
+            try:
+                content = _json.loads(rep.content_json)
+            except (ValueError, TypeError):
+                content = None
+        if content:
+            narrative = (rep, content)
+            break
+
+    # ---- render ---------------------------------------------------------
+    buf = BytesIO()
+    p = _canvas.Canvas(buf, pagesize=A4)
+    width, height = A4
+    y = height - 25 * mm
+
+    def _line(txt, size=10, spacing=12, font='Helvetica'):
+        nonlocal y
+        if y < 30 * mm:
+            p.showPage()
+            y = height - 25 * mm
+        p.setFont(font, size)
+        p.drawString(20 * mm, y, str(txt)[:120])
+        y -= spacing
+
+    def _wrapped(txt, size=9, spacing=11, chars=100):
+        for word_line in str(txt).splitlines():
+            while word_line:
+                _line(word_line[:chars], size, spacing)
+                word_line = word_line[chars:]
+
+    _line(f"Donor Pack: {g.title}", 16, 20, 'Helvetica-Bold')
+    _line(
+        f"Donor: {g.donor_name_cache or '—'}    "
+        f"Ref: {g.donor_grant_ref or '—'}    Status: {g.status}",
+        9, 13,
+    )
+    _line(
+        f"Period: {g.start_date or '—'} → {g.end_date or '—'}    "
+        f"Cadence: {g.reporting_cadence}",
+        9, 16,
+    )
+
+    _line('Financial reconciliation', 12, 16, 'Helvetica-Bold')
+    _line(
+        f"Committed: ${committed:,.0f}    "
+        f"Allocated to rounds: ${total_allocated:,.0f}    "
+        f"Unallocated: ${committed - total_allocated:,.0f}",
+        10, 14, 'Helvetica-Bold',
+    )
+    for rr in round_rows:
+        _line(
+            f"  • {rr['title']} — allocated ${rr['allocated']:,.0f} "
+            f"(round total disbursed: ${rr['round_disbursed']:,.0f})",
+            9, 12,
+        )
+    if not round_rows:
+        _line('  (no allocations yet)', 9, 12)
+    y -= 4
+
+    _line('Deliverables vs targets', 12, 16, 'Helvetica-Bold')
+    for d in deliverables:
+        cur = d['current'] if d['current'] is not None else '—'
+        pct = f"{d['pct']}%" if d['pct'] is not None else d['source']
+        _line(
+            f"  • {d['title']} — {cur} / {d['target'] or '—'} "
+            f"{d['unit'] or ''} ({pct})",
+            9, 12,
+        )
+    if not deliverables:
+        _line('  (no deliverables extracted from the agreement)', 9, 12)
+    y -= 4
+
+    _line('Reporting timeline', 12, 16, 'Helvetica-Bold')
+    for rep in reports:
+        score_txt = ''
+        if rep.compliance_score_json:
+            try:
+                scores = _json.loads(rep.compliance_score_json)
+                items = scores if isinstance(scores, list) else \
+                    scores.get('items', [])
+                vals = [s.get('score') for s in items
+                        if isinstance(s.get('score'), (int, float))]
+                if vals:
+                    score_txt = f"    compliance {round(sum(vals)/len(vals))}/100"
+            except (ValueError, TypeError, AttributeError):
+                pass
+        _line(
+            f"  • {rep.report_type} {rep.period_start or ''}–"
+            f"{rep.period_end or ''} — {rep.status}"
+            f"{'  due ' + str(rep.due_date) if rep.due_date else ''}"
+            f"{score_txt}",
+            9, 12,
+        )
+    if not reports:
+        _line('  (no reports yet)', 9, 12)
+    y -= 4
+
+    if narrative:
+        rep, content = narrative
+        _line(
+            f"Latest narrative ({rep.report_type} "
+            f"{rep.period_start or ''}–{rep.period_end or ''})",
+            12, 16, 'Helvetica-Bold',
+        )
+        for key, label in (
+            ('executive_summary', 'Executive summary'),
+            ('financial_summary', 'Financial summary'),
+            ('impact_narrative', 'Impact narrative'),
+            ('compliance_note', 'Compliance note'),
+        ):
+            txt = (content or {}).get(key)
+            if txt:
+                _line(label, 10, 13, 'Helvetica-Bold')
+                _wrapped(txt, 9, 11)
+                y -= 3
+
+    # Audit anchor (same trust pattern as Phase 671)
+    audit_last = (
+        AuditChainEntry.query
+        .filter(AuditChainEntry.action.like('proximate.%'))
+        .order_by(AuditChainEntry.seq.desc())
+        .first()
+    )
+    if audit_last:
+        _line(
+            f"Audit anchor: seq={audit_last.seq} "
+            f"hash={audit_last.payload_hash[:16]}…",
+            8, 11,
+        )
+
+    p.showPage()
+    p.save()
+    buf.seek(0)
+    AuditChainEntry.append(
+        action='proximate.grant.donor_pack_generated',
+        actor_email=current_user.email,
+        subject_kind='proximate_grant',
+        subject_id=g.id,
+        details={'bytes': buf.getbuffer().nbytes},
+    )
+    return _send_file(
+        buf,
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'proximate-grant-{g.id}-donor-pack.pdf',
+    )

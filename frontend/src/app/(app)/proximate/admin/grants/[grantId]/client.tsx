@@ -320,6 +320,15 @@ export function ProximateGrantDetailClient() {
       />
       <PageMain>
         <div className="space-y-4">
+          {/* Phase 721f — donor pack: full grant-timeline PDF */}
+          <div className="flex justify-end">
+            <a
+              href={`/api/proximate/grants/${g.id}/donor-pack.pdf`}
+              className="inline-flex items-center gap-1.5 text-sm border rounded-lg px-3 py-1.5 hover:bg-muted/40"
+            >
+              ⤓ Donor pack (PDF) — financials, deliverables, reports
+            </a>
+          </div>
           {/* Financial snapshot */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Card className="p-4">
