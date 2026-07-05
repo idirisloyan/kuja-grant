@@ -427,3 +427,322 @@ completions — those were logged there during the Proximate work in
 2026-06-26 and 2026-06-27 before this dedicated backlog file existed.
 
 Going forward, Proximate-only completions land here.
+
+---
+
+## Operational setup + open phases (consolidated from NEAR_BACKLOG.md, 2026-06-30 reorg)
+
+### Proximate operational setup (added 2026-06-30)
+
+Same app as Kuja tenant, so ANTHROPIC/OPENAI/OPENSANCTIONS/SMTP keys
+are inherited — no re-configuration needed. Only genuinely new work:
+
+**Must-have before pilot users**
+- [ ] Verify `SENTRY_DSN` is set on Railway (both tenants currently
+      running blind if not). Free tier is fine for pilot volume.
+- [ ] Set Proximate tenant's AI cost ceiling on `/admin/cost-ceiling`
+      (recommend $50/mo through pilot; Phase 108 machinery already there).
+- [ ] Verify `SEED_PROXIMATE_ON_BOOT=true` is set so the seeded OB /
+      donor / partners / rounds land on the first prod boot after each
+      DB reset.
+- [ ] Uptime monitor — add BetterStack (free tier) checks on
+      `/health` (60s) and `/api/proximate/overview` (5min). Alert the
+      team's Slack channel.
+
+**Should-have — Phase 716b `/proximate-nominate` content redesign
+(added 2026-06-30 after intake-flow review)**
+
+The page today is a bare form. An NGO landing on it cold has no context.
+For pilot, this is the first-touch surface — needs to earn trust in ~15
+seconds before the NGO decides to fill it out.
+
+- [ ] Hero section — what Proximate Fund is, in one sentence Arabic +
+      English. Emphasise "community endorsement" over "grant application"
+      framing (per SoP intent).
+- [ ] Three-step "how it works": Nominate → Community vouches → Adeso
+      reviews. Visual, not paragraphs.
+- [ ] "Recently funded partners" carousel — 3-4 partners with locality
+      + short story. Pulls from the seeded/live register.
+- [ ] FAQ collapsibles — timeline, eligibility, what happens if you're
+      declined, is my data safe, do I need to be a registered NGO.
+- [ ] "Referred by someone?" optional field on the form itself —
+      captures word-of-mouth attribution without adding a full
+      endorser-referral flow.
+- [ ] Arabic-first rendering (Proximate default per Phase 661) —
+      RTL layout, Arabic hero copy is the primary, English is secondary.
+- [ ] Non-code deliverables to produce alongside: (1) A4 printable
+      Arabic+English one-pager with QR to /proximate-nominate for field
+      team, (2) 60-second WhatsApp voice note the OB can forward,
+      (3) template email for peer coordination bodies (OCHA cluster
+      leads, Sudan NGO Forum).
+
+**Explicitly not doing (2026-06-30 decision)** — "endorser refers a
+partner" path. SoP §3 separates nomination (partner/OB) from vouching
+(endorsers) on purpose — merging them defeats the trust floor.
+Revisit only if pilot elders repeatedly ask for it.
+
+**Should-have — Phase 716a Zero-login endorser flow (redesigned
+2026-06-30 after user challenged the login assumption)**
+
+The current endorser flow requires login. Wrong for Sudan — elders
+answering 3 Y/N questions on WhatsApp aren't inbox users. Should
+match the partner report/attest pattern: token URL is the credential,
+no login screen, no account required.
+
+- [ ] New model `ProximateEndorserInvite`:
+      `partner_id, invite_token, invitee_name, invitee_phone, note,
+      created_by_user_id, created_at, used_at, endorsement_id,
+      endorser_id` (last two populated on submit)
+- [ ] New endpoints:
+      • `POST /api/proximate/partners/<id>/endorser-invites` — OB issues
+      • `GET /api/proximate/endorser-invites/<token>` — elder opens
+      • `POST /api/proximate/endorser-invites/<token>` — elder submits
+- [ ] New public client page `/proximate-endorse-invite/[token]` —
+      no auth, mirrors the partner report page pattern
+- [ ] Roster "Share endorser link" button → **"Invite endorser"** modal
+      (name, phone, optional note → generate → WhatsApp share URL)
+- [ ] Backend on submit: auto-create Endorser row with status
+      'captured_via_invite' (bypasses OB approval — the invite IS
+      approval), record Endorsement, mark invite used
+- [ ] SoP compliance preserved: only OB can issue invites (audit
+      trail via `created_by_user_id`); light-KYC still applies to
+      endorsers who want to self-register for repeat vouching
+- [ ] Existing login-based flow stays as an optional path for
+      endorsers who want accounts
+
+**Should-have — Phase 716c Whistleblower / community grievance
+channel (added 2026-06-30)**
+
+SoP §14 implies a public reporting channel; code doesn't have one
+yet. A community member should be able to report concerns about a
+partner without needing an account or explaining who they are.
+
+- [ ] New model `ProximateGrievance`: partner_id (optional — can be
+      about the fund as a whole), reporter_name (optional/anonymous),
+      reporter_phone (optional), category (fraud/safety/other),
+      description, submitted_at, triaged_at, triaged_by_user_id,
+      resolution_notes.
+- [ ] Public URL `/proximate-grievance` — no auth, no token, just a
+      form with a "submit anonymously" option.
+- [ ] OB triage queue at `/proximate/admin/grievances` with 72-hour
+      SLA badge.
+- [ ] Auto-open a Phase 635 intervention if severity=fraud/safety.
+- [ ] Add QR code + short URL to the printable Adeso one-pager.
+
+**Should-have — Phase 716d Partner-side audit trail (added 2026-06-30)**
+
+Partners can currently see their disbursements via the mini-portal
+but not WHY they were flagged / suspended / declined. Fairness gap.
+
+- [ ] Extend partner mini-portal (Phase 634) with a "Decisions
+      affecting me" section: sanctions checks (redacted to
+      "cleared/flagged" only, no list details), status transitions
+      with dates, interventions with response deadlines, and OB
+      decision rationale for any flag.
+- [ ] Right-to-know without right-to-appeal: partner sees what
+      happened, can request review via the grievance channel.
+
+**Should-have — Phase 716e Public transparency page (added 2026-06-30)**
+
+Trust-building for future donors + the public.
+
+- [ ] Public URL `/proximate` (marketing site, not the app shell) —
+      no auth required.
+- [ ] Shows: total envelope moved this year, partner count by
+      locality, sustained-outcome rate (aggregated only, no per-
+      partner detail), current active rounds (title + trigger only).
+- [ ] No PII, no per-disbursement amounts, no partner identities
+      beyond names of publicly-disclosed grantees.
+- [ ] Refreshes daily via a cached endpoint (not real-time — avoids
+      leak vectors).
+
+**Should-have — Phase 716 DD guardrail sweep (files in the "High
+priority — operational" list below)**
+- [ ] Verify `api_cron_sanctions_rescreen` walks Proximate partners
+      (not just Kuja orgs). Rescreen cadence 90 days.
+- [ ] Run sanctions on OB-nominated partners (currently only auto-runs
+      on self-nominate per Phase 658 — audit gap).
+- [ ] Endorser sanctions check at approval time (light-KYC currently
+      no name-list check).
+- [ ] Wire Kuja's `AdverseMediaScreening` to Proximate partners
+      receiving > $10k in a round (matches the tier ladder — no
+      reason to hit the API for a $200 disbursement).
+- [ ] Surface hits as interventions (Phase 635 register), not hard
+      gates — SoP §4 keeps the door open, OB decides after seeing
+      evidence.
+
+**Should-have — Phase 717 WhatsApp Cloud API (defer until manual
+share flow strains)**
+
+Current state: OB shares links manually via their own WhatsApp
+account (`wa.me/<phone>?text=...` opens draft, OB clicks Send).
+That's enough for pilot scale (~20 invites/round). Everything below
+is stuff the system can't do without a Business API account —
+the server can't send messages on behalf of Adeso until Meta
+approves the WhatsApp Business Account.
+
+**Phase 717-a — Foundation (blocks everything else)**
+- [ ] Meta Business Portfolio for Adeso → WhatsApp Business Account
+      + phone number verification (24–72h Meta review).
+- [ ] Register message templates in Meta (each needs 24h approval,
+      English + Arabic separately): `endorsement_invite`,
+      `endorsement_reminder`, `report_ack`, `report_reminder`,
+      `disbursement_notify`, `outcome_reminder`, `partner_cleared`,
+      `round_activated`.
+- [ ] Env vars: `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`,
+      `WHATSAPP_BUSINESS_ACCOUNT_ID`.
+- [ ] Backend `WhatsAppService` send helper + retry queue (mirror
+      the pattern of Phase 147 webhook delivery retry queue).
+- [ ] Delivery receipt webhook — Meta calls Adeso when a message is
+      delivered/read; store status on the relevant record.
+- [ ] Inbound message webhook — capture elder replies to Adeso's
+      number; surface in a new "WhatsApp inbox" for OB triage.
+- [ ] Fallback: keep the manual `wa.me/?text=` button working
+      alongside API-driven auto-messages for OB power-users and
+      for edge cases where the API errors.
+
+**Phase 717-b — Auto-send on trigger events (each hooks a specific
+existing endpoint; all cheap once 717-a lands)**
+- [ ] **Endorsement invite auto-send** — when OB clicks "Generate
+      invite" in the roster modal, ALSO auto-send the WhatsApp
+      message using the `endorsement_invite` template. Removes the
+      "open in WhatsApp then click Send" step.
+- [ ] **Endorsement 48h reminder** — cron scans open invites
+      (`used_at IS NULL AND created_at < now - 48h`), sends
+      `endorsement_reminder`. Stops after 1 reminder.
+- [ ] **Partner report acknowledgement** — hook in
+      `api_submit_disbursement_report` — auto-send `report_ack` to
+      partner's phone thanking them.
+- [ ] **Disbursement notification to partner** — hook in
+      `api_record_disbursement` — auto-send `disbursement_notify`
+      with amount + purpose + report deadline + token URL.
+- [ ] **Report deadline reminder** — cron scans disbursements
+      approaching 14-day report deadline, sends `report_reminder`
+      3 days before due date.
+- [ ] **Outcome attestation nudge** — cron at day 85 post-disburse-
+      ment sends `outcome_reminder` with the outcome token URL.
+- [ ] **Partner-cleared broadcast** — when a partner reaches
+      `dd_clear`, auto-send `partner_cleared` to all contributing
+      endorsers (their vouch mattered — good reputation feedback
+      loop).
+- [ ] **Round-activated broadcast** — when OB signs a round into
+      `active`, auto-send `round_activated` to all approved endorsers
+      informing them a round is now open and inviting nominations.
+
+**Phase 717-c — Two-way messaging surface**
+- [ ] **WhatsApp inbox for OB** — inbound replies land in a triage
+      queue at `/proximate/admin/whatsapp-inbox`. OB can reply from
+      the console (server-side send using the same session).
+- [ ] **Session window handling** — Meta enforces a 24-hour session
+      window after a user messages the business; outside the window
+      only template messages can be sent. Backend must track the
+      per-recipient window state.
+- [ ] **Language auto-detection** — parse inbound Arabic vs English
+      and reply with the matching template.
+
+**Phase 717-d — Analytics + observability**
+- [ ] **Delivery/read rate dashboard tile** on `/proximate/admin` —
+      per template, showing sent / delivered / read / responded.
+- [ ] **Cost tracking** — Meta charges per conversation session
+      (~$0.005–0.05 depending on country + template category); log
+      to per-tenant AI-style cost ceiling machinery (Phase 108
+      pattern).
+- [ ] **Template performance A/B** — try 2 wording variants of the
+      `endorsement_invite` template, measure response rate.
+
+**Blocking dependencies before ANY of 717 can ship:**
+- Adeso must own a dedicated Sudan-reachable phone number NOT used
+  for personal WhatsApp (Meta rejects numbers with prior personal
+  WhatsApp history).
+- Adeso Business Portfolio must be verified (business licence
+  documentation).
+- Template copy must be drafted + translated (English + Arabic) and
+  submitted before Meta's 24h approval window; each edit resets
+  the clock.
+- Phase 108 AI cost ceiling machinery should be extended to include
+  WhatsApp conversation cost before templates go live at scale.
+
+**Should-have — Phase 718 SMS fallback via Twilio (defer until an
+endorser can't be reached over WhatsApp)**
+- [ ] Twilio account + Sudan-reachable number (US long code works
+      for outbound in pilot, ~$0.08/message).
+- [ ] Env vars: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+      `TWILIO_FROM_NUMBER`.
+- [ ] Send helper + fallback logic (try WhatsApp first, then SMS).
+
+**Should-have — Phase 719 File storage on Cloudflare R2**
+- [ ] Provision R2 bucket `proximate-evidence` + API token.
+- [ ] Env vars: `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`,
+      `S3_BUCKET`, `S3_REGION=auto`.
+- [ ] Migrate existing evidence Documents to R2 (Kuja's Document
+      model already supports S3-compatible storage).
+- [ ] Budget: aim for < $5/mo through pilot.
+
+**Should-have — Phase 720 Backup automation**
+- [ ] Enable Railway daily Postgres backups, 30-day retention.
+- [ ] Weekly `pg_dump` → R2 via a cron in `app/tasks/`.
+
+**Deferred by design (not needed for pilot)**
+- Meta-approved WhatsApp templates for Arabic (do after Phase 717
+  English templates are approved — Meta approves per language).
+- Per-tenant email `From` header ("Proximate Fund" vs. "Kuja").
+- Per-tenant webhook URLs on Proximate (Phase 143 machinery exists).
+
+---
+
+## Grant management (inbound donor grants) — Phase 721 follow-ups (filed 2026-07-05)
+
+Phase 721 shipped the foundation (models, endpoints, list + detail
+pages, seeded grants/allocations/reports — commits 50df0d03..64cd8927).
+Status notes from the 2026-07-01 UAT retest: list + donor scoping work;
+detail-page ID bug and allocation seeding fixed in 64cd8927.
+
+- [ ] **Phase 721b — PDF upload → AI extraction wizard.** Upload the
+      actual signed agreement, run `grant_agreement_unpack_service.py`,
+      show extracted terms in a review/edit/accept wizard. The seeded
+      `extracted_json` mimics the output shape but no PDF has actually
+      been parsed yet. THE priority item — this is the demo that sells.
+- [ ] **Phase 721c — AI-drafted donor reports.** Draft the quarterly/
+      annual report body from real round/disbursement/outcome data,
+      human-editable (same shape as Kuja report drafting).
+- [ ] **Phase 721d — Compliance-per-requirement scoring.** Score each
+      report section against the donor's extracted requirements
+      (reuses Kuja auto-rubric machinery). Donor side sees prescreened,
+      scored deliverables — the core selling point.
+- [ ] **Phase 721e — Reporting cron.** Reminders 30/14/3 days before a
+      report due date; auto-generate the next pending report per the
+      grant's cadence; surface on the deadline calendar (.ics).
+- [ ] **Phase 721f — Donor Pack PDF.** Extend the Phase 671 end-of-round
+      PDF to grant-timeline scope: financial reconciliation, impact
+      narrative, embedded photo/voice evidence from partner reports.
+- [ ] **Phase 721g — Restriction enforcement at disbursement time.**
+      A round funded by grant X must respect grant X's geo/sector
+      restrictions (extends the Phase 686 restricted-share validation).
+
+## Small state-machine gaps (from Phase 715, filed 2026-07-05)
+
+- [ ] Cosign clearance doesn't re-bump the roster stage: a disbursement
+      created pending-cosign parks the participant at `bank_verified`;
+      when the final cosigner clears it, `api_cosign_disbursement`
+      should bump to `disbursed`.
+- [ ] `withdrawn` participant stage is never auto-set when a partner is
+      suspended or removed from a round mid-flight.
+
+## Crisis Selector clarity (UAT feedback 2026-06-30)
+
+- [ ] Demoted to secondary nav in Phase 722, but the page itself still
+      doesn't explain what it is or how it works. Add a purpose header
+      ("early-warning signals that justify opening a round"), a
+      how-it-feeds-rounds diagram, and a "start a round from this
+      signal" action.
+
+## Status corrections (2026-07-05)
+
+- [x] **Phase 716a zero-login endorser flow — SHIPPED** (commit
+      cb84e761): invite model + 3 public endpoints +
+      `/proximate-endorse-invite` page + roster "Invite endorser" modal.
+      The spec section above predates the ship.
+- [x] **Phase 716 DD sweep, first item — SHIPPED** (7c0daa76): sanctions
+      screen now runs on OB-nominated partners too. Remaining sweep
+      items (endorser sanctions at approval, adverse media > $10k,
+      rescreen-cron verification, hawala-agent screening) still open.
