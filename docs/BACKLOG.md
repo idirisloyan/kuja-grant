@@ -42,7 +42,15 @@ Updated 2026-07-05.
   primary action to each main surface.
 
 ### Ops verifications (quick, non-code)
-- [ ] `SENTRY_DSN` set on Railway? (all tenants run blind if not)
+- [x] `SENTRY_DSN` set on Railway — verified via `railway variables`
+      2026-07-05.
+- [ ] **`WHISPER_API_KEY` NOT set on Railway** (verified 2026-07-05) —
+      voice notes are saved but never transcribed; the whisper_service
+      returns `no_key` and degrades silently. Team action: create an
+      OpenAI account (Audio-restricted key, $25/mo budget cap) and set
+      `WHISPER_API_KEY` (that exact name) on service `web`. Zero code
+      needed once set. HIGH leverage — voice-first is core to the
+      Proximate conflict-environment design.
 - [ ] BetterStack (or similar) uptime checks on `/health` +
       one per-tenant API probe
 - [ ] Railway daily Postgres backups enabled, 30-day retention
