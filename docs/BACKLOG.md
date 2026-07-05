@@ -44,13 +44,11 @@ Updated 2026-07-05.
 ### Ops verifications (quick, non-code)
 - [x] `SENTRY_DSN` set on Railway — verified via `railway variables`
       2026-07-05.
-- [ ] **`WHISPER_API_KEY` NOT set on Railway** (verified 2026-07-05) —
-      voice notes are saved but never transcribed; the whisper_service
-      returns `no_key` and degrades silently. Team action: create an
-      OpenAI account (Audio-restricted key, $25/mo budget cap) and set
-      `WHISPER_API_KEY` (that exact name) on service `web`. Zero code
-      needed once set. HIGH leverage — voice-first is core to the
-      Proximate conflict-environment design.
+- [x] `WHISPER_API_KEY` set on Railway service `web` (2026-07-05) —
+      verified live: `/api/whisper/status` on prod returns `status: ok`
+      with primary languages ar/so/sw. Voice transcription is active.
+      Key is Audio-restricted with a $25/mo budget cap on the OpenAI
+      account.
 - [ ] BetterStack (or similar) uptime checks on `/health` +
       one per-tenant API probe
 - [ ] Railway daily Postgres backups enabled, 30-day retention
