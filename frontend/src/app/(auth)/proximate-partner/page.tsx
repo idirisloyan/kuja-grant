@@ -44,6 +44,14 @@ interface Disbursement {
   outcome: Outcome | null;
 }
 
+interface Decision {
+  kind: string;
+  label: string;
+  reason?: string | null;
+  response_due_at?: string | null;
+  at: string | null;
+}
+
 interface PartnerPortalPayload {
   partner: {
     id: number;
@@ -53,6 +61,7 @@ interface PartnerPortalPayload {
     dd_cleared_at: string | null;
   };
   disbursements: Disbursement[];
+  decisions?: Decision[];
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -239,6 +248,54 @@ export default function ProximatePartnerPage() {
               </Card>
             ))
           )}
+        </section>
+
+        {/* Phase 716d — right-to-know: decisions affecting this partner */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-medium">
+            {t('proximate.partner.decisions_title')}
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {t('proximate.partner.decisions_intro')}
+          </p>
+          {(!data.decisions || data.decisions.length === 0) ? (
+            <Card className="p-5 text-sm text-center text-muted-foreground">
+              {t('proximate.partner.decisions_empty')}
+            </Card>
+          ) : (
+            <Card className="p-4 divide-y">
+              {data.decisions.map((dec, i) => (
+                <div key={i} className="py-2.5 first:pt-0 last:pb-0 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-medium">{dec.label}</p>
+                    <p className="text-xs text-muted-foreground whitespace-nowrap">
+                      {dec.at && new Date(dec.at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {dec.reason && (
+                    <p className="text-xs text-muted-foreground mt-1" dir="auto">
+                      {t('proximate.partner.decisions_reason_prefix')} {dec.reason}
+                    </p>
+                  )}
+                  {dec.response_due_at && (
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      {t('proximate.partner.decisions_due_prefix')}{' '}
+                      {new Date(dec.response_due_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </Card>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {t('proximate.partner.request_review')}{' — '}
+            <a
+              href={`/proximate-grievance?partner_id=${data.partner.id}`}
+              className="text-blue-600 hover:underline"
+            >
+              {t('proximate.partner.request_review_cta')}
+            </a>
+          </p>
         </section>
 
         <p className="text-xs text-muted-foreground pt-3 border-t">

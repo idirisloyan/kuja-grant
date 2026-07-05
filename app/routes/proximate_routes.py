@@ -5250,7 +5250,89 @@ def api_partner_mini_portal(token):
             ),
         },
         'disbursements': disbursements,
+        # Phase 716d — right-to-know: what the fund has decided about
+        # this partner and why. Redacted (no sanctions-list details,
+        # no reporter identities); review requests go via the public
+        # grievance channel.
+        'decisions': _partner_decision_timeline(partner),
     })
+
+
+def _partner_decision_timeline(partner) -> list[dict]:
+    """Phase 716d — the partner-facing 'decisions affecting me' feed.
+
+    Built from three redacted sources:
+      1. whitelisted audit-chain events on this partner (status
+         transitions, nominations, bank verify, suspend/reinstate) —
+         label only, no details JSON (details can carry list names,
+         reporter identities, endorser emails);
+      2. sanctions checks collapsed to cleared/flagged + timestamp;
+      3. interventions with kind, OB reason (that IS the rationale
+         the fairness gap was about), deadline and status.
+
+    Sorted newest-first. Fairness posture: right-to-know without
+    right-to-appeal — the payload ends with how to request a review.
+    """
+    events = []
+
+    # 1. Whitelisted audit actions → plain-language labels
+    action_labels = {
+        'proximate.partner.nominated': 'Nominated to the fund',
+        'proximate.partner.self_nominated': 'Self-nomination received',
+        'proximate.partner.endorsements_opened': 'Endorsement stage opened',
+        'proximate.partner.dd_pending': 'Due diligence started',
+        'proximate.partner.dd_clear': 'Due diligence cleared',
+        'proximate.partner.bank_verified': 'Payment details verified',
+        'proximate.partner.suspended': 'Suspended pending review',
+        'proximate.partner.reinstated': 'Reinstated',
+        'proximate.partner.status_changed': 'Status updated',
+    }
+    audit_rows = (
+        AuditChainEntry.query
+        .filter_by(subject_kind='proximate_partner', subject_id=partner.id)
+        .order_by(AuditChainEntry.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    for row in audit_rows:
+        label = action_labels.get(row.action)
+        if not label:
+            continue
+        events.append({
+            'kind': 'status',
+            'label': label,
+            'at': row.created_at.isoformat() if row.created_at else None,
+        })
+
+    # 2. Sanctions screening — cleared/flagged only, never list detail
+    if partner.sanctions_checked_at:
+        events.append({
+            'kind': 'screening',
+            'label': (
+                'Routine screening: flagged for review'
+                if partner.sanctions_flag
+                else 'Routine screening: cleared'
+            ),
+            'at': partner.sanctions_checked_at.isoformat(),
+        })
+
+    # 3. Interventions — the OB reason is the rationale the partner
+    # has a right to see (SoP 13 measures are formal notices).
+    for m in InterventionMeasure.query.filter_by(
+        partner_id=partner.id,
+    ).order_by(InterventionMeasure.opened_at.desc()).limit(20).all():
+        events.append({
+            'kind': 'intervention',
+            'label': f'{m.kind.title()} measure ({m.status})',
+            'reason': m.reason,
+            'response_due_at': (
+                m.response_due_at.isoformat() if m.response_due_at else None
+            ),
+            'at': m.opened_at.isoformat() if m.opened_at else None,
+        })
+
+    events.sort(key=lambda e: e.get('at') or '', reverse=True)
+    return events
 
 
 @proximate_bp.route('/partners/<int:partner_id>/mini-portal-link', methods=['POST'])
@@ -7260,3 +7342,343 @@ def api_crisis_selector_brief(row_id):
         'scenario_type': scenario,
         'row_id': row.id,
     })
+
+
+# =========================================================================
+# Phase 716c — Whistleblower / community grievance channel (SoP §14)
+# =========================================================================
+
+@proximate_bp.route('/public/grievances', methods=['POST'])
+def api_submit_grievance():
+    """Public endpoint — no auth, no token. A community member reports
+    a concern about a partner (or the fund as a whole). Anonymity is a
+    first-class option: is_anonymous=true clears identity fields
+    server-side regardless of what the form sent.
+
+    fraud/safety grievances that name a partner auto-open a Phase 635
+    freeze intervention (72h clock) so the OB reacts on the SoP §4
+    track, not just the triage queue. Every submission audit-chains.
+
+    Spam guards mirror self-nominate: honeypot field + a 1-hour window
+    that rejects an identical (partner_id, description) resubmission.
+    """
+    from app.models import (
+        ProximateGrievance, GRIEVANCE_CATEGORIES, InterventionMeasure,
+    )
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+
+    description = (payload.get('description') or '').strip()
+    if not description or len(description) < 10:
+        return jsonify({
+            'success': False,
+            'error': 'description is required (at least 10 characters)',
+        }), 400
+
+    # Honeypot — bots fill every input; humans never see this one
+    if (payload.get('website') or '').strip():
+        return jsonify({'success': False, 'error': 'spam detected'}), 400
+
+    category = (payload.get('category') or 'other').strip().lower()
+    if category not in GRIEVANCE_CATEGORIES:
+        category = 'other'
+
+    partner_id = payload.get('partner_id')
+    partner = None
+    if partner_id:
+        partner = ProximatePartner.query.filter_by(
+            id=partner_id, network_id=net.id,
+        ).first()
+        if not partner:
+            partner_id = None  # about-the-fund fallback, never 404 a reporter
+
+    is_anonymous = bool(payload.get('is_anonymous'))
+
+    # Dedup window — double-taps and copy-paste spam
+    from datetime import timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    dup = ProximateGrievance.query.filter(
+        ProximateGrievance.network_id == net.id,
+        ProximateGrievance.description == description[:5000],
+        ProximateGrievance.submitted_at >= cutoff,
+    ).first()
+    if dup:
+        return jsonify({'success': True, 'grievance_id': dup.id,
+                        'already_submitted': True})
+
+    g = ProximateGrievance(
+        network_id=net.id,
+        partner_id=partner.id if partner else None,
+        reporter_name=None if is_anonymous else (
+            (payload.get('reporter_name') or '').strip()[:160] or None),
+        reporter_phone=None if is_anonymous else (
+            (payload.get('reporter_phone') or '').strip()[:60] or None),
+        is_anonymous=is_anonymous,
+        category=category,
+        description=description[:5000],
+    )
+    db.session.add(g)
+    db.session.commit()
+
+    # SoP §4 — fraud/safety naming a partner opens a freeze unless one
+    # is already running. Reporter identity never enters the
+    # intervention record.
+    if category in ('fraud', 'safety') and partner:
+        existing = InterventionMeasure.query.filter(
+            InterventionMeasure.partner_id == partner.id,
+            InterventionMeasure.status.in_(['open', 'escalated']),
+        ).first()
+        if not existing:
+            measure = InterventionMeasure.open_new(
+                network_id=net.id, partner_id=partner.id, kind='freeze',
+                reason=(
+                    f'Auto-opened from community grievance #{g.id} '
+                    f'(category: {category}). OB review required within '
+                    f'72h per SoP 14.'
+                ),
+                opened_by_user_id=1,  # system user — same as Phase 641
+            )
+            measure.sop_clause = 'SOP-14-grievance-auto'
+            db.session.commit()
+            g.intervention_id = measure.id
+            db.session.commit()
+
+    AuditChainEntry.append(
+        action='proximate.grievance.submitted',
+        actor_email='public-form',
+        subject_kind='proximate_grievance',
+        subject_id=g.id,
+        details={
+            'category': category,
+            'partner_id': g.partner_id,
+            'is_anonymous': is_anonymous,
+            'auto_intervention_id': g.intervention_id,
+        },
+    )
+    logger.info(
+        f"Proximate: grievance submitted id={g.id} category={category} "
+        f"partner_id={g.partner_id} anonymous={is_anonymous} "
+        f"auto_intervention={g.intervention_id}"
+    )
+    return jsonify({'success': True, 'grievance_id': g.id})
+
+
+@proximate_bp.route('/grievances', methods=['GET'])
+@ob_required
+def api_list_grievances():
+    """OB triage queue. Default: new + triaged (working set), newest
+    first, SLA clock fields on every row. ?status= filters explicitly.
+    Reporter identity is included here — this is the one OB-only
+    surface allowed to see it."""
+    from app.models import ProximateGrievance
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    q = ProximateGrievance.query.filter_by(network_id=net.id)
+    status = request.args.get('status')
+    if status:
+        q = q.filter_by(status=status)
+    else:
+        q = q.filter(ProximateGrievance.status.in_(['new', 'triaged']))
+    rows = q.order_by(ProximateGrievance.submitted_at.desc()).limit(200).all()
+
+    partner_ids = {r.partner_id for r in rows if r.partner_id}
+    partners = {}
+    if partner_ids:
+        for p in ProximatePartner.query.filter(
+            ProximatePartner.id.in_(partner_ids),
+        ).all():
+            partners[p.id] = p.name
+
+    out = []
+    for r in rows:
+        d = r.to_dict(include_reporter=True)
+        d['partner_name'] = partners.get(r.partner_id)
+        out.append(d)
+    new_count = sum(1 for r in rows if r.status == 'new')
+    breached = sum(1 for r in rows if r.is_sla_breached)
+    return jsonify({
+        'success': True,
+        'grievances': out,
+        'new_count': new_count,
+        'sla_breached_count': breached,
+    })
+
+
+@proximate_bp.route('/grievances/<int:grievance_id>/triage', methods=['POST'])
+@ob_required
+def api_triage_grievance(grievance_id):
+    """Mark a grievance triaged (OB has looked at it — stops the 72h
+    clock). Optional notes."""
+    from app.models import ProximateGrievance
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    g = ProximateGrievance.query.filter_by(
+        id=grievance_id, network_id=net.id,
+    ).first()
+    if not g:
+        return jsonify({'success': False, 'error': 'Grievance not found'}), 404
+    if g.status != 'new':
+        return jsonify({'success': False,
+                        'error': f'cannot triage from status {g.status}'}), 422
+    payload = request.get_json(silent=True) or {}
+    was_breached = g.is_sla_breached
+    g.triage(user_id=current_user.id, notes=payload.get('notes'))
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.grievance.triaged',
+        actor_email=current_user.email,
+        subject_kind='proximate_grievance',
+        subject_id=g.id,
+        details={'sla_breached_at_triage': was_breached},
+    )
+    return jsonify({'success': True, 'grievance': g.to_dict(include_reporter=True)})
+
+
+@proximate_bp.route('/grievances/<int:grievance_id>/resolve', methods=['POST'])
+@ob_required
+def api_resolve_grievance(grievance_id):
+    """Close out a grievance with resolution notes. dismissed=true for
+    unfounded reports (kept, never deleted — the register is part of
+    the audit posture)."""
+    from app.models import ProximateGrievance
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    g = ProximateGrievance.query.filter_by(
+        id=grievance_id, network_id=net.id,
+    ).first()
+    if not g:
+        return jsonify({'success': False, 'error': 'Grievance not found'}), 404
+    if g.status in ('resolved', 'dismissed'):
+        return jsonify({'success': False,
+                        'error': 'grievance already closed'}), 422
+    payload = request.get_json(silent=True) or {}
+    notes = (payload.get('notes') or '').strip()
+    if not notes:
+        return jsonify({'success': False,
+                        'error': 'resolution notes are required'}), 400
+    dismissed = bool(payload.get('dismissed'))
+    g.resolve(user_id=current_user.id, notes=notes, dismissed=dismissed)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.grievance.dismissed' if dismissed
+               else 'proximate.grievance.resolved',
+        actor_email=current_user.email,
+        subject_kind='proximate_grievance',
+        subject_id=g.id,
+        details={'dismissed': dismissed},
+    )
+    return jsonify({'success': True, 'grievance': g.to_dict(include_reporter=True)})
+
+
+# =========================================================================
+# Phase 716e — Public transparency page data (trust-building surface)
+# =========================================================================
+
+# Daily in-process cache — the public page must never become a live
+# query vector into operational data. {network_id: (computed_at, payload)}
+_TRANSPARENCY_CACHE: dict = {}
+_TRANSPARENCY_TTL_SECONDS = 24 * 3600
+
+
+def _build_transparency_payload(net) -> dict:
+    """Aggregates only — no PII, no per-disbursement amounts, no
+    partner identities beyond counts. Per the 716e spec."""
+    from sqlalchemy import func, extract
+    from app.models import ProximateOutcomeAttestation
+
+    year = datetime.now(timezone.utc).year
+    moved_states = ('pending_report', 'reported', 'verified', 'flagged')
+
+    total_moved = (
+        db.session.query(func.coalesce(func.sum(
+            ProximateDisbursement.amount_usd), 0))
+        .filter(
+            ProximateDisbursement.network_id == net.id,
+            ProximateDisbursement.status.in_(moved_states),
+            extract('year', ProximateDisbursement.sent_at) == year,
+        )
+        .scalar()
+    ) or 0
+
+    disbursement_count = (
+        db.session.query(func.count(ProximateDisbursement.id))
+        .filter(
+            ProximateDisbursement.network_id == net.id,
+            ProximateDisbursement.status.in_(moved_states),
+            extract('year', ProximateDisbursement.sent_at) == year,
+        )
+        .scalar()
+    ) or 0
+
+    # Partner counts by locality — active pipeline only, no names
+    partners_by_locality: dict[str, int] = {}
+    active = ProximatePartner.query.filter(
+        ProximatePartner.network_id == net.id,
+        ProximatePartner.status.in_(
+            ['endorsements_open', 'dd_pending', 'dd_clear'],
+        ),
+    ).all()
+    for p in active:
+        key = (p.locality or 'Other').strip() or 'Other'
+        partners_by_locality[key] = partners_by_locality.get(key, 0) + 1
+
+    # Sustained-outcome rate — OB-verified attestations over all
+    # attested (submitted / verified / disputed). Aggregate only.
+    attested = ProximateOutcomeAttestation.query.join(
+        ProximatePartner,
+        ProximateOutcomeAttestation.partner_id == ProximatePartner.id,
+    ).filter(
+        ProximatePartner.network_id == net.id,
+        ProximateOutcomeAttestation.status.in_(
+            ['submitted', 'verified', 'disputed'],
+        ),
+    ).all()
+    verified_count = sum(1 for a in attested if a.status == 'verified')
+    sustained_rate = (
+        round(100.0 * verified_count / len(attested)) if attested else None
+    )
+
+    # Active rounds — title + trigger only
+    rounds = ProximateRound.query.filter(
+        ProximateRound.network_id == net.id,
+        ProximateRound.status == 'active',
+    ).all()
+
+    return {
+        'year': year,
+        'total_moved_usd': float(total_moved),
+        'disbursement_count': int(disbursement_count),
+        'partner_count': len(active),
+        'partners_by_locality': partners_by_locality,
+        'sustained_outcome_rate_pct': sustained_rate,
+        'outcomes_attested': len(attested),
+        'active_rounds': [
+            {'title': r.title, 'trigger_type': r.trigger_type}
+            for r in rounds
+        ],
+        'generated_at': datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@proximate_bp.route('/public/transparency', methods=['GET'])
+def api_public_transparency():
+    """Public endpoint — no auth. Serves the Phase 716e transparency
+    page. Cached in-process for 24h per tenant so the public surface
+    is a snapshot, not a live query path (leak-vector avoidance per
+    the spec)."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    now_ts = datetime.now(timezone.utc).timestamp()
+    cached = _TRANSPARENCY_CACHE.get(net.id)
+    if cached and (now_ts - cached[0]) < _TRANSPARENCY_TTL_SECONDS:
+        payload = cached[1]
+    else:
+        payload = _build_transparency_payload(net)
+        _TRANSPARENCY_CACHE[net.id] = (now_ts, payload)
+    return jsonify({'success': True, 'transparency': payload})

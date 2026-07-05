@@ -103,6 +103,10 @@ from app.models.proximate_grant import (
     REPORTING_CADENCES as PROXIMATE_GRANT_REPORTING_CADENCES,
     REPORT_STATUSES as PROXIMATE_GRANT_REPORT_STATUSES,
 )
+from app.models.proximate_grievance import (
+    ProximateGrievance, GRIEVANCE_CATEGORIES, GRIEVANCE_STATUSES,
+    TRIAGE_SLA_HOURS,
+)
 
 __all__ = [
     'User', 'Organization', 'Grant', 'Application', 'Assessment',
@@ -145,4 +149,6 @@ __all__ = [
     'ProximateGrant', 'ProximateGrantAllocation', 'ProximateGrantReport',
     'PROXIMATE_GRANT_STATUSES', 'PROXIMATE_GRANT_REPORTING_CADENCES',
     'PROXIMATE_GRANT_REPORT_STATUSES',
+    'ProximateGrievance', 'GRIEVANCE_CATEGORIES', 'GRIEVANCE_STATUSES',
+    'TRIAGE_SLA_HOURS',
 ]

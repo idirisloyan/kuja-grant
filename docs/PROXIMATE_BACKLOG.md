@@ -506,50 +506,51 @@ no login screen, no account required.
       endorsers who want accounts
 
 **Should-have — Phase 716c Whistleblower / community grievance
-channel (added 2026-06-30)**
+channel (added 2026-06-30) — SHIPPED 2026-07-05**
 
-SoP §14 implies a public reporting channel; code doesn't have one
-yet. A community member should be able to report concerns about a
-partner without needing an account or explaining who they are.
+- [x] Model `ProximateGrievance` (partner_id optional, anonymous
+      first-class — identity cleared server-side when chosen,
+      category fraud/safety/other, 72h SLA clock helpers on the
+      model). New table auto-creates on boot.
+- [x] Public `/proximate-grievance` — bilingual AR-first, no auth,
+      anonymity toggle, honeypot + 1h dedup window. Mini-portal links
+      prefill partner_id so partner-named reports carry it.
+- [x] OB triage queue `/proximate/admin/grievances` — 72h countdown
+      badge per row (red once breached), triage stops the clock,
+      resolve/dismiss require notes, reporter identity visible ONLY
+      here. Tile added to the operator dashboard.
+- [x] fraud/safety naming a partner auto-open a Phase 635 freeze
+      (72h, `SOP-14-grievance-auto`) unless one is already running.
+      Every submission/triage/resolution audit-chains.
+- [ ] Add QR code + short URL to the printable Adeso one-pager
+      (regenerate docs/outreach one-pager — pending).
 
-- [ ] New model `ProximateGrievance`: partner_id (optional — can be
-      about the fund as a whole), reporter_name (optional/anonymous),
-      reporter_phone (optional), category (fraud/safety/other),
-      description, submitted_at, triaged_at, triaged_by_user_id,
-      resolution_notes.
-- [ ] Public URL `/proximate-grievance` — no auth, no token, just a
-      form with a "submit anonymously" option.
-- [ ] OB triage queue at `/proximate/admin/grievances` with 72-hour
-      SLA badge.
-- [ ] Auto-open a Phase 635 intervention if severity=fraud/safety.
-- [ ] Add QR code + short URL to the printable Adeso one-pager.
+**Should-have — Phase 716d Partner-side audit trail (added
+2026-06-30) — SHIPPED 2026-07-05**
 
-**Should-have — Phase 716d Partner-side audit trail (added 2026-06-30)**
+- [x] Mini-portal now returns `decisions` — built from (1)
+      whitelisted audit-chain events rendered as plain-language
+      labels only (details JSON never exposed — it can carry list
+      names / reporter identities), (2) sanctions checks collapsed to
+      cleared/flagged + timestamp, (3) interventions with kind, OB
+      reason (the rationale), deadline and status. Newest-first.
+- [x] "Decisions affecting you" section on /proximate-partner with a
+      request-review pointer into /proximate-grievance (prefills
+      partner_id). Right-to-know without right-to-appeal, per spec.
 
-Partners can currently see their disbursements via the mini-portal
-but not WHY they were flagged / suspended / declined. Fairness gap.
+**Should-have — Phase 716e Public transparency page (added
+2026-06-30) — SHIPPED 2026-07-05**
 
-- [ ] Extend partner mini-portal (Phase 634) with a "Decisions
-      affecting me" section: sanctions checks (redacted to
-      "cleared/flagged" only, no list details), status transitions
-      with dates, interventions with response deadlines, and OB
-      decision rationale for any flag.
-- [ ] Right-to-know without right-to-appeal: partner sees what
-      happened, can request review via the grievance channel.
-
-**Should-have — Phase 716e Public transparency page (added 2026-06-30)**
-
-Trust-building for future donors + the public.
-
-- [ ] Public URL `/proximate` (marketing site, not the app shell) —
-      no auth required.
-- [ ] Shows: total envelope moved this year, partner count by
-      locality, sustained-outcome rate (aggregated only, no per-
-      partner detail), current active rounds (title + trigger only).
-- [ ] No PII, no per-disbursement amounts, no partner identities
-      beyond names of publicly-disclosed grantees.
-- [ ] Refreshes daily via a cached endpoint (not real-time — avoids
-      leak vectors).
+- [x] Public `/proximate` (in the auth route group — plain page, not
+      the app shell) reading `GET /api/proximate/public/transparency`.
+- [x] Shows: total moved this year + disbursement count, partner
+      count by locality, sustained-outcome rate (OB-verified share of
+      attested outcomes, aggregate only), active rounds (title +
+      trigger only). Bilingual AR/EN.
+- [x] No PII, no per-disbursement amounts, no partner names anywhere
+      in the payload (locality counts only).
+- [x] 24h in-process cache per tenant — the public page reads a
+      snapshot, never a live query path.
 
 **Should-have — Phase 716 DD guardrail sweep (files in the "High
 priority — operational" list below)**

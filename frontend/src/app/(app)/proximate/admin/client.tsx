@@ -24,7 +24,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ShieldCheck, Activity, Users, FileText, Banknote, Coins, UserPlus, Flame } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, ShieldAlert, Activity, Users, FileText, Banknote, Coins, UserPlus, Flame } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
@@ -238,6 +238,20 @@ export function ProximateAdminClient() {
                   </div>
                   <p className="text-sm font-medium">
                     {t('proximate.admin.tile_crisis_selector_sub')}
+                  </p>
+                </Card>
+              </Link>
+              {/* Phase 716c — grievance triage queue */}
+              <Link href="/proximate/admin/grievances" className="block">
+                <Card className="p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ShieldAlert className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      {t('proximate.grievance_queue.title')}
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium">
+                    {t('proximate.grievance_queue.subtitle')}
                   </p>
                 </Card>
               </Link>
