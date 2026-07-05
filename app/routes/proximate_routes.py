@@ -43,6 +43,7 @@ from app.models import (
     ProximateDisbursement, DEFAULT_REPORT_WINDOW_DAYS,
 )
 from app.utils.network import ob_required
+from app.utils.helpers import get_request_json
 
 logger = logging.getLogger('kuja')
 
@@ -349,13 +350,18 @@ def api_self_nominate_partner():
         status='nominated',
     )
     # Stash the free-text "what does your group do" into intake_form so
-    # the secretariat can read it during triage.
+    # the secretariat can read it during triage. Phase 716b adds
+    # referred_by — word-of-mouth attribution without a full
+    # endorser-referral flow (SoP keeps nomination and vouching apart).
     description = (payload.get('description') or '').strip()
-    if description:
-        partner.set_intake_form({
-            'description': description[:2000],
-            'source': 'self_nominated',
-        })
+    referred_by = (payload.get('referred_by') or '').strip()
+    if description or referred_by:
+        intake = {'source': 'self_nominated'}
+        if description:
+            intake['description'] = description[:2000]
+        if referred_by:
+            intake['referred_by'] = referred_by[:200]
+        partner.set_intake_form(intake)
     db.session.add(partner)
     db.session.commit()
     AuditChainEntry.append(
@@ -387,6 +393,40 @@ def api_self_nominate_partner():
         )
 
     return jsonify({'success': True, 'partner': partner.to_dict()})
+
+
+@proximate_bp.route('/public/funded-partners', methods=['GET'])
+def api_public_funded_partners():
+    """Phase 716b — social proof for the public nominate page.
+
+    Deliberately minimal for a conflict environment: names + locality +
+    disbursement count ONLY. No contacts, no amounts, no free-text
+    descriptions (self-written text could contain sensitive detail).
+    Partners listed are dd_clear — they passed screening and their
+    participation is already visible to their own community by design
+    (community endorsement is public within the locality)."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    rows = (
+        ProximatePartner.query
+        .filter_by(network_id=net.id, status='dd_clear')
+        .order_by(ProximatePartner.dd_cleared_at.desc().nullslast())
+        .limit(4)
+        .all()
+    )
+    out = []
+    for p in rows:
+        count = ProximateDisbursement.query.filter_by(
+            partner_id=p.id,
+        ).count()
+        out.append({
+            'name': p.name,
+            'name_ar': p.name_ar,
+            'locality': p.locality,
+            'disbursements_count': count,
+        })
+    return jsonify({'success': True, 'partners': out})
 
 
 def _run_partner_sanctions_screen(partner):

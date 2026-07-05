@@ -26,13 +26,21 @@ Updated 2026-07-05.
 ## Platform — open items (all tenants)
 
 ### Regression gate is not trustworthy locally
-- **last_touched:** 2026-07-01
+- **last_touched:** 2026-07-05
 - Local `smoke_test.py` reports ~137/167 PASS on Windows dev; failures
   are SQLite readonly/schema quirks, not real regressions — but that
   means the gate can't distinguish real breakage from noise.
+- **2026-07-05 concrete miss:** smoke reported 167/167 PASS while FIVE
+  Proximate POST endpoints were dead on prod (`NameError:
+  get_request_json` — missing import). The suite has no write-path
+  coverage for Proximate grant/participant/invite endpoints; seeds
+  insert rows directly so the gap was invisible until live API testing.
 - [ ] Move local smoke to a dedicated pytest fixture DB (tmpdir SQLite
       or dockerised Postgres), or gate merges on the CI suite only and
       demote local smoke to advisory.
+- [ ] Add smoke cases that POST through every Proximate write endpoint
+      (grant create/update, allocation, participant add, endorser
+      invite, suspend) — a NameError at request time must fail the gate.
 
 ### "What is this / what needs action / what happens next" copy pass
 - **last_touched:** 2026-07-01 (UAT feedback: applies platform-wide,

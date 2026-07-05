@@ -449,32 +449,27 @@ are inherited — no re-configuration needed. Only genuinely new work:
       `/health` (60s) and `/api/proximate/overview` (5min). Alert the
       team's Slack channel.
 
-**Should-have — Phase 716b `/proximate-nominate` content redesign
-(added 2026-06-30 after intake-flow review)**
+**Phase 716b `/proximate-nominate` content redesign — SHIPPED
+2026-07-05** (spec added 2026-06-30 after intake-flow review)
 
-The page today is a bare form. An NGO landing on it cold has no context.
-For pilot, this is the first-touch surface — needs to earn trust in ~15
-seconds before the NGO decides to fill it out.
-
-- [ ] Hero section — what Proximate Fund is, in one sentence Arabic +
-      English. Emphasise "community endorsement" over "grant application"
-      framing (per SoP intent).
-- [ ] Three-step "how it works": Nominate → Community vouches → Adeso
-      reviews. Visual, not paragraphs.
-- [ ] "Recently funded partners" carousel — 3-4 partners with locality
-      + short story. Pulls from the seeded/live register.
-- [ ] FAQ collapsibles — timeline, eligibility, what happens if you're
-      declined, is my data safe, do I need to be a registered NGO.
-- [ ] "Referred by someone?" optional field on the form itself —
-      captures word-of-mouth attribution without adding a full
-      endorser-referral flow.
-- [ ] Arabic-first rendering (Proximate default per Phase 661) —
-      RTL layout, Arabic hero copy is the primary, English is secondary.
-- [ ] Non-code deliverables to produce alongside: (1) A4 printable
-      Arabic+English one-pager with QR to /proximate-nominate for field
-      team, (2) 60-second WhatsApp voice note the OB can forward,
-      (3) template email for peer coordination bodies (OCHA cluster
-      leads, Sudan NGO Forum).
+- [x] Hero — Arabic primary + English secondary, community-endorsement
+      framing ("no formal registration, no account, no heavy paperwork")
+- [x] Three-step visual "how it works": Nominate → Community vouches →
+      Adeso reviews & calls you (bilingual chips)
+- [x] "Recently funded partners" strip — new public endpoint
+      `GET /api/proximate/public/funded-partners`, protection-postured:
+      names + locality + disbursement count ONLY (no amounts, no free
+      text, dd_clear partners only)
+- [x] FAQ collapsibles ×4 (timeline, registered-NGO?, declined?, data
+      safety) — bilingual `<details>` elements, no JS
+- [x] "Referred by someone?" optional field → stored in
+      `intake_form_json.referred_by` for secretariat triage
+- [x] Arabic-first: hero/steps/FAQ hardcoded bilingual (public page
+      renders before language context exists); form labels keep i18n
+- [x] Outreach kit in `docs/outreach/`: A4 one-pager PDF (AR+EN, QR,
+      shaped Arabic via arabic-reshaper; `generate_onepager.py` to
+      re-render when DNS lands), 60s WhatsApp voice-note script
+      (Sudanese-register AR + EN), coordination-body email template
 
 **Explicitly not doing (2026-06-30 decision)** — "endorser refers a
 partner" path. SoP §3 separates nomination (partner/OB) from vouching
@@ -743,6 +738,19 @@ detail-page ID bug and allocation seeding fixed in 64cd8927.
       a "Start a round from this signal" action on every curated row
       and pending signal — prefills `/proximate/rounds/new` (title,
       trigger, summary, region) via query params.
+
+## Hotfix log (2026-07-05, found by live prod verification)
+
+- [x] **Five Proximate POST endpoints were dead on prod** with
+      `NameError: get_request_json is not defined` (helper existed in
+      `app/utils/helpers` but was never imported in
+      `proximate_routes.py`): create grant, update grant, add grant
+      allocation, add round participant (Phase 715b!), create endorser
+      invite (Phase 716a!). Never caught because seeds insert rows
+      directly and the smoke gate has no write-path coverage for these
+      endpoints — smoke reported 167/167 PASS while they were broken.
+      Fixed with a module-level import. Follow-up filed in
+      BACKLOG.md → smoke-gate trustworthiness.
 
 ## Status corrections (2026-07-05)
 
