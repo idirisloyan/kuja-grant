@@ -72,6 +72,9 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return;
     try {
       const params = new URLSearchParams(window.location.search);
+      // Normalise trailing slashes so '/login' and '/login/' (static export)
+      // both match.
+      const path = window.location.pathname.replace(/\/+$/, '') || '/';
       if (params.has('network')) {
         const slug = (params.get('network') || '').trim().toLowerCase();
         const prev = (window.localStorage.getItem('kuja_network_override') || '').toLowerCase();
@@ -96,7 +99,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
         // On tenant switch, force re-auth so the user explicitly chooses
         // identity within the new tenant. POST /api/auth/logout is
         // tolerant of being called without an active session.
-        if (isTenantSwitch && window.location.pathname !== '/login') {
+        if (isTenantSwitch && path !== '/login') {
           (async () => {
             try {
               await fetch('/api/auth/logout', {
@@ -109,6 +112,26 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
             }
             window.location.replace('/login');
           })();
+        }
+      } else if (path === '/login') {
+        // No explicit ?network= signal AND we're on the login screen.
+        // The login must NEVER default to a tenant: multiple teams test
+        // different tenants on the same shared host, and a persisted
+        // override from a previous ?network= visit (or switcher click)
+        // would otherwise silently theme the login as that tenant — e.g.
+        // "Welcome back to Proximate Fund" showing for a Kuja tester.
+        //
+        // Clearing the demo override here makes a bare /login start
+        // neutral (default Kuja marketplace, resolved by host). Testers
+        // then pick their tenant explicitly via the on-page switcher or
+        // a ?network=<slug> link. Host-based resolution (real subdomains
+        // like near.kuja.org) is untouched — it never wrote this key.
+        const stale = window.localStorage.getItem('kuja_network_override');
+        if (stale) {
+          window.localStorage.removeItem('kuja_network_override');
+          // Drop the stale-branded network so loadNetwork() re-resolves
+          // from the host on this same mount (neutral base).
+          useNetworkStore.setState({ network: null, loading: true });
         }
       }
     } catch {

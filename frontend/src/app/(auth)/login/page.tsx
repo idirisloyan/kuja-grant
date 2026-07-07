@@ -163,9 +163,26 @@ export default function LoginPage() {
           });
           if (r.ok) {
             const body = await r.json();
+            const isProximatePersona =
+              body?.persona === 'donor' ||
+              body?.persona === 'ob' ||
+              body?.persona === 'admin';
             if (body?.persona === 'donor') target = '/proximate/donor';
             else if (body?.persona === 'ob' || body?.persona === 'admin') {
               target = '/proximate/admin';
+            }
+            // The bare /login clears any tenant override so it starts
+            // neutral (see NetworkProvider). If this user is in fact a
+            // Proximate persona, pin the override now so the destination
+            // /proximate/* pages carry X-Network-Override and resolve to
+            // the Proximate tenant — even when the user typed their email
+            // on the neutral login instead of clicking the switcher.
+            if (isProximatePersona) {
+              try {
+                window.localStorage.setItem('kuja_network_override', 'proximate');
+              } catch {
+                /* localStorage unavailable — proximate pages fall back to host */
+              }
             }
           }
         } catch {
