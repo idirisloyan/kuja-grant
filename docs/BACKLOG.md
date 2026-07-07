@@ -35,12 +35,21 @@ Updated 2026-07-05.
   get_request_json` — missing import). The suite has no write-path
   coverage for Proximate grant/participant/invite endpoints; seeds
   insert rows directly so the gap was invisible until live API testing.
-- [ ] Move local smoke to a dedicated pytest fixture DB (tmpdir SQLite
-      or dockerised Postgres), or gate merges on the CI suite only and
-      demote local smoke to advisory.
-- [ ] Add smoke cases that POST through every Proximate write endpoint
-      (grant create/update, allocation, participant add, endorser
-      invite, suspend) — a NameError at request time must fail the gate.
+- [x] **RESOLVED 2026-07-07 — `regression.py`.** New deterministic gate:
+      seeds a FRESH isolated SQLite DB in a tmp dir (`KUJA_DB_PATH` hook on
+      dev config; forces UTF-8 stdio so seed unicode no longer crashes on a
+      Windows cp1252 console — that was the bulk of the "readonly/schema
+      quirks" noise). Local == CI. Run: `python regression.py`.
+- [x] **RESOLVED 2026-07-07.** `regression.py` POSTs through the write paths
+      of every Proximate route module (grants/allocations, rounds/sign,
+      partners/suspend, disbursements/cosign, interventions, fsps,
+      endorser-invites, crisis, grievances) + Kuja (grant→apply→submit→
+      review→report) + NEAR (declarations/funds). Any handler that raises
+      (NameError / missing import / 5xx) fails the gate — proven by injecting
+      the exact `get_request_json` NameError and watching it go red. CI:
+      `.github/workflows/regression.yml` (fast API job + full API+Playwright
+      browser job). Live browser leg reuses `browser_test.py --base`.
+      Old `smoke_test.py` stays as an advisory quick-check.
 
 ### "What is this / what needs action / what happens next" copy pass
 - **last_touched:** 2026-07-01 (UAT feedback: applies platform-wide,

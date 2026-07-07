@@ -26,7 +26,15 @@ class BaseConfig:
 
 class DevelopmentConfig(BaseConfig):
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(BASE_DIR, 'kuja.db')}"
+    # KUJA_DB_PATH lets the regression harness point dev config (and the seed
+    # scripts, which also build the app via create_app()) at an isolated
+    # throwaway SQLite file instead of the shared repo kuja.db. Unset in
+    # normal dev → the usual kuja.db. This is what makes the local regression
+    # gate deterministic (no readonly/lock/stale-schema noise from a shared,
+    # possibly-drifted kuja.db).
+    SQLALCHEMY_DATABASE_URI = (
+        f"sqlite:///{os.getenv('KUJA_DB_PATH', os.path.join(BASE_DIR, 'kuja.db'))}"
+    )
     SESSION_COOKIE_SECURE = False
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
     SQLALCHEMY_ENGINE_OPTIONS = {'pool_pre_ping': True}

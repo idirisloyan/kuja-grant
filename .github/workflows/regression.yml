@@ -1,0 +1,43 @@
+name: Regression
+
+# Trustworthy regression gate (regression.py):
+#   * Seeds a FRESH isolated SQLite DB (no shared kuja.db → deterministic).
+#   * API write-path coverage across kuja / near / proximate — a handler that
+#     raises (NameError, missing import, …) fails the gate. This is the gap
+#     that let five dead Proximate endpoints ship undetected.
+#   * Live browser suite (Playwright) against the same seeded server.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  api:
+    name: API regression (isolated DB, write-path)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend deps
+        run: pip install -r requirements.txt
+      - name: Run API regression
+        run: python regression.py --api-only
+
+  browser:
+    name: Full regression + live browser (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend deps
+        run: pip install -r requirements.txt
+      - name: Install Playwright + Chromium
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Run full regression (API + live browser)
+        run: python regression.py --browser
