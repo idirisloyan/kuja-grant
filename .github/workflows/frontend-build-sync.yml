@@ -1,0 +1,35 @@
+name: Frontend build sync
+
+# Railway serves the COMMITTED static/nextjs/ export and does not rebuild the
+# frontend on deploy. So a change under frontend/src that isn't accompanied by
+# a fresh `npm run build` (which regenerates static/nextjs/) silently ships
+# nothing — the live site keeps serving the old UI, while smoke/browser tests
+# pass against the stale committed export.
+#
+# This job fails the moment the committed export drifts from source, so that
+# class of "I fixed it but it never deployed" bug can't reach main unnoticed.
+# It only reads files (recomputes a source fingerprint and compares it to the
+# one stamped into static/nextjs/.source-hash) — it does not rebuild, so it is
+# fast and touches nothing in the deploy path.
+
+on:
+  push:
+    paths:
+      - "frontend/**"
+      - "static/nextjs/**"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "static/nextjs/**"
+
+jobs:
+  build-sync:
+    name: Committed export matches source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Verify static/nextjs/ is in sync with frontend source
+        run: node frontend/scripts/verify-built.js

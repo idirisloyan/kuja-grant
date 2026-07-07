@@ -11,6 +11,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { fingerprint } = require('./source-fingerprint');
 
 const SRC = path.join(__dirname, '..', 'out');
 const DST = path.join(__dirname, '..', '..', 'static', 'nextjs');
@@ -62,5 +63,12 @@ if (fs.existsSync(chunksDir)) {
   })(chunksDir);
   console.log(`Shipped ${count} chunk file(s).`);
 }
+
+// Stamp a fingerprint of the build INPUTS (frontend source) into the export.
+// verify-built.js + the frontend-build-sync CI job compare this against the
+// current source to catch a committed export that was never rebuilt.
+const fp = fingerprint();
+fs.writeFileSync(path.join(DST, '.source-hash'), fp + '\n');
+console.log(`Stamped static/nextjs/.source-hash (${fp.slice(0, 12)}…)`);
 
 console.log('Copied Next.js output to static/nextjs/');
