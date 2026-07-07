@@ -224,7 +224,13 @@ export default function LoginPage() {
   void router;
 
   return (
-    <div className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-10">
+    // dir="ltr" is pinned here on purpose. The Proximate tenant defaults to
+    // Arabic, so use-translation sets documentElement.dir="rtl" globally — but
+    // this login page is English-only on every tenant, and in an RTL context
+    // trailing punctuation on English lines flips to the front (".Welcome back",
+    // "?Not a member yet"). Forcing LTR on the login subtree renders the English
+    // copy correctly regardless of the tenant's default language.
+    <div dir="ltr" className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-10">
       {/* Hero gradient */}
       <div
         aria-hidden
