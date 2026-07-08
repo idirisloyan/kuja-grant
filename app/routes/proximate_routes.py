@@ -1836,6 +1836,295 @@ def api_proximate_overview():
     })
 
 
+# ---- OB attention queue (Phase 717) ----------------------------------
+
+@proximate_bp.route('/attention-queue', methods=['GET'])
+@login_required
+def api_attention_queue():
+    """The single 'what needs a human now' list for the OB. Merges every
+    time-sensitive obligation across the fund into one prioritised feed so
+    nothing hides inside a state machine: interventions (expired first),
+    pending cosigns (money waiting), overdue partner reports, disbursements
+    awaiting independent verification, new grievances, rounds awaiting
+    signature, and the light-KYC endorser queue.
+
+    Read-open like /overview (per-action endpoints enforce OB). Every item
+    carries a severity, a human title/subtitle, and a deep link so the
+    operator can act in one click.
+    """
+    from datetime import datetime as _dt, timezone as _tz
+    from app.models import (
+        ProximatePartner, InterventionMeasure, ProximateDisbursement,
+        ProximateGrievance, ProximateRound, ProximateRoundSignature,
+        Endorser,
+    )
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    now = _dt.now(_tz.utc)
+
+    def _aware(dt):
+        if dt is None:
+            return None
+        return dt.replace(tzinfo=_tz.utc) if dt.tzinfo is None else dt
+
+    def _hours_until(dt):
+        dt = _aware(dt)
+        return round((dt - now).total_seconds() / 3600, 1) if dt else None
+
+    def _days_since(dt):
+        dt = _aware(dt)
+        return round((now - dt).total_seconds() / 86400, 1) if dt else None
+
+    partners = {
+        p.id: p for p in
+        ProximatePartner.query.filter_by(network_id=net.id).all()
+    }
+
+    def _pname(pid):
+        p = partners.get(pid)
+        return p.name if p else f'Partner #{pid}'
+
+    items = []
+
+    # 1. Interventions (open/escalated) — expired / escalated = critical
+    for m in InterventionMeasure.query.filter(
+        InterventionMeasure.network_id == net.id,
+        InterventionMeasure.status.in_(['open', 'escalated']),
+    ).all():
+        hot = bool(getattr(m, 'is_expired', False)) or m.status == 'escalated'
+        items.append({
+            'kind': 'intervention',
+            'severity': 'critical' if hot else 'high',
+            'title': f'{(m.kind or "").title()} intervention — {_pname(m.partner_id)}',
+            'subtitle': ('Response window passed — escalate/resolve now' if hot
+                         else 'Awaiting an independent OB response'),
+            'href': f'/proximate/endorse/{m.partner_id}',
+            'entity_kind': 'intervention', 'entity_id': m.id,
+            'due_at': (m.response_due_at.isoformat()
+                       if m.response_due_at else None),
+            'hours_until_due': _hours_until(m.response_due_at),
+        })
+
+    # 2. Disbursements — pending cosign / overdue report / verify pending
+    for d in ProximateDisbursement.query.filter(
+        ProximateDisbursement.network_id == net.id,
+        ProximateDisbursement.status.in_(
+            ['pending_cosign', 'pending_report', 'reported']),
+    ).all():
+        amt = float(d.amount_usd or 0)
+        if d.status == 'pending_cosign':
+            items.append({
+                'kind': 'cosign',
+                'severity': 'high',
+                'title': f'Cosign needed — ${amt:,.0f} to {_pname(d.partner_id)}',
+                'subtitle': (f'{d.cosigners_required or 0} co-signature(s) '
+                             'required before funds can move'),
+                'href': f'/proximate/disbursements/{d.id}',
+                'entity_kind': 'disbursement', 'entity_id': d.id,
+            })
+        elif d.status == 'pending_report':
+            due = _aware(d.report_due_at)
+            if due and due < now:
+                items.append({
+                    'kind': 'report_overdue',
+                    'severity': 'high',
+                    'title': f'Report overdue — {_pname(d.partner_id)}',
+                    'subtitle': (f'Partner report is {_days_since(due)} '
+                                 'day(s) late'),
+                    'href': f'/proximate/disbursements/{d.id}',
+                    'entity_kind': 'disbursement', 'entity_id': d.id,
+                    'due_at': d.report_due_at.isoformat() if d.report_due_at else None,
+                })
+        elif d.status == 'reported' and d.verifier_verdict != 'confirmed':
+            assigned = d.verifier_user_id is not None
+            items.append({
+                'kind': 'verify',
+                'severity': 'medium',
+                'title': f'Independent verification pending — {_pname(d.partner_id)}',
+                'subtitle': ('Verifier assigned — awaiting attestation'
+                             if assigned else
+                             'No independent verifier assigned yet'),
+                'href': f'/proximate/disbursements/{d.id}',
+                'entity_kind': 'disbursement', 'entity_id': d.id,
+            })
+
+    # 3. Grievances awaiting triage — fraud/safety = critical
+    for gr in ProximateGrievance.query.filter_by(
+        network_id=net.id, status='new',
+    ).all():
+        sev = 'critical' if gr.category in ('fraud', 'safety') else 'high'
+        items.append({
+            'kind': 'grievance',
+            'severity': sev,
+            'title': (f'New {gr.category} grievance'
+                      + (f' — {_pname(gr.partner_id)}' if gr.partner_id else '')),
+            'subtitle': 'Needs triage (SLA clock is running)',
+            'href': '/proximate/admin/grievances',
+            'entity_kind': 'grievance', 'entity_id': gr.id,
+            'age_days': _days_since(gr.submitted_at),
+        })
+
+    # 4. Rounds in review awaiting signatures
+    for r in ProximateRound.query.filter_by(
+        network_id=net.id, status='in_review',
+    ).all():
+        signed = ProximateRoundSignature.query.filter_by(
+            round_id=r.id, status='signed',
+        ).count()
+        items.append({
+            'kind': 'round_sign',
+            'severity': 'medium',
+            'title': f'Round awaiting signatures — {r.title}',
+            'subtitle': f'{signed}/2 signatures collected to activate',
+            'href': f'/proximate/rounds/{r.id}',
+            'entity_kind': 'round', 'entity_id': r.id,
+        })
+
+    # 5. Light-KYC endorser queue
+    pend = Endorser.query.filter_by(
+        network_id=net.id, status='pending',
+    ).count()
+    if pend:
+        items.append({
+            'kind': 'endorser_kyc',
+            'severity': 'low',
+            'title': f'{pend} endorser(s) awaiting light-KYC review',
+            'subtitle': 'Approve or reject in the endorser queue',
+            'href': '/proximate/admin/endorsers',
+            'entity_kind': 'endorser_queue', 'entity_id': 0,
+        })
+
+    order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
+    items.sort(key=lambda x: (
+        order.get(x.get('severity'), 9),
+        x.get('hours_until_due') if x.get('hours_until_due') is not None else 1e9,
+    ))
+
+    counts = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
+    for it in items:
+        counts[it['severity']] = counts.get(it['severity'], 0) + 1
+
+    return jsonify({
+        'success': True,
+        'items': items,
+        'total': len(items),
+        'counts': counts,
+    })
+
+
+# ---- Donor money-trail / traceability (Phase 717) --------------------
+
+@proximate_bp.route('/grants/<int:grant_id>/traceability', methods=['GET'])
+@login_required
+def api_grant_traceability(grant_id):
+    """The donor 'follow the money' chain for one grant:
+    Grant -> round allocations -> disbursements -> partner reports ->
+    outcomes -> audit anchors. Same scope guard as grant detail (OB or
+    the owning donor). Every disbursement carries its latest hash-chained
+    audit anchor so the whole trail is independently verifiable.
+    """
+    from app.models import (
+        ProximateGrant, ProximateGrantAllocation, ProximateRound,
+        ProximateDisbursement, ProximatePartner,
+    )
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    g = ProximateGrant.query.filter_by(
+        id=grant_id, network_id=net.id,
+    ).first()
+    if not g:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    if not _user_is_ob(net):
+        from app.models import ProximateDonor
+        my_donor = ProximateDonor.query.filter_by(
+            network_id=net.id, primary_user_id=current_user.id,
+        ).first()
+        if not my_donor or g.donor_id != my_donor.id:
+            return jsonify({'success': False, 'error': 'not authorised'}), 403
+
+    allocations = ProximateGrantAllocation.query.filter_by(grant_id=g.id).all()
+    round_ids = [a.round_id for a in allocations] or [0]
+    rounds = {
+        r.id: r for r in
+        ProximateRound.query.filter(ProximateRound.id.in_(round_ids)).all()
+    }
+    disbs = ProximateDisbursement.query.filter(
+        ProximateDisbursement.round_id.in_(round_ids),
+    ).all()
+    disb_ids = [d.id for d in disbs] or [0]
+    partners = {
+        p.id: p for p in
+        ProximatePartner.query.filter_by(network_id=net.id).all()
+    }
+
+    # Outcomes keyed by disbursement (model is ProximateOutcomeAttestation)
+    outcomes = {}
+    try:
+        from app.models import ProximateOutcomeAttestation
+        for o in ProximateOutcomeAttestation.query.filter(
+            ProximateOutcomeAttestation.disbursement_id.in_(disb_ids),
+        ).all():
+            outcomes[o.disbursement_id] = o
+    except Exception:
+        pass
+
+    # Latest hash-chained audit anchor per disbursement (batched)
+    anchors = {}
+    try:
+        for e in AuditChainEntry.query.filter(
+            AuditChainEntry.subject_kind == 'proximate_disbursement',
+            AuditChainEntry.subject_id.in_(disb_ids),
+        ).order_by(AuditChainEntry.seq.asc()).all():
+            anchors[e.subject_id] = {
+                'seq': e.seq,
+                'payload_hash': e.payload_hash,
+                'action': e.action,
+            }
+    except Exception:
+        pass
+
+    by_round = {}
+    for d in disbs:
+        by_round.setdefault(d.round_id, []).append(d)
+
+    chain = []
+    for a in allocations:
+        r = rounds.get(a.round_id)
+        chain.append({
+            'round': {
+                'id': a.round_id,
+                'title': r.title if r else f'Round #{a.round_id}',
+                'status': r.status if r else None,
+                'allocation_usd': a.amount_usd,
+            },
+            'disbursements': [{
+                'id': d.id,
+                'amount_usd': float(d.amount_usd or 0),
+                'status': d.status,
+                'partner_name': (partners[d.partner_id].name
+                                 if d.partner_id in partners
+                                 else f'Partner #{d.partner_id}'),
+                'report_submitted': d.status in ('reported', 'verified', 'flagged'),
+                'verifier_verdict': d.verifier_verdict,
+                'outcome': (outcomes[d.id].to_dict()
+                            if d.id in outcomes
+                            and hasattr(outcomes[d.id], 'to_dict') else None),
+                'audit_anchor': anchors.get(d.id),
+            } for d in by_round.get(a.round_id, [])],
+        })
+
+    return jsonify({
+        'success': True,
+        'grant': g.to_dict(),
+        'committed_usd': g.amount_committed_usd,
+        'allocated_usd': g.amount_allocated_usd,
+        'disbursement_count': len(disbs),
+        'chain': chain,
+    })
+
+
 # ---- Funding Rounds (Phase 649) --------------------------------------
 
 @proximate_bp.route('/rounds', methods=['GET'])
