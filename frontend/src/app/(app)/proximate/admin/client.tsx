@@ -33,6 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
+import { AttentionQueue } from '@/components/proximate/attention-queue';
 
 interface Overview {
   success: boolean;
@@ -107,6 +108,10 @@ export function ProximateAdminClient() {
         )}
         {data && (
           <div className="space-y-4">
+            {/* Phase 717 — the single "what needs a human now" feed, above
+                everything. Converts the state machines into a to-do list. */}
+            <AttentionQueue />
+
             {/* Top row — the 4 numbers that matter most */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Card className="p-4">
@@ -252,6 +257,36 @@ export function ProximateAdminClient() {
                   </div>
                   <p className="text-sm font-medium">
                     {t('proximate.grievance_queue.subtitle')}
+                  </p>
+                </Card>
+              </Link>
+              {/* Phase 717 — OB-on-behalf nomination (was API-only) */}
+              <Link href="/proximate/admin/partners/new" className="block">
+                <Card className="p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-2 mb-1">
+                    <UserPlus className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      {t('proximate.admin.tile_nominate_partner') || 'Nominate a partner'}
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium">
+                    {t('proximate.admin.tile_nominate_partner_sub')
+                      || 'Register a partner directly, with bank details.'}
+                  </p>
+                </Card>
+              </Link>
+              {/* Phase 717 — FSP registration (was API-only) */}
+              <Link href="/proximate/admin/fsps/new" className="block">
+                <Card className="p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Banknote className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      {t('proximate.admin.tile_register_fsp') || 'Register a provider'}
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium">
+                    {t('proximate.admin.tile_register_fsp_sub')
+                      || 'Add a bank, hawala, or mobile-money provider.'}
                   </p>
                 </Card>
               </Link>

@@ -14,12 +14,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Loader2, Copy, Check, AlertTriangle, CheckCircle2, ArrowLeft, ShieldCheck,
+  Loader2, Copy, Check, AlertTriangle, CheckCircle2, ArrowLeft, ShieldCheck, UserCheck,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
+import { NextStep, disbursementNextStep } from '@/components/proximate/next-step';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -71,6 +72,9 @@ interface Disbursement {
   cosigners_count: number;
   cosigners_extra: { user_id: number; cosigned_at: string }[];
   flagged_reason: string | null;
+  verifier_user_id?: number | null;
+  verifier_assigned_at?: string | null;
+  verifier_verdict?: string | null;
   audit: AuditRow[];
   outcome: OutcomeAttestation | null;
 }
@@ -122,6 +126,10 @@ export function ProximateDisbursementDetailClient() {
   const [verifyNote, setVerifyNote] = useState('');
   const [ackText, setAckText] = useState('');
   const [ackSending, setAckSending] = useState(false);
+  // Phase 717 — independent verifier assignment (SoP §10).
+  const [assigning, setAssigning] = useState(false);
+  const [verifierUrl, setVerifierUrl] = useState<string | null>(null);
+  const [verifierCopied, setVerifierCopied] = useState(false);
 
   const fetchData = useCallback(async (idNum: number) => {
     try {
@@ -198,6 +206,26 @@ export function ProximateDisbursementDetailClient() {
       setActionError(msg);
     } finally {
       setActing(false);
+    }
+  }
+
+  async function assignVerifier() {
+    if (!id) return;
+    setActionError(null);
+    setAssigning(true);
+    try {
+      const r = await api.post<{ verifier_url?: string; url?: string; verifier_token?: string }>(
+        `/api/proximate/disbursements/${id}/assign-verifier`, {},
+      );
+      const url = r.verifier_url || r.url
+        || (r.verifier_token ? `${window.location.origin}/proximate-verify?t=${r.verifier_token}` : null);
+      setVerifierUrl(url);
+      await fetchData(id);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : t('proximate.disbursement.action_failed');
+      setActionError(msg);
+    } finally {
+      setAssigning(false);
     }
   }
 
@@ -330,6 +358,9 @@ export function ProximateDisbursementDetailClient() {
             )}
           </div>
         </Card>
+
+        {/* Phase 717 — one-line "what happens next" guidance. */}
+        <NextStep info={disbursementNextStep(data)} />
 
         {/* Phase 662 + Phase 668 — pending cosign banner with ladder progress */}
         {data.status === 'pending_cosign' && (
@@ -568,6 +599,53 @@ export function ProximateDisbursementDetailClient() {
                 {t('proximate.disbursement.flag')}
               </Button>
             </div>
+          </Card>
+        )}
+
+        {/* Phase 717 — independent third-party verification (SoP §10). The
+            assign endpoint picks a random, conflict-free endorser; this was
+            previously API-only with no button. */}
+        {(data.status === 'reported' || data.status === 'pending_report')
+          && data.verifier_verdict !== 'confirmed' && (
+          <Card className="p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <UserCheck className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-medium">Independent verification</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Assign a random, conflict-free endorser to independently confirm this
+                  disbursement reached the community. They cannot be the partner&apos;s own
+                  endorser, the sender, a cosigner, or the nominator.
+                </p>
+              </div>
+            </div>
+            {data.verifier_user_id && !verifierUrl ? (
+              <p className="text-xs italic text-muted-foreground">
+                A verifier has been assigned{data.verifier_verdict ? ` (verdict: ${data.verifier_verdict})` : ' — awaiting their attestation'}.
+              </p>
+            ) : verifierUrl ? (
+              <div className="space-y-1.5">
+                <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                  Verifier assigned. Share this one-time link with them (out of band):
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  <input readOnly value={verifierUrl}
+                    className="flex-1 min-w-[200px] h-9 px-3 text-xs bg-muted border border-border rounded-md font-mono" />
+                  <Button size="sm" variant="outline" onClick={() => {
+                    navigator.clipboard?.writeText(verifierUrl).catch(() => {});
+                    setVerifierCopied(true); setTimeout(() => setVerifierCopied(false), 1500);
+                  }}>
+                    {verifierCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button size="sm" variant="outline" onClick={assignVerifier} disabled={assigning}>
+                {assigning ? <Loader2 className="w-4 h-4 me-1 animate-spin" /> : <UserCheck className="w-4 h-4 me-1" />}
+                Assign independent verifier
+              </Button>
+            )}
+            {actionError && <p className="text-sm text-red-600">{actionError}</p>}
           </Card>
         )}
 
