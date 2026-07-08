@@ -83,6 +83,45 @@ def _require_proximate_tenant():
     return net, None
 
 
+def _system_actor_user_id(net):
+    """Return a valid users.id to attribute a *system*-opened record to
+    (e.g. an auto-freeze from a fraud/safety grievance or the security
+    keyword scan).
+
+    InterventionMeasure.opened_by_user_id is a NOT NULL FK to users.id.
+    The auto-open paths historically hardcoded id=1 as "the system user",
+    but no user with id=1 is guaranteed to exist — on Proximate prod it
+    does not — so the insert hit a foreign-key violation and 500'd (this
+    was the SoP-14 fraud/safety grievance auto-freeze defect). We resolve
+    a real user instead: prefer an OB member of THIS network (the fund's
+    accountable body), then any platform admin, then any user. The true
+    provenance ('public-form' / 'cron-security-scan') is still recorded
+    separately on the audit chain.
+    """
+    from app.models import User, NetworkMembership
+    try:
+        ob_user = (
+            db.session.query(User)
+            .join(NetworkMembership, NetworkMembership.org_id == User.org_id)
+            .filter(
+                NetworkMembership.network_id == net.id,
+                NetworkMembership.is_oversight_body.is_(True),
+                NetworkMembership.status == 'active',
+            )
+            .order_by(User.id.asc())
+            .first()
+        )
+        if ob_user:
+            return ob_user.id
+    except Exception:
+        db.session.rollback()
+    admin = User.query.filter_by(role='admin').order_by(User.id.asc()).first()
+    if admin:
+        return admin.id
+    any_user = User.query.order_by(User.id.asc()).first()
+    return any_user.id if any_user else None
+
+
 # ---- Endorser self-register -------------------------------------------
 
 @proximate_bp.route('/endorsers', methods=['POST'])
@@ -1552,13 +1591,15 @@ def api_cron_security_scan():
             if not matched:
                 continue
 
-            # Auto-open a freeze
+            # Auto-open a freeze. opened_by_user_id must reference a real
+            # user (NOT NULL FK) — hardcoding id=1 500'd where no such
+            # user exists; resolve a valid system actor instead.
             measure = InterventionMeasure.open_new(
                 network_id=net.id, partner_id=p.id, kind='freeze',
                 reason=f'Auto-flagged: security signal "{matched}" '
                        f'detected in partner intake. '
                        f'Human OB review required within 72h.',
-                opened_by_user_id=1,  # system user — admin
+                opened_by_user_id=_system_actor_user_id(net),
             )
             measure.sop_clause = 'SOP-13-section-4-auto'
             db.session.commit()
@@ -7436,24 +7477,34 @@ def api_submit_grievance():
     # is already running. Reporter identity never enters the
     # intervention record.
     if category in ('fraud', 'safety') and partner:
-        existing = InterventionMeasure.query.filter(
-            InterventionMeasure.partner_id == partner.id,
-            InterventionMeasure.status.in_(['open', 'escalated']),
-        ).first()
-        if not existing:
-            measure = InterventionMeasure.open_new(
-                network_id=net.id, partner_id=partner.id, kind='freeze',
-                reason=(
-                    f'Auto-opened from community grievance #{g.id} '
-                    f'(category: {category}). OB review required within '
-                    f'72h per SoP 14.'
-                ),
-                opened_by_user_id=1,  # system user — same as Phase 641
+        # Best-effort: the reporter's grievance is already committed above,
+        # so a failure here must never surface as a 500 to a public form.
+        try:
+            existing = InterventionMeasure.query.filter(
+                InterventionMeasure.partner_id == partner.id,
+                InterventionMeasure.status.in_(['open', 'escalated']),
+            ).first()
+            if not existing:
+                actor_id = _system_actor_user_id(net)
+                measure = InterventionMeasure.open_new(
+                    network_id=net.id, partner_id=partner.id, kind='freeze',
+                    reason=(
+                        f'Auto-opened from community grievance #{g.id} '
+                        f'(category: {category}). OB review required within '
+                        f'72h per SoP 14.'
+                    ),
+                    opened_by_user_id=actor_id,
+                )
+                measure.sop_clause = 'SOP-14-grievance-auto'
+                db.session.commit()
+                g.intervention_id = measure.id
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+            logger.exception(
+                f"Proximate: grievance #{g.id} auto-freeze failed "
+                f"(partner {partner.id}); grievance itself is recorded"
             )
-            measure.sop_clause = 'SOP-14-grievance-auto'
-            db.session.commit()
-            g.intervention_id = measure.id
-            db.session.commit()
 
     AuditChainEntry.append(
         action='proximate.grievance.submitted',
