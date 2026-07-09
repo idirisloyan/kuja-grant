@@ -21,7 +21,13 @@ ProximateOutcomeAttestation for the Proximate network. The partner
 mini-portal token is a separate per-partner credential and is left alone.
 
 Usage (local):   py -3 scripts/rotate_proximate_report_tokens.py
-Usage (prod):    railway run --service web py scripts/rotate_proximate_report_tokens.py
+Usage (prod):    railway ssh --service web "python scripts/rotate_proximate_report_tokens.py"
+                 NOTE: use `railway ssh` (runs IN the container), NOT
+                 `railway run` — the web service's DATABASE_URL is the internal
+                 host `postgres-xcra.railway.internal`, which only resolves
+                 inside Railway's network. `railway run` executes locally and
+                 cannot reach it. The "Postgres" service's public proxy is a
+                 DIFFERENT, stale instance — do not target it.
 Add --dry-run to only count what would rotate.
 """
 import os
