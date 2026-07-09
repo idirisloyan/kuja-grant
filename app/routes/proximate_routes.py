@@ -2125,6 +2125,99 @@ def api_grant_traceability(grant_id):
     })
 
 
+# ---- Disbursement pre-flight / "why blocked?" (Phase 717) ------------
+
+@proximate_bp.route('/disbursements/preflight', methods=['GET'])
+@login_required
+def api_disbursement_preflight():
+    """"Why blocked?" for a disbursement. Given a partner (+ optional
+    amount), returns the exact preconditions a release needs BEFORE the OB
+    hits submit: hard `blockers` (cannot proceed) and advisory `warnings`.
+    Serves the "only ever see the next safe step" goal on /disbursements/new
+    and partner detail.
+    """
+    from app.models import ProximatePartner
+    from app.models.proximate_fsp import PartnerDisbursementMethod
+    from app.models.proximate_disbursement import cosigners_required_for
+    from app.models.proximate_endorsement import classify_capital
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    partner_id = request.args.get('partner_id', type=int)
+    amount = request.args.get('amount', type=float) or 0.0
+    if not partner_id:
+        return jsonify({'success': False, 'error': 'partner_id required'}), 400
+    p = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not p:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+
+    blockers, warnings = [], []
+    href = f'/proximate/endorse/{p.id}'
+
+    # 1. Partner trust status
+    if p.status == 'suspended':
+        blockers.append({
+            'code': 'partner_suspended',
+            'message': 'This partner is suspended. Lift the suspension before funding.',
+            'href': href})
+    elif p.status != 'dd_clear':
+        try:
+            tf = p.trust_floor_signals()
+        except Exception:
+            tf = {}
+        missing = []
+        if not tf.get('endorsements_ok'):
+            missing.append('two conflict-free endorsers')
+        if not tf.get('bank_verified'):
+            missing.append('bank verification')
+        if not tf.get('endorsers_meet_reputation_floor'):
+            missing.append('endorsers meeting the reputation floor')
+        warnings.append({
+            'code': 'partner_not_cleared',
+            'message': ('Partner is not fully cleared yet'
+                        + (f" — still needs {', '.join(missing)}." if missing
+                           else f' (status: {p.status}).')),
+            'href': href})
+
+    # 2. A disbursement route must exist
+    total_methods = PartnerDisbursementMethod.query.filter_by(
+        partner_id=p.id).count()
+    verified_methods = PartnerDisbursementMethod.query.filter(
+        PartnerDisbursementMethod.partner_id == p.id,
+        PartnerDisbursementMethod.status.in_(['verified', 'active']),
+    ).count()
+    if total_methods == 0:
+        blockers.append({
+            'code': 'no_method',
+            'message': 'No disbursement route on file. Add a bank, hawala, or mobile-money method for this partner.',
+            'href': f'{href}#routes'})
+    elif verified_methods == 0:
+        warnings.append({
+            'code': 'method_unverified',
+            'message': 'A disbursement method exists but none are verified yet.',
+            'href': f'{href}#routes'})
+
+    cosigners_required = cosigners_required_for(amount) if amount else 0
+    if cosigners_required:
+        warnings.append({
+            'code': 'cosign_required',
+            'message': (f'This amount (${amount:,.0f}) needs '
+                        f'{cosigners_required} co-signature(s) — a different '
+                        'OB member must cosign before funds move.')})
+
+    return jsonify({
+        'success': True,
+        'partner_status': p.status,
+        'can_disburse': len(blockers) == 0,
+        'blockers': blockers,
+        'warnings': warnings,
+        'cosigners_required': cosigners_required,
+        'capital_class': classify_capital(amount) if amount else None,
+    })
+
+
 # ---- Funding Rounds (Phase 649) --------------------------------------
 
 @proximate_bp.route('/rounds', methods=['GET'])

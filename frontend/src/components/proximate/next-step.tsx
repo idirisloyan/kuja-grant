@@ -10,7 +10,7 @@
  */
 
 import Link from 'next/link';
-import { ArrowRight, Circle, CheckCircle2, Dot } from 'lucide-react';
+import { ArrowRight, Circle, CheckCircle2, Dot, AlertTriangle, Info } from 'lucide-react';
 
 export interface NextStepInfo {
   /** Short imperative label, e.g. "Collect a second signature". */
@@ -172,6 +172,115 @@ export function RoundTaskBoard({ round, disbursements }: {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ---- Partner journey -------------------------------------------------
+
+const PARTNER_STEPS = [
+  { key: 'nominate', label: 'Nominated' },
+  { key: 'endorsed', label: 'Endorsed' },
+  { key: 'cleared', label: 'Cleared' },
+  { key: 'funded', label: 'Funded' },
+  { key: 'reported', label: 'Reported' },
+  { key: 'verified', label: 'Verified' },
+];
+
+export function partnerJourneyIndex(status?: string, opts?: {
+  funded?: boolean; reported?: boolean; verified?: boolean;
+}): number {
+  let i = 0;
+  if (status === 'dd_pending') i = 1;
+  else if (status === 'dd_clear') i = 2;
+  else if (status === 'suspended' || status === 'dd_failed') i = 1;
+  // Advance past "Cleared" only from real downstream signals.
+  if (opts?.verified) i = Math.max(i, 5);
+  else if (opts?.reported) i = Math.max(i, 4);
+  else if (opts?.funded) i = Math.max(i, 3);
+  return i;
+}
+
+export function PartnerJourney({ status, funded, reported, verified }: {
+  status?: string; funded?: boolean; reported?: boolean; verified?: boolean;
+}) {
+  const active = partnerJourneyIndex(status, { funded, reported, verified });
+  const suspended = status === 'suspended';
+  return (
+    <div className="flex items-center gap-0 overflow-x-auto py-1" role="list" aria-label="Partner journey">
+      {PARTNER_STEPS.map((s, i) => {
+        const done = i < active;
+        const current = i === active && !suspended;
+        return (
+          <div key={s.key} className="flex items-center shrink-0" role="listitem">
+            <div className="flex flex-col items-center gap-1 min-w-[64px]">
+              {done ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              ) : current ? (
+                <Circle className="w-5 h-5 text-emerald-600 fill-emerald-100 dark:fill-emerald-950" />
+              ) : (
+                <Dot className="w-5 h-5 text-muted-foreground/40" />
+              )}
+              <span className={`text-[11px] ${current ? 'font-semibold text-foreground' : done ? 'text-muted-foreground' : 'text-muted-foreground/60'}`}>
+                {s.label}
+              </span>
+            </div>
+            {i < PARTNER_STEPS.length - 1 && (
+              <div className={`h-0.5 w-5 sm:w-8 ${i < active ? 'bg-emerald-400' : 'bg-border'}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---- Why blocked? ----------------------------------------------------
+
+export interface Blocker { code: string; message: string; href?: string; }
+
+/** Renders the "why blocked?" preconditions: red = hard blocker, amber =
+ *  advisory warning. Nothing renders when both lists are empty. */
+export function WhyBlocked({ blockers = [], warnings = [] }: {
+  blockers?: Blocker[]; warnings?: Blocker[];
+}) {
+  if (blockers.length === 0 && warnings.length === 0) return null;
+  const Row = ({ b, tone }: { b: Blocker; tone: 'block' | 'warn' }) => {
+    const styles = tone === 'block'
+      ? 'text-red-700 dark:text-red-400'
+      : 'text-amber-700 dark:text-amber-400';
+    return (
+      <li className="flex items-start gap-2 text-sm">
+        {tone === 'block'
+          ? <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${styles}`} />
+          : <Info className={`w-4 h-4 shrink-0 mt-0.5 ${styles}`} />}
+        <span className="flex-1">
+          {b.message}
+          {b.href && (
+            <>
+              {' '}
+              <Link href={b.href} className="underline underline-offset-2 hover:no-underline font-medium">
+                Fix it →
+              </Link>
+            </>
+          )}
+        </span>
+      </li>
+    );
+  };
+  const hard = blockers.length > 0;
+  return (
+    <div className={`rounded-lg border px-3 py-2.5 ${hard
+      ? 'border-red-400/50 bg-red-50/60 dark:bg-red-950/20'
+      : 'border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20'}`}>
+      <p className={`text-xs font-semibold uppercase tracking-wide mb-1.5 ${hard
+        ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
+        {hard ? "Can't proceed yet" : 'Before you continue'}
+      </p>
+      <ul className="space-y-1.5">
+        {blockers.map((b) => <Row key={b.code} b={b} tone="block" />)}
+        {warnings.map((b) => <Row key={b.code} b={b} tone="warn" />)}
+      </ul>
     </div>
   );
 }

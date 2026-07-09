@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
+import { WhyBlocked, type Blocker } from '@/components/proximate/next-step';
 
 interface Partner {
   id: number;
@@ -75,6 +76,29 @@ export default function ProximateDisbursementNewPage() {
       setRounds((r.rounds || []).filter((x) => x.status === 'active'));
     });
   }, []);
+
+  // Phase 717 create-from-here — a partner detail page can deep-link
+  // "?partner=<id>" to land here with that partner pre-selected.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const p = new URLSearchParams(window.location.search).get('partner');
+    if (p && /^\d+$/.test(p)) setPartnerId(p);
+  }, []);
+
+  // Phase 717 "why blocked?" — the exact preconditions a release needs,
+  // shown the moment a partner (and optionally an amount) is chosen.
+  const [preflight, setPreflight] = useState<{ blockers: Blocker[]; warnings: Blocker[] } | null>(null);
+  useEffect(() => {
+    if (!partnerId) { setPreflight(null); return; }
+    const params = new URLSearchParams({ partner_id: partnerId });
+    if (amount && parseFloat(amount) > 0) params.set('amount', amount);
+    let cancelled = false;
+    api.get<{ blockers: Blocker[]; warnings: Blocker[] }>(
+      `/api/proximate/disbursements/preflight?${params.toString()}`)
+      .then((r) => { if (!cancelled) setPreflight({ blockers: r.blockers || [], warnings: r.warnings || [] }); })
+      .catch(() => { if (!cancelled) setPreflight(null); });
+    return () => { cancelled = true; };
+  }, [partnerId, amount]);
 
   async function submit() {
     setError(null);
@@ -200,11 +224,26 @@ export default function ProximateDisbursementNewPage() {
               ))}
             </select>
             {partners.length === 0 && (
-              <p className="text-xs text-amber-700 mt-1">
-                {t('proximate.disbursements.no_eligible_partners')}
-              </p>
+              <div className="mt-2 rounded-md border border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2.5">
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  {t('proximate.disbursements.no_eligible_partners')}
+                </p>
+                {/* Phase 717 — actionable empty state: nominate → endorse
+                    is the only way to get a fundable partner, so link it. */}
+                <Link
+                  href="/proximate/admin/partners/new"
+                  className="mt-1.5 inline-flex text-xs font-semibold text-amber-800 dark:text-amber-300 underline underline-offset-2 hover:no-underline"
+                >
+                  Nominate a partner →
+                </Link>
+              </div>
             )}
           </div>
+
+          {/* Phase 717 — why-blocked: exact missing preconditions before submit */}
+          {preflight && (
+            <WhyBlocked blockers={preflight.blockers} warnings={preflight.warnings} />
+          )}
 
           <div>
             <label className="block text-sm font-medium mb-1">

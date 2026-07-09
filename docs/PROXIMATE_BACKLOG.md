@@ -13,7 +13,75 @@
 > See also: [docs/PROXIMATE_FUND_DESIGN.md](PROXIMATE_FUND_DESIGN.md),
 > `seed_proximate.py`, `memory/proximate_prod_state_2026-06-27.md`.
 
-Updated 2026-06-27.
+Updated 2026-07-08.
+
+---
+
+## Usability wave (Phase 717) — "guided field workflow"
+
+Big idea: Proximate should feel less like software and more like a guided
+field workflow — the user should only ever see the *next safe step*. Ideas
+from the 2026-07-08 usability review. **Building now (this wave):** the
+guidance engine — persona journey maps (#1), "why blocked" inline
+explanations (#7), create-from-here CTAs (#8), stronger empty states (#6),
+all reading from one per-entity state/next-action/blocker resolver.
+
+**Deferred (below), in recommended order:**
+
+### Wave B — Donor "money story" (differentiation)
+- [ ] **#9 Donor portal as money story** — lead `/proximate/donor` with the
+  funnel Committed → Allocated → Disbursed → Reported → Verified as the hero,
+  not a stat grid. Composes with the live traceability page (portal =
+  summary, `/proximate/grants/traceability` = drill-in).
+- [ ] **#10 One "Download assurance pack" button** per grant/round — the
+  Donor Pack PDF endpoint already exists; just a prominent CTA.
+- [ ] **#11 Donor-safe "why this matters"** — plain-language tooltips for
+  audit anchors, verifier attestations, and outcome checks.
+
+### Wave C — Field last-mile (impact)
+- [ ] **#14 "Send this code" fallback** on every token page — works TODAY
+  with no WhatsApp API: "If this page doesn't load later, send this code to
+  Adeso." Cheapest field-resilience win; softens the notification gap.
+- [ ] **#4 WhatsApp copy templates (AR + EN)** — every token/share action
+  gets "Copy WhatsApp message" with a proper bilingual template. Bridge to
+  the deferred WhatsApp Business API.
+- [ ] **#12 Reassurance copy** on public/token pages — "This won't affect
+  your safety," "You can stop and come back," "Your name won't be shown if
+  anonymous."
+- [ ] **#13 Audio playback before submit** for voice reports/endorsements.
+- [ ] **#2 Ultra-light token wizards** — one question per screen, large
+  buttons, visible progress, "voice or type," "takes 3 minutes," "no account
+  needed," offline/save reassurance. Start with the **report + endorse**
+  pages (highest field volume).
+- [ ] **#15 "Someone can help me fill this"** assisted-reporting mode
+  (optional helper name) for enumerator/elder-assisted submissions.
+
+### Wave D — Instrumentation & environment
+- [ ] **#17 Per-page field UX telemetry** — confusion clicks, abandoned
+  forms, time-to-submit, retry rate, AI-fallback rate. Extends the existing
+  AI telemetry / false-confidence tracking so "we think it's simpler" becomes
+  "we measured where it fails."
+- [ ] **#18 Low-bandwidth toggle** — hides charts, AI panels, non-essential
+  decoration; real for Sudan connectivity.
+- [ ] **#16 Demo mode / UAT-artifacts filter** — hide stamped test records
+  from real workflows. P2: the stamped-cleanup harness
+  (`tests/proximate_p0_uat.py --cleanup`) already covers most hygiene.
+
+### Reframed (do NOT build as separate features)
+- **#5 End-of-day checklist** — this is ~90% the existing OB attention queue.
+  Add a "grouped by type" view + a "clear for the day" affordance to
+  `<AttentionQueue>` rather than a second surface.
+- **#3 Explain-this-screen helper** — fold the "next thing to do" line into
+  the existing next-step strip; add a collapsible "What is this page?" only
+  on the deep OB surfaces where confusion is real. Not universal (clutter).
+
+### Needs external provisioning (not code)
+- **WhatsApp Business API / SMS (Twilio / Africa's Talking)** — the real
+  field-delivery channel for reminders + token links. Integration point
+  defined; needs a provider **account**. Until then the SoP-12/13 clocks are
+  in-app/audit-only (now surfaced in the attention queue + #14 fallback).
+- **Sudanese-Arabic copy review** of the new operator/token surfaces.
+- **Real-device / weak-connectivity field UAT** with Arabic-first testers.
 
 ---
 

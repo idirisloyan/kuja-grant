@@ -31,6 +31,7 @@ import { InterventionPanel } from '@/components/proximate/intervention-panel';
 import { VoiceQuestionInput } from '@/components/proximate/voice-question-input';
 import { EndorsementsPanel } from '@/components/proximate/endorsements-panel';
 import { DisbursementMethodsPanel } from '@/components/proximate/disbursement-methods-panel';
+import { PartnerJourney, NextStep } from '@/components/proximate/next-step';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -400,6 +401,50 @@ export default function ProximateEndorseWizardClient() {
             <BackChevron className="w-3 h-3" />
             {t('proximate.wizard.back')}
           </button>
+
+          {/* Phase 717 — partner journey + create-from-here next action.
+              The whole trust arc at a glance, and (once cleared) a direct
+              path to record a disbursement without hunting for the form. */}
+          <Card className="p-4 space-y-3">
+            <PartnerJourney status={partner.status} />
+            {(() => {
+              const s = partner.status;
+              if (s === 'dd_clear') {
+                return (
+                  <NextStep info={{
+                    label: 'Cleared for funding. Record a disbursement to this partner.',
+                    href: `/proximate/disbursements/new?partner=${partner.id}`,
+                    cta: 'Record disbursement',
+                    tone: 'action',
+                  }} />
+                );
+              }
+              if (s === 'dd_pending') {
+                return (
+                  <NextStep info={{
+                    label: 'Due diligence in progress — verify the bank/FSP method and confirm independent endorsements below.',
+                    tone: 'waiting',
+                  }} />
+                );
+              }
+              if (s === 'suspended') {
+                return (
+                  <NextStep info={{
+                    label: 'Suspended. Resolve the open intervention before any further funding.',
+                    tone: 'waiting',
+                  }} />
+                );
+              }
+              return (
+                <NextStep info={{
+                  label: 'Collect independent community endorsements to clear this partner for funding.',
+                  href: '/proximate/endorse',
+                  cta: 'Endorsement inbox',
+                  tone: 'action',
+                }} />
+              );
+            })()}
+          </Card>
 
           {partner.sanctions_flag && (
             <Card className="p-4 border-red-400 bg-red-50 dark:bg-red-950/30">
