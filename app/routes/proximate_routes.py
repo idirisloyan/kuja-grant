@@ -238,19 +238,58 @@ def api_get_partner(partner_id):
     if not partner:
         return jsonify({'success': False, 'error': 'Partner not found'}), 404
 
-    # Include the list of existing endorsements (de-identified —
-    # endorser_id only, not name) so the wireframe can render the
-    # "1/2 endorsements collected" progress bar.
+    # RBAC 2026-07-09 — persona-scoped partner detail. Previously any
+    # authenticated tenant user got the full operator to_dict (contact,
+    # bank, sanctions detail, trust-floor + reputation internals). Now:
+    #   OB       -> full operator detail
+    #   endorser -> only what the endorsement wizard needs (identity +
+    #               questions + endorsement PROGRESS), no DD/payment/
+    #               sanctions/reputation internals
+    #   donor / other -> 403 (their views live on donor-scoped surfaces)
+    persona = _proximate_persona(net)
+    if persona not in ('ob', 'endorser'):
+        return jsonify({
+            'success': False, 'error': 'Not authorised',
+            'code': 'err.forbidden',
+        }), 403
+
     endorsements = Endorsement.query.filter_by(partner_id=partner.id).all()
+    questions = {
+        'q1': {'en': Q1_LABEL_EN, 'ar': Q1_LABEL_AR},
+        'q2': {'en': Q2_LABEL_EN, 'ar': Q2_LABEL_AR},
+        'q3': {'en': Q3_LABEL_EN, 'ar': Q3_LABEL_AR},
+    }
+    if persona == 'ob':
+        # Endorsements de-identified (endorser_id only) already in to_dict.
+        return jsonify({
+            'success': True,
+            'partner': partner.to_dict(),
+            'endorsements': [e.to_dict() for e in endorsements],
+            'questions': questions,
+        })
+
+    # Endorser — safe subset only.
+    pd = partner.to_dict()
+    safe = {k: pd.get(k) for k in (
+        'id', 'network_id', 'name', 'name_ar', 'locality', 'country',
+        'status', 'source', 'nominated_at', 'sanctions_flag',
+    )}
+    # Progress-only trust floor: how many independent endorsements are in
+    # and whether the count target is met. Reputation floor, bank/DD and
+    # payment internals are OB-only and deliberately omitted.
+    full_floor = pd.get('trust_floor_signals') or {}
+    safe['trust_floor_signals'] = {
+        'endorsements_independent_count':
+            full_floor.get('endorsements_independent_count'),
+        'endorsements_required': full_floor.get('endorsements_required'),
+        'endorsements_ok': full_floor.get('endorsements_ok'),
+    }
     return jsonify({
         'success': True,
-        'partner': partner.to_dict(),
-        'endorsements': [e.to_dict() for e in endorsements],
-        'questions': {
-            'q1': {'en': Q1_LABEL_EN, 'ar': Q1_LABEL_AR},
-            'q2': {'en': Q2_LABEL_EN, 'ar': Q2_LABEL_AR},
-            'q3': {'en': Q3_LABEL_EN, 'ar': Q3_LABEL_AR},
-        },
+        'partner': safe,
+        # count-only — never expose other endorsers' identities/COI.
+        'endorsements': [{'id': e.id} for e in endorsements],
+        'questions': questions,
     })
 
 
@@ -1053,6 +1092,9 @@ def api_list_interventions():
     net, err = _require_proximate_tenant()
     if err:
         return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
     q = InterventionMeasure.query.filter_by(network_id=net.id)
     partner_id = request.args.get('partner_id', type=int)
     if partner_id:
@@ -1335,6 +1377,9 @@ def api_list_fsps():
     net, err = _require_proximate_tenant()
     if err:
         return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
     kind = request.args.get('kind')
     q = FinancialServiceProvider.query.filter_by(
         network_id=net.id, is_active=True,
@@ -1426,6 +1471,9 @@ def api_list_disbursement_methods(partner_id):
     net, err = _require_proximate_tenant()
     if err:
         return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
     partner = ProximatePartner.query.filter_by(
         id=partner_id, network_id=net.id,
     ).first()
@@ -1734,6 +1782,13 @@ def api_list_endorsements(partner_id):
     ).first()
     if not partner:
         return jsonify({'success': False, 'error': 'Partner not found'}), 404
+    # RBAC 2026-07-09 — OB-only: this returns every endorser's answers +
+    # voice transcripts (their COI reasoning). Endorsers must not read one
+    # another's submissions; they get only a progress count via partner
+    # detail. Donors have no need for it.
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
     rows = Endorsement.query.filter_by(
         partner_id=partner.id,
     ).order_by(Endorsement.created_at.desc()).all()
@@ -1763,6 +1818,9 @@ def api_proximate_overview():
     net, err = _require_proximate_tenant()
     if err:
         return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
 
     # Partners by status
     by_status = {s: 0 for s in PARTNER_STATUSES}
@@ -1861,6 +1919,9 @@ def api_attention_queue():
     net, err = _require_proximate_tenant()
     if err:
         return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
     now = _dt.now(_tz.utc)
 
     def _aware(dt):
@@ -2143,6 +2204,9 @@ def api_disbursement_preflight():
     net, err = _require_proximate_tenant()
     if err:
         return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
     partner_id = request.args.get('partner_id', type=int)
     # The UI sends `amount`, but API callers and tests naturally reach for
     # `amount_usd` because the create endpoint uses that field name. Accept
@@ -2312,6 +2376,9 @@ def api_get_round(round_id):
     for sensitive in (
         'cancellation_reason', 'closing_summary',
         'drafted_by_user_id', 'signatures',
+        # RBAC 2026-07-09 — internal OB lifecycle / sign-off state that a
+        # donor has no need for (flagged in the team RBAC audit).
+        'signers_required', 'signed_count', 'ready_for_activation',
     ):
         rd.pop(sensitive, None)
     return jsonify({
@@ -2320,22 +2387,67 @@ def api_get_round(round_id):
         'disbursements_count': len(disbursements),
         'envelope_used': envelope_used,
         'envelope_remaining': envelope_remaining,
-        'audit_anchor_seq': max((a.seq for a in audit_rows), default=None),
     })
 
 
 def _user_is_ob(net) -> bool:
-    """Helper — is the current user an OB (or platform admin) for this
-    tenant? Used by endpoints that should serve a donor-safe shape to
-    donors but full operator detail to OB. Delegates to the canonical
-    is_oversight_body_member helper used by @ob_required."""
+    """Helper — is the current user an OB for THIS tenant? Used by
+    endpoints that serve a donor-safe shape to donors but full operator
+    detail to OB.
+
+    RBAC hardening (2026-07-09): resolve the OB seat in the EXPLICIT
+    Proximate network (net.id) rather than the ambient host-resolved
+    network. A direct API call without the Proximate host/override header
+    resolves g.network to the default Kuja tenant, where nobody holds an
+    OB seat — that mismatch both (a) wrongly denied the real OB on
+    /audit-chain and (b) is why the ambient check was unreliable. Also
+    drop the `role=='admin'` shortcut: Phase 114 retired the platform-admin
+    auto-pass, but this helper had quietly reintroduced it, which is why
+    platform admin saw OB-only shapes and controls."""
     try:
-        if getattr(current_user, 'role', None) == 'admin':
-            return True
         from app.utils.network import is_oversight_body_member
-        return is_oversight_body_member(current_user)
+        return is_oversight_body_member(
+            current_user, network_id=(net.id if net else None))
     except Exception:
         return False
+
+
+def _proximate_ob_or_403(net):
+    """Return None if the current user is an OB for THIS Proximate net,
+    else a 403 response tuple. Network-explicit; no platform-admin
+    auto-pass. Use immediately after `_require_proximate_tenant()` on
+    OB-only endpoints so the guard matches the slug-resolved tenant the
+    endpoint actually serves."""
+    if _user_is_ob(net):
+        return None
+    return jsonify({
+        'success': False,
+        'error': 'Oversight Body permission required',
+        'code': 'err.ob_required',
+    }), 403
+
+
+def _proximate_persona(net) -> str:
+    """Return the current user's Proximate persona in this network:
+    'ob' | 'endorser' | 'donor' | 'other'. Network-explicit. Platform
+    admins are 'other' unless they also hold a real OB seat (Phase 114).
+    Drives persona-scoped response shaping on shared read endpoints."""
+    if _user_is_ob(net):
+        return 'ob'
+    from app.models import Endorser as _Endorser, ProximateDonor as _Donor
+    try:
+        if _Endorser.query.filter_by(
+                network_id=net.id, user_id=current_user.id).first():
+            return 'endorser'
+    except Exception:
+        db.session.rollback()
+    try:
+        if _Donor.query.filter_by(
+                network_id=net.id, primary_user_id=current_user.id).first():
+            return 'donor'
+    except Exception:
+        db.session.rollback()
+    return 'other'
 
 
 # =========================================================================
@@ -4191,7 +4303,20 @@ def api_get_disbursement(disbursement_id):
     ).first()
     if not d:
         return jsonify({'success': False, 'error': 'not found'}), 404
+    # RBAC 2026-07-09 — OB-only, plus the assigned third-party verifier
+    # (Phase 673) who must see the disbursement to attest. Donors/endorsers
+    # get 403. report_token is a secret access value and is stripped for any
+    # non-OB caller.
+    is_ob = _user_is_ob(net)
+    is_verifier = (getattr(d, 'verifier_user_id', None) == current_user.id)
+    if not (is_ob or is_verifier):
+        return jsonify({
+            'success': False, 'error': 'Not authorised',
+            'code': 'err.forbidden',
+        }), 403
     payload = d.to_dict()
+    if not is_ob:
+        payload.pop('report_token', None)
     if d.report_json:
         import json as _json
         try:
@@ -5132,6 +5257,14 @@ def api_stream_disbursement_attachment(disbursement_id, kind):
     ).first()
     if not d:
         return jsonify({'success': False, 'error': 'not found'}), 404
+    # RBAC 2026-07-09 — evidence (photo/voice) is OB-only, plus the assigned
+    # third-party verifier who must inspect it to attest. Not for donors/endorsers.
+    if not (_user_is_ob(net)
+            or getattr(d, 'verifier_user_id', None) == current_user.id):
+        return jsonify({
+            'success': False, 'error': 'Not authorised',
+            'code': 'err.forbidden',
+        }), 403
 
     doc_id = d.report_photo_doc_id if kind == 'photo' else d.report_voice_doc_id
     if not doc_id:
@@ -6065,17 +6198,23 @@ def api_issue_endorser_portal_link(endorser_id):
 
 
 @proximate_bp.route('/audit-chain', methods=['GET'])
-@ob_required
+@login_required
 def api_proximate_audit_chain():
     """Return the most recent audit-chain rows scoped to this tenant.
 
-    Phase 701 — gated to @ob_required. Reviewer flagged the prior
-    @login_required as a leak: donors could read raw actor emails and
-    intervention subjects. Donors do not need raw chain access — the
-    round-report PDF carries a donor-safe audit anchor for portfolio
-    transparency. If a donor-safe audit view becomes a real ask, add
-    a separate /donor-audit endpoint that filters actor_email and
-    intervention-related actions.
+    OB-only. RBAC hardening (2026-07-09): switched from the ambient
+    @ob_required decorator to the network-explicit inline gate below.
+    @ob_required resolves the OB seat in the host-resolved network, which
+    on the shared prod host is the default Kuja tenant when a caller omits
+    the Proximate host/override header — that wrongly 403'd the real OB
+    (who holds the seat in Proximate, not Kuja). _proximate_ob_or_403
+    resolves the seat in the slug-resolved Proximate net the endpoint
+    actually serves.
+
+    Donors/endorsers do not need raw chain access — the round-report PDF
+    carries a donor-safe audit anchor for portfolio transparency. If a
+    donor-safe audit view becomes a real ask, add a separate /donor-audit
+    endpoint that filters actor_email and intervention-related actions.
 
     Tenant scope: rows with network_id=current tenant OR rows where
     subject_kind starts with 'proximate' (covers legacy rows written
@@ -6084,6 +6223,9 @@ def api_proximate_audit_chain():
     net, err = _require_proximate_tenant()
     if err:
         return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
 
     limit = max(1, min(int(request.args.get('limit', 100) or 100), 500))
     offset = max(0, int(request.args.get('offset', 0) or 0))

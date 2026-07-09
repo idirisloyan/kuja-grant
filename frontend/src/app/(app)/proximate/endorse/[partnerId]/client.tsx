@@ -27,6 +27,7 @@ import {
 import { apiOffline, api, isQueuedResponse } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
+import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { InterventionPanel } from '@/components/proximate/intervention-panel';
 import { VoiceQuestionInput } from '@/components/proximate/voice-question-input';
 import { EndorsementsPanel } from '@/components/proximate/endorsements-panel';
@@ -126,7 +127,13 @@ export default function ProximateEndorseWizardClient() {
   const isRtl = lang === 'ar';
 
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'admin';
+  // RBAC fix (2026-07-09): governance controls (interventions, disbursement
+  // methods, record-disbursement) are OB-only. Platform admins are NOT an OB
+  // (Phase 114) — the old `user?.role === 'admin'` both leaked OB controls to
+  // platform admins AND hid them from the real OB (whose User.role is 'ngo').
+  // Resolve the actual Proximate persona instead.
+  const { persona } = useProximatePersona();
+  const isOb = persona === 'ob';
 
   const [data, setData] = useState<PartnerResp | null>(null);
   const [loading, setLoading] = useState(true);
@@ -414,13 +421,16 @@ export default function ProximateEndorseWizardClient() {
                 return !v || v === k ? fb : v;
               };
               if (s === 'dd_clear') {
+                // Record-disbursement is an OB-only action (RBAC 2026-07-09).
+                // Endorsers/others still see that the partner is cleared, but
+                // without the actionable link into the release form.
                 return (
                   <NextStep info={{
                     label: txn('proximate.pj.next.cleared',
                       'Cleared for funding. Record a disbursement to this partner.'),
-                    href: `/proximate/disbursements/new?partner=${partner.id}`,
-                    cta: txn('proximate.pj.next.cleared_cta', 'Record disbursement'),
-                    tone: 'action',
+                    href: isOb ? `/proximate/disbursements/new?partner=${partner.id}` : undefined,
+                    cta: isOb ? txn('proximate.pj.next.cleared_cta', 'Record disbursement') : undefined,
+                    tone: isOb ? 'action' : 'waiting',
                   }} />
                 );
               }
@@ -483,11 +493,11 @@ export default function ProximateEndorseWizardClient() {
 
           <InterventionPanel
             partnerId={partner.id}
-            canOpen={isAdmin}
-            canWithdraw={isAdmin}
+            canOpen={isOb}
+            canWithdraw={isOb}
           />
 
-          {isAdmin && partner.status !== 'suspended' && (
+          {isOb && partner.status !== 'suspended' && (
             <Card className="p-4 border-violet-300 bg-violet-50/40 dark:bg-violet-950/20">
               <h2 className="text-sm font-medium mb-2">
                 {t('proximate.admin.title')}
@@ -563,7 +573,7 @@ export default function ProximateEndorseWizardClient() {
 
           <EndorsementsPanel partnerId={partnerId} />
 
-          <DisbursementMethodsPanel partnerId={partnerId} isAdmin={isAdmin} />
+          <DisbursementMethodsPanel partnerId={partnerId} isAdmin={isOb} />
 
           <Card className="p-4">
             <p className="text-xs text-muted-foreground mb-4">

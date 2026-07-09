@@ -84,6 +84,15 @@ export function CopilotRail({ scope }: { scope?: CopilotScope }) {
 
   if (!user) return null;
 
+  // RBAC fix (2026-07-09): the generic Kuja Co-pilot is grant-application
+  // centric — it keys off user.role (which is 'ngo' for Proximate OB/donor
+  // users, a platform-compat artifact) and its fetch helpers hit Kuja-grant
+  // endpoints. On the Proximate tenant that means wrong-role advice and
+  // cross-module context leakage. Proximate ships its own persona-aware
+  // guidance surfaces (WhyBlocked / PartnerJourney / next-step + report
+  // drafting), so suppress the generic rail here entirely.
+  if (network?.slug === 'proximate') return null;
+
   return (
     <>
       {/* Persistent sparkle toggle — always visible.

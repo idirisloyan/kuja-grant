@@ -1628,6 +1628,7 @@
   "proximate.disbursement.cosign_required_body": "الصرفيات التي تساوي {amount} أو تزيد تتطلب توقيعًا ثانيًا من هيئة الإشراف وفق دليل الإجراءات §10.4.",
   "proximate.disbursement.cosign_required_title": "مطلوب توقيع ثانٍ",
   "proximate.disbursement.cosign_self_blocked": "أنت بادرت بهذا الصرف، لذا يجب أن يوقّعه عضو آخر من هيئة الإشراف.",
+  "proximate.disbursement.cosign_ob_only": "يمكن لأعضاء هيئة الإشراف فقط المشاركة في توقيع الصرف.",
   "proximate.disbursement.due": "موعد",
   "proximate.disbursement.flag": "إشارة",
   "proximate.disbursement.fsp_picker": "مزوّد الخدمات المالية",

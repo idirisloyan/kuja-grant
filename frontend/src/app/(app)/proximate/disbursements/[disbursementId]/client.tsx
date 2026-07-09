@@ -19,6 +19,7 @@ import {
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
+import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 import { NextStep, disbursementNextStep } from '@/components/proximate/next-step';
 import { Card } from '@/components/ui/card';
@@ -116,6 +117,11 @@ const STATUS_TONE: Record<string, string> = {
 export function ProximateDisbursementDetailClient() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
+  // RBAC fix (2026-07-09): co-signing a release is an OB-only governance
+  // action. The backend already 403s non-OB /cosign, but the button must not
+  // render for donors/endorsers/platform-admins either.
+  const { persona } = useProximatePersona();
+  const isOb = persona === 'ob';
   const [id, setId] = useState<number | null>(null);
   const [data, setData] = useState<Disbursement | null>(null);
   const [loading, setLoading] = useState(true);
@@ -382,7 +388,11 @@ export function ProximateDisbursementDetailClient() {
             {actionError && (
               <p className="text-sm text-red-600">{actionError}</p>
             )}
-            {user?.id === data.sent_by_user_id ? (
+            {!isOb ? (
+              <p className="text-xs italic text-muted-foreground">
+                {t('proximate.disbursement.cosign_ob_only')}
+              </p>
+            ) : user?.id === data.sent_by_user_id ? (
               <p className="text-xs italic text-muted-foreground">
                 {t('proximate.disbursement.cosign_self_blocked')}
               </p>

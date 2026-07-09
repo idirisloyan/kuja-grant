@@ -8,6 +8,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
+import { useNetworkStore } from '@/stores/network-store';
 import { useUIStore } from '@/stores/ui-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -28,6 +29,7 @@ const COLLAPSED_WIDTH = 72;
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, loading, checkSession } = useAuthStore();
+  const network = useNetworkStore((s) => s.network);
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
 
   useTranslation();
@@ -38,18 +40,41 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.replace('/login');
+      // RBAC/UX fix (2026-07-09): a bare /login makes NetworkProvider CLEAR
+      // the tenant override (it must never default to a tenant), so a
+      // logged-out Proximate user would land on the neutral Kuja "K" login
+      // with the wrong brand. Preserve the current tenant so they return to
+      // their own branded login (e.g. /login?network=proximate).
+      let target = '/login';
+      try {
+        const override = window.localStorage.getItem('kuja_network_override');
+        if (override) target = `/login?network=${encodeURIComponent(override)}`;
+      } catch {
+        // localStorage unavailable — fall back to bare /login.
+      }
+      router.replace(target);
     }
   }, [user, loading, router]);
 
   if (loading) {
+    // Network-aware loading placeholder. Falls back to the neutral Kuja "K"
+    // when no tenant is resolved yet; on Proximate/NEAR it shows that
+    // network's initial + brand colour instead of flashing the wrong brand.
+    const brandInitial = (network?.name?.trim()?.[0] || 'K').toUpperCase();
+    const brandColor = network?.brand_color_hex || '#C2410C';
     return (
       <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--kuja-quartz))]">
         <div className="flex flex-col items-center gap-3">
-          <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-[#C2410C] to-[#7C2D12] shadow-lg">
-            <span className="kuja-display text-2xl text-white">K</span>
+          <div
+            className="grid h-12 w-12 place-items-center rounded-xl shadow-lg"
+            style={{ background: `linear-gradient(to bottom right, ${brandColor}, #1f1205)` }}
+          >
+            <span className="kuja-display text-2xl text-white">{brandInitial}</span>
           </div>
-          <div className="h-1 w-24 bg-gradient-to-r from-[#C2410C] via-[#F97316] to-[#C2410C] rounded animate-pulse" />
+          <div
+            className="h-1 w-24 rounded animate-pulse"
+            style={{ background: `linear-gradient(to right, ${brandColor}, #F97316, ${brandColor})` }}
+          />
         </div>
       </div>
     );

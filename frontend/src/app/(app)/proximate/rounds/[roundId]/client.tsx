@@ -116,13 +116,14 @@ export function ProximateRoundDetailClient() {
   // platform compat. Use persona, not user.role. Reviewer's
   // "Submit/Sign actions not visible" was this bug.
   const { persona } = useProximatePersona();
-  const isOperator =
-    persona === 'ob' || persona === 'admin' || user?.role === 'admin';
-  // Phase 705 — only true OBs can sign rounds. Platform admins see
-  // the operator surface (general visibility into the round) but the
-  // backend @ob_required gate rejects signing because admin isn't on
-  // the OB roster (Phase 114 retired the admin override). Hiding the
-  // Sign button here matches what the backend allows.
+  // RBAC 2026-07-09 — the operator surface (round lifecycle controls:
+  // submit / activate / close / record disbursement + the roster editor)
+  // is OB-only. Previously this also matched persona==='admin' and
+  // user.role==='admin', so platform admins saw enabled OB controls
+  // (fiduciary-control risk flagged by the team). The backend now serves
+  // admins the donor-safe round shape and rejects the mutations, so the
+  // UI must match: only a real OB is an operator here.
+  const isOperator = persona === 'ob';
   const canSign = persona === 'ob';
 
   const [roundId, setRoundId] = useState<string>(() => {

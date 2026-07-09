@@ -1628,6 +1628,7 @@
   "proximate.disbursement.cosign_required_body": "Disbursements at or above {amount} require a second Oversight Body signer per SoP §10.4.",
   "proximate.disbursement.cosign_required_title": "Second signer required",
   "proximate.disbursement.cosign_self_blocked": "You initiated this disbursement, so another OB member must co-sign.",
+  "proximate.disbursement.cosign_ob_only": "Ni wanachama wa Chombo cha Usimamizi pekee wanaoweza kusaini pamoja malipo.",
   "proximate.disbursement.due": "due",
   "proximate.disbursement.flag": "Flag",
   "proximate.disbursement.fsp_picker": "Financial service provider",
