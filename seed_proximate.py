@@ -39,7 +39,8 @@ from app import create_app
 from app.extensions import db
 from app.models import (
     Network, User, Endorser, ProximatePartner, Endorsement,
-    FinancialServiceProvider, Organization, NetworkMembership,
+    FinancialServiceProvider, PartnerDisbursementMethod,
+    Organization, NetworkMembership,
     ProximateDonor, ProximateRound, ProximateRoundParticipant,
     ProximateGrant, ProximateGrantAllocation, ProximateGrantReport,
 )
@@ -542,6 +543,64 @@ def run():
                 ))
                 action = 'created'
             print(f"  fsp {action}: {f['name']} ({f['kind']})")
+
+        # --- Demo-ready disbursement routes (Phase 717) ----------------
+        # The dd_clear partners had bank_verified_at set but NO
+        # PartnerDisbursementMethod row, so /disbursements/preflight always
+        # tripped the `no_method` blocker first — the happy path (incl. the
+        # $10k/$50k cosign ladder) was invisible in demos/UAT. Attach one
+        # VERIFIED route to three cleared partners, spanning all three FSP
+        # kinds (bank / hawala / mobile-money). Idempotent.
+        import json as _json
+        db.session.flush()
+        # The two original Tier-1 fixtures (Sennar, Khartoum Sisters)
+        # reliably reach dd_clear; give them BANK + HAWALA so the happy path
+        # is visible across two route kinds. Port Sudan lands at dd_pending,
+        # so its mobile-money route demonstrates the *"route present but not
+        # yet cleared"* preflight warning (distinct from the no_method
+        # blocker) — a useful second demo state.
+        _method_fixtures = [
+            ('Sennar Children Outreach', 'Bank of Khartoum', {
+                'account_holder_name': 'Sennar Children Outreach',
+                'account_number': 'SD4409112830771',
+            }),
+            ('Khartoum Sisters Mutual Aid', 'Gedaref Souq Hawala #4', {
+                'broker_office': 'Gedaref Souq #4',
+                'recipient_phone': '+249912004411',
+                'recipient_name': 'Amna Idris',
+            }),
+            ('Port Sudan Fisherfolk Union', 'Sudani Mobile Money', {
+                'msisdn': '+249911550022',
+                'holder_name': 'Port Sudan Fisherfolk Union',
+            }),
+        ]
+        for partner_name, fsp_name, identifier in _method_fixtures:
+            mp = ProximatePartner.query.filter_by(
+                network_id=proximate.id, name=partner_name,
+            ).first()
+            mfsp = FinancialServiceProvider.query.filter_by(
+                network_id=proximate.id, name=fsp_name,
+            ).first()
+            if not mp or not mfsp:
+                continue
+            method = PartnerDisbursementMethod.query.filter_by(
+                partner_id=mp.id, fsp_id=mfsp.id,
+            ).first()
+            if method:
+                method.status = 'verified'
+                if method.verified_at is None:
+                    method.verified_at = datetime.now(timezone.utc) - timedelta(hours=6)
+                method.identifier_json = _json.dumps(identifier)
+                m_action = 'updated'
+            else:
+                db.session.add(PartnerDisbursementMethod(
+                    partner_id=mp.id, fsp_id=mfsp.id,
+                    identifier_json=_json.dumps(identifier),
+                    status='verified',
+                    verified_at=datetime.now(timezone.utc) - timedelta(hours=6),
+                ))
+                m_action = 'created'
+            print(f"  disbursement method {m_action}: {partner_name} via {fsp_name}")
 
         # --- OB seat (Phase 648) ---------------------------------------
         # The @ob_required decorator (app/utils/network.py:193) checks for
@@ -1199,6 +1258,23 @@ def run():
         print(f"  Participants: {ProximateRoundParticipant.query.join(ProximateRound).filter(ProximateRound.network_id == proximate.id).count()}")
         print(f"  Grants    : {ProximateGrant.query.filter_by(network_id=proximate.id).count()}")
         print(f"  Allocations: {ProximateGrantAllocation.query.join(ProximateGrant).filter(ProximateGrant.network_id == proximate.id).count()}")
+        # Phase 717 health signal — how many partners can actually be paid
+        # (dd_clear AND a verified disbursement route). If this is 0, the
+        # disbursement happy path is invisible: every partner trips the
+        # no_method blocker and demos/UAT only ever see the safety wall.
+        _ready = (
+            ProximatePartner.query
+            .join(PartnerDisbursementMethod,
+                  PartnerDisbursementMethod.partner_id == ProximatePartner.id)
+            .filter(ProximatePartner.network_id == proximate.id,
+                    ProximatePartner.status == 'dd_clear',
+                    PartnerDisbursementMethod.status.in_(['verified', 'active']))
+            .distinct().count()
+        )
+        print(f"  Demo-ready partners (cleared + verified route): {_ready}")
+        if _ready == 0:
+            print("  [WARN] No demo-ready partner — the disbursement happy "
+                  "path (incl. $10k/$50k cosign ladder) will be invisible.")
         print()
         print(f"  Demo URLs:")
         print(f"    /proximate/endorse           — endorser inbox")
