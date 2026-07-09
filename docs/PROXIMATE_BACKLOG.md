@@ -26,6 +26,17 @@ guidance engine — persona journey maps (#1), "why blocked" inline
 explanations (#7), create-from-here CTAs (#8), stronger empty states (#6),
 all reading from one per-entity state/next-action/blocker resolver.
 
+**Shipped 2026-07-08 (commit `092a73062`):** `NextStep`/`PartnerJourney`/
+`WhyBlocked` in `next-step.tsx`; backend `GET /disbursements/preflight`;
+wired onto `/disbursements/new` (why-blocked + `?partner=` deep-link +
+actionable empty state) and partner detail (journey + create-from-here
+"Record disbursement" CTA). **i18n debt:** these guidance strings ship as
+**English literals** (frontend) and English messages (preflight endpoint),
+deliberately — `t('missing.key')` returns the key, so a fallback never
+fires. Follow-up: add real keys to all 6 locales incl. Arabic, and move the
+preflight `blockers`/`warnings` copy to a translatable catalogue. Operator-
+facing, so lower-urgency than the token/last-mile surfaces below.
+
 **Deferred (below), in recommended order:**
 
 ### Wave B — Donor "money story" (differentiation)
