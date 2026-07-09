@@ -450,6 +450,14 @@ def run():
                 action = 'created'
             else:
                 action = 'updated'
+                # Reconcile display fields so a corrected fixture value (e.g. a
+                # name_ar that got mangled by a shell-encoding issue on an
+                # earlier boot) self-heals on the next re-seed instead of
+                # sticking forever. name is the lookup key so it can't drift.
+                p.name_ar = f['name_ar']
+                p.locality = f['locality']
+                p.bank_account_holder_name = f['bank_account_holder_name']
+                p.bank_name = f['bank_name']
                 # Wipe any prior endorsements so we snap to the target shape.
                 Endorsement.query.filter_by(partner_id=p.id).delete()
                 p.bank_verified_at = None
