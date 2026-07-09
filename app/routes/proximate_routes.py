@@ -2144,7 +2144,14 @@ def api_disbursement_preflight():
     if err:
         return err
     partner_id = request.args.get('partner_id', type=int)
-    amount = request.args.get('amount', type=float) or 0.0
+    # The UI sends `amount`, but API callers and tests naturally reach for
+    # `amount_usd` because the create endpoint uses that field name. Accept
+    # both so preflight probes do not produce false negatives.
+    amount = (
+        request.args.get('amount', type=float)
+        if request.args.get('amount') not in (None, '')
+        else request.args.get('amount_usd', type=float)
+    ) or 0.0
     if not partner_id:
         return jsonify({'success': False, 'error': 'partner_id required'}), 400
     p = ProximatePartner.query.filter_by(

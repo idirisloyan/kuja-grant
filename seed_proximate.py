@@ -222,6 +222,22 @@ PARTNER_FIXTURES = [
             ('peter@hopebridges.org', True, True, True),  # Gedaref, no COI
         ],
     },
+    {
+        # Phase 718 - dedicated visual warning fixture. This partner is
+        # cleared, but its route is intentionally UNVERIFIED so the
+        # /disbursements/new WhyBlocked panel can be tested in Arabic without
+        # disturbing the two verified happy-path partners above.
+        'name': 'Arabic WhyBlocked Test Cooperative',
+        'name_ar': 'تعاونية اختبار سبب التعطيل',
+        'locality': 'Gedaref',
+        'bank_account_holder_name': 'Arabic WhyBlocked Test Cooperative',
+        'bank_name': 'Sudani Mobile Money',
+        'target_status': 'dd_clear',
+        'endorsement_target': [
+            ('admin@kuja.org', True, True, True),
+            ('thandi@ubuntu.org', True, True, True),
+        ],
+    },
     # Phase 714 — three additional partners for round-roster demos
     {
         'name': 'Kassala East Farmers Circle',
@@ -563,18 +579,24 @@ def run():
             ('Sennar Children Outreach', 'Bank of Khartoum', {
                 'account_holder_name': 'Sennar Children Outreach',
                 'account_number': 'SD4409112830771',
-            }),
+            }, 'verified'),
             ('Khartoum Sisters Mutual Aid', 'Gedaref Souq Hawala #4', {
                 'broker_office': 'Gedaref Souq #4',
                 'recipient_phone': '+249912004411',
                 'recipient_name': 'Amna Idris',
-            }),
+            }, 'verified'),
             ('Port Sudan Fisherfolk Union', 'Sudani Mobile Money', {
                 'msisdn': '+249911550022',
                 'holder_name': 'Port Sudan Fisherfolk Union',
-            }),
+            }, 'verified'),
+            ('Arabic WhyBlocked Test Cooperative', 'Sudani Mobile Money', {
+                'msisdn': '+249911550099',
+                'holder_name': 'Arabic WhyBlocked Test Cooperative',
+            }, 'unverified'),
         ]
-        for partner_name, fsp_name, identifier in _method_fixtures:
+        for row in _method_fixtures:
+            partner_name, fsp_name, identifier = row[:3]
+            method_status = row[3] if len(row) > 3 else 'verified'
             mp = ProximatePartner.query.filter_by(
                 network_id=proximate.id, name=partner_name,
             ).first()
@@ -586,21 +608,24 @@ def run():
             method = PartnerDisbursementMethod.query.filter_by(
                 partner_id=mp.id, fsp_id=mfsp.id,
             ).first()
+            verified_at = (
+                datetime.now(timezone.utc) - timedelta(hours=6)
+                if method_status in ('verified', 'active') else None
+            )
             if method:
-                method.status = 'verified'
-                if method.verified_at is None:
-                    method.verified_at = datetime.now(timezone.utc) - timedelta(hours=6)
+                method.status = method_status
+                method.verified_at = verified_at
                 method.identifier_json = _json.dumps(identifier)
                 m_action = 'updated'
             else:
                 db.session.add(PartnerDisbursementMethod(
                     partner_id=mp.id, fsp_id=mfsp.id,
                     identifier_json=_json.dumps(identifier),
-                    status='verified',
-                    verified_at=datetime.now(timezone.utc) - timedelta(hours=6),
+                    status=method_status,
+                    verified_at=verified_at,
                 ))
                 m_action = 'created'
-            print(f"  disbursement method {m_action}: {partner_name} via {fsp_name}")
+            print(f"  disbursement method {m_action}: {partner_name} via {fsp_name} ({method_status})")
 
         # --- OB seat (Phase 648) ---------------------------------------
         # The @ob_required decorator (app/utils/network.py:193) checks for
