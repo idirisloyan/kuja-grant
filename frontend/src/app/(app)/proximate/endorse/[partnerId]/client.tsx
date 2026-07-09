@@ -409,12 +409,17 @@ export default function ProximateEndorseWizardClient() {
             <PartnerJourney status={partner.status} />
             {(() => {
               const s = partner.status;
+              const txn = (k: string, fb: string) => {
+                const v = t(k);
+                return !v || v === k ? fb : v;
+              };
               if (s === 'dd_clear') {
                 return (
                   <NextStep info={{
-                    label: 'Cleared for funding. Record a disbursement to this partner.',
+                    label: txn('proximate.pj.next.cleared',
+                      'Cleared for funding. Record a disbursement to this partner.'),
                     href: `/proximate/disbursements/new?partner=${partner.id}`,
-                    cta: 'Record disbursement',
+                    cta: txn('proximate.pj.next.cleared_cta', 'Record disbursement'),
                     tone: 'action',
                   }} />
                 );
@@ -422,7 +427,8 @@ export default function ProximateEndorseWizardClient() {
               if (s === 'dd_pending') {
                 return (
                   <NextStep info={{
-                    label: 'Due diligence in progress — verify the bank/FSP method and confirm independent endorsements below.',
+                    label: txn('proximate.pj.next.dd_pending',
+                      'Due diligence in progress — verify the bank/FSP method and confirm independent endorsements below.'),
                     tone: 'waiting',
                   }} />
                 );
@@ -430,16 +436,18 @@ export default function ProximateEndorseWizardClient() {
               if (s === 'suspended') {
                 return (
                   <NextStep info={{
-                    label: 'Suspended. Resolve the open intervention before any further funding.',
+                    label: txn('proximate.pj.next.suspended',
+                      'Suspended. Resolve the open intervention before any further funding.'),
                     tone: 'waiting',
                   }} />
                 );
               }
               return (
                 <NextStep info={{
-                  label: 'Collect independent community endorsements to clear this partner for funding.',
+                  label: txn('proximate.pj.next.default',
+                    'Collect independent community endorsements to clear this partner for funding.'),
                   href: '/proximate/endorse',
-                  cta: 'Endorsement inbox',
+                  cta: txn('proximate.pj.next.default_cta', 'Endorsement inbox'),
                   tone: 'action',
                 }} />
               );

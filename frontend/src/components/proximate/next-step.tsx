@@ -11,6 +11,18 @@
 
 import Link from 'next/link';
 import { ArrowRight, Circle, CheckCircle2, Dot, AlertTriangle, Info } from 'lucide-react';
+import { useTranslation } from '@/lib/hooks/use-translation';
+
+/** t() returns the key itself when a translation is missing (truthy), so
+ *  `t(k) || fallback` never fires. This guard returns the English fallback
+ *  whenever the key is absent in the active locale. */
+function useTx() {
+  const { t } = useTranslation();
+  return (key: string, fallback: string, params?: Record<string, string | number>) => {
+    const v = t(key, params);
+    return !v || v === key ? fallback : v;
+  };
+}
 
 export interface NextStepInfo {
   /** Short imperative label, e.g. "Collect a second signature". */
@@ -204,6 +216,7 @@ export function partnerJourneyIndex(status?: string, opts?: {
 export function PartnerJourney({ status, funded, reported, verified }: {
   status?: string; funded?: boolean; reported?: boolean; verified?: boolean;
 }) {
+  const tx = useTx();
   const active = partnerJourneyIndex(status, { funded, reported, verified });
   const suspended = status === 'suspended';
   return (
@@ -222,7 +235,7 @@ export function PartnerJourney({ status, funded, reported, verified }: {
                 <Dot className="w-5 h-5 text-muted-foreground/40" />
               )}
               <span className={`text-[11px] ${current ? 'font-semibold text-foreground' : done ? 'text-muted-foreground' : 'text-muted-foreground/60'}`}>
-                {s.label}
+                {tx(`proximate.journey.${s.key}`, s.label)}
               </span>
             </div>
             {i < PARTNER_STEPS.length - 1 && (
@@ -237,30 +250,42 @@ export function PartnerJourney({ status, funded, reported, verified }: {
 
 // ---- Why blocked? ----------------------------------------------------
 
-export interface Blocker { code: string; message: string; href?: string; }
+export interface Blocker {
+  code: string;
+  message: string;
+  href?: string;
+  /** Phase 717 #3 — drives a precise, localized "fix this now" CTA
+   *  (e.g. add_route → "Add a payment route"). */
+  cta_code?: string;
+}
 
 /** Renders the "why blocked?" preconditions: red = hard blocker, amber =
- *  advisory warning. Nothing renders when both lists are empty. */
+ *  advisory warning. Message + CTA localize by code (English `message` is
+ *  the fallback). Nothing renders when both lists are empty. */
 export function WhyBlocked({ blockers = [], warnings = [] }: {
   blockers?: Blocker[]; warnings?: Blocker[];
 }) {
+  const tx = useTx();
   if (blockers.length === 0 && warnings.length === 0) return null;
   const Row = ({ b, tone }: { b: Blocker; tone: 'block' | 'warn' }) => {
     const styles = tone === 'block'
       ? 'text-red-700 dark:text-red-400'
       : 'text-amber-700 dark:text-amber-400';
+    const ctaLabel = b.cta_code
+      ? tx(`proximate.why.cta.${b.cta_code}`, 'Fix it')
+      : tx('proximate.why.cta.fix', 'Fix it');
     return (
       <li className="flex items-start gap-2 text-sm">
         {tone === 'block'
           ? <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${styles}`} />
           : <Info className={`w-4 h-4 shrink-0 mt-0.5 ${styles}`} />}
         <span className="flex-1">
-          {b.message}
+          {tx(`proximate.why.msg.${b.code}`, b.message)}
           {b.href && (
             <>
               {' '}
               <Link href={b.href} className="underline underline-offset-2 hover:no-underline font-medium">
-                Fix it →
+                {ctaLabel} →
               </Link>
             </>
           )}
@@ -275,7 +300,8 @@ export function WhyBlocked({ blockers = [], warnings = [] }: {
       : 'border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20'}`}>
       <p className={`text-xs font-semibold uppercase tracking-wide mb-1.5 ${hard
         ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
-        {hard ? "Can't proceed yet" : 'Before you continue'}
+        {hard ? tx('proximate.why.title.blocked', "Can't proceed yet")
+              : tx('proximate.why.title.warn', 'Before you continue')}
       </p>
       <ul className="space-y-1.5">
         {blockers.map((b) => <Row key={b.code} b={b} tone="block" />)}

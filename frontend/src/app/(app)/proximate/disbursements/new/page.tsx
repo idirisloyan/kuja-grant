@@ -234,7 +234,7 @@ export default function ProximateDisbursementNewPage() {
                   href="/proximate/admin/partners/new"
                   className="mt-1.5 inline-flex text-xs font-semibold text-amber-800 dark:text-amber-300 underline underline-offset-2 hover:no-underline"
                 >
-                  Nominate a partner →
+                  {(() => { const v = t('proximate.disbursements.nominate_cta'); return (!v || v === 'proximate.disbursements.nominate_cta') ? 'Nominate a partner' : v; })()} →
                 </Link>
               </div>
             )}

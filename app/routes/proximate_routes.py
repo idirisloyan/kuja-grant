@@ -2156,10 +2156,13 @@ def api_disbursement_preflight():
     blockers, warnings = [], []
     href = f'/proximate/endorse/{p.id}'
 
-    # 1. Partner trust status
+    # 1. Partner trust status. Each item carries a machine `code` (drives
+    # a localized message on the client) and a `cta_code` (drives a precise,
+    # localized "fix this now" action). `message` is the English fallback.
     if p.status == 'suspended':
         blockers.append({
             'code': 'partner_suspended',
+            'cta_code': 'lift_suspension',
             'message': 'This partner is suspended. Lift the suspension before funding.',
             'href': href})
     elif p.status != 'dd_clear':
@@ -2176,6 +2179,7 @@ def api_disbursement_preflight():
             missing.append('endorsers meeting the reputation floor')
         warnings.append({
             'code': 'partner_not_cleared',
+            'cta_code': 'clear_dd',
             'message': ('Partner is not fully cleared yet'
                         + (f" — still needs {', '.join(missing)}." if missing
                            else f' (status: {p.status}).')),
@@ -2191,11 +2195,13 @@ def api_disbursement_preflight():
     if total_methods == 0:
         blockers.append({
             'code': 'no_method',
+            'cta_code': 'add_route',
             'message': 'No disbursement route on file. Add a bank, hawala, or mobile-money method for this partner.',
             'href': f'{href}#routes'})
     elif verified_methods == 0:
         warnings.append({
             'code': 'method_unverified',
+            'cta_code': 'verify_route',
             'message': 'A disbursement method exists but none are verified yet.',
             'href': f'{href}#routes'})
 
