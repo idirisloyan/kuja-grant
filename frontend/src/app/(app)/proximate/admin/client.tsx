@@ -275,8 +275,8 @@ export function ProximateAdminClient() {
                   </p>
                 </Card>
               </Link>
-              {/* Phase 717 — FSP registration (was API-only) */}
-              <Link href="/proximate/admin/fsps/new" className="block">
+              {/* Phase 717 — FSP registry (was API-only) */}
+              <Link href="/proximate/admin/fsps" className="block">
                 <Card className="p-4 hover:bg-muted/30 transition-colors">
                   <div className="flex items-center gap-2 mb-1">
                     <Banknote className="w-4 h-4 text-muted-foreground" />
