@@ -26,16 +26,40 @@ guidance engine — persona journey maps (#1), "why blocked" inline
 explanations (#7), create-from-here CTAs (#8), stronger empty states (#6),
 all reading from one per-entity state/next-action/blocker resolver.
 
-**Shipped 2026-07-08 (commit `092a73062`):** `NextStep`/`PartnerJourney`/
-`WhyBlocked` in `next-step.tsx`; backend `GET /disbursements/preflight`;
-wired onto `/disbursements/new` (why-blocked + `?partner=` deep-link +
-actionable empty state) and partner detail (journey + create-from-here
-"Record disbursement" CTA). **i18n debt:** these guidance strings ship as
-**English literals** (frontend) and English messages (preflight endpoint),
-deliberately — `t('missing.key')` returns the key, so a fallback never
-fires. Follow-up: add real keys to all 6 locales incl. Arabic, and move the
-preflight `blockers`/`warnings` copy to a translatable catalogue. Operator-
-facing, so lower-urgency than the token/last-mile surfaces below.
+**Shipped 2026-07-08:**
+- `092a73062` — guidance engine: `NextStep`/`PartnerJourney`/`WhyBlocked` in
+  `next-step.tsx`; backend `GET /disbursements/preflight`; wired onto
+  `/disbursements/new` (why-blocked + `?partner=` deep-link + actionable empty
+  state) and partner detail (journey + create-from-here "Record disbursement").
+- `5e9b84507` — **demo-ready partner fixture (#1)**: `seed_proximate.py` gives
+  the two reliably-dd_clear partners a VERIFIED route (Sennar→bank, Khartoum
+  Sisters→hawala) so the disbursement happy path + $10k/$50k cosign ladder are
+  visible, not hidden behind `no_method`. Port Sudan (dd_pending) keeps a
+  mobile-money route to demo the "route present but not cleared" warning. Seed
+  summary now prints a health signal ("Demo-ready partners: N", WARN if 0). To
+  apply on prod: `SEED_PROXIMATE_ON_BOOT=true` → restart once → unset.
+- `734dc59cf` — **#3 precise CTAs** (preflight `cta_code` → WhyBlocked renders
+  add_route / verify_route / clear_dd / lift_suspension, not a generic "Fix
+  it") + **#4 localization**: PartnerJourney, WhyBlocked titles + static
+  blocker messages + all CTAs, partner-detail next-step, and the disbursement
+  empty-state now resolve via `t()` (English key-miss fallback guards the
+  falsy-fallback trap). 23 keys × 6 locales, real Arabic.
+
+**Remaining after this wave (backlog):**
+- [ ] **Dynamic why-blocked i18n** — the two interpolated preflight messages
+  (`partner_not_cleared` missing-list, `cosign_required` amount/count) still
+  render the English backend message. Localize via `t(key, {params})` (the
+  hook supports `{var}` interpolation); send the params from the endpoint.
+- [ ] **Sudanese-Arabic dialect review** of the new operator guidance strings
+  (MSA is authored; a native reviewer should adjust register). Needs a human.
+- [ ] **Fuller #7 CI health-check** — the seed prints a WARN, but a CI/e2e
+  assertion ("prod always has ≥1 cleared partner with a verified route") would
+  catch a silent regression before UAT. Extend `tests/proximate_p0_uat.py`.
+- [ ] **#2 formal disabled-button audit** — the operator's disabled actions
+  (round Sign/Activate, disbursement cosign/verify) already carry `NextStep`
+  guidance strips, so the sweep is *largely satisfied*; a deliberate audit of
+  every disabled control (to guarantee each has an adjacent "why") is the
+  remaining, lower-value piece.
 
 **Deferred (below), in recommended order:**
 
