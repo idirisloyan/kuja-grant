@@ -532,6 +532,121 @@ def run_proximate_writes(base):
     check("public POST /proximate/public/grievances", grievance_public)
 
 
+def run_proximate_rbac(base):
+    """Negative-authorization matrix — the defect class the team's RBAC report
+    surfaced (donors/platform-admins reaching OB-only endpoints, report_token
+    and bank/sanctions fields leaking, the OB wrongly denied on /audit-chain).
+
+    Prior gate only exercised the OB happy path, so none of these were caught.
+    This asserts, per persona:
+      * OB REGAINS every OB-only read (catches the /audit-chain-blocked class),
+      * non-OB personas are DENIED (403) on OB-only ops (the core leak class),
+      * a non-OB body NEVER contains sensitive fields — an INVARIANT, not a
+        brittle status, because a persona can legitimately be a seeded endorser
+        (admin@kuja.org is one on the demo seed) and still must not see
+        bank/sanctions/report_token internals,
+      * an unauthenticated caller gets no data and no 5xx.
+    """
+    section("Proximate — RBAC / authorization matrix (negative cases)")
+    OV = "proximate"
+    ob = login(base, "prox_ob", override=OV)
+    donor = login(base, "prox_donor", override=OV)
+    admin = login(base, "admin", override=OV)  # platform admin — NOT an OB
+
+    # Fields that must NEVER appear in a non-OB response body.
+    SENSITIVE = (
+        "report_token", "bank_account_holder_name", "bank_name",
+        "contact_phone", "sanctions_summary", "intake_form",
+        "reputation_floor", "audit_in_window", "actor_email",
+        "signers_required", "audit_anchor_seq",
+    )
+
+    def _no_sensitive(label, r):
+        leaked = [f for f in SENSITIVE if f'"{f}"' in (r.text or "")]
+        assert not leaked, f"{label} leaked {leaked} (status {r.status_code})"
+
+    pid = _first_id(ob, base, "/api/proximate/partners", override=OV)
+    rid = _first_id(ob, base, "/api/proximate/rounds", override=OV)
+    did = _first_id(ob, base, "/api/proximate/disbursements", override=OV)
+
+    OB_ONLY = [
+        "/api/proximate/overview", "/api/proximate/attention-queue",
+        "/api/proximate/audit-chain", "/api/proximate/interventions",
+        "/api/proximate/fsps",
+    ]
+    if pid:
+        OB_ONLY.append(f"/api/proximate/disbursements/preflight?partner_id={pid}")
+
+    # --- OB regains access (the "OB blocked on /audit-chain" defect) ---
+    for p in OB_ONLY:
+        def ob_ok(p=p):
+            r = get(ob, base, p, override=OV)
+            assert r.status_code == 200, f"OB {p} -> {r.status_code} (want 200): {r.text[:160]}"
+        check(f"OB 200 {p.split('?')[0]}", ob_ok)
+
+    # --- non-OB denied on every OB-only op ---
+    for who, sess in (("donor", donor), ("admin", admin)):
+        for p in OB_ONLY:
+            def denied(p=p, sess=sess):
+                r = get(sess, base, p, override=OV)
+                assert r.status_code == 403, f"{p} -> {r.status_code} (want 403): {r.text[:160]}"
+            check(f"{who} 403 {p.split('?')[0]}", denied)
+
+    # --- disbursement detail: OB 200; non-OB 403 AND no token leak ---
+    if did:
+        def ob_disb():
+            r = get(ob, base, f"/api/proximate/disbursements/{did}", override=OV)
+            assert r.status_code == 200, f"OB disbursement -> {r.status_code}"
+        check("OB 200 /disbursements/<id>", ob_disb)
+        for who, sess in (("donor", donor), ("admin", admin)):
+            def disb_denied(sess=sess, who=who):
+                r = get(sess, base, f"/api/proximate/disbursements/{did}", override=OV)
+                assert r.status_code == 403, f"{who} disbursement -> {r.status_code} (want 403)"
+                _no_sensitive(f"{who} disbursement detail", r)
+            check(f"{who} 403 + no-leak /disbursements/<id>", disb_denied)
+
+    # --- partner detail: OB full; donor hard-403; admin never sees secrets ---
+    if pid:
+        def ob_partner():
+            r = get(ob, base, f"/api/proximate/partners/{pid}", override=OV)
+            assert r.status_code == 200 and '"trust_floor_signals"' in (r.text or ""), \
+                f"OB partner -> {r.status_code}"
+        check("OB 200 /partners/<id> (full)", ob_partner)
+
+        def donor_partner():
+            r = get(donor, base, f"/api/proximate/partners/{pid}", override=OV)
+            assert r.status_code == 403, f"donor partner -> {r.status_code} (want 403)"
+        check("donor 403 /partners/<id>", donor_partner)
+
+        # admin@kuja.org is a seeded endorser -> 403 OR 200-safe-subset; either
+        # way it must never carry bank / sanctions / reputation internals.
+        def admin_partner_no_leak():
+            r = get(admin, base, f"/api/proximate/partners/{pid}", override=OV)
+            assert r.status_code in (200, 403), f"admin partner -> {r.status_code}"
+            _no_sensitive("admin partner detail", r)
+        check("admin no-secret-leak /partners/<id>", admin_partner_no_leak)
+
+    # --- round detail: donor gets the donor-safe view, no internal fields ---
+    if rid:
+        def donor_round_no_leak():
+            r = get(donor, base, f"/api/proximate/rounds/{rid}", override=OV)
+            assert r.status_code in (200, 403), f"donor round -> {r.status_code}"
+            _no_sensitive("donor round detail", r)
+        check("donor no-secret-leak /rounds/<id>", donor_round_no_leak)
+
+    # --- unauthenticated caller: no data, no 5xx ---
+    def unauth_denied():
+        anon = requests.Session()
+        anon.headers["X-Network-Override"] = OV
+        r = anon.get(
+            f"{base}/api/proximate/overview",
+            headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15,
+        )
+        assert r.status_code != 200, f"unauth /overview served 200 data: {r.text[:160]}"
+        assert not _is_server_error(r), f"unauth /overview 5xx: {r.text[:160]}"
+    check("unauth denied (no data / no 5xx) /overview", unauth_denied)
+
+
 def run_near_writes(base):
     section("NEAR — write paths (best-effort; needs seeded funds)")
     OV = "near"
@@ -560,6 +675,7 @@ def run_near_writes(base):
 def run_api_regression(base):
     run_kuja_writes(base)
     run_proximate_writes(base)
+    run_proximate_rbac(base)
     run_near_writes(base)
 
 
