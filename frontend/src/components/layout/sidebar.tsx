@@ -485,19 +485,22 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
       // partners (Phase 693 PII-allowed), disbursements, rounds,
       // endorser approval queue, crisis selector.
       return {
+        // QA 2026-07-10: removed 'Donor view' and 'Observability' — both
+        // link to platform/donor-only surfaces whose data APIs 403 for an OB
+        // (donor dashboard, /api/ai/observability), leaving broken pages +
+        // console errors. 'Audit chain' points at the shared page, which is
+        // now Proximate-aware (falls back to /api/proximate/audit-chain).
         primary: [
           { icon: LayoutDashboard, label: 'Dashboard',           href: '/proximate/admin' },
           { icon: FileText,        label: 'Grants from donors',  href: '/proximate/grants' },
           { icon: HandCoins,       label: 'Rounds & disbursements', href: '/proximate/rounds' },
           { icon: Users,           label: 'Partners',            href: '/proximate/admin/partners' },
           { icon: ClipboardCheck,  label: 'Endorsers',           href: '/proximate/admin/endorsers' },
-          { icon: BarChart3,       label: 'Donor view',          href: '/proximate/donor' },
         ],
         secondary: [
           { icon: MapPin,          label: 'Crisis signals',      href: '/proximate/crisis-selector' },
           { icon: Send,            label: 'All disbursements',   href: '/proximate/disbursements' },
           { icon: ShieldCheck,     label: 'Audit chain',         href: '/admin/audit-chain' },
-          { icon: Activity,        label: t('nav.observability'), href: '/observability' },
           { icon: SettingsIcon,    label: 'Settings',            href: '/settings/notifications' },
         ],
       };

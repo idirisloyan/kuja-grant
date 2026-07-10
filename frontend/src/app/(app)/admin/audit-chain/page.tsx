@@ -23,6 +23,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
+import { useNetworkStore } from '@/stores/network-store';
 import { cn } from '@/lib/utils';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
@@ -99,6 +100,20 @@ function humanise(action: string): string {
 }
 
 export default function AuditChainPage() {
+  // QA 2026-07-10: on the Proximate tenant the OB reaches its own
+  // tenant-scoped chain at /api/proximate/audit-chain (read + jsonl export);
+  // the platform /api/audit-chain/* endpoints are admin-only and 403 the OB,
+  // which used to render this page broken ("undefined break(s)… Insufficient
+  // permissions"). When on Proximate we read the tenant chain and show an
+  // honest tenant-scoped card — the cryptographic re-verify is platform-only,
+  // so we don't fake an "intact" badge; the OB verifies offline via the export.
+  const network = useNetworkStore((s) => s.network);
+  const isProx = network?.slug === 'proximate';
+  const recentUrl = isProx ? '/api/proximate/audit-chain' : '/api/audit-chain/recent';
+  const exportHref = isProx
+    ? '/api/proximate/audit-chain?format=jsonl'
+    : '/api/audit-chain/export.jsonl';
+
   const [verify, setVerify] = useState<VerifyResult | null>(null);
   const [verifyLoading, setVerifyLoading] = useState(true);
   const [recent, setRecent] = useState<RecentResult | null>(null);
@@ -108,6 +123,9 @@ export default function AuditChainPage() {
   const LIMIT = 25;
 
   const loadVerify = async () => {
+    // Proximate has no cryptographic verify endpoint — skip it (calling the
+    // platform one would 403 the OB and show a fake error).
+    if (isProx) { setVerifyLoading(false); return; }
     setVerifyLoading(true);
     try {
       const r = await api.get<VerifyResult>('/api/audit-chain/verify');
@@ -122,7 +140,7 @@ export default function AuditChainPage() {
   const loadRecent = async (newOffset: number) => {
     setRecentLoading(true);
     try {
-      const r = await api.get<RecentResult>(`/api/audit-chain/recent?limit=${LIMIT}&offset=${newOffset}`);
+      const r = await api.get<RecentResult>(`${recentUrl}?limit=${LIMIT}&offset=${newOffset}`);
       setRecent(r);
       setOffset(newOffset);
     } catch (e) {
@@ -135,7 +153,8 @@ export default function AuditChainPage() {
   useEffect(() => {
     loadVerify();
     loadRecent(0);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isProx]);
 
   const integrityOk = verify?.ok === true;
 
@@ -148,7 +167,7 @@ export default function AuditChainPage() {
           subtitle="Every critical event writes a hash-chained row. Any retroactive edit breaks the chain — this page proves it's intact."
           primaryAction={
             <a
-              href="/api/audit-chain/export.jsonl"
+              href={exportHref}
               download
               className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted"
               title="Download the full chain as NDJSON for offline verification"
@@ -159,7 +178,26 @@ export default function AuditChainPage() {
           }
         />
         <PageMain>
-      {/* Integrity card */}
+      {/* Integrity card — on Proximate we can't run the platform verify, so
+          show an honest tenant-scoped state (no fake "intact" claim). */}
+      {isProx ? (
+        <Card className="p-4 sm:p-5 border-l-4 border-l-[hsl(var(--kuja-clay))]">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="w-6 h-6 text-[hsl(var(--kuja-clay))]" />
+            <div>
+              <div className="kuja-eyebrow">Tenant audit chain</div>
+              <h2 className="kuja-display text-xl mt-0.5">
+                {recent ? `${recent.total.toLocaleString()} entries` : '…'}
+              </h2>
+              <p className="text-xs text-[hsl(var(--kuja-ink-soft))] mt-2">
+                Every critical Proximate action writes a hash-chained row.
+                Cryptographic re-verification runs offline against the exported
+                file — download the chain (NDJSON) above and verify independently.
+              </p>
+            </div>
+          </div>
+        </Card>
+      ) : (
       <Card className={cn(
         'p-4 sm:p-5 border-l-4',
         verifyLoading ? 'border-l-[hsl(var(--kuja-ink-soft))]'
@@ -206,6 +244,7 @@ export default function AuditChainPage() {
           </button>
         </div>
       </Card>
+      )}
 
       {/* Recent entries */}
       <Card className="p-4 sm:p-5">
@@ -277,7 +316,7 @@ export default function AuditChainPage() {
               </thead>
               <tbody>
                 {recent.entries.map((e) => (
-                  <tr key={e.id} className="border-b border-[hsl(var(--border))] last:border-b-0 hover:bg-[hsl(var(--kuja-sand-50))]">
+                  <tr key={e.seq} className="border-b border-[hsl(var(--border))] last:border-b-0 hover:bg-[hsl(var(--kuja-sand-50))]">
                     <td className="py-2 font-mono text-[hsl(var(--kuja-ink-soft))]">{e.seq}</td>
                     <td className={cn('py-2 font-semibold', actionTone(e.action))}>
                       {humanise(e.action)}
