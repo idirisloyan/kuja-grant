@@ -584,6 +584,36 @@ def run_proximate_rbac(base):
             assert r.status_code == 200, f"OB {p} -> {r.status_code} (want 200): {r.text[:160]}"
         check(f"OB 200 {p.split('?')[0]}", ob_ok)
 
+    # --- OB NAV SURFACE: every link the OB sidebar renders must resolve for
+    # the OB (200, not 403). This is the "broken nav link" defect class from
+    # the 2026-07-10 QA crawl: 'Donor view', 'Observability', and 'Audit chain'
+    # were shown to the OB but their backing APIs 403'd it, leaving dead pages +
+    # console errors. The API 403 was *correct*; the nav pointing there was the
+    # bug. Keep this list a 1:1 mirror of proximateProfile()'s 'ob'/'admin'
+    # block in frontend/src/components/layout/sidebar.tsx — if you add a nav
+    # item there, add its primary data endpoint here so the gate proves the OB
+    # can actually load it. (Some entries overlap OB_ONLY above by design; the
+    # value here is being a complete mirror of the rendered sidebar.)
+    OB_NAV_SURFACES = [
+        ("Dashboard",              "/api/proximate/overview"),
+        ("Grants from donors",     "/api/proximate/grants"),
+        ("Rounds & disbursements", "/api/proximate/rounds"),
+        ("Partners",               "/api/proximate/partners"),
+        ("Endorsers",              "/api/proximate/admin/endorsers/pending"),
+        ("Crisis signals",         "/api/proximate/crisis-selector"),
+        ("Crisis signals (list)",  "/api/proximate/crisis-signals"),
+        ("All disbursements",      "/api/proximate/disbursements"),
+        ("Audit chain",            "/api/proximate/audit-chain"),
+    ]
+    for label, ep in OB_NAV_SURFACES:
+        def nav_loads(ep=ep, label=label):
+            r = get(ob, base, ep, override=OV)
+            assert r.status_code == 200, (
+                f"OB nav '{label}' -> {ep} returned {r.status_code} "
+                f"(a link the OB is shown but cannot load): {r.text[:160]}"
+            )
+        check(f"OB nav loads: {label}", nav_loads)
+
     # --- non-OB denied on every OB-only op ---
     for who, sess in (("donor", donor), ("admin", admin)):
         for p in OB_ONLY:
