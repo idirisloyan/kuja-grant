@@ -2764,5 +2764,13 @@
   "proximate.pj.next.suspended": "Suspendu. Résolvez l'intervention en cours avant tout financement.",
   "proximate.pj.next.default": "Recueillez des recommandations communautaires indépendantes pour valider ce partenaire.",
   "proximate.pj.next.default_cta": "Boîte de recommandations",
-  "proximate.disbursements.nominate_cta": "Proposer un partenaire"
+  "proximate.disbursements.nominate_cta": "Proposer un partenaire",
+  "proximate.result.recorded_threshold_title": "Recommandation enregistrée — seuil de confiance atteint",
+  "proximate.result.recorded_threshold_subtitle": "Ce partenaire a maintenant suffisamment de recommandations. L’étape suivante est la vérification bancaire et un mode de paiement.",
+  "proximate.disbursement.fill_all_fields": "Remplissez tous les champs ci-dessus pour enregistrer ce mode.",
+  "proximate.disbursements.field_method": "Mode de paiement",
+  "proximate.disbursements.select_method": "Sélectionnez le mode de paiement",
+  "proximate.disbursements.ob_only_title": "Cette page est réservée à l’organe de supervision.",
+  "proximate.disbursements.ob_only_body": "L’enregistrement des décaissements est géré par le secrétariat d’Adeso.",
+  "proximate.admin.bank_verify_needs_method": "Ajoutez un mode de paiement ci-dessous avant de vérifier."
 }

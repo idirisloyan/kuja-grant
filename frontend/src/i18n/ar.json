@@ -2764,5 +2764,13 @@
   "proximate.pj.next.suspended": "موقوف. عالِج التدخّل المفتوح قبل أي تمويل إضافي.",
   "proximate.pj.next.default": "اجمع تزكيات مجتمعية مستقلة لاعتماد هذا الشريك للتمويل.",
   "proximate.pj.next.default_cta": "صندوق التزكيات",
-  "proximate.disbursements.nominate_cta": "رشّح شريكاً"
+  "proximate.disbursements.nominate_cta": "رشّح شريكاً",
+  "proximate.result.recorded_threshold_title": "تم تسجيل التزكية — تم بلوغ حد الثقة",
+  "proximate.result.recorded_threshold_subtitle": "لدى هذا الشريك الآن عدد كافٍ من التزكيات. الخطوة التالية هي التحقق من الحساب البنكي وإضافة وسيلة دفع.",
+  "proximate.disbursement.fill_all_fields": "املأ جميع الحقول أعلاه لحفظ هذه الوسيلة.",
+  "proximate.disbursements.field_method": "وسيلة الدفع",
+  "proximate.disbursements.select_method": "اختر وسيلة الدفع",
+  "proximate.disbursements.ob_only_title": "هذه الصفحة مخصّصة لهيئة الرقابة.",
+  "proximate.disbursements.ob_only_body": "يتولّى تسجيل عمليات الصرف أمانة أديسو.",
+  "proximate.admin.bank_verify_needs_method": "أضف وسيلة دفع أدناه قبل التحقق."
 }

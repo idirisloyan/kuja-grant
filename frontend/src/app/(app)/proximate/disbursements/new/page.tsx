@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2, Send, Copy, Check } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,13 @@ interface Partner {
   name: string;
   status: string;
   locality: string | null;
+}
+
+interface Method {
+  id: number;
+  display: string;
+  status: string;
+  fsp: { kind: string } | null;
 }
 
 interface Round {
@@ -50,8 +58,16 @@ interface CreateResp {
 export default function ProximateDisbursementNewPage() {
   const { t } = useTranslation();
   const router = useRouter();
+  // PRX-RBAC-013 — recording money is OB-only. Non-OB personas can reach
+  // this URL directly; the POST is server-gated (403 err.ob_required), but
+  // the form must not render for them either. persona 'admin' (platform
+  // super-admin) is NOT an OB, so it's excluded too.
+  const { persona, isLoading: personaLoading } = useProximatePersona();
+  const isOb = persona === 'ob';
   const [partners, setPartners] = useState<Partner[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
+  const [methods, setMethods] = useState<Method[]>([]);
+  const [methodId, setMethodId] = useState<string>('');
   const [partnerId, setPartnerId] = useState<string>('');
   const [roundId, setRoundId] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
@@ -70,12 +86,32 @@ export default function ProximateDisbursementNewPage() {
       api.get<{ partners: Partner[] }>('/api/proximate/partners').catch(() => ({ partners: [] })),
       api.get<{ rounds: Round[] }>('/api/proximate/rounds').catch(() => ({ rounds: [] })),
     ]).then(([p, r]) => {
-      setPartners((p.partners || []).filter(
-        (x) => ['dd_clear', 'endorsements_open', 'dd_pending'].includes(x.status)
-      ));
+      // Only fully-cleared partners can receive money. Non-dd_clear
+      // partners were previously listed (blocked at submit), which read
+      // as confusing — hide them so the dropdown only offers fundable
+      // partners. The preflight panel still explains any residual block.
+      setPartners((p.partners || []).filter((x) => x.status === 'dd_clear'));
       setRounds((r.rounds || []).filter((x) => x.status === 'active'));
     });
   }, []);
+
+  // PRX-DISB-001 — load the selected partner's verified payment routes so
+  // the release records WHICH route it used. Auto-select when there's only
+  // one; the OB picks when there are several.
+  useEffect(() => {
+    if (!partnerId) { setMethods([]); setMethodId(''); return; }
+    let cancelled = false;
+    api.get<{ methods: Method[] }>(
+      `/api/proximate/partners/${partnerId}/disbursement-methods`)
+      .then((r) => {
+        if (cancelled) return;
+        const verified = (r.methods || []).filter((m) => m.status === 'verified');
+        setMethods(verified);
+        setMethodId(verified.length === 1 ? String(verified[0].id) : '');
+      })
+      .catch(() => { if (!cancelled) { setMethods([]); setMethodId(''); } });
+    return () => { cancelled = true; };
+  }, [partnerId]);
 
   // Phase 717 create-from-here — a partner detail page can deep-link
   // "?partner=<id>" to land here with that partner pre-selected.
@@ -118,6 +154,7 @@ export default function ProximateDisbursementNewPage() {
         amount_usd: parseFloat(amount),
         purpose: purpose.trim() || undefined,
         report_window_days: parseInt(windowDays, 10) || 14,
+        disbursement_method_id: methodId ? parseInt(methodId, 10) : undefined,
         isf_cleared: isfCleared,
       });
       if (!res.success || !res.disbursement) {
@@ -139,6 +176,31 @@ export default function ProximateDisbursementNewPage() {
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  // PRX-RBAC-013 — hard OB-only gate. Non-OB personas (donor, endorser,
+  // platform admin) get a clean access-denied instead of the money form.
+  if (!personaLoading && !isOb) {
+    return (
+      <PageShell>
+        <PageMain>
+          <Card className="p-6 max-w-md mx-auto text-center space-y-3">
+            <p className="text-sm font-medium">
+              {t('proximate.disbursements.ob_only_title') || 'This page is for the Oversight Body.'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {t('proximate.disbursements.ob_only_body')
+                || 'Recording disbursements is handled by the Adeso secretariat.'}
+            </p>
+            <Link href="/proximate/disbursements">
+              <Button size="sm" variant="outline">
+                {t('proximate.disbursements.back_to_list') || 'Back to disbursements'}
+              </Button>
+            </Link>
+          </Card>
+        </PageMain>
+      </PageShell>
+    );
   }
 
   if (result) {
@@ -260,6 +322,32 @@ export default function ProximateDisbursementNewPage() {
               ))}
             </select>
           </div>
+
+          {/* PRX-DISB-001 — payment route. Records which verified method
+              the money used. Auto-filled when the partner has one; a
+              required pick when there are several. */}
+          {methods.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                {t('proximate.disbursements.field_method') || 'Payment route'}
+                {methods.length > 1 ? ' *' : ''}
+              </label>
+              <select
+                value={methodId}
+                onChange={(e) => setMethodId(e.target.value)}
+                className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md"
+              >
+                {methods.length > 1 && (
+                  <option value="">— {t('proximate.disbursements.select_method') || 'Select the payment route'} —</option>
+                )}
+                {methods.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.display}{m.fsp?.kind ? ` (${m.fsp.kind})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

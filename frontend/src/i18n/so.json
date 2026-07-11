@@ -2764,5 +2764,13 @@
   "proximate.pj.next.suspended": "Waa la joojiyay. Xalli faragelinta furan ka hor maalgelin dheeraad ah.",
   "proximate.pj.next.default": "Uruuri ammaano bulsho oo madax-bannaan si aad shariikagan ugu saftid maalgelin.",
   "proximate.pj.next.default_cta": "Sanduuqa ammaanaha",
-  "proximate.disbursements.nominate_cta": "Magacaabo shariik"
+  "proximate.disbursements.nominate_cta": "Magacaabo shariik",
+  "proximate.result.recorded_threshold_title": "Ballanqaadka waa la diiwaangeliyay — heerka kalsoonida waa la gaadhay",
+  "proximate.result.recorded_threshold_subtitle": "Shariikkani hadda wuxuu leeyahay ballanqaadyo ku filan. Talaabada xigta waa xaqiijinta bangiga iyo dariiq lacag-bixineed.",
+  "proximate.disbursement.fill_all_fields": "Buuxi dhammaan meelaha kor ku qoran si aad u kaydiso dariiqan.",
+  "proximate.disbursements.field_method": "Dariiqa lacag-bixinta",
+  "proximate.disbursements.select_method": "Dooro dariiqa lacag-bixinta",
+  "proximate.disbursements.ob_only_title": "Boggani waxa uu u yaal Hay'adda Kormeerka.",
+  "proximate.disbursements.ob_only_body": "Diiwaangelinta lacag-bixinta waxaa maamula xoghayaha Adeso.",
+  "proximate.admin.bank_verify_needs_method": "Ku dar dariiq lacag-bixineed hoosta ka hor inta aadan xaqiijin."
 }

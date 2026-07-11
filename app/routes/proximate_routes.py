@@ -856,6 +856,25 @@ def api_bank_verify_partner(partner_id):
             'error': 'Bank already verified for this partner',
         }), 409
 
+    # PRX-DD-001 — due-diligence integrity: bank verification confirms a
+    # payment route that is on file, so there must be one. Block the
+    # verify until at least one disbursement method (bank / hawala /
+    # mobile money) exists, otherwise bank_verified_at can be set on a
+    # partner with no account details at all.
+    method_count = PartnerDisbursementMethod.query.filter_by(
+        partner_id=partner.id,
+    ).count()
+    if method_count == 0:
+        return jsonify({
+            'success': False,
+            'code': 'err.no_method',
+            'error': (
+                'Add a disbursement method (bank, hawala, or mobile money) '
+                'before verifying. Bank verification confirms a payment '
+                'route that is already on file.'
+            ),
+        }), 400
+
     partner.bank_verified_at = datetime.now(timezone.utc)
     state_change = None
     floor = partner.trust_floor_signals()
@@ -2243,11 +2262,14 @@ def api_disbursement_preflight():
             tf = {}
         missing = []
         if not tf.get('endorsements_ok'):
-            missing.append('two conflict-free endorsers')
+            missing.append('two conflict-free endorsements')
         if not tf.get('bank_verified'):
-            missing.append('bank verification')
-        if not tf.get('endorsers_meet_reputation_floor'):
-            missing.append('endorsers meeting the reputation floor')
+            missing.append('bank verification and a payment route')
+        # Only surface the reputation-floor item when the endorsement COUNT
+        # is already met — otherwise "need more endorsers" and "endorsers
+        # below the reputation floor" read as the same thing and confuse.
+        if tf.get('endorsements_ok') and not tf.get('endorsers_meet_reputation_floor'):
+            missing.append('endorsers with a higher reputation score')
         warnings.append({
             'code': 'partner_not_cleared',
             'cta_code': 'clear_dd',
@@ -4552,11 +4574,24 @@ def api_record_disbursement():
     needs_cosign = n_cosigners_needed > 0
     initial_status = 'pending_cosign' if needs_cosign else 'pending_report'
 
+    # PRX-DISB-001 — traceability: every money release should record WHICH
+    # payment route it used. If the OB didn't pass an explicit method and
+    # the partner has exactly one verified method on file, link it
+    # automatically so the disbursement + report show the route in the
+    # audit trail (a null method_id on a released disbursement is a gap).
+    method_id = payload.get('disbursement_method_id')
+    if not method_id:
+        _verified = PartnerDisbursementMethod.query.filter_by(
+            partner_id=partner.id, status='verified',
+        ).all()
+        if len(_verified) == 1:
+            method_id = _verified[0].id
+
     d = ProximateDisbursement(
         network_id=net.id,
         partner_id=partner.id,
         round_id=payload.get('round_id'),
-        disbursement_method_id=payload.get('disbursement_method_id'),
+        disbursement_method_id=method_id,
         amount_usd=amount,
         purpose=(payload.get('purpose') or '').strip()[:500] or None,
         sent_by_user_id=current_user.id,

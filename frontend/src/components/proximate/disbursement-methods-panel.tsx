@@ -50,9 +50,13 @@ function kindIcon(kind?: string) {
 export function DisbursementMethodsPanel({
   partnerId,
   isAdmin,
+  onChanged,
 }: {
   partnerId: number | string;
   isAdmin: boolean;
+  // Fired after a method is successfully added or verified, so a parent
+  // (e.g. the partner page's bank-verify gate) can re-read the count.
+  onChanged?: () => void;
 }) {
   const { t } = useTranslation();
   const [methods, setMethods] = useState<Method[]>([]);
@@ -130,6 +134,7 @@ export function DisbursementMethodsPanel({
       setSelectedFspId('');
       setIdentifier({});
       await refresh();
+      onChanged?.();
     } catch (e) {
       setError(
         e instanceof Error
@@ -147,6 +152,7 @@ export function DisbursementMethodsPanel({
         `/api/proximate/disbursement-methods/${methodId}/verify`,
       );
       await refresh();
+      onChanged?.();
     } catch (e) {
       setError(
         e instanceof Error
@@ -269,6 +275,17 @@ export function DisbursementMethodsPanel({
             </div>
           ))}
 
+          {/* PRX-FSP-001 — don't let Save fire before the per-kind
+              identifier fields are filled. Previously Save enabled the
+              moment an FSP was picked, so a click posted an empty
+              identifier and the server bounced it with a 400. */}
+          {selectedFsp && requiredFields.some((f) => !identifier[f.key]?.trim()) && (
+            <p className="text-xs text-muted-foreground">
+              {t('proximate.disbursement.fill_all_fields')
+                || 'Fill in all fields above to save this route.'}
+            </p>
+          )}
+
           {error && <p className="text-xs text-destructive">{error}</p>}
 
           <div className="flex gap-2">
@@ -276,7 +293,11 @@ export function DisbursementMethodsPanel({
               type="button"
               size="sm"
               onClick={handleSubmit}
-              disabled={submitting || !selectedFspId}
+              disabled={
+                submitting
+                || !selectedFspId
+                || requiredFields.some((f) => !identifier[f.key]?.trim())
+              }
             >
               {submitting ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />

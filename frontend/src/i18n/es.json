@@ -2764,5 +2764,13 @@
   "proximate.pj.next.suspended": "Suspendido. Resuelva la intervención abierta antes de más financiación.",
   "proximate.pj.next.default": "Reúna avales comunitarios independientes para aprobar a este socio.",
   "proximate.pj.next.default_cta": "Bandeja de avales",
-  "proximate.disbursements.nominate_cta": "Nominar un socio"
+  "proximate.disbursements.nominate_cta": "Nominar un socio",
+  "proximate.result.recorded_threshold_title": "Aval registrado — umbral de confianza alcanzado",
+  "proximate.result.recorded_threshold_subtitle": "Este socio ya tiene suficientes avales. El siguiente paso es la verificación bancaria y una vía de pago.",
+  "proximate.disbursement.fill_all_fields": "Complete todos los campos anteriores para guardar esta vía.",
+  "proximate.disbursements.field_method": "Vía de pago",
+  "proximate.disbursements.select_method": "Seleccione la vía de pago",
+  "proximate.disbursements.ob_only_title": "Esta página es para el Órgano de Supervisión.",
+  "proximate.disbursements.ob_only_body": "El registro de los desembolsos lo gestiona la secretaría de Adeso.",
+  "proximate.admin.bank_verify_needs_method": "Agregue una vía de pago abajo antes de verificar."
 }

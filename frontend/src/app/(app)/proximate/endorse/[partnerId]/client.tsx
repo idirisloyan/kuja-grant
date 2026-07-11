@@ -18,7 +18,7 @@
  * this is load-bearing.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Loader2, Check, X, AlertTriangle, CheckCircle2,
@@ -153,6 +153,19 @@ export default function ProximateEndorseWizardClient() {
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [suspendReason, setSuspendReason] = useState('');
+  // PRX-DD-001 — bank verification requires a payment route on file.
+  // Track the method count so we can gate the "Mark bank verified" button
+  // (the server also enforces this). Refreshed when the methods panel below
+  // adds/verifies a route.
+  const [methodCount, setMethodCount] = useState<number | null>(null);
+  const refreshMethodCount = useCallback(() => {
+    if (!isOb || !partnerId) return;
+    api.get<{ methods: unknown[] }>(
+      `/api/proximate/partners/${partnerId}/disbursement-methods`)
+      .then((r) => setMethodCount((r.methods || []).length))
+      .catch(() => setMethodCount(null));
+  }, [isOb, partnerId]);
+  useEffect(() => { refreshMethodCount(); }, [refreshMethodCount]);
 
   useEffect(() => {
     if (!partnerId) return;
@@ -348,9 +361,18 @@ export default function ProximateEndorseWizardClient() {
                 <div className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-medium text-sm">{t('proximate.result.recorded_title')}</p>
+                    {/* PRX-ENDORSE-001 — once the trust threshold is met
+                        (2/2 independent endorsements), stop telling the user
+                        "another endorsement is still needed". */}
+                    <p className="font-medium text-sm">
+                      {floor.endorsements_ok
+                        ? t('proximate.result.recorded_threshold_title')
+                        : t('proximate.result.recorded_title')}
+                    </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {t('proximate.result.recorded_subtitle')}
+                      {floor.endorsements_ok
+                        ? t('proximate.result.recorded_threshold_subtitle')
+                        : t('proximate.result.recorded_subtitle')}
                     </p>
                   </div>
                 </div>
@@ -512,16 +534,24 @@ export default function ProximateEndorseWizardClient() {
               )}
               <div className="flex flex-col gap-2">
                 {!partner.bank_verified_at && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleBankVerify}
-                    disabled={adminBusy}
-                  >
-                    {adminBusy && <Loader2 className="w-3 h-3 animate-spin me-2" />}
-                    {t('proximate.admin.bank_verify_button')}
-                  </Button>
+                  <div className="space-y-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBankVerify}
+                      disabled={adminBusy || methodCount === 0}
+                    >
+                      {adminBusy && <Loader2 className="w-3 h-3 animate-spin me-2" />}
+                      {t('proximate.admin.bank_verify_button')}
+                    </Button>
+                    {methodCount === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {t('proximate.admin.bank_verify_needs_method')
+                          || 'Add a payment route below before verifying.'}
+                      </p>
+                    )}
+                  </div>
                 )}
                 {!suspendOpen ? (
                   <Button
@@ -573,7 +603,11 @@ export default function ProximateEndorseWizardClient() {
 
           <EndorsementsPanel partnerId={partnerId} />
 
-          <DisbursementMethodsPanel partnerId={partnerId} isAdmin={isOb} />
+          <DisbursementMethodsPanel
+            partnerId={partnerId}
+            isAdmin={isOb}
+            onChanged={refreshMethodCount}
+          />
 
           <Card className="p-4">
             <p className="text-xs text-muted-foreground mb-4">

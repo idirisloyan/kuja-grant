@@ -2764,5 +2764,13 @@
   "proximate.pj.next.suspended": "Suspended. Resolve the open intervention before any further funding.",
   "proximate.pj.next.default": "Collect independent community endorsements to clear this partner for funding.",
   "proximate.pj.next.default_cta": "Endorsement inbox",
-  "proximate.disbursements.nominate_cta": "Nominate a partner"
+  "proximate.disbursements.nominate_cta": "Nominate a partner",
+  "proximate.result.recorded_threshold_title": "Endorsement recorded — trust threshold met",
+  "proximate.result.recorded_threshold_subtitle": "This partner now has enough endorsements. The next step is bank verification and a payment route.",
+  "proximate.disbursement.fill_all_fields": "Fill in all fields above to save this route.",
+  "proximate.disbursements.field_method": "Payment route",
+  "proximate.disbursements.select_method": "Select the payment route",
+  "proximate.disbursements.ob_only_title": "This page is for the Oversight Body.",
+  "proximate.disbursements.ob_only_body": "Recording disbursements is handled by the Adeso secretariat.",
+  "proximate.admin.bank_verify_needs_method": "Add a payment route below before verifying."
 }

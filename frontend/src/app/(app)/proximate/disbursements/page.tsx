@@ -111,7 +111,10 @@ export default function ProximateDisbursementsPage() {
       <PageHeader
         title={t('proximate.disbursements.title')}
         subtitle={t('proximate.disbursements.subtitle')}
-        primaryAction={isOperator ? (
+        // PRX-RBAC-014 — recording money is OB-only. Platform admin can
+        // observe the list but must not be teased the Record action (the
+        // POST 403s them). isOperator still gates the read/view above.
+        primaryAction={persona === 'ob' ? (
           <Link href="/proximate/disbursements/new">
             <Button size="sm">
               <Plus className="w-3.5 h-3.5 me-1" />

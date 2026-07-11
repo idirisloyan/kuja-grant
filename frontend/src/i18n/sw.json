@@ -2764,5 +2764,13 @@
   "proximate.pj.next.suspended": "Amesimamishwa. Tatua uingiliaji ulio wazi kabla ya ufadhili zaidi.",
   "proximate.pj.next.default": "Kusanya mapendekezo huru ya jamii kumthibitisha mshirika huyu kwa ufadhili.",
   "proximate.pj.next.default_cta": "Kikasha cha mapendekezo",
-  "proximate.disbursements.nominate_cta": "Pendekeza mshirika"
+  "proximate.disbursements.nominate_cta": "Pendekeza mshirika",
+  "proximate.result.recorded_threshold_title": "Uthibitisho umerekodiwa — kiwango cha uaminifu kimefikiwa",
+  "proximate.result.recorded_threshold_subtitle": "Mshirika huyu sasa ana uthibitisho wa kutosha. Hatua inayofuata ni uthibitishaji wa benki na njia ya malipo.",
+  "proximate.disbursement.fill_all_fields": "Jaza sehemu zote hapo juu ili kuhifadhi njia hii.",
+  "proximate.disbursements.field_method": "Njia ya malipo",
+  "proximate.disbursements.select_method": "Chagua njia ya malipo",
+  "proximate.disbursements.ob_only_title": "Ukurasa huu ni wa Chombo cha Usimamizi.",
+  "proximate.disbursements.ob_only_body": "Kurekodi malipo hushughulikiwa na sekretarieti ya Adeso.",
+  "proximate.admin.bank_verify_needs_method": "Ongeza njia ya malipo hapa chini kabla ya kuthibitisha."
 }

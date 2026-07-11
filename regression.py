@@ -614,6 +614,26 @@ def run_proximate_rbac(base):
             )
         check(f"OB nav loads: {label}", nav_loads)
 
+    # --- MONEY-WRITE endpoints: non-OB must be denied (POST 403). The QA
+    # 2026-07-11 pilot pass confirmed these guards hold; lock them into the
+    # gate so a future refactor can't silently open a money-mutation path to
+    # a donor / platform-admin / endorser. (Frontend route guards are
+    # defense-in-depth; THIS is the real gate.) ---
+    MONEY_WRITES = [("/api/proximate/disbursements",
+                     {"partner_id": pid or 1, "amount_usd": 100})]
+    if pid:
+        MONEY_WRITES.append(
+            (f"/api/proximate/partners/{pid}/disbursement-methods",
+             {"fsp_id": 1, "identifier": {}}))
+        MONEY_WRITES.append(
+            (f"/api/proximate/partners/{pid}/bank-verify", {}))
+    for who, sess in (("donor", donor), ("admin", admin)):
+        for ep, pbody in MONEY_WRITES:
+            def money_denied(ep=ep, pbody=pbody, sess=sess):
+                post(sess, base, ep, pbody, override=OV, allow={403})
+            check(f"{who} 403 POST {ep.replace('/api/proximate', '')}",
+                  money_denied)
+
     # --- non-OB denied on every OB-only op ---
     for who, sess in (("donor", donor), ("admin", admin)):
         for p in OB_ONLY:
