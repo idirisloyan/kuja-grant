@@ -171,8 +171,15 @@ export default function ProximatePartnersPage() {
                       key={p.id}
                       className="border-b border-border/60 pb-1.5 last:border-b-0"
                     >
+                      {/* QA 2026-07-12 (PRX-FSP-001 reachability): this used
+                          to link to /proximate/admin?partner=N, but the
+                          dashboard never reads that param — the click dropped
+                          the partner context, and the actual partner detail
+                          (Add payment route, bank verify, interventions,
+                          endorsements) at /proximate/endorse/<id> was
+                          unreachable by navigation. Link the real detail. */}
                       <Link
-                        href={`/proximate/admin?partner=${p.id}`}
+                        href={`/proximate/endorse/${p.id}`}
                         className="flex items-center gap-2 py-1.5 hover:bg-muted/30 rounded-sm px-2 -mx-2"
                       >
                         <div className="flex-1 min-w-0">
