@@ -50,6 +50,30 @@ logger = logging.getLogger('kuja')
 proximate_bp = Blueprint('proximate', __name__, url_prefix='/api/proximate')
 
 
+@proximate_bp.before_request
+def _stamp_proximate_audit_scope():
+    """QA 2026-07-14 (audit export tenant scoping) — every audit-chain
+    row written while serving a Proximate route belongs to the Proximate
+    tenant, but AuditChainEntry.append's fallback reads the HOST-resolved
+    g.network, which is the default Kuja tenant for token-link requests,
+    plain browser downloads, and any caller that omits the tenant
+    override header. Those rows were being stamped network_id=1.
+    Stamping g.audit_network_id here covers all append sites in this
+    blueprint (session, token, public, and cron routes) in one place;
+    append() prefers it over g.network.
+    """
+    try:
+        net = getattr(g, 'network', None)
+        if net is not None and getattr(net, 'slug', None) == 'proximate':
+            g.audit_network_id = net.id
+            return
+        proximate = Network.query.filter_by(slug='proximate').first()
+        if proximate:
+            g.audit_network_id = proximate.id
+    except Exception:
+        pass
+
+
 # ---- Tenant guard -----------------------------------------------------
 
 def _proximate_network():
@@ -6285,12 +6309,17 @@ def api_proximate_audit_chain():
         import json as _json
         # Materialize rows BEFORE building the response — the streaming
         # generator runs after the request context teardown otherwise,
-        # and the SQLAlchemy session is gone. Caps at limit/offset like
-        # the JSON path.
-        export_rows = (
-            q.order_by(AuditChainEntry.seq.asc())
-            .limit(limit).offset(offset).all()
-        )
+        # and the SQLAlchemy session is gone.
+        #
+        # QA 2026-07-14: the export used to inherit the JSON view's
+        # limit default (100), so a 204-entry chain silently produced a
+        # 100-line file — an audit evidence file must be complete. The
+        # full tenant-scoped chain is exported unless the caller passes
+        # an explicit ?limit=.
+        export_q = q.order_by(AuditChainEntry.seq.asc())
+        if request.args.get('limit'):
+            export_q = export_q.limit(limit).offset(offset)
+        export_rows = export_q.all()
         body = '\n'.join(
             _json.dumps({
                 'seq': r.seq,

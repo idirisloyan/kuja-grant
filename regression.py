@@ -684,6 +684,54 @@ def run_proximate_rbac(base):
             _no_sensitive("donor round detail", r)
         check("donor no-secret-leak /rounds/<id>", donor_round_no_leak)
 
+    # --- AUDIT EXPORT INTEGRITY (QA 2026-07-14 audit-chain follow-up).
+    # Three invariants the export probe surfaced:
+    #   1. COMPLETE: the JSONL file must contain every row the JSON view
+    #      counts — the old export inherited limit=100 and silently
+    #      truncated a 204-row chain.
+    #   2. TENANT-SCOPED: no exported row may be stamped with another
+    #      tenant's network_id. Token-link/override-less requests used to
+    #      stamp the host default (Kuja id) on Proximate rows. None is
+    #      tolerated only for legacy/out-of-request writes (Phase 672 v0);
+    #      a WRONG id never is. The expected id comes from the download
+    #      filename (proximate-audit-chain-network<id>.jsonl).
+    #   3. REDACTED ACTORS: a token-authenticated actor is recorded as a
+    #      short prefix ('token:abcd1234…'), never the full credential.
+    def audit_export_integrity():
+        import json as _json
+        import re as _re
+        rj = get(ob, base, "/api/proximate/audit-chain", override=OV)
+        assert rj.status_code == 200, f"audit-chain JSON -> {rj.status_code}"
+        total = (rj.json() or {}).get("total")
+        rx = get(ob, base, "/api/proximate/audit-chain?format=jsonl", override=OV)
+        assert rx.status_code == 200, f"audit-chain jsonl -> {rx.status_code}"
+        m = _re.search(r"network(\d+)\.jsonl",
+                       rx.headers.get("Content-Disposition", ""))
+        assert m, "export filename missing network id"
+        expected_net = int(m.group(1))
+        lines = [ln for ln in (rx.text or "").splitlines() if ln.strip()]
+        assert total is not None and len(lines) == total, (
+            f"export truncated: file has {len(lines)} lines, UI total={total}"
+        )
+        rows = [_json.loads(ln) for ln in lines]
+        wrong = sorted({r0["network_id"] for r0 in rows
+                        if r0.get("network_id") not in (None, expected_net)})
+        assert not wrong, (
+            f"export leaked/mislabeled rows with network_id {wrong} "
+            f"(expected {expected_net} or legacy None)"
+        )
+        assert any(r0.get("network_id") == expected_net for r0 in rows), (
+            "no exported row stamped with the tenant id — stamping hook dead?"
+        )
+        for r0 in rows:
+            actor = r0.get("actor_email") or ""
+            if actor.startswith(("token:", "invite:")):
+                assert len(actor.split(":", 1)[1]) <= 10, (
+                    f"unredacted credential in actor_email: {actor[:24]}…"
+                )
+            assert r0.get("payload_hash") and "seq" in r0, "hash fields missing"
+    check("audit export: complete + tenant-scoped + redacted", audit_export_integrity)
+
     # --- unauthenticated caller: no data, no 5xx ---
     def unauth_denied():
         anon = requests.Session()

@@ -69,13 +69,23 @@ class AuditChainEntry(db.Model):
         fails we log to stderr and return None (no chain entry created).
         """
         try:
-            # Derive network_id from g.network if not passed explicitly.
+            # Derive network_id if not passed explicitly. Prefer
+            # g.audit_network_id — set by route layers that resolve the
+            # true tenant themselves (e.g. proximate_bp's before_request
+            # hook) — over g.network, which is the HOST-resolved network
+            # and is wrong for token-link / override-header / direct-URL
+            # requests that land on the default host (QA 2026-07-14:
+            # proximate rows stamped with the Kuja default network).
             if network_id is None:
                 try:
                     from flask import g
-                    net = getattr(g, 'network', None)
-                    if net is not None and getattr(net, 'id', None):
-                        network_id = net.id
+                    explicit = getattr(g, 'audit_network_id', None)
+                    if explicit:
+                        network_id = explicit
+                    else:
+                        net = getattr(g, 'network', None)
+                        if net is not None and getattr(net, 'id', None):
+                            network_id = net.id
                 except Exception:
                     pass
 
