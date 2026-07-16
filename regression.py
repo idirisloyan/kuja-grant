@@ -573,9 +573,14 @@ def run_proximate_rbac(base):
         "/api/proximate/overview", "/api/proximate/attention-queue",
         "/api/proximate/audit-chain", "/api/proximate/interventions",
         "/api/proximate/fsps",
+        # Blue Nile intake surfaces (2026-07): DD evidence, panel roster,
+        # media verification are OB-only reads like the rest.
+        "/api/proximate/attachments",
+        "/api/proximate/panel-candidates",
     ]
     if pid:
         OB_ONLY.append(f"/api/proximate/disbursements/preflight?partner_id={pid}")
+        OB_ONLY.append(f"/api/proximate/partners/{pid}/media-verification")
 
     # --- OB regains access (the "OB blocked on /audit-chain" defect) ---
     for p in OB_ONLY:
@@ -620,7 +625,10 @@ def run_proximate_rbac(base):
     # a donor / platform-admin / endorser. (Frontend route guards are
     # defense-in-depth; THIS is the real gate.) ---
     MONEY_WRITES = [("/api/proximate/disbursements",
-                     {"partner_id": pid or 1, "amount_usd": 100})]
+                     {"partner_id": pid or 1, "amount_usd": 100}),
+                    # PIF import creates partners + stores bank details —
+                    # same deny class as the money writes.
+                    ("/api/proximate/partners/import-pif", {})]
     if pid:
         MONEY_WRITES.append(
             (f"/api/proximate/partners/{pid}/disbursement-methods",

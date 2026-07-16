@@ -8572,3 +8572,483 @@ def api_grant_donor_pack_pdf(grant_id):
         as_attachment=True,
         download_name=f'proximate-grant-{g.id}-donor-pack.pdf',
     )
+
+
+# =====================================================================
+# Blue Nile round intake (July 2026) — DD evidence, media verification,
+# panel roster, PIF import. The first real round arrived as a OneDrive
+# folder; these endpoints make the system the round's system of record.
+# All OB-only via the network-explicit gate.
+# =====================================================================
+
+_ATTACH_EXTS = {'pdf', 'docx', 'doc', 'png', 'jpg', 'jpeg', 'webp', 'xlsx', 'csv'}
+_ATTACH_MAX_BYTES = 15 * 1024 * 1024
+
+
+def _attach_subject_or_404(net, subject_kind, subject_id):
+    """Resolve + tenant-check the attachment subject. Returns (obj, err)."""
+    from app.models import ProximateRound
+    from app.models.crisis_monitoring import CrisisSignal
+    model = {
+        'partner': ProximatePartner,
+        'round': ProximateRound,
+        'crisis_signal': CrisisSignal,
+    }.get(subject_kind)
+    if model is None:
+        return None, (jsonify({'success': False,
+                               'error': 'invalid subject_kind'}), 400)
+    obj = model.query.filter_by(id=subject_id, network_id=net.id).first()
+    if not obj:
+        return None, (jsonify({'success': False,
+                               'error': 'subject not found'}), 404)
+    return obj, None
+
+
+@proximate_bp.route('/attachments', methods=['POST'])
+@login_required
+def api_add_proximate_attachment():
+    """Attach one evidence file to a partner / round / crisis signal.
+    Multipart: file, subject_kind, subject_id, kind, label(optional)."""
+    import uuid
+    from werkzeug.utils import secure_filename
+    from flask import current_app as cap
+    from app.models import Document, ProximateAttachment, ATTACHMENT_KINDS
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+
+    subject_kind = (request.form.get('subject_kind') or '').strip()
+    try:
+        subject_id = int(request.form.get('subject_id') or 0)
+    except ValueError:
+        subject_id = 0
+    _, err = _attach_subject_or_404(net, subject_kind, subject_id)
+    if err:
+        return err
+
+    kind = (request.form.get('kind') or 'other').strip()
+    if kind not in ATTACHMENT_KINDS:
+        kind = 'other'
+    label = (request.form.get('label') or '').strip()[:300] or None
+
+    if 'file' not in request.files or not request.files['file'].filename:
+        return jsonify({'success': False, 'error': 'no file provided'}), 400
+    file = request.files['file']
+    original_filename = secure_filename(file.filename)
+    ext = (original_filename.rsplit('.', 1)[-1].lower()
+           if '.' in original_filename else '')
+    if ext not in _ATTACH_EXTS:
+        return jsonify({'success': False,
+                        'error': f'file type .{ext} not allowed'}), 400
+    if request.content_length and request.content_length > _ATTACH_MAX_BYTES:
+        return jsonify({'success': False, 'error': 'file too large'}), 413
+
+    stored_filename = f'proximate_evidence_{uuid.uuid4().hex}.{ext}'
+    filepath = os.path.join(cap.config['UPLOAD_FOLDER'], stored_filename)
+    file.save(filepath)
+    file_size = os.path.getsize(filepath)
+
+    doc = Document(
+        original_filename=original_filename,
+        stored_filename=stored_filename,
+        file_size=file_size,
+        mime_type=file.mimetype,
+        doc_type='proximate_evidence',
+    )
+    db.session.add(doc)
+    db.session.flush()
+    att = ProximateAttachment(
+        network_id=net.id,
+        subject_kind=subject_kind,
+        subject_id=subject_id,
+        document_id=doc.id,
+        kind=kind,
+        label=label,
+        uploaded_by_user_id=current_user.id,
+    )
+    db.session.add(att)
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action='proximate.evidence.attached',
+        actor_email=current_user.email,
+        subject_kind=f'proximate_{subject_kind}',
+        subject_id=subject_id,
+        details={'attachment_id': att.id, 'kind': kind,
+                 'filename': original_filename, 'bytes': file_size},
+    )
+    return jsonify({'success': True, 'attachment': att.to_dict()})
+
+
+@proximate_bp.route('/attachments', methods=['GET'])
+@login_required
+def api_list_proximate_attachments():
+    from app.models import ProximateAttachment
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    subject_kind = (request.args.get('subject_kind') or '').strip()
+    try:
+        subject_id = int(request.args.get('subject_id') or 0)
+    except ValueError:
+        subject_id = 0
+    q = ProximateAttachment.query.filter_by(network_id=net.id)
+    if subject_kind:
+        q = q.filter_by(subject_kind=subject_kind)
+    if subject_id:
+        q = q.filter_by(subject_id=subject_id)
+    rows = q.order_by(ProximateAttachment.created_at.desc()).limit(500).all()
+    return jsonify({'success': True,
+                    'attachments': [a.to_dict() for a in rows]})
+
+
+@proximate_bp.route('/attachments/<int:attachment_id>/download', methods=['GET'])
+@login_required
+def api_download_proximate_attachment(attachment_id):
+    from flask import current_app as cap, send_file
+    from app.models import ProximateAttachment
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    att = ProximateAttachment.query.filter_by(
+        id=attachment_id, network_id=net.id,
+    ).first()
+    if not att or not att.document:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    filepath = os.path.join(
+        cap.config['UPLOAD_FOLDER'], att.document.stored_filename,
+    )
+    if not os.path.exists(filepath):
+        return jsonify({'success': False, 'error': 'file missing'}), 404
+    return send_file(
+        filepath, as_attachment=True,
+        download_name=att.document.original_filename,
+        mimetype=att.document.mime_type,
+    )
+
+
+@proximate_bp.route('/partners/<int:partner_id>/media-verification',
+                    methods=['GET', 'POST'])
+@login_required
+def api_partner_media_verification(partner_id):
+    """Social-footprint verification record — the check the field team
+    actually performs (links, followers, activity evidence, verdict).
+    POST appends a new record (history preserved); GET returns latest
+    plus history."""
+    from app.models import ProximateMediaVerification, MEDIA_VERDICTS
+    import json as _json
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'partner not found'}), 404
+
+    if request.method == 'GET':
+        rows = (ProximateMediaVerification.query
+                .filter_by(partner_id=partner.id)
+                .order_by(ProximateMediaVerification.reviewed_at.desc())
+                .limit(20).all())
+        return jsonify({
+            'success': True,
+            'latest': rows[0].to_dict() if rows else None,
+            'history': [r.to_dict() for r in rows],
+        })
+
+    payload = request.get_json(silent=True) or {}
+    verdict = (payload.get('overall_verdict') or 'no_footprint').strip().lower()
+    if verdict not in MEDIA_VERDICTS:
+        return jsonify({
+            'success': False,
+            'error': f'overall_verdict must be one of {MEDIA_VERDICTS}',
+        }), 400
+    links = payload.get('links') or []
+    if not isinstance(links, list):
+        links = [str(links)]
+    mv = ProximateMediaVerification(
+        network_id=net.id,
+        partner_id=partner.id,
+        links_json=_json.dumps([str(u)[:500] for u in links[:10]]),
+        interaction_summary=(payload.get('interaction_summary') or '').strip()[:2000] or None,
+        external_mention=(payload.get('external_mention') or '').strip()[:300] or None,
+        responsible_individual_mention=(
+            payload.get('responsible_individual_mention') or '').strip()[:300] or None,
+        overall_verdict=verdict,
+        notes=(payload.get('notes') or '').strip()[:2000] or None,
+        source=(payload.get('source') or 'manual').strip()[:30],
+        reviewed_by_user_id=current_user.id,
+    )
+    db.session.add(mv)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.partner.media_verified',
+        actor_email=current_user.email,
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={'verdict': verdict, 'links': len(links),
+                 'media_verification_id': mv.id},
+    )
+    return jsonify({'success': True, 'media_verification': mv.to_dict()})
+
+
+@proximate_bp.route('/panel-candidates', methods=['GET', 'POST'])
+@login_required
+def api_panel_candidates():
+    """Per-round panel roster. GET ?round_id= filters; POST creates a
+    candidate (name required; phone/email/rationale/location optional)."""
+    from app.models import ProximatePanelCandidate
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+
+    if request.method == 'GET':
+        q = ProximatePanelCandidate.query.filter_by(network_id=net.id)
+        rid = request.args.get('round_id')
+        if rid and rid.isdigit():
+            q = q.filter_by(round_id=int(rid))
+        rows = q.order_by(ProximatePanelCandidate.created_at.asc()).limit(300).all()
+        return jsonify({'success': True,
+                        'candidates': [c.to_dict() for c in rows]})
+
+    payload = request.get_json(silent=True) or {}
+    name = (payload.get('name') or '').strip()
+    if not name or len(name) < 2:
+        return jsonify({'success': False, 'error': 'name is required'}), 400
+    round_id = payload.get('round_id')
+    if round_id:
+        from app.models import ProximateRound
+        rnd = ProximateRound.query.filter_by(
+            id=round_id, network_id=net.id,
+        ).first()
+        if not rnd:
+            return jsonify({'success': False, 'error': 'round not found'}), 404
+    cand = ProximatePanelCandidate(
+        network_id=net.id,
+        round_id=round_id or None,
+        name=name[:200],
+        phone=(payload.get('phone') or '').strip()[:40] or None,
+        email=(payload.get('email') or '').strip()[:320] or None,
+        rationale=(payload.get('rationale') or '').strip()[:3000] or None,
+        location=(payload.get('location') or '').strip()[:160] or None,
+        status='candidate',
+        created_by_user_id=current_user.id,
+    )
+    db.session.add(cand)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.panel.candidate_added',
+        actor_email=current_user.email,
+        subject_kind='proximate_panel_candidate',
+        subject_id=cand.id,
+        details={'round_id': round_id, 'location': cand.location},
+    )
+    return jsonify({'success': True, 'candidate': cand.to_dict()})
+
+
+@proximate_bp.route('/panel-candidates/<int:candidate_id>', methods=['PATCH'])
+@login_required
+def api_update_panel_candidate(candidate_id):
+    from app.models import ProximatePanelCandidate, PANEL_STATUSES
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    cand = ProximatePanelCandidate.query.filter_by(
+        id=candidate_id, network_id=net.id,
+    ).first()
+    if not cand:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    payload = request.get_json(silent=True) or {}
+    if 'status' in payload:
+        status = (payload.get('status') or '').strip().lower()
+        if status not in PANEL_STATUSES:
+            return jsonify({
+                'success': False,
+                'error': f'status must be one of {PANEL_STATUSES}',
+            }), 400
+        cand.status = status
+    if 'notes' in payload:
+        cand.notes = (payload.get('notes') or '').strip()[:3000] or None
+    if 'round_id' in payload:
+        cand.round_id = payload.get('round_id') or None
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.panel.candidate_updated',
+        actor_email=current_user.email,
+        subject_kind='proximate_panel_candidate',
+        subject_id=cand.id,
+        details={'status': cand.status},
+    )
+    return jsonify({'success': True, 'candidate': cand.to_dict()})
+
+
+@proximate_bp.route('/partners/import-pif', methods=['POST'])
+@login_required
+def api_import_pif():
+    """Bulk-intake on-ramp: one PIF file -> one nominated partner with
+    the structured form stored on intake_form.pif + the original file
+    attached. Multipart: file (docx/pdf), fields_json (optional
+    pre-parsed dict — skips AI), round_id (optional roster link).
+
+    Extraction ladder: fields_json > AI extraction > stub partner named
+    from the filename (honest fallback — the file is attached either
+    way, nothing is lost)."""
+    import uuid
+    import json as _json
+    from werkzeug.utils import secure_filename
+    from flask import current_app as cap
+    from app.models import Document, ProximateAttachment
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+
+    if 'file' not in request.files or not request.files['file'].filename:
+        return jsonify({'success': False, 'error': 'no file provided'}), 400
+    file = request.files['file']
+    original_filename = secure_filename(file.filename)
+    ext = (original_filename.rsplit('.', 1)[-1].lower()
+           if '.' in original_filename else '')
+    if ext not in ('pdf', 'docx', 'doc'):
+        return jsonify({'success': False,
+                        'error': 'PIF must be pdf/docx/doc'}), 400
+
+    stored_filename = f'proximate_pif_{uuid.uuid4().hex}.{ext}'
+    filepath = os.path.join(cap.config['UPLOAD_FOLDER'], stored_filename)
+    file.save(filepath)
+
+    fields = None
+    source = 'fields_json'
+    raw_fields = request.form.get('fields_json')
+    if raw_fields:
+        try:
+            fields = _json.loads(raw_fields)
+        except Exception:
+            fields = None
+    if not isinstance(fields, dict) or not fields:
+        from app.services.proximate_pif_extract_service import (
+            extract_pif_text, extract_pif_fields,
+        )
+        text = extract_pif_text(filepath)
+        fields = extract_pif_fields(doc_text=text,
+                                    filename=original_filename) if text else None
+        source = 'ai_extraction' if fields else 'stub'
+
+    fields = fields or {}
+    name = (fields.get('org_name') or '').strip()
+    if not name:
+        # Filename fallback: "Partner Information Form (Org Name).docx"
+        base = original_filename.rsplit('.', 1)[0]
+        for marker in ('(', ' - '):
+            if marker in base:
+                base = base.split(marker, 1)[1]
+        name = base.replace(')', '').replace('_', ' ').strip() or 'Unnamed partner'
+
+    # Dedup: same name in this tenant -> update the PIF payload instead
+    # of creating a twin.
+    partner = ProximatePartner.query.filter(
+        ProximatePartner.network_id == net.id,
+        db.func.lower(ProximatePartner.name) == name.lower(),
+    ).first()
+    created = partner is None
+    if created:
+        partner = ProximatePartner(
+            network_id=net.id,
+            name=name[:200],
+            status='nominated',
+            country='SD',
+            nominated_by_user_id=current_user.id,
+        )
+        db.session.add(partner)
+
+    if fields.get('org_name_ar'):
+        partner.name_ar = str(fields['org_name_ar'])[:200]
+    if fields.get('headquarters_address') and not partner.locality:
+        partner.locality = str(fields['headquarters_address'])[:120]
+    if fields.get('contact_phone') and not partner.contact_phone:
+        partner.contact_phone = str(fields['contact_phone'])[:40]
+    if fields.get('contact_email') and not partner.contact_email:
+        partner.contact_email = str(fields['contact_email'])[:320]
+    if fields.get('bank_account_holder') and not partner.bank_account_holder_name:
+        partner.bank_account_holder_name = str(fields['bank_account_holder'])[:200]
+    if fields.get('bank_name_branch') and not partner.bank_name:
+        partner.bank_name = str(fields['bank_name_branch'])[:160]
+    if fields.get('bank_account_number') and not partner.bank_account_number:
+        partner.bank_account_number = str(fields['bank_account_number'])[:80]
+
+    intake = partner.get_intake_form() or {}
+    intake['pif'] = fields
+    intake['pif_source'] = source
+    intake['pif_filename'] = original_filename
+    partner.set_intake_form(intake)
+    db.session.flush()
+
+    doc = Document(
+        original_filename=original_filename,
+        stored_filename=stored_filename,
+        file_size=os.path.getsize(filepath),
+        mime_type=file.mimetype,
+        doc_type='proximate_evidence',
+    )
+    db.session.add(doc)
+    db.session.flush()
+    att = ProximateAttachment(
+        network_id=net.id,
+        subject_kind='partner',
+        subject_id=partner.id,
+        document_id=doc.id,
+        kind='pif_original',
+        label=f'PIF ({source})',
+        uploaded_by_user_id=current_user.id,
+    )
+    db.session.add(att)
+    db.session.commit()
+
+    if created:
+        try:
+            _run_partner_sanctions_screen(partner)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+    AuditChainEntry.append(
+        action='proximate.partner.pif_imported',
+        actor_email=current_user.email,
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={'created': created, 'source': source,
+                 'filename': original_filename,
+                 'fields_extracted': len(fields)},
+    )
+    return jsonify({
+        'success': True,
+        'created': created,
+        'extraction_source': source,
+        'partner': partner.to_dict(),
+        'attachment_id': att.id,
+    })

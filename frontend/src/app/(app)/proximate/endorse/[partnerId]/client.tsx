@@ -32,6 +32,9 @@ import { InterventionPanel } from '@/components/proximate/intervention-panel';
 import { VoiceQuestionInput } from '@/components/proximate/voice-question-input';
 import { EndorsementsPanel } from '@/components/proximate/endorsements-panel';
 import { DisbursementMethodsPanel } from '@/components/proximate/disbursement-methods-panel';
+import {
+  PifCard, MediaVerificationPanel, ProximateAttachmentsPanel,
+} from '@/components/proximate/dd-evidence';
 import { PartnerJourney, NextStep } from '@/components/proximate/next-step';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -75,6 +78,10 @@ interface Partner {
   sanctions_checked_at?: string | null;
   sanctions_summary?: SanctionsSummary | null;
   trust_floor_signals: TrustFloor;
+  intake_form?: {
+    pif?: Record<string, string>;
+    pif_source?: string;
+  } | null;
 }
 
 interface Questions {
@@ -608,6 +615,27 @@ export default function ProximateEndorseWizardClient() {
             isAdmin={isOb}
             onChanged={refreshMethodCount}
           />
+
+          {/* Blue Nile intake (2026-07) — the due-diligence file the
+              secretariat used to keep in a OneDrive folder: structured
+              PIF, social-footprint check, and evidence attachments
+              (sam.gov screenshots, PIF originals). OB-only. */}
+          {isOb && partner.intake_form?.pif && (
+            <PifCard
+              pif={partner.intake_form.pif}
+              source={partner.intake_form.pif_source}
+            />
+          )}
+          {isOb && (
+            <MediaVerificationPanel partnerId={Number(partnerId)} />
+          )}
+          {isOb && (
+            <ProximateAttachmentsPanel
+              subjectKind="partner"
+              subjectId={Number(partnerId)}
+              title="Due-diligence evidence"
+            />
+          )}
 
           <Card className="p-4">
             <p className="text-xs text-muted-foreground mb-4">

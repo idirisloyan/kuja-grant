@@ -22,6 +22,9 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
+import {
+  ProximateAttachmentsPanel, PanelRosterPanel,
+} from '@/components/proximate/dd-evidence';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1316,6 +1319,20 @@ export function ProximateRoundDetailClient() {
               </ul>
             )}
           </Card>
+          )}
+
+          {/* Blue Nile intake (2026-07) — the round's evidence pack
+              (needs assessments, site factsheets, cluster alerts) and
+              the panel roster, both formerly loose files. OB-only. */}
+          {isOperator && roundId && (
+            <ProximateAttachmentsPanel
+              subjectKind="round"
+              subjectId={parseInt(roundId, 10)}
+              title="Evidence pack"
+            />
+          )}
+          {isOperator && roundId && (
+            <PanelRosterPanel roundId={parseInt(roundId, 10)} />
           )}
         </div>
       </PageMain>

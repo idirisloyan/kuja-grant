@@ -82,6 +82,10 @@ from app.models.proximate_fsp import (
     FinancialServiceProvider, PartnerDisbursementMethod,
     FSP_KINDS, METHOD_STATUSES,
 )
+from app.models.proximate_dd import (
+    ProximateAttachment, ProximateMediaVerification, ProximatePanelCandidate,
+    ATTACHMENT_SUBJECT_KINDS, ATTACHMENT_KINDS, MEDIA_VERDICTS, PANEL_STATUSES,
+)
 from app.models.proximate_round import (
     ProximateRound, ProximateRoundSignature, ProximateRoundParticipant,
     ROUND_STATUSES, ROUND_TRIGGER_TYPES, ROUND_SIGNERS_REQUIRED,
@@ -140,6 +144,8 @@ __all__ = [
     'RESPONSE_WINDOW_HOURS',
     'FinancialServiceProvider', 'PartnerDisbursementMethod',
     'FSP_KINDS', 'METHOD_STATUSES',
+    'ProximateAttachment', 'ProximateMediaVerification', 'ProximatePanelCandidate',
+    'ATTACHMENT_SUBJECT_KINDS', 'ATTACHMENT_KINDS', 'MEDIA_VERDICTS', 'PANEL_STATUSES',
     'ProximateRound', 'ProximateRoundSignature', 'ProximateRoundParticipant',
     'PARTICIPANT_STAGES',
     'ROUND_STATUSES', 'ROUND_TRIGGER_TYPES', 'ROUND_SIGNERS_REQUIRED',

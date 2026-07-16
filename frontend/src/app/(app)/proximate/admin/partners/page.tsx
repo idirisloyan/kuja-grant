@@ -8,12 +8,15 @@
  * with real filtering + drill-in.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, Search, Users, ShieldCheck, AlertTriangle } from 'lucide-react';
+import {
+  Loader2, Search, Users, ShieldCheck, AlertTriangle, Upload,
+} from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -43,15 +46,47 @@ export default function ProximatePartnersPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  // Blue Nile intake (2026-07) — bulk PIF import. One Word/PDF form in,
+  // one nominated partner out (AI-extracted server-side), original
+  // attached as due-diligence evidence.
+  const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState<string | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = () => {
     api.get<{ success: boolean; partners: Partner[] }>('/api/proximate/partners')
-      .then((r) => { if (!cancelled) setPartners(r.partners || []); })
-      .catch(() => { if (!cancelled) setError('Failed to load partners.'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
+      .then((r) => setPartners(r.partners || []))
+      .catch(() => setError('Failed to load partners.'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const onImport = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setImporting(true);
+    let created = 0, updated = 0, failed = 0;
+    for (const f of Array.from(files)) {
+      try {
+        const fd = new FormData();
+        fd.append('file', f);
+        const r = await api.upload<{ created: boolean }>(
+          '/api/proximate/partners/import-pif', fd,
+        );
+        if (r.created) created += 1; else updated += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    setImportNote(
+      `Imported ${created} new partner${created === 1 ? '' : 's'}`
+      + (updated ? `, updated ${updated}` : '')
+      + (failed ? `, ${failed} failed` : ''),
+    );
+    setImporting(false);
+    if (importRef.current) importRef.current.value = '';
+    load();
+  };
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -129,6 +164,23 @@ export default function ProximatePartnersPage() {
             {/* Filter bar */}
             <Card className="p-3">
               <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  size="sm" variant="outline" disabled={importing}
+                  onClick={() => importRef.current?.click()}
+                >
+                  {importing
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />
+                    : <Upload className="w-3.5 h-3.5 me-1" />}
+                  Import PIFs
+                </Button>
+                <input
+                  ref={importRef} type="file" multiple className="hidden"
+                  accept=".pdf,.docx,.doc"
+                  onChange={(e) => onImport(e.target.files)}
+                />
+                {importNote && (
+                  <span className="text-xs text-muted-foreground">{importNote}</span>
+                )}
                 <div className="relative flex-1 min-w-[180px]">
                   <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
