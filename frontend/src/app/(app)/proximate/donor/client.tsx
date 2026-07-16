@@ -68,7 +68,6 @@ interface Portfolio {
 
 interface DashboardPayload {
   donor: Donor;
-  using_fallback_listing: boolean;
   rounds: RoundSummary[];
   portfolio: Portfolio;
 }
@@ -142,7 +141,7 @@ export function ProximateDonorClient() {
     );
   }
 
-  const { donor, rounds, portfolio, using_fallback_listing } = data;
+  const { donor, rounds, portfolio } = data;
   const followedIds = subscribedIds ?? donor.subscribed_round_ids ?? [];
 
   const toggleFollow = async (roundId: number) => {
@@ -176,12 +175,6 @@ export function ProximateDonorClient() {
           <p className="text-sm text-muted-foreground">{donor.contact_email}</p>
         )}
       </header>
-
-      {using_fallback_listing && (
-        <Card className="p-4 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
-          <p className="text-sm">{t('proximate.donor.fallback_listing_notice')}</p>
-        </Card>
-      )}
 
       {/* Portfolio rollup */}
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -692,6 +692,65 @@ def run_proximate_rbac(base):
             _no_sensitive("donor round detail", r)
         check("donor no-secret-leak /rounds/<id>", donor_round_no_leak)
 
+    # --- DONOR ROUND SCOPE (2026-07-16). The v0 fallback listed EVERY
+    # round in the tenant to a donor with no subscriptions — one funder
+    # could read another funder's round data. Now a donor sees only
+    # rounds linked to them: funded (round.donor_id), co-funded
+    # (donor_shares), or followed (subscribed_round_ids). Invariant:
+    # every round the dashboard returns must be provably linked, and a
+    # non-linked round's report endpoints must 403 for the donor. ---
+    def donor_dashboard_scoped():
+        me = get(donor, base, "/api/proximate/donors/me", override=OV)
+        assert me.status_code == 200, f"donors/me -> {me.status_code}"
+        row = me.json()["donor"]
+        my_id = row["id"]
+        followed = set(row.get("subscribed_round_ids") or [])
+        allr = get(ob, base, "/api/proximate/rounds", override=OV)
+        assert allr.status_code == 200, f"OB rounds -> {allr.status_code}"
+        linked = set(followed)
+        unlinked = []
+        for rr in _list(allr):
+            share_ids = {
+                s.get("donor_id") for s in (rr.get("donor_shares") or [])
+            }
+            if rr.get("donor_id") == my_id or my_id in share_ids:
+                linked.add(rr["id"])
+            else:
+                unlinked.append(rr["id"])
+        dash = get(donor, base, "/api/proximate/donors/me/dashboard",
+                   override=OV)
+        assert dash.status_code == 200, f"dashboard -> {dash.status_code}"
+        body = dash.json()
+        assert "using_fallback_listing" not in body, \
+            "dashboard still exposes the retired fallback flag"
+        shown = {r_["id"] for r_ in body.get("rounds") or []}
+        stray = shown - linked
+        assert not stray, (
+            f"donor dashboard shows rounds not linked to them: {sorted(stray)} "
+            f"(linked={sorted(linked)})"
+        )
+        # The rounds LIST endpoint must apply the same scope.
+        lst = get(donor, base, "/api/proximate/rounds", override=OV)
+        assert lst.status_code == 200, f"donor rounds list -> {lst.status_code}"
+        listed = {r_["id"] for r_ in _list(lst)}
+        stray_list = listed - linked
+        assert not stray_list, (
+            f"donor rounds list shows non-linked rounds: {sorted(stray_list)}"
+        )
+        # A non-linked round's detail, report bundle + PDF must be denied.
+        if unlinked:
+            probe = unlinked[0]
+            for suffix in ("", "/report", "/report.pdf"):
+                rep = get(donor, base,
+                          f"/api/proximate/rounds/{probe}{suffix}",
+                          override=OV)
+                assert rep.status_code == 403, (
+                    f"donor GET rounds/{probe}{suffix} on non-linked round -> "
+                    f"{rep.status_code} (want 403)"
+                )
+    check("donor round scope: dashboard+list ⊆ linked, 403 outside",
+          donor_dashboard_scoped)
+
     # --- AUDIT EXPORT INTEGRITY (QA 2026-07-14 audit-chain follow-up).
     # Three invariants the export probe surfaced:
     #   1. COMPLETE: the JSONL file must contain every row the JSON view

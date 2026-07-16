@@ -2346,13 +2346,24 @@ def api_disbursement_preflight():
 @proximate_bp.route('/rounds', methods=['GET'])
 @login_required
 def api_list_rounds():
-    """List rounds in this tenant, newest first."""
+    """List rounds in this tenant, newest first. Donor-persona callers
+    see only their linked rounds (funded / co-funded / followed) —
+    same scope rule as the donor dashboard (2026-07-16)."""
+    from app.models import ProximateDonor
+    from app.utils.network import is_oversight_body_member
     net, err = _require_proximate_tenant()
     if err:
         return err
-    rows = ProximateRound.query.filter_by(network_id=net.id).order_by(
-        ProximateRound.drafted_at.desc(),
-    ).limit(200).all()
+    q = ProximateRound.query.filter_by(network_id=net.id)
+    if (getattr(current_user, 'role', '') != 'admin'
+            and not is_oversight_body_member(current_user)):
+        donor = ProximateDonor.query.filter_by(
+            network_id=net.id, primary_user_id=current_user.id,
+        ).first()
+        if donor:
+            visible = _donor_visible_round_ids(donor)
+            q = q.filter(ProximateRound.id.in_(list(visible) or [-1]))
+    rows = q.order_by(ProximateRound.drafted_at.desc()).limit(200).all()
     return jsonify({
         'success': True,
         'rounds': [r.to_dict() for r in rows],
@@ -2370,6 +2381,9 @@ def api_get_round(round_id):
     r = ProximateRound.query.filter_by(id=round_id, network_id=net.id).first()
     if not r:
         return jsonify({'success': False, 'error': 'Not found'}), 404
+    scope_err = _donor_round_scope_403(net, r.id)
+    if scope_err:
+        return scope_err
 
     # Temporal linkage — fetch audit-chain rows between submitted_at and
     # closed_at (or now). This is what end-of-round reports key off.
@@ -3753,6 +3767,9 @@ def api_round_report_pdf(round_id):
     r = ProximateRound.query.filter_by(id=round_id, network_id=net.id).first()
     if not r:
         return jsonify({'success': False, 'error': 'Not found'}), 404
+    scope_err = _donor_round_scope_403(net, r.id)
+    if scope_err:
+        return scope_err
 
     disbursements = ProximateDisbursement.query.filter_by(
         network_id=net.id, round_id=r.id,
@@ -3982,6 +3999,9 @@ def api_round_report(round_id):
     r = ProximateRound.query.filter_by(id=round_id, network_id=net.id).first()
     if not r:
         return jsonify({'success': False, 'error': 'Not found'}), 404
+    scope_err = _donor_round_scope_403(net, r.id)
+    if scope_err:
+        return scope_err
 
     end = r.closed_at or datetime.now(timezone.utc)
     start = r.submitted_at or r.drafted_at
@@ -6390,6 +6410,50 @@ def _require_donor():
     return donor, None
 
 
+def _donor_visible_round_ids(donor) -> set:
+    """The rounds this donor is allowed to see: rounds they fund
+    (`round.donor_id`), rounds where they hold a co-funding share
+    (`donor_shares_json`), and rounds they explicitly follow
+    (`subscribed_round_ids`). No fallback — a donor with no linked
+    rounds sees nothing. (Retired 2026-07-16: the v0 "no subscription
+    → list every round in the tenant" behavior, which exposed one
+    funder's round data to every other registered donor.)"""
+    ids = set(donor.subscribed_round_ids())
+    rows = ProximateRound.query.filter_by(network_id=donor.network_id).all()
+    for r in rows:
+        if r.donor_id == donor.id:
+            ids.add(r.id)
+            continue
+        try:
+            if any(
+                int(s.get('donor_id') or 0) == donor.id
+                for s in r._donor_shares()
+            ):
+                ids.add(r.id)
+        except (TypeError, ValueError):
+            pass
+    return ids
+
+
+def _donor_round_scope_403(net, round_id):
+    """Round-scope guard for donor-persona callers on shared read
+    endpoints (round report bundle + PDF). OB members and platform
+    admins pass through; a caller with a donor row is limited to
+    their visible rounds; other personas keep their existing gates."""
+    from app.models import ProximateDonor
+    from app.utils.network import is_oversight_body_member
+    if getattr(current_user, 'role', '') == 'admin':
+        return None
+    if is_oversight_body_member(current_user):
+        return None
+    donor = ProximateDonor.query.filter_by(
+        network_id=net.id, primary_user_id=current_user.id,
+    ).first()
+    if donor and round_id not in _donor_visible_round_ids(donor):
+        return jsonify({'success': False, 'error': 'not in your scope'}), 403
+    return None
+
+
 @proximate_bp.route('/donors', methods=['POST'])
 @ob_required
 def api_register_donor():
@@ -6599,9 +6663,9 @@ def api_donor_ask():
     and call CopilotService. Replay-logged so the OB can audit what
     AI told donors.
 
-    Honest scope: this is grounded ONLY in the donor's subscribed
-    rounds (or the fallback all-rounds-listing). It will not answer
-    questions about partners outside that scope; the prompt says so.
+    Honest scope: this is grounded ONLY in the donor's linked rounds
+    (funded, co-funded, or followed). It will not answer questions
+    about partners outside that scope; the prompt says so.
     """
     from app.models import ProximateOutcomeAttestation
     from app.services.copilot_service import CopilotService
@@ -6619,19 +6683,20 @@ def api_donor_ask():
             'success': False, 'error': 'question too long (max 1000)',
         }), 400
 
-    subscribed = donor.subscribed_round_ids()
-    rounds_q = ProximateRound.query.filter_by(network_id=donor.network_id)
-    if subscribed:
-        rounds_q = rounds_q.filter(ProximateRound.id.in_(subscribed))
-    rounds = rounds_q.order_by(ProximateRound.created_at.desc()).limit(8).all()
+    visible = _donor_visible_round_ids(donor)
+    rounds = ProximateRound.query.filter_by(
+        network_id=donor.network_id,
+    ).filter(ProximateRound.id.in_(visible)).order_by(
+        ProximateRound.created_at.desc()
+    ).limit(8).all() if visible else []
 
     if not rounds:
         return jsonify({
             'success': True,
             'answer': (
-                "I don't have any rounds to look at yet. Once you "
-                "subscribe to a round (or the OB seeds one), I can "
-                "answer questions about it."
+                "No rounds are linked to your donor account yet. Once "
+                "the Oversight Body links your funding round (or you "
+                "follow one), I can answer questions about it."
             ),
             'meta': {'grounded': False},
         })
@@ -6848,10 +6913,9 @@ def api_outcomes_rollup():
         }), 403
 
     round_id_arg = request.args.get('round_id', type=int)
-    allowed_round_ids = None
+    allowed_round_ids = None  # None = unrestricted (OB only)
     if donor and not is_ob:
-        subs = donor.subscribed_round_ids()
-        allowed_round_ids = set(subs) if subs else None  # None = all rounds
+        allowed_round_ids = _donor_visible_round_ids(donor)
 
     outcomes_q = ProximateOutcomeAttestation.query.filter_by(network_id=net.id)
     if round_id_arg:
@@ -6964,10 +7028,10 @@ def api_donor_dashboard():
     one endpoint; no per-round drill-down request is needed for the
     landing view.
 
-    Honest scope: if the donor has no `subscribed_round_ids`, this
-    falls back to listing ALL rounds in the tenant. Subscriptions are
-    a v0 surface; the v1 will require an explicit subscribe before
-    the donor sees anything (per the Phase 686 co-funding gate).
+    Scope (v1, 2026-07-16): the donor sees ONLY rounds linked to them
+    — funded (round.donor_id), co-funded (donor_shares), or followed
+    (subscribed_round_ids). A donor with no linked rounds gets an
+    empty list, never the whole tenant.
     """
     from app.models import (
         ProximateOutcomeAttestation, ProximatePartner,
@@ -6976,11 +7040,15 @@ def api_donor_dashboard():
     if err:
         return err
 
-    subscribed = donor.subscribed_round_ids()
-    q = ProximateRound.query.filter_by(network_id=donor.network_id)
-    if subscribed:
-        q = q.filter(ProximateRound.id.in_(subscribed))
-    rounds = q.order_by(ProximateRound.created_at.desc()).all()
+    visible = _donor_visible_round_ids(donor)
+    if visible:
+        rounds = ProximateRound.query.filter_by(
+            network_id=donor.network_id,
+        ).filter(ProximateRound.id.in_(visible)).order_by(
+            ProximateRound.created_at.desc()
+        ).all()
+    else:
+        rounds = []
 
     out_rounds = []
     portfolio = {
@@ -7059,7 +7127,6 @@ def api_donor_dashboard():
     return jsonify({
         'success': True,
         'donor': donor.to_dict(),
-        'using_fallback_listing': not subscribed,
         'rounds': out_rounds,
         'portfolio': portfolio,
     })
@@ -7235,8 +7302,7 @@ def api_round_retrospective_pdf(round_id):
             network_id=net.id, primary_user_id=current_user.id,
         ).first()
         if donor:
-            subs = donor.subscribed_round_ids()
-            if subs and round_id not in subs:
+            if round_id not in _donor_visible_round_ids(donor):
                 return jsonify({
                     'success': False, 'error': 'not in your scope',
                 }), 403
@@ -7376,8 +7442,7 @@ def api_cron_donor_retrospective():
     for r in closed_rounds:
         donors = ProximateDonor.query.filter_by(network_id=r.network_id).all()
         for d in donors:
-            subs = d.subscribed_round_ids()
-            if subs and r.id not in subs:
+            if r.id not in _donor_visible_round_ids(d):
                 continue
             existing = AuditChainEntry.query.filter_by(
                 subject_kind='proximate_round',
