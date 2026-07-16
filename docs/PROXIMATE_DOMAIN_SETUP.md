@@ -1,10 +1,11 @@
 # Proximate tenant domain + go-live setup
 
-Status (2026-07-16): the Railway side is DONE — `proximate.adesoafrica.org`
-is registered on the `web` service and the backend already routes that
+Status (2026-07-16): the Railway side is DONE — `proximate.kuja.org`
+(Idiris's decision, over the earlier adesoafrica.org option) is
+registered on the `web` service and the backend already routes that
 hostname to the Proximate tenant (`host_aliases` seeded since Phase 627).
 **The only remaining step for the domain is two DNS records at
-adesoafrica.org's DNS provider.**
+kuja.org's DNS provider.**
 
 The same day, the shared `CRON_SECRET` was set on Railway + GitHub —
 every scheduled job (grant reporting cadence, report nudges, sanctions
@@ -14,12 +15,12 @@ returns `{"grants_walked":9,"reports_created":2,"success":true}`.
 
 ---
 
-## 1. DNS records to add (owner: whoever manages adesoafrica.org DNS)
+## 1. DNS records to add (owner: whoever manages kuja.org DNS)
 
 | Type  | Name                        | Value | TTL |
 |-------|-----------------------------|-------|-----|
-| CNAME | `proximate`                 | `2483qpw6.up.railway.app` | 300 |
-| TXT   | `_railway-verify.proximate` | `railway-verify=railway-verify=d1ea0bbcb17004deb6e5cc4c0c7103c01a408ddf768524859a3233b006466c90` | 300 |
+| CNAME | `proximate`                 | `1zj8ev6l.up.railway.app` | 300 |
+| TXT   | `_railway-verify.proximate` | `railway-verify=railway-verify=d1510a5526b115edfbe2d1d752728da76dce403f758b46334a5b41710d545e2a` | 300 |
 
 Values above are what the Railway CLI returned at registration. If the
 DNS provider rejects the TXT value, copy it verbatim from
@@ -32,14 +33,14 @@ resolves — usually < 5 minutes, up to 30. No app restart needed.
 ## 2. Verify (anyone, after DNS propagates)
 
 ```bash
-dig +short proximate.adesoafrica.org
+dig +short proximate.kuja.org
 # → CNAME chain ending in *.up.railway.app
 
-curl -s https://proximate.adesoafrica.org/api/network/current
+curl -s https://proximate.kuja.org/api/network/current
 # → JSON with "slug": "proximate"
 ```
 
-Then in a browser: `https://proximate.adesoafrica.org` should show the
+Then in a browser: `https://proximate.kuja.org` should show the
 Proximate-branded login with Arabic as the default language — no tenant
 switcher, no override header. Log in with any Proximate account and
 confirm the data is the Proximate tenant's.
@@ -70,9 +71,12 @@ that key.
    the UAT/demo rounds so OB consoles show only real data.
 5. **Branding** — `brand_color_hex` is placeholder violet (#7C3AED);
    update it + logo when the Proximate brand spec lands.
-6. **Optional second alias** — `proximate.kuja.org` is already in
-   `host_aliases`; if wanted, repeat step 1 on kuja.org's DNS after
-   `railway domain proximate.kuja.org --service web`.
+6. **Optional second alias** — `proximate.adesoafrica.org` is also in
+   `host_aliases` and was registered on Railway earlier the same day
+   (superseded by the kuja.org decision). It sits harmlessly as
+   "pending" until DNS records exist; either add the records at
+   adesoafrica.org's provider to activate it too, or delete the domain
+   in Railway → web → Settings → Networking to keep the panel clean.
 
 ## Code reference
 
