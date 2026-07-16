@@ -724,8 +724,8 @@ export function ProximateGrantDetailClient() {
               </div>
             )}
             {data.reports.length === 0 && (
-              <p className="text-xs text-muted-foreground italic text-center py-4">
-                No reports scheduled yet. Reports get auto-generated per the grant&apos;s cadence.
+              <p className="text-xs text-muted-foreground">
+                No reports scheduled yet — they are auto-generated per the grant&apos;s cadence.
               </p>
             )}
           </Card>
@@ -739,9 +739,9 @@ export function ProximateGrantDetailClient() {
               </p>
             </div>
             {data.allocations.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic text-center py-4">
+              <p className="text-xs text-muted-foreground">
                 No rounds have drawn from this grant yet.
-                {isOb && ' Rounds can be allocated from the round detail page or here.'}
+                {isOb && ' Allocate from the round detail page.'}
               </p>
             ) : (
               <ul className="space-y-1.5">
@@ -770,19 +770,25 @@ export function ProximateGrantDetailClient() {
             )}
           </Card>
 
-          {/* AI-extraction inspection panel (OB only) */}
+          {/* AI-extraction inspection panel (OB only).
+              QA 2026-07-15 ("too busy"): this rendered the raw JSON blob
+              by default — an inspection tool masquerading as content.
+              Collapsed behind a <details>; the reviewed canonical values
+              above are what the OB actually reads. */}
           {isOb && g.extracted && Object.keys(g.extracted).length > 0 && (
             <Card className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <FileText className="w-4 h-4 text-muted-foreground" />
-                <p className="text-sm font-medium">AI-extracted terms</p>
-                <p className="text-[10px] text-muted-foreground">
-                  (raw first pass — canonical values above have been reviewed)
-                </p>
-              </div>
-              <pre className="text-[10px] font-mono bg-muted/40 p-3 rounded-md overflow-x-auto max-h-64">
-                {JSON.stringify(g.extracted, null, 2)}
-              </pre>
+              <details>
+                <summary className="flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                  <FileText className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-sm font-medium">AI-extracted terms</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    raw first pass, already reviewed — click to inspect
+                  </p>
+                </summary>
+                <pre className="mt-3 text-[10px] font-mono bg-muted/40 p-3 rounded-md overflow-x-auto max-h-64">
+                  {JSON.stringify(g.extracted, null, 2)}
+                </pre>
+              </details>
             </Card>
           )}
         </div>

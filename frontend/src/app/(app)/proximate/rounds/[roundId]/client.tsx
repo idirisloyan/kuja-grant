@@ -1293,30 +1293,52 @@ export function ProximateRoundDetailClient() {
                 {t('proximate.rounds.no_activity')}
               </p>
             ) : (
-              <ul className="space-y-1 text-xs">
-                {auditWindow.slice(0, 30).map((a) => {
-                  const label = labelForProximateAction(a.action);
-                  const isKnown = label !== a.action;
-                  return (
-                  <li key={a.seq} className="flex items-center gap-2">
-                    <span className="text-muted-foreground tabular-nums">#{a.seq}</span>
-                    {/* Phase 704 — human label when we know one,
-                        raw mono code as the fallback so the chain
-                        is never silently mis-rendered. Hover the
-                        label to see the underlying action code. */}
-                    {isKnown ? (
-                      <span title={a.action}>{label}</span>
-                    ) : (
-                      <span className="font-mono">{a.action}</span>
-                    )}
-                    <span className="text-muted-foreground">
-                      ({a.subject_kind} #{a.subject_id})
-                    </span>
-                    <span className="text-muted-foreground ms-auto">{a.actor_email}</span>
-                  </li>
-                  );
-                })}
-              </ul>
+              /* QA 2026-07-15 ("too busy"): the Blue Nile ingestion put
+                 ~500 near-identical rows in this window and the card
+                 rendered 30 of them as a monospace wall. Roll the window
+                 up into per-action counts and show only the most recent
+                 handful of individual events. The full chain is still
+                 one click away via the audit bundle download above. */
+              (() => {
+                const counts = new Map<string, number>();
+                for (const a of auditWindow) {
+                  counts.set(a.action, (counts.get(a.action) || 0) + 1);
+                }
+                const grouped = Array.from(counts.entries())
+                  .sort((x, y) => y[1] - x[1]);
+                return (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      {grouped.slice(0, 8).map(([action, n]) => (
+                        <span
+                          key={action}
+                          title={action}
+                          className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[11px]"
+                        >
+                          {labelForProximateAction(action)}
+                          <span className="text-muted-foreground tabular-nums">×{n}</span>
+                        </span>
+                      ))}
+                      {grouped.length > 8 && (
+                        <span className="text-[11px] text-muted-foreground self-center">
+                          +{grouped.length - 8}
+                        </span>
+                      )}
+                    </div>
+                    <ul className="space-y-1 text-xs">
+                      {auditWindow.slice(0, 6).map((a) => (
+                        <li key={a.seq} className="flex items-center gap-2">
+                          <span title={a.action}>{labelForProximateAction(a.action)}</span>
+                          <span className="text-muted-foreground">
+                            ({a.subject_kind.replace('proximate_', '')} #{a.subject_id})
+                          </span>
+                          <span className="text-muted-foreground ms-auto truncate">{a.actor_email}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()
             )}
           </Card>
           )}
