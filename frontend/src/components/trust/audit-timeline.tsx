@@ -11,6 +11,7 @@
 
 import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 
 export interface AuditEvent {
   action: string;
@@ -49,7 +50,9 @@ export function AuditTimeline({ events }: { events: AuditEvent[] }) {
           <li key={i} className="relative">
             <span className={cn('absolute -left-[27px] top-1 w-3 h-3 rounded-full ring-4 ring-background', dot)} />
             <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-foreground">{e.action}</span>
+              <span className="text-sm font-semibold text-foreground" title={e.action}>
+                {labelForProximateAction(e.action)}
+              </span>
               {e.actor && <span className="text-xs text-muted-foreground">by {e.actor}</span>}
               {ts && <span className="text-xs text-muted-foreground">· {ts.toLocaleString()}</span>}
             </div>

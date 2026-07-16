@@ -141,5 +141,12 @@ export const PROXIMATE_ACTION_LABELS: Record<string, string> = {
  * code so the audit chain is never silently mis-rendered.
  */
 export function labelForProximateAction(action: string): string {
-  return PROXIMATE_ACTION_LABELS[action] ?? action;
+  const known = PROXIMATE_ACTION_LABELS[action];
+  if (known) return known;
+  // Fallback for codes added after this map (or non-proximate chains):
+  // "near.report.submitted" -> "Report submitted". No surface should
+  // ever show a raw machine code to an operator.
+  const tail = action.split('.').slice(1).join(' ').replace(/_/g, ' ').trim()
+    || action.replace(/[._]/g, ' ').trim();
+  return tail.charAt(0).toUpperCase() + tail.slice(1);
 }

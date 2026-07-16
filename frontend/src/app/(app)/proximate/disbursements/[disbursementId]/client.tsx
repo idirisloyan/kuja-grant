@@ -913,15 +913,9 @@ export function ProximateDisbursementDetailClient() {
                       code as fallback (so the chain is never silently
                       mis-rendered). Same util as the round detail
                       audit window. Hover shows the action code. */}
-                  {(() => {
-                    const lbl = labelForProximateAction(row.action);
-                    const isKnown = lbl !== row.action;
-                    return isKnown ? (
-                      <span className="font-medium text-foreground" title={row.action}>{lbl}</span>
-                    ) : (
-                      <span className="font-medium text-foreground font-mono">{row.action}</span>
-                    );
-                  })()}
+                  <span className="font-medium text-foreground" title={row.action}>
+                    {labelForProximateAction(row.action)}
+                  </span>
                   {row.actor_email && <span>· {row.actor_email}</span>}
                 </li>
               ))}

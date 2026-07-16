@@ -1207,6 +1207,37 @@ def _register_spa_routes(app):
     """
     nextjs_dir = os.path.join(app.static_folder, 'nextjs')
 
+    def _proximate_home():
+        """Persona-aware Proximate landing used to salvage bad deep
+        links (pilot polish 2026-07-16, external-review finding). The
+        caller's session tells us who they are; send them to THEIR
+        Proximate surface instead of the generic NGO dashboard, whose
+        API calls are meaningless for Proximate personas."""
+        try:
+            from flask_login import current_user
+            from app.models import Network, ProximateDonor
+            from app.models.proximate_endorsement import Endorser
+            from app.utils.network import is_oversight_body_member
+            if not getattr(current_user, 'is_authenticated', False):
+                return '/login/'
+            net = Network.query.filter_by(slug='proximate').first()
+            if net:
+                if (getattr(current_user, 'role', '') == 'admin'
+                        or is_oversight_body_member(
+                            current_user, network_id=net.id)):
+                    return '/proximate/admin/'
+                if ProximateDonor.query.filter_by(
+                        network_id=net.id,
+                        primary_user_id=current_user.id).first():
+                    return '/proximate/donor/'
+                if Endorser.query.filter_by(
+                        network_id=net.id,
+                        user_id=current_user.id).first():
+                    return '/proximate/endorse/'
+        except Exception:
+            pass
+        return '/dashboard/'
+
     def _serve_nextjs(path=''):
         """Serve a Next.js static export file.
 
@@ -1284,6 +1315,13 @@ def _register_spa_routes(app):
             from flask import abort
             abort(404)
 
+        # /proximate has no real page — the export ships a bare shell
+        # there that bounces logged-in users to the generic /dashboard.
+        # Route it persona-aware like any other salvaged Proximate link.
+        if path.strip('/') == 'proximate':
+            from flask import redirect
+            return redirect(_proximate_home(), code=302)
+
         # Try path/index.html (Next.js trailingSlash output)
         for candidate in [f'{path}/index.html', f'{path}.html']:
             cand_path = os.path.join(nextjs_dir, candidate)
@@ -1309,6 +1347,24 @@ def _register_spa_routes(app):
                 resp = send_from_directory(nextjs_dir, candidate_path)
                 resp.headers['Cache-Control'] = 'no-store, must-revalidate'
                 return resp
+
+        # Pilot polish (2026-07-16, external-review finding): a bad
+        # Proximate deep link used to fall through to the root shell,
+        # which redirects logged-in users to the generic /dashboard —
+        # the wrong tenant's home, where NGO-centric API calls fail
+        # noisily for Proximate personas. Salvage the obvious legacy
+        # link shapes to their real admin routes; everything else under
+        # /proximate lands on the caller's own Proximate surface.
+        if parts and parts[0] == 'proximate':
+            from flask import redirect
+            if (len(parts) >= 3 and parts[1] == 'grants'
+                    and parts[2].isdigit()):
+                return redirect(
+                    f'/proximate/admin/grants/{parts[2]}/', code=302)
+            if len(parts) >= 2 and parts[1] in (
+                    'partners', 'endorsers', 'fsps', 'grievances'):
+                return redirect(f'/proximate/admin/{parts[1]}/', code=302)
+            return redirect(_proximate_home(), code=302)
 
         # Last resort: root index.html so the client can render at least
         # the shell and redirect itself.

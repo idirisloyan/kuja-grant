@@ -447,6 +447,73 @@ export function ProximateRoundDetailClient() {
             );
           })()}
 
+          {/* Pilot polish (2026-07-16, external review): the partner
+              pipeline for THIS round, aggregated from roster stages,
+              with the current bottleneck highlighted — an OB opening
+              the round sees nominated → endorsed → route verified →
+              funds out → reported without reading a runbook. */}
+          {participants.length > 0 && (() => {
+            const roster = participants.filter((p) => p.stage !== 'withdrawn');
+            const JOURNEY = [
+              { keys: ['planned'],
+                label: t('proximate.rounds.journey_nominated') || 'Nominated',
+                hint: t('proximate.rounds.journey_nominated_hint') || 'Partners are on the roster. Next: invite two community endorsers per partner from the roster below.' },
+              { keys: ['endorsement_open'],
+                label: t('proximate.rounds.journey_endorsing') || 'Endorsements',
+                hint: t('proximate.rounds.journey_endorsing_hint') || 'Endorsements are being collected — two conflict-free endorsements clear a partner.' },
+              { keys: ['endorsed'],
+                label: t('proximate.rounds.journey_endorsed') || 'Endorsed + DD',
+                hint: t('proximate.rounds.journey_endorsed_hint') || 'Next: verify each partner’s payment route (bank, hawala or mobile money).' },
+              { keys: ['bank_verified'],
+                label: t('proximate.rounds.journey_route_ok') || 'Route verified',
+                hint: t('proximate.rounds.journey_route_ok_hint') || 'Next: create disbursements — amounts above the threshold collect co-signatures.' },
+              { keys: ['disbursed'],
+                label: t('proximate.rounds.journey_funded') || 'Funds out',
+                hint: t('proximate.rounds.journey_funded_hint') || 'Next: partners report back with photos and receipts; reminders go out automatically.' },
+              { keys: ['reported', 'attested', 'verified'],
+                label: t('proximate.rounds.journey_reported') || 'Reported & verified',
+                hint: t('proximate.rounds.journey_reported_hint') || 'Reports are in — verify them; 90-day outcome attestations follow.' },
+            ];
+            const counts = JOURNEY.map((s) =>
+              roster.filter((p) => s.keys.includes(p.stage)).length);
+            const bottleneck = counts.findIndex((c) => c > 0);
+            return (
+              <Card className="p-4">
+                <p className="text-sm font-medium mb-3">
+                  {t('proximate.rounds.journey_title') || 'What happens next'}
+                </p>
+                <div className="flex items-stretch gap-1 overflow-x-auto pb-1">
+                  {JOURNEY.map((s, i) => (
+                    <div key={s.label} className="flex items-center gap-1 min-w-0">
+                      <div
+                        className={`rounded-md border px-2.5 py-1.5 text-center min-w-[86px] ${
+                          i === bottleneck
+                            ? 'border-primary bg-primary/10'
+                            : counts[i] > 0
+                              ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800'
+                              : 'border-border bg-muted/30'
+                        }`}
+                      >
+                        <p className="text-base font-semibold leading-tight">{counts[i]}</p>
+                        <p className="text-[10px] text-muted-foreground leading-tight">{s.label}</p>
+                      </div>
+                      {i < JOURNEY.length - 1 && (
+                        <span className="text-muted-foreground text-xs shrink-0" aria-hidden>
+                          →
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {bottleneck >= 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {JOURNEY[bottleneck].hint}
+                  </p>
+                )}
+              </Card>
+            );
+          })()}
+
           {/* Status + meta */}
           <Card className="p-4 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">

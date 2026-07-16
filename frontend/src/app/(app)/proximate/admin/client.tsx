@@ -30,6 +30,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -335,9 +336,11 @@ export function ProximateAdminClient() {
                       <span className="text-muted-foreground tabular-nums">
                         #{row.seq}
                       </span>
-                      <span className="font-mono">{row.action}</span>
+                      <span title={row.action}>
+                        {labelForProximateAction(row.action)}
+                      </span>
                       <span className="text-muted-foreground">
-                        ({row.subject_kind} #{row.subject_id})
+                        ({row.subject_kind.replace('proximate_', '')} #{row.subject_id})
                       </span>
                       <span className="text-muted-foreground ms-auto">
                         {row.actor_email}
