@@ -506,9 +506,30 @@ export function ProximateRoundDetailClient() {
                   ))}
                 </div>
                 {bottleneck >= 0 && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {JOURNEY[bottleneck].hint}
-                  </p>
+                  <div className="mt-2 flex items-center justify-between gap-3 flex-wrap">
+                    <p className="text-xs text-muted-foreground flex-1 min-w-[200px]">
+                      {JOURNEY[bottleneck].hint}
+                    </p>
+                    {/* Pilot feedback: the hint told operators to invite
+                        endorsers but gave them nothing to click. Jump to
+                        the roster, where each partner has its own
+                        invite/share-endorser action. */}
+                    {bottleneck <= 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          document.getElementById('round-roster')?.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start',
+                          })
+                        }
+                        className="text-[11px] inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 shrink-0"
+                      >
+                        {t('proximate.rounds.journey_start_endorsements') || 'Start endorsements'}
+                        <span aria-hidden>↓</span>
+                      </button>
+                    )}
+                  </div>
                 )}
               </Card>
             );
@@ -884,7 +905,7 @@ export function ProximateRoundDetailClient() {
               participants.length > 0 || (isOperator && rosterMutable);
             if (!showRoster) return null;
             return (
-            <Card className="p-4">
+            <Card id="round-roster" className="p-4 scroll-mt-4">
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <p className="text-sm font-medium flex items-center gap-2">
                   <Users className="w-4 h-4 text-muted-foreground" />

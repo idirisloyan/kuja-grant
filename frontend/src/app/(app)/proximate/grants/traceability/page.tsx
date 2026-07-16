@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ShieldCheck, Link2, FileText } from 'lucide-react';
 import { api } from '@/lib/api';
+import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
@@ -151,7 +152,7 @@ export default function TraceabilityPage() {
                             <td className="py-2 pe-3 tabular-nums">{money(d.amount_usd)}</td>
                             <td className="py-2 pe-3">
                               <span className={`inline-block px-1.5 py-0.5 rounded text-xs ${STATUS_TONE[d.status] || 'bg-muted text-muted-foreground'}`}>
-                                {d.status}
+                                {labelForProximateStatus(d.status)}
                               </span>
                             </td>
                             <td className="py-2 pe-3">

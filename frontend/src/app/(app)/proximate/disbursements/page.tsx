@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, Plus, Copy, Check } from 'lucide-react';
 import { api } from '@/lib/api';
+import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -149,7 +150,7 @@ export default function ProximateDisbursementsPage() {
                           {d.partner_name || `Partner #${d.partner_id}`}
                         </h3>
                         <Badge variant="outline" className={`text-[10px] ${STATUS_TONE[d.status] || ''}`}>
-                          {d.status}
+                          {labelForProximateStatus(d.status, t)}
                         </Badge>
                         {d.overdue && (
                           <Badge variant="outline" className="text-[10px] bg-red-100 text-red-800 border-red-300">

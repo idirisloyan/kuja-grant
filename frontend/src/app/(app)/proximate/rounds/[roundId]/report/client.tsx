@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, ArrowLeft, Printer } from 'lucide-react';
 import { api } from '@/lib/api';
+import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -200,7 +201,9 @@ export function ProximateRoundReportClient() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           {(['verified', 'flagged', 'reported', 'pending_report'] as const).map((s) => (
             <div key={s} className="border border-border rounded p-3">
-              <div className="text-xs text-muted-foreground uppercase tracking-wide">{s}</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                {labelForProximateStatus(s, t)}
+              </div>
               <div className="font-semibold mt-1">
                 {data.status_counts[s] || 0} · {fmt(data.status_totals_usd[`${s.replace('_report', '')}_usd`] || 0)}
               </div>
@@ -238,7 +241,7 @@ export function ProximateRoundReportClient() {
                   </div>
                   <div className="text-right">
                     <div className="font-semibold">{fmt(d.amount_usd)}</div>
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground">{d.status}</div>
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">{labelForProximateStatus(d.status, t)}</div>
                   </div>
                 </div>
 

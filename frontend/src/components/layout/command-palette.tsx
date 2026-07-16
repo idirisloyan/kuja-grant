@@ -139,7 +139,10 @@ export function CommandPalette() {
       try {
         const [g, o, d, c] = await Promise.all([
           api.get<{ grants?: SearchHitGrant[] }>(`/api/grants/?q=${encodeURIComponent(query)}`).catch(() => ({ grants: [] })),
-          api.get<{ organizations?: SearchHitOrg[] }>(`/api/organizations/search?q=${encodeURIComponent(query)}`).catch(() => ({ organizations: [] })),
+          // Org search lives on the LIST endpoint's ?search= filter —
+          // there is no /organizations/search route (calling it 404'd
+          // in the console on every keystroke).
+          api.get<{ organizations?: SearchHitOrg[] }>(`/api/organizations/?search=${encodeURIComponent(query)}`).catch(() => ({ organizations: [] })),
           api.get<{ hits?: SearchHitDoc[] }>(`/api/documents/search?q=${encodeURIComponent(query)}`).catch(() => ({ hits: [] })),
           // Phase 22B — cross-entity content search (grants/apps/reports/docs)
           query.length >= 3

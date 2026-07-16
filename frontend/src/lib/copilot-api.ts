@@ -46,7 +46,19 @@ async function safeCallAsync<T>(
 ): Promise<CopilotResult<T>> {
   return safeCall<T>(async () => {
     const url = path + (path.includes('?') ? '&' : '?') + 'async=true';
-    const enqueue = await api.post<unknown>(url, body);
+    // The enqueue can hit a transient edge 502/503 during a deploy
+    // rollover or worker restart. One delayed retry absorbs that
+    // (enqueueing is idempotent — worst case a duplicate job runs);
+    // a repeatable failure still surfaces as a typed error.
+    let enqueue: unknown;
+    try {
+      enqueue = await api.post<unknown>(url, body);
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      if (![0, 502, 503, 504].includes(status)) throw e;
+      await new Promise((r) => setTimeout(r, 750));
+      enqueue = await api.post<unknown>(url, body);
+    }
     const dict = enqueue as { ok?: boolean; job_id?: string; status?: string };
 
     // Sync fallback — endpoint hasn't been migrated, response IS the result.
@@ -59,12 +71,20 @@ async function safeCallAsync<T>(
     for (let attempt = 0; attempt < 30; attempt += 1) {
       const delay = ASYNC_POLL_BACKOFFS_MS[Math.min(attempt, ASYNC_POLL_BACKOFFS_MS.length - 1)];
       await new Promise((r) => setTimeout(r, delay));
-      const poll = await api.get<{
+      let poll: {
         success: boolean;
         status: 'running' | 'completed' | 'failed' | 'unknown';
         result?: CopilotResult<T> | T;
         error?: string;
-      }>(`/ai/jobs/${id}`);
+      };
+      try {
+        poll = await api.get(`/ai/jobs/${id}`);
+      } catch {
+        // A single dropped poll shouldn't kill the whole call — the job
+        // is still running server-side. The attempt counter still bounds
+        // total wait, so a dead backend ends in JOB_TIMEOUT, not a hang.
+        continue;
+      }
       if (poll.status === 'completed') {
         // Backend may return either CopilotResult<T> or raw T —
         // normalize to CopilotResult.
