@@ -167,6 +167,35 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // Tenant app identity (2026-07-16, PF brand guide): favicon,
+    // apple-touch icon and PWA manifest all swap to the active
+    // tenant's asset set under /tenants/<slug>/. Every tenant ships
+    // its own icons — Proximate's is the official brand-guide mark;
+    // Kuja/NEAR get brand-colored letter tiles until they have marks.
+    if (network?.slug) {
+      const setLink = (rel: string, href: string, type?: string) => {
+        let el = document.querySelector(
+          `link[rel="${rel}"]`,
+        ) as HTMLLinkElement | null;
+        if (!el) {
+          el = document.createElement('link');
+          el.rel = rel;
+          document.head.appendChild(el);
+        }
+        if (type) el.type = type;
+        if (el.getAttribute('href') !== href) el.setAttribute('href', href);
+      };
+      setLink('icon', `/tenants/${network.slug}/favicon-32.png`, 'image/png');
+      setLink('apple-touch-icon', `/tenants/${network.slug}/icon-180.png`);
+      setLink('manifest', `/tenants/${network.slug}/manifest.webmanifest`);
+      const themeMeta = document.querySelector(
+        'meta[name="theme-color"]',
+      ) as HTMLMetaElement | null;
+      if (themeMeta && network.brand_color_hex) {
+        themeMeta.content = network.brand_color_hex;
+      }
+    }
+
     // Set <html lang="..."> so screen readers + the browser pick up
     // the network's default language before the user authenticates.
     if (network?.default_language) {

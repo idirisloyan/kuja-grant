@@ -1,0 +1,38 @@
+{
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "ar",
+  "dir": "rtl",
+  "categories": [
+    "productivity",
+    "business",
+    "finance"
+  ],
+  "name": "Proximate Fund",
+  "short_name": "Proximate",
+  "description": "Community-first funding for Sudan — Proximate Fund.",
+  "theme_color": "#FC5810",
+  "background_color": "#FFF9F3",
+  "icons": [
+    {
+      "src": "/tenants/proximate/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/tenants/proximate/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/tenants/proximate/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

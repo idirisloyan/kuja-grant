@@ -275,7 +275,7 @@ def create_app(config_name=None):
                         "existing mechanisms, and enabling partner-hosted "
                         "mechanisms — operated by Adeso, Sudan-focused."
                     ),
-                    brand_color_hex="#7C3AED",  # placeholder violet pending brand spec
+                    brand_color_hex="#FC5810",  # Vivid Orange — PF Brand Guide 3.0
                     default_language="ar",
                     home_url="https://proximate.adesoafrica.org",
                     oversight_body_min_signers=2,
@@ -1389,6 +1389,31 @@ def _register_spa_routes(app):
             'status': 'running',
             'message': 'Frontend not built. Run: cd frontend && npm run build',
         })
+
+    @app.route('/favicon.ico')
+    def tenant_favicon():
+        """Host-aware favicon (2026-07-16, PF brand guide). Browsers
+        request /favicon.ico before any JS runs; resolve the tenant
+        from the Host header so proximate.kuja.org gets the Proximate
+        mark and everything else falls back to the Kuja tile. In-app,
+        the network-provider swaps the icon per tenant regardless."""
+        from flask import request as _rq, abort as _abort
+        slug = 'kuja'
+        try:
+            from app.models import Network
+            net = Network.resolve_from_host(_rq.headers.get('Host', ''))
+            if net and net.slug:
+                slug = net.slug
+        except Exception:
+            pass
+        for candidate in (f'tenants/{slug}/favicon.ico',
+                          'tenants/kuja/favicon.ico'):
+            p = os.path.join(nextjs_dir, candidate)
+            if os.path.isfile(p):
+                resp = send_from_directory(nextjs_dir, candidate)
+                resp.headers['Cache-Control'] = 'public, max-age=3600'
+                return resp
+        _abort(404)
 
     @app.route('/<path:path>')
     def catch_all(path):

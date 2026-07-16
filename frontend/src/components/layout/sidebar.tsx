@@ -36,7 +36,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useUIStore } from '@/stores/ui-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
@@ -119,18 +119,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
           sidebarCollapsed ? 'justify-center px-0' : 'px-4',
         )}
       >
-        <div
-          className="grid h-9 w-9 place-items-center rounded-lg shadow-lg flex-shrink-0"
-          style={{
-            background: network?.brand_color_hex
-              ? `linear-gradient(135deg, ${network.brand_color_hex}, ${network.brand_color_hex}DD)`
-              : 'linear-gradient(135deg, #C2410C, #7C2D12)',
-          }}
-        >
-          <span className="kuja-display text-lg text-white leading-none">
-            {(network?.name || 'Kuja').charAt(0).toUpperCase()}
-          </span>
-        </div>
+        <TenantMark key={network?.slug || 'default'} network={network} />
         {!sidebarCollapsed && (
           <div className="min-w-0">
             <div className="kuja-display text-base leading-tight text-white truncate">
@@ -453,6 +442,48 @@ function nearProfile(role: UserRole, t: T): NavProfile {
         ],
       };
   }
+}
+
+/* ----------------------------- Tenant mark ------------------------------ */
+
+function TenantMark({
+  network,
+}: {
+  network: {
+    slug?: string;
+    name?: string;
+    brand_color_hex?: string | null;
+  } | null;
+}) {
+  // Real tenant mark from /tenants/<slug>/ (Proximate's is the official
+  // brand-guide icon). Tenants without a shipped icon set fall back to
+  // the brand-colored letter block.
+  const [imgFailed, setImgFailed] = useState(false);
+  const slug = network?.slug;
+  if (slug && !imgFailed) {
+    return (
+      <img
+        src={`/tenants/${slug}/icon-192.png`}
+        alt=""
+        className="h-9 w-9 rounded-lg shadow-lg flex-shrink-0"
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+  return (
+    <div
+      className="grid h-9 w-9 place-items-center rounded-lg shadow-lg flex-shrink-0"
+      style={{
+        background: network?.brand_color_hex
+          ? `linear-gradient(135deg, ${network.brand_color_hex}, ${network.brand_color_hex}DD)`
+          : 'linear-gradient(135deg, #C2410C, #7C2D12)',
+      }}
+    >
+      <span className="kuja-display text-lg text-white leading-none">
+        {(network?.name || 'Kuja').charAt(0).toUpperCase()}
+      </span>
+    </div>
+  );
 }
 
 /* --------------------------- Proximate flavor --------------------------- */

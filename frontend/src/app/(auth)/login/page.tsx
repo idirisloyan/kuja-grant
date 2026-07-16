@@ -51,6 +51,7 @@ export default function LoginPage() {
   const tenantName = network?.name || 'Kuja';
   const tenantBrand = network?.brand_color_hex || '#C2410C';
   const tenantBrandDark = network?.brand_color_hex || '#7C2D12';
+  const [markFailed, setMarkFailed] = useState(false);
 
   useEffect(() => {
     setHydrated(true);
@@ -271,16 +272,30 @@ export default function LoginPage() {
         {/* LEFT — Brand + tagline (network-aware) */}
         <div className="lg:col-span-2 text-white space-y-5">
           <div className="flex items-center gap-3">
-            <div
-              className="grid h-12 w-12 place-items-center rounded-xl shadow-lg"
-              style={{ background: `linear-gradient(135deg, ${tenantBrand}, ${tenantBrandDark})` }}
-            >
-              <span className="kuja-display text-2xl text-white">
-                {tenantName.charAt(0).toUpperCase()}
-              </span>
-            </div>
+            {/* Real tenant mark (PF brand guide et al.); letter block
+                stays as the fallback for tenants without an icon set. */}
+            {network?.slug && !markFailed ? (
+              <img
+                key={network.slug}
+                src={`/tenants/${network.slug}/icon-192.png`}
+                alt=""
+                className="h-12 w-12 rounded-xl shadow-lg"
+                onError={() => setMarkFailed(true)}
+              />
+            ) : (
+              <div
+                className="grid h-12 w-12 place-items-center rounded-xl shadow-lg"
+                style={{ background: `linear-gradient(135deg, ${tenantBrand}, ${tenantBrandDark})` }}
+              >
+                <span className="kuja-display text-2xl text-white">
+                  {tenantName.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
             <div>
-              <div className="kuja-display text-2xl">{tenantName}</div>
+              {/* .kuja-display hardcodes ink — force white on the dark
+                  login backdrop or the tenant name is unreadable. */}
+              <div className="kuja-display text-2xl text-white">{tenantName}</div>
               <div className="text-xs text-orange-200 uppercase tracking-widest">
                 {isNetworkTenant ? 'Network fund operations' : 'Grant intelligence'}
               </div>

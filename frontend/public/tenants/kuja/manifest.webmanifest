@@ -1,0 +1,38 @@
+{
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "en",
+  "dir": "auto",
+  "categories": [
+    "productivity",
+    "business",
+    "finance"
+  ],
+  "name": "Kuja Grant Management",
+  "short_name": "Kuja",
+  "description": "AI-powered grant management for the Global South.",
+  "theme_color": "#C2410C",
+  "background_color": "#F2F6FA",
+  "icons": [
+    {
+      "src": "/tenants/kuja/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/tenants/kuja/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/tenants/kuja/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
