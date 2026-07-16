@@ -14,6 +14,7 @@ import {
   Loader2, Search, Users, ShieldCheck, AlertTriangle, Upload,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function ProximatePartnersPage() {
+  const { t } = useTranslation();
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export default function ProximatePartnersPage() {
   const load = () => {
     api.get<{ success: boolean; partners: Partner[] }>('/api/proximate/partners')
       .then((r) => setPartners(r.partners || []))
-      .catch(() => setError('Failed to load partners.'))
+      .catch(() => setError(t('proximate.partners.load_failed')))
       .finally(() => setLoading(false));
   };
 
@@ -112,13 +114,13 @@ export default function ProximatePartnersPage() {
     <PageShell>
       <PageHeader
         title="Partners"
-        subtitle="NGOs in the Proximate register — nominated, endorsed, cleared"
+        subtitle={t('proximate.partners.subtitle')}
       />
       <PageMain>
         {loading && (
           <p className="text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin inline me-2" />
-            Loading partners…
+            {t('proximate.partners.loading')}
           </p>
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -129,20 +131,20 @@ export default function ProximatePartnersPage() {
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Users className="w-4 h-4 text-muted-foreground" />
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Total</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('proximate.partners.total')}</p>
                 </div>
                 <p className="text-3xl font-semibold">{counts.all}</p>
               </Card>
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Cleared</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('proximate.partners.cleared')}</p>
                 </div>
                 <p className="text-3xl font-semibold">{counts.dd_clear || 0}</p>
               </Card>
               <Card className="p-4">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                  In review
+                  {t('proximate.partners.in_review')}
                 </p>
                 <p className="text-3xl font-semibold">
                   {(counts.endorsements_open || 0) + (counts.dd_pending || 0)}
@@ -154,7 +156,7 @@ export default function ProximatePartnersPage() {
                     className={`w-4 h-4 ${withSanctionsFlag > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
                   />
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Sanctions flags
+                    {t('proximate.partners.sanctions_flags')}
                   </p>
                 </div>
                 <p className="text-3xl font-semibold">{withSanctionsFlag}</p>
@@ -164,6 +166,15 @@ export default function ProximatePartnersPage() {
             {/* Filter bar */}
             <Card className="p-3">
               <div className="flex items-center gap-2 flex-wrap">
+                {/* QA 2026-07-15: the nomination form existed at
+                    /proximate/admin/partners/new but nothing linked to
+                    it — same navigation dead-end class as PRX-FSP-001. */}
+                <Link
+                  href="/proximate/admin/partners/new"
+                  className="inline-flex items-center gap-1 rounded-md border bg-background hover:bg-muted/40 text-sm px-3 py-1.5 font-medium"
+                >
+                  {t('proximate.partners.nominate')}
+                </Link>
                 <Button
                   size="sm" variant="outline" disabled={importing}
                   onClick={() => importRef.current?.click()}
@@ -171,7 +182,7 @@ export default function ProximatePartnersPage() {
                   {importing
                     ? <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />
                     : <Upload className="w-3.5 h-3.5 me-1" />}
-                  Import PIFs
+                  {t('proximate.partners.import_pifs')}
                 </Button>
                 <input
                   ref={importRef} type="file" multiple className="hidden"
@@ -185,7 +196,7 @@ export default function ProximatePartnersPage() {
                   <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
                     type="text"
-                    placeholder="Filter by name or locality…"
+                    placeholder={t('proximate.partners.filter_placeholder')}
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
                     className="w-full text-sm rounded-md border bg-background p-2 ps-7"
@@ -214,7 +225,7 @@ export default function ProximatePartnersPage() {
             <Card className="p-4">
               {filtered.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic py-8 text-center">
-                  No partners match your filter.
+                  {t('proximate.partners.no_match')}
                 </p>
               ) : (
                 <ul className="space-y-1.5">
@@ -244,7 +255,7 @@ export default function ProximatePartnersPage() {
                         </div>
                         {p.sanctions_flag && (
                           <Badge variant="outline" className="text-[10px] border-destructive text-destructive">
-                            sanctions flag
+                            {t('proximate.partners.sanctions_flag_badge')}
                           </Badge>
                         )}
                         {p.trust_tier && (

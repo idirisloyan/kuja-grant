@@ -137,7 +137,7 @@ export default function ProximateEndorsePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
       </div>
     );
@@ -145,7 +145,7 @@ export default function ProximateEndorsePage() {
 
   if (error && !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white p-4" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" dir={isRtl ? 'rtl' : 'ltr'}>
         <div className="max-w-md w-full text-center">
           <AlertTriangle className="w-10 h-10 mx-auto text-red-500 mb-3" />
           <h1 className="text-xl font-bold mb-2">{t('proximate.endorse.error_title') || 'Could not load'}</h1>
@@ -158,7 +158,7 @@ export default function ProximateEndorsePage() {
   // --- View: SUCCESS ----
   if (view === 'success') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white p-4" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" dir={isRtl ? 'rtl' : 'ltr'}>
         <div className="max-w-md w-full text-center">
           <CheckCircle2 className="w-16 h-16 mx-auto text-emerald-600 mb-4" />
           <h1 className="text-2xl font-bold mb-3">
@@ -226,7 +226,7 @@ export default function ProximateEndorsePage() {
             className={`h-16 rounded-lg text-lg font-bold border-2 ${
               answer === true
                 ? 'bg-emerald-600 border-emerald-700 text-white'
-                : 'bg-white border-gray-300 text-gray-700 hover:border-emerald-500'
+                : 'bg-card border-input text-foreground hover:border-emerald-500'
             }`}
           >
             {t('proximate.endorse.yes') || 'نعم'}
@@ -237,7 +237,7 @@ export default function ProximateEndorsePage() {
             className={`h-16 rounded-lg text-lg font-bold border-2 ${
               answer === false
                 ? 'bg-red-600 border-red-700 text-white'
-                : 'bg-white border-gray-300 text-gray-700 hover:border-red-500'
+                : 'bg-card border-input text-foreground hover:border-red-500'
             }`}
           >
             {t('proximate.endorse.no') || 'لا'}
@@ -270,7 +270,7 @@ export default function ProximateEndorsePage() {
     );
 
     return (
-      <div className="min-h-screen bg-white p-4 sm:p-6" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="min-h-screen bg-background p-4 sm:p-6" dir={isRtl ? 'rtl' : 'ltr'}>
         <div className="max-w-md mx-auto">
           {/* Tiny breadcrumb back — no full app nav */}
           <button
@@ -349,7 +349,7 @@ export default function ProximateEndorsePage() {
   const pending = data?.pending_endorsements || [];
 
   return (
-    <div className="min-h-screen bg-white p-4 sm:p-6" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen bg-background p-4 sm:p-6" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="max-w-md mx-auto">
         <h1 className="text-2xl font-bold mb-1">
           {t('proximate.endorse.list_title') || 'التزكيات المطلوبة منك'}

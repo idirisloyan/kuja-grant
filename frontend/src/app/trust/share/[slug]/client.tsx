@@ -144,7 +144,7 @@ function ShareInner() {
                 variant="outline"
                 size="sm"
                 onClick={() => window.print()}
-                className="bg-white"
+                className="bg-background"
               >
                 <Printer className="h-3.5 w-3.5 mr-1.5" />
                 Print

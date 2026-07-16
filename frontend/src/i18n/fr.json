@@ -2772,5 +2772,19 @@
   "proximate.disbursements.select_method": "Sélectionnez le mode de paiement",
   "proximate.disbursements.ob_only_title": "Cette page est réservée à l’organe de supervision.",
   "proximate.disbursements.ob_only_body": "L’enregistrement des décaissements est géré par le secrétariat d’Adeso.",
-  "proximate.admin.bank_verify_needs_method": "Ajoutez un mode de paiement ci-dessous avant de vérifier."
+  "proximate.admin.bank_verify_needs_method": "Ajoutez un mode de paiement ci-dessous avant de vérifier.",
+  "proximate.donor.follow": "Suivre",
+  "proximate.donor.following": "Suivi ✓",
+  "proximate.partners.subtitle": "ONG du registre Proximate — nommées, recommandées, validées",
+  "proximate.partners.loading": "Chargement des partenaires…",
+  "proximate.partners.load_failed": "Échec du chargement des partenaires.",
+  "proximate.partners.total": "Total",
+  "proximate.partners.cleared": "Validées",
+  "proximate.partners.in_review": "En examen",
+  "proximate.partners.sanctions_flags": "Alertes sanctions",
+  "proximate.partners.filter_placeholder": "Filtrer par nom ou localité…",
+  "proximate.partners.no_match": "Aucun partenaire ne correspond au filtre.",
+  "proximate.partners.import_pifs": "Importer des PIF",
+  "proximate.partners.nominate": "Nommer un partenaire",
+  "proximate.partners.sanctions_flag_badge": "alerte sanctions"
 }

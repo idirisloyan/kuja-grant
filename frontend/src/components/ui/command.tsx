@@ -60,7 +60,13 @@ function CommandDialog({
         )}
         showCloseButton={showCloseButton}
       >
-        {children}
+        {/* QA 2026-07-15 (search crash): CommandInput/List/Item are cmdk
+            children that read the store from the Command root's context.
+            This wrapper variant passed children straight into the dialog
+            with no root, so opening the palette threw "Cannot read
+            properties of undefined (reading 'subscribe')" and took down
+            the page. Children must always mount inside <Command>. */}
+        <Command>{children}</Command>
       </DialogContent>
     </Dialog>
   )

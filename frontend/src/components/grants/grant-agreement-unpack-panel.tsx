@@ -183,7 +183,7 @@ export function GrantAgreementUnpackPanel({
     return (
       <Card className="p-4 border-l-4 border-l-[hsl(var(--kuja-spark))] bg-[hsl(var(--kuja-spark-soft))]">
         <div className="flex items-start gap-3">
-          <div className="p-2 rounded-md bg-white">
+          <div className="p-2 rounded-md bg-card">
             <Wand2 className="w-5 h-5 text-[hsl(var(--kuja-spark))]" />
           </div>
           <div className="flex-1 min-w-0">

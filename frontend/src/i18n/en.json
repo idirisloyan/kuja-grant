@@ -2772,5 +2772,19 @@
   "proximate.disbursements.select_method": "Select the payment route",
   "proximate.disbursements.ob_only_title": "This page is for the Oversight Body.",
   "proximate.disbursements.ob_only_body": "Recording disbursements is handled by the Adeso secretariat.",
-  "proximate.admin.bank_verify_needs_method": "Add a payment route below before verifying."
+  "proximate.admin.bank_verify_needs_method": "Add a payment route below before verifying.",
+  "proximate.donor.follow": "Follow",
+  "proximate.donor.following": "Following ✓",
+  "proximate.partners.subtitle": "NGOs in the Proximate register — nominated, endorsed, cleared",
+  "proximate.partners.loading": "Loading partners…",
+  "proximate.partners.load_failed": "Failed to load partners.",
+  "proximate.partners.total": "Total",
+  "proximate.partners.cleared": "Cleared",
+  "proximate.partners.in_review": "In review",
+  "proximate.partners.sanctions_flags": "Sanctions flags",
+  "proximate.partners.filter_placeholder": "Filter by name or locality…",
+  "proximate.partners.no_match": "No partners match your filter.",
+  "proximate.partners.import_pifs": "Import PIFs",
+  "proximate.partners.nominate": "Nominate partner",
+  "proximate.partners.sanctions_flag_badge": "sanctions flag"
 }

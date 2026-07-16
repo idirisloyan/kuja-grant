@@ -2772,5 +2772,19 @@
   "proximate.disbursements.select_method": "اختر وسيلة الدفع",
   "proximate.disbursements.ob_only_title": "هذه الصفحة مخصّصة لهيئة الرقابة.",
   "proximate.disbursements.ob_only_body": "يتولّى تسجيل عمليات الصرف أمانة أديسو.",
-  "proximate.admin.bank_verify_needs_method": "أضف وسيلة دفع أدناه قبل التحقق."
+  "proximate.admin.bank_verify_needs_method": "أضف وسيلة دفع أدناه قبل التحقق.",
+  "proximate.donor.follow": "متابعة",
+  "proximate.donor.following": "تتم المتابعة ✓",
+  "proximate.partners.subtitle": "المنظمات في سجل الصندوق — مرشّحة، موصى بها، مجازة",
+  "proximate.partners.loading": "جارٍ تحميل الشركاء…",
+  "proximate.partners.load_failed": "تعذّر تحميل الشركاء.",
+  "proximate.partners.total": "الإجمالي",
+  "proximate.partners.cleared": "مجازة",
+  "proximate.partners.in_review": "قيد المراجعة",
+  "proximate.partners.sanctions_flags": "إشارات العقوبات",
+  "proximate.partners.filter_placeholder": "تصفية بالاسم أو المنطقة…",
+  "proximate.partners.no_match": "لا يوجد شركاء مطابقون للتصفية.",
+  "proximate.partners.import_pifs": "استيراد نماذج PIF",
+  "proximate.partners.nominate": "ترشيح شريك",
+  "proximate.partners.sanctions_flag_badge": "إشارة عقوبات"
 }

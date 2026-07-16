@@ -71,6 +71,46 @@ Updated 2026-07-05.
 - [ ] Railway daily Postgres backups enabled, 30-day retention
       (Phase 720 in the Proximate file covers the R2 pg_dump cron)
 
+### i18n Tier-2: admin/secondary surfaces still English-only
+- **last_touched:** 2026-07-15 (QA "incomplete translation" finding)
+- Ground truth after the 2026-07-15 audit: all six public/token-holder
+  journeys (Proximate endorse/verify/report/outcome tokens, donor
+  journey, OB journey) and the primary app surfaces ARE translated
+  (2,788 keys × en/ar/fr/es/sw/so, parity-tested). Tier 1 of the QA fix
+  added `proximate.partners.*` + donor follow keys and wired the
+  Proximate partners list. What remains is 24 substantive files with
+  zero `t()` wiring — overwhelmingly internal admin/ops consoles where
+  English is acceptable short-term but should be wired for consistency:
+  - `app/(app)/admin/metrics/page.tsx` (~22 strings)
+  - `app/(app)/admin/crisis-monitoring/[id]/client.tsx` (~20)
+  - `app/(app)/admin/ai-cost/page.tsx` (~14)
+  - `app/(app)/admin/tenant-health/page.tsx` (~11)
+  - `app/(app)/settings/webhooks/page.tsx` (~11)
+  - `app/(app)/admin/audit-chain/page.tsx` (~10)
+  - `app/(app)/admin/crisis-monitoring/page.tsx` (~10)
+  - `app/(app)/admin/network-memberships/[id]/client.tsx` (~10)
+  - `app/(app)/admin/declarations/[id]/client.tsx` (~9)
+  - `app/(app)/admin/ai-telemetry/page.tsx` (~8)
+  - `app/(app)/admin/reviewers-workload/page.tsx` (~8)
+  - `app/(app)/admin/ai-quality/page.tsx` (~7)
+  - `app/(app)/admin/network-memberships/page.tsx` (~7)
+  - `app/(app)/admin/windows/[id]/report/client.tsx` (~6)
+  - `app/(app)/donors/[id]/client.tsx` (~6) ← user-facing, do first
+  - `app/(app)/ngo/[id]/client.tsx` (~6) ← user-facing, do first
+  - `app/(app)/admin/cost-ceiling/page.tsx` (~5)
+  - `app/(app)/network/directory/page.tsx` (~5) ← user-facing
+  - `app/(app)/network/join/page.tsx` (~5) ← user-facing
+  - `app/(app)/proximate/admin/grants/[grantId]/client.tsx` (~5, OB-only)
+  - `app/(app)/settings/notifications/page.tsx` (~5) ← user-facing
+  - `app/(app)/admin/reviews-bulk/page.tsx` (~4)
+  - `app/(app)/calendar/page.tsx` (~4) ← user-facing
+  - `app/(app)/admin/cron-health/page.tsx` (~3)
+- Suggested order: the 7 user-facing files first (donors/ngo detail,
+  network directory/join, notifications settings, calendar, Proximate
+  grant detail), then admin consoles in descending string count.
+- Also untranslated by design so far: the OB sidebar labels and dynamic
+  import-result notes ("Imported N new partners…") on the partners page.
+
 ### Shared-service items tracked in tenant files (pointers)
 - WhatsApp Cloud API (Phase 717 a–d) — filed under Proximate because it
   ships there first, but the send helper + templates + inbox are

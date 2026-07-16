@@ -318,7 +318,7 @@ export default function LoginPage() {
 
         {/* RIGHT — Login card */}
         <div className="lg:col-span-3">
-          <div className="rounded-2xl bg-white/95 backdrop-blur border border-white/20 shadow-2xl p-6 lg:p-8">
+          <div className="rounded-2xl bg-card/95 backdrop-blur border border-border/40 shadow-2xl p-6 lg:p-8">
             {/* Phase 708 — Tenant switcher above the heading. Flips
                 branding + demo accounts in place; localStorage carries
                 X-Network-Override on every subsequent API call. */}

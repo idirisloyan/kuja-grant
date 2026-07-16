@@ -2772,5 +2772,19 @@
   "proximate.disbursements.select_method": "Seleccione la vía de pago",
   "proximate.disbursements.ob_only_title": "Esta página es para el Órgano de Supervisión.",
   "proximate.disbursements.ob_only_body": "El registro de los desembolsos lo gestiona la secretaría de Adeso.",
-  "proximate.admin.bank_verify_needs_method": "Agregue una vía de pago abajo antes de verificar."
+  "proximate.admin.bank_verify_needs_method": "Agregue una vía de pago abajo antes de verificar.",
+  "proximate.donor.follow": "Seguir",
+  "proximate.donor.following": "Siguiendo ✓",
+  "proximate.partners.subtitle": "ONG en el registro de Proximate — nominadas, avaladas, aprobadas",
+  "proximate.partners.loading": "Cargando socios…",
+  "proximate.partners.load_failed": "No se pudieron cargar los socios.",
+  "proximate.partners.total": "Total",
+  "proximate.partners.cleared": "Aprobadas",
+  "proximate.partners.in_review": "En revisión",
+  "proximate.partners.sanctions_flags": "Alertas de sanciones",
+  "proximate.partners.filter_placeholder": "Filtrar por nombre o localidad…",
+  "proximate.partners.no_match": "Ningún socio coincide con el filtro.",
+  "proximate.partners.import_pifs": "Importar PIF",
+  "proximate.partners.nominate": "Nominar socio",
+  "proximate.partners.sanctions_flag_badge": "alerta de sanciones"
 }

@@ -2772,5 +2772,19 @@
   "proximate.disbursements.select_method": "Chagua njia ya malipo",
   "proximate.disbursements.ob_only_title": "Ukurasa huu ni wa Chombo cha Usimamizi.",
   "proximate.disbursements.ob_only_body": "Kurekodi malipo hushughulikiwa na sekretarieti ya Adeso.",
-  "proximate.admin.bank_verify_needs_method": "Ongeza njia ya malipo hapa chini kabla ya kuthibitisha."
+  "proximate.admin.bank_verify_needs_method": "Ongeza njia ya malipo hapa chini kabla ya kuthibitisha.",
+  "proximate.donor.follow": "Fuata",
+  "proximate.donor.following": "Unafuata ✓",
+  "proximate.partners.subtitle": "Mashirika kwenye rejista ya Proximate — yaliyopendekezwa, kuthibitishwa, kupitishwa",
+  "proximate.partners.loading": "Inapakia washirika…",
+  "proximate.partners.load_failed": "Imeshindikana kupakia washirika.",
+  "proximate.partners.total": "Jumla",
+  "proximate.partners.cleared": "Zimepitishwa",
+  "proximate.partners.in_review": "Inakaguliwa",
+  "proximate.partners.sanctions_flags": "Alama za vikwazo",
+  "proximate.partners.filter_placeholder": "Chuja kwa jina au eneo…",
+  "proximate.partners.no_match": "Hakuna washirika wanaolingana na kichujio.",
+  "proximate.partners.import_pifs": "Leta PIF",
+  "proximate.partners.nominate": "Pendekeza mshirika",
+  "proximate.partners.sanctions_flag_badge": "alama ya vikwazo"
 }

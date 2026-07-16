@@ -2772,5 +2772,19 @@
   "proximate.disbursements.select_method": "Dooro dariiqa lacag-bixinta",
   "proximate.disbursements.ob_only_title": "Boggani waxa uu u yaal Hay'adda Kormeerka.",
   "proximate.disbursements.ob_only_body": "Diiwaangelinta lacag-bixinta waxaa maamula xoghayaha Adeso.",
-  "proximate.admin.bank_verify_needs_method": "Ku dar dariiq lacag-bixineed hoosta ka hor inta aadan xaqiijin."
+  "proximate.admin.bank_verify_needs_method": "Ku dar dariiq lacag-bixineed hoosta ka hor inta aadan xaqiijin.",
+  "proximate.donor.follow": "Raac",
+  "proximate.donor.following": "Waad raacaysaa ✓",
+  "proximate.partners.subtitle": "Hay’adaha diiwaanka Proximate — la magacaabay, la taageeray, la oggolaaday",
+  "proximate.partners.loading": "Waxaa soo dhacaya wadaagayaasha…",
+  "proximate.partners.load_failed": "Wadaagayaasha lama soo rarin.",
+  "proximate.partners.total": "Wadarta",
+  "proximate.partners.cleared": "La oggolaaday",
+  "proximate.partners.in_review": "Dib-u-eegis",
+  "proximate.partners.sanctions_flags": "Calaamado cunaqabateyn",
+  "proximate.partners.filter_placeholder": "Ku shaandhee magac ama degaan…",
+  "proximate.partners.no_match": "Ma jiraan wadaagayaal u dhigma shaandhada.",
+  "proximate.partners.import_pifs": "Soo dejin PIF",
+  "proximate.partners.nominate": "Magacaw wadaage",
+  "proximate.partners.sanctions_flag_badge": "calaamad cunaqabateyn"
 }

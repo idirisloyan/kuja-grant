@@ -88,6 +88,10 @@ export function ProximateDonorClient() {
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // QA 2026-07-15 gap closure — the subscribe/unsubscribe endpoints
+  // existed but the donor UI had no control. null = not touched yet;
+  // falls back to the server-reported list.
+  const [subscribedIds, setSubscribedIds] = useState<number[] | null>(null);
 
   useEffect(() => {
     api
@@ -139,6 +143,23 @@ export function ProximateDonorClient() {
   }
 
   const { donor, rounds, portfolio, using_fallback_listing } = data;
+  const followedIds = subscribedIds ?? donor.subscribed_round_ids ?? [];
+
+  const toggleFollow = async (roundId: number) => {
+    const following = followedIds.includes(roundId);
+    const next = following
+      ? followedIds.filter((x) => x !== roundId)
+      : [...followedIds, roundId];
+    setSubscribedIds(next);
+    try {
+      await api.post(
+        `/api/proximate/donors/me/${following ? 'unsubscribe' : 'subscribe'}`,
+        { round_ids: [roundId] },
+      );
+    } catch {
+      setSubscribedIds(followedIds);
+    }
+  };
   // Phase 697 — divide by outcome_total (number of obligation rows),
   // NOT disbursement_count. Matches the per-round card's math so the
   // top-card and round-card percentages can't drift apart.
@@ -239,6 +260,15 @@ export function ProximateDonorClient() {
                     )}
                   </p>
                 </div>
+                <Button
+                  size="sm"
+                  variant={followedIds.includes(r.id) ? 'secondary' : 'outline'}
+                  onClick={() => toggleFollow(r.id)}
+                >
+                  {followedIds.includes(r.id)
+                    ? t('proximate.donor.following')
+                    : t('proximate.donor.follow')}
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
