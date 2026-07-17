@@ -9730,6 +9730,11 @@ def _package_view(pkg, *, for_donor):
     items = pkg.items
     if for_donor:
         items = [i for i in items if i.donor_visible]
+    item_dicts = [i.to_dict() for i in items]
+    if for_donor:
+        # change_request is an internal OB<->partner note.
+        for d in item_dicts:
+            d.pop('change_request', None)
     return {
         'package': pkg.to_dict(include_token=not for_donor),
         'partner': {'id': partner.id, 'name': partner.name,
@@ -9737,7 +9742,7 @@ def _package_view(pkg, *, for_donor):
                     'locality': partner.locality} if partner else None,
         'round': {'id': rnd.id, 'title': rnd.title} if rnd else None,
         'activities': [a.to_dict() for a in acts],
-        'items': [i.to_dict() for i in items],
+        'items': item_dicts,
         'voice_questions': [
             {'key': k, 'label': lbl} for k, lbl in VOICE_QUESTIONS
         ],
@@ -9795,6 +9800,13 @@ def api_edit_report_package(package_id):
     body = get_request_json() or {}
     if isinstance(body.get('narrative'), dict):
         pkg.narrative_json = _json.dumps(body['narrative'])
+    if 'exchange_rate' in body:
+        # spend_currency units per 1 USD; null/0 clears it.
+        try:
+            rate = float(body.get('exchange_rate') or 0)
+        except (TypeError, ValueError):
+            rate = 0
+        pkg.exchange_rate = rate if rate > 0 else None
     db.session.commit()
     return jsonify({'success': True, 'package': pkg.to_dict(include_token=True)})
 
@@ -9885,6 +9897,17 @@ def api_review_report_item(package_id, item_id):
         )
     if 'caption' in body:
         item.caption = (body.get('caption') or '').strip()[:500] or None
+    if 'change_request' in body:
+        note = (body.get('change_request') or '').strip()[:500] or None
+        item.change_request = note
+        AuditChainEntry.append(
+            action='proximate.report_package.item_change_request',
+            actor_email=current_user.email,
+            subject_kind='proximate_report_package',
+            subject_id=pkg.id,
+            details={'item_id': item.id, 'kind': item.kind,
+                     'flagged': bool(note)},
+        )
     db.session.commit()
     return jsonify({'success': True, 'item': item.to_dict()})
 
@@ -10012,31 +10035,63 @@ def api_report_package_pdf(package_id):
     buf = BytesIO()
     c = _canvas.Canvas(buf, pagesize=A4)
     W, H = A4
+    BRAND = (0xFC / 255, 0x58 / 255, 0x10 / 255)  # PF orange #FC5810
+    INK = (0.13, 0.12, 0.11)
     y = H - 20 * mm
 
-    def _line(text, size=10, bold=False, gap=5.2):
+    def _line(text, size=10, bold=False, gap=5.2, color=INK):
         nonlocal y
         if y < 25 * mm:
             c.showPage()
             y = H - 20 * mm
+        c.setFillColorRGB(*color)
         c.setFont('Helvetica-Bold' if bold else 'Helvetica', size)
         for chunk in ([text[i:i + 100] for i in range(0, len(text), 100)]
                       or ['']):
             c.drawString(20 * mm, y, chunk)
             y -= gap * mm
+        c.setFillColorRGB(*INK)
+
+    def _section(title):
+        nonlocal y
+        if y < 35 * mm:
+            c.showPage()
+            y = H - 20 * mm
+        _line(title, 12, bold=True, color=BRAND)
+        c.setStrokeColorRGB(*BRAND)
+        c.setLineWidth(0.8)
+        c.line(20 * mm, y + 2.5 * mm, W - 20 * mm, y + 2.5 * mm)
+        y -= 1.5 * mm
 
     partner = view['partner'] or {}
     rnd = view['round'] or {}
-    _line('Proximate Fund — Partner Implementation Report', 15, bold=True, gap=8)
-    _line(f"{partner.get('name', '')} — {rnd.get('title', '')}", 11, bold=True)
-    _line(f"Status: {pkg.status}   Published: {pkg.published_at or '—'}", 9)
+
+    # Brand header band.
+    band_h = 30 * mm
+    c.setFillColorRGB(*BRAND)
+    c.rect(0, H - band_h, W, band_h, stroke=0, fill=1)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont('Helvetica-Bold', 16)
+    c.drawString(20 * mm, H - 13 * mm, 'Proximate Fund')
+    c.setFont('Helvetica', 11)
+    c.drawString(20 * mm, H - 19 * mm, 'Partner Implementation Report')
+    c.setFont('Helvetica', 9)
+    when = pkg.published_at or pkg.submitted_at
+    c.drawRightString(W - 20 * mm, H - 13 * mm,
+                      when.strftime('%d %b %Y') if when else '')
+    c.setFillColorRGB(*INK)
+    y = H - band_h - 10 * mm
+    _line(f"{partner.get('name', '')} — {rnd.get('title', '')}", 12, bold=True)
+    _line(f"Status: {pkg.status}"
+          + (f"   Locality: {partner.get('locality')}"
+             if partner.get('locality') else ''), 9, color=(0.45, 0.43, 0.42))
     y -= 3 * mm
     if narrative.get('summary_en'):
-        _line('Summary', 12, bold=True)
+        _section('Summary')
         _line(narrative['summary_en'], 10)
         y -= 2 * mm
     for sec in (narrative.get('sections') or [])[:8]:
-        _line(sec.get('title_en', ''), 11, bold=True)
+        _section(sec.get('title_en', ''))
         _line(sec.get('body_en', ''), 9.5)
         y -= 2 * mm
 
@@ -10044,7 +10099,11 @@ def api_report_package_pdf(package_id):
     acts = {str(a['id']): a for a in view['activities']}
     blocks = (answers.get('activities') or {})
     if blocks:
-        _line('Financials (actual vs approved)', 12, bold=True)
+        rate = pkg.exchange_rate
+        _section('Financials (actual vs approved)')
+        if rate:
+            _line(f'Rate used: {rate:,.0f} {pkg.spend_currency} per 1 USD',
+                  8.5, color=(0.45, 0.43, 0.42))
         for aid, block in blocks.items():
             approved = acts.get(aid, {})
             _line(approved.get('name', 'General activity'), 10, bold=True)
@@ -10052,7 +10111,9 @@ def api_report_package_pdf(package_id):
                               for l in approved.get('budget_lines', [])}
             for label, amount in (block.get('spend') or {}).items():
                 app_amt = approved_lines.get(label)
-                _line(f'  {label}: {amount:,.0f} {pkg.spend_currency}'
+                # ~ not U+2248: reportlab base fonts are Latin-1 only.
+                usd = f'  ~ {amount / rate:,.0f} USD' if rate else ''
+                _line(f'  {label}: {amount:,.0f} {pkg.spend_currency}{usd}'
                       + (f'  (approved {app_amt:,.0f} USD)'
                          if app_amt is not None else ''), 9)
             if block.get('people_reached') is not None:
@@ -10063,7 +10124,7 @@ def api_report_package_pdf(package_id):
     photos = [i for i in view['items'] if i['kind'] == 'photo'][:6]
     others = [i for i in view['items'] if i['kind'] != 'photo']
     if photos:
-        _line('Photo evidence', 12, bold=True)
+        _section('Photo evidence')
         x = 20 * mm
         thumb = 50 * mm
         for it in photos:
@@ -10091,7 +10152,7 @@ def api_report_package_pdf(package_id):
                 y -= thumb + 8 * mm
         y -= thumb + 8 * mm
     if others:
-        _line('Other evidence', 12, bold=True)
+        _section('Other evidence')
         for it in others[:20]:
             _line(f"  [{it['kind']}] {it.get('caption') or it.get('filename', '')}", 9)
 
@@ -10278,6 +10339,9 @@ def api_submit_report_package(token):
     pkg.status = 'submitted'
     pkg.submitted_at = datetime.now(timezone.utc)
     pkg.ob_notes = None
+    # Resubmission answers the OB's per-item fix requests — clear them.
+    for it in pkg.items:
+        it.change_request = None
     db.session.commit()
     try:
         from app.utils.background import submit_task
@@ -10344,8 +10408,11 @@ def api_report_item_file(item_id):
     )
     if not os.path.exists(filepath):
         return jsonify({'success': False, 'error': 'file missing'}), 404
+    # conditional=True enables HTTP Range (206) so videos and long voice
+    # notes scrub instead of downloading whole.
     return send_file(filepath, mimetype=item.document.mime_type,
-                     download_name=item.document.original_filename)
+                     download_name=item.document.original_filename,
+                     conditional=True)
 
 
 @proximate_bp.route('/partners/import-pif', methods=['POST'])

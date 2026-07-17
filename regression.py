@@ -961,6 +961,27 @@ def run_proximate_rbac(base):
         item = up.json()["item"]
         assert item["donor_visible"] is False, "media not internal by default!"
 
+        # OB flags the item with a per-item fix request; the partner's
+        # token view carries the note.
+        fl = ob.request("PATCH",
+                        f"{base}/api/proximate/report-packages/{pkg_id}/items/{item['id']}",
+                        json={"change_request": "Please retake in daylight"},
+                        headers=_hdrs(OV), timeout=15)
+        assert fl.status_code == 200, f"item flag -> {fl.status_code}"
+        assert fl.json()["item"]["change_request"] == "Please retake in daylight"
+        pv = anon.get(f"{base}/api/proximate/report-package/{tok}",
+                      headers=H, timeout=15)
+        assert "Please retake in daylight" in pv.text, \
+            "flag missing from partner token view"
+
+        # OB sets the exchange rate (spend_currency per USD)
+        xr = ob.request("PATCH",
+                        f"{base}/api/proximate/report-packages/{pkg_id}",
+                        json={"exchange_rate": 2500}, headers=_hdrs(OV),
+                        timeout=15)
+        assert xr.status_code == 200 and \
+            xr.json()["package"]["exchange_rate"] == 2500, "rate not stored"
+
         # donor subscribes to the round so scope passes — still DENIED
         # pre-publish.
         donor.post(f"{base}/api/proximate/donors/me/subscribe",
@@ -975,6 +996,12 @@ def run_proximate_rbac(base):
         assert sub.status_code == 200, f"submit -> {sub.status_code}"
         assert anon.post(f"{base}/api/proximate/report-package/{tok}/submit",
                          headers=H, timeout=15).status_code == 409
+        # resubmission clears per-item fix requests
+        ob_view = get(ob, base, f"/api/proximate/report-packages/{pkg_id}",
+                      override=OV).json()
+        assert all(not i.get("change_request")
+                   for i in ob_view.get("items", [])), \
+            "change_request not cleared on submit"
 
         # OB approves the photo for donor eyes + publishes
         vis = ob.request("PATCH",
@@ -1004,6 +1031,11 @@ def run_proximate_rbac(base):
         pdf = get(ob, base, f"/api/proximate/report-packages/{pkg_id}/pdf",
                   override=OV)
         assert pdf.status_code in (200, 503), f"pdf -> {pdf.status_code}"
+        # Range request on the evidence file -> 206 partial (video scrub)
+        rg = ob.get(f"{base}/api/proximate/report-items/{item['id']}/file",
+                    headers={**_hdrs(OV), "Range": "bytes=0-9"}, timeout=15)
+        assert rg.status_code == 206, f"range -> {rg.status_code}"
+        assert len(rg.content) == 10, f"range bytes -> {len(rg.content)}"
     check("report package: token fill + safeguarding gate + publish flow",
           report_package_flow)
 

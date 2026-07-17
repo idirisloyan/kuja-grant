@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Loader2, ArrowLeft, Sparkles, Eye, EyeOff, Send, Undo2, FileDown,
+  Loader2, ArrowLeft, Sparkles, Eye, EyeOff, Send, Undo2, FileDown, Flag,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
@@ -31,7 +31,8 @@ interface Activity {
 interface Item {
   id: number; kind: string; caption: string | null;
   question_key: string | null; transcript: string | null;
-  donor_visible: boolean; filename: string | null; mime_type: string | null;
+  donor_visible: boolean; change_request?: string | null;
+  filename: string | null; mime_type: string | null;
 }
 interface Section {
   title_en?: string; title_ar?: string; body_en?: string; body_ar?: string;
@@ -49,7 +50,8 @@ interface PkgView {
         spend?: Record<string, number>;
       }>;
     };
-    spend_currency: string; narrative: Narrative | null;
+    spend_currency: string; exchange_rate: number | null;
+    narrative: Narrative | null;
     ob_notes: string | null; published_at: string | null;
   };
   partner?: { name: string; name_ar: string | null; locality: string | null };
@@ -77,6 +79,7 @@ export function ProximateReportPackageClient() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [notes, setNotes] = useState('');
+  const [rateInput, setRateInput] = useState('');
   const [narrative, setNarrative] = useState<Narrative | null>(null);
   const { persona } = useProximatePersona();
   // Same rule as the round page: only a real OB is an operator here.
@@ -94,6 +97,8 @@ export function ProximateReportPackageClient() {
       .then((r) => {
         setData(r);
         setNarrative(r.package?.narrative || null);
+        setRateInput(r.package?.exchange_rate
+          ? String(r.package.exchange_rate) : '');
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false));
@@ -137,6 +142,33 @@ export function ProximateReportPackageClient() {
 
   const setNarrativeField = (patch: Partial<Narrative>) =>
     setNarrative((n) => ({ ...(n || {}), ...patch }));
+
+  // Per-item fix request. A prompt keeps this one tap on an OB-only
+  // surface; the note lands on the partner's token page.
+  const flagItem = (it: Item) => {
+    const note = window.prompt(
+      'What should the partner fix on this item? (leave empty to clear)',
+      it.change_request || '');
+    if (note === null) return;
+    act(`flag${it.id}`, () =>
+      api.patch(`/api/proximate/report-packages/${pkg.id}/items/${it.id}`,
+                { change_request: note }));
+  };
+
+  const flagButton = (it: Item) => isOperator && (
+    <button
+      type="button" onClick={() => flagItem(it)}
+      title={it.change_request
+        ? `Fix requested: ${it.change_request}` : 'Request a fix from the partner'}
+      className={`shrink-0 inline-flex items-center gap-0.5 px-1 py-0.5 rounded border text-[9px] ${
+        it.change_request
+          ? 'bg-amber-50 text-amber-800 border-amber-300'
+          : 'bg-muted text-muted-foreground border-border'}`}
+    >
+      <Flag className="w-3 h-3" />
+      {it.change_request ? 'Flagged' : 'Flag'}
+    </button>
+  );
 
   return (
     <div className="max-w-3xl mx-auto space-y-4 p-4 md:p-6">
@@ -251,7 +283,36 @@ export function ProximateReportPackageClient() {
       {/* Financials */}
       {blocks.length > 0 && (
         <Card className="p-4 space-y-2">
-          <h2 className="text-sm font-semibold">Financials — actual vs approved</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-sm font-semibold flex-1">
+              Financials — actual vs approved
+            </h2>
+            {isOperator && (
+              <div className="flex items-center gap-1 text-[11px]">
+                <span className="text-muted-foreground">
+                  {pkg.spend_currency}/USD
+                </span>
+                <input
+                  type="number" inputMode="decimal" min={0}
+                  value={rateInput} placeholder="rate"
+                  onChange={(e) => setRateInput(e.target.value)}
+                  className="w-20 rounded-md border bg-background px-1.5 py-1 text-xs"
+                />
+                <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]"
+                  disabled={busy === 'rate'}
+                  onClick={() => act('rate', () =>
+                    api.patch(`/api/proximate/report-packages/${pkg.id}`,
+                              { exchange_rate: rateInput ? Number(rateInput) : null }))}>
+                  {busy === 'rate' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Set rate'}
+                </Button>
+              </div>
+            )}
+            {!isOperator && pkg.exchange_rate ? (
+              <span className="text-[10px] text-muted-foreground">
+                Rate: {Number(pkg.exchange_rate).toLocaleString()} {pkg.spend_currency}/USD
+              </span>
+            ) : null}
+          </div>
           {blocks.map(([aid, block]) => {
             const approved = actsById.get(aid);
             const approvedLines = new Map(
@@ -271,6 +332,11 @@ export function ProximateReportPackageClient() {
                     <span className="tabular-nums">
                       {Number(amount).toLocaleString()} {pkg.spend_currency}
                     </span>
+                    {pkg.exchange_rate ? (
+                      <span className="text-muted-foreground tabular-nums">
+                        ≈ {Math.round(Number(amount) / pkg.exchange_rate).toLocaleString()} USD
+                      </span>
+                    ) : null}
                     {approvedLines.has(label) && (
                       <span className="text-muted-foreground tabular-nums">
                         / approved {Number(approvedLines.get(label)).toLocaleString()} USD
@@ -323,7 +389,13 @@ export function ProximateReportPackageClient() {
                       {it.donor_visible ? 'Donor' : 'Internal'}
                     </button>
                   )}
+                  {flagButton(it)}
                 </figcaption>
+                {it.change_request && isOperator && (
+                  <p className="px-1.5 pb-1.5 text-[9px] text-amber-700">
+                    Fix requested: {it.change_request}
+                  </p>
+                )}
               </figure>
             ))}
           </div>
@@ -349,7 +421,13 @@ export function ProximateReportPackageClient() {
                   {it.donor_visible ? 'Donor-visible' : 'Internal'}
                 </button>
               )}
+              {flagButton(it)}
             </div>
+            {it.change_request && isOperator && (
+              <p className="text-[10px] text-amber-700">
+                Fix requested: {it.change_request}
+              </p>
+            )}
           </div>
         ))}
         {voices.length > 0 && isOperator && (
@@ -393,6 +471,7 @@ export function ProximateReportPackageClient() {
                 {it.donor_visible ? 'Donor-visible' : 'Internal'}
               </button>
             )}
+            {flagButton(it)}
           </div>
         ))}
         {items.length === 0 && (

@@ -24,6 +24,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 import { SelectionVoteCard } from '@/components/proximate/selection-vote-card';
 import { ReportPackagesCard } from '@/components/proximate/report-packages-card';
+import { ApprovedActivitiesCard } from '@/components/proximate/approved-activities-card';
 import {
   ProximateAttachmentsPanel, PanelRosterPanel,
 } from '@/components/proximate/dd-evidence';
@@ -1020,6 +1021,15 @@ export function ProximateRoundDetailClient() {
           {/* Partner report packages — phone links + review queue. */}
           {isOperator && participants.length > 0 && (
             <ReportPackagesCard
+              roundId={Number(roundId)}
+              participants={participants}
+              isOperator={isOperator}
+            />
+          )}
+
+          {/* Approved activities — the reporting baseline per partner. */}
+          {isOperator && participants.length > 0 && (
+            <ApprovedActivitiesCard
               roundId={Number(roundId)}
               participants={participants}
               isOperator={isOperator}

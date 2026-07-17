@@ -29,6 +29,7 @@ interface Activity {
 interface Item {
   id: number; kind: string; caption: string | null;
   question_key: string | null; filename: string | null;
+  change_request?: string | null;
   transcript?: string | null;
 }
 interface VoiceQ { key: string; label: string }
@@ -406,6 +407,12 @@ export default function ProximateReportPackagePage() {
                     </button>
                   </>
                 )}
+                {answered.filter((i) => i.change_request).map((i) => (
+                  <p key={i.id}
+                     className="w-full rounded bg-amber-50 border border-amber-200 px-2 py-1 text-[10px] text-amber-800">
+                    Please fix — يرجى التصحيح: {i.change_request}
+                  </p>
+                ))}
               </div>
             );
           })}
@@ -467,7 +474,8 @@ export default function ProximateReportPackagePage() {
           {shelfItems.length > 0 && (
             <ul className="space-y-1.5">
               {shelfItems.map((it) => (
-                <li key={it.id} className="flex items-center gap-2 text-xs rounded-md border bg-card px-2.5 py-2">
+                <li key={it.id} className="text-xs rounded-md border bg-card px-2.5 py-2 space-y-1">
+                <div className="flex items-center gap-2">
                   <span className="uppercase text-[9px] text-muted-foreground w-12 shrink-0">{it.kind}</span>
                   <span className="flex-1 min-w-0 truncate">{it.caption || it.filename}</span>
                   {editable && (
@@ -477,6 +485,12 @@ export default function ProximateReportPackagePage() {
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
+                </div>
+                {it.change_request && (
+                  <p className="rounded bg-amber-50 border border-amber-200 px-2 py-1 text-[10px] text-amber-800">
+                    Please fix — يرجى التصحيح: {it.change_request}
+                  </p>
+                )}
                 </li>
               ))}
             </ul>

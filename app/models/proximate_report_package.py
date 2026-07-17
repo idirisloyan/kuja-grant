@@ -144,6 +144,10 @@ class ProximateReportPackage(db.Model):
     #   "spend": {"Personnel": n, ...}}, "period_from": iso, ...}
     answers_json = db.Column(db.Text, nullable=False, default='{}')
     spend_currency = db.Column(db.String(8), nullable=False, default='SDG')
+    # Optional OB-set rate: spend_currency units per 1 USD (e.g. 2500
+    # SDG/USD). Lets the review page show actuals in USD next to the
+    # approved budget without forcing partners to convert.
+    exchange_rate = db.Column(db.Float, nullable=True)
     # AI-compiled narrative (OB-editable copies live beside the draft):
     # {"summary_en", "summary_ar", "sections": [{"title_en","title_ar",
     #   "body_en","body_ar"}], "compiled_at", "source"}
@@ -187,6 +191,7 @@ class ProximateReportPackage(db.Model):
             'status': self.status,
             'answers': self.get_answers(),
             'spend_currency': self.spend_currency,
+            'exchange_rate': self.exchange_rate,
             'narrative': self.get_narrative(),
             'ob_notes': self.ob_notes,
             'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
@@ -219,6 +224,10 @@ class ProximateReportItem(db.Model):
     question_key = db.Column(db.String(40), nullable=True)
     transcript = db.Column(db.Text, nullable=True)
     donor_visible = db.Column(db.Boolean, nullable=False, default=False)
+    # OB's per-item fix request ("retake this photo", "receipt unreadable").
+    # Shown on the partner's token page while status=changes_requested;
+    # cleared when the partner resubmits.
+    change_request = db.Column(db.String(500), nullable=True)
     uploaded_via = db.Column(db.String(12), nullable=False, default='token')
     created_at = db.Column(db.DateTime, nullable=False, default=_now)
 
@@ -233,6 +242,7 @@ class ProximateReportItem(db.Model):
             'question_key': self.question_key,
             'transcript': self.transcript,
             'donor_visible': self.donor_visible,
+            'change_request': self.change_request,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'filename': doc.original_filename if doc else None,
             'mime_type': doc.mime_type if doc else None,
