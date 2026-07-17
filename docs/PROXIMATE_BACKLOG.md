@@ -969,3 +969,29 @@ covered by prior phases plus this session's additions.
   deep Facebook/X search isn't possible via API. If the team wants more,
   the next lever is a WhatsApp-first "ask the community" loop, not more
   scraping.
+
+## Report-package wave (2026-07-16, `575d321a5`) — deferred items
+
+- **Approved-activity editing UI:** activities (names + budget lines per
+  partner) are full CRUD via API but the OB currently has no dedicated
+  screen to manage them — the demo path creates them programmatically.
+  Add an "Approved activities" editor on the round page (or partner row)
+  so OBs can set the schedule when a round is decided.
+- **Per-item request-changes:** "Request changes" reopens the whole
+  package with one OB note. If partners find that too blunt, add
+  per-item flags ("retake this photo", "this number looks off").
+- **Video streaming:** evidence videos are served via send_file without
+  HTTP Range support — fine for short clips, but long videos won't
+  scrub. Add Range-request handling if partners start sending 100MB
+  videos.
+- **Exchange rate on spend:** partners report spend in SDG (default)
+  while approved budgets are USD; the review page shows both without
+  conversion. Add an optional rate field (or monthly rate table) if the
+  OB wants automatic actual-vs-budget in one currency.
+- **Report package WhatsApp nudges:** reporting links are shared
+  manually (Copy/WhatsApp buttons). Once Twilio templates clear Meta
+  approval, add a "remind partner" send + a due-date cron.
+- **Donor PDF polish:** the PDF is functional (narrative + financials +
+  photo thumbnails). A designed layout (brand fonts/colors, cover page,
+  Arabic rendering) is a natural follow-up once the team blesses the
+  content structure.
