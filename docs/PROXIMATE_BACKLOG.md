@@ -984,7 +984,12 @@ Most items DONE 2026-07-17 in `82752d8d1`:
   review page; UI + PDF show ~USD next to actuals. A monthly rate table
   remains a possible v2 if per-package rates get tedious.
 - ~~Donor PDF polish (light)~~ — DONE: PF orange header band, brand
-  section rules, date stamp. Still open: designed cover page + embedded
-  Arabic font (reportlab base fonts can't shape Arabic script).
+  section rules, date stamp.
+- ~~Arabic script in the PDF~~ — DONE 2026-07-17 (`2931f20db`): Amiri
+  embedded (SIL OFL, vendored in app/assets/fonts) + arabic-reshaper +
+  python-bidi; PDF now renders name_ar, summary_ar and section
+  title_ar/body_ar as connected RTL script. TEAM ACTION: have the
+  Arabic reviewer sanity-check one real PDF (ligatures/word order)
+  before Blue Nile reporting. Still open: designed cover page.
 - **Report package WhatsApp nudges:** STILL BLOCKED on Meta template
   approval. Once cleared, add a "remind partner" send + a due-date cron.
