@@ -23,6 +23,7 @@ import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 import { SelectionVoteCard } from '@/components/proximate/selection-vote-card';
+import { ReportPackagesCard } from '@/components/proximate/report-packages-card';
 import {
   ProximateAttachmentsPanel, PanelRosterPanel,
 } from '@/components/proximate/dd-evidence';
@@ -1014,6 +1015,15 @@ export function ProximateRoundDetailClient() {
               for other personas. */}
           {isOperator && participants.length > 0 && (
             <SelectionVoteCard roundId={Number(roundId)} isOperator={isOperator} />
+          )}
+
+          {/* Partner report packages — phone links + review queue. */}
+          {isOperator && participants.length > 0 && (
+            <ReportPackagesCard
+              roundId={Number(roundId)}
+              participants={participants}
+              isOperator={isOperator}
+            />
           )}
 
           {/* Phase 715b — Add-partner dialog. Renders as a lightweight

@@ -104,6 +104,10 @@ from app.models.proximate_endorser_invite import ProximateEndorserInvite
 from app.models.proximate_panel_vote import (
     ProximatePanelVoteSession, ProximatePanelVoteInvite,
 )
+from app.models.proximate_report_package import (
+    ProximateApprovedActivity, ProximateReportPackage, ProximateReportItem,
+    PACKAGE_STATUSES, ITEM_KINDS, VOICE_QUESTIONS, DEFAULT_BUDGET_LINES,
+)
 from app.models.proximate_grant import (
     ProximateGrant, ProximateGrantAllocation, ProximateGrantReport,
     GRANT_STATUSES as PROXIMATE_GRANT_STATUSES,
@@ -156,6 +160,9 @@ __all__ = [
     'DISBURSEMENT_STATUSES', 'DEFAULT_REPORT_WINDOW_DAYS',
     'ProximateEndorserInvite',
     'ProximatePanelVoteSession', 'ProximatePanelVoteInvite',
+    'ProximateApprovedActivity', 'ProximateReportPackage',
+    'ProximateReportItem', 'PACKAGE_STATUSES', 'ITEM_KINDS',
+    'VOICE_QUESTIONS', 'DEFAULT_BUDGET_LINES',
     'ProximateGrant', 'ProximateGrantAllocation', 'ProximateGrantReport',
     'PROXIMATE_GRANT_STATUSES', 'PROXIMATE_GRANT_REPORTING_CADENCES',
     'PROXIMATE_GRANT_REPORT_STATUSES',

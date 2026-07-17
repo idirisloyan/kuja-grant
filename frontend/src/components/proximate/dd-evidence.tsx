@@ -400,6 +400,24 @@ export function PanelRosterPanel({ roundId }: { roundId?: number }) {
   const [rows, setRows] = useState<PanelCandidate[]>([]);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  // Process doc §2 — CVs collected during panelist vetting.
+  const [cvBusyId, setCvBusyId] = useState<number | null>(null);
+  const cvInputRef = useRef<HTMLInputElement>(null);
+  const cvTargetRef = useRef<number | null>(null);
+
+  const uploadCv = async (candidateId: number, file: File) => {
+    setCvBusyId(candidateId);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('subject_kind', 'panel_candidate');
+      fd.append('subject_id', String(candidateId));
+      fd.append('kind', 'cv');
+      await api.upload('/api/proximate/attachments', fd);
+    } finally {
+      setCvBusyId(null);
+    }
+  };
 
   const refresh = useCallback(() => {
     const qs = roundId ? `?round_id=${roundId}` : '';
@@ -444,6 +462,15 @@ export function PanelRosterPanel({ roundId }: { roundId?: number }) {
           Add
         </Button>
       </div>
+      <input
+        type="file" className="hidden" ref={cvInputRef}
+        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f && cvTargetRef.current != null) uploadCv(cvTargetRef.current, f);
+          e.target.value = '';
+        }}
+      />
       {rows.length === 0 ? (
         <p className="text-xs text-muted-foreground italic">No panel candidates yet.</p>
       ) : (
@@ -455,6 +482,17 @@ export function PanelRosterPanel({ roundId }: { roundId?: number }) {
                 {c.location && (
                   <span className="text-muted-foreground">{c.location}</span>
                 )}
+                <button
+                  type="button"
+                  disabled={cvBusyId === c.id}
+                  onClick={() => {
+                    cvTargetRef.current = c.id;
+                    cvInputRef.current?.click();
+                  }}
+                  className="text-[10px] px-1.5 py-1 rounded-md border border-border hover:bg-muted"
+                >
+                  {cvBusyId === c.id ? 'Uploading…' : 'CV'}
+                </button>
                 <select
                   value={c.status}
                   onChange={(e) => setStatus(c.id, e.target.value)}

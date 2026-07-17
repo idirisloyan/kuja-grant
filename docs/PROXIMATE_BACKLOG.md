@@ -949,3 +949,23 @@ grants all carry purpose-stating subtitles; Crisis Selector got its
 explainer header 2026-07-05 and the grievance queue shipped with SLA
 copy built in. No further copy changes needed — item closed as
 covered by prior phases plus this session's additions.
+
+## DD + selection-vote wave (2026-07-16, `350295e02`) — deferred items
+
+- **SAM_GOV_API_KEY (team action):** the SAM.gov Exclusions check is wired
+  into every partner/endorser/FSP sanctions screen but only activates when
+  the `SAM_GOV_API_KEY` env var is set on Railway. Get a free key at
+  https://api.data.gov (any team member's account works) and add it to the
+  web service. Without it, screening behaves exactly as before.
+- **Vote outcome → roster auto-apply:** closing a selection vote records
+  the strict-majority outcome + tally on the audit chain but does NOT
+  change participant stages — the OB applies the decision by hand. If
+  pilots show this is pure toil, add a one-click "apply outcome" that
+  withdraws non-selected participants (with its own audit entry).
+- **Vote deadlines + reminders:** sessions stay open until the OB closes
+  them. A deadline field + WhatsApp/daily-cron nudge for panelists who
+  haven't voted is the natural v2.
+- **AI media check depth:** the web check covers public web + news well;
+  deep Facebook/X search isn't possible via API. If the team wants more,
+  the next lever is a WhatsApp-first "ask the community" loop, not more
+  scraping.

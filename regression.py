@@ -883,6 +883,146 @@ def run_proximate_rbac(base):
     check("selection vote: token loop + one-shot + OB-only open/close",
           selection_vote_flow)
 
+    # --- PARTNER REPORT PACKAGE (July 2026): the donor-report pipeline.
+    # Full lifecycle every run: OB opens a package, the partner fills it
+    # anonymously via token (numeric answers + a photo item), submits
+    # (replay 409s), the donor is DENIED until publish, the OB approves
+    # media item-by-item (default is internal — the safeguarding gate),
+    # publishes, and the subscribed donor then sees ONLY approved items
+    # and never the package token. ---
+    def report_package_flow():
+        import io
+        import requests as _rq
+        # round with roster + its first partner
+        rp_rid, rp_pid = None, None
+        for rr in _list(get(ob, base, "/api/proximate/rounds", override=OV)):
+            pr = get(ob, base,
+                     f"/api/proximate/rounds/{rr['id']}/participants",
+                     override=OV)
+            if pr.status_code != 200:
+                continue
+            active = [p for p in (pr.json().get("participants") or [])
+                      if p.get("stage") != "withdrawn"]
+            if active:
+                rp_rid, rp_pid = rr["id"], active[0]["partner_id"]
+                break
+        assert rp_rid, "no round with roster"
+
+        # approved activity (the reporting baseline)
+        aa = ob.post(f"{base}/api/proximate/rounds/{rp_rid}/approved-activities",
+                     json={"partner_id": rp_pid, "name": "Regression Activity",
+                           "budget_lines": [{"label": "Personnel", "amount": 500},
+                                            {"label": "Supplies & Materials",
+                                             "amount": 1500}]},
+                     headers=_hdrs(OV), timeout=30)
+        assert aa.status_code == 200, f"approved-activity -> {aa.status_code}"
+        act_id = aa.json()["activity"]["id"]
+
+        # OB opens the package (idempotent)
+        op = ob.post(f"{base}/api/proximate/rounds/{rp_rid}/report-packages",
+                     json={"partner_id": rp_pid}, headers=_hdrs(OV), timeout=30)
+        assert op.status_code == 200, f"open package -> {op.status_code}"
+        pkg = op.json()["package"]
+        pkg_id, tok = pkg["id"], pkg["package_token"]
+
+        anon = _rq.Session()
+        H = _hdrs(OV)
+        assert anon.get(f"{base}/api/proximate/report-package/deadbeef",
+                        headers=H, timeout=15).status_code == 404
+        bal = anon.get(f"{base}/api/proximate/report-package/{tok}",
+                       headers=H, timeout=15)
+        assert bal.status_code == 200, f"token view -> {bal.status_code}"
+        assert "package_token" not in bal.text, "token echoed to partner view"
+
+        # numeric answers keyed by the approved activity
+        ans = anon.post(f"{base}/api/proximate/report-package/{tok}/answers",
+                        json={"answers": {"activities": {str(act_id): {
+                            "status": "done", "unit": "households",
+                            "people_reached": 70,
+                            "disaggregation": {"women": 70, "pwd": 5},
+                            "spend": {"Personnel": 450,
+                                      "Supplies & Materials": 1600}}}}},
+                        headers=H, timeout=15)
+        assert ans.status_code == 200, f"answers -> {ans.status_code}"
+
+        # one photo item — MUST default to internal-only
+        png = (b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00"
+               b"\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\r"
+               b"IDATx\x9cc\xfc\xff\xff?\x03\x00\x08\xfc\x02\xfe\xa7\x9a\xa0"
+               b"\xa0\x00\x00\x00\x00IEND\xaeB`\x82")
+        up = anon.post(f"{base}/api/proximate/report-package/{tok}/items",
+                       data={"kind": "photo", "caption": "Regression photo"},
+                       files={"file": ("evidence.png", io.BytesIO(png),
+                                       "image/png")},
+                       headers={"X-Network-Override": OV,
+                                "X-Requested-With": "XMLHttpRequest"},
+                       timeout=30)
+        assert up.status_code == 200, f"item upload -> {up.status_code}: {up.text[:160]}"
+        item = up.json()["item"]
+        assert item["donor_visible"] is False, "media not internal by default!"
+
+        # donor subscribes to the round so scope passes — still DENIED
+        # pre-publish.
+        donor.post(f"{base}/api/proximate/donors/me/subscribe",
+                   json={"round_ids": [rp_rid]}, headers=_hdrs(OV), timeout=15)
+        dv = get(donor, base, f"/api/proximate/report-packages/{pkg_id}",
+                 override=OV)
+        assert dv.status_code == 403, f"donor pre-publish -> {dv.status_code}"
+
+        # partner submits; replay 409s
+        sub = anon.post(f"{base}/api/proximate/report-package/{tok}/submit",
+                        headers=H, timeout=60)
+        assert sub.status_code == 200, f"submit -> {sub.status_code}"
+        assert anon.post(f"{base}/api/proximate/report-package/{tok}/submit",
+                         headers=H, timeout=15).status_code == 409
+
+        # OB approves the photo for donor eyes + publishes
+        vis = ob.request("PATCH",
+                         f"{base}/api/proximate/report-packages/{pkg_id}/items/{item['id']}",
+                         json={"donor_visible": True}, headers=_hdrs(OV),
+                         timeout=15)
+        assert vis.status_code == 200, f"item approve -> {vis.status_code}"
+        pub = ob.post(f"{base}/api/proximate/report-packages/{pkg_id}/review",
+                      json={"action": "publish"}, headers=_hdrs(OV), timeout=60)
+        assert pub.status_code == 200, f"publish -> {pub.status_code}"
+
+        # donor now sees the published view: only approved items, no token
+        dv2 = get(donor, base, f"/api/proximate/report-packages/{pkg_id}",
+                  override=OV)
+        assert dv2.status_code == 200, f"donor post-publish -> {dv2.status_code}"
+        body = dv2.json()
+        assert "package_token" not in dv2.text, "token leaked to donor"
+        assert all(i["donor_visible"] for i in body.get("items", [])), \
+            "internal item leaked to donor"
+        # donor list endpoint includes it
+        dl = get(donor, base, "/api/proximate/donors/me/report-packages",
+                 override=OV)
+        assert dl.status_code == 200 and any(
+            p["id"] == pkg_id for p in dl.json().get("packages", [])), \
+            "published package missing from donor list"
+        # PDF renders for the OB (503 tolerated only if reportlab absent)
+        pdf = get(ob, base, f"/api/proximate/report-packages/{pkg_id}/pdf",
+                  override=OV)
+        assert pdf.status_code in (200, 503), f"pdf -> {pdf.status_code}"
+    check("report package: token fill + safeguarding gate + publish flow",
+          report_package_flow)
+
+    # --- Partner vetting assessment (process doc §4 formal record) ---
+    def vetting_assessment():
+        if not pid:
+            raise Skip("no partner")
+        g = get(ob, base, f"/api/proximate/partners/{pid}/vetting-assessment",
+                override=OV)
+        assert g.status_code == 200, f"vetting GET -> {g.status_code}"
+        assert "sanctions_flag" in g.text and "media_verdict" in g.text
+        p = ob.post(f"{base}/api/proximate/partners/{pid}/vetting-assessment",
+                    json={}, headers=_hdrs(OV), timeout=30)
+        assert p.status_code == 200 and p.json().get("recorded") is True
+        d = donor.post(f"{base}/api/proximate/partners/{pid}/vetting-assessment",
+                       json={}, headers=_hdrs(OV), timeout=15)
+        assert d.status_code == 403, f"donor vetting POST -> {d.status_code}"
+    check("vetting assessment: OB records, donor denied", vetting_assessment)
+
     # --- unauthenticated caller: no data, no 5xx ---
     def unauth_denied():
         anon = requests.Session()

@@ -233,6 +233,9 @@ export function ProximateDonorClient() {
         </Card>
       )}
 
+      {/* Partner implementation reports — published by the OB. */}
+      <DonorPublishedReports />
+
       {/* Per-round cards */}
       <section className="space-y-3">
         <h2 className="text-lg font-medium">{t('proximate.donor.rounds_title')}</h2>
@@ -418,5 +421,56 @@ function AskBox() {
         </div>
       )}
     </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Partner implementation reports — packages the OB published for
+   this donor's rounds. Each opens the full web report (narrative,
+   approved gallery, financials) with a PDF export.                    */
+/* ------------------------------------------------------------------ */
+
+interface PublishedReport {
+  id: number;
+  partner_name: string | null;
+  round_title: string | null;
+  published_at: string | null;
+}
+
+function DonorPublishedReports() {
+  const [reports, setReports] = useState<PublishedReport[] | null>(null);
+
+  useEffect(() => {
+    api.get<{ packages: PublishedReport[] }>(
+      '/api/proximate/donors/me/report-packages',
+    ).then((r) => setReports(r.packages)).catch(() => setReports([]));
+  }, []);
+
+  if (!reports || reports.length === 0) return null;
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-medium flex items-center gap-2">
+        <FileText className="w-4 h-4 text-muted-foreground" />
+        Partner reports
+      </h2>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {reports.map((r) => (
+          <a key={r.id} href={`/proximate/reports/${r.id}`}>
+            <Card className="p-3 hover:bg-muted/40 transition space-y-1">
+              <p className="text-sm font-medium truncate">{r.partner_name}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {r.round_title}
+                {r.published_at &&
+                  ` · ${new Date(r.published_at).toLocaleDateString()}`}
+              </p>
+              <p className="text-[11px] text-primary inline-flex items-center gap-1">
+                View report <ExternalLink className="w-3 h-3" />
+              </p>
+            </Card>
+          </a>
+        ))}
+      </div>
+    </section>
   );
 }

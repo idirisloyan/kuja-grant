@@ -540,9 +540,28 @@ def _run_partner_sanctions_screen(partner):
     from app.services.compliance_service import ComplianceService
     import json as _json
 
+    # Process doc §4: for unregistered initiatives the screen must cover
+    # the KEY INDIVIDUALS, not just the group name. Pull leadership from
+    # the intake form whenever present and screen them alongside the org.
+    leadership = []
+    intake = {}
+    try:
+        intake = partner.get_intake_form() or {}
+    except Exception:
+        intake = {}
+    pif = intake.get('pif') if isinstance(intake.get('pif'), dict) else {}
+    for source in (intake, pif):
+        for key in ('contact_name', 'responsible_person', 'lead_name',
+                    'contact_person', 'declaration_name'):
+            v = source.get(key)
+            if isinstance(v, str) and v.strip():
+                leadership.append(v.strip()[:120])
+    leadership = list(dict.fromkeys(leadership))[:3]
+
     checks = ComplianceService.screen_organization(
         org_name=partner.name,
         country=partner.country or 'SD',
+        personnel=leadership or None,
     ) or []
     flagged_checks = [c for c in checks if c.get('status') == 'flagged']
     summary = {
@@ -8652,12 +8671,14 @@ _ATTACH_MAX_BYTES = 15 * 1024 * 1024
 
 def _attach_subject_or_404(net, subject_kind, subject_id):
     """Resolve + tenant-check the attachment subject. Returns (obj, err)."""
-    from app.models import ProximateRound
+    from app.models import ProximateRound, ProximatePanelCandidate
     from app.models.crisis_monitoring import CrisisSignal
     model = {
         'partner': ProximatePartner,
         'round': ProximateRound,
         'crisis_signal': CrisisSignal,
+        # Process doc §2: panelist CVs collected during vetting.
+        'panel_candidate': ProximatePanelCandidate,
     }.get(subject_kind)
     if model is None:
         return None, (jsonify({'success': False,
@@ -8961,6 +8982,89 @@ def api_partner_media_verification_ai_check(partner_id):
         'findings_count': len(findings),
         'overall_status': overall,
     })
+
+
+@proximate_bp.route('/partners/<int:partner_id>/vetting-assessment',
+                    methods=['GET', 'POST'])
+@login_required
+def api_partner_vetting_assessment(partner_id):
+    """Process doc §4: the internal Partner Vetting Assessment — ONE
+    consolidated record confirming the partner completed verification.
+    GET computes the live view; POST snapshots it onto the audit chain
+    as the formal internal record."""
+    import json as _json
+    from app.models import (
+        ProximateMediaVerification, ProximateAttachment, Endorsement,
+    )
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'partner not found'}), 404
+
+    mv = (ProximateMediaVerification.query
+          .filter_by(partner_id=partner.id)
+          .order_by(ProximateMediaVerification.reviewed_at.desc())
+          .first())
+    attach_counts = {}
+    for att in ProximateAttachment.query.filter_by(
+            subject_kind='partner', subject_id=partner.id).all():
+        attach_counts[att.kind] = attach_counts.get(att.kind, 0) + 1
+    try:
+        endorsement_count = Endorsement.query.filter_by(
+            partner_id=partner.id).count()
+    except Exception:
+        endorsement_count = None
+    try:
+        sanctions_summary = _json.loads(partner.sanctions_summary_json or '{}')
+    except Exception:
+        sanctions_summary = {}
+
+    assessment = {
+        'partner_id': partner.id,
+        'partner_name': partner.name,
+        'sanctions_flag': bool(partner.sanctions_flag),
+        'sanctions_checked_at': (partner.sanctions_checked_at.isoformat()
+                                 if partner.sanctions_checked_at else None),
+        'sanctions_checks': sanctions_summary.get('total_checks'),
+        'sanctions_flagged_count': sanctions_summary.get('flagged_count'),
+        'media_verdict': mv.overall_verdict if mv else None,
+        'media_checked_at': (mv.reviewed_at.isoformat()
+                             if mv and mv.reviewed_at else None),
+        'evidence_files': attach_counts,
+        'endorsements': endorsement_count,
+        'dd_status': getattr(partner, 'dd_status', None),
+        'capital_class': getattr(partner, 'capital_class', None),
+        'has_pif': bool((partner.get_intake_form() or {}).get('pif')
+                        if hasattr(partner, 'get_intake_form') else False),
+    }
+    # A partner is vetting-complete when screened clear, media-checked,
+    # and carrying at least one evidence file. Advisory, not a gate —
+    # the OB decides.
+    assessment['complete'] = bool(
+        partner.sanctions_checked_at and not partner.sanctions_flag
+        and mv is not None and attach_counts,
+    )
+
+    if request.method == 'GET':
+        return jsonify({'success': True, 'assessment': assessment})
+
+    AuditChainEntry.append(
+        action='proximate.partner.vetting_assessed',
+        actor_email=current_user.email,
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details=assessment,
+    )
+    return jsonify({'success': True, 'assessment': assessment,
+                    'recorded': True})
 
 
 @proximate_bp.route('/panel-candidates', methods=['GET', 'POST'])
@@ -9321,6 +9425,927 @@ def api_submit_selection_vote(token):
                  'passed': len(votes) - selected_count},
     )
     return jsonify({'success': True, 'voted_at': inv.voted_at.isoformat()})
+
+
+# ----------------------------------------------------------------------
+# Partner report packages — the donor-report pipeline (July 2026).
+# Approved activity schedule (the reporting baseline from the grant
+# agreement) + one package per partner per round, filled from a phone
+# via a REUSABLE token link, compiled by AI, reviewed/redacted by the
+# OB, published to the donor dashboard. Media defaults to internal-only.
+# ----------------------------------------------------------------------
+
+_REPORT_MEDIA_EXTS = {
+    'photo': {'png', 'jpg', 'jpeg', 'webp', 'heic'},
+    'video': {'mp4', 'mov', 'webm', '3gp', 'mkv'},
+    'voice': {'webm', 'mp3', 'm4a', 'ogg', 'wav', 'aac', 'opus'},
+    'receipt': {'png', 'jpg', 'jpeg', 'webp', 'pdf'},
+    'doc': {'pdf', 'docx', 'doc', 'xlsx', 'csv', 'txt'},
+    'other': {'png', 'jpg', 'jpeg', 'webp', 'pdf', 'docx', 'xlsx', 'csv',
+              'mp4', 'mov', 'webm', 'mp3', 'm4a', 'txt'},
+}
+_REPORT_MEDIA_MAX = {
+    'video': 100 * 1024 * 1024,
+    'voice': 25 * 1024 * 1024,
+}
+_REPORT_MEDIA_DEFAULT_MAX = 15 * 1024 * 1024
+
+
+def _package_for_token_or_404(token):
+    from app.models import ProximateReportPackage
+    pkg = ProximateReportPackage.query.filter_by(
+        package_token=token,
+    ).first()
+    if not pkg:
+        return None, (jsonify({'success': False, 'error': 'invalid token'}), 404)
+    return pkg, None
+
+
+def _report_answers_clean(raw):
+    """Whitelist + numeric-coerce the structured core. Money and people
+    are NUMBERS here — the whole point after the free-text Excel era."""
+    def _num(v):
+        try:
+            n = float(v)
+            return n if n >= 0 else None
+        except (TypeError, ValueError):
+            return None
+
+    out = {}
+    if not isinstance(raw, dict):
+        return out
+    for key in ('period_from', 'period_to'):
+        v = raw.get(key)
+        if isinstance(v, str) and len(v) <= 10:
+            out[key] = v
+    acts = raw.get('activities')
+    if isinstance(acts, dict):
+        clean_acts = {}
+        for aid, block in list(acts.items())[:40]:
+            if not isinstance(block, dict):
+                continue
+            entry = {}
+            if block.get('status') in ('done', 'partial', 'not_done'):
+                entry['status'] = block['status']
+            if block.get('unit') in ('individuals', 'households'):
+                entry['unit'] = block['unit']
+            pr = _num(block.get('people_reached'))
+            if pr is not None:
+                entry['people_reached'] = pr
+            dis = block.get('disaggregation')
+            if isinstance(dis, dict):
+                entry['disaggregation'] = {
+                    k: _num(v) for k, v in dis.items()
+                    if k in ('women', 'men', 'girls', 'boys', 'pwd')
+                    and _num(v) is not None
+                }
+            spend = block.get('spend')
+            if isinstance(spend, dict):
+                entry['spend'] = {
+                    str(k)[:60]: _num(v) for k, v in list(spend.items())[:12]
+                    if _num(v) is not None
+                }
+            clean_acts[str(aid)[:20]] = entry
+        out['activities'] = clean_acts
+    return out
+
+
+@proximate_bp.route('/rounds/<int:round_id>/approved-activities',
+                    methods=['GET', 'POST'])
+@login_required
+def api_round_approved_activities(round_id):
+    """The grant agreement's activity schedule (doc §7) — reporting
+    baseline. GET ?partner_id= filters; POST creates one."""
+    from app.models import (
+        ProximateApprovedActivity, ProximateRound, DEFAULT_BUDGET_LINES,
+    )
+    import json as _json
+    from datetime import date
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    rnd = ProximateRound.query.filter_by(
+        id=round_id, network_id=net.id,
+    ).first()
+    if not rnd:
+        return jsonify({'success': False, 'error': 'round not found'}), 404
+
+    if request.method == 'GET':
+        q = ProximateApprovedActivity.query.filter_by(
+            round_id=rnd.id, network_id=net.id,
+        )
+        pid = request.args.get('partner_id')
+        if pid and pid.isdigit():
+            q = q.filter_by(partner_id=int(pid))
+        rows = q.order_by(ProximateApprovedActivity.id.asc()).limit(200).all()
+        return jsonify({'success': True,
+                        'activities': [a.to_dict() for a in rows],
+                        'default_budget_lines': list(DEFAULT_BUDGET_LINES)})
+
+    body = get_request_json() or {}
+    try:
+        partner_id = int(body.get('partner_id') or 0)
+    except (TypeError, ValueError):
+        partner_id = 0
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'partner not found'}), 404
+    name = (body.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'name required'}), 400
+
+    def _parse_date(v):
+        try:
+            return date.fromisoformat(v) if v else None
+        except (TypeError, ValueError):
+            return None
+
+    lines = body.get('budget_lines')
+    if not isinstance(lines, list) or not lines:
+        lines = [{'label': lb, 'amount': 0} for lb in DEFAULT_BUDGET_LINES]
+    clean_lines = []
+    for ln in lines[:12]:
+        if not isinstance(ln, dict) or not ln.get('label'):
+            continue
+        try:
+            amount = max(0.0, float(ln.get('amount') or 0))
+        except (TypeError, ValueError):
+            amount = 0.0
+        clean_lines.append({'label': str(ln['label'])[:60], 'amount': amount})
+
+    act = ProximateApprovedActivity(
+        network_id=net.id,
+        round_id=rnd.id,
+        partner_id=partner.id,
+        name=name[:300],
+        description=(body.get('description') or '').strip()[:3000] or None,
+        target_population=(body.get('target_population') or '').strip()[:300] or None,
+        geographic_area=(body.get('geographic_area') or '').strip()[:300] or None,
+        period_start=_parse_date(body.get('period_start')),
+        period_end=_parse_date(body.get('period_end')),
+        budget_lines_json=_json.dumps(clean_lines),
+        created_by_user_id=current_user.id,
+    )
+    db.session.add(act)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.round.activity_approved',
+        actor_email=current_user.email,
+        subject_kind='proximate_round',
+        subject_id=rnd.id,
+        details={'activity_id': act.id, 'partner_id': partner.id,
+                 'name': act.name,
+                 'budget_total': sum(l['amount'] for l in clean_lines)},
+    )
+    return jsonify({'success': True, 'activity': act.to_dict()})
+
+
+@proximate_bp.route('/approved-activities/<int:activity_id>',
+                    methods=['PATCH', 'DELETE'])
+@login_required
+def api_update_approved_activity(activity_id):
+    from app.models import ProximateApprovedActivity
+    import json as _json
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    act = ProximateApprovedActivity.query.filter_by(
+        id=activity_id, network_id=net.id,
+    ).first()
+    if not act:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    if request.method == 'DELETE':
+        db.session.delete(act)
+        db.session.commit()
+        return jsonify({'success': True})
+    body = get_request_json() or {}
+    for field in ('name', 'description', 'target_population',
+                  'geographic_area'):
+        if field in body:
+            setattr(act, field, (body.get(field) or '').strip()[:3000] or None)
+    if isinstance(body.get('budget_lines'), list):
+        clean = []
+        for ln in body['budget_lines'][:12]:
+            if isinstance(ln, dict) and ln.get('label'):
+                try:
+                    amount = max(0.0, float(ln.get('amount') or 0))
+                except (TypeError, ValueError):
+                    amount = 0.0
+                clean.append({'label': str(ln['label'])[:60],
+                              'amount': amount})
+        act.budget_lines_json = _json.dumps(clean)
+    db.session.commit()
+    return jsonify({'success': True, 'activity': act.to_dict()})
+
+
+@proximate_bp.route('/rounds/<int:round_id>/report-packages',
+                    methods=['GET', 'POST'])
+@login_required
+def api_round_report_packages(round_id):
+    """OB: GET lists all packages for the round (with share tokens);
+    POST opens (or returns the existing) package for a partner."""
+    from app.models import ProximateReportPackage, ProximateRound
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    rnd = ProximateRound.query.filter_by(
+        id=round_id, network_id=net.id,
+    ).first()
+    if not rnd:
+        return jsonify({'success': False, 'error': 'round not found'}), 404
+
+    if request.method == 'GET':
+        rows = (ProximateReportPackage.query
+                .filter_by(round_id=rnd.id, network_id=net.id)
+                .order_by(ProximateReportPackage.created_at.asc())
+                .limit(300).all())
+        out = []
+        for p in rows:
+            partner = ProximatePartner.query.get(p.partner_id)
+            d = p.to_dict(include_token=True)
+            d['partner_name'] = partner.name if partner else None
+            d['item_count'] = len(p.items)
+            out.append(d)
+        return jsonify({'success': True, 'packages': out})
+
+    body = get_request_json() or {}
+    try:
+        partner_id = int(body.get('partner_id') or 0)
+    except (TypeError, ValueError):
+        partner_id = 0
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'partner not found'}), 404
+    existing = ProximateReportPackage.query.filter_by(
+        round_id=rnd.id, partner_id=partner.id, network_id=net.id,
+    ).first()
+    if existing:
+        return jsonify({'success': True, 'created': False,
+                        'package': existing.to_dict(include_token=True)})
+    pkg = ProximateReportPackage(
+        network_id=net.id,
+        round_id=rnd.id,
+        partner_id=partner.id,
+        created_by_user_id=current_user.id,
+    )
+    db.session.add(pkg)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.report_package.opened',
+        actor_email=current_user.email,
+        subject_kind='proximate_round',
+        subject_id=rnd.id,
+        details={'package_id': pkg.id, 'partner_id': partner.id},
+    )
+    return jsonify({'success': True, 'created': True,
+                    'package': pkg.to_dict(include_token=True)})
+
+
+def _package_view(pkg, *, for_donor):
+    """Serialised package. Donors get published narrative + APPROVED
+    media only; the OB sees everything including transcripts."""
+    from app.models import ProximateApprovedActivity, VOICE_QUESTIONS
+    partner = ProximatePartner.query.get(pkg.partner_id)
+    from app.models import ProximateRound
+    rnd = ProximateRound.query.get(pkg.round_id)
+    acts = (ProximateApprovedActivity.query
+            .filter_by(round_id=pkg.round_id, partner_id=pkg.partner_id)
+            .order_by(ProximateApprovedActivity.id.asc()).all())
+    items = pkg.items
+    if for_donor:
+        items = [i for i in items if i.donor_visible]
+    return {
+        'package': pkg.to_dict(include_token=not for_donor),
+        'partner': {'id': partner.id, 'name': partner.name,
+                    'name_ar': partner.name_ar,
+                    'locality': partner.locality} if partner else None,
+        'round': {'id': rnd.id, 'title': rnd.title} if rnd else None,
+        'activities': [a.to_dict() for a in acts],
+        'items': [i.to_dict() for i in items],
+        'voice_questions': [
+            {'key': k, 'label': lbl} for k, lbl in VOICE_QUESTIONS
+        ],
+    }
+
+
+@proximate_bp.route('/report-packages/<int:package_id>', methods=['GET'])
+@login_required
+def api_get_report_package(package_id):
+    """Persona-aware detail: OB full view; a scoped donor sees the
+    package only once PUBLISHED and only donor-visible items."""
+    from app.models import ProximateReportPackage
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    pkg = ProximateReportPackage.query.filter_by(
+        id=package_id, network_id=net.id,
+    ).first()
+    if not pkg:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+
+    if _user_is_ob(net):
+        return jsonify({'success': True, **_package_view(pkg, for_donor=False)})
+
+    donor, derr = _require_donor()
+    if derr:
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    scope = _donor_round_scope_403(net, pkg.round_id)
+    if scope:
+        return scope
+    if pkg.status != 'published':
+        return jsonify({'success': False, 'error': 'not published'}), 403
+    return jsonify({'success': True, **_package_view(pkg, for_donor=True)})
+
+
+@proximate_bp.route('/report-packages/<int:package_id>', methods=['PATCH'])
+@login_required
+def api_edit_report_package(package_id):
+    """OB edits the compiled narrative before publishing."""
+    from app.models import ProximateReportPackage
+    import json as _json
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    pkg = ProximateReportPackage.query.filter_by(
+        id=package_id, network_id=net.id,
+    ).first()
+    if not pkg:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    body = get_request_json() or {}
+    if isinstance(body.get('narrative'), dict):
+        pkg.narrative_json = _json.dumps(body['narrative'])
+    db.session.commit()
+    return jsonify({'success': True, 'package': pkg.to_dict(include_token=True)})
+
+
+@proximate_bp.route('/report-packages/<int:package_id>/compile',
+                    methods=['POST'])
+@login_required
+def api_compile_report_package(package_id):
+    from app.models import ProximateReportPackage
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    pkg = ProximateReportPackage.query.filter_by(
+        id=package_id, network_id=net.id,
+    ).first()
+    if not pkg:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    _compile_package_narrative(pkg)
+    db.session.commit()
+    return jsonify({'success': True, 'package': pkg.to_dict(include_token=True)})
+
+
+def _compile_package_narrative(pkg):
+    """Best-effort AI compile stored on the package. Never raises."""
+    import json as _json
+    from app.models import ProximateApprovedActivity, ProximateRound
+    from app.services.proximate_report_compile_service import (
+        compile_report_narrative,
+    )
+    partner = ProximatePartner.query.get(pkg.partner_id)
+    rnd = ProximateRound.query.get(pkg.round_id)
+    acts = (ProximateApprovedActivity.query
+            .filter_by(round_id=pkg.round_id, partner_id=pkg.partner_id)
+            .all())
+    transcripts = [(i.question_key or 'note', i.transcript)
+                   for i in pkg.items if i.transcript]
+    captions = [f'{i.kind}: {i.caption}' for i in pkg.items if i.caption]
+    narrative = compile_report_narrative(
+        partner_name=partner.name if partner else f'Partner #{pkg.partner_id}',
+        round_title=rnd.title if rnd else f'Round #{pkg.round_id}',
+        answers=pkg.get_answers(),
+        activities=[a.to_dict() for a in acts],
+        transcripts=transcripts,
+        captions=captions,
+        spend_currency=pkg.spend_currency,
+    )
+    pkg.narrative_json = _json.dumps(narrative)
+
+
+@proximate_bp.route('/report-packages/<int:package_id>/items/<int:item_id>',
+                    methods=['PATCH'])
+@login_required
+def api_review_report_item(package_id, item_id):
+    """OB approves media for donor eyes (the safeguarding gate) or
+    fixes a caption."""
+    from app.models import ProximateReportPackage, ProximateReportItem
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    pkg = ProximateReportPackage.query.filter_by(
+        id=package_id, network_id=net.id,
+    ).first()
+    if not pkg:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    item = ProximateReportItem.query.filter_by(
+        id=item_id, package_id=pkg.id,
+    ).first()
+    if not item:
+        return jsonify({'success': False, 'error': 'item not found'}), 404
+    body = get_request_json() or {}
+    if 'donor_visible' in body:
+        item.donor_visible = bool(body['donor_visible'])
+        AuditChainEntry.append(
+            action='proximate.report_package.item_visibility',
+            actor_email=current_user.email,
+            subject_kind='proximate_report_package',
+            subject_id=pkg.id,
+            details={'item_id': item.id, 'kind': item.kind,
+                     'donor_visible': item.donor_visible},
+        )
+    if 'caption' in body:
+        item.caption = (body.get('caption') or '').strip()[:500] or None
+    db.session.commit()
+    return jsonify({'success': True, 'item': item.to_dict()})
+
+
+@proximate_bp.route('/report-packages/<int:package_id>/review',
+                    methods=['POST'])
+@login_required
+def api_review_report_package(package_id):
+    """OB decision: request_changes (back to the partner with notes) or
+    publish (donor-visible). Publishing without a compiled narrative
+    compiles first, so the donor never sees an empty page."""
+    from app.models import ProximateReportPackage
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    pkg = ProximateReportPackage.query.filter_by(
+        id=package_id, network_id=net.id,
+    ).first()
+    if not pkg:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    body = get_request_json() or {}
+    action = (body.get('action') or '').strip()
+    if action not in ('request_changes', 'publish'):
+        return jsonify({'success': False,
+                        'error': 'action must be request_changes|publish'}), 400
+    if action == 'request_changes':
+        pkg.status = 'changes_requested'
+        pkg.ob_notes = (body.get('notes') or '').strip()[:2000] or None
+    else:
+        if not pkg.narrative_json:
+            _compile_package_narrative(pkg)
+        pkg.status = 'published'
+        pkg.published_at = datetime.now(timezone.utc)
+    pkg.reviewed_by_user_id = current_user.id
+    db.session.commit()
+    AuditChainEntry.append(
+        action=f'proximate.report_package.{action}',
+        actor_email=current_user.email,
+        subject_kind='proximate_report_package',
+        subject_id=pkg.id,
+        details={'round_id': pkg.round_id, 'partner_id': pkg.partner_id,
+                 'status': pkg.status,
+                 'donor_visible_items': sum(1 for i in pkg.items
+                                            if i.donor_visible)},
+    )
+    return jsonify({'success': True, 'package': pkg.to_dict(include_token=True)})
+
+
+@proximate_bp.route('/donors/me/report-packages', methods=['GET'])
+@login_required
+def api_donor_report_packages():
+    """Donor dashboard: published packages across the donor's rounds."""
+    from app.models import ProximateReportPackage, ProximateRound
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    donor, derr = _require_donor()
+    if derr:
+        return derr
+    visible = _donor_visible_round_ids(donor)
+    if not visible:
+        return jsonify({'success': True, 'packages': []})
+    rows = (ProximateReportPackage.query
+            .filter(ProximateReportPackage.network_id == net.id,
+                    ProximateReportPackage.status == 'published',
+                    ProximateReportPackage.round_id.in_(list(visible)))
+            .order_by(ProximateReportPackage.published_at.desc())
+            .limit(100).all())
+    out = []
+    for p in rows:
+        partner = ProximatePartner.query.get(p.partner_id)
+        rnd = ProximateRound.query.get(p.round_id)
+        out.append({
+            'id': p.id,
+            'partner_name': partner.name if partner else None,
+            'round_title': rnd.title if rnd else None,
+            'published_at': p.published_at.isoformat() if p.published_at else None,
+        })
+    return jsonify({'success': True, 'packages': out})
+
+
+@proximate_bp.route('/report-packages/<int:package_id>/pdf', methods=['GET'])
+@login_required
+def api_report_package_pdf(package_id):
+    """Printable package: narrative + financial table + photo thumbnails
+    (videos become named links — no video-in-PDF acrobatics)."""
+    from flask import current_app as cap, send_file
+    from io import BytesIO
+    from app.models import ProximateReportPackage, ProximateApprovedActivity
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    pkg = ProximateReportPackage.query.filter_by(
+        id=package_id, network_id=net.id,
+    ).first()
+    if not pkg:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    is_ob = _user_is_ob(net)
+    if not is_ob:
+        donor, derr = _require_donor()
+        if derr:
+            return jsonify({'success': False, 'error': 'forbidden'}), 403
+        scope = _donor_round_scope_403(net, pkg.round_id)
+        if scope:
+            return scope
+        if pkg.status != 'published':
+            return jsonify({'success': False, 'error': 'not published'}), 403
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+        from reportlab.pdfgen import canvas as _canvas
+        from reportlab.lib.utils import ImageReader
+    except ImportError:
+        return jsonify({'success': False,
+                        'error': 'reportlab not installed on this deploy'}), 503
+
+    view = _package_view(pkg, for_donor=not is_ob)
+    narrative = pkg.get_narrative() or {}
+    buf = BytesIO()
+    c = _canvas.Canvas(buf, pagesize=A4)
+    W, H = A4
+    y = H - 20 * mm
+
+    def _line(text, size=10, bold=False, gap=5.2):
+        nonlocal y
+        if y < 25 * mm:
+            c.showPage()
+            y = H - 20 * mm
+        c.setFont('Helvetica-Bold' if bold else 'Helvetica', size)
+        for chunk in ([text[i:i + 100] for i in range(0, len(text), 100)]
+                      or ['']):
+            c.drawString(20 * mm, y, chunk)
+            y -= gap * mm
+
+    partner = view['partner'] or {}
+    rnd = view['round'] or {}
+    _line('Proximate Fund — Partner Implementation Report', 15, bold=True, gap=8)
+    _line(f"{partner.get('name', '')} — {rnd.get('title', '')}", 11, bold=True)
+    _line(f"Status: {pkg.status}   Published: {pkg.published_at or '—'}", 9)
+    y -= 3 * mm
+    if narrative.get('summary_en'):
+        _line('Summary', 12, bold=True)
+        _line(narrative['summary_en'], 10)
+        y -= 2 * mm
+    for sec in (narrative.get('sections') or [])[:8]:
+        _line(sec.get('title_en', ''), 11, bold=True)
+        _line(sec.get('body_en', ''), 9.5)
+        y -= 2 * mm
+
+    answers = pkg.get_answers()
+    acts = {str(a['id']): a for a in view['activities']}
+    blocks = (answers.get('activities') or {})
+    if blocks:
+        _line('Financials (actual vs approved)', 12, bold=True)
+        for aid, block in blocks.items():
+            approved = acts.get(aid, {})
+            _line(approved.get('name', 'General activity'), 10, bold=True)
+            approved_lines = {l['label']: l['amount']
+                              for l in approved.get('budget_lines', [])}
+            for label, amount in (block.get('spend') or {}).items():
+                app_amt = approved_lines.get(label)
+                _line(f'  {label}: {amount:,.0f} {pkg.spend_currency}'
+                      + (f'  (approved {app_amt:,.0f} USD)'
+                         if app_amt is not None else ''), 9)
+            if block.get('people_reached') is not None:
+                _line(f"  People reached: {block['people_reached']:,.0f} "
+                      f"{block.get('unit', '')}", 9)
+        y -= 2 * mm
+
+    photos = [i for i in view['items'] if i['kind'] == 'photo'][:6]
+    others = [i for i in view['items'] if i['kind'] != 'photo']
+    if photos:
+        _line('Photo evidence', 12, bold=True)
+        x = 20 * mm
+        thumb = 50 * mm
+        for it in photos:
+            from app.models import ProximateReportItem
+            row = ProximateReportItem.query.get(it['id'])
+            if not row or not row.document:
+                continue
+            path = os.path.join(cap.config['UPLOAD_FOLDER'],
+                                row.document.stored_filename)
+            if not os.path.exists(path):
+                continue
+            if y < 70 * mm:
+                c.showPage()
+                y = H - 20 * mm
+                x = 20 * mm
+            try:
+                c.drawImage(ImageReader(path), x, y - thumb,
+                            width=thumb, height=thumb,
+                            preserveAspectRatio=True, anchor='sw')
+            except Exception:
+                continue
+            x += thumb + 5 * mm
+            if x + thumb > W - 20 * mm:
+                x = 20 * mm
+                y -= thumb + 8 * mm
+        y -= thumb + 8 * mm
+    if others:
+        _line('Other evidence', 12, bold=True)
+        for it in others[:20]:
+            _line(f"  [{it['kind']}] {it.get('caption') or it.get('filename', '')}", 9)
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    return send_file(
+        buf, as_attachment=True, mimetype='application/pdf',
+        download_name=f'proximate-report-{pkg.id}.pdf',
+    )
+
+
+# --- Public token surface -------------------------------------------------
+
+@proximate_bp.route('/report-package/<token>', methods=['GET'])
+def api_get_report_package_by_token(token):
+    """Public. The partner's own view of their package."""
+    pkg, err = _package_for_token_or_404(token)
+    if err:
+        return err
+    view = _package_view(pkg, for_donor=False)
+    # The partner doesn't need internal review metadata or the token echo.
+    view['package'].pop('package_token', None)
+    return jsonify({'success': True, **view})
+
+
+@proximate_bp.route('/report-package/<token>/answers', methods=['POST'])
+def api_save_report_answers(token):
+    """Public. Save/replace the structured core while editable."""
+    import json as _json
+    pkg, err = _package_for_token_or_404(token)
+    if err:
+        return err
+    if pkg.status not in ('draft', 'changes_requested'):
+        return jsonify({'success': False, 'error': 'not editable'}), 409
+    body = request.get_json(silent=True) or {}
+    pkg.answers_json = _json.dumps(_report_answers_clean(body.get('answers')))
+    cur = (body.get('spend_currency') or '').strip().upper()
+    if cur in ('SDG', 'USD', 'SSP', 'EGP', 'ETB', 'KES'):
+        pkg.spend_currency = cur
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@proximate_bp.route('/report-package/<token>/items', methods=['POST'])
+def api_add_report_item(token):
+    """Public. Add one evidence item (photo/video/voice/receipt/doc) to
+    the shelf. Multipart: file, kind, caption?, question_key?.
+    Voice notes get a background Whisper transcript."""
+    import uuid
+    from werkzeug.utils import secure_filename
+    from flask import current_app as cap
+    from app.models import (
+        Document, ProximateReportItem, ITEM_KINDS, VOICE_QUESTIONS,
+    )
+
+    pkg, err = _package_for_token_or_404(token)
+    if err:
+        return err
+    if pkg.status not in ('draft', 'changes_requested'):
+        return jsonify({'success': False, 'error': 'not editable'}), 409
+    if len(pkg.items) >= 60:
+        return jsonify({'success': False, 'error': 'item limit reached'}), 400
+
+    kind = (request.form.get('kind') or 'other').strip()
+    if kind not in ITEM_KINDS:
+        kind = 'other'
+    question_key = (request.form.get('question_key') or '').strip() or None
+    if question_key and question_key not in {k for k, _ in VOICE_QUESTIONS}:
+        question_key = None
+    caption = (request.form.get('caption') or '').strip()[:500] or None
+
+    if 'file' not in request.files or not request.files['file'].filename:
+        return jsonify({'success': False, 'error': 'no file provided'}), 400
+    file = request.files['file']
+    original_filename = secure_filename(file.filename) or f'{kind}.bin'
+    ext = (original_filename.rsplit('.', 1)[-1].lower()
+           if '.' in original_filename else '')
+    if ext not in _REPORT_MEDIA_EXTS.get(kind, _REPORT_MEDIA_EXTS['other']):
+        return jsonify({'success': False,
+                        'error': f'.{ext} not allowed for {kind}'}), 400
+    max_bytes = _REPORT_MEDIA_MAX.get(kind, _REPORT_MEDIA_DEFAULT_MAX)
+    if request.content_length and request.content_length > max_bytes:
+        return jsonify({'success': False, 'error': 'file too large'}), 413
+
+    stored_filename = f'proximate_report_{uuid.uuid4().hex}.{ext}'
+    filepath = os.path.join(cap.config['UPLOAD_FOLDER'], stored_filename)
+    file.save(filepath)
+    file_size = os.path.getsize(filepath)
+    if file_size > max_bytes:
+        os.remove(filepath)
+        return jsonify({'success': False, 'error': 'file too large'}), 413
+
+    doc = Document(
+        original_filename=original_filename,
+        stored_filename=stored_filename,
+        file_size=file_size,
+        mime_type=file.mimetype,
+        doc_type='proximate_report_media',
+    )
+    db.session.add(doc)
+    db.session.flush()
+    item = ProximateReportItem(
+        package_id=pkg.id,
+        kind=kind,
+        document_id=doc.id,
+        caption=caption,
+        question_key=question_key,
+        uploaded_via='token',
+    )
+    db.session.add(item)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.report_package.item_added',
+        actor_email=f'token:{pkg.package_token[:8]}…',
+        subject_kind='proximate_report_package',
+        subject_id=pkg.id,
+        details={'item_id': item.id, 'kind': kind, 'bytes': file_size},
+    )
+
+    if kind == 'voice':
+        # Same background pattern as disbursement report voice notes.
+        try:
+            from app.services.whisper_service import transcribe_audio
+            from app.utils.background import submit_task
+            from flask import current_app as _ca
+            _app = _ca._get_current_object()
+            voice_path, item_id = filepath, item.id
+
+            def _run_transcribe():
+                with _app.app_context():
+                    try:
+                        with open(voice_path, 'rb') as f:
+                            audio = f.read()
+                        result = transcribe_audio(
+                            audio, language='ar',
+                            filename=os.path.basename(voice_path),
+                        )
+                        text = (result.get('text') or '').strip()
+                        if text:
+                            target = ProximateReportItem.query.get(item_id)
+                            if target:
+                                target.transcript = text[:8000]
+                                db.session.commit()
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning(
+                            f'report item whisper failed item={item_id}: {e}')
+            submit_task(_run_transcribe, task_type='proximate_report_whisper')
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f'report whisper schedule failed: {e}')
+
+    return jsonify({'success': True, 'item': item.to_dict()})
+
+
+@proximate_bp.route('/report-package/<token>/items/<int:item_id>',
+                    methods=['DELETE'])
+def api_delete_report_item(token, item_id):
+    from app.models import ProximateReportItem
+    pkg, err = _package_for_token_or_404(token)
+    if err:
+        return err
+    if pkg.status not in ('draft', 'changes_requested'):
+        return jsonify({'success': False, 'error': 'not editable'}), 409
+    item = ProximateReportItem.query.filter_by(
+        id=item_id, package_id=pkg.id,
+    ).first()
+    if not item:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    db.session.delete(item)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@proximate_bp.route('/report-package/<token>/submit', methods=['POST'])
+def api_submit_report_package(token):
+    """Public. Partner locks the package for OB review. The AI compile
+    runs in the background — partners are often on slow connections and
+    must not wait on an AI call; publish re-compiles if this one missed."""
+    pkg, err = _package_for_token_or_404(token)
+    if err:
+        return err
+    if pkg.status not in ('draft', 'changes_requested'):
+        return jsonify({'success': False, 'error': 'already submitted'}), 409
+    pkg.status = 'submitted'
+    pkg.submitted_at = datetime.now(timezone.utc)
+    pkg.ob_notes = None
+    db.session.commit()
+    try:
+        from app.utils.background import submit_task
+        from flask import current_app as _ca
+        _app = _ca._get_current_object()
+        pkg_id = pkg.id
+
+        def _run_compile():
+            with _app.app_context():
+                try:
+                    from app.models import ProximateReportPackage as _Pkg
+                    target = _Pkg.query.get(pkg_id)
+                    if target and target.status == 'submitted':
+                        _compile_package_narrative(target)
+                        db.session.commit()
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(
+                        f'package compile on submit failed pkg={pkg_id}: {e}')
+        submit_task(_run_compile, task_type='proximate_report_compile')
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f'package compile schedule failed: {e}')
+    AuditChainEntry.append(
+        action='proximate.report_package.submitted',
+        actor_email=f'token:{pkg.package_token[:8]}…',
+        subject_kind='proximate_report_package',
+        subject_id=pkg.id,
+        details={'round_id': pkg.round_id, 'partner_id': pkg.partner_id,
+                 'items': len(pkg.items)},
+    )
+    return jsonify({'success': True,
+                    'submitted_at': pkg.submitted_at.isoformat()})
+
+
+@proximate_bp.route('/report-items/<int:item_id>/file', methods=['GET'])
+@login_required
+def api_report_item_file(item_id):
+    """Stream one evidence file. OB always; scoped donor only when the
+    package is published AND the item is donor-visible."""
+    from flask import current_app as cap, send_file
+    from app.models import ProximateReportItem, ProximateReportPackage
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    item = ProximateReportItem.query.get(item_id)
+    if not item or not item.document:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    pkg = ProximateReportPackage.query.filter_by(
+        id=item.package_id, network_id=net.id,
+    ).first()
+    if not pkg:
+        return jsonify({'success': False, 'error': 'not found'}), 404
+    if not _user_is_ob(net):
+        donor, derr = _require_donor()
+        if derr:
+            return jsonify({'success': False, 'error': 'forbidden'}), 403
+        scope = _donor_round_scope_403(net, pkg.round_id)
+        if scope:
+            return scope
+        if pkg.status != 'published' or not item.donor_visible:
+            return jsonify({'success': False, 'error': 'forbidden'}), 403
+    filepath = os.path.join(
+        cap.config['UPLOAD_FOLDER'], item.document.stored_filename,
+    )
+    if not os.path.exists(filepath):
+        return jsonify({'success': False, 'error': 'file missing'}), 404
+    return send_file(filepath, mimetype=item.document.mime_type,
+                     download_name=item.document.original_filename)
 
 
 @proximate_bp.route('/partners/import-pif', methods=['POST'])
