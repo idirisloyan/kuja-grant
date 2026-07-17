@@ -1027,10 +1027,21 @@ def run_proximate_rbac(base):
         assert dl.status_code == 200 and any(
             p["id"] == pkg_id for p in dl.json().get("packages", [])), \
             "published package missing from donor list"
+        # Arabic narrative -> PDF must embed the shaped-Arabic font.
+        nr = ob.request("PATCH",
+                        f"{base}/api/proximate/report-packages/{pkg_id}",
+                        json={"narrative": {
+                            "summary_en": "Regression summary.",
+                            "summary_ar": "تم توزيع المساعدات في ولاية النيل الأزرق",
+                            "sections": []}},
+                        headers=_hdrs(OV), timeout=15)
+        assert nr.status_code == 200, f"narrative patch -> {nr.status_code}"
         # PDF renders for the OB (503 tolerated only if reportlab absent)
         pdf = get(ob, base, f"/api/proximate/report-packages/{pkg_id}/pdf",
                   override=OV)
         assert pdf.status_code in (200, 503), f"pdf -> {pdf.status_code}"
+        if pdf.status_code == 200:
+            assert b"Amiri" in pdf.content, "Arabic font not embedded in PDF"
         # Range request on the evidence file -> 206 partial (video scrub)
         rg = ob.get(f"{base}/api/proximate/report-items/{item['id']}/file",
                     headers={**_hdrs(OV), "Range": "bytes=0-9"}, timeout=15)

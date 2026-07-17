@@ -10030,6 +10030,11 @@ def api_report_package_pdf(package_id):
         return jsonify({'success': False,
                         'error': 'reportlab not installed on this deploy'}), 503
 
+    from app.utils.arabic_pdf import (
+        ensure_arabic_fonts, has_arabic, shape_ar, wrap_arabic,
+    )
+    arabic_ok = ensure_arabic_fonts()
+
     view = _package_view(pkg, for_donor=not is_ob)
     narrative = pkg.get_narrative() or {}
     buf = BytesIO()
@@ -10039,8 +10044,27 @@ def api_report_package_pdf(package_id):
     INK = (0.13, 0.12, 0.11)
     y = H - 20 * mm
 
+    def _line_ar(text, size=10, bold=False, gap=6.0, color=INK):
+        # Arabic: shaped + bidi-ordered, right-aligned. Amiri sits lower
+        # on the line than Helvetica, hence the slightly larger gap.
+        nonlocal y
+        font = 'Amiri-Bold' if bold else 'Amiri'
+        for logical in wrap_arabic(text, font, size, W - 40 * mm):
+            if y < 25 * mm:
+                c.showPage()
+                y = H - 20 * mm
+            c.setFillColorRGB(*color)
+            c.setFont(font, size)
+            c.drawRightString(W - 20 * mm, y, shape_ar(logical))
+            y -= gap * mm
+        c.setFillColorRGB(*INK)
+
     def _line(text, size=10, bold=False, gap=5.2, color=INK):
         nonlocal y
+        text = text or ''
+        if arabic_ok and has_arabic(text):
+            _line_ar(text, size=size, bold=bold, color=color)
+            return
         if y < 25 * mm:
             c.showPage()
             y = H - 20 * mm
@@ -10082,17 +10106,28 @@ def api_report_package_pdf(package_id):
     c.setFillColorRGB(*INK)
     y = H - band_h - 10 * mm
     _line(f"{partner.get('name', '')} — {rnd.get('title', '')}", 12, bold=True)
+    if arabic_ok and partner.get('name_ar'):
+        _line(partner['name_ar'], 11, bold=True)
     _line(f"Status: {pkg.status}"
           + (f"   Locality: {partner.get('locality')}"
              if partner.get('locality') else ''), 9, color=(0.45, 0.43, 0.42))
     y -= 3 * mm
-    if narrative.get('summary_en'):
+    if narrative.get('summary_en') or narrative.get('summary_ar'):
         _section('Summary')
-        _line(narrative['summary_en'], 10)
+        if narrative.get('summary_en'):
+            _line(narrative['summary_en'], 10)
+        if arabic_ok and narrative.get('summary_ar'):
+            y -= 1 * mm
+            _line(narrative['summary_ar'], 11)
         y -= 2 * mm
     for sec in (narrative.get('sections') or [])[:8]:
         _section(sec.get('title_en', ''))
         _line(sec.get('body_en', ''), 9.5)
+        if arabic_ok and sec.get('title_ar'):
+            y -= 1 * mm
+            _line(sec['title_ar'], 10.5, bold=True)
+        if arabic_ok and sec.get('body_ar'):
+            _line(sec['body_ar'], 10.5)
         y -= 2 * mm
 
     answers = pkg.get_answers()
