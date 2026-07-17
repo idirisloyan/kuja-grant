@@ -993,3 +993,21 @@ Most items DONE 2026-07-17 in `82752d8d1`:
   before Blue Nile reporting. Still open: designed cover page.
 - **Report package WhatsApp nudges:** STILL BLOCKED on Meta template
   approval. Once cleared, add a "remind partner" send + a due-date cron.
+
+## 17-July QA follow-up (media gate + audit-chain 403)
+
+- **Media-safeguarding negative case: PROVEN on prod** (demo round 8,
+  package 3, demo partner "River Bend Aid Circle"): mixed package with
+  one approved + one internal-only item — OB sees both; donor sees only
+  the approved item; donor detail/list/PDF contain no trace of the
+  hidden caption/filename; hidden file stream returns 403 to the donor.
+  Same negative case is now PINNED in `regression.py`
+  `report_package_flow` (still 93 checks) so it can never regress.
+- **Audit-chain console 403s: triaged, not a defect.** The 403s QA saw
+  come from the OB account visiting PLATFORM-ADMIN pages:
+  `/admin/audit-chain` (admin-only `/api/audit-chain/recent` +
+  `/verify`) and `/observability` (admin-only `/api/ai/observability`).
+  Deny-by-default RBAC working as designed; no data returned, no leak;
+  the OB's own surfaces produce zero console errors. Optional polish
+  (not filed, per QA): show a friendly "admin access required" state on
+  those pages instead of a silently empty panel.

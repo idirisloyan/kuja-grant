@@ -961,6 +961,19 @@ def run_proximate_rbac(base):
         item = up.json()["item"]
         assert item["donor_visible"] is False, "media not internal by default!"
 
+        # a SECOND item that stays internal-only — the safeguarding
+        # negative case: the donor must never see any trace of it.
+        up2 = anon.post(f"{base}/api/proximate/report-package/{tok}/items",
+                        data={"kind": "photo",
+                              "caption": "INTERNAL-ONLY-REGRESSION-XYZZY"},
+                        files={"file": ("hidden-evidence-xyzzy.png",
+                                        io.BytesIO(png), "image/png")},
+                        headers={"X-Network-Override": OV,
+                                 "X-Requested-With": "XMLHttpRequest"},
+                        timeout=30)
+        assert up2.status_code == 200, f"hidden upload -> {up2.status_code}"
+        hidden = up2.json()["item"]
+
         # OB flags the item with a per-item fix request; the partner's
         # token view carries the note.
         fl = ob.request("PATCH",
@@ -996,12 +1009,15 @@ def run_proximate_rbac(base):
         assert sub.status_code == 200, f"submit -> {sub.status_code}"
         assert anon.post(f"{base}/api/proximate/report-package/{tok}/submit",
                          headers=H, timeout=15).status_code == 409
-        # resubmission clears per-item fix requests
+        # resubmission clears per-item fix requests; OB sees BOTH items
         ob_view = get(ob, base, f"/api/proximate/report-packages/{pkg_id}",
                       override=OV).json()
         assert all(not i.get("change_request")
                    for i in ob_view.get("items", [])), \
             "change_request not cleared on submit"
+        ob_ids = {i["id"] for i in ob_view.get("items", [])}
+        assert {item["id"], hidden["id"]} <= ob_ids, \
+            f"OB missing items: {ob_ids}"
 
         # OB approves the photo for donor eyes + publishes
         vis = ob.request("PATCH",
@@ -1021,6 +1037,21 @@ def run_proximate_rbac(base):
         assert "package_token" not in dv2.text, "token leaked to donor"
         assert all(i["donor_visible"] for i in body.get("items", [])), \
             "internal item leaked to donor"
+        d_items = body.get("items", [])
+        assert [i["id"] for i in d_items] == [item["id"]], \
+            f"donor item set wrong: {[i['id'] for i in d_items]}"
+        assert "INTERNAL-ONLY-REGRESSION-XYZZY" not in dv2.text \
+            and "hidden-evidence-xyzzy" not in dv2.text, \
+            "hidden item caption/filename leaked to donor"
+        # hidden file stream must be denied; approved one must stream
+        hfile = donor.get(
+            f"{base}/api/proximate/report-items/{hidden['id']}/file",
+            headers=_hdrs(OV), timeout=15)
+        assert hfile.status_code == 403, f"hidden file -> {hfile.status_code}"
+        afile = donor.get(
+            f"{base}/api/proximate/report-items/{item['id']}/file",
+            headers=_hdrs(OV), timeout=15)
+        assert afile.status_code == 200, f"approved file -> {afile.status_code}"
         # donor list endpoint includes it
         dl = get(donor, base, "/api/proximate/donors/me/report-packages",
                  override=OV)
