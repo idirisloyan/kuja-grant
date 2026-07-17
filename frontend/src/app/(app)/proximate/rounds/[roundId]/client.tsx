@@ -22,6 +22,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
+import { SelectionVoteCard } from '@/components/proximate/selection-vote-card';
 import {
   ProximateAttachmentsPanel, PanelRosterPanel,
 } from '@/components/proximate/dd-evidence';
@@ -1007,6 +1008,13 @@ export function ProximateRoundDetailClient() {
             </Card>
             );
           })()}
+
+          {/* Panel selection vote — the digital replacement for the
+              physical selection meeting. OB-only card; renders nothing
+              for other personas. */}
+          {isOperator && participants.length > 0 && (
+            <SelectionVoteCard roundId={Number(roundId)} isOperator={isOperator} />
+          )}
 
           {/* Phase 715b — Add-partner dialog. Renders as a lightweight
               inline modal so we don't need to pull in a Dialog primitive.

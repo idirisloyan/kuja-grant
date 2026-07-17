@@ -799,6 +799,90 @@ def run_proximate_rbac(base):
             assert r0.get("payload_hash") and "seq" in r0, "hash fields missing"
     check("audit export: complete + tenant-scoped + redacted", audit_export_integrity)
 
+    # --- PANEL SELECTION VOTE (July 2026): full token-link loop + authz.
+    # The selection meeting is the highest-stakes decision in a round, so
+    # the gate walks the whole flow every run: OB opens (donor is denied),
+    # an anonymous panelist votes ONCE via token (replay 409s, bad token
+    # 404s), OB closes (donor denied), majority outcome recorded. ---
+    def selection_vote_flow():
+        import requests as _rq
+        # A round with a live roster (participants endpoint, not detail).
+        vote_rid = None
+        for rr in _list(get(ob, base, "/api/proximate/rounds", override=OV)):
+            pr = get(ob, base,
+                     f"/api/proximate/rounds/{rr['id']}/participants",
+                     override=OV)
+            if pr.status_code != 200:
+                continue
+            active = [p for p in (pr.json().get("participants") or [])
+                      if p.get("stage") != "withdrawn"]
+            if active:
+                vote_rid = rr["id"]
+                break
+        assert vote_rid, "no round with roster to vote on"
+        vp = f"/api/proximate/rounds/{vote_rid}/selection-vote"
+
+        # Ensure an appointed panelist exists for this round.
+        pc = ob.post(f"{base}/api/proximate/panel-candidates",
+                     json={"name": "Regression Panelist", "round_id": vote_rid,
+                           "phone": "+249900000000"},
+                     headers=_hdrs(OV), timeout=30)
+        assert pc.status_code == 200, f"panel-candidate create -> {pc.status_code}"
+        cid = pc.json()["candidate"]["id"]
+        pa = ob.request("PATCH", f"{base}/api/proximate/panel-candidates/{cid}",
+                        json={"status": "appointed"}, headers=_hdrs(OV),
+                        timeout=30)
+        assert pa.status_code == 200, f"appoint -> {pa.status_code}"
+
+        # Donor must NOT be able to open a vote.
+        dv = donor.post(f"{base}{vp}", json={}, headers=_hdrs(OV), timeout=30)
+        assert dv.status_code == 403, f"donor open vote -> {dv.status_code}"
+
+        # OB opens (a leftover open session from a prior run is closed first).
+        ov_resp = ob.post(f"{base}{vp}", json={}, headers=_hdrs(OV), timeout=30)
+        if ov_resp.status_code == 409:
+            ob.post(f"{base}{vp}/close", json={}, headers=_hdrs(OV), timeout=30)
+            ov_resp = ob.post(f"{base}{vp}", json={}, headers=_hdrs(OV),
+                              timeout=30)
+        assert ov_resp.status_code == 200, (
+            f"OB open vote -> {ov_resp.status_code}: {ov_resp.text[:160]}")
+        invites = ov_resp.json().get("invites") or []
+        assert invites and invites[0].get("vote_token"), "no invite token"
+        token = invites[0]["vote_token"]
+        ballot = ov_resp.json()["session"]["ballot"]
+        assert ballot, "empty ballot"
+
+        # Anonymous panelist: bad token 404, real token 200, vote once,
+        # replay 409.
+        anon = _rq.Session()
+        assert anon.get(f"{base}/api/proximate/selection-vote/deadbeef",
+                        headers=_hdrs(OV), timeout=15).status_code == 404
+        bal = anon.get(f"{base}/api/proximate/selection-vote/{token}",
+                       headers=_hdrs(OV), timeout=15)
+        assert bal.status_code == 200, f"ballot fetch -> {bal.status_code}"
+        first_pid = str(ballot[0]["participant_id"])
+        cast = anon.post(f"{base}/api/proximate/selection-vote/{token}",
+                         json={"choices": {first_pid: "select"}},
+                         headers=_hdrs(OV), timeout=15)
+        assert cast.status_code == 200, f"cast -> {cast.status_code}: {cast.text[:160]}"
+        replay = anon.post(f"{base}/api/proximate/selection-vote/{token}",
+                           json={"choices": {first_pid: "select"}},
+                           headers=_hdrs(OV), timeout=15)
+        assert replay.status_code == 409, f"replay -> {replay.status_code}"
+
+        # Donor cannot close; OB closes; majority outcome recorded.
+        dc = donor.post(f"{base}{vp}/close", json={}, headers=_hdrs(OV),
+                        timeout=30)
+        assert dc.status_code == 403, f"donor close -> {dc.status_code}"
+        cl = ob.post(f"{base}{vp}/close", json={}, headers=_hdrs(OV),
+                     timeout=30)
+        assert cl.status_code == 200, f"OB close -> {cl.status_code}"
+        outcome = cl.json()["session"]["outcome"]
+        assert int(first_pid) in outcome["selected_participant_ids"], (
+            f"1–0 majority not selected: {outcome}")
+    check("selection vote: token loop + one-shot + OB-only open/close",
+          selection_vote_flow)
+
     # --- unauthenticated caller: no data, no 5xx ---
     def unauth_denied():
         anon = requests.Session()

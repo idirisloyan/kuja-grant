@@ -234,6 +234,7 @@ interface MediaVerification {
   responsible_individual_mention: string | null;
   overall_verdict: string;
   notes: string | null;
+  source?: string | null;
   reviewed_at: string | null;
 }
 
@@ -248,6 +249,8 @@ export function MediaVerificationPanel({ partnerId }: { partnerId: number }) {
   const [latest, setLatest] = useState<MediaVerification | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState('');
   const [link, setLink] = useState('');
   const [summary, setSummary] = useState('');
   const [verdict, setVerdict] = useState('no_footprint');
@@ -275,6 +278,24 @@ export function MediaVerificationPanel({ partnerId }: { partnerId: number }) {
     }
   };
 
+  // AI web check — Claude + live web search finds links/mentions and files
+  // a DRAFT row (source ai_web_search). The human verdict via "Record
+  // check" remains the authoritative record.
+  const runAiCheck = async () => {
+    setAiBusy(true);
+    setAiError('');
+    try {
+      await api.post(
+        `/api/proximate/partners/${partnerId}/media-verification/ai-check`, {},
+      );
+      refresh();
+    } catch {
+      setAiError('Web check failed — try again or record manually.');
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   return (
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-2">
@@ -285,10 +306,20 @@ export function MediaVerificationPanel({ partnerId }: { partnerId: number }) {
             {latest.overall_verdict.replace(/_/g, ' ')}
           </Badge>
         )}
+        {latest?.source === 'ai_web_search' && (
+          <Badge variant="outline" className="text-[10px] bg-violet-100 text-violet-800 border-violet-300">
+            AI draft
+          </Badge>
+        )}
+        <Button size="sm" variant="outline" disabled={aiBusy} onClick={runAiCheck}>
+          {aiBusy && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
+          {aiBusy ? 'Searching…' : 'Run web check'}
+        </Button>
         <Button size="sm" variant="outline" onClick={() => setFormOpen((v) => !v)}>
           {latest ? 'Re-verify' : 'Record check'}
         </Button>
       </div>
+      {aiError && <p className="text-xs text-rose-600 mb-2">{aiError}</p>}
       {latest ? (
         <div className="text-xs space-y-1">
           {latest.links.map((u) => (

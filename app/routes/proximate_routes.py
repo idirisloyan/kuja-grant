@@ -8872,6 +8872,97 @@ def api_partner_media_verification(partner_id):
     return jsonify({'success': True, 'media_verification': mv.to_dict()})
 
 
+@proximate_bp.route('/partners/<int:partner_id>/media-verification/ai-check',
+                    methods=['POST'])
+@login_required
+def api_partner_media_verification_ai_check(partner_id):
+    """AI-assisted media check — runs the adverse-media web screen (Claude +
+    live web search) and stores the outcome as a DRAFT verification row.
+
+    The AI does the legwork (finding links + mentions); the verdict stays
+    conservative — 'inconclusive' unless the screen flagged something
+    ('negative'), or found nothing at all ('no_footprint') — so a human
+    still reviews and posts the final manual record. source='ai_web_search'
+    keeps the two kinds of row distinguishable forever.
+    """
+    from app.models import ProximateMediaVerification
+    from app.services.adverse_media_service import AdverseMediaService
+    import json as _json
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=net.id,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'partner not found'}), 404
+
+    leadership = []
+    intake = partner.get_intake_form() if hasattr(partner, 'get_intake_form') else {}
+    if isinstance(intake, dict):
+        for key in ('contact_name', 'responsible_person', 'lead_name'):
+            v = (intake.get(key) or '').strip() if isinstance(intake.get(key), str) else ''
+            if v:
+                leadership.append(v)
+
+    screening = AdverseMediaService.screen(
+        org_name=partner.name,
+        country=partner.country or 'SD',
+        leadership=leadership[:3] or None,
+    )
+    findings = screening.get('findings') or []
+    summary = screening.get('summary') or {}
+    overall = summary.get('overall_status') or 'clear'
+
+    links = [f.get('url') for f in findings if f.get('url')][:10]
+    mention_bits = [
+        f"[{f.get('severity', '?')}] {f.get('headline', '')}"
+        for f in findings[:5]
+    ]
+    if overall == 'flagged':
+        verdict = 'negative'
+    elif findings:
+        verdict = 'inconclusive'
+    else:
+        verdict = 'no_footprint'
+
+    mv = ProximateMediaVerification(
+        network_id=net.id,
+        partner_id=partner.id,
+        links_json=_json.dumps([str(u)[:500] for u in links]),
+        interaction_summary=(screening.get('ai_notes') or '')[:2000] or None,
+        external_mention='; '.join(mention_bits)[:300] or None,
+        overall_verdict=verdict,
+        notes=('AI draft — review the links and post your own verdict. '
+               f"Source: {screening.get('source', 'ai')}, "
+               f"confidence {screening.get('ai_confidence', '?')}/100.")[:2000],
+        source='ai_web_search',
+        reviewed_by_user_id=current_user.id,
+    )
+    db.session.add(mv)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.partner.media_ai_checked',
+        actor_email=current_user.email,
+        subject_kind='proximate_partner',
+        subject_id=partner.id,
+        details={'verdict': verdict, 'findings': len(findings),
+                 'overall_status': overall,
+                 'media_verification_id': mv.id,
+                 'ai_source': screening.get('source')},
+    )
+    return jsonify({
+        'success': True,
+        'media_verification': mv.to_dict(),
+        'findings_count': len(findings),
+        'overall_status': overall,
+    })
+
+
 @proximate_bp.route('/panel-candidates', methods=['GET', 'POST'])
 @login_required
 def api_panel_candidates():
@@ -8967,6 +9058,269 @@ def api_update_panel_candidate(candidate_id):
         details={'status': cand.status},
     )
     return jsonify({'success': True, 'candidate': cand.to_dict()})
+
+
+# ----------------------------------------------------------------------
+# Panel selection vote — token-link voting for the round selection
+# meeting. One session per round; each appointed panelist gets a
+# personal one-shot ballot link (same zero-login pattern as endorser
+# invites). OB opens, panelists tap, OB closes; everything audit-chained.
+# ----------------------------------------------------------------------
+
+def _vote_session_tally(session):
+    """Live tally from submitted ballots: {pid: {'select': n, 'pass': n}}."""
+    tally = {str(b['participant_id']): {'select': 0, 'pass': 0}
+             for b in session.get_ballot()}
+    voted = 0
+    for inv in session.invites:
+        if not inv.voted_at:
+            continue
+        voted += 1
+        for pid, choice in inv.get_votes().items():
+            if pid in tally and choice in ('select', 'pass'):
+                tally[pid][choice] += 1
+    return tally, voted
+
+
+@proximate_bp.route('/rounds/<int:round_id>/selection-vote',
+                    methods=['GET', 'POST'])
+@login_required
+def api_round_selection_vote(round_id):
+    """GET: latest session + live tally (OB view, includes share tokens).
+    POST: open a new session. Panelists default to the round's APPOINTED
+    panel candidates (override with panel_candidate_ids); the ballot is
+    the round's non-withdrawn roster, frozen at open."""
+    from app.models import (
+        ProximatePanelVoteSession, ProximatePanelVoteInvite,
+        ProximatePanelCandidate, ProximateRound, ProximateRoundParticipant,
+    )
+    import json as _json
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    rnd = ProximateRound.query.filter_by(
+        id=round_id, network_id=net.id,
+    ).first()
+    if not rnd:
+        return jsonify({'success': False, 'error': 'round not found'}), 404
+
+    if request.method == 'GET':
+        session = (ProximatePanelVoteSession.query
+                   .filter_by(round_id=rnd.id, network_id=net.id)
+                   .order_by(ProximatePanelVoteSession.created_at.desc())
+                   .first())
+        if not session:
+            return jsonify({'success': True, 'session': None})
+        tally, voted = _vote_session_tally(session)
+        return jsonify({
+            'success': True,
+            'session': session.to_dict(),
+            'invites': [i.to_dict(include_token=True)
+                        for i in session.invites],
+            'tally': tally,
+            'voted': voted,
+            'invited': len(session.invites),
+        })
+
+    existing = ProximatePanelVoteSession.query.filter_by(
+        round_id=rnd.id, network_id=net.id, status='open',
+    ).first()
+    if existing:
+        return jsonify({
+            'success': False, 'error': 'vote_already_open',
+            'session_id': existing.id,
+        }), 409
+
+    participants = (ProximateRoundParticipant.query
+                    .filter_by(round_id=rnd.id)
+                    .filter(ProximateRoundParticipant.stage != 'withdrawn')
+                    .all())
+    if not participants:
+        return jsonify({
+            'success': False, 'error': 'roster_empty',
+        }), 400
+
+    body = get_request_json() or {}
+    cand_q = ProximatePanelCandidate.query.filter_by(network_id=net.id)
+    ids = body.get('panel_candidate_ids')
+    if isinstance(ids, list) and ids:
+        cands = cand_q.filter(ProximatePanelCandidate.id.in_(
+            [int(i) for i in ids if str(i).isdigit()])).all()
+    else:
+        cands = cand_q.filter_by(round_id=rnd.id, status='appointed').all()
+    if not cands:
+        return jsonify({
+            'success': False, 'error': 'no_appointed_panelists',
+        }), 400
+
+    ballot = []
+    for p in participants:
+        partner = getattr(p, 'partner', None) or ProximatePartner.query.get(
+            p.partner_id)
+        ballot.append({
+            'participant_id': p.id,
+            'partner_id': p.partner_id,
+            'partner_name': (partner.name if partner else None)
+                or f'Partner #{p.partner_id}',
+            'partner_name_ar': getattr(partner, 'name_ar', None),
+            'locality': getattr(partner, 'locality', None),
+        })
+
+    session = ProximatePanelVoteSession(
+        network_id=net.id,
+        round_id=rnd.id,
+        ballot_json=_json.dumps(ballot),
+        created_by_user_id=current_user.id,
+    )
+    db.session.add(session)
+    db.session.flush()
+    for c in cands:
+        db.session.add(ProximatePanelVoteInvite(
+            session_id=session.id,
+            panel_candidate_id=c.id,
+            voter_name=c.name,
+            voter_phone=c.phone,
+        ))
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.round.selection_vote_opened',
+        actor_email=current_user.email,
+        subject_kind='proximate_round',
+        subject_id=rnd.id,
+        details={'session_id': session.id, 'ballot_size': len(ballot),
+                 'panelists': len(cands)},
+    )
+    return jsonify({
+        'success': True,
+        'session': session.to_dict(),
+        'invites': [i.to_dict(include_token=True) for i in session.invites],
+    })
+
+
+@proximate_bp.route('/rounds/<int:round_id>/selection-vote/close',
+                    methods=['POST'])
+@login_required
+def api_round_selection_vote_close(round_id):
+    """OB closes the vote: strict majority of CAST ballots selects a
+    partner (select > pass; ties are not selected — the OB decides those
+    outside the tally). The outcome is recorded, not auto-applied to the
+    roster: the system records, the OB acts."""
+    from app.models import ProximatePanelVoteSession, ProximateRound
+    import json as _json
+
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    rnd = ProximateRound.query.filter_by(
+        id=round_id, network_id=net.id,
+    ).first()
+    if not rnd:
+        return jsonify({'success': False, 'error': 'round not found'}), 404
+    session = ProximatePanelVoteSession.query.filter_by(
+        round_id=rnd.id, network_id=net.id, status='open',
+    ).first()
+    if not session:
+        return jsonify({'success': False, 'error': 'no open vote'}), 404
+
+    tally, voted = _vote_session_tally(session)
+    selected = [int(pid) for pid, t in tally.items()
+                if t['select'] > t['pass']]
+    outcome = {
+        'selected_participant_ids': selected,
+        'tally': tally,
+        'voted': voted,
+        'invited': len(session.invites),
+    }
+    session.outcome_json = _json.dumps(outcome)
+    session.status = 'closed'
+    session.closed_by_user_id = current_user.id
+    session.closed_at = datetime.now(timezone.utc)
+    db.session.commit()
+    AuditChainEntry.append(
+        action='proximate.round.selection_vote_closed',
+        actor_email=current_user.email,
+        subject_kind='proximate_round',
+        subject_id=rnd.id,
+        details={'session_id': session.id, **outcome},
+    )
+    return jsonify({'success': True, 'session': session.to_dict()})
+
+
+@proximate_bp.route('/selection-vote/<token>', methods=['GET'])
+def api_get_selection_vote_ballot(token):
+    """Public. Panelist opens their WhatsApp link cold — returns the
+    ballot (partner names only, no internal detail) + whether they
+    already voted."""
+    from app.models import ProximatePanelVoteInvite, ProximateRound
+    inv = ProximatePanelVoteInvite.query.filter_by(vote_token=token).first()
+    if not inv:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    session = inv.session
+    rnd = ProximateRound.query.get(session.round_id)
+    return jsonify({
+        'success': True,
+        'voter_name': inv.voter_name,
+        'already_voted': inv.voted_at is not None,
+        'vote_open': session.status == 'open',
+        'round': {
+            'title': rnd.title if rnd else None,
+            'title_ar': getattr(rnd, 'title_ar', None),
+        },
+        'ballot': session.get_ballot(),
+    })
+
+
+@proximate_bp.route('/selection-vote/<token>', methods=['POST'])
+def api_submit_selection_vote(token):
+    """Public. One-shot ballot submit. Body: {choices: {"<participant_id>":
+    "select"|"pass"}, note?}. Anything not on the frozen ballot is
+    ignored; anything on the ballot but missing defaults to 'pass'."""
+    from app.models import ProximatePanelVoteInvite
+    import json as _json
+
+    inv = ProximatePanelVoteInvite.query.filter_by(vote_token=token).first()
+    if not inv:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    if inv.voted_at is not None:
+        return jsonify({'success': False, 'error': 'already_voted'}), 409
+    session = inv.session
+    if session.status != 'open':
+        return jsonify({'success': False, 'error': 'vote_closed'}), 409
+
+    body = get_request_json() or {}
+    raw = body.get('choices') or {}
+    if not isinstance(raw, dict):
+        return jsonify({'success': False, 'error': 'choices must be an object'}), 400
+    ballot_ids = {str(b['participant_id']) for b in session.get_ballot()}
+    votes = {}
+    for pid in ballot_ids:
+        choice = str(raw.get(pid, 'pass')).strip().lower()
+        votes[pid] = choice if choice in ('select', 'pass') else 'pass'
+
+    inv.votes_json = _json.dumps(votes)
+    inv.note = (str(body.get('note') or '').strip()[:2000]) or None
+    inv.voted_at = datetime.now(timezone.utc)
+    db.session.commit()
+    selected_count = sum(1 for v in votes.values() if v == 'select')
+    AuditChainEntry.append(
+        action='proximate.round.selection_vote_cast',
+        actor_email=f'panelist:{inv.vote_token[:8]}…',
+        subject_kind='proximate_round',
+        subject_id=session.round_id,
+        # Counts only — individual choices stay in the DB row, visible
+        # to OB, never on the public transparency surface.
+        details={'session_id': session.id, 'invite_id': inv.id,
+                 'selected': selected_count,
+                 'passed': len(votes) - selected_count},
+    )
+    return jsonify({'success': True, 'voted_at': inv.voted_at.isoformat()})
 
 
 @proximate_bp.route('/partners/import-pif', methods=['POST'])

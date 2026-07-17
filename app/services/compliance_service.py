@@ -22,6 +22,9 @@ from app.utils.cache import _sanctions_cache, _list_cache
 logger = logging.getLogger('kuja')
 
 OPENSANCTIONS_API_KEY = os.getenv('OPENSANCTIONS_API_KEY', '')
+# SAM.gov Exclusions (US federal debarment) — free key from api.data.gov.
+# When unset the check is skipped entirely so screening output is unchanged.
+SAM_GOV_API_KEY = os.getenv('SAM_GOV_API_KEY', '')
 
 
 class ComplianceService:
@@ -57,6 +60,11 @@ class ComplianceService:
             checks.append(cls._download_and_check_ofac(org_name))
             checks.append(cls._download_and_check_eu(org_name))
             checks.append(cls._check_world_bank_fallback(org_name))
+
+        # SAM.gov Exclusions — Proximate teams screen partners on sam.gov by
+        # hand today; with a key configured this makes it a first-class check.
+        if SAM_GOV_API_KEY:
+            checks.append(cls._check_sam_exclusions(org_name))
 
         # Supplementary keyword check
         keyword_flagged = any(kw in org_name.lower() for kw in cls.FLAGGED_KEYWORDS)
@@ -585,6 +593,92 @@ class ComplianceService:
                 'source': 'not_available',
             },
         }
+
+    @classmethod
+    def _check_sam_exclusions(cls, org_name):
+        """SAM.gov Exclusions API (US federal debarments).
+
+        Never raises: network/API trouble degrades to status='pending' so a
+        SAM outage can't block partner intake. Results are fuzzy-matched
+        against the same threshold as the other lists to avoid flagging
+        every namesake.
+        """
+        cache_key = f'sam_exclusions_{org_name.lower()}'
+        cached = _sanctions_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        base = {
+            'check_type': 'sam_exclusions',
+            'result': {
+                'list': 'SAM.gov Exclusions (US federal debarment)',
+                'source': 'sam.gov',
+            },
+        }
+        try:
+            resp = requests.get(
+                'https://api.sam.gov/entity-information/v4/exclusions',
+                params={
+                    'api_key': SAM_GOV_API_KEY,
+                    'exclusionName': org_name,
+                    'isActive': 'Y',
+                },
+                timeout=8,
+            )
+            resp.raise_for_status()
+            data = resp.json() or {}
+            rows = data.get('excludedEntity') or data.get('entityData') or []
+            matches = []
+            for row in rows[:50]:
+                details = row.get('exclusionDetails') or {}
+                ident = row.get('exclusionIdentification') or {}
+                name = (
+                    details.get('exclusionName')
+                    or ident.get('exclusionName')
+                    or row.get('exclusionName')
+                    or ''
+                )
+                if not name:
+                    continue
+                score = SequenceMatcher(
+                    None, org_name.lower(), name.lower()).ratio()
+                if score >= cls.FUZZY_THRESHOLD:
+                    matches.append({
+                        'name': name,
+                        'match_score': round(score * 100),
+                        'exclusion_type': details.get('exclusionType')
+                            or row.get('exclusionType'),
+                        'classification': details.get('classificationType')
+                            or row.get('classificationType'),
+                    })
+            if matches:
+                best = max(m['match_score'] for m in matches)
+                base['status'] = 'flagged'
+                base['result'].update({
+                    'match_score': best,
+                    'reason': f'{len(matches)} active SAM.gov exclusion '
+                              f'match(es) for "{org_name}"',
+                    'matches': matches[:5],
+                    'action_required': 'Manual review required — confirm '
+                                       'identity before any funds move',
+                })
+            else:
+                base['status'] = 'clear'
+                base['result'].update({
+                    'match_score': 0,
+                    'message': 'No active SAM.gov exclusion matches',
+                    'records_screened': data.get('totalRecords', len(rows)),
+                })
+            _sanctions_cache.set(cache_key, base)
+        except Exception as e:
+            logger.warning(f"SAM.gov exclusions check failed for "
+                           f"'{org_name}': {e}")
+            base['status'] = 'pending'
+            base['result'].update({
+                'message': 'SAM.gov API unavailable — check not completed',
+                'error': str(e)[:200],
+            })
+        return base
 
     # --- Registration & Persistence ---
 
