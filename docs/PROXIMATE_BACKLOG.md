@@ -211,9 +211,12 @@ session; entries move to "Completed" below as each ships.
   crisis rows get attention-band severity badges (red = critical
   only), report-period dates, ?band= filter chips; pending-signal
   badges moved to the dark-safe tone system with humanized labels.
-- [ ] **Stage 4b** — audit chain two-level view (collapsed
-  action/user/time/record + expandable hash/payload), notifications
-  grouping, settings sections.
+- [x] **Stage 4b — audit chain two-level view** (`adcb07591`):
+  collapsed rows = seq/action/actor/subject/time; click expands
+  inline prev-hash/payload-hash/details row. Presentation only —
+  chain + export logic untouched per spec.
+- [ ] **Stage 4c** — notifications grouping + settings sections
+  (collapsible category groups per spec).
 - [ ] **Stage 5** — responsive/a11y/perf sweep (390px-first, focus,
   contrast, dark mode + RTL across redesigned pages).
 

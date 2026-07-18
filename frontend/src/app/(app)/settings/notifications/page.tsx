@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react';
 import {
   Bell, MessageSquare, Phone, Mail, Smartphone, Loader2, Check, X, Send, Info,
+  ChevronRight,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -74,6 +75,11 @@ export default function NotificationSettingsPage() {
   // Shared contact form
   const [phone, setPhone] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  // Redesign Stage 4 — collapsible category groups. Collapsed shows
+  // the category name + how many channels are on; expand to change
+  // individual channels. Keeps the page short on mobile without
+  // hiding whether a category is enabled.
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -213,10 +219,28 @@ export default function NotificationSettingsPage() {
             return (
               <div key={c.category} className="py-3 first:pt-0 last:pb-0">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold">{meta.label}</div>
-                    <div className="text-xs text-[hsl(var(--kuja-ink-soft))] mt-0.5">{meta.hint}</div>
-                  </div>
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left"
+                    aria-expanded={openCategory === c.category}
+                    onClick={() => setOpenCategory(
+                      openCategory === c.category ? null : c.category,
+                    )}
+                  >
+                    <div className="text-sm font-semibold flex items-center gap-1.5">
+                      <ChevronRight
+                        className={cn(
+                          'w-3.5 h-3.5 transition-transform',
+                          openCategory === c.category && 'rotate-90',
+                        )}
+                      />
+                      {meta.label}
+                      <span className="text-[10px] font-normal text-[hsl(var(--kuja-ink-soft))]">
+                        {c.channels.length} channel{c.channels.length === 1 ? '' : 's'} on
+                      </span>
+                    </div>
+                    <div className="text-xs text-[hsl(var(--kuja-ink-soft))] mt-0.5 ps-5">{meta.hint}</div>
+                  </button>
                   <button
                     type="button"
                     onClick={() => sendTest(c.category)}
@@ -225,7 +249,10 @@ export default function NotificationSettingsPage() {
                     <Send className="w-3 h-3" /> Test
                   </button>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
+                <div className={cn(
+                  'mt-2 flex-wrap gap-1.5 ps-5',
+                  openCategory === c.category ? 'flex' : 'hidden',
+                )}>
                   {prefs.catalog.channels.map((ch) => {
                     const cm = CHANNEL_LABELS[ch] ?? { label: ch, icon: Bell, muted: true };
                     const Icon = cm.icon;
