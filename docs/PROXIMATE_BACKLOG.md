@@ -1108,3 +1108,36 @@ Most items DONE 2026-07-17 in `82752d8d1`:
   the OB's own surfaces produce zero console errors. Optional polish
   (not filed, per QA): show a friendly "admin access required" state on
   those pages instead of a silently empty panel.
+
+## 18-July delivery-review response (8.8/10 wave) — `131044a7d`
+
+QA review of the redesign delivery doc scored 8.8/10 with two P1s.
+All code items fixed and prod-verified:
+
+- ~~P1 marketplace what's-new banner on Proximate pages~~ — DONE:
+  `whats-new-banner.tsx` now returns null on the Proximate tenant
+  (same leak class as the Phase 709 sidebar + command-palette fixes).
+  A Proximate-specific digest is a possible v2 if the team wants one.
+- ~~P1 donor report page showing OB-only safeguarding hint~~ — DONE
+  (defense-in-depth): could NOT be reproduced with a clean donor
+  session (both login flows show donor-safe copy); root cause class is
+  a stale client persona cache after an OB→donor account switch in the
+  same browser profile. Fix: `GET /report-packages/<id>` now returns a
+  session-derived `viewer` field and the page requires viewer=ob AND
+  persona=ob before rendering operator copy. Gate now asserts the
+  viewer field for both personas; browser smoke exercises the exact
+  account-switch path.
+- ~~P2 raw audit subject labels (`proximate_report_package #3`)~~ —
+  DONE: collapsed rows humanize subject kinds ("Report package #3");
+  raw kinds remain in the expanded Details JSON for verification.
+- **P2 "not yet Arabic-ready" (mixed EN/AR screens)** — OPEN, tracked
+  debt: guidance-engine strings (Phase 717) and several OB console
+  labels are English-only by design debt. Needs a dedicated Arabic
+  coverage wave + the standing native-speaker review. Not a quick fix;
+  scoped separately.
+- **P3 endorser approval confirm not exercisable on prod** — NO ACTION:
+  no pending endorsers on prod by design; flow verified locally 10/10
+  (Stage 3c) and the empty state is intentional.
+- **Testing improvements shipped with this wave:** armed-trigger banner
+  assertions, stale-account-switch donor view, humanized-audit-label
+  checks (verify_leak_fixes_*.py), viewer-field gate assertions.
