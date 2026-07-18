@@ -9,7 +9,7 @@
  * is surfaced inline so the OB can copy the partner-facing URL.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, Plus, Copy, Check } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -55,6 +55,33 @@ export default function ProximateDisbursementsPage() {
   const [rows, setRows] = useState<Disbursement[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<number | null>(null);
+  // Redesign Stage 3c — status filter chips, URL-persisted (same
+  // pattern as the rounds and partners registers).
+  const [statusFilter, setStatusFilter] = useState('all');
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get('status');
+    if (s) setStatusFilter(s);
+  }, []);
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (statusFilter && statusFilter !== 'all') sp.set('status', statusFilter);
+    else sp.delete('status');
+    const qs = sp.toString();
+    window.history.replaceState(
+      null, '', window.location.pathname + (qs ? `?${qs}` : ''),
+    );
+  }, [statusFilter]);
+  const statusCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const d of rows ?? []) c[d.status] = (c[d.status] || 0) + 1;
+    return c;
+  }, [rows]);
+  const visibleRows = useMemo(
+    () => (rows ?? []).filter(
+      (d) => statusFilter === 'all' || d.status === statusFilter,
+    ),
+    [rows, statusFilter],
+  );
 
   useEffect(() => {
     if (!isOperator) return; // Don't even fetch — donors aren't supposed to see this.
@@ -133,8 +160,31 @@ export default function ProximateDisbursementsPage() {
           </Card>
         )}
         {rows !== null && rows.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap mb-2">
+            {['all', 'draft', 'pending_cosign', 'disbursed', 'pending_report',
+              'reported', 'verified', 'flagged']
+              .filter((s) => s === 'all' || statusCounts[s])
+              .map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStatusFilter(s)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    statusFilter === s
+                      ? 'bg-foreground text-background border-foreground'
+                      : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
+                  }`}
+                >
+                  {s === 'all'
+                    ? `All (${rows.length})`
+                    : `${labelForProximateStatus(s, t)} (${statusCounts[s]})`}
+                </button>
+              ))}
+          </div>
+        )}
+        {visibleRows.length > 0 && (
           <ul className="space-y-2">
-            {rows.map((d) => (
+            {visibleRows.map((d) => (
               <li key={d.id}>
                 <Card className="p-4 hover:bg-muted/30 transition-colors">
                   <div className="flex items-start gap-3 flex-wrap">
