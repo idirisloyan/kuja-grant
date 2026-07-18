@@ -261,11 +261,19 @@ export function ProximateDonorClient() {
         ) : (
           rounds.map((r) => (
             <Card key={r.id} className="p-4 space-y-3">
+              {/* QA-18 item 11 — one clear hierarchy: title + status up
+                  top, ONE primary action (the full round report), and
+                  the secondary actions grouped consistently below. */}
               <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <h3 className="text-base font-medium">{r.title}</h3>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-medium">{r.title}</h3>
+                    <span className={`text-[10px] px-2 py-0.5 rounded border ${TONE_CLASSES[toneForProximateStatus(r.status)]}`}>
+                      {labelForProximateStatus(r.status, t)}
+                    </span>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    {r.trigger_type} · {r.status}
+                    {r.trigger_type}
                     {r.created_at && (
                       <span> · {new Date(r.created_at).toLocaleDateString()}</span>
                     )}
@@ -273,22 +281,10 @@ export function ProximateDonorClient() {
                 </div>
                 <Button
                   size="sm"
-                  variant={followedIds.includes(r.id) ? 'secondary' : 'outline'}
-                  onClick={() => toggleFollow(r.id)}
+                  onClick={() => window.open(`/proximate/rounds/${r.id}/report`, '_self')}
                 >
-                  {followedIds.includes(r.id)
-                    ? t('proximate.donor.following')
-                    : t('proximate.donor.follow')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    window.open(`${process.env.NEXT_PUBLIC_API_BASE || ''}${r.report_pdf_url}`, '_blank')
-                  }
-                >
-                  <FileText className="w-4 h-4 me-1" />
-                  {t('proximate.donor.download_pdf')}
+                  <ExternalLink className="w-4 h-4 me-1" />
+                  {t('proximate.donor.view_full_report')}
                 </Button>
               </div>
 
@@ -361,14 +357,27 @@ export function ProximateDonorClient() {
                 </div>
               )}
 
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => window.open(`/proximate/rounds/${r.id}/report`, '_self')}
-              >
-                <ExternalLink className="w-4 h-4 me-1" />
-                {t('proximate.donor.view_full_report')}
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap pt-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    window.open(`${process.env.NEXT_PUBLIC_API_BASE || ''}${r.report_pdf_url}`, '_blank')
+                  }
+                >
+                  <FileText className="w-4 h-4 me-1" />
+                  {t('proximate.donor.download_pdf')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => toggleFollow(r.id)}
+                >
+                  {followedIds.includes(r.id)
+                    ? t('proximate.donor.following')
+                    : t('proximate.donor.follow')}
+                </Button>
+              </div>
             </Card>
           ))
         )}
@@ -462,6 +471,7 @@ interface PublishedReport {
 }
 
 function DonorPublishedReports() {
+  const { t } = useTranslation();
   const [reports, setReports] = useState<PublishedReport[] | null>(null);
 
   useEffect(() => {
@@ -478,21 +488,47 @@ function DonorPublishedReports() {
         <FileText className="w-4 h-4 text-muted-foreground" />
         Partner reports
       </h2>
-      <div className="grid gap-2 sm:grid-cols-2">
+      {/* QA-18 items 9+10 — donor-grade report cards: partner name as
+          the title, round + date as metadata, a Published badge, and
+          "View report" as the unmistakable primary action with the PDF
+          as secondary. */}
+      <div className="grid gap-3 sm:grid-cols-2">
         {reports.map((r) => (
-          <a key={r.id} href={`/proximate/reports/${r.id}`}>
-            <Card className="p-3 hover:bg-muted/40 transition space-y-1">
-              <p className="text-sm font-medium truncate">{r.partner_name}</p>
-              <p className="text-xs text-muted-foreground truncate">
-                {r.round_title}
-                {r.published_at &&
-                  ` · ${new Date(r.published_at).toLocaleDateString()}`}
-              </p>
-              <p className="text-[11px] text-primary inline-flex items-center gap-1">
-                View report <ExternalLink className="w-3 h-3" />
-              </p>
-            </Card>
-          </a>
+          <Card
+            key={r.id}
+            className="p-4 space-y-2.5 hover:shadow-md hover:border-[hsl(var(--kuja-clay))]/40 transition cursor-pointer"
+            onClick={() => { window.location.href = `/proximate/reports/${r.id}`; }}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-semibold truncate">{r.partner_name}</p>
+              <span className={`text-[10px] px-2 py-0.5 rounded border shrink-0 ${TONE_CLASSES.positive}`}>
+                {labelForProximateStatus('published', t)}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground truncate">
+              {r.round_title}
+              {r.published_at &&
+                ` · ${new Date(r.published_at).toLocaleDateString()}`}
+            </p>
+            <div className="flex items-center gap-2 pt-0.5">
+              <Button size="sm" className="h-7 text-xs" onClick={(e) => {
+                e.stopPropagation();
+                window.location.href = `/proximate/reports/${r.id}`;
+              }}>
+                View report
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={(e) => {
+                e.stopPropagation();
+                window.open(
+                  `${process.env.NEXT_PUBLIC_API_BASE || ''}/api/proximate/report-packages/${r.id}/pdf`,
+                  '_blank',
+                );
+              }}>
+                <FileText className="w-3.5 h-3.5 me-1" />
+                Download PDF
+              </Button>
+            </div>
+          </Card>
         ))}
       </div>
     </section>
