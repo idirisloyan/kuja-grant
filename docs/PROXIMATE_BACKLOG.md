@@ -164,6 +164,28 @@ session; entries move to "Completed" below as each ships.
   no outcome link, donor dashboard clean (screenshots in Downloads).
   Deferred to redesign Stages 3/4: donor card layout polish (QA 8-11).
 
+### Consolidated redesign — Stages 1+2 shipped (2026-07-18)
+- [x] **Stage 1 — design system** (`2b79ba4fe`, prod-verified 8/8):
+  `components/proximate/status-badge.tsx` = ONE semantic status→tone
+  map (positive/attention/critical/active/neutral, dark-mode variants)
+  + `<ProximateStatusBadge>`; `empty-state.tsx` primitive; 8 per-page
+  inline color maps retired (the drift behind the green-flagged bug);
+  `labelForProximateStatus` no longer leaks raw keys for untranslated
+  codes; all core lists/details humanized.
+- [x] **Stage 2 — console shell** (`ff6f65bf5`, prod-verified 8/8):
+  sidebar grouped Workspace / Operations / Governance (Proximate OB
+  only; other tenants untouched); PageHeader `breadcrumbs` prop wired
+  on disbursement/round/partner detail; partners list filters persist
+  in the URL (`?status=&q=`, history.replaceState); command palette
+  (Ctrl/Cmd-K) is tenant-aware — Proximate personas get console
+  destinations, closing the marketplace-links leak (Phase 709 class).
+- [ ] **Stage 3** — dashboard, rounds, partners, partner detail,
+  disbursements page redesigns + donor polish (QA 8-11).
+- [ ] **Stage 4** — grants, endorser approvals, crisis signals, audit
+  chain two-level view, notifications, settings.
+- [ ] **Stage 5** — responsive/a11y/perf sweep (390px-first, focus,
+  contrast, dark mode + RTL across redesigned pages).
+
 ---
 
 ## High priority (next sprint candidates)
