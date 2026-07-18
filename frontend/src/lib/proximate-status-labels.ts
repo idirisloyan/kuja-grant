@@ -24,8 +24,12 @@ export function labelForProximateStatus(
   t?: (key: string) => string,
 ): string {
   if (!status) return '';
-  const translated = t ? t(`proximate.status.${status}`) : '';
-  if (translated) return translated;
+  // translate() falls back to the raw KEY when a locale lacks the entry,
+  // so "returned something truthy" is not "translated" — compare against
+  // the key or the fallback would leak "proximate.status.<code>" strings.
+  const key = `proximate.status.${status}`;
+  const translated = t ? t(key) : '';
+  if (translated && translated !== key) return translated;
   if (EN_FALLBACK[status]) return EN_FALLBACK[status];
   const pretty = status.replace(/_/g, ' ');
   return pretty.charAt(0).toUpperCase() + pretty.slice(1);

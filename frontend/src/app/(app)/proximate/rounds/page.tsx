@@ -18,6 +18,8 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
+import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -36,14 +38,6 @@ interface Round {
   signed_count: number;
   signers_required: number;
 }
-
-const STATUS_TONE: Record<string, string> = {
-  draft: 'bg-muted text-muted-foreground',
-  in_review: 'bg-amber-100 text-amber-800 border-amber-300',
-  active: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  closed: 'bg-blue-100 text-blue-800 border-blue-300',
-  cancelled: 'bg-red-100 text-red-800 border-red-300',
-};
 
 export default function ProximateRoundsPage() {
   const { t } = useTranslation();
@@ -113,8 +107,8 @@ export default function ProximateRoundsPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-medium truncate">{r.title}</h3>
-                          <Badge variant="outline" className={`text-[10px] ${STATUS_TONE[r.status] || ''}`}>
-                            {r.status}
+                          <Badge variant="outline" className={`text-[10px] ${TONE_CLASSES[toneForProximateStatus(r.status)]}`}>
+                            {labelForProximateStatus(r.status, t)}
                           </Badge>
                           {r.status === 'in_review' && (
                             <span className="text-xs text-muted-foreground">

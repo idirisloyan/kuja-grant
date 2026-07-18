@@ -17,6 +17,8 @@ import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { Button } from '@/components/ui/button';
 import {
   PageShell, PageHeader, PageMain,
@@ -32,14 +34,6 @@ interface Partner {
   sanctions_flag: boolean;
   endorsements_count?: number;
 }
-
-const statusStyles: Record<string, string> = {
-  nominated: 'bg-muted text-muted-foreground border-border',
-  endorsements_open: 'bg-amber-100 text-amber-800 border-amber-300',
-  dd_pending: 'bg-sky-100 text-sky-800 border-sky-300',
-  dd_clear: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  suspended: 'bg-rose-100 text-rose-800 border-rose-300',
-};
 
 export default function ProximatePartnersPage() {
   const { t } = useTranslation();
@@ -265,9 +259,9 @@ export default function ProximatePartnersPage() {
                         )}
                         <Badge
                           variant="outline"
-                          className={`text-[10px] ${statusStyles[p.status] || ''}`}
+                          className={`text-[10px] ${TONE_CLASSES[toneForProximateStatus(p.status)]}`}
                         >
-                          {p.status.replace(/_/g, ' ')}
+                          {labelForProximateStatus(p.status, t)}
                         </Badge>
                       </Link>
                     </li>

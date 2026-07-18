@@ -22,6 +22,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { NextStep, disbursementNextStep } from '@/components/proximate/next-step';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -106,14 +107,6 @@ interface OutcomeAttestation {
   ack_message: string | null;
   ack_message_at: string | null;
 }
-
-const STATUS_TONE: Record<string, string> = {
-  pending_cosign: 'bg-violet-100 text-violet-800 border-violet-300',
-  pending_report: 'bg-amber-100 text-amber-800 border-amber-300',
-  reported: 'bg-blue-100 text-blue-800 border-blue-300',
-  verified: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  flagged: 'bg-red-100 text-red-800 border-red-300',
-};
 
 export function ProximateDisbursementDetailClient() {
   const { t } = useTranslation();
@@ -331,7 +324,7 @@ export function ProximateDisbursementDetailClient() {
         title={data.partner_name || `Partner #${data.partner_id}`}
         subtitle={data.purpose || undefined}
         status={{
-          label: data.status,
+          label: labelForProximateStatus(data.status, t),
           tone: data.status === 'verified'
             ? 'good'
             : data.status === 'flagged'
@@ -745,13 +738,7 @@ export function ProximateDisbursementDetailClient() {
               </div>
               <span
                 className={`text-xs px-2 py-1 rounded border ${
-                  data.outcome.status === 'verified'
-                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                    : data.outcome.status === 'disputed'
-                      ? 'bg-red-100 text-red-800 border-red-300'
-                      : data.outcome.status === 'submitted'
-                        ? 'bg-blue-100 text-blue-800 border-blue-300'
-                        : 'bg-amber-100 text-amber-800 border-amber-300'
+                  TONE_CLASSES[toneForProximateStatus(data.outcome.status)]
                 }`}
               >
                 {t(`proximate.outcome.status_${data.outcome.status}`)}

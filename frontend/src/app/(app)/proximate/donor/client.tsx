@@ -20,6 +20,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 
 interface Donor {
   id: number;
@@ -352,13 +353,7 @@ export function ProximateDonorClient() {
                   {Object.entries(r.status_counts).map(([s, n]) => (
                     <span
                       key={s}
-                      className={`px-2 py-1 rounded border ${
-                        s === 'flagged'
-                          ? 'bg-red-100 text-red-800 border-red-300'
-                          : s === 'verified'
-                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                            : 'bg-muted text-muted-foreground border-border'
-                      }`}
+                      className={`px-2 py-1 rounded border ${TONE_CLASSES[toneForProximateStatus(s)]}`}
                     >
                       {n} {labelForProximateStatus(s, t)}
                     </span>

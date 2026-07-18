@@ -14,6 +14,8 @@ import { api } from '@/lib/api';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -34,14 +36,6 @@ interface Grant {
   reporting_next_due_at: string | null;
   status: string;
 }
-
-const statusStyles: Record<string, string> = {
-  draft: 'bg-muted text-muted-foreground border-border',
-  active: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  paused: 'bg-amber-100 text-amber-800 border-amber-300',
-  completed: 'bg-sky-100 text-sky-800 border-sky-300',
-  cancelled: 'bg-rose-100 text-rose-800 border-rose-300',
-};
 
 function fmtUsd(v: number | null | undefined): string {
   if (v === null || v === undefined) return '—';
@@ -165,7 +159,7 @@ export default function ProximateGrantsListPage() {
               {grants.length > 0 && (
                 <ul className="space-y-2">
                   {grants.map((g) => {
-                    const statusCls = statusStyles[g.status] || statusStyles.draft;
+                    const statusCls = TONE_CLASSES[toneForProximateStatus(g.status)];
                     const pctAllocated =
                       g.amount_committed_usd
                         ? Math.min(
@@ -198,7 +192,7 @@ export default function ProximateGrantsListPage() {
                               variant="outline"
                               className={`text-[10px] ${statusCls}`}
                             >
-                              {g.status}
+                              {labelForProximateStatus(g.status)}
                             </Badge>
                           </div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">

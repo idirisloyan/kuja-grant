@@ -20,6 +20,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -38,13 +39,6 @@ interface Disbursement {
   report_token: string | null;
   has_report: boolean;
 }
-
-const STATUS_TONE: Record<string, string> = {
-  pending_report: 'bg-amber-100 text-amber-800 border-amber-300',
-  reported: 'bg-blue-100 text-blue-800 border-blue-300',
-  verified: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  flagged: 'bg-red-100 text-red-800 border-red-300',
-};
 
 export default function ProximateDisbursementsPage() {
   const { t } = useTranslation();
@@ -149,7 +143,7 @@ export default function ProximateDisbursementsPage() {
                         <h3 className="font-medium truncate">
                           {d.partner_name || `Partner #${d.partner_id}`}
                         </h3>
-                        <Badge variant="outline" className={`text-[10px] ${STATUS_TONE[d.status] || ''}`}>
+                        <Badge variant="outline" className={`text-[10px] ${TONE_CLASSES[toneForProximateStatus(d.status)]}`}>
                           {labelForProximateStatus(d.status, t)}
                         </Badge>
                         {d.overdue && (

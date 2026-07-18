@@ -22,6 +22,8 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
+import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { SelectionVoteCard } from '@/components/proximate/selection-vote-card';
 import { ReportPackagesCard } from '@/components/proximate/report-packages-card';
 import { ApprovedActivitiesCard } from '@/components/proximate/approved-activities-card';
@@ -106,14 +108,6 @@ interface Resp {
   envelope_used?: number;
   envelope_remaining?: number | null;
 }
-
-const STATUS_TONE: Record<string, string> = {
-  draft: 'bg-muted text-muted-foreground',
-  in_review: 'bg-amber-100 text-amber-800 border-amber-300',
-  active: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  closed: 'bg-blue-100 text-blue-800 border-blue-300',
-  cancelled: 'bg-red-100 text-red-800 border-red-300',
-};
 
 export function ProximateRoundDetailClient() {
   const { t } = useTranslation();
@@ -541,8 +535,8 @@ export function ProximateRoundDetailClient() {
           {/* Status + meta */}
           <Card className="p-4 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className={STATUS_TONE[round.status]}>
-                {round.status}
+              <Badge variant="outline" className={TONE_CLASSES[toneForProximateStatus(round.status)]}>
+                {labelForProximateStatus(round.status, t)}
               </Badge>
               {round.status === 'in_review' && (
                 <span className="text-xs text-muted-foreground">
