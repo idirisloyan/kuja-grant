@@ -201,6 +201,11 @@ session; entries move to "Completed" below as each ships.
   NAME resolved on the pending endpoint (OB-only), Pending-review /
   sanctions badges, confirm-before-approve step, success note,
   spec empty-state copy.
+- [x] **Stage 3 (partner detail tabs)** (`59d4fb8f6`): OB view of
+  /proximate/endorse/[id] organized into Overview / Endorsements /
+  Due diligence / Disbursements tabs (?tab= in URL, CSS-hide
+  wrappers); Disbursements tab adds the partner's own disbursement
+  list. Endorser-facing wizard flow unchanged (no tab bar).
 - [ ] **Stage 4** — grants, crisis signals, audit chain two-level
   view, notifications, settings.
 - [ ] **Stage 5** — responsive/a11y/perf sweep (390px-first, focus,
