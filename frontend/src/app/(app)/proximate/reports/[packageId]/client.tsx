@@ -356,9 +356,14 @@ export function ProximateReportPackageClient() {
           <h2 className="text-sm font-semibold flex-1">
             Evidence ({items.length})
           </h2>
-          {isOperator && (
+          {isOperator ? (
             <p className="text-[10px] text-muted-foreground">
               Everything is internal until you make it donor-visible.
+            </p>
+          ) : (
+            <p className="text-[10px] text-muted-foreground">
+              Evidence included in this report has passed quality and
+              safeguarding review.
             </p>
           )}
         </div>

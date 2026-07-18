@@ -117,7 +117,9 @@ export function disbursementNextStep(d: {
     case 'verified':
       return { label: 'Verified. A 90-day outcome attestation obligation is now tracked.', tone: 'done' };
     case 'flagged':
-      return { label: 'Flagged. Follow the Plan-B route if this was a route failure.', tone: 'action' };
+      // QA-18 item 6: flagged guidance must read as a warning (amber),
+      // never the green action treatment.
+      return { label: 'Flagged — follow-up required. Resolve the issue with the partner, then mark the report verified to resume the normal flow.', tone: 'waiting' };
     default:
       return null;
   }

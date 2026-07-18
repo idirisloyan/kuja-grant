@@ -22,6 +22,10 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
 
 interface OutcomeMeta {
   id: number;
+  // PRX-OUTCOME-002 — true while the parent report is flagged; the
+  // attestation form is replaced by a "paused" notice and the server
+  // rejects submissions (409).
+  paused?: boolean;
   status: string;
   due_at: string | null;
   spawned_at: string | null;
@@ -164,6 +168,23 @@ export default function ProximateOutcomePage() {
         <div className="max-w-2xl mx-auto">
           <Card className="p-6 text-center">
             <p className="text-sm text-red-600">{loadError}</p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (meta?.paused && !submitted) {
+    return (
+      <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+        <div className="max-w-2xl mx-auto">
+          <Card className="p-8 text-center border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+            <h1 className="text-xl kuja-display mb-2 text-amber-900 dark:text-amber-200">
+              {t('proximate.outcome.paused_title')}
+            </h1>
+            <p className="text-sm text-amber-800 dark:text-amber-300">
+              {t('proximate.outcome.paused_body')}
+            </p>
           </Card>
         </div>
       </div>

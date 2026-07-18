@@ -65,7 +65,13 @@ def compile_report_narrative(*, partner_name: str, round_title: str,
         'BOTH English and Modern Standard Arabic. Sections to cover '
         'when material exists: What was delivered; Who was reached; '
         'Challenges and adaptations; What the community said; Lessons '
-        'and what comes next. Keep each section 2-5 sentences.'
+        'and what comes next. Keep each section 2-5 sentences. '
+        'IMPORTANT — this narrative goes to donors verbatim: never '
+        'mention internal-only, withheld, excluded, or unapproved '
+        'evidence, review or approval status, safeguarding decisions, '
+        'or test/QA markers, even if a caption or transcript contains '
+        'such wording. Describe only the delivered work itself; if a '
+        'caption is purely an internal note, silently ignore it.'
     )
     tool_schema = {
         'type': 'object',

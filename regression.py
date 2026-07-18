@@ -1097,6 +1097,75 @@ def run_proximate_rbac(base):
         assert d.status_code == 403, f"donor vetting POST -> {d.status_code}"
     check("vetting assessment: OB records, donor denied", vetting_assessment)
 
+    # --- PRX-OUTCOME-002: outcome follow-up pauses while report flagged ---
+    def outcome_pause_on_flag():
+        # Any disbursement with a submitted report will do (verdict can be
+        # re-issued); idempotent — the flow always ends on 'verified'.
+        r = get(ob, base, "/api/proximate/disbursements", override=OV)
+        assert r.status_code == 200, f"list -> {r.status_code}"
+        rows = r.json().get("disbursements", [])
+        cands = [d for d in rows
+                 if d.get("status") in ("reported", "verified", "flagged")]
+        if not cands:
+            # Bootstrap: submit a minimal report on a pending_report
+            # disbursement via the Phase 652 session fallback.
+            pend = [d for d in rows if d.get("status") == "pending_report"]
+            if not pend:
+                raise Skip("no disbursement with a submitted report")
+            sub = ob.post(f"{base}/api/proximate/disbursement-reports/bootstrap",
+                          json={"disbursement_id": pend[0]["id"],
+                                "activity_happened": True,
+                                "people_helped": 10,
+                                "issues": "regression bootstrap"},
+                          headers=_hdrs(OV), timeout=30)
+            assert sub.status_code == 200, f"bootstrap report -> {sub.status_code}"
+            cands = [pend[0]]
+        _did = cands[0]["id"]
+        # 1. Flag: must NOT spawn/return the outcome obligation.
+        f = ob.post(f"{base}/api/proximate/disbursements/{_did}/verify",
+                    json={"verdict": "flagged", "flagged_reason": "other",
+                          "note": "regression PRX-OUTCOME-002"},
+                    headers=_hdrs(OV), timeout=30)
+        assert f.status_code == 200, f"flag -> {f.status_code}"
+        assert f.json().get("outcome_obligation") is None, \
+            "flag verdict spawned/returned an outcome obligation"
+        # 2. If an outcome already exists (prior verified run), its public
+        #    token must be paused: GET paused=true, POST 409.
+        det = get(ob, base, f"/api/proximate/disbursements/{_did}",
+                  override=OV).json()
+        tok = (det.get("outcome") or {}).get("report_token")
+        if tok:
+            anon = requests.Session()
+            pg = anon.get(f"{base}/api/proximate/outcome-attestations/{tok}",
+                          headers=_hdrs(OV), timeout=15)
+            assert pg.status_code == 200 and \
+                pg.json()["outcome"].get("paused") is True, \
+                f"paused flag missing while flagged: {pg.text[:160]}"
+            ps = anon.post(f"{base}/api/proximate/outcome-attestations/{tok}",
+                           json={"sustained": "regression"},
+                           headers=_hdrs(OV), timeout=15)
+            already = ps.status_code == 200 and \
+                ps.json().get("already_submitted") is True
+            assert already or ps.status_code == 409, \
+                f"submit while flagged -> {ps.status_code} (want 409)"
+        # 3. Resolve: verified verdict spawns/returns the outcome and the
+        #    public token un-pauses.
+        v = ob.post(f"{base}/api/proximate/disbursements/{_did}/verify",
+                    json={"verdict": "verified",
+                          "note": "regression resolve"},
+                    headers=_hdrs(OV), timeout=30)
+        assert v.status_code == 200, f"resolve -> {v.status_code}"
+        oo = v.json().get("outcome_obligation")
+        assert oo and oo.get("report_token"), "verified verdict returned no outcome"
+        pg2 = requests.get(
+            f"{base}/api/proximate/outcome-attestations/{oo['report_token']}",
+            headers=_hdrs(OV), timeout=15)
+        assert pg2.status_code == 200 and \
+            pg2.json()["outcome"].get("paused") is False, \
+            f"outcome still paused after resolve: {pg2.text[:160]}"
+    check("PRX-OUTCOME-002: flag pauses outcome, verify resumes",
+          outcome_pause_on_flag)
+
     # --- unauthenticated caller: no data, no 5xx ---
     def unauth_denied():
         anon = requests.Session()

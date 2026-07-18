@@ -5530,7 +5530,10 @@ def api_verify_disbursement_report(disbursement_id):
     # Phase 678 — spawn the 90-day outcome attestation obligation. The
     # partner gets a long-form token URL they can return to at the
     # 3-month mark to record whether the money actually helped.
-    outcome = _spawn_outcome_obligation(d, net)
+    # PRX-OUTCOME-002: a FLAGGED report follows the Plan-B/remediation
+    # path — the normal outcome flow only starts (or resumes, via the
+    # idempotent spawn) once the OB re-verdicts the report as verified.
+    outcome = _spawn_outcome_obligation(d, net) if verdict == 'verified' else None
     return jsonify({
         'success': True,
         'disbursement': d.to_dict(),
@@ -5602,6 +5605,10 @@ def api_get_outcome_by_token(token):
         'success': True,
         'outcome': {
             'id': o.id,
+            # PRX-OUTCOME-002: outcome follow-up pauses while the parent
+            # report is flagged (Plan-B path). Partner page shows a
+            # notice instead of the attestation form.
+            'paused': bool(d and d.status == 'flagged'),
             'status': o.status,
             'due_at': o.due_at.isoformat() if o.due_at else None,
             'spawned_at': o.spawned_at.isoformat() if o.spawned_at else None,
@@ -5674,6 +5681,18 @@ def api_submit_outcome_attestation(token):
             'already_submitted': True,
             'outcome': o.to_dict(),
         })
+
+    # PRX-OUTCOME-002: while the parent report is flagged, the outcome
+    # flow is paused server-side too (the link may already be in the
+    # partner's hands from before the flag).
+    _pd = ProximateDisbursement.query.get(o.disbursement_id)
+    if _pd and _pd.status == 'flagged':
+        return jsonify({
+            'success': False,
+            'paused': True,
+            'error': 'outcome follow-up is paused while the report '
+                     'is under review',
+        }), 409
 
     import json as _json
     payload = request.get_json(silent=True) or {}

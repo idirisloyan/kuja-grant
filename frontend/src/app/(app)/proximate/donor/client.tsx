@@ -19,6 +19,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
+import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 
 interface Donor {
   id: number;
@@ -209,13 +210,26 @@ export function ProximateDonorClient() {
           <p className="text-xs text-muted-foreground">
             {t('proximate.donor.stat_outcome_data')}
           </p>
-          <p className="text-2xl font-medium">
-            {outcomeRate != null ? `${outcomeRate}%` : '—'}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {portfolio.outcome_attested}/{portfolio.outcome_total}{' '}
-            {t('proximate.donor.attested')}
-          </p>
+          {portfolio.outcome_total === 0 ? (
+            <>
+              <p className="text-2xl font-medium text-muted-foreground">—</p>
+              <p className="text-xs text-muted-foreground">
+                {t('proximate.donor.no_outcomes_due')}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-2xl font-medium">
+                {portfolio.outcome_attested === 0
+                  ? t('proximate.donor.outcomes_pending')
+                  : `${outcomeRate}%`}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {portfolio.outcome_attested}/{portfolio.outcome_total}{' '}
+                {t('proximate.donor.attested')}
+              </p>
+            </>
+          )}
         </Card>
       </section>
 
@@ -308,12 +322,27 @@ export function ProximateDonorClient() {
                     {t('proximate.donor.stat_outcome_data')}
                   </dt>
                   <dd className="text-sm">
-                    {r.outcome_total
-                      ? `${pct(r.outcome_attested, r.outcome_total)}%`
-                      : '—'}
-                    <span className="text-xs text-muted-foreground ms-1">
-                      ({r.outcome_attested}/{r.outcome_total})
-                    </span>
+                    {/* QA-18: never show "0%" / "(0/0)" when nothing is
+                        due yet — donors read it as poor performance. */}
+                    {r.outcome_total === 0 ? (
+                      <span className="text-muted-foreground">
+                        {t('proximate.donor.no_outcomes_due')}
+                      </span>
+                    ) : r.outcome_attested === 0 ? (
+                      <>
+                        {t('proximate.donor.outcomes_pending')}
+                        <span className="text-xs text-muted-foreground ms-1">
+                          (0/{r.outcome_total})
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {pct(r.outcome_attested, r.outcome_total)}%
+                        <span className="text-xs text-muted-foreground ms-1">
+                          ({r.outcome_attested}/{r.outcome_total})
+                        </span>
+                      </>
+                    )}
                   </dd>
                 </div>
               </dl>
@@ -331,7 +360,7 @@ export function ProximateDonorClient() {
                             : 'bg-muted text-muted-foreground border-border'
                       }`}
                     >
-                      {n} {s}
+                      {n} {labelForProximateStatus(s, t)}
                     </span>
                   ))}
                 </div>

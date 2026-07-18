@@ -21,6 +21,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
+import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { NextStep, disbursementNextStep } from '@/components/proximate/next-step';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -410,25 +411,46 @@ export function ProximateDisbursementDetailClient() {
           </Card>
         )}
 
-        {/* Phase 668 — Plan-B FSP banner when a disbursement was flagged for route failure */}
-        {data.status === 'flagged' && data.flagged_reason === 'route_failure_security' && (
-          <Card className="p-4 border-amber-300 bg-amber-50 dark:bg-amber-950/30 space-y-2">
+        {/* PRX-OUTCOME-002 — one amber remediation card for EVERY flagged
+            report (verdict-flagged included, not just route failures).
+            Normal follow-up (outcome link, acknowledgement) is paused
+            until the OB re-verdicts the report as verified. */}
+        {data.status === 'flagged' && (
+          <Card className="p-4 border-amber-300 bg-amber-50 dark:bg-amber-950/30 space-y-3">
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                  {t('proximate.disbursement.planb_title')}
+                  {data.flagged_reason === 'route_failure_security'
+                    ? t('proximate.disbursement.planb_title')
+                    : t('proximate.disbursement.flagged_title')}
                 </h3>
                 <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">
-                  {t('proximate.disbursement.planb_body')}
+                  {data.flagged_reason === 'route_failure_security'
+                    ? t('proximate.disbursement.planb_body')
+                    : t('proximate.disbursement.flagged_body')}
                 </p>
-                <Link
-                  href={`/proximate/endorse/${data.partner_id}#routes`}
-                  className="inline-flex items-center gap-1 text-xs text-amber-900 dark:text-amber-200 mt-2 hover:underline"
-                >
-                  {t('proximate.disbursement.planb_view_routes')} →
-                </Link>
+                {data.flagged_reason && data.flagged_reason !== 'route_failure_security' && (
+                  <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">
+                    {t('proximate.disbursement.flag_reason')}: {labelForProximateStatus(data.flagged_reason)}
+                  </p>
+                )}
+                {data.flagged_reason === 'route_failure_security' && (
+                  <Link
+                    href={`/proximate/endorse/${data.partner_id}#routes`}
+                    className="inline-flex items-center gap-1 text-xs text-amber-900 dark:text-amber-200 mt-2 hover:underline"
+                  >
+                    {t('proximate.disbursement.planb_view_routes')} →
+                  </Link>
+                )}
               </div>
+            </div>
+            <div>
+              <Button size="sm" variant="outline" onClick={() => verdict('verified')} disabled={acting}>
+                {acting ? <Loader2 className="w-4 h-4 me-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 me-1" />}
+                {t('proximate.disbursement.flagged_resolve')}
+              </Button>
+              {actionError && <p className="text-sm text-red-600 mt-2">{actionError}</p>}
             </div>
           </Card>
         )}
@@ -674,6 +696,10 @@ export function ProximateDisbursementDetailClient() {
                   </p>
                 )}
               </div>
+            ) : data.status === 'flagged' ? (
+              <p className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded p-3">
+                {t('proximate.disbursement.ack_paused')}
+              </p>
             ) : (
               <>
                 <p className="text-xs text-muted-foreground">
@@ -732,7 +758,13 @@ export function ProximateDisbursementDetailClient() {
               </span>
             </div>
 
-            {data.outcome.status === 'pending' && data.outcome.report_token && (
+            {data.outcome.status === 'pending' && data.status === 'flagged' && (
+              <p className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded p-3">
+                {t('proximate.disbursement.outcome_paused')}
+              </p>
+            )}
+
+            {data.outcome.status === 'pending' && data.outcome.report_token && data.status !== 'flagged' && (
               <div className="text-xs space-y-2">
                 <p className="text-muted-foreground">
                   {t('proximate.outcome.share_link_hint')}
