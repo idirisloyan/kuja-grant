@@ -14,7 +14,7 @@
  * verify endpoint walks the chain and surfaces the break point.
  */
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronRight, Download,
@@ -119,6 +119,11 @@ export default function AuditChainPage() {
   const [recent, setRecent] = useState<RecentResult | null>(null);
   const [recentLoading, setRecentLoading] = useState(true);
   const [offset, setOffset] = useState(0);
+  // Redesign Stage 4 — two-level event view. Collapsed rows show the
+  // operational facts (action / actor / subject / time); the hashes
+  // and details payload needed for independent verification live in
+  // an expandable row. Presentation only — chain/export logic untouched.
+  const [expandedSeq, setExpandedSeq] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const LIMIT = 25;
 
@@ -309,14 +314,17 @@ export default function AuditChainPage() {
                   <th className="py-2 text-left font-semibold">Action</th>
                   <th className="py-2 text-left font-semibold">Actor</th>
                   <th className="py-2 text-left font-semibold">Subject</th>
-                  <th className="py-2 text-left font-semibold">Prev hash</th>
-                  <th className="py-2 text-left font-semibold">Payload hash</th>
                   <th className="py-2 text-left font-semibold">When</th>
+                  <th className="py-2 text-left font-semibold" aria-label="Expand" />
                 </tr>
               </thead>
               <tbody>
                 {recent.entries.map((e) => (
-                  <tr key={e.seq} className="border-b border-[hsl(var(--border))] last:border-b-0 hover:bg-[hsl(var(--kuja-sand-50))]">
+                  <Fragment key={e.seq}>
+                  <tr
+                    className="border-b border-[hsl(var(--border))] last:border-b-0 hover:bg-[hsl(var(--kuja-sand-50))] cursor-pointer"
+                    onClick={() => setExpandedSeq(expandedSeq === e.seq ? null : e.seq)}
+                  >
                     <td className="py-2 font-mono text-[hsl(var(--kuja-ink-soft))]">{e.seq}</td>
                     <td className={cn('py-2 font-semibold', actionTone(e.action))}>
                       {humanise(e.action)}
@@ -359,16 +367,41 @@ export default function AuditChainPage() {
                         );
                       })()}
                     </td>
-                    <td className="py-2 font-mono text-[10px] text-[hsl(var(--kuja-ink-soft))]">
-                      {e.prev_hash || '(genesis)'}
-                    </td>
-                    <td className="py-2 font-mono text-[10px] text-[hsl(var(--kuja-ink))]">
-                      {e.payload_hash}
-                    </td>
                     <td className="py-2 text-[hsl(var(--kuja-ink-soft))]">
                       {new Date(e.created_at).toLocaleString()}
                     </td>
+                    <td className="py-2 text-[hsl(var(--kuja-ink-soft))]">
+                      <ChevronRight
+                        className={cn(
+                          'w-3.5 h-3.5 transition-transform',
+                          expandedSeq === e.seq && 'rotate-90',
+                        )}
+                      />
+                    </td>
                   </tr>
+                  {expandedSeq === e.seq && (
+                    <tr className="border-b border-[hsl(var(--border))] bg-[hsl(var(--kuja-sand-50))]/50">
+                      <td colSpan={6} className="py-2 px-3">
+                        <div className="grid gap-1.5 text-[10px] font-mono">
+                          <div>
+                            <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">Prev hash</span>
+                            <span className="break-all">{e.prev_hash || '(genesis)'}</span>
+                          </div>
+                          <div>
+                            <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">Payload hash</span>
+                            <span className="break-all">{e.payload_hash}</span>
+                          </div>
+                          {e.details && Object.keys(e.details).length > 0 && (
+                            <div>
+                              <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">Details</span>
+                              <pre className="whitespace-pre-wrap break-all inline">{JSON.stringify(e.details)}</pre>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
