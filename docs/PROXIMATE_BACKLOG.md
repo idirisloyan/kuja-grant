@@ -136,6 +136,34 @@ session; entries move to "Completed" below as each ships.
 - [x] **Phase 687** — Retrospective PDF endpoint + monthly cron (this commit); audit row emitted per donor/round, manual send pending SMTP
 - [x] **Phase 688** — Final ship cycle for the 678-687 block (this commit); 6 honest punt-list deferrals tracked below
 
+### 18-July QA wave + PRX-OUTCOME-002 — shipped `77c91ca0f` (2026-07-18)
+- [x] **PRX-OUTCOME-002 product rule** (per QA "needs product decision"):
+  flagged report = one amber Plan-B/remediation path. Flag verdict no
+  longer spawns the 90-day outcome; existing outcome tokens pause
+  (public GET carries `paused`, POST → 409, partner page shows a
+  paused notice); acknowledgements pause; outcome link/WhatsApp hidden.
+  "Mark resolved — verify report" on the flagged card re-verdicts to
+  verified and everything resumes automatically (spawn is idempotent).
+  Gate check `PRX-OUTCOME-002` covers flag→no-spawn→pause→409→resume
+  (94 checks).
+- [x] Raw key `proximate.disbursement.copy` fixed — "Copy outcome
+  link" + 10 supporting keys, all 6 locales (2819-key parity).
+- [x] Flagged treatment green→amber: generalized flagged card (any
+  reason, with humanized reason line) replaced the route-failure-only
+  banner; guidance strip (`next-step.tsx`) flagged tone was the actual
+  green Plan-B alert QA saw — now amber `waiting` tone.
+- [x] Donor polish: status chips through `labelForProximateStatus`
+  (no more `pending_report`); outcome metric zero-states ("No outcomes
+  due yet" for 0/0, "Pending (0/N)" instead of alarming 0%);
+  "Following ✓" → "Receiving updates".
+- [x] Internal-only copy (QA 15/16): compile prompt hardened (never
+  mention withheld/internal evidence or review status); neutral
+  safeguarding line under donor Evidence section; prod package 3
+  narrative audited — already clean.
+- Prod-verified on demo data: flagged disb 24 shows the amber path,
+  no outcome link, donor dashboard clean (screenshots in Downloads).
+  Deferred to redesign Stages 3/4: donor card layout polish (QA 8-11).
+
 ---
 
 ## High priority (next sprint candidates)
