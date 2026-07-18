@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Loader2, Search, Users, ShieldCheck, AlertTriangle, Upload,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -35,6 +36,8 @@ interface Partner {
   endorsements_count?: number;
 }
 
+const PAGE_SIZE = 30;
+
 export default function ProximatePartnersPage() {
   const { t } = useTranslation();
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -42,6 +45,12 @@ export default function ProximatePartnersPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  // Redesign Stage 3c — the register must stay usable as the partner
+  // count grows: incremental loading instead of one endless page, sort
+  // control, and filter chips behind a toggle on small screens.
+  const [sort, setSort] = useState<'name' | 'newest'>('name');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   // Blue Nile intake (2026-07) — bulk PIF import. One Word/PDF form in,
   // one nominated partner out (AI-extracted server-side), original
   // attached as due-diligence evidence.
@@ -119,6 +128,15 @@ export default function ProximatePartnersPage() {
     });
   }, [partners, filter, statusFilter]);
 
+  const sorted = useMemo(() => {
+    const list = [...filtered];
+    if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
+    else list.sort((a, b) => b.id - a.id);
+    return list;
+  }, [filtered, sort]);
+
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filter, statusFilter, sort]);
+
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: partners.length };
     for (const p of partners) c[p.status] = (c[p.status] || 0) + 1;
@@ -143,40 +161,41 @@ export default function ProximatePartnersPage() {
         {error && <p className="text-sm text-destructive">{error}</p>}
         {!loading && !error && (
           <div className="space-y-4">
-            {/* Rollup tiles */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Card className="p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('proximate.partners.total')}</p>
+            {/* Rollup tiles — compact stat row (Stage 3c): the spec calls
+                for a summary strip, not oversized cards. */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Card className="p-3">
+                <div className="flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('proximate.partners.total')}</p>
                 </div>
-                <p className="text-3xl font-semibold">{counts.all}</p>
+                <p className="text-xl font-semibold">{counts.all}</p>
               </Card>
-              <Card className="p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('proximate.partners.cleared')}</p>
+              <Card className="p-3">
+                <div className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('proximate.partners.cleared')}</p>
                 </div>
-                <p className="text-3xl font-semibold">{counts.dd_clear || 0}</p>
+                <p className="text-xl font-semibold">{counts.dd_clear || 0}</p>
               </Card>
-              <Card className="p-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+              <Card className="p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   {t('proximate.partners.in_review')}
                 </p>
-                <p className="text-3xl font-semibold">
+                <p className="text-xl font-semibold">
                   {(counts.endorsements_open || 0) + (counts.dd_pending || 0)}
                 </p>
               </Card>
-              <Card className={`p-4 ${withSanctionsFlag > 0 ? 'border-destructive' : ''}`}>
-                <div className="flex items-center gap-2 mb-1">
+              <Card className={`p-3 ${withSanctionsFlag > 0 ? 'border-destructive' : ''}`}>
+                <div className="flex items-center gap-1.5">
                   <AlertTriangle
-                    className={`w-4 h-4 ${withSanctionsFlag > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
+                    className={`w-3.5 h-3.5 ${withSanctionsFlag > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
                   />
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                     {t('proximate.partners.sanctions_flags')}
                   </p>
                 </div>
-                <p className="text-3xl font-semibold">{withSanctionsFlag}</p>
+                <p className="text-xl font-semibold">{withSanctionsFlag}</p>
               </Card>
             </div>
 
@@ -219,7 +238,23 @@ export default function ProximatePartnersPage() {
                     className="w-full text-sm rounded-md border bg-background p-2 ps-7"
                   />
                 </div>
-                <div className="flex items-center gap-1 flex-wrap">
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as 'name' | 'newest')}
+                  className="text-xs rounded-md border bg-background px-2 py-1.5"
+                >
+                  <option value="name">{t('proximate.partners.sort_name')}</option>
+                  <option value="newest">{t('proximate.partners.sort_newest')}</option>
+                </select>
+                <Button
+                  size="sm" variant="outline" className="sm:hidden"
+                  onClick={() => setFiltersOpen((v) => !v)}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 me-1" />
+                  {t('proximate.partners.filters')}
+                  {statusFilter !== 'all' ? ' (1)' : ''}
+                </Button>
+                <div className={`${filtersOpen ? 'flex' : 'hidden'} sm:flex items-center gap-1 flex-wrap w-full sm:w-auto`}>
                   {['all', 'nominated', 'endorsements_open', 'dd_pending', 'dd_clear', 'suspended'].map((s) => (
                     <button
                       key={s}
@@ -231,7 +266,7 @@ export default function ProximatePartnersPage() {
                           : 'bg-background hover:bg-muted/40'
                       }`}
                     >
-                      {s.replace(/_/g, ' ')} ({counts[s] || 0})
+                      {s === 'all' ? 'All' : labelForProximateStatus(s, t)} ({counts[s] || 0})
                     </button>
                   ))}
                 </div>
@@ -246,7 +281,7 @@ export default function ProximatePartnersPage() {
                 </p>
               ) : (
                 <ul className="space-y-1.5">
-                  {filtered.map((p) => (
+                  {sorted.slice(0, visibleCount).map((p) => (
                     <li
                       key={p.id}
                       className="border-b border-border/60 pb-1.5 last:border-b-0"
@@ -270,14 +305,12 @@ export default function ProximatePartnersPage() {
                             </p>
                           )}
                         </div>
+                        {/* Collapsed row shows one workflow status + one
+                            secondary signal (sanctions). Trust tier and the
+                            rest live on the partner detail. */}
                         {p.sanctions_flag && (
                           <Badge variant="outline" className="text-[10px] border-destructive text-destructive">
                             {t('proximate.partners.sanctions_flag_badge')}
-                          </Badge>
-                        )}
-                        {p.trust_tier && (
-                          <Badge variant="outline" className="text-[10px]">
-                            {p.trust_tier}
                           </Badge>
                         )}
                         <Badge
@@ -290,6 +323,16 @@ export default function ProximatePartnersPage() {
                     </li>
                   ))}
                 </ul>
+              )}
+              {sorted.length > visibleCount && (
+                <div className="pt-3 text-center">
+                  <Button
+                    size="sm" variant="outline"
+                    onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                  >
+                    {t('proximate.partners.show_more')} ({sorted.length - visibleCount})
+                  </Button>
+                </div>
               )}
             </Card>
           </div>
