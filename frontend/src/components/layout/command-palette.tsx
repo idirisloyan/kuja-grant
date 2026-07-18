@@ -28,6 +28,8 @@ import {
   AlertTriangle, ArrowRightCircle,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
+import { useNetworkStore } from '@/stores/network-store';
+import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { api } from '@/lib/api';
 
 interface NavAction {
@@ -63,6 +65,25 @@ const NAV_ACTIONS: NavAction[] = [
   { id: 'admin-grants',     label: 'All grants',         description: 'Cross-org view',           href: '/grants',              icon: Briefcase,       roles: ['admin'] },
   { id: 'admin-apps',       label: 'All applications',   description: 'Cross-org view',           href: '/applications',        icon: FileText,        roles: ['admin'] },
   { id: 'admin-observability', label: 'Observability',   description: 'AI health + telemetry',    href: '/observability',       icon: Activity,        roles: ['admin'] },
+];
+
+// Redesign Stage 2 — the palette is tenant-aware. Inside the Proximate
+// tenant the Kuja-marketplace destinations above would 403/confuse
+// (Proximate users are seeded role='ngo'); these persona-scoped
+// destinations mirror the Proximate sidebar instead.
+const PROXIMATE_OB_ACTIONS: NavAction[] = [
+  { id: 'prx-dashboard',     label: 'Dashboard',              description: 'Operator console',        href: '/proximate/admin',            icon: LayoutDashboard, roles: [] },
+  { id: 'prx-grants',        label: 'Grants from donors',     description: 'Committed envelopes',     href: '/proximate/grants',           icon: Briefcase,       roles: [] },
+  { id: 'prx-rounds',        label: 'Rounds & disbursements', description: 'Funding rounds',          href: '/proximate/rounds',           icon: BarChart3,       roles: [], keywords: ['funding', 'round'] },
+  { id: 'prx-partners',      label: 'Partners',               description: 'Community partners',      href: '/proximate/admin/partners',   icon: Building2,       roles: [], keywords: ['pif', 'nominate'] },
+  { id: 'prx-endorsers',     label: 'Endorsers',              description: 'Approval queue',          href: '/proximate/admin/endorsers',  icon: ClipboardCheck,  roles: [] },
+  { id: 'prx-disbursements', label: 'All disbursements',      description: 'Money out + reports',     href: '/proximate/disbursements',    icon: FileText,        roles: [], keywords: ['payment', 'report'] },
+  { id: 'prx-crisis',        label: 'Crisis signals',         description: 'Crisis selector',         href: '/proximate/crisis-selector',  icon: Activity,        roles: [] },
+  { id: 'prx-audit',         label: 'Audit chain',            description: 'Tamper-evident log',      href: '/admin/audit-chain',          icon: ShieldCheck,     roles: [] },
+];
+const PROXIMATE_DONOR_ACTIONS: NavAction[] = [
+  { id: 'prx-donor',        label: 'Donor portal', description: 'Portfolio + reports', href: '/proximate/donor',  icon: LayoutDashboard, roles: [] },
+  { id: 'prx-donor-rounds', label: 'Rounds',       description: 'Rounds you fund',     href: '/proximate/rounds', icon: BarChart3,       roles: [] },
 ];
 
 interface SearchHitGrant {
@@ -108,6 +129,9 @@ export function CommandPalette() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const role = user?.role ?? '';
+  const network = useNetworkStore((s) => s.network);
+  const isProximate = network?.slug === 'proximate';
+  const { persona } = useProximatePersona();
 
   // Open with keyboard
   useEffect(() => {
@@ -166,10 +190,14 @@ export function CommandPalette() {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [query]);
 
-  const navActions = useMemo(
-    () => NAV_ACTIONS.filter(a => a.roles.length === 0 || a.roles.includes(role)),
-    [role]
-  );
+  const navActions = useMemo(() => {
+    if (isProximate) {
+      if (persona === 'ob' || persona === 'admin') return PROXIMATE_OB_ACTIONS;
+      if (persona === 'donor') return PROXIMATE_DONOR_ACTIONS;
+      return [];
+    }
+    return NAV_ACTIONS.filter(a => a.roles.length === 0 || a.roles.includes(role));
+  }, [role, isProximate, persona]);
 
   const go = useCallback((href: string) => {
     setOpen(false);

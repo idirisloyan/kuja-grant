@@ -323,6 +323,10 @@ export function ProximateDisbursementDetailClient() {
       <PageHeader
         title={data.partner_name || `Partner #${data.partner_id}`}
         subtitle={data.purpose || undefined}
+        breadcrumbs={[
+          { label: 'Proximate', href: '/proximate/admin' },
+          { label: 'Disbursements', href: '/proximate/disbursements' },
+        ]}
         status={{
           label: labelForProximateStatus(data.status, t),
           tone: data.status === 'verified'

@@ -125,6 +125,7 @@ interface MetaItem {
 
 export function PageHeader({
   title, subtitle, icon: Icon, status, meta, primaryAction, secondaryAction,
+  breadcrumbs,
 }: {
   title: string;
   subtitle?: string;
@@ -136,9 +137,31 @@ export function PageHeader({
   primaryAction?: ReactNode;
   /** Secondary action — appears next to the primary; use sparingly. */
   secondaryAction?: ReactNode;
+  /** Redesign Stage 2 — ancestor trail above the title. The current page
+      is NOT included; the last crumb is the parent list. */
+  breadcrumbs?: { label: string; href?: string }[];
 }) {
   return (
     <header className="border border-border rounded-lg bg-card p-5">
+      {breadcrumbs && breadcrumbs.length > 0 && (
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap"
+        >
+          {breadcrumbs.map((c, i) => (
+            <span key={i} className="inline-flex items-center gap-1.5">
+              {i > 0 && <span aria-hidden>/</span>}
+              {c.href ? (
+                <Link href={c.href} className="hover:text-foreground hover:underline">
+                  {c.label}
+                </Link>
+              ) : (
+                <span>{c.label}</span>
+              )}
+            </span>
+          ))}
+        </nav>
+      )}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2 flex-wrap">

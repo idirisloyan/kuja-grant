@@ -58,6 +58,29 @@ export default function ProximatePartnersPage() {
 
   useEffect(() => { load(); }, []);
 
+  // Redesign Stage 2 — filters live in the URL so a filtered view
+  // survives refresh and can be shared. Read once on mount, write via
+  // history.replaceState (no useSearchParams — static export has no
+  // Suspense boundary here, and no navigation should fire per keystroke).
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const s = sp.get('status');
+    const q = sp.get('q');
+    if (s) setStatusFilter(s);
+    if (q) setFilter(q);
+  }, []);
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (statusFilter && statusFilter !== 'all') sp.set('status', statusFilter);
+    else sp.delete('status');
+    if (filter) sp.set('q', filter);
+    else sp.delete('q');
+    const qs = sp.toString();
+    window.history.replaceState(
+      null, '', window.location.pathname + (qs ? `?${qs}` : ''),
+    );
+  }, [statusFilter, filter]);
+
   const onImport = async (files: FileList | null) => {
     if (!files?.length) return;
     setImporting(true);

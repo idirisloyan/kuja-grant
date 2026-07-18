@@ -68,6 +68,11 @@ interface NavItem {
 interface NavProfile {
   primary: NavItem[];
   secondary: NavItem[];
+  // Redesign Stage 2 — optional labeled groups (Workspace / Operations /
+  // Governance). When present they replace the primary/secondary split;
+  // primary+secondary stay populated as the flat fallback so nothing
+  // else (e.g. the command palette) needs to understand groups.
+  groups?: { label: string; items: NavItem[] }[];
 }
 
 interface SidebarProps {
@@ -132,28 +137,58 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
         )}
       </div>
 
-      {/* Nav: primary + secondary in two groups */}
+      {/* Nav: labeled groups when the profile defines them, else the
+          classic primary + secondary split */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-3">
-        <NavGroup
-          items={profile.primary}
-          pathname={pathname}
-          collapsed={sidebarCollapsed}
-        />
-        {profile.secondary.length > 0 && (
-          <>
-            <div
-              className={cn(
-                'mx-2 border-t border-white/5',
-                sidebarCollapsed && 'mx-3',
+        {profile.groups?.length ? (
+          profile.groups.map((g, i) => (
+            <div key={g.label} className="space-y-1">
+              {i > 0 && (
+                <div
+                  className={cn(
+                    'mx-2 border-t border-white/5 mb-2',
+                    sidebarCollapsed && 'mx-3',
+                  )}
+                  aria-hidden
+                />
               )}
-              aria-hidden
-            />
+              {!sidebarCollapsed && (
+                <div className="px-3 pb-1 text-[9px] uppercase tracking-[0.16em] text-[#8C6450]">
+                  {g.label}
+                </div>
+              )}
+              <NavGroup
+                items={g.items}
+                pathname={pathname}
+                collapsed={sidebarCollapsed}
+                tone={i === 0 ? 'primary' : 'secondary'}
+              />
+            </div>
+          ))
+        ) : (
+          <>
             <NavGroup
-              items={profile.secondary}
+              items={profile.primary}
               pathname={pathname}
               collapsed={sidebarCollapsed}
-              tone="secondary"
             />
+            {profile.secondary.length > 0 && (
+              <>
+                <div
+                  className={cn(
+                    'mx-2 border-t border-white/5',
+                    sidebarCollapsed && 'mx-3',
+                  )}
+                  aria-hidden
+                />
+                <NavGroup
+                  items={profile.secondary}
+                  pathname={pathname}
+                  collapsed={sidebarCollapsed}
+                  tone="secondary"
+                />
+              </>
+            )}
           </>
         )}
       </nav>
@@ -533,6 +568,33 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
           { icon: Send,            label: 'All disbursements',   href: '/proximate/disbursements' },
           { icon: ShieldCheck,     label: 'Audit chain',         href: '/admin/audit-chain' },
           { icon: SettingsIcon,    label: 'Settings',            href: '/settings/notifications' },
+        ],
+        // Redesign Stage 2 — spec grouping for the operator console.
+        groups: [
+          {
+            label: 'Workspace',
+            items: [
+              { icon: LayoutDashboard, label: 'Dashboard',              href: '/proximate/admin' },
+              { icon: FileText,        label: 'Grants from donors',     href: '/proximate/grants' },
+              { icon: HandCoins,       label: 'Rounds & disbursements', href: '/proximate/rounds' },
+            ],
+          },
+          {
+            label: 'Operations',
+            items: [
+              { icon: Users,          label: 'Partners',          href: '/proximate/admin/partners' },
+              { icon: ClipboardCheck, label: 'Endorsers',         href: '/proximate/admin/endorsers' },
+              { icon: Send,           label: 'All disbursements', href: '/proximate/disbursements' },
+              { icon: MapPin,         label: 'Crisis signals',    href: '/proximate/crisis-selector' },
+            ],
+          },
+          {
+            label: 'Governance',
+            items: [
+              { icon: ShieldCheck,  label: 'Audit chain', href: '/admin/audit-chain' },
+              { icon: SettingsIcon, label: 'Settings',    href: '/settings/notifications' },
+            ],
+          },
         ],
       };
 

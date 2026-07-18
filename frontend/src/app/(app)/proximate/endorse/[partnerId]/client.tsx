@@ -426,6 +426,10 @@ export default function ProximateEndorseWizardClient() {
       <PageHeader
         title={displayName}
         subtitle={partner.locality ?? undefined}
+        breadcrumbs={[
+          { label: 'Proximate', href: '/proximate/admin' },
+          { label: 'Partners', href: '/proximate/admin/partners' },
+        ]}
       />
       <PageMain>
         <div className="space-y-4">

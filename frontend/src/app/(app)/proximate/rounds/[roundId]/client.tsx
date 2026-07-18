@@ -345,6 +345,10 @@ export function ProximateRoundDetailClient() {
       <PageHeader
         title={round.title}
         subtitle={round.title_ar || ''}
+        breadcrumbs={[
+          { label: 'Proximate', href: '/proximate/admin' },
+          { label: 'Rounds', href: '/proximate/rounds' },
+        ]}
       />
       <PageMain>
         <div className="space-y-4">
