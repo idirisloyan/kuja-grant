@@ -206,8 +206,14 @@ session; entries move to "Completed" below as each ships.
   Due diligence / Disbursements tabs (?tab= in URL, CSS-hide
   wrappers); Disbursements tab adds the partner's own disbursement
   list. Endorser-facing wizard flow unchanged (no tab bar).
-- [ ] **Stage 4** — grants, crisis signals, audit chain two-level
-  view, notifications, settings.
+- [x] **Stage 4a — grants + crisis signals** (`a257e27eb`): grants
+  rollup compacted + funding period on collapsed row + EmptyState;
+  crisis rows get attention-band severity badges (red = critical
+  only), report-period dates, ?band= filter chips; pending-signal
+  badges moved to the dark-safe tone system with humanized labels.
+- [ ] **Stage 4b** — audit chain two-level view (collapsed
+  action/user/time/record + expandable hash/payload), notifications
+  grouping, settings sections.
 - [ ] **Stage 5** — responsive/a11y/perf sweep (390px-first, focus,
   contrast, dark mode + RTL across redesigned pages).
 
