@@ -109,7 +109,39 @@ interface Resp {
   envelope_remaining?: number | null;
 }
 
+// Redesign Stage 3b — round detail tab order. Sections keep their
+// original render position and hooks; tabs only CSS-hide them (no
+// unmount), so every existing flow (modals, polling, anchors) is
+// untouched.
+const ROUND_TABS = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'partners', label: 'Partners' },
+  { key: 'reports', label: 'Reports & closing pack' },
+  { key: 'disbursements', label: 'Disbursements' },
+  { key: 'activity', label: 'Activity' },
+];
+
 export function ProximateRoundDetailClient() {
+  const [tab, setTab] = useState('overview');
+  // Deep links keep working: ?tab= wins, and the Phase 717 guidance
+  // links to #round-roster land on the Partners tab.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const qtab = sp.get('tab');
+    if (qtab && ROUND_TABS.some((x) => x.key === qtab)) setTab(qtab);
+    else if (window.location.hash === '#round-roster') setTab('partners');
+  }, []);
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (tab !== 'overview') sp.set('tab', tab);
+    else sp.delete('tab');
+    const qs = sp.toString();
+    window.history.replaceState(
+      null, '',
+      window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash,
+    );
+  }, [tab]);
+  const tabCls = (x: string) => (tab === x ? 'space-y-4' : 'hidden');
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   // Phase 701 — Proximate OBs are seeded with User.role='ngo' for
@@ -352,6 +384,31 @@ export function ProximateRoundDetailClient() {
       />
       <PageMain>
         <div className="space-y-4">
+          {/* Redesign Stage 3b — tab bar. Sections below render in
+              their original order; inactive tabs are CSS-hidden. */}
+          <div className="flex items-center gap-1 border-b border-border overflow-x-auto" role="tablist">
+            {ROUND_TABS
+              .filter((x) => isOperator
+                || ['overview', 'partners', 'disbursements'].includes(x.key))
+              .map((x) => (
+                <button
+                  key={x.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === x.key}
+                  onClick={() => setTab(x.key)}
+                  className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                    tab === x.key
+                      ? 'border-[hsl(var(--kuja-clay))] text-foreground font-medium'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {x.label}
+                </button>
+              ))}
+          </div>
+
+          <div className={tabCls('overview')}>
           {/* Phase 701 — Stage banner + next-action CTA.
               Reviewer feedback: the backend supports draft → submit →
               sign → active → closed but the UI made none of that
@@ -770,7 +827,9 @@ export function ProximateRoundDetailClient() {
               <p className="text-xs whitespace-pre-wrap">{round.closing_summary}</p>
             </Card>
           )}
+          </div>
 
+          <div className={tabCls('reports')}>
           {/* Phase 702 — Closing pack eligibility panel.
               Reviewer feedback: retrospective PDF returns 422 when the
               round is draft, with no UI hint why. This panel makes
@@ -885,7 +944,9 @@ export function ProximateRoundDetailClient() {
               </Card>
             );
           })()}
+          </div>
 
+          <div className={tabCls('partners')}>
           {/* Phase 711 — Partner Roster.
               User feedback: "it is not clear how you tie a round to
               NGO's...should show visual representation of the stage of
@@ -1015,7 +1076,9 @@ export function ProximateRoundDetailClient() {
           {isOperator && participants.length > 0 && (
             <SelectionVoteCard roundId={Number(roundId)} isOperator={isOperator} />
           )}
+          </div>
 
+          <div className={tabCls('reports')}>
           {/* Partner report packages — phone links + review queue. */}
           {isOperator && participants.length > 0 && (
             <ReportPackagesCard
@@ -1033,6 +1096,7 @@ export function ProximateRoundDetailClient() {
               isOperator={isOperator}
             />
           )}
+          </div>
 
           {/* Phase 715b — Add-partner dialog. Renders as a lightweight
               inline modal so we don't need to pull in a Dialog primitive.
@@ -1294,6 +1358,7 @@ export function ProximateRoundDetailClient() {
             </div>
           )}
 
+          <div className={tabCls('disbursements')}>
           {/* Phase 656 — Disbursements rollup.
               Phase 703 — donor-safe variant. Donors see envelope rollup +
               count only (no per-row partner detail or "Disburse more"
@@ -1392,7 +1457,9 @@ export function ProximateRoundDetailClient() {
               </Card>
             );
           })()}
+          </div>
 
+          <div className={tabCls('activity')}>
           {/* Audit window — operator-only.
               Phase 703 — donor-safe API doesn't return audit_in_window.
               Donors get the audit_anchor_seq on the round PDF for
@@ -1456,7 +1523,9 @@ export function ProximateRoundDetailClient() {
             )}
           </Card>
           )}
+          </div>
 
+          <div className={tabCls('reports')}>
           {/* Blue Nile intake (2026-07) — the round's evidence pack
               (needs assessments, site factsheets, cluster alerts) and
               the panel roster, both formerly loose files. OB-only. */}
@@ -1470,6 +1539,7 @@ export function ProximateRoundDetailClient() {
           {isOperator && roundId && (
             <PanelRosterPanel roundId={parseInt(roundId, 10)} />
           )}
+          </div>
         </div>
       </PageMain>
     </PageShell>
