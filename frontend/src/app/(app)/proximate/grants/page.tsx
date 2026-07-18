@@ -14,6 +14,7 @@ import { api } from '@/lib/api';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/proximate/empty-state';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import {
@@ -87,44 +88,45 @@ export default function ProximateGrantsListPage() {
 
         {!loading && !error && (
           <div className="space-y-4">
-            {/* Rollup — three big numbers */}
+            {/* Rollup — compact stat row (Stage 4): summary strip, not
+                oversized cards, matching the partners register. */}
             {grants.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <Card className="p-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <DollarSign className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <Card className="p-3">
+                  <div className="flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                       Committed
                     </p>
                   </div>
-                  <p className="text-3xl font-semibold">{fmtUsd(totalCommitted)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xl font-semibold">{fmtUsd(totalCommitted)}</p>
+                  <p className="text-xs text-muted-foreground">
                     across {grants.length} grant{grants.length === 1 ? '' : 's'}
                   </p>
                 </Card>
-                <Card className="p-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <DollarSign className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                <Card className="p-3">
+                  <div className="flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                       Allocated to rounds
                     </p>
                   </div>
-                  <p className="text-3xl font-semibold">{fmtUsd(totalAllocated)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xl font-semibold">{fmtUsd(totalAllocated)}</p>
+                  <p className="text-xs text-muted-foreground">
                     {totalCommitted
                       ? `${((totalAllocated / totalCommitted) * 100).toFixed(0)}% of committed`
                       : ''}
                   </p>
                 </Card>
-                <Card className="p-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <DollarSign className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                <Card className="p-3">
+                  <div className="flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                       Uncommitted
                     </p>
                   </div>
-                  <p className="text-3xl font-semibold">{fmtUsd(totalRemaining)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xl font-semibold">{fmtUsd(totalRemaining)}</p>
+                  <p className="text-xs text-muted-foreground">
                     available for future rounds
                   </p>
                 </Card>
@@ -151,10 +153,14 @@ export default function ProximateGrantsListPage() {
                 )}
               </div>
               {grants.length === 0 && (
-                <p className="text-sm text-muted-foreground italic py-6 text-center">
-                  No grants recorded yet.
-                  {isOb && ' Upload a signed agreement to get started.'}
-                </p>
+                <EmptyState
+                  compact
+                  icon={FileText}
+                  title="No grants recorded yet"
+                  hint={isOb
+                    ? 'Upload a signed donor agreement to bring its budget, reporting cadence and deliverables into the fund.'
+                    : 'Grants your organization commits to Adeso will appear here once recorded.'}
+                />
               )}
               {grants.length > 0 && (
                 <ul className="space-y-2">
@@ -216,9 +222,19 @@ export default function ProximateGrantsListPage() {
                             </div>
                             <div>
                               <p className="text-[10px] uppercase text-muted-foreground">
-                                Reporting
+                                Period
                               </p>
-                              <p className="font-mono">{g.reporting_cadence}</p>
+                              {/* Funding period on the collapsed card (spec);
+                                  reporting cadence lives on the detail page. */}
+                              <p className="font-mono">
+                                {g.start_date
+                                  ? new Date(g.start_date).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+                                  : '—'}
+                                {' – '}
+                                {g.end_date
+                                  ? new Date(g.end_date).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+                                  : '—'}
+                              </p>
                             </div>
                           </div>
                           {g.amount_committed_usd && (

@@ -11,7 +11,7 @@
  * data lands) and can ask Claude for a scenario-typed decision brief.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Loader2, Flame, Sparkles, Plus, Radio, ClipboardCheck, Rocket,
@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { TONE_CLASSES } from '@/components/proximate/status-badge';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -92,6 +94,37 @@ export default function CrisisSelectorPage() {
   // only re-fetched the published-rows endpoint. Now we also fetch
   // /crisis-signals after each submit and render them on top.
   const [signals, setSignals] = useState<CrisisSignal[]>([]);
+  // Redesign Stage 4 — severity filter over the curated list, built
+  // from the attention bands actually present (same chip pattern as
+  // the rounds/disbursements registers). Red stays reserved for the
+  // critical band; every other band renders amber.
+  const [bandFilter, setBandFilter] = useState('all');
+  useEffect(() => {
+    const b = new URLSearchParams(window.location.search).get('band');
+    if (b) setBandFilter(b);
+  }, []);
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (bandFilter && bandFilter !== 'all') sp.set('band', bandFilter);
+    else sp.delete('band');
+    const qs = sp.toString();
+    window.history.replaceState(
+      null, '', window.location.pathname + (qs ? `?${qs}` : ''),
+    );
+  }, [bandFilter]);
+  const bandCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const r of data?.rows ?? []) {
+      if (r.attention_band) c[r.attention_band] = (c[r.attention_band] || 0) + 1;
+    }
+    return c;
+  }, [data]);
+  const visibleRows = useMemo(
+    () => (data?.rows ?? []).filter(
+      (r) => bandFilter === 'all' || r.attention_band === bandFilter,
+    ),
+    [data, bandFilter],
+  );
 
   async function logSignal() {
     if (!signalDescription.trim() || signalDescription.trim().length < 5) {
@@ -281,13 +314,13 @@ export default function CrisisSelectorPage() {
                     variant="outline"
                     className={`text-[10px] mt-0.5 ${
                       sig.status === 'pending'
-                        ? 'bg-amber-100 text-amber-800 border-amber-300'
+                        ? TONE_CLASSES.attention
                         : sig.status === 'triaged'
-                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                          : 'bg-muted text-muted-foreground'
+                          ? TONE_CLASSES.positive
+                          : TONE_CLASSES.neutral
                     }`}
                   >
-                    {sig.status}
+                    {labelForProximateStatus(sig.status, t)}
                   </Badge>
                   <span className="font-mono text-muted-foreground">
                     {sig.country}
@@ -340,8 +373,29 @@ export default function CrisisSelectorPage() {
           </Card>
         )}
 
+        {(data?.rows.length ?? 0) > 0 && Object.keys(bandCounts).length > 1 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {['all', ...Object.keys(bandCounts)].map((b) => (
+              <button
+                key={b}
+                type="button"
+                onClick={() => setBandFilter(b)}
+                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                  bandFilter === b
+                    ? 'bg-foreground text-background border-foreground'
+                    : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
+                }`}
+              >
+                {b === 'all'
+                  ? `All (${data?.rows.length ?? 0})`
+                  : `${labelForProximateStatus(b, t)} (${bandCounts[b]})`}
+              </button>
+            ))}
+          </div>
+        )}
+
         <ul className="space-y-3">
-          {data?.rows.map((row) => (
+          {visibleRows.map((row) => (
             <li key={row.id}>
               <Card className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -350,10 +404,27 @@ export default function CrisisSelectorPage() {
                       <h3 className="font-medium">
                         {row.country}{row.region && ` · ${row.region}`}
                       </h3>
+                      {row.attention_band && (
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${
+                            row.attention_band === 'critical'
+                              ? TONE_CLASSES.critical
+                              : TONE_CLASSES.attention
+                          }`}
+                        >
+                          {labelForProximateStatus(row.attention_band, t)}
+                        </Badge>
+                      )}
                       {row.flagged_for_ob && (
-                        <Badge variant="outline" className="text-[10px] bg-red-100 text-red-800 border-red-300">
+                        <Badge variant="outline" className={`text-[10px] ${TONE_CLASSES.critical}`}>
                           {t('proximate.crisis_selector.flagged')}
                         </Badge>
+                      )}
+                      {row.report_period_start && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(row.report_period_start).toLocaleDateString()}
+                        </span>
                       )}
                     </div>
                     {row.event_title && (
@@ -390,7 +461,7 @@ export default function CrisisSelectorPage() {
                   <span className="text-xs text-muted-foreground ms-1">
                     {t('proximate.crisis_selector.draft_brief_as')}:
                   </span>
-                  {(data.scenario_types || []).map((s) => (
+                  {(data?.scenario_types || []).map((s) => (
                     <Button
                       key={s}
                       size="sm"
