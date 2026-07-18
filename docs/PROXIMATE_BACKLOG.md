@@ -189,8 +189,12 @@ session; entries move to "Completed" below as each ships.
   Reports & closing pack / Disbursements / Activity) via CSS-hide
   wrappers — hooks/modals untouched, ?tab= in URL, #round-roster
   deep-link lands on Partners.
-- [ ] **Stage 3c** — dashboard 2-3 column layout, partners list
-  compact rows + pagination, disbursements register filters.
+- [x] **Stage 3c (dashboard)** (`c8fe52d39`, prod-verified): operator
+  dashboard top section = Requires Attention beside Recent Activity
+  (lg 2/3 + 1/3); lower detail 2-col; status chips humanized.
+- [ ] **Stage 3c remainder** — partners list compact rows +
+  pagination, disbursements register status filters, endorser
+  approvals queue-first.
 - [ ] **Stage 4** — grants, endorser approvals, crisis signals, audit
   chain two-level view, notifications, settings.
 - [ ] **Stage 5** — responsive/a11y/perf sweep (390px-first, focus,
