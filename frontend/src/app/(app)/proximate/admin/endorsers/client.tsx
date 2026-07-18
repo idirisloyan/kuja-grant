@@ -20,7 +20,10 @@ import { Loader2, Check, X, Mail, MapPin } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/proximate/empty-state';
+import { TONE_CLASSES } from '@/components/proximate/status-badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -28,6 +31,7 @@ import {
 interface Endorser {
   id: number;
   user_id: number;
+  user_name?: string | null;
   locality: string | null;
   country: string;
   status: string;
@@ -35,6 +39,7 @@ interface Endorser {
   village_name?: string | null;
   family_name?: string | null;
   employer?: string | null;
+  sanctions_flag?: boolean;
 }
 
 export function ProximateEndorserQueueClient() {
@@ -45,6 +50,11 @@ export function ProximateEndorserQueueClient() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [rejectingId, setRejectingId] = useState<number | null>(null);
   const [reason, setReason] = useState('');
+  // Redesign Stage 3c — approvals need an explicit confirm step
+  // (reject already has one via the reason panel) and a visible
+  // success note once the record leaves the queue.
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = async () => {
     setLoading(true);
@@ -68,10 +78,12 @@ export function ProximateEndorserQueueClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const approve = async (id: number) => {
+  const approve = async (id: number, name: string) => {
     setBusyId(id);
     try {
       await api.post(`/api/proximate/admin/endorsers/${id}/approve`);
+      setConfirmingId(null);
+      setNotice(`${t('proximate.endorser_queue.approved_note')} — ${name}`);
       await refresh();
     } catch (e) {
       setError(
@@ -82,7 +94,7 @@ export function ProximateEndorserQueueClient() {
     }
   };
 
-  const reject = async (id: number) => {
+  const reject = async (id: number, name: string) => {
     if (!reason.trim()) {
       setError(t('proximate.endorser_queue.reason_required'));
       return;
@@ -94,6 +106,7 @@ export function ProximateEndorserQueueClient() {
       });
       setRejectingId(null);
       setReason('');
+      setNotice(`${t('proximate.endorser_queue.rejected_note')} — ${name}`);
       await refresh();
     } catch (e) {
       setError(
@@ -120,11 +133,18 @@ export function ProximateEndorserQueueClient() {
         {error && (
           <p className="text-sm text-destructive">{error}</p>
         )}
+        {notice && (
+          <div className={`text-xs rounded-md border px-3 py-2 ${TONE_CLASSES.positive}`}>
+            {notice}
+          </div>
+        )}
         {rows !== null && rows.length === 0 && !loading && (
-          <Card className="p-4">
-            <p className="text-sm text-muted-foreground">
-              {t('proximate.endorser_queue.empty')}
-            </p>
+          <Card>
+            <EmptyState
+              compact
+              title={t('proximate.endorser_queue.empty_title')}
+              hint={t('proximate.endorser_queue.empty_body')}
+            />
           </Card>
         )}
         {rows !== null && rows.length > 0 && (
@@ -134,9 +154,19 @@ export function ProximateEndorserQueueClient() {
                 <Card className="p-4">
                   <div className="flex items-start gap-4">
                     <div className="flex-1 space-y-1">
-                      <p className="text-sm font-medium">
-                        {t('proximate.endorser_queue.endorser')} #{e.id}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium">
+                          {e.user_name || `${t('proximate.endorser_queue.endorser')} #${e.id}`}
+                        </p>
+                        <Badge variant="outline" className={`text-[10px] ${TONE_CLASSES.attention}`}>
+                          {t('proximate.endorser_queue.pending_badge')}
+                        </Badge>
+                        {e.sanctions_flag && (
+                          <Badge variant="outline" className={`text-[10px] ${TONE_CLASSES.critical}`}>
+                            {t('proximate.partners.sanctions_flag_badge')}
+                          </Badge>
+                        )}
+                      </div>
                       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Mail className="w-3 h-3" />
@@ -176,14 +206,14 @@ export function ProximateEndorserQueueClient() {
                     <div className="flex flex-col gap-2 shrink-0">
                       <Button
                         size="sm"
-                        onClick={() => approve(e.id)}
+                        onClick={() => {
+                          setConfirmingId(e.id);
+                          setRejectingId(null);
+                          setError(null);
+                        }}
                         disabled={busyId === e.id}
                       >
-                        {busyId === e.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />
-                        ) : (
-                          <Check className="w-3.5 h-3.5 me-1" />
-                        )}
+                        <Check className="w-3.5 h-3.5 me-1" />
                         {t('proximate.endorser_queue.approve')}
                       </Button>
                       <Button
@@ -191,6 +221,7 @@ export function ProximateEndorserQueueClient() {
                         variant="outline"
                         onClick={() => {
                           setRejectingId(e.id);
+                          setConfirmingId(null);
                           setReason('');
                           setError(null);
                         }}
@@ -201,6 +232,32 @@ export function ProximateEndorserQueueClient() {
                       </Button>
                     </div>
                   </div>
+                  {confirmingId === e.id && (
+                    <div className="mt-3 pt-3 border-t flex items-center gap-2 flex-wrap">
+                      <p className="text-xs text-muted-foreground flex-1 min-w-[200px]">
+                        {t('proximate.endorser_queue.confirm_approve_body')}
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={() => approve(e.id, e.user_name || `#${e.id}`)}
+                        disabled={busyId === e.id}
+                      >
+                        {busyId === e.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5 me-1" />
+                        )}
+                        {t('proximate.endorser_queue.confirm_approve')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setConfirmingId(null)}
+                      >
+                        {t('proximate.endorser_queue.cancel')}
+                      </Button>
+                    </div>
+                  )}
                   {rejectingId === e.id && (
                     <div className="mt-3 pt-3 border-t space-y-2">
                       <label className="text-xs text-muted-foreground block">
@@ -216,7 +273,7 @@ export function ProximateEndorserQueueClient() {
                         <Button
                           size="sm"
                           variant="destructive"
-                          onClick={() => reject(e.id)}
+                          onClick={() => reject(e.id, e.user_name || `#${e.id}`)}
                           disabled={busyId === e.id || !reason.trim()}
                         >
                           {t('proximate.endorser_queue.confirm_reject')}

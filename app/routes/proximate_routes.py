@@ -1328,9 +1328,24 @@ def api_pending_endorsers():
     rows = Endorser.query.filter_by(
         network_id=net.id, status='pending',
     ).order_by(Endorser.registered_at.asc()).limit(200).all()
+    # Redesign Stage 3c — the queue shows the endorser's name, not
+    # "User #N". Resolved here (not in to_dict) so the name only
+    # surfaces on this OB-gated endpoint.
+    from app.models import User as _User
+    user_ids = [e.user_id for e in rows]
+    users = {
+        u.id: u for u in _User.query.filter(_User.id.in_(user_ids)).all()
+    } if user_ids else {}
+    payload = []
+    for e in rows:
+        d = e.to_dict(include_coi=True)
+        u = users.get(e.user_id)
+        d['user_name'] = (u.name or None) if u else None
+        d['sanctions_flag'] = bool(e.sanctions_flag)
+        payload.append(d)
     return jsonify({
         'success': True,
-        'endorsers': [e.to_dict(include_coi=True) for e in rows],
+        'endorsers': payload,
         'total': len(rows),
     })
 
