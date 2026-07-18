@@ -8,7 +8,8 @@
  * "New round" CTA; everyone else can browse.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { EmptyState } from '@/components/proximate/empty-state';
 import Link from 'next/link';
 import { Loader2, Plus, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -61,6 +62,35 @@ export default function ProximateRoundsPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Redesign Stage 3b — status filter chips with counts; selection
+  // lives in the URL (same history.replaceState pattern as the
+  // partners register) so a filtered view survives refresh.
+  const [statusFilter, setStatusFilter] = useState('all');
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get('status');
+    if (s) setStatusFilter(s);
+  }, []);
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (statusFilter && statusFilter !== 'all') sp.set('status', statusFilter);
+    else sp.delete('status');
+    const qs = sp.toString();
+    window.history.replaceState(
+      null, '', window.location.pathname + (qs ? `?${qs}` : ''),
+    );
+  }, [statusFilter]);
+  const statusCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const r of rounds ?? []) c[r.status] = (c[r.status] || 0) + 1;
+    return c;
+  }, [rounds]);
+  const visibleRounds = useMemo(
+    () => (rounds ?? []).filter(
+      (r) => statusFilter === 'all' || r.status === statusFilter,
+    ),
+    [rounds, statusFilter],
+  );
+
   return (
     <PageShell>
       <PageHeader
@@ -98,8 +128,39 @@ export default function ProximateRoundsPage() {
           </Card>
         )}
         {rounds !== null && rounds.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {['all', 'draft', 'in_review', 'active', 'closed', 'cancelled']
+              .filter((s) => s === 'all' || statusCounts[s])
+              .map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStatusFilter(s)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    statusFilter === s
+                      ? 'bg-foreground text-background border-foreground'
+                      : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
+                  }`}
+                >
+                  {s === 'all'
+                    ? `All (${rounds.length})`
+                    : `${labelForProximateStatus(s, t)} (${statusCounts[s]})`}
+                </button>
+              ))}
+          </div>
+        )}
+        {rounds !== null && rounds.length > 0 && visibleRounds.length === 0 && (
+          <Card>
+            <EmptyState
+              compact
+              title={`No ${labelForProximateStatus(statusFilter, t).toLowerCase()} rounds`}
+              hint="Try a different status filter."
+            />
+          </Card>
+        )}
+        {visibleRounds.length > 0 && (
           <ul className="space-y-2">
-            {rounds.map((r) => (
+            {visibleRounds.map((r) => (
               <li key={r.id}>
                 <Link href={`/proximate/rounds/${r.id}`} className="block">
                   <Card className="p-4 hover:bg-muted/30 transition-colors">
