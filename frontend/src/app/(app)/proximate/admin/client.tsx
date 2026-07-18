@@ -29,7 +29,8 @@ import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 import {
   PageShell, PageHeader, PageMain,
@@ -109,9 +110,40 @@ export function ProximateAdminClient() {
         )}
         {data && (
           <div className="space-y-4">
-            {/* Phase 717 — the single "what needs a human now" feed, above
-                everything. Converts the state machines into a to-do list. */}
-            <AttentionQueue />
+            {/* Redesign Stage 3c — spec top section: Requires Attention
+                beside Recent Activity on desktop instead of one long
+                column. Phase 717 attention feed keeps first position. */}
+            <div className="grid gap-4 lg:grid-cols-3 items-start">
+              <div className="lg:col-span-2">
+                <AttentionQueue />
+              </div>
+              <Card className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Activity className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-sm font-medium">
+                    {t('proximate.admin.recent_activity')}
+                  </p>
+                </div>
+                {data.recent_audit.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {t('proximate.admin.no_activity')}
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5 text-xs">
+                    {data.recent_audit.map((row) => (
+                      <li key={row.seq} className="flex items-center gap-2">
+                        <span className="text-muted-foreground tabular-nums">
+                          #{row.seq}
+                        </span>
+                        <span title={row.action} className="truncate">
+                          {labelForProximateAction(row.action)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            </div>
 
             {/* Top row — the 4 numbers that matter most */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -293,63 +325,34 @@ export function ProximateAdminClient() {
               </Link>
             </div>
 
-            {/* Partners by status — secondary detail */}
-            <Card className="p-4">
-              <p className="text-sm font-medium mb-3">
-                {t('proximate.admin.by_status')}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(data.partners_by_status).map(([status, n]) => (
-                  <Badge key={status} variant="outline" className="text-xs">
-                    {status}: {n}
-                  </Badge>
-                ))}
-              </div>
-            </Card>
-
-            {/* FSP smoke-check */}
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm">
-                  {t('proximate.admin.fsps_registered')}
+            {/* Lower row — secondary detail in two columns (spec: don't
+                stack everything in one long column on desktop). */}
+            <div className="grid gap-4 lg:grid-cols-2 items-start">
+              <Card className="p-4">
+                <p className="text-sm font-medium mb-3">
+                  {t('proximate.admin.by_status')}
                 </p>
-                <p className="text-lg font-semibold">{data.fsps_registered}</p>
-              </div>
-            </Card>
-
-            {/* Recent audit feed */}
-            <Card className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Activity className="w-4 h-4 text-muted-foreground" />
-                <p className="text-sm font-medium">
-                  {t('proximate.admin.recent_activity')}
-                </p>
-              </div>
-              {data.recent_audit.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  {t('proximate.admin.no_activity')}
-                </p>
-              ) : (
-                <ul className="space-y-1.5 text-xs">
-                  {data.recent_audit.map((row) => (
-                    <li key={row.seq} className="flex items-center gap-2">
-                      <span className="text-muted-foreground tabular-nums">
-                        #{row.seq}
-                      </span>
-                      <span title={row.action}>
-                        {labelForProximateAction(row.action)}
-                      </span>
-                      <span className="text-muted-foreground">
-                        ({row.subject_kind.replace('proximate_', '')} #{row.subject_id})
-                      </span>
-                      <span className="text-muted-foreground ms-auto">
-                        {row.actor_email}
-                      </span>
-                    </li>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(data.partners_by_status).map(([status, n]) => (
+                    <span
+                      key={status}
+                      className={`text-xs px-2 py-1 rounded border ${TONE_CLASSES[toneForProximateStatus(status)]}`}
+                    >
+                      {labelForProximateStatus(status, t)}: {n}
+                    </span>
                   ))}
-                </ul>
-              )}
-            </Card>
+                </div>
+              </Card>
+
+              <Card className="p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm">
+                    {t('proximate.admin.fsps_registered')}
+                  </p>
+                  <p className="text-lg font-semibold">{data.fsps_registered}</p>
+                </div>
+              </Card>
+            </div>
           </div>
         )}
       </PageMain>
