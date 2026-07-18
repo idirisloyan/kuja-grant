@@ -53,6 +53,22 @@ function subjectDrillHref(kind: string | null, id: number | null | undefined): s
   }
 }
 
+/**
+ * Human-readable subject label for collapsed rows. Raw kinds like
+ * `proximate_report_package` read as internal codes; strip the tenant
+ * prefix and title-case the first word. The raw kind stays visible in
+ * the expanded Details JSON for verification.
+ */
+const SUBJECT_LABELS: Record<string, string> = {
+  org: 'Organisation',
+  window: 'Funding window',
+};
+function subjectLabel(kind: string): string {
+  if (SUBJECT_LABELS[kind]) return SUBJECT_LABELS[kind];
+  const words = kind.replace(/^proximate_/, '').split('_').join(' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 interface VerifyResult {
   success: boolean;
   ok: boolean;
@@ -351,7 +367,7 @@ export default function AuditChainPage() {
                               href && 'hover:bg-[hsl(var(--kuja-sand-50))] hover:border-[hsl(var(--kuja-clay))] cursor-pointer transition-colors',
                             )}
                           >
-                            {e.subject_kind} #{e.subject_id}
+                            {subjectLabel(e.subject_kind)} #{e.subject_id}
                             {href && <ArrowUpRight className="w-2.5 h-2.5" />}
                           </Badge>
                         );

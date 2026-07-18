@@ -1018,6 +1018,10 @@ def run_proximate_rbac(base):
         ob_ids = {i["id"] for i in ob_view.get("items", [])}
         assert {item["id"], hidden["id"]} <= ob_ids, \
             f"OB missing items: {ob_ids}"
+        # the viewer field is what the frontend gates OB-only copy on —
+        # it must reflect the SESSION, never a client-side cache
+        assert ob_view.get("viewer") == "ob", \
+            f"OB viewer field -> {ob_view.get('viewer')}"
 
         # OB approves the photo for donor eyes + publishes
         vis = ob.request("PATCH",
@@ -1043,6 +1047,8 @@ def run_proximate_rbac(base):
         assert "INTERNAL-ONLY-REGRESSION-XYZZY" not in dv2.text \
             and "hidden-evidence-xyzzy" not in dv2.text, \
             "hidden item caption/filename leaked to donor"
+        assert body.get("viewer") == "donor", \
+            f"donor viewer field -> {body.get('viewer')}"
         # hidden file stream must be denied; approved one must stream
         hfile = donor.get(
             f"{base}/api/proximate/report-items/{hidden['id']}/file",

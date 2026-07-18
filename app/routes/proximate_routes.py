@@ -9780,6 +9780,10 @@ def _package_view(pkg, *, for_donor):
         'voice_questions': [
             {'key': k, 'label': lbl} for k, lbl in VOICE_QUESTIONS
         ],
+        # Session-derived viewer role: the frontend must gate operator-only
+        # copy/controls on THIS, not on client-side persona caches, which can
+        # go stale across account switches in the same browser profile.
+        'viewer': 'donor' if for_donor else 'ob',
     }
 
 

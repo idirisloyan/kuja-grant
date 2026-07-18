@@ -58,6 +58,7 @@ interface PkgView {
   round?: { id: number; title: string };
   activities?: Activity[];
   items?: Item[];
+  viewer?: 'ob' | 'donor';
   error?: string;
 }
 
@@ -82,8 +83,12 @@ export function ProximateReportPackageClient() {
   const [rateInput, setRateInput] = useState('');
   const [narrative, setNarrative] = useState<Narrative | null>(null);
   const { persona } = useProximatePersona();
-  // Same rule as the round page: only a real OB is an operator here.
-  const isOperator = persona === 'ob';
+  // Operator = the API said so for THIS session (viewer comes from the
+  // package response, so it can never disagree with what the backend served)
+  // AND the persona hook agrees. The persona hook alone can serve a stale
+  // cached 'ob' after an account switch in the same browser profile, which
+  // briefly showed OB-only copy on a donor session.
+  const isOperator = data?.viewer === 'ob' && persona === 'ob';
 
   useEffect(() => {
     const m = window.location.pathname.match(/\/proximate\/reports\/(\d+)/);

@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Sparkles, X, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
+import { useNetworkStore } from '@/stores/network-store';
 import { api } from '@/lib/api';
 
 interface Item {
@@ -57,11 +58,17 @@ function writeLocal(key: string, val: string) {
 
 export function WhatsNewBanner() {
   const user = useAuthStore((s) => s.user);
+  const network = useNetworkStore((s) => s.network);
+  // The digest is built from marketplace activity (open grants etc.), which
+  // Proximate personas cannot open — same leak class the sidebar (Phase 709)
+  // and command palette fixed. Suppress it entirely on the Proximate tenant
+  // until a console-specific digest exists.
+  const isProximate = network?.slug === 'proximate';
   const [data, setData] = useState<Resp | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || isProximate) return;
     const since = readLocal(LAST_VISIT_KEY);
     // No prior visit on this device → just stamp now and skip the call.
     if (!since) {
@@ -83,9 +90,9 @@ export function WhatsNewBanner() {
       })
       .catch(() => { /* network noise — banner just doesn't render */ });
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, isProximate]);
 
-  if (!user) return null;
+  if (!user || isProximate) return null;
   if (dismissed || !data || data.total === 0) return null;
 
   const handleDismiss = () => {
