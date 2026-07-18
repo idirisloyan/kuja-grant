@@ -215,8 +215,13 @@ session; entries move to "Completed" below as each ships.
   collapsed rows = seq/action/actor/subject/time; click expands
   inline prev-hash/payload-hash/details row. Presentation only —
   chain + export logic untouched per spec.
-- [ ] **Stage 4c** — notifications grouping + settings sections
-  (collapsible category groups per spec).
+- [x] **Stage 4c — notification preference groups** (`f518ecc97`):
+  /settings/notifications categories collapse to name + "N channels
+  on"; expand to configure. DEFERRED from Stage 4: a dedicated
+  settings hub page (Profile/Language/Theme/Bandwidth sections) —
+  those controls live in the shell today and the per-page settings
+  split already reflects the spec's grouping; revisit if the team
+  wants a single /settings landing page.
 - [ ] **Stage 5** — responsive/a11y/perf sweep (390px-first, focus,
   contrast, dark mode + RTL across redesigned pages).
 
