@@ -192,11 +192,17 @@ session; entries move to "Completed" below as each ships.
 - [x] **Stage 3c (dashboard)** (`c8fe52d39`, prod-verified): operator
   dashboard top section = Requires Attention beside Recent Activity
   (lg 2/3 + 1/3); lower detail 2-col; status chips humanized.
-- [ ] **Stage 3c remainder** — partners list compact rows +
-  pagination, disbursements register status filters, endorser
-  approvals queue-first.
-- [ ] **Stage 4** — grants, endorser approvals, crisis signals, audit
-  chain two-level view, notifications, settings.
+- [x] **Stage 3c (registers)** (`957ae5791` + `9d9e682e3` +
+  `513d30094`): disbursements register status-filter chips with
+  counts (URL ?status=, same pattern as rounds); partners register
+  compact stat row + humanized chips (+proximate.status.dd_pending
+  key) + mobile Filters toggle + Name/Newest sort + 30-row
+  incremental loading; endorser approvals queue-first — endorser
+  NAME resolved on the pending endpoint (OB-only), Pending-review /
+  sanctions badges, confirm-before-approve step, success note,
+  spec empty-state copy.
+- [ ] **Stage 4** — grants, crisis signals, audit chain two-level
+  view, notifications, settings.
 - [ ] **Stage 5** — responsive/a11y/perf sweep (390px-first, focus,
   contrast, dark mode + RTL across redesigned pages).
 
