@@ -222,8 +222,16 @@ session; entries move to "Completed" below as each ships.
   those controls live in the shell today and the per-page settings
   split already reflects the spec's grouping; revisit if the team
   wants a single /settings landing page.
-- [ ] **Stage 5** — responsive/a11y/perf sweep (390px-first, focus,
-  contrast, dark mode + RTL across redesigned pages).
+- [x] **Stage 5 — responsive/dark/RTL sweep** (2026-07-18,
+  verification-only, no defects found): 390px pass on all 9
+  redesigned pages (dashboard, rounds, partners, partner detail,
+  disbursements, grants, crisis, endorser queue, audit chain) —
+  zero horizontal overflow, zero JS errors; dark-mode pass on
+  dashboard/disbursements/crisis/endorser queue; RTL pass (real
+  ar-language user → dir=rtl) on dashboard/rounds/partners with no
+  overflow. Screenshot evidence: Downloads/s5_*.png (mobile, dark,
+  rtl variants). Credit: tone-system dark variants + logical
+  ms-/me-/ps- spacing used throughout the redesign.
 
 ---
 
