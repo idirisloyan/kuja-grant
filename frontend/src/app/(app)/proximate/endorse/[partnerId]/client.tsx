@@ -36,12 +36,34 @@ import {
   PifCard, MediaVerificationPanel, ProximateAttachmentsPanel,
 } from '@/components/proximate/dd-evidence';
 import { PartnerJourney, NextStep } from '@/components/proximate/next-step';
+import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
+
+// Redesign Stage 3 — OB partner-detail tabs. Endorsers keep the
+// linear wizard flow; the tab bar and CSS-hiding apply only to the
+// Oversight Body view (same technique as the round detail).
+const PARTNER_TABS = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'endorsements', label: 'Endorsements' },
+  { key: 'dd', label: 'Due diligence' },
+  { key: 'disbursements', label: 'Disbursements' },
+];
+
+interface PartnerDisbursement {
+  id: number;
+  partner_id: number;
+  amount_usd: number | null;
+  status: string;
+  sent_at: string | null;
+  purpose: string | null;
+}
 
 interface TrustFloor {
   endorsements_independent_count: number;
@@ -165,6 +187,41 @@ export default function ProximateEndorseWizardClient() {
   // (the server also enforces this). Refreshed when the methods panel below
   // adds/verifies a route.
   const [methodCount, setMethodCount] = useState<number | null>(null);
+  const [tab, setTab] = useState('overview');
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const qtab = sp.get('tab');
+    if (qtab && PARTNER_TABS.some((x) => x.key === qtab)) setTab(qtab);
+  }, []);
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (tab !== 'overview') sp.set('tab', tab);
+    else sp.delete('tab');
+    const qs = sp.toString();
+    window.history.replaceState(
+      null, '',
+      window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash,
+    );
+  }, [tab]);
+  const tabCls = (x: string) => (!isOb || tab === x ? 'space-y-4' : 'hidden');
+  // Partner's disbursements for the Disbursements tab (OB-only — the
+  // list endpoint 403s everyone else).
+  const [partnerDisbs, setPartnerDisbs] = useState<PartnerDisbursement[] | null>(null);
+  useEffect(() => {
+    if (!isOb || !partnerId) return;
+    let cancelled = false;
+    api.get<{ disbursements: PartnerDisbursement[] }>('/api/proximate/disbursements')
+      .then((r) => {
+        if (cancelled) return;
+        setPartnerDisbs(
+          (r.disbursements || []).filter(
+            (d) => String(d.partner_id) === String(partnerId),
+          ),
+        );
+      })
+      .catch(() => { if (!cancelled) setPartnerDisbs(null); });
+    return () => { cancelled = true; };
+  }, [isOb, partnerId]);
   const refreshMethodCount = useCallback(() => {
     if (!isOb || !partnerId) return;
     api.get<{ methods: unknown[] }>(
@@ -442,6 +499,28 @@ export default function ProximateEndorseWizardClient() {
             {t('proximate.wizard.back')}
           </button>
 
+          {isOb && (
+            <div className="flex items-center gap-1 border-b border-border overflow-x-auto" role="tablist">
+              {PARTNER_TABS.map((x) => (
+                <button
+                  key={x.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === x.key}
+                  onClick={() => setTab(x.key)}
+                  className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                    tab === x.key
+                      ? 'border-[hsl(var(--kuja-clay))] text-foreground font-medium'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {x.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className={tabCls('overview')}>
           {/* Phase 717 — partner journey + create-from-here next action.
               The whole trust arc at a glance, and (once cleared) a direct
               path to record a disbursement without hunting for the form. */}
@@ -611,15 +690,13 @@ export default function ProximateEndorseWizardClient() {
               </div>
             </Card>
           )}
+          </div>
 
+          <div className={tabCls('endorsements')}>
           <EndorsementsPanel partnerId={partnerId} />
+          </div>
 
-          <DisbursementMethodsPanel
-            partnerId={partnerId}
-            isAdmin={isOb}
-            onChanged={refreshMethodCount}
-          />
-
+          <div className={tabCls('dd')}>
           {/* Blue Nile intake (2026-07) — the due-diligence file the
               secretariat used to keep in a OneDrive folder: structured
               PIF, social-footprint check, and evidence attachments
@@ -640,7 +717,58 @@ export default function ProximateEndorseWizardClient() {
               title="Due-diligence evidence"
             />
           )}
+          </div>
 
+          <div className={tabCls('disbursements')}>
+          <DisbursementMethodsPanel
+            partnerId={partnerId}
+            isAdmin={isOb}
+            onChanged={refreshMethodCount}
+          />
+          {isOb && partnerDisbs !== null && (
+            <Card className="p-4">
+              <h2 className="text-sm font-medium mb-3">
+                {t('proximate.partner.disbursements_title')}
+              </h2>
+              {partnerDisbs.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {t('proximate.partner.disbursements_empty')}
+                </p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {partnerDisbs.map((d) => (
+                    <li key={d.id}>
+                      <Link
+                        href={`/proximate/disbursements/${d.id}`}
+                        className="flex items-center gap-2 py-1.5 px-2 -mx-2 rounded-sm hover:bg-muted/30"
+                      >
+                        <span className="text-sm font-medium">
+                          {d.amount_usd ? `$${d.amount_usd.toLocaleString()}` : '—'}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${TONE_CLASSES[toneForProximateStatus(d.status)]}`}
+                        >
+                          {labelForProximateStatus(d.status, t)}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground truncate flex-1">
+                          {d.purpose || ''}
+                        </span>
+                        {d.sent_at && (
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(d.sent_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
+          </div>
+
+          <div className={tabCls('endorsements')}>
           <Card className="p-4">
             <p className="text-xs text-muted-foreground mb-4">
               {t('proximate.wizard.instructions')}
@@ -709,6 +837,7 @@ export default function ProximateEndorseWizardClient() {
               t('proximate.wizard.submit')
             )}
           </Button>
+          </div>
         </div>
       </PageMain>
     </PageShell>
