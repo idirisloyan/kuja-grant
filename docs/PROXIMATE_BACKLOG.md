@@ -179,8 +179,18 @@ session; entries move to "Completed" below as each ships.
   in the URL (`?status=&q=`, history.replaceState); command palette
   (Ctrl/Cmd-K) is tenant-aware — Proximate personas get console
   destinations, closing the marketplace-links leak (Phase 709 class).
-- [ ] **Stage 3** — dashboard, rounds, partners, partner detail,
-  disbursements page redesigns + donor polish (QA 8-11).
+- [x] **Stage 3a — donor cards QA 9-11** (`409f27335`, prod-verified):
+  Partner-reports cards (name title, Published badge, primary View
+  report + secondary PDF); Your-rounds cards (status badge, primary
+  Full round report, grouped secondary actions).
+- [x] **Stage 3b — rounds** (`c7ff60ee5` + `dde4ce0c8`, both
+  prod-verified): register status-filter chips with counts (URL
+  ?status=); round detail organized into 5 tabs (Overview / Partners /
+  Reports & closing pack / Disbursements / Activity) via CSS-hide
+  wrappers — hooks/modals untouched, ?tab= in URL, #round-roster
+  deep-link lands on Partners.
+- [ ] **Stage 3c** — dashboard 2-3 column layout, partners list
+  compact rows + pagination, disbursements register filters.
 - [ ] **Stage 4** — grants, endorser approvals, crisis signals, audit
   chain two-level view, notifications, settings.
 - [ ] **Stage 5** — responsive/a11y/perf sweep (390px-first, focus,
