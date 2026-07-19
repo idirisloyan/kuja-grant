@@ -46,6 +46,12 @@ class User(UserMixin, db.Model):
     # includes this user on a given run.
     digest_cadence = db.Column(db.String(10), nullable=False, default='weekly')
 
+    # Read-only observer account: may hold any role/memberships for READ
+    # access, but every mutating request is rejected in middleware
+    # (enforce_read_only_accounts). Grant-side flag only — nothing in the
+    # app ever sets it; it is assigned directly in the DB.
+    read_only = db.Column(db.Boolean, default=False)
+
     # Relationships
     organization = db.relationship('Organization', backref=db.backref('users', lazy='dynamic'))
     reviews = db.relationship('Review', backref='reviewer', lazy='dynamic')
@@ -68,6 +74,7 @@ class User(UserMixin, db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'is_active': self.is_active,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'read_only': bool(self.read_only),
         }
         if include_org and self.organization:
             data['organization'] = self.organization.to_dict()

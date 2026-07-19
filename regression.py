@@ -128,6 +128,28 @@ def seed_fresh_db(db_path):
     _run_seed("seed_networked_funds.py", db_path, required=False)
     # Proximate fixtures (OB user, partners, endorsers, rounds).
     _run_seed("seed_proximate.py", db_path, required=True)
+    _seed_read_only_fixture(db_path)
+
+
+def _seed_read_only_fixture(db_path):
+    """Fixture for the read-only observer middleware check: an admin-role
+    user with users.read_only=1. Inserted directly (no seed script — the
+    flag is deliberately not settable through any app path)."""
+    import sqlite3
+    from werkzeug.security import generate_password_hash
+    conn = sqlite3.connect(db_path)
+    try:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(users)")}
+        if "read_only" not in cols:
+            return  # pre-migration schema — the check will Skip
+        conn.execute(
+            "insert into users (email, password_hash, name, role, language,"
+            " is_active, read_only, digest_cadence) values (?,?,?,?,?,1,1,?)",
+            ("readonly.gate@kuja.org", generate_password_hash("pass123"),
+             "Read-only gate fixture", "admin", "en", "off"))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -1117,6 +1139,30 @@ def run_proximate_rbac(base):
                 f"marketplace digest leaked to Proximate {who}: {j}"
     check("whats-new: empty digest under Proximate session",
           whats_new_tenant_guard)
+
+    # --- read-only observer accounts (users.read_only): reads pass,
+    # every mutating verb 403s in middleware, logout stays reachable. ---
+    def read_only_account_guard():
+        s = requests.Session()
+        r = s.post(f"{base}/api/auth/login",
+                   json={"email": "readonly.gate@kuja.org",
+                         "password": "pass123"},
+                   headers=_hdrs(), timeout=15)
+        if r.status_code != 200:
+            raise Skip("no read-only fixture account")
+        me = get(s, base, "/api/auth/me")
+        assert me.status_code == 200, f"read-only GET me -> {me.status_code}"
+        assert '"read_only": true' in me.text.replace("'", '"') \
+            or '"read_only":true' in me.text.replace(" ", ""), \
+            "read_only flag missing from /me"
+        p1 = s.post(f"{base}/api/grants", json={"title": "nope"},
+                    headers=_hdrs(), timeout=15)
+        assert p1.status_code == 403, f"read-only POST -> {p1.status_code}"
+        assert "read-only" in p1.text, f"missing clear message: {p1.text[:120]}"
+        lo = s.post(f"{base}/api/auth/logout", headers=_hdrs(), timeout=15)
+        assert lo.status_code in (200, 204), f"logout -> {lo.status_code}"
+    check("read-only account: reads pass, mutations 403, logout allowed",
+          read_only_account_guard)
 
     # --- PRX-OUTCOME-002: outcome follow-up pauses while report flagged ---
     def outcome_pause_on_flag():

@@ -317,6 +317,36 @@ def register_middleware(app):
             g.network = None
             g.network_id = None
 
+    @app.before_request
+    def enforce_read_only_accounts():
+        """Read-only observer accounts (users.read_only) can browse
+        everything their role and memberships allow but never mutate.
+
+        Server-side boundary, not a UI affordance: the frontend still
+        renders action controls for these accounts and any click lands
+        here with a clear 403. Blocks every mutating verb, including
+        POST-shaped reads (exports, AI Q&A) — strictness over convenience.
+        Login stays reachable (the caller is unauthenticated at that
+        point) and logout is allowlisted so the account can't get stuck.
+        """
+        if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+            return None
+        if request.path in ('/api/auth/login', '/api/auth/logout'):
+            return None
+        try:
+            if current_user.is_authenticated and \
+                    bool(getattr(current_user, 'read_only', False)):
+                return jsonify({
+                    'success': False,
+                    'error': 'read_only_account',
+                    'message': 'This account is read-only — viewing is '
+                               'allowed, changes are not.',
+                }), 403
+        except Exception:
+            # Auth layer not ready (first boot) — never block the request.
+            return None
+        return None
+
     @app.after_request
     def add_request_id_header(response):
         """Include request ID in response for client-side correlation."""
