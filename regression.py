@@ -1103,6 +1103,21 @@ def run_proximate_rbac(base):
         assert d.status_code == 403, f"donor vetting POST -> {d.status_code}"
     check("vetting assessment: OB records, donor denied", vetting_assessment)
 
+    # --- /api/whats-new tenant guard (18-Jul QA residual): the marketplace
+    # digest must come back EMPTY under a Proximate session even on a
+    # direct API call — frontend suppression is not a tenant boundary. ---
+    def whats_new_tenant_guard():
+        for who, sess in (("ob", ob), ("donor", donor)):
+            r = get(sess, base,
+                    "/api/whats-new?since=2026-06-01T00:00:00Z", override=OV)
+            assert r.status_code == 200, \
+                f"whats-new ({who}) -> {r.status_code}"
+            j = r.json()
+            assert j.get("total") == 0 and j.get("items") == [], \
+                f"marketplace digest leaked to Proximate {who}: {j}"
+    check("whats-new: empty digest under Proximate session",
+          whats_new_tenant_guard)
+
     # --- PRX-OUTCOME-002: outcome follow-up pauses while report flagged ---
     def outcome_pause_on_flag():
         # Any disbursement with a submitted report will do (verdict can be

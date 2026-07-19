@@ -28,6 +28,7 @@ from app.models.application import Application
 from app.models.report import Report
 from app.models.grant import Grant
 from app.models.notification import Notification
+from app.utils.network import get_current_network
 
 whats_new_bp = Blueprint('whats_new', __name__, url_prefix='/api')
 
@@ -200,6 +201,22 @@ def api_whats_new():
     """
     since = _parse_since(request.args.get('since'))
     role = current_user.role
+
+    # The digest buckets are built from marketplace activity (open grants,
+    # applications, reports) that Proximate personas cannot open. The
+    # frontend no longer renders the banner on Proximate, but suppression
+    # in the UI is not a tenant boundary — a direct API call must get an
+    # empty digest too.
+    net = get_current_network()
+    if net is not None and getattr(net, 'slug', None) == 'proximate':
+        return jsonify({
+            'success': True,
+            'since': since.isoformat(),
+            'role': role,
+            'total': 0,
+            'items': [],
+        })
+
     org_id = getattr(current_user, 'org_id', None)
     if role == 'ngo':
         summary = _ngo_summary(since, org_id)
