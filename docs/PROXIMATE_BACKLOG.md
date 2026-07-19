@@ -1141,3 +1141,9 @@ All code items fixed and prod-verified:
 - **Testing improvements shipped with this wave:** armed-trigger banner
   assertions, stale-account-switch donor view, humanized-audit-label
   checks (verify_leak_fixes_*.py), viewer-field gate assertions.
+- ~~Residual (18-Jul validation, 9.4/10): `/api/whats-new` backend
+  tenant guard~~ — DONE `e542ba716`: the endpoint returns an empty
+  digest whenever the resolved network is Proximate, so a direct API
+  call can no longer fetch marketplace data under a Proximate session;
+  Kuja marketplace behavior unchanged. Pinned in the gate for both OB
+  and donor sessions (gate now 95 checks).
