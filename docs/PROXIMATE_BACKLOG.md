@@ -1147,3 +1147,24 @@ All code items fixed and prod-verified:
   call can no longer fetch marketplace data under a Proximate session;
   Kuja marketplace behavior unchanged. Pinned in the gate for both OB
   and donor sessions (gate now 95 checks).
+
+## 18-July gap-closure wave (`356ccf372`) — spec items previously open
+
+- ~~Settings hub page (deferred in Stage 4)~~ — DONE: /settings groups
+  profile, language/theme/bandwidth, notification/security links, and
+  tenant/role-gated extras. All sidebar Settings links repointed.
+- ~~Mobile bottom navigation ("consider" item)~~ — DONE: Proximate OB
+  persona only, <sm viewports, Home/Rounds/Partners/Disbursements/More
+  per the spec's suggested structure. Donors/endorsers unchanged.
+- ~~Saved filters on Partners ("where practical")~~ — DONE: named
+  status+search combos, per-device (localStorage), max 6.
+- ~~Previous/next record navigation ("where appropriate")~~ — DONE on
+  partner detail for OB, ordered by the register's default name sort,
+  preserves the active tab.
+- ~~Tablet acceptance criteria~~ — SWEPT: 768x1024 + 1024x768 across
+  10 pages, 40/40 (0 overflow, 0 JS errors), tablet_*.png evidence;
+  tablet_sweep script now part of the standing verification set.
+- Remaining spec non-requirements, deliberately not built: virtualized
+  lists (incremental loading covers current scale), per-page
+  loading/error-state screenshot pack (states exist + are exercised by
+  tests; formal capture pack is documentation work, backlog on demand).
