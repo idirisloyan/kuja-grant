@@ -117,3 +117,17 @@ Updated 2026-07-05.
   platform primitives NEAR/Kuja can reuse.
 - Twilio SMS fallback (Phase 718) — same.
 - Cloudflare R2 evidence storage (Phase 719) — same.
+
+## Read-only observer accounts (shipped 2026-07-18, `a9a1a8684`)
+- `users.read_only` flag + middleware guard: authenticated read-only
+  users can browse everything their role/memberships allow; every
+  mutating verb (POST/PUT/PATCH/DELETE) returns 403 with a clear
+  message; login/logout stay reachable. Flag is NOT settable through
+  any app path — DB-assigned only. Gate check + seeded fixture
+  (readonly.gate@kuja.org, local regression DB only) — 96 checks.
+- Prod account: iloyan@gmail.com (role admin + Proximate OB org) for
+  full read coverage across Kuja/NEAR/Proximate. Password managed at
+  DB level like all accounts. Known boundary: donor/NGO/partner
+  persona-specific portals need their own records; underlying data is
+  visible via admin/OB registers. UI still shows action buttons — they
+  403 server-side (acceptable; a UI read-only banner is possible v2).
