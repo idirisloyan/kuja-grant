@@ -22,6 +22,7 @@ import { OfflineBanner } from '@/components/layout/offline-banner';
 import { JourneyRail } from '@/components/dashboards/journey-rail';
 import { WhatsNewBanner } from '@/components/layout/whats-new-banner';
 import { OfflineQueuePanel } from '@/components/layout/offline-queue-panel';
+import { ProximateBottomNav } from '@/components/proximate/bottom-nav';
 
 const SIDEBAR_WIDTH = 280;
 const COLLAPSED_WIDTH = 72;
@@ -133,6 +134,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {children}
             </div>
           </main>
+          {/* Redesign spec — mobile bottom navigation. Self-gated:
+              Proximate tenant + OB persona + <sm viewport only. */}
+          <ProximateBottomNav />
         </div>
         <CopilotRail />
         {/* Phase 100 — offline outbox manual-review panel. Self-gated:

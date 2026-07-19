@@ -222,6 +222,31 @@ export default function ProximateEndorseWizardClient() {
       .catch(() => { if (!cancelled) setPartnerDisbs(null); });
     return () => { cancelled = true; };
   }, [isOb, partnerId]);
+  // Redesign spec — previous/next record navigation for reviewers
+  // walking the register. OB-only (uses the OB partners endpoint) and
+  // ordered by name to match the register's default sort.
+  const [registerIds, setRegisterIds] = useState<number[] | null>(null);
+  useEffect(() => {
+    if (!isOb) return;
+    let cancelled = false;
+    api.get<{ partners: { id: number; name: string }[] }>('/api/proximate/partners')
+      .then((r) => {
+        if (cancelled) return;
+        const ids = (r.partners || [])
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((p) => p.id);
+        setRegisterIds(ids);
+      })
+      .catch(() => { if (!cancelled) setRegisterIds(null); });
+    return () => { cancelled = true; };
+  }, [isOb]);
+  const registerIdx = registerIds
+    ? registerIds.indexOf(Number(partnerId)) : -1;
+  const prevPartnerId = registerIdx > 0 ? registerIds?.[registerIdx - 1] : null;
+  const nextPartnerId = (registerIds && registerIdx >= 0
+    && registerIdx < registerIds.length - 1)
+    ? registerIds[registerIdx + 1] : null;
+
   const refreshMethodCount = useCallback(() => {
     if (!isOb || !partnerId) return;
     api.get<{ methods: unknown[] }>(
@@ -498,6 +523,29 @@ export default function ProximateEndorseWizardClient() {
             <BackChevron className="w-3 h-3" />
             {t('proximate.wizard.back')}
           </button>
+
+          {isOb && (prevPartnerId || nextPartnerId) && (
+            <div className="flex items-center justify-end gap-1.5 text-xs">
+              {prevPartnerId ? (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/proximate/endorse/${prevPartnerId}?tab=${tab}`)}
+                  className="rounded-md border px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                >
+                  ← {t('proximate.partner.prev')}
+                </button>
+              ) : null}
+              {nextPartnerId ? (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/proximate/endorse/${nextPartnerId}?tab=${tab}`)}
+                  className="rounded-md border px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                >
+                  {t('proximate.partner.next')} →
+                </button>
+              ) : null}
+            </div>
+          )}
 
           {isOb && (
             <div className="flex items-center gap-1 border-b border-border overflow-x-auto" role="tablist">

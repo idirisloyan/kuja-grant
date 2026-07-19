@@ -37,6 +37,7 @@ interface Partner {
 }
 
 const PAGE_SIZE = 30;
+const SAVED_FILTERS_KEY = 'kuja_partner_saved_filters_v1';
 
 export default function ProximatePartnersPage() {
   const { t } = useTranslation();
@@ -51,6 +52,12 @@ export default function ProximatePartnersPage() {
   const [sort, setSort] = useState<'name' | 'newest'>('name');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Redesign spec "saved filters where practical" — named search+status
+  // combos persisted per-device in localStorage. Presentation only; the
+  // saved entry just replays the same URL-backed filter state.
+  const [savedFilters, setSavedFilters] = useState<
+    { label: string; status: string; q: string }[]
+  >([]);
   // Blue Nile intake (2026-07) — bulk PIF import. One Word/PDF form in,
   // one nominated partner out (AI-extracted server-side), original
   // attached as due-diligence evidence.
@@ -77,7 +84,31 @@ export default function ProximatePartnersPage() {
     const q = sp.get('q');
     if (s) setStatusFilter(s);
     if (q) setFilter(q);
+    try {
+      const raw = window.localStorage.getItem(SAVED_FILTERS_KEY);
+      if (raw) setSavedFilters(JSON.parse(raw));
+    } catch { /* corrupted store — start empty */ }
   }, []);
+
+  const persistSaved = (next: { label: string; status: string; q: string }[]) => {
+    setSavedFilters(next);
+    try {
+      window.localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(next));
+    } catch { /* storage full/unavailable — chips just don't persist */ }
+  };
+
+  const saveCurrentFilter = () => {
+    const label = [
+      statusFilter !== 'all' ? labelForProximateStatus(statusFilter, t) : '',
+      filter.trim(),
+    ].filter(Boolean).join(' · ');
+    if (!label) return;
+    const next = [
+      ...savedFilters.filter((f) => f.label !== label),
+      { label, status: statusFilter, q: filter.trim() },
+    ].slice(-6);
+    persistSaved(next);
+  };
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     if (statusFilter && statusFilter !== 'all') sp.set('status', statusFilter);
@@ -270,6 +301,43 @@ export default function ProximatePartnersPage() {
                     </button>
                   ))}
                 </div>
+                {/* Saved filters row: replay a named search+status combo. */}
+                {(savedFilters.length > 0 || statusFilter !== 'all' || filter.trim()) && (
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                    {savedFilters.map((f) => (
+                      <span
+                        key={f.label}
+                        className="inline-flex items-center rounded-md border bg-muted/40 text-[11px]"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => { setStatusFilter(f.status); setFilter(f.q); }}
+                          className="px-2 py-1 hover:underline"
+                          title={t('proximate.partners.apply_saved')}
+                        >
+                          {f.label}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => persistSaved(savedFilters.filter((x) => x.label !== f.label))}
+                          className="px-1.5 py-1 text-muted-foreground hover:text-destructive"
+                          aria-label={`${t('proximate.partners.remove_saved')}: ${f.label}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    {(statusFilter !== 'all' || filter.trim()) && (
+                      <button
+                        type="button"
+                        onClick={saveCurrentFilter}
+                        className="text-[11px] px-2 py-1 rounded-md border border-dashed text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                      >
+                        {t('proximate.partners.save_filter')}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </Card>
 

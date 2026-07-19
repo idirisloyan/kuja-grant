@@ -335,7 +335,7 @@ function kujaProfile(role: UserRole, t: T): NavProfile {
         ],
         secondary: [
           { icon: MessageSquare,   label: 'Messages',                  href: '/messages' },
-          { icon: SettingsIcon,    label: 'Settings',                  href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',                  href: '/settings' },
         ],
       };
 
@@ -357,7 +357,7 @@ function kujaProfile(role: UserRole, t: T): NavProfile {
           { icon: Search,          label: 'Find a grant',              href: '/grants' },
           { icon: MessageSquare,   label: 'Messages',                  href: '/messages' },
           { icon: HelpCircle,      label: 'Help & Chat',               href: '/chat' },
-          { icon: SettingsIcon,    label: 'Settings',                  href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',                  href: '/settings' },
         ],
       };
 
@@ -371,7 +371,7 @@ function kujaProfile(role: UserRole, t: T): NavProfile {
           { icon: ClipboardCheck,  label: t('nav.completed_reviews'),  href: '/reviews/completed' },
         ],
         secondary: [
-          { icon: SettingsIcon,    label: 'Settings',                  href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',                  href: '/settings' },
         ],
       };
 
@@ -392,7 +392,7 @@ function kujaProfile(role: UserRole, t: T): NavProfile {
           { icon: Activity,        label: t('nav.observability'),      href: '/observability' },
           { icon: BarChart3,       label: t('nav.metrics'),            href: '/admin/metrics' },
           { icon: ShieldCheck,     label: t('nav.audit_chain'),        href: '/admin/audit-chain' },
-          { icon: SettingsIcon,    label: 'Settings',                  href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',                  href: '/settings' },
         ],
       };
   }
@@ -425,7 +425,7 @@ function nearProfile(role: UserRole, t: T): NavProfile {
           // as a known utility shortcut. The two will diverge once Phase 49
           // ships /governance with a wider scope.
           { icon: ClipboardList,   label: 'Audit',               href: '/admin/audit-chain' },
-          { icon: SettingsIcon,    label: 'Settings',            href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',            href: '/settings' },
         ],
       };
 
@@ -446,7 +446,7 @@ function nearProfile(role: UserRole, t: T): NavProfile {
         secondary: [
           { icon: MessageSquare,   label: 'Messages',               href: '/messages' },
           { icon: Inbox,           label: 'Feedback',               href: '/feedback' },
-          { icon: SettingsIcon,    label: 'Settings',               href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',               href: '/settings' },
         ],
       };
 
@@ -460,7 +460,7 @@ function nearProfile(role: UserRole, t: T): NavProfile {
         ],
         secondary: [
           { icon: MessageSquare,   label: 'Messages',            href: '/messages' },
-          { icon: SettingsIcon,    label: 'Settings',            href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',            href: '/settings' },
         ],
       };
 
@@ -473,7 +473,7 @@ function nearProfile(role: UserRole, t: T): NavProfile {
           { icon: ClipboardCheck,  label: t('nav.completed_reviews'), href: '/reviews/completed' },
         ],
         secondary: [
-          { icon: SettingsIcon,    label: 'Settings',                 href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',                 href: '/settings' },
         ],
       };
   }
@@ -541,7 +541,7 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
           { icon: Sparkles,        label: 'Ask AI',           href: '/proximate/donor#ask' },
         ],
         secondary: [
-          { icon: SettingsIcon,    label: 'Settings',         href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',         href: '/settings' },
         ],
       };
 
@@ -567,7 +567,7 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
           { icon: MapPin,          label: 'Crisis signals',      href: '/proximate/crisis-selector' },
           { icon: Send,            label: 'All disbursements',   href: '/proximate/disbursements' },
           { icon: ShieldCheck,     label: 'Audit chain',         href: '/admin/audit-chain' },
-          { icon: SettingsIcon,    label: 'Settings',            href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',            href: '/settings' },
         ],
         // Redesign Stage 2 — spec grouping for the operator console.
         groups: [
@@ -592,7 +592,7 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
             label: 'Governance',
             items: [
               { icon: ShieldCheck,  label: 'Audit chain', href: '/admin/audit-chain' },
-              { icon: SettingsIcon, label: 'Settings',    href: '/settings/notifications' },
+              { icon: SettingsIcon, label: 'Settings',    href: '/settings' },
             ],
           },
         ],
@@ -613,7 +613,7 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
           { icon: LayoutDashboard, label: 'Proximate home', href: '/proximate/donor' },
         ],
         secondary: [
-          { icon: SettingsIcon,    label: 'Settings',       href: '/settings/notifications' },
+          { icon: SettingsIcon,    label: 'Settings',       href: '/settings' },
         ],
       };
   }
