@@ -1648,6 +1648,8 @@
   "proximate.disbursement.no_audit": "No audit rows yet.",
   "proximate.disbursement.none": "No disbursement methods on file yet.",
   "proximate.disbursement.outcome_paused": "Le suivi des résultats est suspendu tant que le rapport est signalé. Il reprendra automatiquement une fois le rapport résolu.",
+  "proximate.disbursement.payment_confirmations": "Confirmations de paiement",
+  "proximate.disbursement.payment_confirmations_empty": "Aucune confirmation de paiement pour l'instant — après confirmation du transfert, téléversez ici le reçu du hawala ou de l'application de paiement.",
   "proximate.disbursement.photo_evidence": "Photo evidence",
   "proximate.disbursement.pick_fsp": "— pick an FSP —",
   "proximate.disbursement.planb_body": "The primary disbursement route was flagged for security failure. Try an alternate FSP from the partner detail.",

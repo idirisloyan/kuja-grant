@@ -1648,6 +1648,8 @@
   "proximate.disbursement.no_audit": "لا توجد سجلات بعد.",
   "proximate.disbursement.none": "لا توجد طرق صرف مسجّلة بعد.",
   "proximate.disbursement.outcome_paused": "متابعة النتائج متوقفة مؤقتاً أثناء تعليم التقرير. ستُستأنف تلقائياً بعد حل التقرير.",
+  "proximate.disbursement.payment_confirmations": "تأكيدات الدفع",
+  "proximate.disbursement.payment_confirmations_empty": "لا توجد تأكيدات دفع بعد — بعد تأكيد التحويل، حمِّل إيصال الحوالة أو تطبيق الدفع هنا.",
   "proximate.disbursement.photo_evidence": "صورة دليلية",
   "proximate.disbursement.pick_fsp": "— اختر مزوّداً —",
   "proximate.disbursement.planb_body": "تم وضع علامة فشل أمني على المسار الأساسي. جرّب مزود خدمة مالية بديل من تفاصيل الشريك.",

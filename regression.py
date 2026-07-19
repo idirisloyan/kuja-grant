@@ -685,6 +685,47 @@ def run_proximate_rbac(base):
                 _no_sensitive(f"{who} disbursement detail", r)
             check(f"{who} 403 + no-leak /disbursements/<id>", disb_denied)
 
+        # --- payment-confirmation upload (2026-07-19): hawala / government
+        # payment-app receipts must attach to the SPECIFIC disbursement,
+        # round-trip on the list endpoint, and stay OB-only to write. ---
+        _PNG = (b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00"
+                b"\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0c"
+                b"IDATx\x9cc\xf8\xcf\xc0\x00\x00\x00\x03\x00\x01\x9a\x92\xdc"
+                b"\xe4\x00\x00\x00\x00IEND\xaeB`\x82")
+
+        def ob_payment_confirmation():
+            h = {"X-Requested-With": "XMLHttpRequest", "X-Network-Override": OV}
+            r = ob.post(
+                f"{base}/api/proximate/attachments",
+                data={"subject_kind": "disbursement", "subject_id": str(did),
+                      "kind": "payment_confirmation",
+                      "label": "Gate fixture — hawala receipt"},
+                files={"file": ("gate_receipt.png", _PNG, "image/png")},
+                headers=h, timeout=30,
+            )
+            assert r.status_code == 200, f"upload -> {r.status_code}: {r.text[:160]}"
+            att = r.json().get("attachment") or {}
+            assert att.get("kind") == "payment_confirmation", att
+            lst = get(ob, base,
+                      f"/api/proximate/attachments?subject_kind=disbursement"
+                      f"&subject_id={did}", override=OV)
+            assert lst.status_code == 200, f"list -> {lst.status_code}"
+            ids = [a.get("id") for a in lst.json().get("attachments", [])]
+            assert att.get("id") in ids, f"uploaded {att.get('id')} not in {ids}"
+        check("OB payment-confirmation upload on disbursement", ob_payment_confirmation)
+
+        def donor_payment_confirmation_denied():
+            h = {"X-Requested-With": "XMLHttpRequest", "X-Network-Override": OV}
+            r = donor.post(
+                f"{base}/api/proximate/attachments",
+                data={"subject_kind": "disbursement", "subject_id": str(did),
+                      "kind": "payment_confirmation"},
+                files={"file": ("nope.png", _PNG, "image/png")},
+                headers=h, timeout=30,
+            )
+            assert r.status_code == 403, f"donor upload -> {r.status_code} (want 403)"
+        check("donor 403 payment-confirmation upload", donor_payment_confirmation_denied)
+
     # --- partner detail: OB full; donor hard-403; admin never sees secrets ---
     if pid:
         def ob_partner():

@@ -1648,6 +1648,8 @@
   "proximate.disbursement.no_audit": "No audit rows yet.",
   "proximate.disbursement.none": "No disbursement methods on file yet.",
   "proximate.disbursement.outcome_paused": "Dabagalka natiijada waa la hakiyay inta warbixinta ay calaamad leedahay. Si otomaatig ah ayay dib ugu soo laaban doontaa marka warbixinta la xalliyo.",
+  "proximate.disbursement.payment_confirmations": "Xaqiijinta lacag-bixinta",
+  "proximate.disbursement.payment_confirmations_empty": "Weli ma jiraan xaqiijinno lacag-bixin — kadib markaad xaqiijiso wareejinta, halkan soo geli risiidhka xawaaladda ama abka lacag-bixinta.",
   "proximate.disbursement.photo_evidence": "Photo evidence",
   "proximate.disbursement.pick_fsp": "— pick an FSP —",
   "proximate.disbursement.planb_body": "The primary disbursement route was flagged for security failure. Try an alternate FSP from the partner detail.",

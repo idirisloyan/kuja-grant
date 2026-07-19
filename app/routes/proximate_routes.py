@@ -8713,6 +8713,9 @@ def _attach_subject_or_404(net, subject_kind, subject_id):
         'crisis_signal': CrisisSignal,
         # Process doc §2: panelist CVs collected during vetting.
         'panel_candidate': ProximatePanelCandidate,
+        # Hawala/FSP payment confirmations (e.g. the government payment
+        # app receipt) filed against the specific transfer they prove.
+        'disbursement': ProximateDisbursement,
     }.get(subject_kind)
     if model is None:
         return None, (jsonify({'success': False,

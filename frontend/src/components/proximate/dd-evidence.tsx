@@ -119,6 +119,7 @@ const KIND_LABELS: Record<string, string> = {
   screening_evidence: 'Screening evidence',
   media_evidence: 'Media evidence',
   situation_analysis: 'Situation analysis',
+  payment_confirmation: 'Payment confirmation',
   other: 'Other',
 };
 
@@ -130,14 +131,17 @@ function fmtBytes(n: number | null) {
 
 export function ProximateAttachmentsPanel({
   subjectKind, subjectId, title = 'Evidence files',
+  defaultKind = 'other', emptyText = 'No evidence files yet.',
 }: {
-  subjectKind: 'partner' | 'round' | 'crisis_signal';
+  subjectKind: 'partner' | 'round' | 'crisis_signal' | 'disbursement';
   subjectId: number;
   title?: string;
+  defaultKind?: string;
+  emptyText?: string;
 }) {
   const [rows, setRows] = useState<Attachment[]>([]);
   const [busy, setBusy] = useState(false);
-  const [uploadKind, setUploadKind] = useState('other');
+  const [uploadKind, setUploadKind] = useState(defaultKind);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(() => {
@@ -197,7 +201,7 @@ export function ProximateAttachmentsPanel({
       </div>
       {rows.length === 0 ? (
         <p className="text-xs text-muted-foreground italic">
-          No evidence files yet.
+          {emptyText}
         </p>
       ) : (
         <ul className="space-y-1">

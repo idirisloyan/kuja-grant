@@ -29,10 +29,10 @@ from datetime import datetime, timezone
 from app.extensions import db
 
 ATTACHMENT_SUBJECT_KINDS = ('partner', 'round', 'crisis_signal',
-                            'panel_candidate')
+                            'panel_candidate', 'disbursement')
 ATTACHMENT_KINDS = (
     'pif_original', 'screening_evidence', 'media_evidence',
-    'situation_analysis', 'cv', 'other',
+    'situation_analysis', 'cv', 'payment_confirmation', 'other',
 )
 MEDIA_VERDICTS = ('positive', 'negative', 'no_footprint', 'inconclusive')
 PANEL_STATUSES = ('candidate', 'vetted', 'appointed', 'declined')

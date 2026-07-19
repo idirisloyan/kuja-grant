@@ -24,6 +24,7 @@ import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { NextStep, disbursementNextStep } from '@/components/proximate/next-step';
+import { ProximateAttachmentsPanel } from '@/components/proximate/dd-evidence';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -717,6 +718,18 @@ export function ProximateDisbursementDetailClient() {
               </>
             )}
           </Card>
+        )}
+
+        {/* Payment confirmations — hawala / government payment-app
+            receipts filed against this specific transfer. */}
+        {isOb && (
+          <ProximateAttachmentsPanel
+            subjectKind="disbursement"
+            subjectId={data.id}
+            title={t('proximate.disbursement.payment_confirmations')}
+            defaultKind="payment_confirmation"
+            emptyText={t('proximate.disbursement.payment_confirmations_empty')}
+          />
         )}
 
         {/* Phase 680 — 90-day outcome attestation */}

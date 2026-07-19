@@ -1648,6 +1648,8 @@
   "proximate.disbursement.no_audit": "No audit rows yet.",
   "proximate.disbursement.none": "No disbursement methods on file yet.",
   "proximate.disbursement.outcome_paused": "Ufuatiliaji wa matokeo umesimamishwa wakati ripoti ina alama. Utaendelea kiotomatiki ripoti itakapotatuliwa.",
+  "proximate.disbursement.payment_confirmations": "Uthibitisho wa malipo",
+  "proximate.disbursement.payment_confirmations_empty": "Hakuna uthibitisho wa malipo bado — baada ya kuthibitisha uhamisho, pakia hapa risiti ya hawala au ya programu ya malipo.",
   "proximate.disbursement.photo_evidence": "Photo evidence",
   "proximate.disbursement.pick_fsp": "— pick an FSP —",
   "proximate.disbursement.planb_body": "The primary disbursement route was flagged for security failure. Try an alternate FSP from the partner detail.",
