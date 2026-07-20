@@ -119,3 +119,24 @@ mode.
   `proximate.payment_confirmation.attached` (+ label + gate pin) and
   the `/api/whats-new` hydration guard (zero digest requests on
   Proximate; Kuja unaffected).
+- **Shipped 2026-07-20 (second wave): OB-console label i18n.** The three
+  hardcoded English label maps now resolve through i18n first with the
+  English map as fallback: 96 audit-action labels
+  (`labelForProximateAction`, keys `audit_label.<action>`), 29 audit
+  subject-kind labels (new shared `labelForAuditSubject`, keys
+  `audit_subject.<kind>` — replaces the audit-chain page's local map
+  and the round page's raw `subject_kind` text), and 7 attachment-kind
+  labels (`proximate.attachment_kind.<kind>` in dd-evidence, + CV kind
+  added, + Upload/Download/empty-state strings keyed). 134 new keys ×6
+  locales (parity 2872→3006) with real translations in ALL five
+  non-English locales for these keys. English output is byte-identical
+  (EN values = the old hardcoded strings), so QA scripts keyed to
+  English copy are unaffected. Verified locally: Arabic labels + RTL on
+  operator dashboard, audit chain, and disbursement activity; English
+  fallback unchanged.
+- **Known i18n debt (logged, NOT this wave): fr/es/sw/so placeholder
+  backfill.** ~537 `proximate.*` keys per locale in fr/es/sw/so still
+  hold English placeholder values (Arabic is fully translated; the 134
+  label keys above are translated in all six). Translating ~2,100
+  existing strings is its own project — schedule post-UAT, ideally with
+  a human reviewer per language.

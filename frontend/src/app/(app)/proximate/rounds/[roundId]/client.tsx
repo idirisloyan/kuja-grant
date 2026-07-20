@@ -21,7 +21,7 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { labelForProximateAction } from '@/lib/proximate-audit-labels';
+import { labelForProximateAction, labelForAuditSubject } from '@/lib/proximate-audit-labels';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { SelectionVoteCard } from '@/components/proximate/selection-vote-card';
@@ -1496,7 +1496,7 @@ export function ProximateRoundDetailClient() {
                           title={action}
                           className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[11px]"
                         >
-                          {labelForProximateAction(action)}
+                          {labelForProximateAction(action, t)}
                           <span className="text-muted-foreground tabular-nums">×{n}</span>
                         </span>
                       ))}
@@ -1509,9 +1509,9 @@ export function ProximateRoundDetailClient() {
                     <ul className="space-y-1 text-xs">
                       {auditWindow.slice(0, 6).map((a) => (
                         <li key={a.seq} className="flex items-center gap-2">
-                          <span title={a.action}>{labelForProximateAction(a.action)}</span>
-                          <span className="text-muted-foreground">
-                            ({a.subject_kind.replace('proximate_', '')} #{a.subject_id})
+                          <span title={a.action}>{labelForProximateAction(a.action, t)}</span>
+                          <span className="text-muted-foreground" title={a.subject_kind}>
+                            ({labelForAuditSubject(a.subject_kind, t)} #{a.subject_id})
                           </span>
                           <span className="text-muted-foreground ms-auto truncate">{a.actor_email}</span>
                         </li>

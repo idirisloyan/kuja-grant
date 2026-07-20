@@ -136,7 +136,7 @@ export function ProximateAdminClient() {
                           #{row.seq}
                         </span>
                         <span title={row.action} className="truncate">
-                          {labelForProximateAction(row.action)}
+                          {labelForProximateAction(row.action, t)}
                         </span>
                       </li>
                     ))}

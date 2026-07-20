@@ -24,6 +24,7 @@ import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 /* ------------------------------------------------------------------ */
 /* PIF card                                                            */
@@ -114,14 +115,24 @@ interface Attachment {
   created_at: string | null;
 }
 
+// English fallbacks; the panel resolves `proximate.attachment_kind.<kind>`
+// through i18n first so the Arabic-default OB reads Arabic kind badges.
 const KIND_LABELS: Record<string, string> = {
   pif_original: 'PIF original',
   screening_evidence: 'Screening evidence',
   media_evidence: 'Media evidence',
   situation_analysis: 'Situation analysis',
+  cv: 'CV',
   payment_confirmation: 'Payment confirmation',
   other: 'Other',
 };
+
+function kindLabel(kind: string, t: (key: string) => string): string {
+  const key = `proximate.attachment_kind.${kind}`;
+  const translated = t(key);
+  if (translated && translated !== key) return translated;
+  return KIND_LABELS[kind] || kind;
+}
 
 function fmtBytes(n: number | null) {
   if (!n) return '';
@@ -130,8 +141,8 @@ function fmtBytes(n: number | null) {
 }
 
 export function ProximateAttachmentsPanel({
-  subjectKind, subjectId, title = 'Evidence files',
-  defaultKind = 'other', emptyText = 'No evidence files yet.',
+  subjectKind, subjectId, title,
+  defaultKind = 'other', emptyText,
 }: {
   subjectKind: 'partner' | 'round' | 'crisis_signal' | 'disbursement';
   subjectId: number;
@@ -139,6 +150,7 @@ export function ProximateAttachmentsPanel({
   defaultKind?: string;
   emptyText?: string;
 }) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<Attachment[]>([]);
   const [busy, setBusy] = useState(false);
   const [uploadKind, setUploadKind] = useState(defaultKind);
@@ -175,14 +187,16 @@ export function ProximateAttachmentsPanel({
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <Paperclip className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold flex-1">{title}</h3>
+        <h3 className="text-sm font-semibold flex-1">
+          {title ?? t('proximate.attachments.title')}
+        </h3>
         <select
           value={uploadKind}
           onChange={(e) => setUploadKind(e.target.value)}
           className="text-xs rounded-md border bg-background p-1.5"
         >
-          {Object.entries(KIND_LABELS).map(([k, label]) => (
-            <option key={k} value={k}>{label}</option>
+          {Object.keys(KIND_LABELS).map((k) => (
+            <option key={k} value={k}>{kindLabel(k, t)}</option>
           ))}
         </select>
         <Button
@@ -192,7 +206,7 @@ export function ProximateAttachmentsPanel({
           {busy
             ? <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />
             : <Upload className="w-3.5 h-3.5 me-1" />}
-          Upload
+          {t('common.upload')}
         </Button>
         <input
           ref={fileRef} type="file" multiple className="hidden"
@@ -201,14 +215,14 @@ export function ProximateAttachmentsPanel({
       </div>
       {rows.length === 0 ? (
         <p className="text-xs text-muted-foreground italic">
-          {emptyText}
+          {emptyText ?? t('proximate.attachments.empty')}
         </p>
       ) : (
         <ul className="space-y-1">
           {rows.map((a) => (
             <li key={a.id} className="flex items-center gap-2 text-xs py-1 border-b border-border/50 last:border-b-0">
               <Badge variant="outline" className="text-[10px] shrink-0">
-                {KIND_LABELS[a.kind] || a.kind}
+                {kindLabel(a.kind, t)}
               </Badge>
               <span className="flex-1 truncate font-medium">{a.filename}</span>
               <span className="text-muted-foreground shrink-0">{fmtBytes(a.file_size)}</span>
@@ -216,7 +230,7 @@ export function ProximateAttachmentsPanel({
                 href={`/api/proximate/attachments/${a.id}/download`}
                 className="text-primary hover:underline shrink-0 inline-flex items-center gap-1"
               >
-                <Download className="w-3 h-3" /> Download
+                <Download className="w-3 h-3" /> {t('common.download')}
               </a>
             </li>
           ))}

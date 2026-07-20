@@ -950,7 +950,7 @@ export function ProximateDisbursementDetailClient() {
                       mis-rendered). Same util as the round detail
                       audit window. Hover shows the action code. */}
                   <span className="font-medium text-foreground" title={row.action}>
-                    {labelForProximateAction(row.action)}
+                    {labelForProximateAction(row.action, t)}
                   </span>
                   {row.actor_email && <span>· {row.actor_email}</span>}
                 </li>

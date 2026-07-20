@@ -138,10 +138,23 @@ export const PROXIMATE_ACTION_LABELS: Record<string, string> = {
 };
 
 /**
- * Resolve an action code to a human label. Falls back to the raw
- * code so the audit chain is never silently mis-rendered.
+ * Resolve an action code to a human label. i18n-first: every
+ * catalogued action has an `audit_label.<action>` key in all six
+ * locales, so Arabic-default OB users see Arabic activity feeds. The
+ * English map above stays as the fallback for callers without a
+ * translator and for actions that land before their keys do. Falls
+ * back to the prettified raw code so the audit chain is never
+ * silently mis-rendered.
  */
-export function labelForProximateAction(action: string): string {
+export function labelForProximateAction(
+  action: string,
+  t?: (key: string) => string,
+): string {
+  if (t) {
+    const key = `audit_label.${action}`;
+    const translated = t(key);
+    if (translated && translated !== key) return translated;
+  }
   const known = PROXIMATE_ACTION_LABELS[action];
   if (known) return known;
   // Fallback for codes added after this map (or non-proximate chains):
@@ -150,4 +163,57 @@ export function labelForProximateAction(action: string): string {
   const tail = action.split('.').slice(1).join(' ').replace(/_/g, ' ').trim()
     || action.replace(/[._]/g, ' ').trim();
   return tail.charAt(0).toUpperCase() + tail.slice(1);
+}
+
+/**
+ * Human label for an audit row's subject_kind ("proximate_round" →
+ * "Round" / "دورة"). Same i18n-first contract as the action labels,
+ * keyed `audit_subject.<kind>`. The English map covers the kinds the
+ * backend actually stamps; anything new prettifies (tenant prefix
+ * stripped) instead of leaking a machine token.
+ */
+const AUDIT_SUBJECT_LABELS: Record<string, string> = {
+  org: 'Organisation',
+  window: 'Funding window',
+  fund: 'Fund',
+  application: 'Application',
+  emergency_declaration: 'Emergency declaration',
+  grant: 'Grant',
+  network_membership: 'Network membership',
+  report: 'Report',
+  crisis_monitoring_report: 'Crisis monitoring report',
+  crisis_monitoring_row: 'Crisis monitoring row',
+  crisis_signal: 'Crisis signal',
+  member_feedback: 'Member feedback',
+  tenant_message: 'Tenant message',
+  document: 'Document',
+  partner: 'Partner',
+  proximate_partner: 'Partner',
+  proximate_round: 'Round',
+  proximate_disbursement: 'Disbursement',
+  proximate_donor: 'Donor',
+  proximate_endorser: 'Endorser',
+  proximate_fsp: 'FSP',
+  proximate_grant: 'Grant',
+  proximate_grant_report: 'Grant report',
+  proximate_grievance: 'Grievance',
+  proximate_intervention: 'Intervention',
+  proximate_outcome_attestation: 'Outcome attestation',
+  proximate_panel_candidate: 'Panel candidate',
+  proximate_report_package: 'Report package',
+  proximate_crisis_signal: 'Crisis signal',
+};
+
+export function labelForAuditSubject(
+  kind: string,
+  t?: (key: string) => string,
+): string {
+  if (t) {
+    const key = `audit_subject.${kind}`;
+    const translated = t(key);
+    if (translated && translated !== key) return translated;
+  }
+  if (AUDIT_SUBJECT_LABELS[kind]) return AUDIT_SUBJECT_LABELS[kind];
+  const words = kind.replace(/^proximate_/, '').split('_').join(' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }

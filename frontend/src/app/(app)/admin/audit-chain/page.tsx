@@ -26,6 +26,8 @@ import { api } from '@/lib/api';
 import { useNetworkStore } from '@/stores/network-store';
 import { cn } from '@/lib/utils';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
+import { useTranslation } from '@/lib/hooks/use-translation';
+import { labelForProximateAction, labelForAuditSubject } from '@/lib/proximate-audit-labels';
 
 /**
  * Phase 61 — map an audit chain row's subject_kind to its detail page
@@ -53,21 +55,9 @@ function subjectDrillHref(kind: string | null, id: number | null | undefined): s
   }
 }
 
-/**
- * Human-readable subject label for collapsed rows. Raw kinds like
- * `proximate_report_package` read as internal codes; strip the tenant
- * prefix and title-case the first word. The raw kind stays visible in
- * the expanded Details JSON for verification.
- */
-const SUBJECT_LABELS: Record<string, string> = {
-  org: 'Organisation',
-  window: 'Funding window',
-};
-function subjectLabel(kind: string): string {
-  if (SUBJECT_LABELS[kind]) return SUBJECT_LABELS[kind];
-  const words = kind.replace(/^proximate_/, '').split('_').join(' ');
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
+// Subject labels moved to the shared catalogue (labelForAuditSubject) so
+// the OB console renders them in the viewer's language; the raw kind
+// stays visible in the expanded Details JSON for verification.
 
 interface VerifyResult {
   success: boolean;
@@ -115,6 +105,17 @@ function humanise(action: string): string {
   return action.replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
+/**
+ * Proximate rows resolve through the shared catalogue (i18n-first, so
+ * the Arabic-default OB reads Arabic); platform rows keep the
+ * title-case prettifier — two-segment codes like `grant.published`
+ * would lose their subject through the proximate fallback.
+ */
+function actionLabel(action: string, t: (key: string) => string): string {
+  if (action.startsWith('proximate.')) return labelForProximateAction(action, t);
+  return humanise(action);
+}
+
 export default function AuditChainPage() {
   // QA 2026-07-10: on the Proximate tenant the OB reaches its own
   // tenant-scoped chain at /api/proximate/audit-chain (read + jsonl export);
@@ -124,6 +125,7 @@ export default function AuditChainPage() {
   // honest tenant-scoped card — the cryptographic re-verify is platform-only,
   // so we don't fake an "intact" badge; the OB verifies offline via the export.
   const network = useNetworkStore((s) => s.network);
+  const { t } = useTranslation();
   const isProx = network?.slug === 'proximate';
   const recentUrl = isProx ? '/api/proximate/audit-chain' : '/api/audit-chain/recent';
   const exportHref = isProx
@@ -343,7 +345,7 @@ export default function AuditChainPage() {
                   >
                     <td className="py-2 font-mono text-[hsl(var(--kuja-ink-soft))]">{e.seq}</td>
                     <td className={cn('py-2 font-semibold', actionTone(e.action))}>
-                      {humanise(e.action)}
+                      {actionLabel(e.action, t)}
                     </td>
                     <td className="py-2">
                       {e.actor_email ? (
@@ -367,7 +369,7 @@ export default function AuditChainPage() {
                               href && 'hover:bg-[hsl(var(--kuja-sand-50))] hover:border-[hsl(var(--kuja-clay))] cursor-pointer transition-colors',
                             )}
                           >
-                            {subjectLabel(e.subject_kind)} #{e.subject_id}
+                            {labelForAuditSubject(e.subject_kind, t)} #{e.subject_id}
                             {href && <ArrowUpRight className="w-2.5 h-2.5" />}
                           </Badge>
                         );
