@@ -68,7 +68,11 @@ export function WhatsNewBanner() {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    if (!user || isProximate) return;
+    // Wait for the tenant to hydrate before deciding to fetch: with
+    // `network` still null, isProximate is false and the digest call
+    // fired once per page mount on Proximate too (QA 2026-07-20 noted
+    // the repeated /api/whats-new requests — harmless, but wasteful).
+    if (!user || !network || isProximate) return;
     const since = readLocal(LAST_VISIT_KEY);
     // No prior visit on this device → just stamp now and skip the call.
     if (!since) {
@@ -90,7 +94,7 @@ export function WhatsNewBanner() {
       })
       .catch(() => { /* network noise — banner just doesn't render */ });
     return () => { cancelled = true; };
-  }, [user, isProximate]);
+  }, [user, network, isProximate]);
 
   if (!user || isProximate) return null;
   if (dismissed || !data || data.total === 0) return null;

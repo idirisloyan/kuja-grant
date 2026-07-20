@@ -8796,8 +8796,14 @@ def api_add_proximate_attachment():
     db.session.add(att)
     db.session.commit()
 
+    # QA 2026-07-20: payment confirmations get their own audit action so
+    # the chain reads "Payment confirmation attached" instead of the
+    # generic evidence wording (their audit scripts searched for it).
+    audit_action = ('proximate.payment_confirmation.attached'
+                    if kind == 'payment_confirmation'
+                    else 'proximate.evidence.attached')
     AuditChainEntry.append(
-        action='proximate.evidence.attached',
+        action=audit_action,
         actor_email=current_user.email,
         subject_kind=f'proximate_{subject_kind}',
         subject_id=subject_id,

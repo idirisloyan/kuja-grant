@@ -712,6 +712,12 @@ def run_proximate_rbac(base):
             assert lst.status_code == 200, f"list -> {lst.status_code}"
             ids = [a.get("id") for a in lst.json().get("attachments", [])]
             assert att.get("id") in ids, f"uploaded {att.get('id')} not in {ids}"
+            # QA 2026-07-20: the chain must record a DISTINCT action for
+            # payment confirmations, not the generic evidence wording.
+            chain = get(ob, base, "/api/proximate/audit-chain", override=OV)
+            assert chain.status_code == 200, f"audit-chain -> {chain.status_code}"
+            assert "proximate.payment_confirmation.attached" in (chain.text or ""), \
+                "payment-confirmation upload not distinctly audited"
         check("OB payment-confirmation upload on disbursement", ob_payment_confirmation)
 
         def donor_payment_confirmation_denied():

@@ -22,6 +22,7 @@ export const PROXIMATE_ACTION_LABELS: Record<string, string> = {
   // Blue Nile intake (2026-07) — these landed without labels, so the
   // round activity card showed raw codes for the entire ingestion.
   'proximate.evidence.attached': 'Evidence file attached',
+  'proximate.payment_confirmation.attached': 'Payment confirmation attached',
   'proximate.partner.pif_imported': 'Partner imported from PIF',
   'proximate.partner.media_verified': 'Media check recorded',
   'proximate.panel.candidate_added': 'Panel candidate added',
