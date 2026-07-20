@@ -143,7 +143,13 @@ mode.
   English-visible change; {placeholder} tokens asserted preserved.
   Verified locally in fr/sw/so. **Residual:** a machine-authored pass —
   a native-speaker review per language is still recommended before
-  marketing any of these four locales as fully supported; and a small
-  set of shared-shell strings (sidebar nav groups, some non-proximate
-  chrome) lives in other namespaces and still shows English in
-  fr/es/sw/so.
+  marketing any of these four locales as fully supported.
+- **CLOSED 2026-07-20 (`e639ae6e8`): shell/nav localization** (QA's
+  9.6→10 item #1). Proximate sidebar items, the Workspace/Operations/
+  Governance group headers, the command-palette entries and chrome, and
+  the header Search label now resolve through i18n (36 new `nav.*` keys
+  ×6, parity 3042) with English literals as fallback — English shell
+  byte-identical. Verified: Arabic shell fully Arabic (9/9 nav probes,
+  zero English leftovers). Remaining known-EN chrome: the NEAR-profile
+  sidebar literals (Declarations, Funds & Windows…) — deliberately out
+  of scope, NEAR operates English-first.
