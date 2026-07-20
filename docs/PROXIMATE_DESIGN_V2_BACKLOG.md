@@ -134,9 +134,16 @@ mode.
   English copy are unaffected. Verified locally: Arabic labels + RTL on
   operator dashboard, audit chain, and disbursement activity; English
   fallback unchanged.
-- **Known i18n debt (logged, NOT this wave): fr/es/sw/so placeholder
-  backfill.** ~537 `proximate.*` keys per locale in fr/es/sw/so still
-  hold English placeholder values (Arabic is fully translated; the 134
-  label keys above are translated in all six). Translating ~2,100
-  existing strings is its own project — schedule post-UAT, ideally with
-  a human reviewer per language.
+- **CLOSED 2026-07-20 (`cca1bfda7`): fr/es/sw/so placeholder
+  backfill.** The ~547 `proximate.*` English-placeholder keys per
+  locale now carry real translations in all four languages (terminology
+  pinned: fr cycle/décaissement/recommandant/bailleur; es
+  ronda/desembolso/avalista/donante; sw mzunguko/malipo/mthibitishaji;
+  so wareeg/lacag-bixin/taageere). EN and AR untouched; zero
+  English-visible change; {placeholder} tokens asserted preserved.
+  Verified locally in fr/sw/so. **Residual:** a machine-authored pass —
+  a native-speaker review per language is still recommended before
+  marketing any of these four locales as fully supported; and a small
+  set of shared-shell strings (sidebar nav groups, some non-proximate
+  chrome) lives in other namespaces and still shows English in
+  fr/es/sw/so.
