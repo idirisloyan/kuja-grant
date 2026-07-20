@@ -90,6 +90,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   const network = useNetworkStore((s) => s.network);
   const isNearFlavor = !!network?.slug && network.slug !== 'kuja';
   const isProximateFlavor = network?.slug === 'proximate';
+  const isSaxansaxoFlavor = network?.slug === 'saxansaxo';
   const role: UserRole = (user?.role as UserRole) ?? 'ngo';
   // Phase 696 — Proximate donors/OB are seeded with role='ngo' for
   // platform compatibility. The persona endpoint resolves their actual
@@ -110,9 +111,11 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   // Profile, Capacity Assessment) into the Proximate shell. Now we
   // treat null/loading and 'none' identically: minimal Proximate shell
   // — no Kuja links, no persona confusion.
-  const profile = isProximateFlavor
-    ? proximateProfile(persona ?? 'none', t)
-    : pickNavProfile(role, isNearFlavor, t);
+  const profile = isSaxansaxoFlavor
+    ? saxansaxoProfile(t)
+    : isProximateFlavor
+      ? proximateProfile(persona ?? 'none', t)
+      : pickNavProfile(role, isNearFlavor, t);
   const currentWidth = sidebarCollapsed ? collapsedWidth : width;
 
   const body = (
@@ -617,5 +620,24 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
         ],
       };
   }
+}
+
+/* --------------------------- Saxansaxo flavor --------------------------- */
+//
+// July 2026 — SCLR micro-grants tenant (v0). The console is a single
+// ops surface: access is gated server-side by SaxOpsMember, so there is
+// no persona split here. Community-facing pages (/sax-proposal,
+// /sax-report) are public token links and never render the shell.
+
+function saxansaxoProfile(t: T): NavProfile {
+  return {
+    primary: [
+      { icon: LayoutDashboard, label: t('nav.dashboard'),        href: '/saxansaxo/admin' },
+      { icon: Users,           label: t('nav.community_groups'), href: '/saxansaxo/groups' },
+    ],
+    secondary: [
+      { icon: SettingsIcon,    label: t('nav.settings'),         href: '/settings' },
+    ],
+  };
 }
 

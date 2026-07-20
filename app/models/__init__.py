@@ -168,4 +168,14 @@ __all__ = [
     'PROXIMATE_GRANT_REPORT_STATUSES',
     'ProximateGrievance', 'GRIEVANCE_CATEGORIES', 'GRIEVANCE_STATUSES',
     'TRIAGE_SLA_HOURS',
+    'SaxOpsMember', 'SaxFund', 'SaxGroup', 'SaxPermission', 'SaxInquiry',
+    'SaxProposal', 'SaxVetting', 'SaxGrant', 'SaxReport', 'SaxAreaPause',
+    'SAX_STAGES', 'SAX_OUTCOME_TAGS', 'SAX_DISBURSE_SLA_DAYS',
 ]
+
+# Saxansaxo — SCLR micro-grants tenant (July 2026)
+from app.models.saxansaxo import (  # noqa: E402,F401
+    SaxOpsMember, SaxFund, SaxGroup, SaxPermission, SaxInquiry,
+    SaxProposal, SaxVetting, SaxGrant, SaxReport, SaxAreaPause,
+    SAX_STAGES, SAX_OUTCOME_TAGS, SAX_DISBURSE_SLA_DAYS,
+)

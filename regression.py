@@ -59,6 +59,7 @@ USERS = {
     "reviewer": "james@reviewer.org",
     "prox_ob": "ob@proximate.org",
     "prox_donor": "donor1@proximate.org",
+    "sax_ops": "ops@saxansaxo.org",
 }
 
 # ---------------------------------------------------------------------------
@@ -1318,11 +1319,200 @@ def run_near_writes(base):
     check("admin POST /api/funds (create)", fund_create)
 
 
+def run_saxansaxo_writes(base):
+    """Saxansaxo SCLR lifecycle — full 8-step happy path plus the deny
+    cases that define the tenant's posture: SaxOpsMember-only console
+    (platform admins do NOT auto-pass), permission-first intake,
+    pause-blocked localities, vetting-gated grants, envelope ceiling.
+    Runs against the isolated seeded DB, so asserts are strict."""
+    section("Saxansaxo — SCLR lifecycle + deny cases")
+    OV = "saxansaxo"
+    state = {}
+
+    def unauth_denied():
+        r = requests.get(f"{base}/api/saxansaxo/overview",
+                         headers=_hdrs(OV), timeout=15)
+        assert r.status_code == 401, f"unauth overview -> {r.status_code}"
+    check("unauth GET /saxansaxo/overview -> 401", unauth_denied)
+
+    def non_member_denied():
+        admin = login(base, "admin", override=OV)
+        r = get(admin, base, "/api/saxansaxo/overview", override=OV)
+        assert r.status_code == 403, (
+            f"platform admin (no SaxOpsMember) -> {r.status_code}, expected 403"
+        )
+    check("platform admin without ops seat -> 403 (no auto-pass)", non_member_denied)
+
+    ops = login(base, "sax_ops", override=OV)
+
+    def overview_ok():
+        r = get(ops, base, "/api/saxansaxo/overview", override=OV)
+        assert r.status_code == 200, f"overview -> {r.status_code}: {r.text[:200]}"
+        d = r.json()
+        assert d.get("success") and "clock" in d and "stage_counts" in d
+    check("ops GET /saxansaxo/overview", overview_ok)
+
+    def fund_create():
+        r = post(ops, base, "/api/saxansaxo/funds",
+                 {"name": "Resilio Gate Fund", "total_usd": 20000},
+                 override=OV, allow={201})
+        state["fund_id"] = r.json()["fund"]["id"]
+    check("ops POST /saxansaxo/funds (create envelope)", fund_create)
+
+    def group_needs_permission():
+        r = post(ops, base, "/api/saxansaxo/groups",
+                 {"name": "No Permission Group", "locality": "Gate Town"},
+                 override=OV, allow={400})
+        assert r.json().get("code") == "err.permission_required"
+    check("group create without permission fields -> 400", group_needs_permission)
+
+    def pause_blocks_intake():
+        r = post(ops, base, "/api/saxansaxo/pauses",
+                 {"locality": "Paused Town",
+                  "reason": "Office-holder attempted to steer selection"},
+                 override=OV, allow={201})
+        pause_id = r.json()["pause"]["id"]
+        r2 = post(ops, base, "/api/saxansaxo/groups",
+                  {"name": "Blocked Group", "locality": "Paused Town",
+                   "granted_by_name": "Chief A", "granted_by_role": "chief"},
+                  override=OV, allow={409})
+        assert r2.json().get("code") == "err.locality_paused"
+        post(ops, base, f"/api/saxansaxo/pauses/{pause_id}/lift",
+             override=OV, allow={200})
+    check("active pause blocks group intake (then lift)", pause_blocks_intake)
+
+    def group_create():
+        r = post(ops, base, "/api/saxansaxo/groups",
+                 {"name": "Gate Womens Cooperative",
+                  "name_so": "Iskaashatada Haweenka",
+                  "locality": "Gate Town", "region": "Banadir",
+                  "granted_by_name": "Chief Ali", "granted_by_role": "chief"},
+                 override=OV, allow={201})
+        g = r.json()["group"]
+        state["group_id"] = g["id"]
+        assert g["stage"] == "permission", f"new group stage {g['stage']}"
+        assert g["permission"]["granted_by_name"] == "Chief Ali"
+    check("ops POST /saxansaxo/groups (permission-first intake)", group_create)
+
+    def grant_gated_on_vetting():
+        post(ops, base, f"/api/saxansaxo/groups/{state['group_id']}/grant",
+             {"fund_id": state["fund_id"], "amount_usd": 5000,
+              "signatory_name": "Halima Yusuf"},
+             override=OV, allow={409})
+    check("grant before 'selected' vetting -> 409", grant_gated_on_vetting)
+
+    def inquiry():
+        r = post(ops, base, f"/api/saxansaxo/groups/{state['group_id']}/inquiry",
+                 {"answers": {"q_doing": "Rebuilding the well"},
+                  "activity_90d_score": 3},
+                 override=OV, allow={200})
+        assert r.json()["inquiry"]["activity_90d_score"] == 3
+    check("ops POST inquiry (activity score)", inquiry)
+
+    def proposal_link():
+        r = post(ops, base,
+                 f"/api/saxansaxo/groups/{state['group_id']}/proposal-link",
+                 override=OV, allow={200})
+        d = r.json()
+        state["proposal_token"] = d["proposal"]["token"]
+        assert d["link_path"].startswith("/sax-proposal/")
+    check("ops POST proposal-link (issue token)", proposal_link)
+
+    def public_proposal():
+        tok = state["proposal_token"]
+        r = requests.get(f"{base}/api/saxansaxo/proposal?token={tok}", timeout=15)
+        assert r.status_code == 200 and r.json()["success"]
+        r2 = requests.post(
+            f"{base}/api/saxansaxo/proposal?token={tok}",
+            json={"answers": {"q_problem": "Ceelka ayaa dumay",
+                              "q_plan": "Dib u dhisid"}},
+            headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15,
+        )
+        assert r2.status_code == 200, f"public proposal submit -> {r2.status_code}"
+    check("public proposal GET+POST via token (no login)", public_proposal)
+
+    def vetting_selected():
+        r = post(ops, base, f"/api/saxansaxo/groups/{state['group_id']}/vetting",
+                 {"decision": "selected",
+                  "scores": {"already_active": 3, "community_backing": 2}},
+                 override=OV, allow={200})
+        assert r.json()["vetting"]["decision"] == "selected"
+    check("ops POST vetting (selected)", vetting_selected)
+
+    def grant_create():
+        r = post(ops, base, f"/api/saxansaxo/groups/{state['group_id']}/grant",
+                 {"fund_id": state["fund_id"], "amount_usd": 5000,
+                  "signatory_name": "Halima Yusuf"},
+                 override=OV, allow={201}, timeout=90)
+        g = r.json()["grant"]
+        state["grant_id"] = g["id"]
+        assert g["signatory_screening"] in (
+            "clear", "review", "unavailable", "pending")
+    check("ops POST grant (starts 10-day clock, screens signatory)", grant_create)
+
+    def envelope_ceiling():
+        r = post(ops, base, f"/api/saxansaxo/groups/{state['group_id']}/grant",
+                 {"fund_id": state["fund_id"], "amount_usd": 999999,
+                  "signatory_name": "Halima Yusuf"},
+                 override=OV, allow={409})
+        assert r.json().get("code") == "err.envelope_exceeded"
+    check("grant over fund envelope -> 409", envelope_ceiling)
+
+    def disburse():
+        r = post(ops, base, f"/api/saxansaxo/grants/{state['grant_id']}/disburse",
+                 override=OV, allow={200})
+        d = r.json()
+        state["report_token"] = d["grant"]["report_token"]
+        assert d["report_link_path"].startswith("/sax-report/")
+        post(ops, base, f"/api/saxansaxo/grants/{state['grant_id']}/disburse",
+             override=OV, allow={409})  # idempotency guard
+    check("ops POST disburse (stops clock, issues report link)", disburse)
+
+    def public_report():
+        tok = state["report_token"]
+        r = requests.get(f"{base}/api/saxansaxo/report?token={tok}", timeout=15)
+        assert r.status_code == 200 and r.json()["success"]
+        r2 = requests.post(
+            f"{base}/api/saxansaxo/report?token={tok}",
+            json={"answers": {"q_done": "Waan dhisnay ceelka",
+                              "q_contributed": "Shaqo iyo alaab"}},
+            headers={"X-Requested-With": "XMLHttpRequest"}, timeout=15,
+        )
+        assert r2.status_code == 200, f"public report submit -> {r2.status_code}"
+    check("public report GET+POST via token (no login)", public_report)
+
+    def outcome():
+        r = post(ops, base, f"/api/saxansaxo/grants/{state['grant_id']}/outcome",
+                 {"outcome_tag": "delivered",
+                  "outcome_lesson": "Community finished ahead of plan"},
+                 override=OV, allow={200})
+        g = r.json()["grant"]
+        assert g["outcome_tag"] == "delivered"
+        # report's q_contributed answer was copied onto the grant
+        assert g["co_contribution"] == "Shaqo iyo alaab"
+    check("ops POST outcome (tag + lesson closes the story)", outcome)
+
+    def stage_rollup():
+        r = get(ops, base, f"/api/saxansaxo/groups/{state['group_id']}",
+                override=OV)
+        assert r.status_code == 200
+        assert r.json()["group"]["stage"] == "closed", (
+            f"expected closed, got {r.json()['group']['stage']}"
+        )
+        r2 = get(ops, base, "/api/saxansaxo/overview", override=OV)
+        d = r2.json()
+        assert d["stage_counts"].get("closed", 0) >= 1
+        fund = next(f for f in d["funds"] if f["id"] == state["fund_id"])
+        assert fund["committed_usd"] >= 5000 and fund["disbursed_usd"] >= 5000
+    check("computed stage == closed + fund rollup reflects grant", stage_rollup)
+
+
 def run_api_regression(base):
     run_kuja_writes(base)
     run_proximate_writes(base)
     run_proximate_rbac(base)
     run_near_writes(base)
+    run_saxansaxo_writes(base)
 
 
 def run_browser(base):

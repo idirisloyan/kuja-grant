@@ -300,6 +300,85 @@ def create_app(config_name=None):
                 db.session.add(proximate_net)
                 db.session.commit()
                 app.logger.info("Seeded 'proximate' Network row (bootstrap path)")
+
+            # Saxansaxo — SCLR micro-grants tenant (July 2026).
+            # Somalia-focused; default_language='so' so community-facing
+            # surfaces land in Somali first (the so locale is fully
+            # translated as of 2026-07-20). Temp access pre-domain is
+            # ?network=saxansaxo / X-Network-Override, same as
+            # Proximate's pre-domain phase. Brand teal is a PLACEHOLDER
+            # until a brand guide exists ("saxansaxo" = light rain).
+            if not Network.query.filter_by(slug="saxansaxo").first():
+                sax_net = Network(
+                    slug="saxansaxo",
+                    name="Saxansaxo",
+                    mission_short=(
+                        "Survivor and Community-Led Response (SCLR) in "
+                        "Somalia — micro-grants direct to already-active "
+                        "community groups. Operated by Adeso, funded by "
+                        "Resilio."
+                    ),
+                    brand_color_hex="#0E8A7B",
+                    default_language="so",
+                    oversight_body_min_signers=1,
+                    membership_review_days=10,
+                    default_assessment_framework="kuja",
+                    assessment_framework_display="SCLR Selection Criteria",
+                    default_currency="USD",
+                    is_default=False,
+                    is_active=True,
+                )
+                sax_net.set_host_aliases(["saxansaxo.kuja.org"])
+                sax_net.set_features({
+                    "sclr_no_spend_policing": True,
+                    "disburse_sla_days": 10,
+                })
+                db.session.add(sax_net)
+                db.session.commit()
+                app.logger.info("Seeded 'saxansaxo' Network row (bootstrap path)")
+
+            # Idempotent Saxansaxo ops seat — mirrors the Proximate
+            # ob@ pattern for the temp phase (rotate before real pilot).
+            try:
+                from werkzeug.security import generate_password_hash
+                from app.models import (User, Organization,
+                                        NetworkMembership, SaxOpsMember)
+                sax_net_row = Network.query.filter_by(slug="saxansaxo").first()
+                if sax_net_row:
+                    sax_org = Organization.query.filter_by(
+                        name='Saxansaxo Secretariat').first()
+                    if not sax_org:
+                        sax_org = Organization(
+                            name='Saxansaxo Secretariat',
+                            org_type='ngo', country='SO')
+                        db.session.add(sax_org)
+                        db.session.flush()
+                    sax_user = User.query.filter_by(
+                        email='ops@saxansaxo.org').first()
+                    if not sax_user:
+                        sax_user = User(
+                            email='ops@saxansaxo.org',
+                            password_hash=generate_password_hash('pass123'),
+                            role='ngo', name='Saxansaxo Ops',
+                            org_id=sax_org.id)
+                        db.session.add(sax_user)
+                        db.session.flush()
+                    sm = NetworkMembership.query.filter_by(
+                        network_id=sax_net_row.id, org_id=sax_org.id).first()
+                    if not sm:
+                        from datetime import datetime as _dt, timezone as _tz
+                        db.session.add(NetworkMembership(
+                            network_id=sax_net_row.id, org_id=sax_org.id,
+                            status='active', member_tier='member',
+                            is_oversight_body=True,
+                            joined_at=_dt.now(_tz.utc)))
+                    if not SaxOpsMember.query.filter_by(
+                            user_id=sax_user.id).first():
+                        db.session.add(SaxOpsMember(user_id=sax_user.id))
+                    db.session.commit()
+            except Exception as se:
+                db.session.rollback()
+                app.logger.warning(f"Saxansaxo ops seed skipped: {se}")
         except Exception as e:
             app.logger.warning(f"Network bootstrap skipped: {e}")
 
