@@ -14,6 +14,7 @@
 | Kuja Marketplace | [KUJA_BACKLOG.md](KUJA_BACKLOG.md) | NGO↔donor marketplace tenant (payments, metrics-gated items) |
 | NEAR | [NEAR_BACKLOG.md](NEAR_BACKLOG.md) | Network fund tenant (declarations, windows, memberships) |
 | Proximate Fund | [PROXIMATE_BACKLOG.md](PROXIMATE_BACKLOG.md) | Sudan community-fund tenant (endorsements, rounds, inbound grants) |
+| Saxansaxo | [SAXANSAXO_BACKLOG.md](SAXANSAXO_BACKLOG.md) | Somalia SCLR micro-grants tenant (8-step cycle, no spend policing) |
 
 History note: before 2026-06-30 this file was the Kuja backlog and the
 NEAR file accumulated everything (including Proximate). Reorganised so
