@@ -536,12 +536,12 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
       // portfolio-level: rounds they fund, outcome rollups, ask the AI.
       return {
         primary: [
-          { icon: LayoutDashboard, label: 'Donor portal',     href: '/proximate/donor' },
-          { icon: HandCoins,       label: 'Rounds',           href: '/proximate/rounds' },
-          { icon: Sparkles,        label: 'Ask AI',           href: '/proximate/donor#ask' },
+          { icon: LayoutDashboard, label: t('nav.donor_portal'), href: '/proximate/donor' },
+          { icon: HandCoins,       label: t('nav.rounds'),       href: '/proximate/rounds' },
+          { icon: Sparkles,        label: t('nav.ask_ai'),       href: '/proximate/donor#ask' },
         ],
         secondary: [
-          { icon: SettingsIcon,    label: 'Settings',         href: '/settings' },
+          { icon: SettingsIcon,    label: t('nav.settings'),     href: '/settings' },
         ],
       };
 
@@ -557,42 +557,42 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
         // console errors. 'Audit chain' points at the shared page, which is
         // now Proximate-aware (falls back to /api/proximate/audit-chain).
         primary: [
-          { icon: LayoutDashboard, label: 'Dashboard',           href: '/proximate/admin' },
-          { icon: FileText,        label: 'Grants from donors',  href: '/proximate/grants' },
-          { icon: HandCoins,       label: 'Rounds & disbursements', href: '/proximate/rounds' },
-          { icon: Users,           label: 'Partners',            href: '/proximate/admin/partners' },
-          { icon: ClipboardCheck,  label: 'Endorsers',           href: '/proximate/admin/endorsers' },
+          { icon: LayoutDashboard, label: t('nav.dashboard'),            href: '/proximate/admin' },
+          { icon: FileText,        label: t('nav.grants_from_donors'),   href: '/proximate/grants' },
+          { icon: HandCoins,       label: t('nav.rounds_disbursements'), href: '/proximate/rounds' },
+          { icon: Users,           label: t('nav.partners'),             href: '/proximate/admin/partners' },
+          { icon: ClipboardCheck,  label: t('nav.endorsers'),            href: '/proximate/admin/endorsers' },
         ],
         secondary: [
-          { icon: MapPin,          label: 'Crisis signals',      href: '/proximate/crisis-selector' },
-          { icon: Send,            label: 'All disbursements',   href: '/proximate/disbursements' },
-          { icon: ShieldCheck,     label: 'Audit chain',         href: '/admin/audit-chain' },
-          { icon: SettingsIcon,    label: 'Settings',            href: '/settings' },
+          { icon: MapPin,          label: t('nav.crisis_signals'),       href: '/proximate/crisis-selector' },
+          { icon: Send,            label: t('nav.all_disbursements'),    href: '/proximate/disbursements' },
+          { icon: ShieldCheck,     label: t('nav.audit_chain'),          href: '/admin/audit-chain' },
+          { icon: SettingsIcon,    label: t('nav.settings'),             href: '/settings' },
         ],
         // Redesign Stage 2 — spec grouping for the operator console.
         groups: [
           {
-            label: 'Workspace',
+            label: t('nav.workspace'),
             items: [
-              { icon: LayoutDashboard, label: 'Dashboard',              href: '/proximate/admin' },
-              { icon: FileText,        label: 'Grants from donors',     href: '/proximate/grants' },
-              { icon: HandCoins,       label: 'Rounds & disbursements', href: '/proximate/rounds' },
+              { icon: LayoutDashboard, label: t('nav.dashboard'),            href: '/proximate/admin' },
+              { icon: FileText,        label: t('nav.grants_from_donors'),   href: '/proximate/grants' },
+              { icon: HandCoins,       label: t('nav.rounds_disbursements'), href: '/proximate/rounds' },
             ],
           },
           {
-            label: 'Operations',
+            label: t('nav.operations'),
             items: [
-              { icon: Users,          label: 'Partners',          href: '/proximate/admin/partners' },
-              { icon: ClipboardCheck, label: 'Endorsers',         href: '/proximate/admin/endorsers' },
-              { icon: Send,           label: 'All disbursements', href: '/proximate/disbursements' },
-              { icon: MapPin,         label: 'Crisis signals',    href: '/proximate/crisis-selector' },
+              { icon: Users,          label: t('nav.partners'),          href: '/proximate/admin/partners' },
+              { icon: ClipboardCheck, label: t('nav.endorsers'),         href: '/proximate/admin/endorsers' },
+              { icon: Send,           label: t('nav.all_disbursements'), href: '/proximate/disbursements' },
+              { icon: MapPin,         label: t('nav.crisis_signals'),    href: '/proximate/crisis-selector' },
             ],
           },
           {
-            label: 'Governance',
+            label: t('nav.governance'),
             items: [
-              { icon: ShieldCheck,  label: 'Audit chain', href: '/admin/audit-chain' },
-              { icon: SettingsIcon, label: 'Settings',    href: '/settings' },
+              { icon: ShieldCheck,  label: t('nav.audit_chain'), href: '/admin/audit-chain' },
+              { icon: SettingsIcon, label: t('nav.settings'),    href: '/settings' },
             ],
           },
         ],
@@ -610,10 +610,10 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
       // the TenantSwitcher on /login.
       return {
         primary: [
-          { icon: LayoutDashboard, label: 'Proximate home', href: '/proximate/donor' },
+          { icon: LayoutDashboard, label: t('nav.proximate_home'), href: '/proximate/donor' },
         ],
         secondary: [
-          { icon: SettingsIcon,    label: 'Settings',       href: '/settings' },
+          { icon: SettingsIcon,    label: t('nav.settings'),       href: '/settings' },
         ],
       };
   }

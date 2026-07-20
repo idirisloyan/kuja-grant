@@ -150,7 +150,7 @@ export function Header() {
           aria-label="Open command palette"
         >
           <Search className="h-3.5 w-3.5" />
-          <span className="hidden lg:inline">Search…</span>
+          <span className="hidden lg:inline">{t('nav.search') !== 'nav.search' ? t('nav.search') : 'Search…'}</span>
           <kbd className="hidden lg:inline-flex items-center rounded border border-[hsl(var(--border))] bg-[hsl(var(--kuja-sand-50))] px-1.5 text-[10px] font-mono">⌘K</kbd>
         </button>
 

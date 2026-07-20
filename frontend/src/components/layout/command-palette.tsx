@@ -30,6 +30,7 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
 
 interface NavAction {
@@ -40,6 +41,10 @@ interface NavAction {
   icon: typeof Search;
   roles: string[];   // empty = all
   keywords?: string[];
+  // i18n-first render (QA 2026-07-20 shell-localization): when set, the
+  // key is tried before the English literal, which stays as fallback.
+  labelKey?: string;
+  descKey?: string;
 }
 
 const NAV_ACTIONS: NavAction[] = [
@@ -72,18 +77,18 @@ const NAV_ACTIONS: NavAction[] = [
 // (Proximate users are seeded role='ngo'); these persona-scoped
 // destinations mirror the Proximate sidebar instead.
 const PROXIMATE_OB_ACTIONS: NavAction[] = [
-  { id: 'prx-dashboard',     label: 'Dashboard',              description: 'Operator console',        href: '/proximate/admin',            icon: LayoutDashboard, roles: [] },
-  { id: 'prx-grants',        label: 'Grants from donors',     description: 'Committed envelopes',     href: '/proximate/grants',           icon: Briefcase,       roles: [] },
-  { id: 'prx-rounds',        label: 'Rounds & disbursements', description: 'Funding rounds',          href: '/proximate/rounds',           icon: BarChart3,       roles: [], keywords: ['funding', 'round'] },
-  { id: 'prx-partners',      label: 'Partners',               description: 'Community partners',      href: '/proximate/admin/partners',   icon: Building2,       roles: [], keywords: ['pif', 'nominate'] },
-  { id: 'prx-endorsers',     label: 'Endorsers',              description: 'Approval queue',          href: '/proximate/admin/endorsers',  icon: ClipboardCheck,  roles: [] },
-  { id: 'prx-disbursements', label: 'All disbursements',      description: 'Money out + reports',     href: '/proximate/disbursements',    icon: FileText,        roles: [], keywords: ['payment', 'report'] },
-  { id: 'prx-crisis',        label: 'Crisis signals',         description: 'Crisis selector',         href: '/proximate/crisis-selector',  icon: Activity,        roles: [] },
-  { id: 'prx-audit',         label: 'Audit chain',            description: 'Tamper-evident log',      href: '/admin/audit-chain',          icon: ShieldCheck,     roles: [] },
+  { id: 'prx-dashboard',     label: 'Dashboard',              labelKey: 'nav.dashboard',            description: 'Operator console',    descKey: 'nav.desc_operator_console',    href: '/proximate/admin',            icon: LayoutDashboard, roles: [] },
+  { id: 'prx-grants',        label: 'Grants from donors',     labelKey: 'nav.grants_from_donors',   description: 'Committed envelopes', descKey: 'nav.desc_committed_envelopes', href: '/proximate/grants',           icon: Briefcase,       roles: [] },
+  { id: 'prx-rounds',        label: 'Rounds & disbursements', labelKey: 'nav.rounds_disbursements', description: 'Funding rounds',      descKey: 'nav.desc_funding_rounds',      href: '/proximate/rounds',           icon: BarChart3,       roles: [], keywords: ['funding', 'round'] },
+  { id: 'prx-partners',      label: 'Partners',               labelKey: 'nav.partners',             description: 'Community partners',  descKey: 'nav.desc_community_partners',  href: '/proximate/admin/partners',   icon: Building2,       roles: [], keywords: ['pif', 'nominate'] },
+  { id: 'prx-endorsers',     label: 'Endorsers',              labelKey: 'nav.endorsers',            description: 'Approval queue',      descKey: 'nav.desc_approval_queue',      href: '/proximate/admin/endorsers',  icon: ClipboardCheck,  roles: [] },
+  { id: 'prx-disbursements', label: 'All disbursements',      labelKey: 'nav.all_disbursements',    description: 'Money out + reports', descKey: 'nav.desc_money_out',           href: '/proximate/disbursements',    icon: FileText,        roles: [], keywords: ['payment', 'report'] },
+  { id: 'prx-crisis',        label: 'Crisis signals',         labelKey: 'nav.crisis_signals',       description: 'Crisis selector',     descKey: 'nav.desc_crisis_selector',     href: '/proximate/crisis-selector',  icon: Activity,        roles: [] },
+  { id: 'prx-audit',         label: 'Audit chain',            labelKey: 'nav.audit_chain',          description: 'Tamper-evident log',  descKey: 'nav.desc_tamper_log',          href: '/admin/audit-chain',          icon: ShieldCheck,     roles: [] },
 ];
 const PROXIMATE_DONOR_ACTIONS: NavAction[] = [
-  { id: 'prx-donor',        label: 'Donor portal', description: 'Portfolio + reports', href: '/proximate/donor',  icon: LayoutDashboard, roles: [] },
-  { id: 'prx-donor-rounds', label: 'Rounds',       description: 'Rounds you fund',     href: '/proximate/rounds', icon: BarChart3,       roles: [] },
+  { id: 'prx-donor',        label: 'Donor portal', labelKey: 'nav.donor_portal', description: 'Portfolio + reports', descKey: 'nav.desc_portfolio_reports', href: '/proximate/donor',  icon: LayoutDashboard, roles: [] },
+  { id: 'prx-donor-rounds', label: 'Rounds',       labelKey: 'nav.rounds',       description: 'Rounds you fund',     descKey: 'nav.desc_rounds_you_fund',   href: '/proximate/rounds', icon: BarChart3,       roles: [] },
 ];
 
 interface SearchHitGrant {
@@ -127,11 +132,19 @@ export function CommandPalette() {
   const [contentHits, setContentHits] = useState<GlobalHit[]>([]);
   const [searching, setSearching] = useState(false);
   const router = useRouter();
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const role = user?.role ?? '';
   const network = useNetworkStore((s) => s.network);
   const isProximate = network?.slug === 'proximate';
   const { persona } = useProximatePersona();
+  // i18n-first with the English literal as fallback (missing key → t
+  // returns the key itself, so we fall back rather than leak a key).
+  const loc = useCallback((key: string | undefined, fallback: string) => {
+    if (!key) return fallback;
+    const tr = t(key);
+    return tr && tr !== key ? tr : fallback;
+  }, [t]);
 
   // Open with keyboard
   useEffect(() => {
@@ -205,33 +218,39 @@ export function CommandPalette() {
   }, [router]);
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen} title="Quick actions" description="Search across the app">
+    <CommandDialog open={open} onOpenChange={setOpen} title={loc('nav.palette_title', 'Quick actions')} description={loc('nav.palette_search_across', 'Search across the app')}>
       <CommandInput
-        placeholder="Type to search grants, orgs, actions…"
+        placeholder={loc('nav.palette_placeholder', 'Type to search grants, orgs, actions…')}
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
         <CommandEmpty>
-          {query.length < 2 ? 'Type 2+ characters to search.' : searching ? 'Searching…' : 'No results.'}
+          {query.length < 2
+            ? loc('nav.palette_type_min', 'Type 2+ characters to search.')
+            : searching
+              ? loc('nav.palette_searching', 'Searching…')
+              : loc('nav.palette_no_results', 'No results.')}
         </CommandEmpty>
 
         {/* Quick actions */}
-        <CommandGroup heading="Quick actions">
+        <CommandGroup heading={loc('nav.palette_title', 'Quick actions')}>
           {navActions.map((a) => {
             const Icon = a.icon;
+            const label = loc(a.labelKey, a.label);
+            const description = a.description ? loc(a.descKey, a.description) : undefined;
             return (
               <CommandItem
                 key={a.id}
-                value={`${a.label} ${a.description ?? ''} ${(a.keywords ?? []).join(' ')}`}
+                value={`${label} ${a.label} ${a.description ?? ''} ${(a.keywords ?? []).join(' ')}`}
                 onSelect={() => go(a.href)}
                 className="flex items-center gap-2"
               >
                 <Icon className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold">{a.label}</div>
-                  {a.description && (
-                    <div className="text-[11px] text-[hsl(var(--kuja-ink-soft))]">{a.description}</div>
+                  <div className="text-sm font-semibold">{label}</div>
+                  {description && (
+                    <div className="text-[11px] text-[hsl(var(--kuja-ink-soft))]">{description}</div>
                   )}
                 </div>
                 <ArrowRightCircle className="w-3.5 h-3.5 opacity-50" />
@@ -244,7 +263,7 @@ export function CommandPalette() {
         {grantHits.length > 0 && (
           <>
             <CommandSeparator />
-            <CommandGroup heading="Grants">
+            <CommandGroup heading={loc('nav.palette_grants', 'Grants')}>
               {grantHits.map((g) => (
                 <CommandItem
                   key={`grant-${g.id}`}
@@ -269,7 +288,7 @@ export function CommandPalette() {
         {orgHits.length > 0 && (
           <>
             <CommandSeparator />
-            <CommandGroup heading="Organisations">
+            <CommandGroup heading={loc('nav.palette_orgs', 'Organisations')}>
               {orgHits.map((o) => (
                 <CommandItem
                   key={`org-${o.id}`}
@@ -295,7 +314,7 @@ export function CommandPalette() {
         {docHits.length > 0 && (
           <>
             <CommandSeparator />
-            <CommandGroup heading="Documents">
+            <CommandGroup heading={loc('nav.palette_documents', 'Documents')}>
               {docHits.map((d) => (
                 <CommandItem
                   key={`doc-${d.document_id}`}
@@ -334,7 +353,7 @@ export function CommandPalette() {
         {contentHits.length > 0 && (
           <>
             <CommandSeparator />
-            <CommandGroup heading="In your content">
+            <CommandGroup heading={loc('nav.palette_content', 'In your content')}>
               {contentHits.map((c) => (
                 <CommandItem
                   key={`content-${c.kind}-${c.id}`}
@@ -366,7 +385,7 @@ export function CommandPalette() {
         )}
 
         <CommandSeparator />
-        <CommandGroup heading="Tips">
+        <CommandGroup heading={loc('nav.palette_tips', 'Tips')}>
           <CommandItem disabled className="text-[11px] text-[hsl(var(--kuja-ink-soft))]">
             <Sparkles className="w-3 h-3" /> Press <CommandShortcut>/</CommandShortcut> from anywhere to open this.
           </CommandItem>
