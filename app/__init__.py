@@ -328,7 +328,8 @@ def create_app(config_name=None):
                     is_default=False,
                     is_active=True,
                 )
-                sax_net.set_host_aliases(["saxansaxo.kuja.org"])
+                sax_net.set_host_aliases(
+                    ["saxansaxo.kuja.org", "sclr.kuja.org"])
                 sax_net.set_features({
                     "sclr_no_spend_policing": True,
                     "disburse_sla_days": 10,
@@ -345,6 +346,20 @@ def create_app(config_name=None):
                                         NetworkMembership, SaxOpsMember)
                 sax_net_row = Network.query.filter_by(slug="saxansaxo").first()
                 if sax_net_row:
+                    # Idempotent host-alias sync — rows created before the
+                    # sclr.kuja.org companion domain (July 2026) must gain
+                    # it too, or the new host would resolve to the default
+                    # tenant.
+                    _sax_wanted = ["saxansaxo.kuja.org", "sclr.kuja.org"]
+                    _sax_current = sax_net_row.get_host_aliases()
+                    _sax_missing = [a for a in _sax_wanted
+                                    if a not in _sax_current]
+                    if _sax_missing:
+                        sax_net_row.set_host_aliases(
+                            _sax_current + _sax_missing)
+                        db.session.commit()
+                        app.logger.info(
+                            f"Saxansaxo host aliases synced: +{_sax_missing}")
                     sax_org = Organization.query.filter_by(
                         name='Saxansaxo Secretariat').first()
                     if not sax_org:

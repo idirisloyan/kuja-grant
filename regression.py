@@ -1492,6 +1492,17 @@ def run_saxansaxo_writes(base):
         assert g["co_contribution"] == "Shaqo iyo alaab"
     check("ops POST outcome (tag + lesson closes the story)", outcome)
 
+    def host_resolution():
+        # Both custom domains must resolve to the saxansaxo tenant by
+        # Host header alone (no override) — the sclr.kuja.org companion
+        # domain rides on the same alias list.
+        for host in ("saxansaxo.kuja.org", "sclr.kuja.org"):
+            r = requests.get(f"{base}/api/network/current",
+                             headers={"Host": host}, timeout=15)
+            slug = (r.json().get("network") or {}).get("slug")
+            assert slug == "saxansaxo", f"Host {host} resolved to {slug}"
+    check("host aliases: saxansaxo.kuja.org + sclr.kuja.org resolve", host_resolution)
+
     def stage_rollup():
         r = get(ops, base, f"/api/saxansaxo/groups/{state['group_id']}",
                 override=OV)
