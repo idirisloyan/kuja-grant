@@ -26,6 +26,12 @@ import { Loader2, CheckCircle2, Send, Camera, Mic, X } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  OfflineFallbackCard,
+  ReassuranceNote,
+  VoicePlayback,
+  AssistedByField,
+} from '@/components/proximate/token-page-support';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
 
@@ -60,6 +66,11 @@ export default function ProximateReportPage() {
   // Phase 655 — photo + voice attachments
   const [photoDocId, setPhotoDocId] = useState<number | null>(null);
   const [voiceDocId, setVoiceDocId] = useState<number | null>(null);
+  // Kept alongside voiceDocId purely so the partner can hear their own
+  // recording before sending — played from the local blob, no round-trip.
+  const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  // Optional: who helped fill this in (enumerator / elder-assisted).
+  const [assistedBy, setAssistedBy] = useState('');
   const [uploadingKind, setUploadingKind] = useState<'photo' | 'voice' | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -143,6 +154,7 @@ export default function ProximateReportPage() {
             spend_summary: spendSummary.trim() || null,
             report_photo_doc_id: photoDocId,
             report_voice_doc_id: voiceDocId,
+            assisted_by: assistedBy.trim() || null,
           }),
         }
       );
@@ -339,7 +351,10 @@ export default function ProximateReportPage() {
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) uploadAttachment('voice', f);
+                if (f) {
+                  setVoiceFile(f);
+                  uploadAttachment('voice', f);
+                }
                 e.target.value = '';
               }}
             />
@@ -394,13 +409,19 @@ export default function ProximateReportPage() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setVoiceDocId(null)}
+                  onClick={() => {
+                    setVoiceDocId(null);
+                    setVoiceFile(null);
+                  }}
                 >
                   <X className="w-3.5 h-3.5 me-1" />
                   {t('proximate.report.q4_remove')}
                 </Button>
               )}
             </div>
+
+            {/* Hear it back before sending — plays the local file. */}
+            <VoicePlayback file={voiceFile} />
 
             {(photoDocId !== null || voiceDocId !== null) && (
               <p className="text-xs text-emerald-700 mt-2">
@@ -431,6 +452,8 @@ export default function ProximateReportPage() {
             />
           </div>
 
+          <AssistedByField value={assistedBy} onChange={setAssistedBy} />
+
           {submitError && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
               {submitError}
@@ -446,6 +469,9 @@ export default function ProximateReportPage() {
             {t('proximate.report.submit')}
           </Button>
         </Card>
+
+        <ReassuranceNote variant="report" />
+        {meta?.id != null && <OfflineFallbackCard code={`PR-${meta.id}`} />}
       </div>
     </div>
   );

@@ -5415,6 +5415,12 @@ def api_submit_disbursement_report(token):
       report_voice_doc_id: int     (Q4 attachment, optional)
       report_photo_doc_id: int     (Q4 attachment, optional)
       report_voice_transcript: string (optional transcript pre-computed by client)
+      assisted_by: string          (optional: who helped fill this in)
+
+    assisted_by exists because a lot of these reports are filled in with
+    an enumerator or an elder sitting next to the partner. Recording it
+    is honesty about provenance, not a mark against the partner — it does
+    not gate anything and does not change how the report is treated.
     """
     d = ProximateDisbursement.query.filter_by(report_token=token).first()
     auth_source = 'token'
@@ -5454,6 +5460,7 @@ def api_submit_disbursement_report(token):
         'people_helped': payload.get('people_helped'),
         'issues': (payload.get('issues') or '').strip()[:5000] or None,
         'spend_summary': (payload.get('spend_summary') or '').strip()[:5000] or None,
+        'assisted_by': (payload.get('assisted_by') or '').strip()[:120] or None,
         'submitted_at': datetime.now(timezone.utc).isoformat(),
         'source': auth_source,
     }
