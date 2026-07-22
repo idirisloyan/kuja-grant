@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, Fraunces } from 'next/font/google';
 import './globals.css';
 import { AppRegistry } from '@/components/app-registry';
@@ -15,13 +15,31 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: 'Kuja — Grant intelligence for the Global South',
   description: 'Unified grant platform: donor co-pilot, NGO readiness coaching, reviewer intelligence, ongoing compliance. Built for African organizations.',
+  // NOTE: no `metadataBase`. It is deliberately unset — see the viewport
+  // export below for the themeColor story, and this for the origin one:
+  // metadataBase only resolves RELATIVE metadata URLs to absolute ones,
+  // and the sole relative URL here is `manifest`, which Next emits as
+  // host-relative (`/manifest.webmanifest`). Host-relative is exactly
+  // right for a four-tenant deployment — proximate, saxansaxo, sclr and
+  // kuja each serve their own manifest off their own domain. Pinning
+  // metadataBase to one origin would point the other three tenants'
+  // PWA manifest at a domain that is not theirs. There are no
+  // openGraph/twitter images declared, so nothing else needs it, and
+  // the build emits no metadataBase warning.
   manifest: '/manifest.webmanifest',
-  themeColor: '#C2410C',
   appleWebApp: {
     capable: true,
     title: 'Kuja',
     statusBarStyle: 'default',
   },
+};
+
+// themeColor belongs in the viewport export, not metadata — Next has
+// treated it as unsupported metadata since 14. It was warning once per
+// prerendered route (~160 lines a build), which is the real cost: a
+// wall of known-benign warnings is where a genuine one goes unnoticed.
+export const viewport: Viewport = {
+  themeColor: '#C2410C',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
