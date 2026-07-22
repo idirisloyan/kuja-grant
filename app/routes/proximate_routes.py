@@ -50,6 +50,35 @@ logger = logging.getLogger('kuja')
 proximate_bp = Blueprint('proximate', __name__, url_prefix='/api/proximate')
 
 
+def _notify(fn_name: str, *args):
+    """Fire a messaging automation without letting it affect the caller.
+
+    Two things this guarantees, both deliberate:
+
+    1. The import is lazy. proximate_messaging_routes imports this module
+       for its own helpers, so a top-level import here is circular.
+
+    2. Nothing propagates. These call sites sit inside money-movement
+       transactions — a disbursement, a cosign, a DD clearance. A Twilio
+       timeout or a malformed phone number must never be the reason a
+       recorded disbursement rolls back. The event already happened; the
+       message is a best-effort consequence of it, not a precondition.
+
+    A failure is logged at warning and the unsent row (or its absence)
+    surfaces in the OB messaging console, which is where someone can act
+    on it. Silence here would be the bug — see MessagingService._send_log.
+    """
+    try:
+        from app.routes import proximate_messaging_routes as pmr
+        return getattr(pmr, fn_name)(*args)
+    except Exception as e:
+        logger.warning(
+            'Proximate messaging automation %s failed (non-fatal): %s',
+            fn_name, e,
+        )
+        return None
+
+
 @proximate_bp.before_request
 def _stamp_proximate_audit_scope():
     """QA 2026-07-14 (audit export tenant scoping) — every audit-chain
@@ -788,6 +817,12 @@ def api_submit_endorsement(partner_id):
 
     db.session.commit()
 
+    # The elders who vouched took a reputational risk on this
+    # partner. Tell them it landed — silence after a vouch is how
+    # community endorsement quietly stops being worth doing.
+    if state_change == 'dd_clear':
+        _notify('send_partner_cleared', partner)
+
     # Audit-chain hooks — Phase 631. Best-effort: AuditChainEntry.append
     # never raises, so a chain failure can't lose the endorsement write.
     AuditChainEntry.append(
@@ -927,6 +962,12 @@ def api_bank_verify_partner(partner_id):
         partner.dd_cleared_at = datetime.now(timezone.utc)
         state_change = 'dd_clear'
     db.session.commit()
+
+    # The elders who vouched took a reputational risk on this
+    # partner. Tell them it landed — silence after a vouch is how
+    # community endorsement quietly stops being worth doing.
+    if state_change == 'dd_clear':
+        _notify('send_partner_cleared', partner)
 
     AuditChainEntry.append(
         action='proximate.partner.bank_verified',
@@ -2318,23 +2359,41 @@ def api_disbursement_preflight():
             tf = p.trust_floor_signals()
         except Exception:
             tf = {}
-        missing = []
+        # `missing_codes` carries the machine names; `missing` is only the
+        # English rendering for the `message` fallback. Before 2026-07-21
+        # the list existed ONLY as English baked into `message`, so the
+        # client had nothing to localize and every locale saw English.
+        missing_codes, missing = [], []
         if not tf.get('endorsements_ok'):
+            missing_codes.append('endorsements')
             missing.append('two conflict-free endorsements')
         if not tf.get('bank_verified'):
+            missing_codes.append('bank_route')
             missing.append('bank verification and a payment route')
         # Only surface the reputation-floor item when the endorsement COUNT
         # is already met — otherwise "need more endorsers" and "endorsers
         # below the reputation floor" read as the same thing and confuse.
         if tf.get('endorsements_ok') and not tf.get('endorsers_meet_reputation_floor'):
+            missing_codes.append('reputation_floor')
             missing.append('endorsers with a higher reputation score')
-        warnings.append({
-            'code': 'partner_not_cleared',
-            'cta_code': 'clear_dd',
-            'message': ('Partner is not fully cleared yet'
-                        + (f" — still needs {', '.join(missing)}." if missing
-                           else f' (status: {p.status}).')),
-            'href': href})
+        if missing_codes:
+            warnings.append({
+                'code': 'partner_not_cleared',
+                'cta_code': 'clear_dd',
+                'missing_codes': missing_codes,
+                'message': ('Partner is not fully cleared yet — still needs '
+                            + ', '.join(missing) + '.'),
+                'href': href})
+        else:
+            # Distinct code (not a param on the one above) so the client
+            # picks the right sentence from `code` alone and WhyBlocked
+            # stays free of per-code branching.
+            warnings.append({
+                'code': 'partner_not_cleared_status',
+                'cta_code': 'clear_dd',
+                'params': {'status': p.status},
+                'message': f'Partner is not fully cleared yet (status: {p.status}).',
+                'href': href})
 
     # 2. A disbursement route must exist
     total_methods = PartnerDisbursementMethod.query.filter_by(
@@ -2358,8 +2417,16 @@ def api_disbursement_preflight():
 
     cosigners_required = cosigners_required_for(amount) if amount else 0
     if cosigners_required:
+        # Singular/plural split by code rather than a count param: the
+        # ladder tops out at 3 (SoP 10 §4), and picking the sentence
+        # server-side keeps plural rules out of the shared renderer.
+        # `amount` goes over the wire as a NUMBER so each locale formats
+        # its own currency; the English `message` keeps the $ literal
+        # only as the no-translation fallback.
         warnings.append({
-            'code': 'cosign_required',
+            'code': ('cosign_required' if cosigners_required == 1
+                     else 'cosign_required_multi'),
+            'params': {'amount': amount, 'count': cosigners_required},
             'message': (f'This amount (${amount:,.0f}) needs '
                         f'{cosigners_required} co-signature(s) — a different '
                         'OB member must cosign before funds move.')})
@@ -2853,6 +2920,11 @@ def api_create_endorser_invite(partner_id):
             'invitee_phone': inv.invitee_phone,
         },
     )
+    # Deliver the invite if we have a phone. When we don't — or when no
+    # provider is configured — the OB still gets the token back in this
+    # response to share by hand, which is how this worked before.
+    if inv.invitee_phone:
+        _notify('send_endorsement_invite', inv)
     return jsonify({
         'success': True,
         'invite': inv.to_dict(include_token=True),
@@ -2988,6 +3060,12 @@ def api_submit_endorser_invite(token):
     inv.endorsement_id = endorsement.id
     inv.endorser_id = endorser.id
     db.session.commit()
+
+    # The elders who vouched took a reputational risk on this
+    # partner. Tell them it landed — silence after a vouch is how
+    # community endorsement quietly stops being worth doing.
+    if state_change == 'dd_clear':
+        _notify('send_partner_cleared', partner)
 
     AuditChainEntry.append(
         action='proximate.endorsement.submitted_via_invite',
@@ -4803,6 +4881,10 @@ def api_record_disbursement():
         _bump_participant_stage(
             d.round_id, partner.id, 'disbursed', current_user.id,
         )
+        # Money is out and the report clock has started. Tell the partner
+        # now, with their report link — not at the deadline, when a
+        # reminder is already a reprimand.
+        _notify('send_disbursement_notify', d)
     else:
         _bump_participant_stage(
             d.round_id, partner.id, 'bank_verified', current_user.id,
@@ -5130,6 +5212,9 @@ def api_cosign_disbursement(disbursement_id):
         _bump_participant_stage(
             d.round_id, d.partner_id, 'disbursed', current_user.id,
         )
+        # Same notify as the no-cosign path — this is the moment the
+        # money actually moved for a ladder disbursement.
+        _notify('send_disbursement_notify', d)
     return jsonify({'success': True, 'disbursement': d.to_dict()})
 
 
@@ -5494,6 +5579,10 @@ def api_submit_disbursement_report(token):
         d.round_id, d.partner_id, 'reported',
         current_user.id if current_user.is_authenticated else None,
     )
+    # Close the loop. A partner who sent a voice note from a $2 handset
+    # has no way to tell whether it arrived; the on-screen confirmation
+    # is gone the moment they close the browser.
+    _notify('send_report_ack', d)
 
     logger.info(
         f"Proximate: report submitted disbursement_id={d.id} "
@@ -6254,6 +6343,12 @@ def api_endorser_portal_submit(token, partner_id):
             state_change = 'dd_pending'
 
     db.session.commit()
+
+    # The elders who vouched took a reputational risk on this
+    # partner. Tell them it landed — silence after a vouch is how
+    # community endorsement quietly stops being worth doing.
+    if state_change == 'dd_clear':
+        _notify('send_partner_cleared', partner)
 
     # Audit-chain — token-portal endorsement is flagged with
     # submitted_via=token_url so auditors can distinguish from the

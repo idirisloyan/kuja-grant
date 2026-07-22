@@ -13,6 +13,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, CheckCircle2, AlertTriangle, Check } from 'lucide-react';
+import {
+  ReassuranceNote,
+  EffortBadges,
+} from '@/components/proximate/token-page-support';
+
+// NOTE: no OfflineFallbackCard here. The ballot response carries no
+// record id we could quote (voter_name + ballot only), and a fallback
+// code derived from the vote token would put a credential into a
+// WhatsApp thread. If the OB wants one, expose the invite id.
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
 
@@ -187,6 +196,7 @@ export default function ProximateVotePage() {
           <p className="text-sm text-muted-foreground" dir="rtl">
             اضغط على الشركاء الذين تختارهم للتمويل، ثم اضغط «إرسال» مرة واحدة.
           </p>
+          <EffortBadges showVoice={false} className="justify-center" />
         </div>
 
         <div className="space-y-2">
@@ -241,6 +251,12 @@ export default function ProximateVotePage() {
           rows={2}
           className="w-full text-sm rounded-md border bg-background p-2"
         />
+
+        {/* variant="endorse": an individual panelist's ballot is never
+            shown to the partners on it, which is the thing a panelist
+            from the same locality actually worries about. showResume is
+            false — selections live only in this tab. */}
+        <ReassuranceNote variant="endorse" showResume={false} />
 
         {error && <p className="text-sm text-rose-600 text-center">{error}</p>}
       </div>

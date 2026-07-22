@@ -19,6 +19,11 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  OfflineFallbackCard,
+  ReassuranceNote,
+  EffortBadges,
+} from '@/components/proximate/token-page-support';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
 
@@ -135,6 +140,7 @@ export default function ProximateVerifyPage() {
           <h1 className="text-2xl kuja-display">
             {t('proximate.verify.title')}
           </h1>
+          <EffortBadges showVoice={false} className="mt-3" />
         </header>
 
         <Card className="p-5 space-y-3">
@@ -239,6 +245,14 @@ export default function ProximateVerifyPage() {
             </Button>
           </Card>
         )}
+
+        {/* variant="endorse": the verifier's name reaches Adeso but is
+            never shown to the partner they are attesting about, which is
+            exactly what that line says. showResume is false — this page
+            keeps no draft, and one long-form verdict is not worth
+            leaving on what may be a borrowed phone. */}
+        <ReassuranceNote variant="endorse" showResume={false} />
+        <OfflineFallbackCard code={`DV-${data.id}`} />
 
         <p className="text-xs text-muted-foreground pt-3 border-t">
           {t('proximate.verify.footer_keep_link_safe')}

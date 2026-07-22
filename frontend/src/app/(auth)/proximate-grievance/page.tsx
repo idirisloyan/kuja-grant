@@ -16,6 +16,18 @@ import { useState } from 'react';
 import { Loader2, ShieldAlert, CheckCircle2, EyeOff } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  OfflineFallbackCard,
+  ReassuranceNote,
+  BilingualShare,
+  EffortBadges,
+  useOrigin,
+} from '@/components/proximate/token-page-support';
+
+// This page NEVER uses useLocalDraft. A half-written whistleblower
+// report sitting in localStorage on a phone that gets borrowed, seized
+// or searched is a safety problem, not a convenience feature — which is
+// also why ReassuranceNote below is passed showResume={false}.
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
 
@@ -34,7 +46,9 @@ export default function ProximateGrievancePage() {
   const [website, setWebsite] = useState(''); // honeypot
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [grievanceId, setGrievanceId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const origin = useOrigin();
 
   // A mini-portal link can prefill which partner the report concerns
   const partnerId = typeof window !== 'undefined'
@@ -70,6 +84,10 @@ export default function ProximateGrievancePage() {
       if (!r.ok || !body.success) {
         setError(body.error || 'Could not submit. Please try again.');
       } else {
+        // The record id is safe to show even to an anonymous reporter:
+        // it identifies the REPORT, not the person, and it is the only
+        // way they can ask us about it later without giving a name.
+        setGrievanceId(typeof body.grievance_id === 'number' ? body.grievance_id : null);
         setDone(true);
       }
     } catch {
@@ -93,6 +111,9 @@ export default function ProximateGrievancePage() {
             within 72 hours. Your identity is never shared beyond the
             oversight team.
           </p>
+          {grievanceId != null && (
+            <OfflineFallbackCard code={`GR-${grievanceId}`} className="text-start" />
+          )}
         </Card>
       </div>
     );
@@ -117,6 +138,7 @@ export default function ProximateGrievancePage() {
             misconduct — tell us here. You do not need an account, and you can
             report without giving your name.
           </p>
+          <EffortBadges showVoice={false} />
         </header>
 
         <Card className="p-5 space-y-5">
@@ -217,6 +239,14 @@ export default function ProximateGrievancePage() {
             </div>
           )}
 
+          {/* The anonymity promise is made ONLY while the box is ticked.
+              Untick it and the note drops that line rather than
+              contradicting the name field directly above it. */}
+          <ReassuranceNote
+            variant={anonymous ? 'anonymous' : 'concern'}
+            showResume={false}
+          />
+
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <Button onClick={submit} disabled={busy} className="w-full">
@@ -235,6 +265,26 @@ export default function ProximateGrievancePage() {
             group concerned until review is complete.
           </p>
         </Card>
+
+        {/* Pass the channel on. This is the ONE page here whose URL is
+            safe to forward — it carries no token and no credential. The
+            partner_id prefill is deliberately dropped from the shared
+            link: it would tell the recipient who someone is reporting. */}
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground" dir="rtl">
+            تعرف شخصاً يحتاج لهذه القناة؟ أرسل له الرابط.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Know someone who needs this channel? Send them the link.
+          </p>
+          <BilingualShare
+            message={{
+              ar: 'إذا رأيت شيئاً خاطئاً — احتيال، أو خطر على أحد، أو أي مخالفة — يمكنك إبلاغ فريق الرقابة في أديسو عبر هذا الرابط. لا تحتاج إلى حساب، ويمكنك الإبلاغ دون ذكر اسمك.',
+              en: 'If you have seen something wrong — fraud, danger to someone, or any misconduct — you can tell the Adeso oversight team here. You do not need an account, and you can report without giving your name.',
+            }}
+            link={origin ? `${origin}/proximate-grievance` : undefined}
+          />
+        </div>
       </div>
     </div>
   );

@@ -715,3 +715,255 @@ class ComplianceService:
             saved.append(check)
         db.session.commit()
         return saved
+
+    # --- Sanctions hits as interventions (SOP 13 §4) -------------------
+    #
+    # Before this, a screening hit only set ProximatePartner.sanctions_flag
+    # and wrote sanctions_summary_json. Nothing opened an entry in the
+    # intervention register, so a hit had no response clock, showed up in
+    # no OB queue, and could sit unexamined indefinitely. SOP 13 §4 wants a
+    # graduated measure with an explicit deadline for exactly this.
+    #
+    # WHY 'warning' AND NOT 'freeze' — read before "fixing" this:
+    # The kinds are graduated (warning 24h / freeze 72h / suspend 5d) and
+    # `freeze` is documented as "disbursements paused pending response".
+    # A sanctions hit looks like it deserves a freeze, but the fund's
+    # design is explicit that screening must NOT hard-gate funding: these
+    # lists are fuzzy-matched and a Sudanese org sharing a name fragment
+    # with a listed entity is a routine false positive. The OB decides
+    # after seeing the evidence. `warning` is the kind whose own docstring
+    # is "no reputation impact yet; this is the secretariat flagging a
+    # concern" — it puts a 24h clock and a queue entry on the hit without
+    # touching money movement. Nothing here writes partner.status, and
+    # /disbursements/preflight does not gate on interventions or on
+    # sanctions_flag, so the funding path is provably unchanged.
+
+    SANCTIONS_INTERVENTION_KIND = 'warning'
+    SANCTIONS_SOP_CLAUSE = 'SOP-13-section-4-sanctions'
+
+    @staticmethod
+    def _resolve_system_actor_user_id(network_id):
+        """Return a real users.id to attribute a system-opened
+        intervention to, or None if the DB has no usable user.
+
+        InterventionMeasure.opened_by_user_id is a NOT NULL FK. Hardcoding
+        id=1 as "the system user" caused a production FK violation once
+        already (no user with id=1 exists on Proximate prod), so resolve a
+        genuine actor: an OB member of THIS network first, then any admin,
+        then any user. True provenance is recorded on the audit chain.
+
+        This deliberately mirrors proximate_routes._system_actor_user_id
+        rather than importing it: services must not import route modules
+        (routes import services — the reverse direction creates a cycle at
+        blueprint-registration time). The shared invariant is "never
+        hardcode a user id", not the code itself.
+        """
+        from app.models import User, NetworkMembership
+        try:
+            ob_user = (
+                db.session.query(User)
+                .join(NetworkMembership,
+                      NetworkMembership.org_id == User.org_id)
+                .filter(
+                    NetworkMembership.network_id == network_id,
+                    NetworkMembership.is_oversight_body.is_(True),
+                    NetworkMembership.status == 'active',
+                )
+                .order_by(User.id.asc())
+                .first()
+            )
+            if ob_user:
+                return ob_user.id
+            admin = (
+                db.session.query(User)
+                .filter(User.role == 'admin')
+                .order_by(User.id.asc())
+                .first()
+            )
+            if admin:
+                return admin.id
+            any_user = db.session.query(User).order_by(User.id.asc()).first()
+            return any_user.id if any_user else None
+        except Exception as e:
+            logger.warning(f'system actor resolution failed: {e}')
+            return None
+
+    @classmethod
+    def open_intervention_for_sanctions_hit(cls, partner, *,
+                                            actor_email='system-sanctions-screen'):
+        """Open an intervention for a partner carrying a sanctions flag.
+
+        Idempotent: if the partner already has an open or escalated
+        intervention of any kind, this does nothing — the OB is already
+        looking at that partner and a second row would just be noise. This
+        is the same open-intervention guard the Phase 641 security-keyword
+        scan uses.
+
+        Returns a dict; `opened` is True only when a row was actually
+        created. Every non-open outcome carries a `reason` so a caller
+        (or the cron payload) can never read "nothing happened" as
+        success — this codebase has shipped that bug twice.
+        """
+        from app.models.proximate_intervention import InterventionMeasure
+        from app.models.audit_chain import AuditChainEntry
+        import json as _json
+
+        if not getattr(partner, 'sanctions_flag', False):
+            return {'opened': False, 'reason': 'no_sanctions_flag',
+                    'partner_id': getattr(partner, 'id', None)}
+
+        # The intervention register FKs to proximate_partners. Endorsers
+        # and FSPs carry the same three sanctions columns (Phase 716) but
+        # cannot be the subject of an InterventionMeasure, so screening
+        # those still flags without opening — by schema, not by oversight.
+        if getattr(partner, '__tablename__', None) != 'proximate_partners':
+            return {'opened': False, 'reason': 'not_a_partner_entity',
+                    'partner_id': getattr(partner, 'id', None)}
+
+        existing = InterventionMeasure.query.filter(
+            InterventionMeasure.partner_id == partner.id,
+            InterventionMeasure.status.in_(['open', 'escalated']),
+        ).first()
+        if existing:
+            return {'opened': False, 'reason': 'intervention_already_open',
+                    'partner_id': partner.id,
+                    'intervention_id': existing.id}
+
+        actor_id = cls._resolve_system_actor_user_id(partner.network_id)
+        if actor_id is None:
+            # Fail loudly rather than swallow: with no resolvable user the
+            # insert would violate the NOT NULL FK anyway.
+            logger.error(
+                f'Cannot open sanctions intervention for partner '
+                f'{partner.id}: no resolvable system actor user'
+            )
+            return {'opened': False, 'reason': 'no_system_actor',
+                    'partner_id': partner.id}
+
+        # Quote the actual matched lists in the reason so the OB sees WHY
+        # without opening another screen.
+        try:
+            summary = _json.loads(partner.sanctions_summary_json or '{}')
+        except (ValueError, TypeError):
+            summary = {}
+        hits = summary.get('flagged') or []
+        lists = ', '.join(
+            sorted({(h.get('list') or h.get('check_type') or '?')
+                    for h in hits})
+        ) or 'sanctions screening'
+
+        reason = (
+            f'Automated sanctions screening returned '
+            f'{summary.get("flagged_count", len(hits))} potential match(es) '
+            f'for "{partner.name}" on: {lists}. '
+            'Review the match evidence and confirm or dismiss. '
+            'This is a review prompt, not a funding block — screening '
+            'matches are fuzzy and false positives on name fragments are '
+            'expected.'
+        )
+
+        try:
+            measure = InterventionMeasure.open_new(
+                network_id=partner.network_id,
+                partner_id=partner.id,
+                kind=cls.SANCTIONS_INTERVENTION_KIND,
+                reason=reason,
+                opened_by_user_id=actor_id,
+            )
+            measure.sop_clause = cls.SANCTIONS_SOP_CLAUSE
+            db.session.commit()
+        except Exception as e:
+            logger.error(f'Failed to open sanctions intervention for '
+                         f'partner {partner.id}: {e}')
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return {'opened': False, 'reason': 'insert_failed',
+                    'partner_id': partner.id, 'detail': str(e)[:200]}
+
+        AuditChainEntry.append(
+            action='proximate.intervention.opened.warning.auto_sanctions',
+            actor_email=actor_email,
+            subject_kind='proximate_partner',
+            subject_id=partner.id,
+            details={
+                'intervention_id': measure.id,
+                'sop_clause': measure.sop_clause,
+                'flagged_count': summary.get('flagged_count', len(hits)),
+                'lists': lists,
+                # Recorded so an auditor can see the no-hard-gate decision
+                # was intentional and not a missing freeze.
+                'funding_gated': False,
+            },
+            network_id=partner.network_id,
+        )
+        logger.warning(
+            f'Proximate: opened sanctions intervention {measure.id} for '
+            f'partner {partner.id} ({partner.name!r}) — {lists}'
+        )
+        return {'opened': True, 'partner_id': partner.id,
+                'intervention_id': measure.id,
+                'kind': cls.SANCTIONS_INTERVENTION_KIND}
+
+    @classmethod
+    def sweep_sanctions_interventions(cls, *, limit=500):
+        """Open interventions for every flagged partner that lacks one.
+
+        This is the 'reliably' half of sanctions-hits-as-interventions.
+        Screening runs from several call sites (partner create, the Phase
+        716 DD sweep, manual re-screens), so rather than depend on each of
+        them remembering to open a measure, this sweep reconciles the
+        register against the flags. That also back-fills partners flagged
+        before this existed.
+
+        Idempotent by construction — open_intervention_for_sanctions_hit
+        skips anything already under an open measure.
+        """
+        from app.models.proximate_endorsement import ProximatePartner
+
+        result = {'considered': 0, 'opened': 0, 'skipped': 0,
+                  'failed': 0, 'opened_ids': [], 'skip_reasons': {}}
+
+        partners = (
+            ProximatePartner.query
+            .filter(
+                ProximatePartner.sanctions_flag.is_(True),
+                # Only partners still live in the pipeline. 'dd_failed'
+                # and 'suspended' partners have already been decided on,
+                # so opening a fresh 24h review clock against them adds
+                # queue noise without a decision to make — which matters
+                # because this sweep also back-fills historical flags the
+                # first time it runs. Deliberately WIDER than the Phase
+                # 641 security scan (dd_clear/dd_pending only): a
+                # sanctions hit is most useful caught at nomination,
+                # before endorsers spend effort on the partner.
+                ProximatePartner.status.in_([
+                    'nominated', 'endorsements_open',
+                    'dd_pending', 'dd_clear',
+                ]),
+            )
+            .order_by(ProximatePartner.id.asc())
+            .limit(int(limit))
+            .all()
+        )
+        for p in partners:
+            result['considered'] += 1
+            outcome = cls.open_intervention_for_sanctions_hit(p)
+            if outcome.get('opened'):
+                result['opened'] += 1
+                result['opened_ids'].append(outcome['intervention_id'])
+                continue
+            reason = outcome.get('reason', 'unknown')
+            # 'insert_failed' / 'no_system_actor' are real failures; the
+            # rest are expected no-ops. Keeping them apart stops a broken
+            # sweep from looking like a quiet one.
+            if reason in ('insert_failed', 'no_system_actor'):
+                result['failed'] += 1
+            else:
+                result['skipped'] += 1
+            result['skip_reasons'][reason] = (
+                result['skip_reasons'].get(reason, 0) + 1)
+
+        logger.info(f'sanctions intervention sweep: {result}')
+        return result

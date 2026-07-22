@@ -16,6 +16,11 @@
 
 import { useEffect, useState } from 'react';
 import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import {
+  OfflineFallbackCard,
+  ReassuranceNote,
+  EffortBadges,
+} from '@/components/proximate/token-page-support';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
 
@@ -166,6 +171,7 @@ export default function ProximateEndorseInvitePage() {
           <p className="text-sm text-muted-foreground">
             Adeso has asked you to endorse an NGO for our current round.
           </p>
+          <EffortBadges minutes={3} showVoice={false} className="justify-center" />
         </div>
 
         <div className="bg-muted/40 rounded-lg p-4 space-y-2">
@@ -243,6 +249,12 @@ export default function ProximateEndorseInvitePage() {
           {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
           Submit endorsement
         </button>
+
+        {/* showResume=false: this is a ONE-TIME link and the page keeps
+            no draft, so promising "come back later" would be wrong twice
+            over. */}
+        <ReassuranceNote variant="endorse" showResume={false} />
+        <OfflineFallbackCard code={`EN-${p.id}`} />
 
         <p className="text-[10px] text-center text-muted-foreground">
           Your answers are shared only with Adeso. No account is created.

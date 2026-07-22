@@ -259,6 +259,16 @@ export interface Blocker {
   /** Phase 717 #3 — drives a precise, localized "fix this now" CTA
    *  (e.g. add_route → "Add a payment route"). */
   cta_code?: string;
+  /** 2026-07-21 — interpolation values for `proximate.why.msg.<code>`.
+   *  Two preflight items (cosign_required, partner_not_cleared_status)
+   *  used to bake their numbers/status into the English `message`, so
+   *  no localized key could carry them and every locale fell through to
+   *  English. Optional: items without placeholders send nothing. */
+  params?: Record<string, string | number>;
+  /** Machine names for the partner_not_cleared "still needs …" list.
+   *  Localized fragment-by-fragment here, then joined — sending the
+   *  English phrases was the bug. */
+  missing_codes?: string[];
 }
 
 /** Renders the "why blocked?" preconditions: red = hard blocker, amber =
@@ -276,13 +286,24 @@ export function WhyBlocked({ blockers = [], warnings = [] }: {
     const ctaLabel = b.cta_code
       ? tx(`proximate.why.cta.${b.cta_code}`, 'Fix it')
       : tx('proximate.why.cta.fix', 'Fix it');
+    const params: Record<string, string | number> = { ...(b.params || {}) };
+    // Money arrives as a raw number so the locale, not the server,
+    // decides the formatting.
+    if (typeof params.amount === 'number') {
+      params.amount = `$${Math.round(params.amount).toLocaleString()}`;
+    }
+    if (b.missing_codes?.length) {
+      params.missing = b.missing_codes
+        .map((c) => tx(`proximate.why.missing.${c}`, c))
+        .join(tx('proximate.why.missing_separator', ', '));
+    }
     return (
       <li className="flex items-start gap-2 text-sm">
         {tone === 'block'
           ? <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${styles}`} />
           : <Info className={`w-4 h-4 shrink-0 mt-0.5 ${styles}`} />}
         <span className="flex-1">
-          {tx(`proximate.why.msg.${b.code}`, b.message)}
+          {tx(`proximate.why.msg.${b.code}`, b.message, params)}
           {b.href && (
             <>
               {' '}

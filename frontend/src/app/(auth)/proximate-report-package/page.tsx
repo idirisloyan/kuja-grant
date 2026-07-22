@@ -17,6 +17,15 @@ import {
   Loader2, CheckCircle2, AlertTriangle, Camera, Video, FileText,
   Receipt, Mic, Trash2, Send,
 } from 'lucide-react';
+import {
+  OfflineFallbackCard,
+  ReassuranceNote,
+  VoicePlayback,
+  EffortBadges,
+} from '@/components/proximate/token-page-support';
+
+// No useLocalDraft here: this page already saves server-side via
+// /answers, which is why ReassuranceNote keeps its resume line.
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
 
@@ -72,6 +81,10 @@ export default function ProximateReportPackagePage() {
   const [uploadCaption, setUploadCaption] = useState('');
   const [uploadBusy, setUploadBusy] = useState(false);
   const [voiceBusy, setVoiceBusy] = useState<string | null>(null);
+  // The recording just attached, kept locally so the partner can hear it
+  // back. One at a time — this is a check-before-you-send affordance,
+  // not a library, and holding every blob would sink a low-end phone.
+  const [lastVoice, setLastVoice] = useState<{ key: string; file: File } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -229,6 +242,8 @@ export default function ProximateReportPackagePage() {
             your report. If anything more is needed, this same link will
             reopen with a note.
           </p>
+          {/* The reference to quote if the link stops opening. */}
+          <OfflineFallbackCard code={`RP-${data.package.id}`} className="text-start" />
         </div>
       </div>
     );
@@ -267,6 +282,7 @@ export default function ProximateReportPackagePage() {
           <p className="text-xs text-muted-foreground" dir="rtl">
             أضف الأرقام والأدلة والإجابات الصوتية تدريجياً، ثم اضغط «إرسال» عند اكتمال التقرير.
           </p>
+          <EffortBadges className="justify-center" />
         </div>
 
         {data.package.status === 'changes_requested' && data.package.ob_notes && (
@@ -388,6 +404,7 @@ export default function ProximateReportPackagePage() {
                         const f = e.target.files?.[0];
                         if (f) {
                           setVoiceBusy(q.key);
+                          setLastVoice({ key: q.key, file: f });
                           await uploadItem(f, 'voice', q.key);
                           setVoiceBusy(null);
                         }
@@ -406,6 +423,12 @@ export default function ProximateReportPackagePage() {
                       {answered.length ? 'Add another' : 'Record / attach'}
                     </button>
                   </>
+                )}
+                {/* Hear the just-recorded answer back before submitting. */}
+                {lastVoice?.key === q.key && (
+                  <div className="w-full">
+                    <VoicePlayback file={lastVoice.file} />
+                  </div>
                 )}
                 {answered.filter((i) => i.change_request).map((i) => (
                   <p key={i.id}
@@ -498,6 +521,9 @@ export default function ProximateReportPackagePage() {
         </div>
 
         {error && <p className="text-sm text-rose-600 text-center">{error}</p>}
+
+        <ReassuranceNote variant="report" />
+        <OfflineFallbackCard code={`RP-${pkg.id}`} />
       </div>
 
       {editable && (

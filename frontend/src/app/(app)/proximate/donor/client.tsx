@@ -14,13 +14,16 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Loader2, ExternalLink, FileText, AlertTriangle, MessageCircle, Send } from 'lucide-react';
+import { Loader2, ExternalLink, FileText, AlertTriangle, MessageCircle, Send, ShieldCheck } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
+import { DonorMoneyFunnel, computeFunnelTotals } from '@/components/proximate/donor-money-funnel';
+import { AssurancePackButton } from '@/components/proximate/donor-assurance-pack';
+import { DonorExplainer } from '@/components/proximate/donor-explainer';
 
 interface Donor {
   id: number;
@@ -74,6 +77,21 @@ interface DashboardPayload {
   portfolio: Portfolio;
 }
 
+/** Subset of /api/proximate/grants (donor-scoped server-side) that the
+ *  portal needs: the funnel's "Committed" stage and the per-grant
+ *  assurance pack. */
+interface DonorGrant {
+  id: number;
+  title: string;
+  donor_grant_ref: string | null;
+  amount_committed_usd: number | null;
+  amount_allocated_usd: number | null;
+  amount_remaining_usd: number | null;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+}
+
 function pct(num: number, denom: number) {
   if (!denom) return null;
   return Math.round((num / denom) * 100);
@@ -93,6 +111,12 @@ export function ProximateDonorClient() {
   // existed but the donor UI had no control. null = not touched yet;
   // falls back to the server-reported list.
   const [subscribedIds, setSubscribedIds] = useState<number[] | null>(null);
+  // Grants are a SEPARATE fetch from the dashboard on purpose: the
+  // dashboard endpoint is round-scoped and has no grant concept, and a
+  // donor with no grant agreement on file is a legitimate state (the
+  // funnel then shows Committed as "not recorded" rather than $0).
+  // `null` = still loading / failed, which is NOT the same as `[]`.
+  const [grants, setGrants] = useState<DonorGrant[] | null>(null);
 
   useEffect(() => {
     api
@@ -108,6 +132,13 @@ export function ProximateDonorClient() {
         }
       })
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    api
+      .get<{ grants: DonorGrant[] }>('/api/proximate/grants')
+      .then((r) => setGrants(r.grants || []))
+      .catch(() => setGrants([]));
   }, []);
 
   if (loading) {
@@ -166,6 +197,15 @@ export function ProximateDonorClient() {
   // top-card and round-card percentages can't drift apart.
   const outcomeRate = pct(portfolio.outcome_attested, portfolio.outcome_total);
 
+  // "Committed" is only real when a signed grant agreement exists. A
+  // donor whose grants haven't been recorded yet gets null (rendered as
+  // "not recorded"); showing $0 would read as "you gave nothing", and
+  // silently substituting the envelope would overstate what is on paper.
+  const committedUsd = grants && grants.length > 0
+    ? grants.reduce((sum, g) => sum + (g.amount_committed_usd || 0), 0)
+    : null;
+  const funnelTotals = computeFunnelTotals(rounds, committedUsd);
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
       <header>
@@ -178,7 +218,23 @@ export function ProximateDonorClient() {
         )}
       </header>
 
-      {/* Portfolio rollup */}
+      {/* Hero: the money story. Committed → Allocated → Disbursed →
+          Reported → Verified. The stat grid below it keeps every number
+          the grid used to lead with, one level down the hierarchy. */}
+      <DonorMoneyFunnel
+        totals={funnelTotals}
+        flaggedCount={portfolio.flagged_count}
+      />
+
+      {/* The three controls behind the funnel's last two stages. Donors
+          consistently could not say what "verified" was worth without
+          this; each entry explains what the control proves and what it
+          does not. */}
+      <AssuranceControlsStrip />
+
+      {/* Portfolio rollup — secondary to the funnel now, but complete:
+          partner/payment counts and the outcome-attestation rate live
+          nowhere else. */}
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="p-4">
           <p className="text-xs text-muted-foreground">
@@ -208,8 +264,9 @@ export function ProximateDonorClient() {
           </p>
         </Card>
         <Card className="p-4">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
             {t('proximate.donor.stat_outcome_data')}
+            <DonorExplainer term="outcome_check" />
           </p>
           {portfolio.outcome_total === 0 ? (
             <>
@@ -229,10 +286,24 @@ export function ProximateDonorClient() {
                 {portfolio.outcome_attested}/{portfolio.outcome_total}{' '}
                 {t('proximate.donor.attested')}
               </p>
+              {/* outcome_verified was already in the payload but never
+                  rendered — it is the stronger signal of the two and a
+                  donor asking "who checked?" had no answer on screen. */}
+              {portfolio.outcome_verified > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {t('proximate.donor.outcomes_verified_count', {
+                    count: portfolio.outcome_verified,
+                  })}
+                </p>
+              )}
             </>
           )}
         </Card>
       </section>
+
+      {/* Grants — the assurance pack's natural home: one pack covers a
+          whole grant timeline across every round it funded. */}
+      <DonorGrants grants={grants} />
 
       {portfolio.flagged_count > 0 && (
         <Card className="p-4 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 flex items-start gap-3">
@@ -315,8 +386,9 @@ export function ProximateDonorClient() {
                   <dd className="text-sm">{r.partners_served}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-muted-foreground">
+                  <dt className="text-xs text-muted-foreground inline-flex items-center gap-1">
                     {t('proximate.donor.stat_outcome_data')}
+                    <DonorExplainer term="outcome_check" />
                   </dt>
                   <dd className="text-sm">
                     {/* QA-18: never show "0%" / "(0/0)" when nothing is
@@ -358,16 +430,11 @@ export function ProximateDonorClient() {
               )}
 
               <div className="flex items-center gap-2 flex-wrap pt-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    window.open(`${process.env.NEXT_PUBLIC_API_BASE || ''}${r.report_pdf_url}`, '_blank')
-                  }
-                >
-                  <FileText className="w-4 h-4 me-1" />
-                  {t('proximate.donor.download_pdf')}
-                </Button>
+                {/* Replaces the old raw window.open on report_pdf_url:
+                    that call dropped the X-Network-Override header and
+                    rendered a 503/403 JSON body in a new tab while this
+                    page still looked like the download worked. */}
+                <AssurancePackButton scope="round" id={r.id} variant="outline" />
                 <Button
                   size="sm"
                   variant="ghost"
@@ -389,6 +456,90 @@ export function ProximateDonorClient() {
         {t('proximate.donor.footer_honest_scope')}
       </p>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Assurance controls — the three things standing behind "Verified".
+   Named and explained in donor language, because "verified" on its own
+   is worth whatever the reader assumes it is worth.                    */
+/* ------------------------------------------------------------------ */
+
+function AssuranceControlsStrip() {
+  const { t } = useTranslation();
+  const controls = ['audit_anchor', 'verifier_attestation', 'outcome_check'] as const;
+  return (
+    <Card className="p-4">
+      <h2 className="text-sm font-medium flex items-center gap-2 mb-2.5">
+        <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+        {t('proximate.donor.controls_title')}
+      </h2>
+      <ul className="grid gap-2 sm:grid-cols-3">
+        {controls.map((c) => (
+          <li key={c} className="text-xs">
+            <span className="font-medium inline-flex items-center gap-1">
+              {t(`proximate.donor.explain.${c}.title`)}
+              <DonorExplainer term={c} />
+            </span>
+            <p className="text-muted-foreground mt-0.5">
+              {t(`proximate.donor.explain.${c}.short`)}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Grants — one assurance pack per grant, covering the whole timeline.  */
+/* ------------------------------------------------------------------ */
+
+function DonorGrants({ grants }: { grants: DonorGrant[] | null }) {
+  const { t } = useTranslation();
+  // null = the grants call hasn't landed (or failed). Rendering nothing
+  // is right: an empty "Your grants" heading would imply the donor has
+  // none, which we do not know yet.
+  if (!grants || grants.length === 0) return null;
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-medium">{t('proximate.donor.grants_title')}</h2>
+      {grants.map((g) => (
+        <Card key={g.id} className="p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <h3 className="text-base font-medium">{g.title}</h3>
+              <p className="text-xs text-muted-foreground">
+                {g.donor_grant_ref && <span>{g.donor_grant_ref} · </span>}
+                {labelForProximateStatus(g.status, t)}
+              </p>
+            </div>
+            <AssurancePackButton scope="grant" id={g.id} showHint />
+          </div>
+          <dl className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <dt className="text-xs text-muted-foreground">
+                {t('proximate.donor.funnel.stage.committed')}
+              </dt>
+              <dd className="text-sm">{usd(g.amount_committed_usd)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">
+                {t('proximate.donor.funnel.stage.allocated')}
+              </dt>
+              <dd className="text-sm">{usd(g.amount_allocated_usd)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">
+                {t('proximate.donor.grant_remaining')}
+              </dt>
+              <dd className="text-sm">{usd(g.amount_remaining_usd)}</dd>
+            </div>
+          </dl>
+        </Card>
+      ))}
+    </section>
   );
 }
 

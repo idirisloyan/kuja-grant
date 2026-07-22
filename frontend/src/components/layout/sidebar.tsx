@@ -567,6 +567,10 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
           { icon: ClipboardCheck,  label: t('nav.endorsers'),            href: '/proximate/admin/endorsers' },
         ],
         secondary: [
+          // Mirrors the Operations group below — primary+secondary are the
+          // flat fallback the command palette reads, so a groups-only entry
+          // would be unreachable from ⌘K.
+          { icon: MessageSquare,   label: t('nav.messages'),             href: '/proximate/admin/messages' },
           { icon: MapPin,          label: t('nav.crisis_signals'),       href: '/proximate/crisis-selector' },
           { icon: Send,            label: t('nav.all_disbursements'),    href: '/proximate/disbursements' },
           { icon: ShieldCheck,     label: t('nav.audit_chain'),          href: '/admin/audit-chain' },
@@ -587,6 +591,7 @@ function proximateProfile(persona: ProximatePersona, t: T): NavProfile {
             items: [
               { icon: Users,          label: t('nav.partners'),          href: '/proximate/admin/partners' },
               { icon: ClipboardCheck, label: t('nav.endorsers'),         href: '/proximate/admin/endorsers' },
+              { icon: MessageSquare,  label: t('nav.messages'),          href: '/proximate/admin/messages' },
               { icon: Send,           label: t('nav.all_disbursements'), href: '/proximate/disbursements' },
               { icon: MapPin,         label: t('nav.crisis_signals'),    href: '/proximate/crisis-selector' },
             ],

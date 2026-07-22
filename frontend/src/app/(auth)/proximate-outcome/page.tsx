@@ -17,6 +17,19 @@ import { Loader2, CheckCircle2, Send, Camera, Mic, X } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  OfflineFallbackCard,
+  ReassuranceNote,
+  VoicePlayback,
+  EffortBadges,
+  DraftRestoredNote,
+  useLocalDraft,
+} from '@/components/proximate/token-page-support';
+
+// NOTE: AssistedByField is deliberately NOT used here. The outcome
+// endpoint has no assisted_by column and ignores unknown keys, so the
+// field would collect a name and silently drop it — the exact failure
+// mode this codebase has shipped twice. Add the column first.
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
 
@@ -58,10 +71,32 @@ export default function ProximateOutcomePage() {
 
   const [photoDocId, setPhotoDocId] = useState<number | null>(null);
   const [voiceDocId, setVoiceDocId] = useState<number | null>(null);
+  // Local copy of the recording so the partner can hear it back before
+  // sending. Never submitted — voiceDocId is what the payload carries.
+  const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [uploadingKind, setUploadingKind] = useState<'photo' | 'voice' | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const voiceInputRef = useRef<HTMLInputElement>(null);
+
+  // Keyed on the attestation id, never the token. Without this the
+  // "you can come back later" line in ReassuranceNote would be a lie —
+  // this form has no server-side draft.
+  const draftKey = meta?.id != null ? `outcome:${meta.id}` : null;
+  const { restored, clear: clearDraft } = useLocalDraft(
+    draftKey,
+    { stillInState, totalIntended, sustained, notSustained, counterfactual,
+      photoDocId, voiceDocId },
+    (saved) => {
+      if (saved.stillInState !== undefined) setStillInState(saved.stillInState);
+      if (saved.totalIntended !== undefined) setTotalIntended(saved.totalIntended);
+      if (saved.sustained !== undefined) setSustained(saved.sustained);
+      if (saved.notSustained !== undefined) setNotSustained(saved.notSustained);
+      if (saved.counterfactual !== undefined) setCounterfactual(saved.counterfactual);
+      if (saved.photoDocId !== undefined) setPhotoDocId(saved.photoDocId);
+      if (saved.voiceDocId !== undefined) setVoiceDocId(saved.voiceDocId);
+    },
+  );
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -145,6 +180,9 @@ export default function ProximateOutcomePage() {
       if (!r.ok || !data.success) {
         setSubmitError(data.error || t('proximate.outcome.submit_failed'));
       } else {
+        // Only once the server has it — a draft cleared on a failed send
+        // loses the answers the partner is about to retry.
+        clearDraft();
         setSubmitted(true);
       }
     } catch {
@@ -217,6 +255,9 @@ export default function ProximateOutcomePage() {
               )}
             </Card>
           )}
+          {/* Still useful after sending: the reference the partner quotes
+              if they need to ask us anything about this attestation. */}
+          {meta?.id != null && <OfflineFallbackCard code={`OA-${meta.id}`} />}
         </div>
       </div>
     );
@@ -247,6 +288,8 @@ export default function ProximateOutcomePage() {
               )}
             </p>
           )}
+          <EffortBadges className="mt-3" />
+          {restored && <DraftRestoredNote className="mt-2" />}
         </header>
 
         <Card className="p-6 space-y-5">
@@ -356,7 +399,10 @@ export default function ProximateOutcomePage() {
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) uploadAttachment('voice', f);
+                if (f) {
+                  setVoiceFile(f);
+                  uploadAttachment('voice', f);
+                }
                 e.target.value = '';
               }}
             />
@@ -409,13 +455,20 @@ export default function ProximateOutcomePage() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setVoiceDocId(null)}
+                  onClick={() => {
+                    setVoiceDocId(null);
+                    setVoiceFile(null);
+                  }}
                 >
                   <X className="w-3.5 h-3.5 me-1" />
                   {t('proximate.outcome.q4_remove')}
                 </Button>
               )}
             </div>
+
+            {/* Hear it back before sending — plays the local file. */}
+            <VoicePlayback file={voiceFile} />
+
             {uploadError && (
               <p className="text-xs text-red-600 mt-2">{uploadError}</p>
             )}
@@ -436,6 +489,9 @@ export default function ProximateOutcomePage() {
             {t('proximate.outcome.submit')}
           </Button>
         </Card>
+
+        <ReassuranceNote variant="outcome" />
+        {meta?.id != null && <OfflineFallbackCard code={`OA-${meta.id}`} />}
       </div>
     </div>
   );

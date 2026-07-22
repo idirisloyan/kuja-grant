@@ -1,0 +1,94 @@
+name: Weekly Proximate database backup cron
+
+# Wave 4 — Weekly logical backup of the production database to object
+# storage. The audit chain is only worth what it is recoverable from:
+# a tamper-evident log that lives on exactly one disk is a single
+# hardware failure away from proving nothing.
+#
+# Depends on object storage being configured (R2/S3 env vars). Without
+# it the endpoint returns a truthful failure rather than reporting a
+# backup it did not take — see reason='storage_not_configured'.
+#
+# Also note: the endpoint needs `pg_dump` present in the Railway image.
+# If it is missing the response carries reason='pg_dump_not_found' and
+# this job fails loudly, which is the intent — a silent no-op backup is
+# worse than no backup, because it buys false confidence.
+#
+# Required repo secrets:
+#   CRON_SECRET — must match the CRON_SECRET set on Railway
+#   PROD_BASE   — optional override of the base URL
+
+on:
+  # Sundays at 02:00 UTC — before the Monday sanctions re-screen, so a
+  # week's worth of screening decisions is captured in the snapshot
+  # that precedes the next week's changes.
+  schedule:
+    - cron: "0 2 * * 0"
+
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Determine base URL
+        id: base
+        run: |
+          if [ -n "${{ secrets.PROD_BASE }}" ]; then
+            echo "url=${{ secrets.PROD_BASE }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://web-production-6f8a.up.railway.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: POST /api/proximate-ops/backup/weekly
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET repo secret is missing — add it under Settings → Secrets and variables → Actions, matching the Railway env var."
+            exit 1
+          fi
+          # A full dump can take minutes; give curl room before it gives up.
+          http_code=$(curl -s -o /tmp/body.json -w "%{http_code}" \
+            --max-time 900 \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            "${BASE_URL}/api/proximate-ops/backup/weekly")
+          echo "HTTP ${http_code}"
+          cat /tmp/body.json || true
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Proximate weekly backup cron returned ${http_code}"
+            exit 1
+          fi
+
+      - name: Summarise run output
+        if: always()
+        run: |
+          if [ -f /tmp/body.json ]; then
+            python3 - <<'PY'
+          import json, os
+          with open('/tmp/body.json') as f:
+              try:
+                  d = json.load(f)
+              except Exception:
+                  print('Cron returned non-JSON body')
+                  raise SystemExit(0)
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if not summary:
+              print(json.dumps(d, indent=2))
+              raise SystemExit(0)
+          with open(summary, 'a') as out:
+              out.write('# Proximate weekly backup\n\n')
+              out.write(f'- **Backed up**: {d.get("backed_up")}\n')
+              out.write(f'- **Key**: {d.get("key")}\n')
+              out.write(f'- **Compressed bytes**: {d.get("size")}\n')
+              out.write(f'- **Raw bytes**: {d.get("raw_size")}\n')
+              if d.get('reason'):
+                  out.write(f'- **Reason not taken**: {d.get("reason")}\n')
+          PY
+          fi

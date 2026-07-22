@@ -92,6 +92,81 @@ def readonly_checks(ob):
     _mark(r.status_code == 200, 'grievance queue 200 (OB-only)', f'status={r.status_code}')
 
 
+# Statuses the backend accepts as a usable payment route. Mirrors the
+# filter in api_disbursement_preflight (proximate_routes.py) — 'active' is
+# a legacy value that predates 'verified' and still means routable.
+_ROUTABLE_METHOD_STATUSES = ('verified', 'active')
+
+
+def fundable_partner_checks(ob, sample_limit=25):
+    """INVARIANT: the tenant can always move money to at least one partner.
+
+    Read-only, so it is safe against prod and runs on every invocation.
+
+    The three preconditions are checked together on ONE partner, because
+    satisfying them separately is not the same thing: a cleared partner
+    with no verified route, or a routable partner still in dd_pending,
+    both leave the fund unable to disburse. The UAT script itself creates
+    a fresh partner every run and would happily pass its own chain while
+    the pre-existing roster had silently degraded — that is exactly the
+    regression this catches.
+
+    A degradation here is usually caused by a bulk status change, an FSP
+    being retired (which unverifies its routes), or a partner suspension
+    that swept more rows than intended. Finding it in CI beats finding it
+    in the middle of a UAT session with the donor watching.
+    """
+    print("\n== Fundable-partner invariant ==")
+    r = ob.get('/api/proximate/partners?status=dd_clear')
+    body = _json(r)
+    partners = body.get('partners', [])
+    if not _mark(r.status_code == 200, 'cleared-partner list 200',
+                 f'status={r.status_code}'):
+        return
+    if not _mark(len(partners) > 0, 'at least one dd_clear partner exists',
+                 f'count={len(partners)}'):
+        return
+
+    # Stop at the first fully-fundable partner; the invariant is "at least
+    # one", not "all of them". sample_limit bounds the request count on a
+    # large roster — 25 partners is 50 requests worst case.
+    fundable = None
+    inspected = 0
+    no_route = []
+    for p in partners[:sample_limit]:
+        inspected += 1
+        pid = p.get('id')
+        mr = ob.get(f'/api/proximate/partners/{pid}/disbursement-methods')
+        methods = _json(mr).get('methods', [])
+        routable = [m for m in methods
+                    if m.get('status') in _ROUTABLE_METHOD_STATUSES]
+        if not routable:
+            no_route.append(p.get('name') or f'#{pid}')
+            continue
+        # The route exists — now confirm the OB's own gate agrees. No
+        # amount is passed, so this asks "any disbursement at all", which
+        # keeps the cosign ladder out of the assertion.
+        pf = _json(ob.get(f'/api/proximate/disbursements/preflight?partner_id={pid}'))
+        if pf.get('can_disburse'):
+            fundable = {
+                'id': pid,
+                'name': p.get('name'),
+                'method_id': routable[0].get('id'),
+                'method_status': routable[0].get('status'),
+            }
+            break
+
+    _mark(
+        fundable is not None,
+        'a cleared partner has a verified payment route and passes preflight',
+        (f"partner={fundable['name']} (#{fundable['id']}) "
+         f"method #{fundable['method_id']} = {fundable['method_status']}")
+        if fundable else
+        (f'inspected {inspected}/{len(partners)} cleared partners; '
+         f'none fundable. Without a route: {", ".join(no_route[:5]) or "n/a"}'),
+    )
+
+
 def run_p0(ob, ob2, stamp):
     print(f"\n== Mutating P0 chain (stamp={stamp}) ==")
 
@@ -240,6 +315,7 @@ def main():
         sys.exit(0)
 
     readonly_checks(ob)
+    fundable_partner_checks(ob)
 
     if args.run:
         ob2 = Client(args.base)

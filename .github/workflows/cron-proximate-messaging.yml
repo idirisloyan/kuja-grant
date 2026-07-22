@@ -1,0 +1,192 @@
+name: Proximate messaging cron
+
+# Backlog items 1-18, 33 (July 2026) — drives the WhatsApp/SMS layer:
+#
+#   sweep-retries         re-attempts queued sends whose backoff elapsed
+#   endorsement-reminder  one nudge 48h after an unanswered endorsement
+#                         invite, and never again
+#   report-reminder       partners whose disbursement report is due in 3 days
+#   outcome-nudge         the day-85 "what lasted?" question on a 90-day
+#                         outcome obligation
+#
+# Two schedules, one file. The retry sweep is hourly because a queued
+# message sitting in backoff is time-sensitive — a partner waiting on a
+# disbursement link should not wait a day for the next cron. The three
+# reminders are daily; they are dedup'd server-side (the endorsement one
+# permanently), so running them more often would only add load.
+#
+# Every endpoint is a no-op returning configured=false when no WhatsApp/SMS
+# provider is wired, so a green run here does NOT by itself mean messages
+# went out. The step summary prints `configured` for exactly that reason.
+#
+# Required repo secrets:
+#   CRON_SECRET — must match the CRON_SECRET set on Railway
+#   PROD_BASE   — optional override of the base URL
+
+on:
+  schedule:
+    # Hourly at :20 — retry sweep only.
+    - cron: "20 * * * *"
+    # Daily at 04:30 UTC — full pass. 04:00 and 04:15 are already taken by
+    # the disbursement-nudge and outcome-due-nudge crons; staggering keeps
+    # them off the same Railway worker boot.
+    - cron: "30 4 * * *"
+
+  workflow_dispatch:
+
+jobs:
+  messaging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Determine base URL
+        id: base
+        run: |
+          if [ -n "${{ secrets.PROD_BASE }}" ]; then
+            echo "url=${{ secrets.PROD_BASE }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://web-production-6f8a.up.railway.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check CRON_SECRET is present
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET repo secret is missing — add it under Settings → Secrets and variables → Actions, matching the Railway env var."
+            exit 1
+          fi
+
+      - name: POST /api/proximate/messaging/sweep-retries
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          http_code=$(curl -s -o /tmp/prox-msg-sweep-retries.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            -H "X-Network-Override: proximate" \
+            -d '{}' \
+            "${BASE_URL}/api/proximate/messaging/sweep-retries")
+          echo "HTTP ${http_code}"
+          cat /tmp/prox-msg-sweep-retries.json || true
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Proximate messaging sweep-retries returned ${http_code}"
+            exit 1
+          fi
+
+      # The reminders only run on the daily schedule (and on a manual
+      # dispatch). On the hourly tick this step is skipped, so the sweep
+      # above is the only thing that fires.
+      - name: POST /api/proximate/messaging/endorsement-reminder
+        if: github.event.schedule == '30 4 * * *' || github.event_name == 'workflow_dispatch'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          http_code=$(curl -s -o /tmp/prox-msg-endorsement-reminder.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            -H "X-Network-Override: proximate" \
+            -d '{}' \
+            "${BASE_URL}/api/proximate/messaging/endorsement-reminder")
+          echo "HTTP ${http_code}"
+          cat /tmp/prox-msg-endorsement-reminder.json || true
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Proximate endorsement-reminder returned ${http_code}"
+            exit 1
+          fi
+
+      - name: POST /api/proximate/messaging/report-reminder
+        if: github.event.schedule == '30 4 * * *' || github.event_name == 'workflow_dispatch'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          http_code=$(curl -s -o /tmp/prox-msg-report-reminder.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            -H "X-Network-Override: proximate" \
+            -d '{}' \
+            "${BASE_URL}/api/proximate/messaging/report-reminder")
+          echo "HTTP ${http_code}"
+          cat /tmp/prox-msg-report-reminder.json || true
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Proximate report-reminder returned ${http_code}"
+            exit 1
+          fi
+
+      - name: POST /api/proximate/messaging/outcome-nudge
+        if: github.event.schedule == '30 4 * * *' || github.event_name == 'workflow_dispatch'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.url }}
+        run: |
+          set -euo pipefail
+          http_code=$(curl -s -o /tmp/prox-msg-outcome-nudge.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            -H "X-Network-Override: proximate" \
+            -d '{}' \
+            "${BASE_URL}/api/proximate/messaging/outcome-nudge")
+          echo "HTTP ${http_code}"
+          cat /tmp/prox-msg-outcome-nudge.json || true
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Proximate outcome-nudge returned ${http_code}"
+            exit 1
+          fi
+
+      - name: Summarise run output
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob, json, os
+
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          lines = ['# Proximate messaging cron\n\n']
+          unconfigured = False
+
+          for path in sorted(glob.glob('/tmp/prox-msg-*.json')):
+              job = os.path.basename(path)[:-5]
+              try:
+                  with open(path) as f:
+                      d = json.load(f)
+              except Exception:
+                  lines.append(f'- **{job}**: non-JSON response\n')
+                  continue
+              if d.get('configured') is False:
+                  unconfigured = True
+                  lines.append(
+                      f'- **{job}**: skipped — messaging not configured\n'
+                  )
+                  continue
+              bits = []
+              for k in ('examined', 'sent', 'skipped', 'failed'):
+                  if d.get(k) is not None:
+                      bits.append(f'{k} {d[k]}')
+              lines.append(f'- **{job}**: ' + (', '.join(bits) or 'ok') + '\n')
+
+          if unconfigured:
+              lines.append(
+                  '\n> No WhatsApp/SMS provider is configured, so nothing was '
+                  'sent. This run is green because the crons behaved '
+                  'correctly — not because messages reached anyone.\n'
+              )
+
+          if summary:
+              with open(summary, 'a') as out:
+                  out.writelines(lines)
+          else:
+              print(''.join(lines))
+          PY

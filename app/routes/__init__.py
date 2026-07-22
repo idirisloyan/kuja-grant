@@ -81,6 +81,8 @@ def register_blueprints(app):
     from app.routes.peer_snippets_routes import peer_snippets_bp  # Phase 117: peer reference snippets
     from app.routes.webhook_routes import webhook_bp  # Phase 143: outbound webhooks
     from app.routes.saxansaxo_routes import saxansaxo_bp  # Saxansaxo SCLR micro-grants (July 2026)
+    from app.routes.proximate_ops_routes import proximate_ops_bp  # Phase 719-720: object storage + backup crons
+    from app.routes.proximate_messaging_routes import proximate_messaging_bp, proximate_hooks_bp  # Proximate messaging log + automations (July 2026)
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -103,5 +105,7 @@ def register_blueprints(app):
                credentials_bp, passport_vc_bp, well_known_bp,
                synthetic_monitor_bp, replay_bp, tenant_health_bp,
                donor_portfolio_qa_bp, cost_ceiling_bp, peer_snippets_bp, webhook_bp,
-               proximate_bp, saxansaxo_bp]:
+               proximate_bp, saxansaxo_bp,
+               proximate_messaging_bp, proximate_hooks_bp,
+               proximate_ops_bp]:
         app.register_blueprint(bp)
