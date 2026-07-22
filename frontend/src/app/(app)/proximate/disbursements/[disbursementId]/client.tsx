@@ -24,6 +24,7 @@ import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { NextStep, disbursementNextStep } from '@/components/proximate/next-step';
+import { useOrigin } from '@/components/proximate/token-page-support';
 import { ProximateAttachmentsPanel } from '@/components/proximate/dd-evidence';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -118,6 +119,12 @@ export function ProximateDisbursementDetailClient() {
   const { persona } = useProximatePersona();
   const isOb = persona === 'ob';
   const [id, setId] = useState<number | null>(null);
+  // Read the origin from a mount effect, never inline during render. An
+  // inline `typeof window` ternary yields '' on the prerender pass, which
+  // would bake a domain-less link into a Copy button or a WhatsApp body —
+  // and a link without its host is worthless once it has been pasted into
+  // a chat thread and sent to someone in the field.
+  const origin = useOrigin();
   const [data, setData] = useState<Disbursement | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -315,8 +322,8 @@ export function ProximateDisbursementDetailClient() {
     );
   }
 
-  const partnerLink = data.report_token
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/proximate-report?t=${data.report_token}`
+  const partnerLink = origin && data.report_token
+    ? `${origin}/proximate-report?t=${data.report_token}`
     : '';
 
   return (
@@ -775,7 +782,7 @@ export function ProximateDisbursementDetailClient() {
                 </p>
                 <div className="flex gap-2 flex-wrap">
                   <code className="flex-1 min-w-[200px] truncate bg-muted px-2 py-1 rounded text-xs">
-                    {`${typeof window !== 'undefined' ? window.location.origin : ''}/proximate-outcome?t=${data.outcome.report_token}`}
+                    {`${origin ?? ''}/proximate-outcome?t=${data.outcome.report_token}`}
                   </code>
                   <Button size="sm" variant="outline" onClick={copyOutcomeUrl}>
                     {t('proximate.disbursement.copy')}
@@ -784,7 +791,7 @@ export function ProximateDisbursementDetailClient() {
                       token (parity with the report-token share row above). */}
                   <a
                     href={`https://wa.me/?text=${encodeURIComponent(
-                      `${t('proximate.disbursement.whatsapp_lead')} ${typeof window !== 'undefined' ? window.location.origin : ''}/proximate-outcome?t=${data.outcome.report_token}`,
+                      `${t('proximate.disbursement.whatsapp_lead')} ${origin ?? ''}/proximate-outcome?t=${data.outcome.report_token}`,
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"

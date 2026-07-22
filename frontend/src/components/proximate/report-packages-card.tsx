@@ -17,6 +17,7 @@ import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { useOrigin } from '@/components/proximate/token-page-support';
 
 interface Pkg {
   id: number; partner_id: number; partner_name: string | null;
@@ -34,6 +35,7 @@ const STATUS_TONE: Record<string, string> = {
 export function ReportPackagesCard({
   roundId, participants, isOperator,
 }: { roundId: number; participants: Participant[]; isOperator: boolean }) {
+  const origin = useOrigin();
   const [pkgs, setPkgs] = useState<Pkg[] | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -54,8 +56,10 @@ export function ReportPackagesCard({
   const roster = participants.filter((p) => p.stage !== 'withdrawn');
   if (roster.length === 0) return null;
 
+  // See selection-vote-card: origin comes from a mount effect so a
+  // prerender pass can never bake a host-less link into a share action.
   const shareUrl = (token: string) =>
-    `${typeof window !== 'undefined' ? window.location.origin : ''}/proximate-report-package?t=${token}`;
+    `${origin ?? ''}/proximate-report-package?t=${token}`;
 
   const open = async (partnerId: number) => {
     setBusyId(partnerId);

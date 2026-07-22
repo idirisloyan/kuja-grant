@@ -15,6 +15,7 @@ import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useOrigin } from '@/components/proximate/token-page-support';
 
 interface VoteInvite {
   id: number;
@@ -56,6 +57,7 @@ interface VoteResp {
 export function SelectionVoteCard({
   roundId, isOperator,
 }: { roundId: number; isOperator: boolean }) {
+  const origin = useOrigin();
   const [data, setData] = useState<VoteResp | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -110,8 +112,10 @@ export function SelectionVoteCard({
     }
   };
 
-  const shareUrl = (token?: string) =>
-    `${typeof window !== 'undefined' ? window.location.origin : ''}/proximate-vote?t=${token}`;
+  // Origin from a mount effect, never an inline `typeof window` ternary:
+  // that resolves to '' on the prerender pass, and a ballot link without
+  // its host is dead the moment a panellist receives it on WhatsApp.
+  const shareUrl = (token?: string) => `${origin ?? ''}/proximate-vote?t=${token}`;
 
   const copyLink = async (inv: VoteInvite) => {
     try {
