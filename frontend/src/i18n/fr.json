@@ -2280,7 +2280,7 @@
   "proximate.rounds.pack_retro_after_close": "Disponible 180 jours après la clôture du cycle.",
   "proximate.rounds.pack_retro_wait": "Disponible dans",
   "proximate.rounds.pack_retro_wait_unit": "jours après la clôture.",
-  "proximate.rounds.pack_retrospective_pdf": "PDF de rétrospective bailleur (90 jours)",
+  "proximate.rounds.pack_retrospective_pdf": "PDF de rétrospective bailleur (180 jours)",
   "proximate.rounds.ready_to_activate": "prêt à activer",
   "proximate.rounds.recuse": "Se récuser (conflit d'intérêts)",
   "proximate.rounds.region": "Région",

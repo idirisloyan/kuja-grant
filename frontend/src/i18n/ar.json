@@ -2280,7 +2280,7 @@
   "proximate.rounds.pack_retro_after_close": "بيكون متاح بعد ١٨٠ يوم من إغلاق الجولة.",
   "proximate.rounds.pack_retro_wait": "بيكون متاح خلال",
   "proximate.rounds.pack_retro_wait_unit": "يوم بعد إغلاق الجولة.",
-  "proximate.rounds.pack_retrospective_pdf": "تقرير الاسترجاع للمانح (٩٠ يوم)",
+  "proximate.rounds.pack_retrospective_pdf": "تقرير الاسترجاع للمانح (١٨٠ يوم)",
   "proximate.rounds.ready_to_activate": "جاهزة للتفعيل",
   "proximate.rounds.recuse": "تنحٍ (تضارب مصالح)",
   "proximate.rounds.region": "المنطقة",
