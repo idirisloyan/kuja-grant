@@ -24,6 +24,7 @@ because EmailService and MessagingService._send_log each shipped the
 opposite behaviour and it cost us real partner contact.
 """
 
+import base64
 import hashlib
 import hmac
 import logging
@@ -744,6 +745,58 @@ def _verify_meta_signature(raw: bytes) -> bool:
     return hmac.compare_digest(expected, header.split('=', 1)[1])
 
 
+def _verify_twilio_signature() -> bool:
+    """X-Twilio-Signature over the full URL + sorted POST params.
+
+    Twilio's scheme: concatenate the exact URL it called with each POST
+    param as key+value in lexical key order, HMAC-SHA1 that with the
+    account auth token, base64 it, compare to the header.
+
+    This endpoint sits OUTSIDE /api/ precisely so the CSRF guard does
+    not reject Twilio's form encoding — which means the signature is
+    the only thing standing between the public internet and the OB's
+    inbox. Without it, anyone could POST fabricated inbound messages,
+    open 24-hour session windows for arbitrary numbers, or forge
+    delivery receipts. Forged receipts are the worst of the three: this
+    whole system exists to give people an evidence trail they can
+    trust, and "delivered" has to mean delivered.
+
+    Unset token => reject. This is deliberately the opposite of the
+    Meta path's accept-when-unconfigured onboarding stance, because
+    Twilio hands you the auth token at the same moment it gives you the
+    number — there is no legitimate window where the webhook is live
+    and the token is unknown.
+    """
+    token = os.getenv('TWILIO_AUTH_TOKEN')
+    if not token:
+        logger.warning(
+            'Proximate webhook: TWILIO_AUTH_TOKEN unset — rejecting '
+            'form-encoded inbound rather than trusting it',
+        )
+        return False
+
+    header = request.headers.get('X-Twilio-Signature', '')
+    if not header:
+        return False
+
+    # Behind Railway's proxy request.url can come back http://; Twilio
+    # signed the https:// URL its console points at.
+    url = request.url
+    proto = request.headers.get('X-Forwarded-Proto')
+    if proto == 'https' and url.startswith('http://'):
+        url = 'https://' + url[len('http://'):]
+
+    payload = url + ''.join(
+        f'{k}{request.form[k]}' for k in sorted(request.form.keys())
+    )
+    expected = base64.b64encode(
+        hmac.new(
+            token.encode('utf-8'), payload.encode('utf-8'), hashlib.sha1,
+        ).digest()
+    ).decode('ascii')
+    return hmac.compare_digest(expected, header)
+
+
 @proximate_messaging_bp.route('/webhooks/whatsapp', methods=['GET'])
 def api_whatsapp_verify():
     """Meta's subscription handshake: echo hub.challenge when the token
@@ -896,6 +949,14 @@ def _webhook_inbound():
                 net, request.get_json(silent=True) or {},
             )
         else:
+            if not _verify_twilio_signature():
+                logger.warning(
+                    'Proximate webhook: X-Twilio-Signature mismatch — '
+                    'payload rejected',
+                )
+                return jsonify({
+                    'success': False, 'error': 'signature verification failed',
+                }), 403
             inbound, receipts = _handle_twilio_form(net, request.form)
     except Exception as exc:  # pragma: no cover - defensive
         db.session.rollback()
