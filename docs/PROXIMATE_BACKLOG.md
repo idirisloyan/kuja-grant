@@ -74,21 +74,21 @@ all reading from one per-entity state/next-action/blocker resolver.
   audit anchors, verifier attestations, and outcome checks.
 
 ### Wave C — Field last-mile (impact)
-- [ ] **#14 "Send this code" fallback** on every token page — works TODAY
+- [x] **#14 "Send this code" fallback** on every token page — works TODAY
   with no WhatsApp API: "If this page doesn't load later, send this code to
   Adeso." Cheapest field-resilience win; softens the notification gap.
 - [ ] **#4 WhatsApp copy templates (AR + EN)** — every token/share action
   gets "Copy WhatsApp message" with a proper bilingual template. Bridge to
   the deferred WhatsApp Business API.
-- [ ] **#12 Reassurance copy** on public/token pages — "This won't affect
+- [x] **#12 Reassurance copy** on public/token pages — "This won't affect
   your safety," "You can stop and come back," "Your name won't be shown if
   anonymous."
-- [ ] **#13 Audio playback before submit** for voice reports/endorsements.
+- [x] **#13 Audio playback before submit** for voice reports/endorsements.
 - [ ] **#2 Ultra-light token wizards** — one question per screen, large
   buttons, visible progress, "voice or type," "takes 3 minutes," "no account
   needed," offline/save reassurance. Start with the **report + endorse**
   pages (highest field volume).
-- [ ] **#15 "Someone can help me fill this"** assisted-reporting mode
+- [x] **#15 "Someone can help me fill this"** assisted-reporting mode
   (optional helper name) for enumerator/elder-assisted submissions.
 
 ### Wave D — Instrumentation & environment
@@ -634,17 +634,30 @@ Going forward, Proximate-only completions land here.
 
 ### Proximate operational setup (added 2026-06-30)
 
+### Outbound email — NOT CONFIGURED (found 2026-07-21)
+
+- [ ] **Set an email provider key on the Railway `web` service.** Neither
+      `SENDGRID_API_KEY` nor `SMTP_HOST` is set, so `EmailService.send()`
+      falls through to a log-only branch **that returns success**. Every
+      decision email, digest and partner acknowledgement the system
+      believes it sent has been written to the log and discarded, with
+      nothing surfacing as an error. This was never a backlog item, which
+      is why it went unnoticed for months. Code needs no change — the
+      service already prefers sendgrid -> smtp -> log.
+
+
 Same app as Kuja tenant, so ANTHROPIC/OPENAI/OPENSANCTIONS/SMTP keys
 are inherited — no re-configuration needed. Only genuinely new work:
 
 **Must-have before pilot users**
-- [ ] Verify `SENTRY_DSN` is set on Railway (both tenants currently
+- [x] Verify `SENTRY_DSN` is set on Railway (both tenants currently
       running blind if not). Free tier is fine for pilot volume.
 - [ ] Set Proximate tenant's AI cost ceiling on `/admin/cost-ceiling`
       (recommend $50/mo through pilot; Phase 108 machinery already there).
-- [ ] Verify `SEED_PROXIMATE_ON_BOOT=true` is set so the seeded OB /
-      donor / partners / rounds land on the first prod boot after each
-      DB reset.
+- [x] ~~Verify `SEED_PROXIMATE_ON_BOOT=true`~~ **REVERSED 2026-07-21.** Set to
+      `false` on prod. It was left true long past its one-shot use, so demo
+      fixtures were recreated on every cold start into a tenant holding real
+      programme data. Do NOT set it true again on prod.
 - [ ] Uptime monitor — add BetterStack (free tier) checks on
       `/health` (60s) and `/api/proximate/overview` (5min). Alert the
       team's Slack channel.
@@ -684,25 +697,25 @@ answering 3 Y/N questions on WhatsApp aren't inbox users. Should
 match the partner report/attest pattern: token URL is the credential,
 no login screen, no account required.
 
-- [ ] New model `ProximateEndorserInvite`:
+- [x] New model `ProximateEndorserInvite`:
       `partner_id, invite_token, invitee_name, invitee_phone, note,
       created_by_user_id, created_at, used_at, endorsement_id,
       endorser_id` (last two populated on submit)
-- [ ] New endpoints:
+- [x] New endpoints:
       • `POST /api/proximate/partners/<id>/endorser-invites` — OB issues
       • `GET /api/proximate/endorser-invites/<token>` — elder opens
       • `POST /api/proximate/endorser-invites/<token>` — elder submits
-- [ ] New public client page `/proximate-endorse-invite/[token]` —
+- [x] New public client page `/proximate-endorse-invite/[token]` —
       no auth, mirrors the partner report page pattern
-- [ ] Roster "Share endorser link" button → **"Invite endorser"** modal
+- [x] Roster "Share endorser link" button → **"Invite endorser"** modal
       (name, phone, optional note → generate → WhatsApp share URL)
-- [ ] Backend on submit: auto-create Endorser row with status
+- [x] Backend on submit: auto-create Endorser row with status
       'captured_via_invite' (bypasses OB approval — the invite IS
       approval), record Endorsement, mark invite used
-- [ ] SoP compliance preserved: only OB can issue invites (audit
+- [x] SoP compliance preserved: only OB can issue invites (audit
       trail via `created_by_user_id`); light-KYC still applies to
       endorsers who want to self-register for repeat vouching
-- [ ] Existing login-based flow stays as an optional path for
+- [x] Existing login-based flow stays as an optional path for
       endorsers who want accounts
 
 **Should-have — Phase 716c Whistleblower / community grievance
@@ -873,9 +886,9 @@ existing endpoint; all cheap once 717-a lands)**
 
 **Should-have — Phase 718 SMS fallback via Twilio (defer until an
 endorser can't be reached over WhatsApp)**
-- [ ] Twilio account + Sudan-reachable number (US long code works
+- [x] Twilio account + Sudan-reachable number (US long code works
       for outbound in pilot, ~$0.08/message).
-- [ ] Env vars: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+- [x] Env vars: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
       `TWILIO_FROM_NUMBER`.
 - [ ] Send helper + fallback logic (try WhatsApp first, then SMS).
 

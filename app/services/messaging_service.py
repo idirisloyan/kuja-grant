@@ -127,18 +127,37 @@ class MessagingService:
 
     @classmethod
     def _send_log(cls, *, attempted: str, to: str, body: str) -> dict:
-        """No-op channel that just logs. Always succeeds; useful in dev
-        and as a graceful degradation when a real channel isn't wired."""
+        """No-op channel that writes the message to the log instead of
+        delivering it. Useful in dev, and the graceful degradation when a
+        real channel isn't wired.
+
+        `success` is True ONLY when logging is what the caller actually
+        asked for (channel='log'). When we fell back here because no
+        provider is configured, success is False and `delivered` is False.
+
+        This used to return success=True unconditionally. That is the
+        same bug that hid unconfigured outbound email for months: the
+        caller believes the message went out, nothing surfaces an error,
+        and the failure is invisible until someone asks why nobody ever
+        replied. A fallback must never report success for a delivery that
+        did not happen.
+        """
         logger.info(
             f"MESSAGING_LOG attempted_channel={attempted} to={to[:6]}*** "
             f"body_len={len(body)} body_preview={body[:80]!r}"
         )
+        explicitly_requested = (attempted == 'log')
         return {
-            'success': True,
+            'success': explicitly_requested,
+            'delivered': False,
             'channel': 'log',
             'attempted_channel': attempted,
-            'fallback_used': attempted != 'log',
+            'fallback_used': not explicitly_requested,
             'sid': None,
+            'error': (
+                None if explicitly_requested
+                else f'no provider configured for {attempted} — message logged, not delivered'
+            ),
             'sent_at': datetime.now(timezone.utc).isoformat(),
         }
 
