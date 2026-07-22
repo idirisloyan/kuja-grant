@@ -179,3 +179,11 @@ from app.models.saxansaxo import (  # noqa: E402,F401
     SaxProposal, SaxVetting, SaxGrant, SaxReport, SaxAreaPause,
     SAX_STAGES, SAX_OUTCOME_TAGS, SAX_DISBURSE_SLA_DAYS,
 )
+
+# Proximate messaging log — outbound/inbound to partner + endorser phones
+from app.models.proximate_message import (  # noqa: E402,F401
+    ProximateMessage, ProximateSessionWindow, SESSION_WINDOW_HOURS,
+)
+__all__ += [
+    'ProximateMessage', 'ProximateSessionWindow', 'SESSION_WINDOW_HOURS',
+]
