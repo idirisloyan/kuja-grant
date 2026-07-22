@@ -46,7 +46,7 @@ all reading from one per-entity state/next-action/blocker resolver.
   falsy-fallback trap). 23 keys × 6 locales, real Arabic.
 
 **Remaining after this wave (backlog):**
-- [ ] **Dynamic why-blocked i18n** — the two interpolated preflight messages
+- [x] **Dynamic why-blocked i18n** — the two interpolated preflight messages _(DONE 2026-07-21 `59b4adf69` — Wave 2 — `missing_codes`)_
   (`partner_not_cleared` missing-list, `cosign_required` amount/count) still
   render the English backend message. Localize via `t(key, {params})` (the
   hook supports `{var}` interpolation); send the params from the endpoint.
@@ -64,27 +64,27 @@ all reading from one per-entity state/next-action/blocker resolver.
 **Deferred (below), in recommended order:**
 
 ### Wave B — Donor "money story" (differentiation)
-- [ ] **#9 Donor portal as money story** — lead `/proximate/donor` with the
+- [x] **#9 Donor portal as money story** — lead `/proximate/donor` with the _(DONE 2026-07-21 `59b4adf69` — Wave 2 — money funnel)_
   funnel Committed → Allocated → Disbursed → Reported → Verified as the hero,
   not a stat grid. Composes with the live traceability page (portal =
   summary, `/proximate/grants/traceability` = drill-in).
-- [ ] **#10 One "Download assurance pack" button** per grant/round — the
+- [x] **#10 One "Download assurance pack" button** per grant/round — the _(DONE 2026-07-21 `59b4adf69` — Wave 2 — assurance pack)_
   Donor Pack PDF endpoint already exists; just a prominent CTA.
-- [ ] **#11 Donor-safe "why this matters"** — plain-language tooltips for
+- [x] **#11 Donor-safe "why this matters"** — plain-language tooltips for _(DONE 2026-07-21 `59b4adf69` — Wave 2 — donor explainer)_
   audit anchors, verifier attestations, and outcome checks.
 
 ### Wave C — Field last-mile (impact)
 - [x] **#14 "Send this code" fallback** on every token page — works TODAY
   with no WhatsApp API: "If this page doesn't load later, send this code to
   Adeso." Cheapest field-resilience win; softens the notification gap.
-- [ ] **#4 WhatsApp copy templates (AR + EN)** — every token/share action
+- [x] **#4 WhatsApp copy templates (AR + EN)** — every token/share action _(DONE 2026-07-21 `59b4adf69` — Wave 1b — BilingualShare/TEMPLATE_PHRASES)_
   gets "Copy WhatsApp message" with a proper bilingual template. Bridge to
   the deferred WhatsApp Business API.
 - [x] **#12 Reassurance copy** on public/token pages — "This won't affect
   your safety," "You can stop and come back," "Your name won't be shown if
   anonymous."
 - [x] **#13 Audio playback before submit** for voice reports/endorsements.
-- [ ] **#2 Ultra-light token wizards** — one question per screen, large
+- [x] **#2 Ultra-light token wizards** — one question per screen, large _(DONE 2026-07-21 `59b4adf69` — Wave 1c — 6-step wizard)_
   buttons, visible progress, "voice or type," "takes 3 minutes," "no account
   needed," offline/save reassurance. Start with the **report + endorse**
   pages (highest field volume).
@@ -787,7 +787,7 @@ priority — operational" list below)**
       screened at registration — same 3 sanctions columns on
       `proximate_fsps`, same helper. Locally verified live against
       OpenSanctions (5 checks on a test broker).
-- [ ] Surface hits as interventions (Phase 635 register), not hard
+- [x] Surface hits as interventions (Phase 635 register), not hard _(DONE 2026-07-21 `59b4adf69` — Wave 4 — sanctions sweep)_
       gates — SoP §4 keeps the door open, OB decides after seeing
       evidence. PARTIAL: every screen now writes an audit-chain row
       and flags the entity; auto-opening an intervention register row
@@ -813,11 +813,11 @@ approves the WhatsApp Business Account.
       `round_activated`.
 - [ ] Env vars: `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`,
       `WHATSAPP_BUSINESS_ACCOUNT_ID`.
-- [ ] Backend `WhatsAppService` send helper + retry queue (mirror
+- [x] Backend `WhatsAppService` send helper + retry queue (mirror _(DONE 2026-07-21 `59b4adf69` — Wave 3a — ProximateMessaging + sweep_retries)_
       the pattern of Phase 147 webhook delivery retry queue).
-- [ ] Delivery receipt webhook — Meta calls Adeso when a message is
+- [x] Delivery receipt webhook — Meta calls Adeso when a message is _(DONE 2026-07-21 `59b4adf69` — Wave 3a — record_receipt)_
       delivered/read; store status on the relevant record.
-- [ ] Inbound message webhook — capture elder replies to Adeso's
+- [x] Inbound message webhook — capture elder replies to Adeso's _(DONE 2026-07-21 `59b4adf69` — Wave 3a — record_inbound)_
       number; surface in a new "WhatsApp inbox" for OB triage.
 - [ ] Fallback: keep the manual `wa.me/?text=` button working
       alongside API-driven auto-messages for OB power-users and
@@ -825,7 +825,7 @@ approves the WhatsApp Business Account.
 
 **Phase 717-b — Auto-send on trigger events (each hooks a specific
 existing endpoint; all cheap once 717-a lands)**
-- [ ] **Endorsement invite auto-send** — when OB clicks "Generate
+- [x] **Endorsement invite auto-send** — when OB clicks "Generate _(DONE 2026-07-21 `59b4adf69` — Wave 3b — wired in api_create_endorser_invite)_
       invite" in the roster modal, ALSO auto-send the WhatsApp
       message using the `endorsement_invite` template. Removes the
       "open in WhatsApp then click Send" step.
