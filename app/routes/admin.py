@@ -1701,6 +1701,8 @@ def api_admin_users():
             'last_login_at': getattr(u, 'last_login_at', None).isoformat() if getattr(u, 'last_login_at', None) else None,
             'is_active': bool(getattr(u, 'is_active', True)),
             'is_oversight_body': _user_holds_ob_seat(u),
+            # Null off Proximate. Additive field — existing callers ignore it.
+            'proximate_persona': _proximate_persona_for(u),
         })
     return jsonify({'success': True, 'users': rows})
 
@@ -1721,6 +1723,50 @@ def api_admin_users():
 # ======================================================================
 
 VALID_ROLES = ('ngo', 'donor', 'reviewer', 'admin')
+
+
+def _proximate_persona_for(user) -> str | None:
+    """Resolve a listed user's REAL Proximate persona, or None off-tenant.
+
+    Proximate's actors are Oversight Body, endorsers, panel and partners —
+    there are no NGOs. The platform `role` column carries the Kuja
+    marketplace vocabulary ('ngo'/'donor'/'reviewer'/'admin') and is a
+    poor description of anyone on this fund.
+
+    So we derive, rather than store, the persona — from the same
+    authoritative facts the guards use: the org's Oversight Body seat,
+    an Endorser row, a ProximateDonor row. Deriving means the label a
+    human reads can never disagree with the permission the guard
+    enforces, which storing a second copy on User.role would allow.
+
+    (That is not a stylistic preference. ~25 shared endpoints gate as
+    `if role == 'ngo': restrict-to-own-org` with no else arm, so an
+    unrecognised role value falls through to the UNFILTERED branch —
+    adding an 'ob' role would silently hand OB users every application,
+    report and document in the tenant.)
+    """
+    from app.utils.network import get_current_network, is_oversight_body_member
+    try:
+        net = get_current_network()
+        if not net or getattr(net, 'slug', None) != 'proximate':
+            return None
+    except Exception:
+        return None
+
+    if getattr(user, 'role', None) == 'admin':
+        return 'admin'
+    if is_oversight_body_member(user, network_id=net.id):
+        return 'ob'
+    try:
+        from app.models import Endorser, ProximateDonor
+        if Endorser.query.filter_by(network_id=net.id, user_id=user.id).first():
+            return 'endorser'
+        if ProximateDonor.query.filter_by(
+                network_id=net.id, primary_user_id=user.id).first():
+            return 'donor'
+    except Exception:
+        db.session.rollback()
+    return 'other'
 
 
 def _user_holds_ob_seat(user) -> bool:

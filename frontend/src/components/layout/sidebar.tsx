@@ -313,11 +313,34 @@ function NavGroup({
 
 type T = (k: string) => string;
 
+/**
+ * Last-resort nav for a role the profile builders do not recognise.
+ *
+ * kujaProfile/nearProfile are exhaustive switches over UserRole with no
+ * default arm, so an unexpected value makes them fall off the end and
+ * return undefined — which throws on `profile.groups` a few lines later
+ * and white-screens the whole shell, not just the sidebar.
+ *
+ * Nothing produces an unknown role today. This exists because the cost
+ * of being wrong is a blank app for whoever hits it, and the cost of
+ * the guard is six lines. Settings is always safe to show.
+ */
+function fallbackProfile(t: T): NavProfile {
+  return {
+    primary: [
+      { icon: LayoutDashboard, label: t('nav.dashboard'), href: '/dashboard' },
+    ],
+    secondary: [
+      { icon: SettingsIcon, label: 'Settings', href: '/settings' },
+    ],
+  };
+}
+
 function pickNavProfile(role: UserRole, isNearFlavor: boolean, t: T): NavProfile {
   if (isNearFlavor) {
-    return nearProfile(role, t);
+    return nearProfile(role, t) ?? fallbackProfile(t);
   }
-  return kujaProfile(role, t);
+  return kujaProfile(role, t) ?? fallbackProfile(t);
 }
 
 /* ----------------------------- Kuja flavor ----------------------------- */

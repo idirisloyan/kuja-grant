@@ -15,6 +15,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
+import { useNetworkStore } from '@/stores/network-store';
 
 interface UserRow {
   id: number;
@@ -27,7 +28,28 @@ interface UserRow {
   last_login_at: string | null;
   is_active?: boolean;
   is_oversight_body?: boolean;
+  /** Proximate's own vocabulary. Null on every other tenant. */
+  proximate_persona?: 'ob' | 'donor' | 'endorser' | 'admin' | 'other' | null;
 }
+
+/**
+ * Proximate has no NGOs. Its actors are the Oversight Body, endorsers,
+ * the selection panel and partners — so on that tenant we show the
+ * persona the fund actually uses rather than the platform's Kuja-era
+ * role column.
+ *
+ * Partners, endorsers and panellists mostly are not user accounts at
+ * all: they are reached by a WhatsApp link because they are on shared,
+ * low-end handsets, and forcing a login on them would stop the fund
+ * working. That is why this list is short.
+ */
+const PROXIMATE_PERSONA_LABEL: Record<string, string> = {
+  ob: 'Oversight Body',
+  donor: 'Donor',
+  endorser: 'Endorser',
+  admin: 'Administrator',
+  other: 'No Proximate role',
+};
 
 interface Resp {
   users: UserRow[];
@@ -66,6 +88,8 @@ function CreateUserDialog({ onClose, onCreated }: {
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const network = useNetworkStore((s) => s.network);
+  const isProximate = network?.slug === 'proximate';
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<(typeof ROLES)[number]>('ngo');
@@ -199,16 +223,43 @@ function CreateUserDialog({ onClose, onCreated }: {
           />
         </label>
 
-        <label className="block text-sm">
-          <span className="text-xs text-muted-foreground">Role</span>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as (typeof ROLES)[number])}
-            className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          >
-            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </label>
+        {isProximate ? (
+          <label className="block text-sm">
+            <span className="text-xs text-muted-foreground">What is this person?</span>
+            <select
+              value={role === 'admin' ? 'admin' : 'ob'}
+              onChange={(e) => {
+                const v = e.target.value;
+                // Administrators are a platform role. Oversight Body is an
+                // org-level seat, so the underlying platform role is left
+                // at its default and the seat does the real work — see the
+                // OB checkbox below.
+                setRole(v === 'admin' ? 'admin' : 'ngo');
+                setWantOb(v === 'ob');
+              }}
+              className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              <option value="ob">Oversight Body member</option>
+              <option value="admin">Administrator (can manage users)</option>
+            </select>
+            <span className="block text-xs text-muted-foreground mt-1">
+              Partners, endorsers and panellists are not accounts — they are
+              reached by a link on their phone. Donors are set up through the
+              donor flow.
+            </span>
+          </label>
+        ) : (
+          <label className="block text-sm">
+            <span className="text-xs text-muted-foreground">Role</span>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as (typeof ROLES)[number])}
+              className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </label>
+        )}
 
         <label className="block text-sm">
           <span className="text-xs text-muted-foreground">Organisation</span>
@@ -376,9 +427,20 @@ export default function AdminUsersPage() {
                     <td className="px-2 py-2 font-medium">{u.name ?? '—'}</td>
                     <td className="px-2 py-2 text-xs">{u.email}</td>
                     <td className="px-2 py-2 space-x-1 whitespace-nowrap">
-                      <Badge variant="outline" className="text-[10px]">{u.role}</Badge>
-                      {u.is_oversight_body && (
-                        <Badge className="text-[10px] bg-[hsl(var(--kuja-clay))] text-white">OB</Badge>
+                      {/* On Proximate show the fund's own vocabulary; the
+                          platform role is a Kuja-era implementation detail
+                          and reads as nonsense to this team. */}
+                      {u.proximate_persona ? (
+                        <Badge
+                          variant={u.proximate_persona === 'other' ? 'outline' : undefined}
+                          className={u.proximate_persona === 'other'
+                            ? 'text-[10px]'
+                            : 'text-[10px] bg-[hsl(var(--kuja-clay))] text-white'}
+                        >
+                          {PROXIMATE_PERSONA_LABEL[u.proximate_persona] ?? u.proximate_persona}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px]">{u.role}</Badge>
                       )}
                     </td>
                     <td className="px-2 py-2 text-xs">{u.org_name ?? '—'}</td>
