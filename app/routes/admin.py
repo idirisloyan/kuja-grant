@@ -26,7 +26,7 @@ from sqlalchemy import text, bindparam
 from app.extensions import db
 from app.models import (
     User, Organization, Grant, Application, Assessment,
-    Review, ComplianceCheck, Document,
+    Review, ComplianceCheck, Document, AuditChainEntry,
 )
 from app.middleware import APP_VERSION, APP_START_TIME, APP_BUILD
 
@@ -1699,5 +1699,261 @@ def api_admin_users():
             'org_name': u.organization.name if u.organization else None,
             'created_at': u.created_at.isoformat() if u.created_at else None,
             'last_login_at': getattr(u, 'last_login_at', None).isoformat() if getattr(u, 'last_login_at', None) else None,
+            'is_active': bool(getattr(u, 'is_active', True)),
+            'is_oversight_body': _user_holds_ob_seat(u),
         })
     return jsonify({'success': True, 'users': rows})
+
+
+# ======================================================================
+# Admin user administration — create, deactivate, reactivate.
+#
+# Until this existed the only ways to make an account were public
+# self-registration and the deploy-time seed scripts, so onboarding a
+# colleague meant a developer with database access. That is a bad place
+# for a live fund to be.
+#
+# Two deliberate choices, both explained where they are implemented:
+#
+#   1. There is no hard delete. "Remove" deactivates.
+#   2. The temporary password is generated here, never chosen by the
+#      caller, and returned exactly once.
+# ======================================================================
+
+VALID_ROLES = ('ngo', 'donor', 'reviewer', 'admin')
+
+
+def _user_holds_ob_seat(user) -> bool:
+    """Oversight Body is an ORG-level grant, not a per-user flag.
+
+    Surfaced on the user row because that is where an admin looks, but
+    the underlying seat belongs to the organisation — see
+    app/utils/network.py:is_oversight_body_member. Anyone else in the
+    same org has it too.
+    """
+    try:
+        from app.utils.network import is_oversight_body_member
+        return bool(is_oversight_body_member(user))
+    except Exception:
+        return False
+
+
+def _generate_temp_password() -> str:
+    """A temporary password the admin relays out-of-band.
+
+    Generated server-side rather than accepted from the caller so a
+    hurried admin cannot set 'password123' on an account that can move
+    money. `secrets` is the CSPRNG; the alphabet omits characters that
+    are ambiguous when read aloud over a phone line (0/O, 1/l/I), which
+    is a real delivery channel for this fund.
+    """
+    import secrets
+    alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+    return '-'.join(
+        ''.join(secrets.choice(alphabet) for _ in range(5)) for _ in range(3)
+    )
+
+
+@admin_bp.route('/admin/users', methods=['POST'])
+@login_required
+def api_admin_create_user():
+    """Create a user. Admin only.
+
+    Body: email, name, role, org_id (optional), is_oversight_body (bool).
+
+    Returns the created user plus `temp_password` — the ONLY time that
+    value is ever readable. It is hashed on the way into the database
+    and deliberately not logged.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'admin only'}), 403
+
+    body = request.get_json(silent=True) or {}
+    email = (body.get('email') or '').strip().lower()
+    name = (body.get('name') or '').strip()
+    role = (body.get('role') or '').strip().lower()
+    org_id = body.get('org_id')
+    want_ob = bool(body.get('is_oversight_body'))
+
+    if not email or '@' not in email:
+        return jsonify({'success': False, 'error': 'a valid email is required'}), 400
+    if not name:
+        return jsonify({'success': False, 'error': 'name is required'}), 400
+    if role not in VALID_ROLES:
+        return jsonify({
+            'success': False,
+            'error': f'role must be one of: {", ".join(VALID_ROLES)}',
+        }), 400
+
+    if User.query.filter(User.email.ilike(email)).first():
+        return jsonify({
+            'success': False,
+            'error': 'a user with that email already exists',
+        }), 409
+
+    org = None
+    if org_id:
+        org = Organization.query.get(org_id)
+        if not org:
+            return jsonify({'success': False, 'error': 'organisation not found'}), 404
+
+    # An OB seat lives on the organisation, so we cannot grant it to a
+    # user who has no organisation. Failing loudly here is better than
+    # creating the account and silently ignoring half the request.
+    if want_ob and not org:
+        return jsonify({
+            'success': False,
+            'error': ('Oversight Body access is granted to an organisation, '
+                      'so this user needs one. Pick an organisation first.'),
+            'code': 'err.ob_needs_org',
+        }), 400
+
+    temp_password = _generate_temp_password()
+    user = User(email=email, name=name, role=role,
+                org_id=org.id if org else None, is_active=True)
+    user.set_password(temp_password)
+    db.session.add(user)
+
+    ob_granted_to_org = None
+    if want_ob:
+        from app.models import NetworkMembership
+        from app.utils.network import get_current_network_id
+        nid = get_current_network_id()
+        if not nid:
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'error': 'could not determine the current network',
+            }), 400
+        m = NetworkMembership.query.filter_by(
+            network_id=nid, org_id=org.id,
+        ).first()
+        if not m:
+            m = NetworkMembership(network_id=nid, org_id=org.id, status='active')
+            db.session.add(m)
+        m.status = 'active'
+        m.is_oversight_body = True
+        ob_granted_to_org = org.name
+
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action='admin.user.created',
+        actor_email=getattr(current_user, 'email', None),
+        subject_kind='user',
+        subject_id=user.id,
+        details={
+            'email': email,
+            'role': role,
+            'org_id': org.id if org else None,
+            'oversight_body_granted': bool(want_ob),
+        },
+    )
+    logger.info(
+        'admin.user.created by=%s email=%s role=%s ob=%s',
+        getattr(current_user, 'email', '?'), email, role, want_ob,
+    )
+
+    return jsonify({
+        'success': True,
+        'user': {
+            'id': user.id, 'email': user.email, 'name': user.name,
+            'role': user.role, 'org_id': user.org_id,
+            'org_name': org.name if org else None,
+            'is_active': True,
+            'is_oversight_body': bool(want_ob),
+        },
+        'temp_password': temp_password,
+        # Surfaced so the UI can warn: the seat is org-wide, so this
+        # also affects colleagues who share the organisation.
+        'ob_granted_to_org': ob_granted_to_org,
+    }), 201
+
+
+@admin_bp.route('/admin/users/<int:user_id>/deactivate', methods=['POST'])
+@login_required
+def api_admin_deactivate_user(user_id):
+    """Revoke a user's access. Admin only.
+
+    This is deliberately deactivation and NOT deletion. Two reasons,
+    and they are not stylistic:
+
+      - Audit attribution. Rows in the hash-chained audit log name the
+        user who signed, approved or released money. Deleting the user
+        would leave decisions in the record with nobody attached to
+        them, which defeats the point of keeping the chain.
+      - Referential integrity. Applications, reviews, endorsements and
+        signatures all carry user foreign keys. A hard DELETE would
+        violate them on Postgres (it would appear to work on SQLite,
+        which does not enforce FKs by default — exactly the class of bug
+        that passes in dev and 500s in production).
+
+    A deactivated user cannot log in and holds no permissions.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'admin only'}), 403
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'error': 'user not found'}), 404
+
+    if user.id == current_user.id:
+        return jsonify({
+            'success': False,
+            'error': 'you cannot deactivate your own account',
+            'code': 'err.self_deactivate',
+        }), 400
+
+    # Never let the last active admin be switched off — that locks
+    # everyone out of user administration with no way back in short of
+    # database access, which is the situation this feature exists to end.
+    if user.role == 'admin' and getattr(user, 'is_active', True):
+        remaining = User.query.filter(
+            User.role == 'admin', User.is_active.is_(True), User.id != user.id,
+        ).count()
+        if remaining == 0:
+            return jsonify({
+                'success': False,
+                'error': 'this is the last active admin; promote another first',
+                'code': 'err.last_admin',
+            }), 400
+
+    user.is_active = False
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action='admin.user.deactivated',
+        actor_email=getattr(current_user, 'email', None),
+        subject_kind='user',
+        subject_id=user.id,
+        details={'email': user.email, 'role': user.role},
+    )
+    logger.info(
+        'admin.user.deactivated by=%s email=%s',
+        getattr(current_user, 'email', '?'), user.email,
+    )
+    return jsonify({'success': True, 'user_id': user.id, 'is_active': False})
+
+
+@admin_bp.route('/admin/users/<int:user_id>/reactivate', methods=['POST'])
+@login_required
+def api_admin_reactivate_user(user_id):
+    """Restore access to a deactivated user. Admin only."""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'admin only'}), 403
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'error': 'user not found'}), 404
+
+    user.is_active = True
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action='admin.user.reactivated',
+        actor_email=getattr(current_user, 'email', None),
+        subject_kind='user',
+        subject_id=user.id,
+        details={'email': user.email, 'role': user.role},
+    )
+    return jsonify({'success': True, 'user_id': user.id, 'is_active': True})
