@@ -1736,20 +1736,15 @@ def api_partner_history(partner_id):
 # Cycle closeout pack
 # ===============================================================
 
-@cycle_bp.route('/rounds/<int:round_id>/closeout', methods=['GET'])
-@login_required
-@ob_required
-def api_cycle_closeout(round_id):
-    """Everything needed to close a cycle, and what is still open.
+def cycle_state(rnd):
+    """Load a cycle's records and work out what is still outstanding.
 
-    The outstanding list is the point. A closeout that only summarised
-    what went well would let a cycle be declared finished with three
-    partners still unpaid.
+    This is the ONE place the closeout rule lives. It was previously
+    inline in the closeout endpoint, which meant the close action could
+    — and did — let a cycle be closed while the closeout pack still
+    reported blockers. Two answers to "is this cycle finished?" is one
+    answer too many, so both callers now come here.
     """
-    rnd = _scoped_round(round_id)
-    if not rnd:
-        return jsonify({'success': False, 'error': 'Round not found'}), 404
-
     awards = ProximateAward.query.filter_by(round_id=rnd.id).all()
     contracts = {
         c.award_id: c
@@ -1810,6 +1805,33 @@ def api_cycle_closeout(round_id):
             'severity': 'warn'})
 
     blocks = [o for o in outstanding if o['severity'] == 'block']
+    return {
+        'awards': awards, 'awarded': awarded, 'contracts': contracts,
+        'disbs': disbs, 'meetings': meetings, 'panel': panel,
+        'partner_names': partner_names,
+        'outstanding': outstanding, 'blocks': blocks,
+    }
+
+
+@cycle_bp.route('/rounds/<int:round_id>/closeout', methods=['GET'])
+@login_required
+@ob_required
+def api_cycle_closeout(round_id):
+    """Everything needed to close a cycle, and what is still open.
+
+    The outstanding list is the point. A closeout that only summarised
+    what went well would let a cycle be declared finished with three
+    partners still unpaid.
+    """
+    rnd = _scoped_round(round_id)
+    if not rnd:
+        return jsonify({'success': False, 'error': 'Round not found'}), 404
+
+    st = cycle_state(rnd)
+    awards, awarded = st['awards'], st['awarded']
+    disbs, meetings, panel = st['disbs'], st['meetings'], st['panel']
+    outstanding, blocks = st['outstanding'], st['blocks']
+
     return jsonify({
         'success': True,
         'cycle': _round_setup_dict(rnd),
@@ -1839,6 +1861,15 @@ def api_cycle_closeout(round_id):
         'outstanding': outstanding,
         'ready_to_close': not blocks,
         'blocking_count': len(blocks),
+        # A cycle that is already closed must not keep reading as "not
+        # ready" with no explanation — that was the split-brain the QA
+        # caught. If it was closed over the top of blockers, say so, name
+        # who accepted them and why, and show what they were on the day.
+        'closed': rnd.status == 'closed',
+        'closed_at': rnd.closed_at.isoformat() if rnd.closed_at else None,
+        'closed_over_blockers': rnd.closed_over_blockers,
+        'close_override_reason': rnd.close_override_reason,
+        'close_blockers_at_close': rnd.close_blockers(),
     })
 
 
@@ -2041,7 +2072,20 @@ def api_cycle_closeout_pdf(round_id):
 
     # Readiness first. If the pack opens with a summary of what went well,
     # a cycle can be signed off with partners still unpaid.
-    if data['ready_to_close']:
+    if data.get('closed_over_blockers'):
+        # The most important line in the document. A donor reading this pack
+        # is entitled to know the cycle was signed off with open items, what
+        # they were, and on what stated grounds — before any of the numbers.
+        line('This cycle was closed with unfinished items.',
+             bold=True, size=12, colour=(0.7, 0.1, 0.1))
+        line(f'Reason given: {data.get("close_override_reason") or "—"}',
+             size=9, colour=(0.35, 0.1, 0.1))
+        for o in (data.get('close_blockers_at_close') or []):
+            line(f'  • unresolved at closing: '
+                 f'{(o.get("partner") + ": ") if o.get("partner") else ""}'
+                 f'{o.get("what")}', size=9, colour=(0.5, 0.15, 0.15))
+        y -= 4
+    elif data['ready_to_close']:
         line('Nothing is blocking closeout.', bold=True)
     else:
         line(f'{data["blocking_count"]} item(s) must be finished first.',

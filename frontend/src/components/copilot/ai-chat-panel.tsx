@@ -22,8 +22,10 @@
  *     blank input
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { Send, RotateCcw, Loader2, MessageSquare, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Send, RotateCcw, Loader2, MessageSquare, Sparkles, AlertCircle,
+} from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
@@ -88,28 +90,49 @@ export function AIChatPanel({ scope }: { scope?: ChatScope }) {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const [openError, setOpenError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scopeKind = scope?.kind ?? 'global';
   const exampleKey = scope?.kind ?? 'global';
 
-  // Open or resume the thread
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
+  // Open or resume the thread.
+  //
+  // This used to swallow every failure ("quiet — leave empty"), and because
+  // the composer was disabled until a thread id arrived, any hiccup left a
+  // permanently dead input box with nothing on screen explaining why. A
+  // flagship AI surface that can silently present as broken is worse than
+  // one that says it is broken, so failures are now visible and retryable.
+  const openThread = useCallback(async (): Promise<number | null> => {
+    setOpenError(null);
     setInitializing(true);
-    api.post<OpenResp>('/api/ai/threads/open', {
-      scope_kind: scope?.kind ?? null,
-      scope_id: scope?.id ?? null,
-    }).then((r) => {
-      if (cancelled || !r.success) return;
+    try {
+      const r = await api.post<OpenResp>('/api/ai/threads/open', {
+        scope_kind: scope?.kind ?? null,
+        scope_id: scope?.id ?? null,
+      });
+      if (!r.success) {
+        setOpenError('Could not open the conversation.');
+        return null;
+      }
       setThreadId(r.thread_id);
       setTitle(r.title ?? null);
       setMessages(r.messages ?? []);
-    }).catch(() => { /* quiet — leave empty */ })
-    .finally(() => { if (!cancelled) setInitializing(false); });
+      return r.thread_id;
+    } catch {
+      setOpenError('Could not reach the chat service.');
+      return null;
+    } finally {
+      setInitializing(false);
+    }
+  }, [scope?.kind, scope?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void openThread().then(() => { if (cancelled) { /* unmounted */ } });
     return () => { cancelled = true; };
-  }, [user, scope?.kind, scope?.id]);
+  }, [user, openThread]);
 
   // Auto-scroll on new content
   useEffect(() => {
@@ -119,7 +142,14 @@ export function AIChatPanel({ scope }: { scope?: ChatScope }) {
   }, [messages]);
 
   const send = async (text: string) => {
-    if (!threadId || !text.trim() || busy) return;
+    if (!text.trim() || busy) return;
+    // The thread may still be opening, or the first attempt may have failed.
+    // Open one now rather than making the user work out why Send did nothing.
+    let tid = threadId;
+    if (!tid) {
+      tid = await openThread();
+      if (!tid) return;
+    }
     const userMsg: ChatMessage = { role: 'user', content: text.trim() };
     const pendingMsg: ChatMessage = { role: 'assistant', content: '', pending: true };
     setMessages((prev) => [...prev, userMsg, pendingMsg]);
@@ -127,7 +157,7 @@ export function AIChatPanel({ scope }: { scope?: ChatScope }) {
     setBusy(true);
     try {
       const r = await api.post<PostResp>(
-        `/api/ai/threads/${threadId}/messages`,
+        `/api/ai/threads/${tid}/messages`,
         { content: text.trim() },
       );
       setMessages((prev) => {
@@ -194,6 +224,20 @@ export function AIChatPanel({ scope }: { scope?: ChatScope }) {
       </header>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2">
+        {!initializing && openError && (
+          <div className="flex items-start gap-2 rounded-md border border-[hsl(var(--destructive))]/30 bg-[hsl(var(--destructive))]/5 px-3 py-2 text-sm">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--destructive))]" />
+            <div className="flex-1">
+              <div className="font-medium">{openError}</div>
+              <div className="text-xs text-muted-foreground">
+                You can still type a question — sending will try again.
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => void openThread()}>
+              Try again
+            </Button>
+          </div>
+        )}
         {initializing && (
           <div className="flex items-center justify-center text-sm text-muted-foreground gap-2 py-6">
             <Loader2 className="h-4 w-4 animate-spin" /> Opening thread…
@@ -260,16 +304,23 @@ export function AIChatPanel({ scope }: { scope?: ChatScope }) {
               send(draft);
             }
           }}
-          placeholder="Ask, refine, follow up…  (Enter to send · Shift+Enter for newline)"
+          placeholder={
+            openError
+              ? 'Type your question — we will reconnect when you send.'
+              : 'Ask, refine, follow up…  (Enter to send · Shift+Enter for newline)'
+          }
           rows={2}
           maxLength={4000}
-          disabled={busy || !threadId}
+          // Deliberately NOT gated on threadId. A slow or failed open used to
+          // leave this box dead with no explanation; send() opens the thread
+          // on demand instead.
+          disabled={busy}
           className="flex-1 resize-none rounded-md border border-[hsl(var(--border))] bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[hsl(var(--kuja-clay))]"
         />
         <Button
           type="submit"
           size="sm"
-          disabled={busy || !threadId || !draft.trim()}
+          disabled={busy || !draft.trim()}
           className="bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay))]/90 text-white gap-1.5"
         >
           {busy

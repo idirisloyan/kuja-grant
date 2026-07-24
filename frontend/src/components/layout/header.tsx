@@ -71,7 +71,18 @@ export function Header() {
 
   const handleLogout = async () => {
     await logout();
-    router.replace('/login');
+    // Stay inside the tenant the user was working in. A bare /login
+    // deliberately clears any tenant override (several teams test different
+    // tenants on one shared host, and a sticky override showed people the
+    // wrong brand), so signing out of Proximate dropped you onto the Kuja
+    // Marketplace login — jarring, and it reads as if you left the fund.
+    // Passing the slug explicitly is the signal NetworkProvider already
+    // understands, so branding survives without weakening that rule.
+    const slug = (network?.slug || '').trim();
+    const isTenant = !!slug && !network?.is_default;
+    router.replace(
+      isTenant ? `/login?network=${encodeURIComponent(slug)}` : '/login',
+    );
   };
 
   const openCopilot = () => {

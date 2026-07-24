@@ -179,6 +179,22 @@ class ProximateRound(db.Model):
     cancellation_reason = db.Column(db.Text, nullable=True)
     closing_summary = db.Column(db.Text, nullable=True)
 
+    # ---- closing over the top of unfinished business ---------------------
+    # Closing is gated on the same readiness rule the closeout pack reports.
+    # But a partner can become permanently unreachable — the organisation
+    # dissolves, the person dies, the locality becomes inaccessible — and a
+    # gate with no way through would either strand the cycle forever or, far
+    # worse, push somebody to falsify a receipt confirmation to get past it.
+    # So the gate can be overridden, never silently: the reason is required,
+    # the blockers are snapshotted as they stood, and both print in the
+    # closeout pack.
+    close_override_reason = db.Column(db.Text, nullable=True)
+    close_override_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=True,
+    )
+    close_overridden_at = db.Column(db.DateTime, nullable=True)
+    close_blockers_json = db.Column(db.Text, nullable=True)
+
     created_at = db.Column(db.DateTime, nullable=False, default=_now)
     updated_at = db.Column(db.DateTime, nullable=False, default=_now, onupdate=_now)
 
@@ -270,15 +286,49 @@ class ProximateRound(db.Model):
         self.cancelled_at = _now()
         self.cancellation_reason = reason
 
-    def close(self, summary: str | None = None) -> None:
+    def close(self, summary: str | None = None, *,
+              override_reason: str | None = None,
+              override_by_user_id: int | None = None,
+              blockers: list | None = None) -> None:
         """active → closed. Cycle is over; round is the audit-chain
-        anchor for a date-range query against subsequent reporting."""
+        anchor for a date-range query against subsequent reporting.
+
+        The caller is responsible for computing readiness and refusing to
+        call this without an `override_reason` when blockers remain — the
+        rule lives in the route because it needs the award, contract,
+        disbursement and evidence tables. What this method guarantees is
+        that an override can never be applied without being recorded.
+        """
         if self.status != "active":
             raise ValueError(f"Cannot close a {self.status!r} round")
         self.status = "closed"
         self.closed_at = _now()
         if summary:
             self.closing_summary = summary[:5000]
+        if override_reason:
+            import json as _json
+            self.close_override_reason = override_reason[:2000]
+            self.close_override_by_user_id = override_by_user_id
+            self.close_overridden_at = _now()
+            # Snapshot what was unresolved AT THE MOMENT of closing. Deriving
+            # it later would silently change as the underlying records move,
+            # and the whole point is to show what was accepted on the day.
+            self.close_blockers_json = _json.dumps(blockers or [])
+
+    @property
+    def closed_over_blockers(self) -> bool:
+        """Was this cycle closed with unfinished business, on the record?"""
+        return bool(self.close_overridden_at)
+
+    def close_blockers(self) -> list:
+        if not self.close_blockers_json:
+            return []
+        import json as _json
+        try:
+            v = _json.loads(self.close_blockers_json)
+            return v if isinstance(v, list) else []
+        except (ValueError, TypeError):
+            return []
 
     # ---- serialization --------------------------------------------------
 
@@ -368,6 +418,13 @@ class ProximateRound(db.Model):
             "closed_at": self.closed_at.isoformat() if self.closed_at else None,
             "cancellation_reason": self.cancellation_reason,
             "closing_summary": self.closing_summary,
+            "closed_over_blockers": self.closed_over_blockers,
+            "close_override_reason": self.close_override_reason,
+            "close_overridden_at": (
+                self.close_overridden_at.isoformat()
+                if self.close_overridden_at else None
+            ),
+            "close_blockers": self.close_blockers(),
             "signed_count": self.signed_count,
             "signers_required": ROUND_SIGNERS_REQUIRED,
             "ready_for_activation": self.ready_for_activation,

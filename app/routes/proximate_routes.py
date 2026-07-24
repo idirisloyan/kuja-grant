@@ -4418,9 +4418,45 @@ def api_close_round(round_id):
     r = ProximateRound.query.filter_by(id=round_id, network_id=net.id).first()
     if not r:
         return jsonify({'success': False, 'error': 'Not found'}), 404
-    summary = (request.get_json(silent=True) or {}).get('summary', '')
+    body = request.get_json(silent=True) or {}
+    summary = body.get('summary', '')
+    override_reason = (body.get('override_reason') or '').strip()
+
+    # Closing now answers to the same readiness rule the closeout pack
+    # reports. Before this, the two disagreed: a cycle could be marked
+    # closed while /closeout still said partners had not confirmed
+    # receiving their money. "Closed" has to mean the same thing on every
+    # screen or it means nothing to a donor.
+    from app.routes.proximate_cycle_routes import cycle_state
+    blocks = cycle_state(r)['blocks']
+    if blocks and not override_reason:
+        return jsonify({
+            'success': False,
+            'code': 'err.closeout_blocked',
+            'error': (
+                f'{len(blocks)} item(s) must be finished before this cycle '
+                'can close, or an explicit reason for closing anyway.'
+            ),
+            'blocks': blocks,
+        }), 409
+    if blocks and len(override_reason) < 15:
+        # A reason that says "ok" is not a reason. This will be printed in
+        # the donor pack, so it has to read as an explanation.
+        return jsonify({
+            'success': False,
+            'code': 'err.override_reason_too_short',
+            'error': ('Say why the cycle is closing with unfinished items — '
+                      'this is printed in the closeout pack.'),
+            'blocks': blocks,
+        }), 422
+
     try:
-        r.close(summary=summary)
+        r.close(
+            summary=summary,
+            override_reason=override_reason if blocks else None,
+            override_by_user_id=current_user.id if blocks else None,
+            blockers=blocks if blocks else None,
+        )
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 409
     db.session.commit()
@@ -4429,7 +4465,12 @@ def api_close_round(round_id):
         actor_email=current_user.email,
         subject_kind='proximate_round',
         subject_id=r.id,
-        details={'summary_preview': (summary or '')[:200]},
+        details={
+            'summary_preview': (summary or '')[:200],
+            'closed_over_blockers': bool(blocks),
+            'blocking_count': len(blocks),
+            'override_reason': override_reason[:500] if blocks else None,
+        },
     )
     return jsonify({'success': True, 'round': r.to_dict()})
 
