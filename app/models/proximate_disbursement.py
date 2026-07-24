@@ -88,6 +88,40 @@ class ProximateDisbursement(db.Model):
 
     # Report obligation
     report_due_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
+    # ---- Receipt confirmation (2026-07-24) ------------------------------
+    # "Sent" and "arrived" are not the same event, and until now only the
+    # first was recorded. Partners in Sudan are often paid through a
+    # hawala agent and see a credit with no indication of who sent it —
+    # so the fund could not answer "did they actually get it, and do they
+    # know it was us?" This closes that.
+    #
+    # The implementation clock starts from `received_at`, NOT from
+    # `sent_at`: a partner cannot begin spending money that has not
+    # landed, and holding them to a deadline that started while the
+    # transfer was in transit is exactly the kind of unfairness the
+    # low-connectivity design is meant to avoid.
+    receipt_amount = db.Column(db.Float, nullable=True)
+    receipt_currency = db.Column(db.String(8), nullable=True)
+    received_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    receipt_sender_shown = db.Column(db.String(200), nullable=True)
+    receipt_doc_id = db.Column(
+        db.Integer, db.ForeignKey('documents.id'), nullable=True,
+    )
+    receipt_confirmed_by_name = db.Column(db.String(200), nullable=True)
+    receipt_confirmed_by_phone = db.Column(db.String(50), nullable=True)
+    receipt_note = db.Column(db.Text, nullable=True)
+    # 'partner_link' when the partner used their own token link;
+    # 'secretariat' when staff entered it from a WhatsApp message.
+    receipt_source = db.Column(db.String(20), nullable=True)
+    receipt_recorded_by_user_id = db.Column(
+        db.Integer, db.ForeignKey('users.id'), nullable=True,
+    )
+    receipt_confirmed_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    receipt_token = db.Column(db.String(64), nullable=True, index=True)
+    implementation_start_at = db.Column(
+        db.DateTime(timezone=True), nullable=True,
+    )
     report_submitted_at = db.Column(db.DateTime(timezone=True), nullable=True)
     report_token = db.Column(db.String(64), nullable=True, unique=True, index=True)
 
@@ -182,6 +216,27 @@ class ProximateDisbursement(db.Model):
             'overdue': self.is_overdue(),
             'report_token': self.report_token,
             'has_report': self.report_submitted_at is not None,
+            # Receipt confirmation — "sent" is not "arrived".
+            'receipt_confirmed': self.receipt_confirmed_at is not None,
+            'receipt_amount': self.receipt_amount,
+            'receipt_currency': self.receipt_currency,
+            'received_at': self.received_at.isoformat() if self.received_at else None,
+            'receipt_sender_shown': self.receipt_sender_shown,
+            'receipt_confirmed_by_name': self.receipt_confirmed_by_name,
+            'receipt_source': self.receipt_source,
+            'receipt_note': self.receipt_note,
+            'has_receipt_doc': bool(self.receipt_doc_id),
+            'receipt_confirmed_at': (
+                self.receipt_confirmed_at.isoformat()
+                if self.receipt_confirmed_at else None
+            ),
+            'implementation_start_at': (
+                self.implementation_start_at.isoformat()
+                if self.implementation_start_at else None
+            ),
+            'awaiting_receipt': (
+                self.sent_at is not None and self.receipt_confirmed_at is None
+            ),
             'ack_message': self.ack_message,
             'ack_message_at': (
                 self.ack_message_at.isoformat() if self.ack_message_at else None

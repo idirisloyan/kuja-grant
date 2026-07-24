@@ -85,11 +85,16 @@ from app.models.proximate_fsp import (
 from app.models.proximate_dd import (
     ProximateAttachment, ProximateMediaVerification, ProximatePanelCandidate,
     ATTACHMENT_SUBJECT_KINDS, ATTACHMENT_KINDS, MEDIA_VERDICTS, PANEL_STATUSES,
+    PANEL_MEMBER_STATUSES,
 )
 from app.models.proximate_round import (
     ProximateRound, ProximateRoundSignature, ProximateRoundParticipant,
     ROUND_STATUSES, ROUND_TRIGGER_TYPES, ROUND_SIGNERS_REQUIRED,
-    PARTICIPANT_STAGES,
+    PARTICIPANT_STAGES, ROUND_PHASES, AREA_SOURCES,
+)
+from app.models.proximate_cycle import (
+    ProximatePanelMeeting, ProximateAward, ProximateContract,
+    MEETING_TYPES, AWARD_DECISIONS, AWARD_METHODS, CONTRACT_STATUSES,
 )
 from app.models.proximate_disbursement import (
     ProximateDisbursement,
@@ -151,6 +156,9 @@ __all__ = [
     'RESPONSE_WINDOW_HOURS',
     'FinancialServiceProvider', 'PartnerDisbursementMethod',
     'FSP_KINDS', 'METHOD_STATUSES',
+    'ProximatePanelMeeting', 'ProximateAward', 'ProximateContract',
+    'MEETING_TYPES', 'AWARD_DECISIONS', 'AWARD_METHODS', 'CONTRACT_STATUSES',
+    'ROUND_PHASES', 'AREA_SOURCES', 'PANEL_MEMBER_STATUSES',
     'ProximateAttachment', 'ProximateMediaVerification', 'ProximatePanelCandidate',
     'ATTACHMENT_SUBJECT_KINDS', 'ATTACHMENT_KINDS', 'MEDIA_VERDICTS', 'PANEL_STATUSES',
     'ProximateRound', 'ProximateRoundSignature', 'ProximateRoundParticipant',

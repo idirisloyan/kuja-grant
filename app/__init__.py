@@ -430,6 +430,40 @@ def create_app(config_name=None):
             app.logger.warning(f"Could not verify lockout columns (non-PostgreSQL or migration pending): {e}")
 
     # -----------------------------------------------------------------
+    # 2026-07-24 — endorsement can come from a panel member.
+    #
+    # Proximate has no separate "endorser" role: endorsement is a step
+    # its panel members perform. Panel members have no user account by
+    # design (WhatsApp link, shared handset), so they cannot be an
+    # Endorser row, which requires user_id. The endorsement therefore
+    # points at EITHER an endorser (legacy, live Blue Nile data) or a
+    # panel member — which means the original NOT NULL on endorser_id
+    # has to come off.
+    #
+    # The Phase 610 reconciler only ADDS columns; it cannot relax a
+    # constraint, so this is explicit. Idempotent, and a no-op on
+    # SQLite, where new databases are built from the model anyway.
+    # -----------------------------------------------------------------
+    with app.app_context():
+        try:
+            if db.engine.dialect.name == 'postgresql':
+                from sqlalchemy import text
+                with db.engine.connect() as conn:
+                    conn.execute(text(
+                        'ALTER TABLE proximate_endorsements '
+                        'ALTER COLUMN endorser_id DROP NOT NULL'
+                    ))
+                    conn.commit()
+                app.logger.info(
+                    'proximate_endorsements.endorser_id is nullable '
+                    '(panel members endorse without an account)'
+                )
+        except Exception as e:
+            app.logger.warning(
+                f'Could not relax endorser_id NOT NULL (table may not exist yet): {e}'
+            )
+
+    # -----------------------------------------------------------------
     # Auto schema reconciliation — Phase 610.
     #
     # Walks every SQLAlchemy model registered on db.Model, compares each

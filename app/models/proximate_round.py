@@ -32,6 +32,31 @@ ROUND_STATUSES = ("draft", "in_review", "active", "cancelled", "closed")
 ROUND_TRIGGER_TYPES = ("disaster", "donor_commitment", "programme_cycle")
 SIGNATURE_STATUSES = ("pending", "signed", "recused", "rejected")
 
+# Operational phases — the real Proximate process, in order. Distinct
+# from ROUND_STATUSES (see the `phase` column for why they are separate).
+ROUND_PHASES = (
+    "context_review",   # area picked, rationale being written
+    "panel_setup",      # finding + vetting panel members
+    "nominations",      # panel members nominating partners
+    "due_diligence",    # secretariat vetting nominated partners
+    "awarding",         # panel meeting → who gets what
+    "contracting",      # agreements out for signature
+    "disbursement",     # money moving
+    "implementation",   # clock running, evidence arriving
+    "reporting",        # partner reports in review
+    "closeout",         # cycle being wrapped up
+)
+
+# Evidence sources for area selection (SoP: how Proximate picks where to
+# work). Stored as slugs in `area_sources_json`.
+AREA_SOURCES = (
+    "local_networks",
+    "community_information",
+    "humanitarian_reports",
+    "internal_analysis",
+    "targeted_mapping",
+)
+
 # How many OB signers must affirm before the round goes active. Hard-coded
 # to 2 for v1 — matches Adeso's pre-platform sign-off pattern. If a future
 # tenant needs a different floor, lift it to a Network column.
@@ -90,9 +115,59 @@ class ProximateRound(db.Model):
     donor_shares_json = db.Column(db.Text, nullable=True)
     target_region = db.Column(db.String(120), nullable=True)
 
+    # ---- Cycle setup (2026-07-24) ---------------------------------------
+    # The cycle now starts where Proximate actually starts it: pick the
+    # area and the grant size, THEN find panel members, THEN partners.
+    # Everything below is nullable so existing rounds keep loading.
+    target_locality = db.Column(db.String(160), nullable=True)
+    # "Size of grant for the round" — the per-partner award size this
+    # cycle is built around. Not a hard cap: the panel can approve a
+    # different amount and the award record keeps both numbers.
+    grant_size_usd = db.Column(db.Float, nullable=True)
+
+    # Why this area. The SoP names five evidence sources; we store the
+    # rationale as prose and the sources as a JSON list of slugs so the
+    # donor pack can show "selected on the basis of X, Y, Z".
+    area_rationale = db.Column(db.Text, nullable=True)
+    area_sources_json = db.Column(db.Text, nullable=True)
+    security_note = db.Column(db.Text, nullable=True)
+    market_risk_note = db.Column(db.Text, nullable=True)
+    conflict_sensitivity_note = db.Column(db.Text, nullable=True)
+    feasibility_note = db.Column(db.Text, nullable=True)
+
+    # ---- Money: envelope is NOT what partners can receive ---------------
+    # `envelope_usd` is what the donor allocated to this cycle. Some of it
+    # pays for salaries, technology and administration. Only the remainder
+    # can be awarded to partners, and awards are checked against it — see
+    # `disbursable_usd` below. Getting this wrong over-commits the fund,
+    # which is why it is computed rather than typed.
+    admin_overhead_usd = db.Column(db.Float, nullable=True)
+
+    # ---- Target dates: these WARN, they do not block --------------------
+    # Ground reality delays cycles in Sudan. A missed target date is
+    # information for the secretariat, never a reason the system refuses
+    # to let them continue.
+    target_award_date = db.Column(db.Date, nullable=True)
+    target_disbursement_date = db.Column(db.Date, nullable=True)
+    target_report_date = db.Column(db.Date, nullable=True)
+
     status = db.Column(
         db.String(40), nullable=False, default="draft", index=True,
     )
+
+    # Operational phase, deliberately SEPARATE from `status`.
+    #
+    # `status` answers "is this cycle live?" (draft / in_review / active /
+    # cancelled / closed) and gates the multi-sig activation. `phase`
+    # answers "where in the process are we?" — a cycle can be `active`
+    # while sitting in `awarding`. Collapsing the two would mean every
+    # existing `status == 'active'` check silently changes meaning the
+    # moment the secretariat moves to contracting, so they stay apart.
+    phase = db.Column(
+        db.String(30), nullable=True, default="context_review", index=True,
+    )
+    paused_at = db.Column(db.DateTime, nullable=True)
+    pause_reason = db.Column(db.Text, nullable=True)
 
     drafted_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     drafted_at = db.Column(db.DateTime, nullable=False, default=_now)
@@ -106,6 +181,44 @@ class ProximateRound(db.Model):
 
     created_at = db.Column(db.DateTime, nullable=False, default=_now)
     updated_at = db.Column(db.DateTime, nullable=False, default=_now, onupdate=_now)
+
+    # ---- money ----------------------------------------------------------
+
+    @property
+    def disbursable_usd(self) -> float:
+        """What partners can actually be awarded from this cycle.
+
+        The donor's envelope is NOT this number. Salaries, technology and
+        administration come out of the same envelope first. Treating the
+        two as interchangeable is how a fund over-commits, so the split is
+        computed here once and every award check reads it.
+        """
+        envelope = float(self.envelope_usd or 0)
+        overhead = float(self.admin_overhead_usd or 0)
+        return max(0.0, envelope - overhead)
+
+    @property
+    def awarded_usd(self) -> float:
+        """Sum of approved awards on this cycle (excludes declined ones)."""
+        from app.models.proximate_cycle import ProximateAward
+        rows = ProximateAward.query.filter_by(
+            round_id=self.id, decision="awarded",
+        ).all()
+        return float(sum(float(a.approved_amount_usd or 0) for a in rows))
+
+    @property
+    def uncommitted_usd(self) -> float:
+        return self.disbursable_usd - self.awarded_usd
+
+    def money_summary(self) -> dict:
+        return {
+            "envelope_usd": float(self.envelope_usd or 0),
+            "admin_overhead_usd": float(self.admin_overhead_usd or 0),
+            "disbursable_usd": self.disbursable_usd,
+            "awarded_usd": self.awarded_usd,
+            "uncommitted_usd": self.uncommitted_usd,
+            "grant_size_usd": float(self.grant_size_usd) if self.grant_size_usd else None,
+        }
 
     # ---- properties -----------------------------------------------------
 
@@ -337,14 +450,28 @@ class ProximateRoundSignature(db.Model):
 # renders roster on the round detail page.
 
 PARTICIPANT_STAGES = (
-    "planned",           # roster entry only
-    "endorsement_open",  # endorser links shared
-    "endorsed",          # 2+ endorsements collected
+    "nominated",         # a panel member put them forward
+    "info_requested",    # secretariat asked for the partner information form
+    "info_received",
+    "planned",           # roster entry only (legacy entry point, kept)
+    "endorsement_open",  # panel-member links shared
+    "endorsed",          # 2+ panel endorsements collected
+    "due_diligence",     # secretariat vetting in progress
+    "dd_passed",
+    "dd_failed",
+    "shortlisted",       # back to the panel for the award decision
+    "awarded",
+    "not_awarded",
+    "contracting",
+    "contract_signed",
     "bank_verified",     # ready to disburse
     "disbursed",         # first tranche sent
-    "reported",          # 14-day partner report received
+    "receipt_confirmed",  # partner confirmed the money arrived
+    "implementing",
+    "reported",          # partner report received
     "attested",          # 90-day outcome attested
     "verified",          # third-party verifier confirmed
+    "closed",
     "withdrawn",         # removed from the round
 )
 

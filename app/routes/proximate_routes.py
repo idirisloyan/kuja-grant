@@ -751,7 +751,9 @@ def api_submit_endorsement(partner_id):
     # level too via the unique constraint, but we catch it here for
     # a clean error rather than a 500.
     if Endorsement.query.filter_by(
-        partner_id=partner.id, endorser_id=endorser.id,
+        partner_id=partner.id,
+        **({'panel_member_id': party['id']} if party['kind'] == 'panel_member'
+           else {'endorser_id': party['id']}),
     ).first():
         return jsonify({
             'success': False,
@@ -831,7 +833,8 @@ def api_submit_endorsement(partner_id):
         subject_kind='proximate_partner',
         subject_id=partner.id,
         details={
-            'endorser_id': endorser.id,
+            'endorser_id': party['id'],
+            'endorser_kind': party['kind'],
             'endorsement_id': endorsement.id,
             'coi_check_passed': endorsement.coi_check_passed,
             'coi_signals': list(signals.keys()),
@@ -4651,6 +4654,34 @@ def api_record_disbursement():
             f"Proximate: disbursement on non-cleared partner id={partner.id} status={partner.status}"
         )
 
+    # ---- Cycle authorisation gate (2026-07-24) --------------------------
+    # Money may not leave without a panel award decision behind it and a
+    # completed agreement in front of it. Both are recorded elsewhere; this
+    # is the point where they become binding.
+    #
+    # The gate arms itself per cycle: it applies only once a round has at
+    # least one award record, which is what marks that cycle as running the
+    # panel workflow. Rounds created before this existed have no awards and
+    # keep their previous behaviour, so live cycles mid-flight are not
+    # stranded by a deploy. New cycles are gated from their first award.
+    _round_id = payload.get('round_id')
+    if _round_id:
+        from app.models import ProximateAward
+        _cycle_uses_awards = ProximateAward.query.filter_by(
+            round_id=_round_id, network_id=net.id,
+        ).count() > 0
+        if _cycle_uses_awards:
+            from app.routes.proximate_cycle_routes import compute_readiness
+            readiness = compute_readiness(partner.id, _round_id)
+            if not readiness['ready']:
+                return jsonify({
+                    'success': False,
+                    'error': readiness['blocks'][0]['message'],
+                    'code': 'err.cycle_gate',
+                    'blocks': readiness['blocks'],
+                    'warnings': readiness['warnings'],
+                }), 422
+
     from datetime import timedelta
     from app.models.proximate_disbursement import (
         COSIGN_THRESHOLD_USD, cosigners_required_for,
@@ -6190,37 +6221,81 @@ def _ensure_endorser_public_token(endorser) -> str:
     return endorser.public_token
 
 
+def _resolve_endorsing_party(token):
+    """Who is behind this token — a panel member, or a legacy endorser?
+
+    Proximate's answer is always "a panel member": endorsement is a step
+    they perform and there is no separate endorser role. But the live
+    Blue Nile data was collected under the older model, so both resolve
+    here and the rest of the portal does not care which it got.
+
+    Returns (party, error_response). `party` is a small dict rather than
+    an ORM object so the two shapes stay interchangeable.
+    """
+    from app.models import ProximatePanelCandidate
+
+    member = ProximatePanelCandidate.query.filter_by(public_token=token).first()
+    if member:
+        if member.status != 'confirmed':
+            return None, (jsonify({
+                'success': False,
+                'error': 'this panel member is not currently seated',
+            }), 403)
+        return {
+            'kind': 'panel_member',
+            'id': member.id,
+            'row': member,
+            'network_id': member.network_id,
+            'locality': member.location,
+            'display_name': member.name,
+        }, None
+
+    endorser = Endorser.query.filter_by(public_token=token).first()
+    if not endorser:
+        return None, (jsonify({'success': False, 'error': 'invalid token'}), 404)
+    if endorser.status != 'approved':
+        return None, (jsonify({
+            'success': False,
+            'error': f'endorser status is {endorser.status!r}; must be approved',
+        }), 403)
+    return {
+        'kind': 'endorser',
+        'id': endorser.id,
+        'row': endorser,
+        'network_id': endorser.network_id,
+        'locality': endorser.locality,
+        'display_name': None,
+    }, None
+
+
 @proximate_bp.route('/endorser-portal/<token>', methods=['GET'])
 def api_endorser_portal_lookup(token):
     """Public lookup. Token IS the credential.
 
-    Returns the endorser's identity + the partners they can endorse
-    right now (those in nominated / endorsements_open / dd_pending
-    states that this endorser hasn't already endorsed and where the COI
-    auto-check would pass server-side).
+    Returns the endorsing party's identity + the partners they can
+    endorse right now (those in nominated / endorsements_open /
+    dd_pending states that they haven't already endorsed and where the
+    COI auto-check would pass server-side).
     """
-    endorser = Endorser.query.filter_by(public_token=token).first()
-    if not endorser:
-        return jsonify({'success': False, 'error': 'invalid token'}), 404
-
-    if endorser.status != 'approved':
-        return jsonify({
-            'success': False,
-            'error': f'endorser status is {endorser.status!r}; must be approved',
-        }), 403
+    party, err = _resolve_endorsing_party(token)
+    if err:
+        return err
+    endorser = party['row']
 
     # Find partners awaiting endorsement in this network. Pre-filter by
     # status so the inbox shows only actionable items.
     actionable_statuses = ('nominated', 'endorsements_open', 'dd_pending')
+    _mine = (
+        {'panel_member_id': party['id']} if party['kind'] == 'panel_member'
+        else {'endorser_id': party['id']}
+    )
     existing = {
-        e.partner_id for e in Endorsement.query.filter_by(
-            endorser_id=endorser.id,
-        ).all()
+        e.partner_id for e in Endorsement.query.filter_by(**_mine).all()
     }
     candidates = (
         ProximatePartner.query
         .filter(
-            ProximatePartner.network_id == endorser.network_id,
+            ProximatePartner.network_id == party['network_id'],
             ProximatePartner.status.in_(actionable_statuses),
         )
         .order_by(ProximatePartner.nominated_at.desc().nullslast())
@@ -6256,10 +6331,12 @@ def api_endorser_portal_lookup(token):
     return jsonify({
         'success': True,
         'endorser': {
-            'id': endorser.id,
-            'reputation_score': endorser.reputation_score,
-            'endorsements_count': endorser.endorsements_count,
-            'locality': endorser.locality,
+            'id': party['id'],
+            'kind': party['kind'],
+            'name': party['display_name'],
+            'reputation_score': getattr(endorser, 'reputation_score', None),
+            'endorsements_count': getattr(endorser, 'endorsements_count', None),
+            'locality': party['locality'],
         },
         'pending_endorsements': pending,
     })
@@ -6278,16 +6355,13 @@ def api_endorser_portal_submit(token, partner_id):
     page so partners experience this as a 3-question form, not a
     platform login.
     """
-    endorser = Endorser.query.filter_by(public_token=token).first()
-    if not endorser:
-        return jsonify({'success': False, 'error': 'invalid token'}), 404
-    if endorser.status != 'approved':
-        return jsonify({
-            'success': False, 'error': 'endorser not approved',
-        }), 403
+    party, err = _resolve_endorsing_party(token)
+    if err:
+        return err
+    endorser = party['row']
 
     partner = ProximatePartner.query.filter_by(
-        id=partner_id, network_id=endorser.network_id,
+        id=partner_id, network_id=party['network_id'],
     ).first()
     if not partner:
         return jsonify({'success': False, 'error': 'partner not found'}), 404
@@ -6312,9 +6386,16 @@ def api_endorser_portal_submit(token, partner_id):
             }), 400
 
     signals = Endorsement.compute_coi_signals(partner=partner, endorser=endorser)
+    # Attribute to whichever kind of party the token resolved to. A
+    # panel member has no endorser row to point at — they have no
+    # account at all — so the endorsement names them directly.
+    _attrib = (
+        {'panel_member_id': party['id']} if party['kind'] == 'panel_member'
+        else {'endorser_id': party['id']}
+    )
     endorsement = Endorsement(
         partner_id=partner.id,
-        endorser_id=endorser.id,
+        **_attrib,
         q1_real=payload['q1_real'],
         q2_trust=payload['q2_trust'],
         q3_accept_aid=payload['q3_accept_aid'],
@@ -6327,7 +6408,11 @@ def api_endorser_portal_submit(token, partner_id):
     )
     endorsement.set_coi_signals(signals)
     db.session.add(endorsement)
-    endorser.endorsements_count = (endorser.endorsements_count or 0) + 1
+    # Reputation is an Endorser-model concept. Panel members are vetted
+    # by the secretariat before they are seated, so they do not carry a
+    # running score; skip rather than fake one.
+    if party['kind'] == 'endorser':
+        endorser.endorsements_count = (endorser.endorsements_count or 0) + 1
     db.session.flush()
 
     floor = partner.trust_floor_signals()

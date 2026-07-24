@@ -435,10 +435,28 @@ class Endorsement(db.Model):
         nullable=False,
         index=True,
     )
+    # Exactly one of these two identifies who endorsed.
+    #
+    # `endorser_id` is the original path and still carries the live Blue
+    # Nile data. `panel_member_id` is the path Proximate actually uses:
+    # endorsement is a STEP performed by panel members, and there is no
+    # separate endorser role. Panel members are deliberately account-less
+    # — they work from a WhatsApp link on a shared handset — so they
+    # cannot be represented as an Endorser, which requires a user_id.
+    #
+    # Nullable at the model level; see `endorsing_party` for the accessor
+    # and the boot-time DDL in app/__init__.py that relaxes the original
+    # NOT NULL on existing databases.
     endorser_id = db.Column(
         db.Integer,
         db.ForeignKey("proximate_endorsers.id"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    panel_member_id = db.Column(
+        db.Integer,
+        db.ForeignKey("proximate_panel_candidates.id"),
+        nullable=True,
         index=True,
     )
 
