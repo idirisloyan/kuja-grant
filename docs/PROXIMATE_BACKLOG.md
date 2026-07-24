@@ -13,7 +13,7 @@
 > See also: [docs/PROXIMATE_FUND_DESIGN.md](PROXIMATE_FUND_DESIGN.md),
 > `seed_proximate.py`, `memory/proximate_prod_state_2026-06-27.md`.
 
-Updated 2026-07-08.
+Updated 2026-07-24.
 
 ---
 
@@ -1181,3 +1181,69 @@ All code items fixed and prod-verified:
   lists (incremental loading covers current scale), per-page
   loading/error-state screenshot pack (states exist + are exercised by
   tests; formal capture pack is documentation work, backlog on demand).
+
+---
+
+## Grant cycle command centre — SHIPPED 2026-07-24 (`4a6d099ff`)
+
+Response to the team's operating-model review. The lifecycle in the code
+started at "we have a partner" and ended at "they reported"; Proximate's
+real process has about fourteen steps. Everything upstream of a partner
+and the whole middle of the money flow had no home.
+
+**Shipped**
+
+- **Cycle setup** — region, locality, grant size, why-this-area with the
+  SoP's five evidence sources. Round detail → *Cycle setup* tab.
+- **Money split** — `envelope_usd` was a single number, so the system
+  invited committing the donor's whole grant to partners.
+  `disbursable_usd = envelope − admin_overhead` is computed and every
+  award is checked against it. Over-commit is refused with the arithmetic
+  shown.
+- **Panel members, first-class** — their own due diligence (sanctions,
+  media, social, plus a free-form slot), governance flags, and a no-login
+  WhatsApp link minted on seating. Seating blocked until checks pass.
+- **Panel meetings** — the three SoP sessions plus follow-ups; outstanding
+  required meetings are reported, never blocked on.
+- **Award register** — generated from decisions. Requested / recommended /
+  approved kept separately.
+- **Contracting** — PandaDoc status tracked and the signed PDF stored;
+  PandaDoc is not replaced.
+- **Receipt confirmation** — partner link or secretariat-entered WhatsApp
+  screenshot. **The implementation clock starts from `received_at`, not
+  `sent_at`.**
+- **Disbursement gate** — DD passed + panel award + completed contract +
+  verified payment method. Arms per cycle (once a round has its first
+  award), so live cycles are not stranded by the deploy.
+
+**Two decisions worth carrying forward**
+
+- *There is no endorser role.* Endorsement is a step panel members
+  perform. `Endorser.user_id` is NOT NULL so a panel member cannot be one
+  — they have no account by design. `Endorsement` now points at either an
+  endorser (legacy Blue Nile data) or a panel member.
+- *Secretariat-recorded awards are allowed but flagged.* A meeting on a
+  bad line still happened. But without a linked meeting, minutes or a
+  panel confirmation, "the panel decided" is unfalsifiable — and panel
+  independence is what this fund sells to donors.
+
+**Deliberately NOT built**
+
+- A partner performance *score*. The evidence (on-time reporting, receipt
+  lag, documentation quality) is recorded; no number. In Sudan a
+  timeliness score measures connectivity as much as diligence, and a
+  score becomes a funding gate by accident.
+- Thirteen top-level nav items. The cycle is the spine; setup, panel and
+  awards are tabs on the round. A process has fourteen steps; a person
+  has about three jobs.
+
+**Still open**
+
+- Stage B/C/D partner fields (PIF, DD, suggested activities) exist but are
+  not yet revealed stage-by-stage on one partner record.
+- Implementation follow-up "evidence inbox" — attachments exist, no
+  dedicated per-partner inbox.
+- Partner history across cycles.
+- Cycle closeout pack.
+- Panel-member CV upload wired to the `cv_doc_id` slot.
+- AI extraction from donor agreements into the money split.
