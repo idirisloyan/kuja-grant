@@ -415,3 +415,105 @@ class ProximateContract(db.Model):
             "has_signed_doc": bool(self.signed_doc_id),
             "is_complete": self.is_complete,
         }
+
+
+# ===============================================================
+# Implementation evidence
+# ===============================================================
+
+# How the evidence reached Proximate. WhatsApp is first because it is
+# the common case, not the exception — a partner sends a photo to
+# whoever they normally talk to, and that is the report until someone
+# writes it down.
+EVIDENCE_SOURCES = (
+    'whatsapp', 'call', 'email', 'field_visit', 'form', 'other',
+)
+
+EVIDENCE_KINDS = (
+    'progress_update', 'receipt', 'invoice', 'activity_photo', 'video',
+    'voice_note', 'issue', 'other',
+)
+
+
+class ProximateEvidence(db.Model):
+    """Anything that arrived about a partner mid-implementation.
+
+    Deliberately NOT the attachment table. An attachment needs a file;
+    most of what actually arrives is a sentence — "he called, the market
+    is closed, distribution moved to Thursday". Losing that because
+    there was nothing to upload is how a partner record ends up looking
+    emptier than the relationship actually is.
+
+    `occurred_at` is separate from `created_at`: staff log things days
+    later, and the date the thing happened is the one that matters.
+    """
+
+    __tablename__ = 'proximate_evidence'
+    __table_args__ = (
+        db.Index('ix_prx_evidence_partner', 'partner_id', 'occurred_at'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    network_id = db.Column(
+        db.Integer, db.ForeignKey('networks.id'), nullable=False, index=True,
+    )
+    partner_id = db.Column(
+        db.Integer, db.ForeignKey('proximate_partners.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    round_id = db.Column(
+        db.Integer, db.ForeignKey('proximate_rounds.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+    disbursement_id = db.Column(
+        db.Integer,
+        db.ForeignKey('proximate_disbursements.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+
+    occurred_at = db.Column(db.DateTime, nullable=True)
+    source = db.Column(db.String(20), nullable=True, default='whatsapp')
+    kind = db.Column(db.String(30), nullable=True, default='progress_update')
+    summary = db.Column(db.Text, nullable=True)
+    document_id = db.Column(
+        db.Integer, db.ForeignKey('documents.id'), nullable=True,
+    )
+
+    is_issue = db.Column(db.Boolean, nullable=True, default=False)
+    needs_followup = db.Column(db.Boolean, nullable=True, default=False)
+    needs_panel = db.Column(db.Boolean, nullable=True, default=False)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+    resolution_note = db.Column(db.Text, nullable=True)
+
+    recorded_by_user_id = db.Column(
+        db.Integer, db.ForeignKey('users.id'), nullable=True,
+    )
+    created_at = db.Column(db.DateTime, nullable=False, default=_now)
+    updated_at = db.Column(
+        db.DateTime, nullable=False, default=_now, onupdate=_now,
+    )
+
+    @property
+    def is_open_issue(self) -> bool:
+        return bool(self.is_issue) and not self.resolved_at
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'partner_id': self.partner_id,
+            'round_id': self.round_id,
+            'disbursement_id': self.disbursement_id,
+            'occurred_at': self.occurred_at.isoformat() if self.occurred_at else None,
+            'source': self.source or 'other',
+            'kind': self.kind or 'progress_update',
+            'summary': self.summary,
+            'has_document': bool(self.document_id),
+            'document_id': self.document_id,
+            'is_issue': bool(self.is_issue),
+            'needs_followup': bool(self.needs_followup),
+            'needs_panel': bool(self.needs_panel),
+            'is_open_issue': self.is_open_issue,
+            'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None,
+            'resolution_note': self.resolution_note,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }

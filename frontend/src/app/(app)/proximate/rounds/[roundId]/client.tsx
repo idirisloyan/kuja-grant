@@ -30,6 +30,7 @@ import { ApprovedActivitiesCard } from '@/components/proximate/approved-activiti
 import { CycleSetupCard } from '@/components/proximate/cycle-setup-card';
 import { PanelRosterCard } from '@/components/proximate/panel-roster-card';
 import { AwardRegisterCard } from '@/components/proximate/award-register-card';
+import { CycleCloseoutCard } from '@/components/proximate/cycle-closeout-card';
 import {
   ProximateAttachmentsPanel, PanelRosterPanel,
 } from '@/components/proximate/dd-evidence';
@@ -124,6 +125,7 @@ const ROUND_TABS = [
   { key: 'setup', label: 'Cycle setup' },
   { key: 'panel', label: 'Panel' },
   { key: 'awards', label: 'Awards & contracts' },
+  { key: 'closeout', label: 'Closeout' },
   { key: 'partners', label: 'Partners' },
   { key: 'reports', label: 'Reports & closing pack' },
   { key: 'disbursements', label: 'Disbursements' },
@@ -970,6 +972,10 @@ export function ProximateRoundDetailClient() {
 
           <div className={tabCls('awards')}>
             <AwardRegisterCard roundId={Number(roundId)} canEdit={isOperator} />
+          </div>
+
+          <div className={tabCls('closeout')}>
+            <CycleCloseoutCard roundId={Number(roundId)} />
           </div>
 
           <div className={tabCls('partners')}>

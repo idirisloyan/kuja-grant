@@ -61,7 +61,7 @@ from app.models import (
     ProximateRound, ProximateRoundParticipant,
     ProximatePartner, ProximatePanelCandidate,
     ProximatePanelMeeting, ProximateAward, ProximateContract,
-    ProximateDisbursement,
+    ProximateDisbursement, ProximateEvidence,
 
     AWARD_DECISIONS, AWARD_METHODS, CONTRACT_STATUSES, MEETING_TYPES,
     ROUND_PHASES, AREA_SOURCES,
@@ -1243,3 +1243,725 @@ def api_receipt_link(disb_id):
         'success': True,
         'url': f'{base}/proximate-receipt?t={d.receipt_token}',
     })
+
+
+# ===============================================================
+# Staged partner record
+# ===============================================================
+#
+# One partner record, not seven forms. The fields are the same fields
+# they always were — what changes is that they are grouped by the stage
+# they belong to, and a stage the partner has not reached yet is marked
+# `locked` rather than shown as a wall of empty inputs.
+#
+# The stage definitions live here rather than in the frontend so that
+# "what does this cycle require" has one answer, and the donor pack and
+# the console cannot drift apart.
+
+PARTNER_STAGES = [
+    {
+        'key': 'nomination',
+        'label': 'Nomination',
+        'blurb': 'What the panel member put forward.',
+        'fields': [
+            ('nomination_rationale', 'Why they were nominated'),
+            ('track_record', 'Track record'),
+            ('community_credibility', 'Basis of community credibility'),
+            ('proposed_activity_idea', 'Proposed activity idea'),
+            ('known_risks', 'Known risks or concerns'),
+        ],
+    },
+    {
+        'key': 'initial_information',
+        'label': 'Partner information',
+        'blurb': 'Collected once Proximate makes contact (the PIF).',
+        'fields': [
+            ('legal_status', 'Legal status'),
+            ('registration_number', 'Registration number'),
+            ('country_of_registration', 'Country of registration'),
+            ('year_established', 'Year established'),
+            ('headquarters', 'Headquarters'),
+            ('operational_offices', 'Operational offices'),
+            ('website_social', 'Website / social media'),
+            ('thematic_focus', 'Thematic focus areas'),
+            ('target_population', 'Primary target population'),
+            ('geographic_areas', 'Geographic areas of operation'),
+            ('activities_12m', 'Key activities, last 12 months'),
+            ('beneficiaries_reached', 'Beneficiaries reached'),
+            ('current_donors', 'Current donor-funded programmes'),
+        ],
+    },
+    {
+        'key': 'due_diligence',
+        'label': 'Due diligence',
+        'blurb': 'What the secretariat checked, and what it found.',
+        'fields': [],   # sourced from the DD models, not the intake form
+    },
+    {
+        'key': 'activities',
+        'label': 'Proposed activities',
+        'blurb': 'What they are asking to do, and for how much.',
+        'fields': [
+            ('requested_budget', 'Requested budget'),
+            ('activity_1', 'Activity 1 — name / type'),
+            ('activity_1_description', 'Activity 1 — description'),
+            ('activity_2', 'Activity 2 (optional)'),
+            ('activity_3', 'Activity 3 (optional)'),
+            ('activity_target_population', 'Target population'),
+            ('activity_duration', 'Duration'),
+            ('admin_cost_pct', 'Administration cost %'),
+        ],
+    },
+    {
+        'key': 'award',
+        'label': 'Award decision',
+        'blurb': 'What the panel decided.',
+        'fields': [],   # sourced from ProximateAward
+    },
+    {
+        'key': 'contracting',
+        'label': 'Contracting & payment',
+        'blurb': 'Only relevant once awarded.',
+        'fields': [],   # sourced from ProximateContract
+    },
+    {
+        'key': 'implementation',
+        'label': 'Implementation',
+        'blurb': 'Money out, evidence in.',
+        'fields': [],
+    },
+    {
+        'key': 'reporting',
+        'label': 'Reporting',
+        'blurb': "The partner's account of what happened.",
+        'fields': [],
+    },
+]
+
+
+@cycle_bp.route('/partners/<int:partner_id>/stages', methods=['GET'])
+@login_required
+@ob_required
+def api_partner_stages(partner_id):
+    """One partner, presented by stage, with each stage's completeness.
+
+    `reached` marks the stages this partner has actually got to. Later
+    stages come back `locked` — the fields are named so the secretariat
+    can see what is coming, but nothing pretends to be missing data when
+    it is simply not that partner's turn yet.
+    """
+    nid = _net_id()
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=nid,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not found'}), 404
+
+    round_id = request.args.get('round_id', type=int)
+    try:
+        form = json.loads(partner.intake_form_json) if partner.intake_form_json else {}
+        if not isinstance(form, dict):
+            form = {}
+    except (ValueError, TypeError):
+        form = {}
+
+    q = ProximateAward.query.filter_by(partner_id=partner_id, network_id=nid)
+    if round_id:
+        q = q.filter_by(round_id=round_id)
+    award = q.order_by(ProximateAward.created_at.desc()).first()
+    contract = (
+        ProximateContract.query.filter_by(award_id=award.id).first()
+        if award else None
+    )
+
+    reached = {'nomination'}
+    if form:
+        reached.add('initial_information')
+    status = (getattr(partner, 'status', '') or '').lower()
+    if status in ('dd_pending', 'dd_clear', 'endorsements_open'):
+        reached.add('due_diligence')
+    if form.get('requested_budget') or form.get('activity_1'):
+        reached.add('activities')
+    if award:
+        reached.add('award')
+    if contract:
+        reached.add('contracting')
+
+    disbursements = ProximateDisbursement.query.filter_by(
+        partner_id=partner_id, network_id=nid,
+    ).all()
+    if disbursements:
+        reached.add('implementation')
+    if any(d.report_submitted_at for d in disbursements):
+        reached.add('reporting')
+
+    out = []
+    for stage in PARTNER_STAGES:
+        fields = []
+        for fkey, flabel in stage['fields']:
+            value = form.get(fkey)
+            fields.append({
+                'key': fkey, 'label': flabel,
+                'value': value if value not in ('', None) else None,
+                'filled': value not in ('', None),
+            })
+
+        derived = None
+        if stage['key'] == 'due_diligence':
+            derived = {
+                'status': partner.status,
+                'trust_tier': getattr(partner, 'trust_tier', None),
+                'dd_cleared_at': (
+                    partner.dd_cleared_at.isoformat()
+                    if getattr(partner, 'dd_cleared_at', None) else None
+                ),
+            }
+        elif stage['key'] == 'award' and award:
+            derived = award.to_dict(partner.name)
+        elif stage['key'] == 'contracting' and contract:
+            derived = contract.to_dict()
+        elif stage['key'] == 'implementation':
+            derived = {
+                'disbursements': len(disbursements),
+                'receipt_confirmed': sum(
+                    1 for d in disbursements if d.receipt_confirmed_at),
+                'awaiting_receipt': sum(
+                    1 for d in disbursements
+                    if d.sent_at and not d.receipt_confirmed_at),
+                'evidence_items': ProximateEvidence.query.filter_by(
+                    partner_id=partner_id).count(),
+                'open_issues': ProximateEvidence.query.filter_by(
+                    partner_id=partner_id, is_issue=True, resolved_at=None,
+                ).count(),
+            }
+        elif stage['key'] == 'reporting':
+            derived = {
+                'reports_due': len(disbursements),
+                'reports_in': sum(
+                    1 for d in disbursements if d.report_submitted_at),
+                'overdue': sum(1 for d in disbursements if d.is_overdue()),
+            }
+
+        out.append({
+            'key': stage['key'],
+            'label': stage['label'],
+            'blurb': stage['blurb'],
+            'reached': stage['key'] in reached,
+            'locked': stage['key'] not in reached,
+            'fields': fields,
+            'filled_count': len([f for f in fields if f['filled']]),
+            'field_count': len(fields),
+            'derived': derived,
+        })
+
+    return jsonify({
+        'success': True,
+        'partner': {'id': partner.id, 'name': partner.name,
+                    'status': partner.status},
+        'stages': out,
+    })
+
+
+@cycle_bp.route('/partners/<int:partner_id>/stages', methods=['PATCH'])
+@login_required
+@ob_required
+def api_partner_stage_save(partner_id):
+    """Save intake-form fields for one stage.
+
+    Writes into the partner's existing `intake_form_json` rather than a
+    new table: the PIF was always stored there, and splitting it now
+    would mean two places to look for the same answer.
+    """
+    nid = _net_id()
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=nid,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not found'}), 404
+
+    body = get_request_json() or {}
+    values = body.get('values')
+    if not isinstance(values, dict):
+        return jsonify({'success': False, 'error': 'values object required'}), 400
+
+    known = {f[0] for s in PARTNER_STAGES for f in s['fields']}
+    try:
+        form = json.loads(partner.intake_form_json) if partner.intake_form_json else {}
+        if not isinstance(form, dict):
+            form = {}
+    except (ValueError, TypeError):
+        form = {}
+
+    changed = []
+    for k, v in values.items():
+        if k not in known:
+            continue          # ignore anything not on a declared stage
+        form[k] = v
+        changed.append(k)
+    partner.intake_form_json = json.dumps(form, ensure_ascii=False)
+    db.session.commit()
+    _audit('proximate.partner.stage_saved', 'partner', partner.id, fields=changed)
+    return jsonify({'success': True, 'saved': changed})
+
+
+# ===============================================================
+# Evidence inbox
+# ===============================================================
+
+@cycle_bp.route('/partners/<int:partner_id>/evidence', methods=['GET'])
+@login_required
+@ob_required
+def api_evidence_list(partner_id):
+    nid = _net_id()
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=nid,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not found'}), 404
+    rows = ProximateEvidence.query.filter_by(
+        partner_id=partner_id, network_id=nid,
+    ).order_by(
+        ProximateEvidence.occurred_at.desc().nullslast(),
+        ProximateEvidence.created_at.desc(),
+    ).limit(200).all()
+    items = [r.to_dict() for r in rows]
+    return jsonify({
+        'success': True,
+        'evidence': items,
+        'summary': {
+            'total': len(items),
+            'open_issues': len([i for i in items if i['is_open_issue']]),
+            'needs_followup': len([i for i in items if i['needs_followup']]),
+            'needs_panel': len([i for i in items if i['needs_panel']]),
+        },
+    })
+
+
+@cycle_bp.route('/partners/<int:partner_id>/evidence', methods=['POST'])
+@login_required
+@ob_required
+def api_evidence_add(partner_id):
+    """Log something that arrived — with or without a file.
+
+    A phone call has no attachment. Requiring one would mean the most
+    common kind of contact never gets recorded, which is exactly how a
+    partner record ends up looking emptier than the relationship is.
+    """
+    nid = _net_id()
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=nid,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not found'}), 404
+
+    body = get_request_json() or {}
+    summary = (body.get('summary') or '').strip()
+    if not summary and not body.get('document_id'):
+        return jsonify({
+            'success': False,
+            'error': 'Add a note or attach a file — one or the other.',
+        }), 400
+
+    occurred = None
+    if body.get('occurred_at'):
+        try:
+            occurred = datetime.fromisoformat(
+                str(body['occurred_at']).replace('Z', '+00:00'))
+        except (ValueError, TypeError):
+            occurred = None
+
+    e = ProximateEvidence(
+        network_id=nid,
+        partner_id=partner_id,
+        round_id=body.get('round_id') or None,
+        disbursement_id=body.get('disbursement_id') or None,
+        occurred_at=occurred or _now(),
+        source=(body.get('source') or 'whatsapp')[:20],
+        kind=(body.get('kind') or 'progress_update')[:30],
+        summary=summary or None,
+        document_id=body.get('document_id') or None,
+        is_issue=bool(body.get('is_issue')),
+        needs_followup=bool(body.get('needs_followup')),
+        needs_panel=bool(body.get('needs_panel')),
+        recorded_by_user_id=getattr(current_user, 'id', None),
+    )
+    db.session.add(e)
+    db.session.commit()
+    _audit('proximate.evidence.recorded', 'partner', partner_id,
+           source=e.source, kind=e.kind, is_issue=bool(e.is_issue))
+    return jsonify({'success': True, 'evidence': e.to_dict()}), 201
+
+
+@cycle_bp.route('/evidence/<int:evidence_id>', methods=['PATCH'])
+@login_required
+@ob_required
+def api_evidence_update(evidence_id):
+    nid = _net_id()
+    e = ProximateEvidence.query.filter_by(id=evidence_id, network_id=nid).first()
+    if not e:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    body = get_request_json() or {}
+    for f in ('summary', 'resolution_note'):
+        if f in body:
+            setattr(e, f, (body.get(f) or None))
+    for f in ('is_issue', 'needs_followup', 'needs_panel'):
+        if f in body:
+            setattr(e, f, bool(body.get(f)))
+    if 'resolved' in body:
+        e.resolved_at = _now() if body.get('resolved') else None
+    db.session.commit()
+    _audit('proximate.evidence.updated', 'partner', e.partner_id,
+           evidence_id=e.id, resolved=bool(e.resolved_at))
+    return jsonify({'success': True, 'evidence': e.to_dict()})
+
+
+# ===============================================================
+# Partner history
+# ===============================================================
+
+@cycle_bp.route('/partners/<int:partner_id>/history', methods=['GET'])
+@login_required
+@ob_required
+def api_partner_history(partner_id):
+    """Everything this partner has done with the fund, across all cycles.
+
+    Facts, not a score. There is deliberately no single number here.
+
+    A "reliability rating" built from report timeliness would, in Sudan,
+    be measuring connectivity and conflict as much as diligence — and a
+    number on a partner card becomes a funding gate by accident, against
+    exactly the organisations this fund exists to reach. The underlying
+    facts are all present so a human can weigh them with the context
+    only a human has.
+    """
+    nid = _net_id()
+    partner = ProximatePartner.query.filter_by(
+        id=partner_id, network_id=nid,
+    ).first()
+    if not partner:
+        return jsonify({'success': False, 'error': 'Partner not found'}), 404
+
+    awards = ProximateAward.query.filter_by(
+        partner_id=partner_id, network_id=nid,
+    ).order_by(ProximateAward.created_at.asc()).all()
+    disbs = ProximateDisbursement.query.filter_by(
+        partner_id=partner_id, network_id=nid,
+    ).all()
+
+    round_ids = {a.round_id for a in awards} | {
+        d.round_id for d in disbs if d.round_id}
+    rounds = {}
+    if round_ids:
+        for r in ProximateRound.query.filter(
+            ProximateRound.id.in_(list(round_ids))
+        ).all():
+            rounds[r.id] = r
+
+    cycles = []
+    for rid in sorted(round_ids):
+        r = rounds.get(rid)
+        a = next((x for x in awards if x.round_id == rid), None)
+        ds = [d for d in disbs if d.round_id == rid]
+        cycles.append({
+            'round_id': rid,
+            'round_title': r.title if r else None,
+            'region': r.target_region if r else None,
+            'decision': a.decision if a else None,
+            'approved_amount_usd': a.approved_amount_usd if a else None,
+            'disbursements': len(ds),
+            'total_sent_usd': float(sum(float(d.amount_usd or 0) for d in ds)),
+            'receipts_confirmed': sum(1 for d in ds if d.receipt_confirmed_at),
+            'reports_in': sum(1 for d in ds if d.report_submitted_at),
+        })
+
+    lags = []
+    for d in disbs:
+        if d.sent_at and d.received_at:
+            lags.append(max(0, (d.received_at - d.sent_at).days))
+
+    on_time = late = 0
+    for d in disbs:
+        if not d.report_submitted_at or not d.report_due_at:
+            continue
+        due, sub = d.report_due_at, d.report_submitted_at
+        if due.tzinfo is None:
+            due = due.replace(tzinfo=timezone.utc)
+        if sub.tzinfo is None:
+            sub = sub.replace(tzinfo=timezone.utc)
+        if sub <= due:
+            on_time += 1
+        else:
+            late += 1
+
+    ev = ProximateEvidence.query.filter_by(
+        partner_id=partner_id, network_id=nid).all()
+
+    return jsonify({
+        'success': True,
+        'partner': {'id': partner.id, 'name': partner.name,
+                    'status': partner.status,
+                    'locality': getattr(partner, 'locality', None)},
+        'cycles': cycles,
+        'observations': {
+            'cycles_participated': len(cycles),
+            'times_awarded': len([c for c in cycles if c['decision'] == 'awarded']),
+            'times_not_awarded': len(
+                [c for c in cycles if c['decision'] == 'not_awarded']),
+            'total_awarded_usd': float(sum(
+                float(a.approved_amount_usd or 0) for a in awards
+                if a.decision == 'awarded')),
+            'total_sent_usd': float(sum(float(d.amount_usd or 0) for d in disbs)),
+            'receipts_confirmed': sum(1 for d in disbs if d.receipt_confirmed_at),
+            'receipts_outstanding': sum(
+                1 for d in disbs if d.sent_at and not d.receipt_confirmed_at),
+            'median_receipt_lag_days': (
+                sorted(lags)[len(lags) // 2] if lags else None),
+            'reports_on_time': on_time,
+            'reports_late': late,
+            'reports_outstanding': sum(
+                1 for d in disbs if not d.report_submitted_at),
+            'evidence_items': len(ev),
+            'open_issues': len([x for x in ev if x.is_open_issue]),
+        },
+        'note': (
+            'These are observations, not a rating. Report timing in Sudan '
+            'reflects connectivity and conflict as much as diligence — read '
+            'them alongside what you know about the context.'
+        ),
+    })
+
+
+# ===============================================================
+# Cycle closeout pack
+# ===============================================================
+
+@cycle_bp.route('/rounds/<int:round_id>/closeout', methods=['GET'])
+@login_required
+@ob_required
+def api_cycle_closeout(round_id):
+    """Everything needed to close a cycle, and what is still open.
+
+    The outstanding list is the point. A closeout that only summarised
+    what went well would let a cycle be declared finished with three
+    partners still unpaid.
+    """
+    rnd = _scoped_round(round_id)
+    if not rnd:
+        return jsonify({'success': False, 'error': 'Round not found'}), 404
+
+    awards = ProximateAward.query.filter_by(round_id=rnd.id).all()
+    contracts = {
+        c.award_id: c
+        for c in ProximateContract.query.filter_by(round_id=rnd.id).all()
+    }
+    disbs = ProximateDisbursement.query.filter_by(round_id=rnd.id).all()
+    meetings = ProximatePanelMeeting.query.filter_by(round_id=rnd.id).all()
+    panel = ProximatePanelCandidate.query.filter_by(round_id=rnd.id).all()
+
+    awarded = [a for a in awards if a.decision == 'awarded']
+    partner_names = {}
+    pids = {a.partner_id for a in awards} | {d.partner_id for d in disbs}
+    if pids:
+        for p in ProximatePartner.query.filter(
+            ProximatePartner.id.in_(list(pids))
+        ).all():
+            partner_names[p.id] = p.name
+
+    outstanding = []
+    for a in awarded:
+        nm = partner_names.get(a.partner_id, f'Partner #{a.partner_id}')
+        c = contracts.get(a.id)
+        if not c or not c.is_complete:
+            outstanding.append({'partner': nm,
+                                'what': 'Agreement not completed',
+                                'severity': 'block'})
+        if not a.decision_is_attributable:
+            outstanding.append({
+                'partner': nm,
+                'what': 'Award has no meeting, minutes or panel confirmation',
+                'severity': 'warn'})
+    for d in disbs:
+        nm = partner_names.get(d.partner_id, f'Partner #{d.partner_id}')
+        if d.sent_at and not d.receipt_confirmed_at:
+            outstanding.append({'partner': nm,
+                                'what': 'Receipt of funds not confirmed',
+                                'severity': 'block'})
+        if not d.report_submitted_at:
+            outstanding.append({
+                'partner': nm, 'what': 'Partner report not received',
+                'severity': 'block' if d.is_overdue() else 'warn'})
+
+    held = {m.meeting_type for m in meetings}
+    for required in ('orientation', 'nomination_review', 'awarding'):
+        if required not in held:
+            outstanding.append({
+                'partner': None,
+                'what': f'No {required.replace("_", " ")} meeting recorded',
+                'severity': 'warn'})
+
+    open_issues = ProximateEvidence.query.filter_by(
+        round_id=rnd.id, is_issue=True, resolved_at=None,
+    ).count()
+    if open_issues:
+        outstanding.append({
+            'partner': None,
+            'what': f'{open_issues} unresolved issue(s) in the evidence log',
+            'severity': 'warn'})
+
+    blocks = [o for o in outstanding if o['severity'] == 'block']
+    return jsonify({
+        'success': True,
+        'cycle': _round_setup_dict(rnd),
+        'panel': {
+            'total': len(panel),
+            'confirmed': len([p for p in panel if p.status == 'confirmed']),
+            'localities': sorted({
+                (p.location or '').strip() for p in panel
+                if p.status == 'confirmed' and (p.location or '').strip()
+            }),
+        },
+        'meetings': [m.to_dict() for m in meetings],
+        'awards': {
+            'considered': len(awards),
+            'awarded': len(awarded),
+            'not_awarded': len([a for a in awards if a.decision == 'not_awarded']),
+            'total_approved_usd': float(sum(
+                float(a.approved_amount_usd or 0) for a in awarded)),
+        },
+        'money': rnd.money_summary(),
+        'disbursements': {
+            'count': len(disbs),
+            'total_sent_usd': float(sum(float(d.amount_usd or 0) for d in disbs)),
+            'receipts_confirmed': sum(1 for d in disbs if d.receipt_confirmed_at),
+            'reports_in': sum(1 for d in disbs if d.report_submitted_at),
+        },
+        'outstanding': outstanding,
+        'ready_to_close': not blocks,
+        'blocking_count': len(blocks),
+    })
+
+
+# ===============================================================
+# Panel-member CV
+# ===============================================================
+
+@cycle_bp.route('/panel/<int:member_id>/cv', methods=['POST'])
+@login_required
+@ob_required
+def api_panel_cv(member_id):
+    """Link an already-uploaded document as this member's CV.
+
+    The upload itself goes through the existing /api/proximate/attachments
+    endpoint (subject_kind='panel_candidate'); this links the resulting
+    document so the roster can show at a glance who has one — which is
+    what the SoP's CV-review requirement needs to be checkable.
+    """
+    nid = _net_id()
+    m = ProximatePanelCandidate.query.filter_by(
+        id=member_id, network_id=nid,
+    ).first()
+    if not m:
+        return jsonify({'success': False, 'error': 'Panel member not found'}), 404
+    body = get_request_json() or {}
+    doc_id = body.get('document_id')
+    if not doc_id:
+        return jsonify({'success': False, 'error': 'document_id required'}), 400
+    m.cv_doc_id = doc_id
+    db.session.commit()
+    _audit('proximate.panel.cv_linked', 'panel_member', m.id, document_id=doc_id)
+    return jsonify({'success': True, 'member': m.to_dict()})
+
+
+# ===============================================================
+# Money split from the donor agreements
+# ===============================================================
+
+@cycle_bp.route('/rounds/<int:round_id>/money-from-grants', methods=['POST'])
+@login_required
+@ob_required
+def api_money_from_grants(round_id):
+    """Propose the cycle's money split from the linked donor grants.
+
+    Reads what was allocated to this cycle and — where the donor
+    agreement has been through AI extraction — what that document said
+    about administration and overhead.
+
+    It PROPOSES. Nothing is written unless the caller passes
+    `apply: true`, because an extracted number is a reading of a PDF, and
+    a reading of a PDF should not silently become the ceiling on what
+    partners can be paid.
+    """
+    rnd = _scoped_round(round_id)
+    if not rnd:
+        return jsonify({'success': False, 'error': 'Round not found'}), 404
+
+    from app.models import ProximateGrantAllocation, ProximateGrant
+
+    allocs = ProximateGrantAllocation.query.filter_by(round_id=rnd.id).all()
+    allocated = float(sum(float(a.amount_usd or 0) for a in allocs))
+
+    overhead_hint = 0.0
+    sources = []
+    for a in allocs:
+        g = ProximateGrant.query.get(a.grant_id) if a.grant_id else None
+        if not g:
+            continue
+        entry = {
+            'grant_id': g.id,
+            'title': g.title,
+            'donor': g.donor_name_cache,
+            'allocated_usd': float(a.amount_usd or 0),
+            'committed_usd': float(g.amount_committed_usd or 0),
+            'received_usd': float(g.amount_received_usd or 0),
+            'overhead_from_agreement': None,
+        }
+        try:
+            ex = json.loads(g.extracted_json) if g.extracted_json else {}
+        except (ValueError, TypeError):
+            ex = {}
+        if isinstance(ex, dict):
+            for key in ('admin_overhead_usd', 'overhead_usd',
+                        'indirect_cost_usd', 'administration_usd'):
+                if not ex.get(key):
+                    continue
+                try:
+                    share = float(ex[key])
+                except (TypeError, ValueError):
+                    continue
+                # Scale the agreement's overhead to this cycle's slice of
+                # the grant — a grant split across three cycles must not
+                # charge each of them the full amount.
+                committed = float(g.amount_committed_usd or 0)
+                if committed > 0 and a.amount_usd:
+                    share = share * (float(a.amount_usd) / committed)
+                entry['overhead_from_agreement'] = round(share, 2)
+                overhead_hint += share
+                break
+        sources.append(entry)
+
+    proposal = {
+        'envelope_usd': allocated or float(rnd.envelope_usd or 0),
+        'admin_overhead_usd': round(overhead_hint, 2) if overhead_hint else None,
+        'sources': sources,
+    }
+    if proposal['admin_overhead_usd'] is None:
+        proposal['note'] = (
+            'No administration figure was found in the donor agreements. '
+            'Enter it by hand — the envelope is not what partners can '
+            'receive, and leaving it at zero would say that it is.'
+        )
+
+    body = get_request_json() or {}
+    if body.get('apply'):
+        if proposal['envelope_usd']:
+            rnd.envelope_usd = proposal['envelope_usd']
+        if proposal['admin_overhead_usd'] is not None:
+            rnd.admin_overhead_usd = proposal['admin_overhead_usd']
+        db.session.commit()
+        _audit('proximate.cycle.money_from_grants', 'round', rnd.id,
+               envelope=rnd.envelope_usd, overhead=rnd.admin_overhead_usd)
+        return jsonify({'success': True, 'applied': True,
+                        'money': rnd.money_summary(), 'proposal': proposal})
+
+    return jsonify({'success': True, 'applied': False,
+                    'proposal': proposal, 'money': rnd.money_summary()})

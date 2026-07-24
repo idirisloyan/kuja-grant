@@ -29,6 +29,8 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { InterventionPanel } from '@/components/proximate/intervention-panel';
+import { PartnerLifecycleCard } from '@/components/proximate/partner-lifecycle-card';
+import { EvidenceInboxCard, PartnerHistoryCard } from '@/components/proximate/evidence-inbox-card';
 import { VoiceQuestionInput } from '@/components/proximate/voice-question-input';
 import { EndorsementsPanel } from '@/components/proximate/endorsements-panel';
 import { DisbursementMethodsPanel } from '@/components/proximate/disbursement-methods-panel';
@@ -51,9 +53,15 @@ import {
 // Oversight Body view (same technique as the round detail).
 const PARTNER_TABS = [
   { key: 'overview', label: 'Overview' },
+  // 2026-07-24 — one record, revealed by stage. "Record" sits first
+  // because it is the whole partner; the tabs after it are the parts
+  // of that record that have their own machinery.
+  { key: 'record', label: 'Record' },
   { key: 'endorsements', label: 'Endorsements' },
   { key: 'dd', label: 'Due diligence' },
   { key: 'disbursements', label: 'Disbursements' },
+  { key: 'evidence', label: 'Evidence' },
+  { key: 'history', label: 'History' },
 ];
 
 interface PartnerDisbursement {
@@ -738,6 +746,18 @@ export default function ProximateEndorseWizardClient() {
               </div>
             </Card>
           )}
+          </div>
+
+          <div className={tabCls('record')}>
+            <PartnerLifecycleCard partnerId={Number(partnerId)} canEdit={isOb} />
+          </div>
+
+          <div className={tabCls('evidence')}>
+            <EvidenceInboxCard partnerId={Number(partnerId)} canEdit={isOb} />
+          </div>
+
+          <div className={tabCls('history')}>
+            <PartnerHistoryCard partnerId={Number(partnerId)} />
           </div>
 
           <div className={tabCls('endorsements')}>

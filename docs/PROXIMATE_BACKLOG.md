@@ -1237,13 +1237,42 @@ and the whole middle of the money flow had no home.
   awards are tabs on the round. A process has fourteen steps; a person
   has about three jobs.
 
+**Wave 2 — SHIPPED same day**
+
+- **Staged partner record** — one record, fields grouped by stage, later
+  stages `locked` rather than shown as empty inputs. Stage definitions
+  come from the server so the console and the donor pack cannot drift.
+  Partner detail → *Record* tab.
+- **Evidence inbox** — per partner. **A note alone is enough**; most of
+  what arrives mid-implementation is a sentence from a phone call, and
+  requiring an upload would mean the commonest form of contact never
+  gets recorded. Issues can be flagged, escalated to the panel, resolved.
+- **Partner history across cycles** — awards, money, receipt lag, report
+  timing, evidence. **No score, deliberately** (see the note below).
+- **Cycle closeout pack** — blockers first, then the summary.
+  `ready_to_close` is computed from the blockers, never asserted.
+- **Panel-member CV** — `cv_doc_id` linked from an uploaded attachment.
+- **Money split from donor agreements** — reads AI-extracted overhead and
+  **scales it to this cycle's slice** of the grant. It PROPOSES; nothing
+  is written without `apply: true`, because a reading of a PDF should not
+  silently become the ceiling on what partners can be paid.
+
+**Why there is still no partner performance score**
+
+The evidence is all recorded — on-time reporting, receipt lag,
+documentation quality, open issues. The number is not, and should not be.
+In Sudan a timeliness metric measures connectivity and conflict at least
+as much as diligence, and a score on a partner card becomes a funding
+gate by accident, against exactly the organisations this fund exists to
+reach. `/partners/<id>/history` returns observations with a written
+caveat instead.
+
 **Still open**
 
-- Stage B/C/D partner fields (PIF, DD, suggested activities) exist but are
-  not yet revealed stage-by-stage on one partner record.
-- Implementation follow-up "evidence inbox" — attachments exist, no
-  dedicated per-partner inbox.
-- Partner history across cycles.
-- Cycle closeout pack.
-- Panel-member CV upload wired to the `cv_doc_id` slot.
-- AI extraction from donor agreements into the money split.
+- Arabic strings for the new cycle surfaces (English-only at present;
+  the six locale files are still in parity at 3,238 keys each).
+- Evidence attachments upload inline from the inbox (today the file goes
+  through `/api/proximate/attachments` first, then is referenced).
+- Closeout pack as a server-rendered PDF (currently print-to-PDF).
+- Cron nudge for cycles sitting in `implementation` with no evidence
+  logged for N days.

@@ -93,8 +93,9 @@ from app.models.proximate_round import (
     PARTICIPANT_STAGES, ROUND_PHASES, AREA_SOURCES,
 )
 from app.models.proximate_cycle import (
-    ProximatePanelMeeting, ProximateAward, ProximateContract,
+    ProximatePanelMeeting, ProximateAward, ProximateContract, ProximateEvidence,
     MEETING_TYPES, AWARD_DECISIONS, AWARD_METHODS, CONTRACT_STATUSES,
+    EVIDENCE_SOURCES, EVIDENCE_KINDS,
 )
 from app.models.proximate_disbursement import (
     ProximateDisbursement,
@@ -157,6 +158,7 @@ __all__ = [
     'FinancialServiceProvider', 'PartnerDisbursementMethod',
     'FSP_KINDS', 'METHOD_STATUSES',
     'ProximatePanelMeeting', 'ProximateAward', 'ProximateContract',
+    'ProximateEvidence', 'EVIDENCE_SOURCES', 'EVIDENCE_KINDS',
     'MEETING_TYPES', 'AWARD_DECISIONS', 'AWARD_METHODS', 'CONTRACT_STATUSES',
     'ROUND_PHASES', 'AREA_SOURCES', 'PANEL_MEMBER_STATUSES',
     'ProximateAttachment', 'ProximateMediaVerification', 'ProximatePanelCandidate',
