@@ -16,6 +16,7 @@ import {
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface Outstanding { partner: string | null; what: string; severity: string }
 interface Closeout {
@@ -37,6 +38,7 @@ function usd(n: unknown): string {
 }
 
 export function CycleCloseoutCard({ roundId }: { roundId: number }) {
+  const { t } = useTranslation();
   const [d, setD] = useState<Closeout | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -55,7 +57,7 @@ export function CycleCloseoutCard({ roundId }: { roundId: number }) {
   if (loading) {
     return (
       <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="w-4 h-4 animate-spin" /> Building the closeout pack…
+        <Loader2 className="w-4 h-4 animate-spin" /> {t('proximate.cycle.building_closeout') || 'Building the closeout pack…'}
       </Card>
     );
   }
@@ -75,18 +77,28 @@ export function CycleCloseoutCard({ roundId }: { roundId: number }) {
             <div>
               <h3 className="font-semibold">
                 {d.ready_to_close
-                  ? 'Nothing is blocking closeout'
+                  ? (t('proximate.cycle.closeout_ready') || 'Nothing is blocking closeout')
                   : `${d.blocking_count} thing${d.blocking_count === 1 ? '' : 's'} must be finished first`}
               </h3>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {d.ready_to_close
-                  ? 'Every partner has been paid, confirmed receipt and reported.'
-                  : 'A cycle should not be closed while a partner is still owed money or a report.'}
+                  ? (t('proximate.cycle.closeout_ready_sub')
+                     || 'Every partner has been paid, confirmed receipt and reported.')
+                  : (t('proximate.cycle.closeout_blocked_sub')
+                     || 'A cycle should not be closed while a partner is still owed money or a report.')}
               </p>
             </div>
           </div>
-          <Button size="sm" variant="outline" onClick={() => window.print()}>
-            <Printer className="w-3.5 h-3.5 mr-1.5" /> Print
+          <Button
+            size="sm" variant="outline"
+            onClick={() => {
+              // Server-rendered so the pack does not depend on which
+              // browser produced it, and so Arabic shapes correctly.
+              window.location.href =
+                `/api/proximate/rounds/${roundId}/closeout.pdf`;
+            }}
+          >
+            <Printer className="w-3.5 h-3.5 mr-1.5" /> {t('proximate.cycle.download_pdf') || 'Download PDF'}
           </Button>
         </div>
       </Card>
@@ -94,7 +106,7 @@ export function CycleCloseoutCard({ roundId }: { roundId: number }) {
       {blocks.length > 0 && (
         <Card className="p-5 space-y-2">
           <h4 className="text-sm font-semibold flex items-center gap-2">
-            <CircleAlert className="w-4 h-4 text-red-600" /> Must be resolved
+            <CircleAlert className="w-4 h-4 text-red-600" /> {t('proximate.cycle.must_resolve') || 'Must be resolved'}
           </h4>
           <ul className="space-y-1.5">
             {blocks.map((o, i) => (
@@ -112,7 +124,7 @@ export function CycleCloseoutCard({ roundId }: { roundId: number }) {
       {warns.length > 0 && (
         <Card className="p-5 space-y-2">
           <h4 className="text-sm font-semibold flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600" /> Worth noting
+            <AlertTriangle className="w-4 h-4 text-amber-600" /> {t('proximate.cycle.worth_noting') || 'Worth noting'}
           </h4>
           <ul className="space-y-1.5">
             {warns.map((o, i) => (
@@ -129,31 +141,32 @@ export function CycleCloseoutCard({ roundId }: { roundId: number }) {
 
       <Card className="p-5 space-y-4">
         <h4 className="text-sm font-semibold flex items-center gap-2">
-          <PackageCheck className="w-4 h-4 text-muted-foreground" /> The cycle in summary
+          <PackageCheck className="w-4 h-4 text-muted-foreground" /> {t('proximate.cycle.cycle_summary') || 'The cycle in summary'}
         </h4>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-          <S label="Panel members seated" v={String(d.panel.confirmed)} />
-          <S label="Localities represented" v={String(d.panel.localities.length)} />
-          <S label="Meetings recorded" v={String(d.meetings.length)} />
-          <S label="Partners considered" v={String(d.awards.considered)} />
-          <S label="Awarded" v={String(d.awards.awarded)} />
-          <S label="Total approved" v={usd(d.awards.total_approved_usd)} />
-          <S label="Total sent" v={usd(d.disbursements.total_sent_usd)} />
-          <S label="Receipts confirmed"
+          <S label={t('proximate.cycle.panel_seated') || 'Panel members seated'} v={String(d.panel.confirmed)} />
+          <S label={t('proximate.cycle.localities_represented') || 'Localities represented'} v={String(d.panel.localities.length)} />
+          <S label={t('proximate.cycle.meetings_recorded') || 'Meetings recorded'} v={String(d.meetings.length)} />
+          <S label={t('proximate.cycle.partners_considered') || 'Partners considered'} v={String(d.awards.considered)} />
+          <S label={t('proximate.cycle.awarded') || 'Awarded'} v={String(d.awards.awarded)} />
+          <S label={t('proximate.cycle.total_approved') || 'Total approved'} v={usd(d.awards.total_approved_usd)} />
+          <S label={t('proximate.cycle.total_sent') || 'Total sent'} v={usd(d.disbursements.total_sent_usd)} />
+          <S label={t('proximate.cycle.receipts_confirmed') || 'Receipts confirmed'}
              v={`${d.disbursements.receipts_confirmed} of ${d.disbursements.count}`} />
         </div>
 
         <div className="pt-3 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-          <S label="Donor envelope" v={usd(d.money.envelope_usd)} />
-          <S label="Administration" v={usd(d.money.admin_overhead_usd)} />
-          <S label="Available for partners" v={usd(d.money.disbursable_usd)} />
-          <S label="Unspent" v={usd(d.money.uncommitted_usd)} />
+          <S label={t('proximate.cycle.envelope') || 'Donor envelope'} v={usd(d.money.envelope_usd)} />
+          <S label={t('proximate.cycle.admin_overhead') || 'Administration'} v={usd(d.money.admin_overhead_usd)} />
+          <S label={t('proximate.cycle.disbursable') || 'Available for partners'} v={usd(d.money.disbursable_usd)} />
+          <S label={t('proximate.cycle.unspent') || 'Unspent'} v={usd(d.money.uncommitted_usd)} />
         </div>
 
         {d.panel.localities.length > 0 && (
           <p className="text-xs text-muted-foreground pt-2 border-t border-border">
-            Panel drawn from: {d.panel.localities.join(', ')}.
+            {(t('proximate.cycle.panel_drawn_from') || 'Panel drawn from: {x}.')
+              .replace('{x}', d.panel.localities.join(', '))}
           </p>
         )}
       </Card>

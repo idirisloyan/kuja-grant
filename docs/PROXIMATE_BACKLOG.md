@@ -1267,12 +1267,32 @@ gate by accident, against exactly the organisations this fund exists to
 reach. `/partners/<id>/history` returns observations with a written
 caveat instead.
 
+**Wave 3 — SHIPPED same day**
+
+- **Arabic across every cycle surface.** 187 keys under
+  `proximate.cycle.*`, real Arabic for all of them. Locale parity holds
+  at 3,425 keys across all six files. **fr/es/sw/so carry the English
+  string as a visible placeholder** — the existing convention on this
+  tenant — so the parity test stays honest and nothing renders as a raw
+  key. Components use the codebase idiom `t('key') || 'English'`, so a
+  missing key degrades to readable text rather than to `proximate.cycle.x`.
+- **Inline evidence upload.** The dialog uploads the file and writes the
+  note in one action. **If the upload fails the note is still saved** —
+  losing a written account because a photo would not send is the worst
+  outcome on a bad line.
+- **Closeout pack as a server-rendered PDF.** Blockers first, then the
+  summary. Arabic goes through the same Amiri + reshaper path as the
+  partner report pack, so a cycle run in Arabic produces an Arabic pack.
+- **Quiet-implementation cron** (`cron-proximate-stale-implementation.yml`,
+  Tuesdays 05:00 UTC, deliberately clear of the Sunday backup and Monday
+  sanctions sweep). Flags partners who have had money for 14+ days with
+  nothing logged. It records an observation for the secretariat and
+  **does not message the partner or change their status** — being hard to
+  reach in Sudan is not misconduct, and the wording says so. Duplicate
+  flags are suppressed while one is unresolved.
+
 **Still open**
 
-- Arabic strings for the new cycle surfaces (English-only at present;
-  the six locale files are still in parity at 3,238 keys each).
-- Evidence attachments upload inline from the inbox (today the file goes
-  through `/api/proximate/attachments` first, then is referenced).
-- Closeout pack as a server-rendered PDF (currently print-to-PDF).
-- Cron nudge for cycles sitting in `implementation` with no evidence
-  logged for N days.
+- Native Sudanese-Arabic review of the new strings. They are translated,
+  not yet dialect-checked — same gate the partner guide is behind.
+- Visual pass on the new tabs by a logged-in human.

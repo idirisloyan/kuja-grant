@@ -21,14 +21,15 @@ import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 const SOURCES = [
-  { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
-  { key: 'call', label: 'Phone call', icon: Phone },
-  { key: 'email', label: 'Email', icon: Mail },
-  { key: 'field_visit', label: 'Field visit', icon: MapPin },
-  { key: 'form', label: 'Form', icon: FileText },
-  { key: 'other', label: 'Other', icon: FileText },
+  { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, k: 'proximate.cycle.src_whatsapp' },
+  { key: 'call', label: 'Phone call', icon: Phone, k: 'proximate.cycle.src_call' },
+  { key: 'email', label: 'Email', icon: Mail, k: 'proximate.cycle.src_email' },
+  { key: 'field_visit', label: 'Field visit', icon: MapPin, k: 'proximate.cycle.src_field_visit' },
+  { key: 'form', label: 'Form', icon: FileText, k: 'proximate.cycle.src_form' },
+  { key: 'other', label: 'Other', icon: FileText, k: 'proximate.cycle.src_other' },
 ];
 
 const KINDS = [
@@ -46,6 +47,7 @@ interface Evidence {
 export function EvidenceInboxCard({ partnerId, roundId, canEdit }: {
   partnerId: number; roundId?: number; canEdit: boolean;
 }) {
+  const { t } = useTranslation();
   const [items, setItems] = useState<Evidence[]>([]);
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,7 +74,7 @@ export function EvidenceInboxCard({ partnerId, roundId, canEdit }: {
   if (loading) {
     return (
       <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="w-4 h-4 animate-spin" /> Loading evidence…
+        <Loader2 className="w-4 h-4 animate-spin" /> {t('proximate.cycle.loading') || 'Loading…'}
       </Card>
     );
   }
@@ -83,34 +85,33 @@ export function EvidenceInboxCard({ partnerId, roundId, canEdit }: {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold flex items-center gap-2">
-              <Inbox className="w-4 h-4 text-muted-foreground" /> Evidence
+              <Inbox className="w-4 h-4 text-muted-foreground" /> {t('proximate.cycle.evidence_title') || 'Evidence'}
             </h3>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Anything that arrived — a WhatsApp photo, a phone call, a
-              receipt. A note on its own is enough; there is no need to
-              have a file.
+              {t('proximate.cycle.evidence_blurb')
+                || 'Anything that arrived — a WhatsApp photo, a phone call, a receipt. A note on its own is enough; there is no need to have a file.'}
             </p>
           </div>
           {canEdit && (
             <Button size="sm" onClick={() => setAdding(true)}>
-              <Plus className="w-3.5 h-3.5 mr-1.5" /> Log something
+              <Plus className="w-3.5 h-3.5 mr-1.5" /> {t('proximate.cycle.log_something') || 'Log something'}
             </Button>
           )}
         </div>
         {summary && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-            <Stat label="Items" v={summary.total} />
-            <Stat label="Open issues" v={summary.open_issues} bad={summary.open_issues > 0} />
-            <Stat label="Needs follow-up" v={summary.needs_followup} />
-            <Stat label="For the panel" v={summary.needs_panel} />
+            <Stat label={t('proximate.cycle.items') || 'Items'} v={summary.total} />
+            <Stat label={t('proximate.cycle.open_issues') || 'Open issues'} v={summary.open_issues} bad={summary.open_issues > 0} />
+            <Stat label={t('proximate.cycle.needs_followup') || 'Needs follow-up'} v={summary.needs_followup} />
+            <Stat label={t('proximate.cycle.for_the_panel') || 'For the panel'} v={summary.needs_panel} />
           </div>
         )}
       </Card>
 
       {items.length === 0 && (
         <Card className="p-6 text-center text-sm text-muted-foreground">
-          Nothing logged yet. When a partner sends a photo or calls, record
-          it here — that is what the record is made of.
+          {t('proximate.cycle.evidence_empty')
+            || 'Nothing logged yet. When a partner sends a photo or calls, record it here — that is what the record is made of.'}
         </Card>
       )}
 
@@ -122,17 +123,18 @@ export function EvidenceInboxCard({ partnerId, roundId, canEdit }: {
               <div className="flex items-start gap-3 min-w-0">
                 <Src className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm">{e.summary || '(attachment only)'}</p>
+                  <p className="text-sm">{e.summary || (t('proximate.cycle.attachment_only') || '(attachment only)')}</p>
                   <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-2">
-                    <span>{SOURCES.find((s) => s.key === e.source)?.label || e.source}</span>
+                    <span>{(() => { const sc = SOURCES.find((s) => s.key === e.source);
+                      return sc ? (t(sc.k) || sc.label) : e.source; })()}</span>
                     <span>·</span>
                     <span>{e.kind.replace(/_/g, ' ')}</span>
                     {e.occurred_at && <><span>·</span><span>{e.occurred_at.slice(0, 10)}</span></>}
-                    {e.has_document && <><span>·</span><span>file attached</span></>}
+                    {e.has_document && <><span>·</span><span>{t('proximate.cycle.file_attached') || 'file attached'}</span></>}
                   </p>
                   {e.resolution_note && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      Resolved: {e.resolution_note}
+                      {t('proximate.cycle.resolved') || 'Resolved'}: {e.resolution_note}
                     </p>
                   )}
                 </div>
@@ -145,7 +147,7 @@ export function EvidenceInboxCard({ partnerId, roundId, canEdit }: {
                     {canEdit && (
                       <Button size="sm" variant="outline" className="h-7 text-xs"
                               onClick={() => resolve(e.id)}>
-                        Resolve
+                        {t('proximate.cycle.resolve') || 'Resolve'}
                       </Button>
                     )}
                   </>
@@ -182,6 +184,7 @@ function Stat({ label, v, bad }: { label: string; v: number; bad?: boolean }) {
 function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
   partnerId: number; roundId?: number; onClose: () => void; onAdded: () => void;
 }) {
+  const { t } = useTranslation();
   const [source, setSource] = useState('whatsapp');
   const [kind, setKind] = useState('progress_update');
   const [summary, setSummary] = useState('');
@@ -191,15 +194,50 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
   const [panel, setPanel] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  /**
+   * Upload the file first, then reference it on the evidence row.
+   *
+   * The attachment endpoint is multipart and owns storage; evidence is
+   * JSON. Rather than teach one of them the other's shape, the dialog
+   * does the two steps and the user sees one action. If the upload
+   * fails the note is still saved — losing a written account because a
+   * photo would not send is the worst possible outcome on a bad line.
+   */
+  async function uploadFile(): Promise<number | null> {
+    if (!file) return null;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('subject_kind', 'partner');
+      fd.append('subject_id', String(partnerId));
+      fd.append('kind', 'other');
+      const r = await fetch('/api/proximate/attachments', {
+        method: 'POST', body: fd, credentials: 'include',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      const j = await r.json().catch(() => null);
+      setUploading(false);
+      return j?.attachment?.document_id ?? j?.document_id ?? null;
+    } catch {
+      setUploading(false);
+      return null;
+    }
+  }
 
   async function submit() {
     setBusy(true); setErr('');
     try {
+      const documentId = await uploadFile();
       const r = await api.post<{ success: boolean; error?: string }>(
         `/api/proximate/partners/${partnerId}/evidence`,
         {
           source, kind, summary, round_id: roundId,
           occurred_at: occurred || undefined,
+          document_id: documentId ?? undefined,
           is_issue: isIssue, needs_followup: followup, needs_panel: panel,
         },
       );
@@ -215,14 +253,14 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
       <Card className="w-full max-w-lg p-5 space-y-3 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold">Log something that arrived</h3>
+          <h3 className="font-semibold">{t('proximate.cycle.log_title') || 'Log something that arrived'}</h3>
           <button type="button" onClick={onClose} aria-label="Close">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
 
         <div>
-          <p className="text-xs text-muted-foreground mb-1.5">How did it reach you?</p>
+          <p className="text-xs text-muted-foreground mb-1.5">{t('proximate.cycle.how_reached') || 'How did it reach you?'}</p>
           <div className="flex flex-wrap gap-2">
             {SOURCES.map((s) => (
               <button
@@ -233,25 +271,26 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
                     : 'border-border text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {s.label}
+                {t(s.k) || s.label}
               </button>
             ))}
           </div>
         </div>
 
         <label className="block text-sm">
-          <span className="text-xs text-muted-foreground">What happened</span>
+          <span className="text-xs text-muted-foreground">{t('proximate.cycle.what_happened') || 'What happened'}</span>
           <textarea
             rows={3} value={summary} autoFocus
             onChange={(e) => setSummary(e.target.value)}
-            placeholder="He called — the market is closed, distribution moved to Thursday."
+            placeholder={t('proximate.cycle.what_happened_ph')
+              || 'He called — the market is closed, distribution moved to Thursday.'}
             className="mt-1 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm"
           />
         </label>
 
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="block text-sm">
-            <span className="text-xs text-muted-foreground">Kind</span>
+            <span className="text-xs text-muted-foreground">{t('proximate.cycle.kind') || 'Kind'}</span>
             <select
               value={kind} onChange={(e) => setKind(e.target.value)}
               className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
@@ -262,7 +301,7 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
             </select>
           </label>
           <label className="block text-sm">
-            <span className="text-xs text-muted-foreground">When it happened</span>
+            <span className="text-xs text-muted-foreground">{t('proximate.cycle.when_happened') || 'When it happened'}</span>
             <input
               type="date" value={occurred}
               onChange={(e) => setOccurred(e.target.value)}
@@ -271,11 +310,22 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
           </label>
         </div>
 
+        <label className="block text-sm">
+          <span className="text-xs text-muted-foreground">
+            {t('proximate.cycle.attach_file') || 'Attach a file (optional)'}
+          </span>
+          <input
+            type="file"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className="mt-1 w-full text-sm file:mr-2 file:rounded-md file:border file:border-border file:bg-background file:px-2 file:py-1 file:text-xs"
+          />
+        </label>
+
         <div className="space-y-2">
           {([
-            ['This is a problem', isIssue, setIsIssue],
-            ['Needs follow-up', followup, setFollowup],
-            ['The panel should see this', panel, setPanel],
+            [t('proximate.cycle.is_problem') || 'This is a problem', isIssue, setIsIssue],
+            [t('proximate.cycle.needs_followup') || 'Needs follow-up', followup, setFollowup],
+            [t('proximate.cycle.panel_should_see') || 'The panel should see this', panel, setPanel],
           ] as [string, boolean, (v: boolean) => void][]).map(([label, val, set]) => (
             <label key={label} className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={val} onChange={(e) => set(e.target.checked)} />
@@ -286,9 +336,12 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
 
         {err && <p className="text-sm text-red-600">{err}</p>}
         <div className="flex justify-end gap-2">
-          <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button size="sm" variant="outline" onClick={onClose}>{t('proximate.cycle.cancel') || 'Cancel'}</Button>
           <Button size="sm" onClick={submit} disabled={busy || !summary.trim()}>
-            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Log it'}
+            {busy || uploading
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                  {uploading ? (t('proximate.cycle.uploading') || 'Uploading…') : ''}</>
+              : (t('proximate.cycle.log_it') || 'Log it')}
           </Button>
         </div>
       </Card>
@@ -306,6 +359,7 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
  * accident, against exactly the organisations this fund exists for.
  */
 export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
+  const { t } = useTranslation();
   const [data, setData] = useState<{
     cycles: Record<string, unknown>[];
     observations: Record<string, number | null>;
@@ -328,7 +382,7 @@ export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
   if (loading) {
     return (
       <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="w-4 h-4 animate-spin" /> Loading history…
+        <Loader2 className="w-4 h-4 animate-spin" /> {t('proximate.cycle.loading_history') || 'Loading history…'}
       </Card>
     );
   }
@@ -336,26 +390,34 @@ export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
 
   const o = data.observations;
   const rows: [string, string][] = [
-    ['Cycles participated in', String(o.cycles_participated ?? 0)],
-    ['Times awarded', String(o.times_awarded ?? 0)],
-    ['Total awarded', `$${Number(o.total_awarded_usd || 0).toLocaleString()}`],
-    ['Total sent', `$${Number(o.total_sent_usd || 0).toLocaleString()}`],
-    ['Receipts confirmed', String(o.receipts_confirmed ?? 0)],
-    ['Receipts outstanding', String(o.receipts_outstanding ?? 0)],
-    ['Typical time to confirm receipt',
+    [t('proximate.cycle.cycles_participated') || 'Cycles participated in',
+      String(o.cycles_participated ?? 0)],
+    [t('proximate.cycle.times_awarded') || 'Times awarded', String(o.times_awarded ?? 0)],
+    [t('proximate.cycle.total_awarded') || 'Total awarded',
+      `$${Number(o.total_awarded_usd || 0).toLocaleString()}`],
+    [t('proximate.cycle.total_sent') || 'Total sent',
+      `$${Number(o.total_sent_usd || 0).toLocaleString()}`],
+    [t('proximate.cycle.receipts_confirmed') || 'Receipts confirmed',
+      String(o.receipts_confirmed ?? 0)],
+    [t('proximate.cycle.receipts_outstanding') || 'Receipts outstanding',
+      String(o.receipts_outstanding ?? 0)],
+    [t('proximate.cycle.median_receipt_lag') || 'Typical time to confirm receipt',
       o.median_receipt_lag_days === null || o.median_receipt_lag_days === undefined
-        ? 'No data yet' : `${o.median_receipt_lag_days} day(s)`],
-    ['Reports on time', String(o.reports_on_time ?? 0)],
-    ['Reports late', String(o.reports_late ?? 0)],
-    ['Reports outstanding', String(o.reports_outstanding ?? 0)],
-    ['Evidence logged', String(o.evidence_items ?? 0)],
-    ['Open issues', String(o.open_issues ?? 0)],
+        ? (t('proximate.cycle.no_data_yet') || 'No data yet')
+        : (t('proximate.cycle.days') || '{n} day(s)')
+            .replace('{n}', String(o.median_receipt_lag_days))],
+    [t('proximate.cycle.reports_on_time') || 'Reports on time', String(o.reports_on_time ?? 0)],
+    [t('proximate.cycle.reports_late') || 'Reports late', String(o.reports_late ?? 0)],
+    [t('proximate.cycle.reports_outstanding') || 'Reports outstanding',
+      String(o.reports_outstanding ?? 0)],
+    [t('proximate.cycle.evidence_logged') || 'Evidence logged', String(o.evidence_items ?? 0)],
+    [t('proximate.cycle.open_issues') || 'Open issues', String(o.open_issues ?? 0)],
   ];
 
   return (
     <Card className="p-5 space-y-4">
       <h3 className="font-semibold flex items-center gap-2">
-        <History className="w-4 h-4 text-muted-foreground" /> History with the fund
+        <History className="w-4 h-4 text-muted-foreground" /> {t('proximate.cycle.history_title') || 'History with the fund'}
       </h3>
 
       {data.cycles.length > 0 && (
@@ -363,11 +425,11 @@ export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-muted-foreground border-b border-border">
-                <th className="py-1.5 pr-3 font-normal">Cycle</th>
-                <th className="py-1.5 pr-3 font-normal">Decision</th>
-                <th className="py-1.5 pr-3 font-normal text-right">Approved</th>
-                <th className="py-1.5 pr-3 font-normal text-right">Sent</th>
-                <th className="py-1.5 font-normal text-right">Reports in</th>
+                <th className="py-1.5 pr-3 font-normal">{t('proximate.cycle.cycle') || 'Cycle'}</th>
+                <th className="py-1.5 pr-3 font-normal">{t('proximate.cycle.decision') || 'Decision'}</th>
+                <th className="py-1.5 pr-3 font-normal text-right">{t('proximate.cycle.approved') || 'Approved'}</th>
+                <th className="py-1.5 pr-3 font-normal text-right">{t('proximate.cycle.sent') || 'Sent'}</th>
+                <th className="py-1.5 font-normal text-right">{t('proximate.cycle.reports_in') || 'Reports in'}</th>
               </tr>
             </thead>
             <tbody>

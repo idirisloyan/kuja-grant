@@ -21,13 +21,19 @@ import { Loader2, MapPin, Banknote, CalendarClock, AlertTriangle } from 'lucide-
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
-const AREA_SOURCES: { key: string; label: string }[] = [
-  { key: 'local_networks', label: 'Trusted local networks' },
-  { key: 'community_information', label: 'Community / grassroots information' },
-  { key: 'humanitarian_reports', label: 'Humanitarian or development reports' },
-  { key: 'internal_analysis', label: 'Internal research / context analysis' },
-  { key: 'targeted_mapping', label: 'Targeted mapping' },
+const AREA_SOURCES: { key: string; label: string; k: string }[] = [
+  { key: 'local_networks', label: 'Trusted local networks',
+    k: 'proximate.cycle.src_local_networks' },
+  { key: 'community_information', label: 'Community / grassroots information',
+    k: 'proximate.cycle.src_community' },
+  { key: 'humanitarian_reports', label: 'Humanitarian or development reports',
+    k: 'proximate.cycle.src_reports' },
+  { key: 'internal_analysis', label: 'Internal research / context analysis',
+    k: 'proximate.cycle.src_internal' },
+  { key: 'targeted_mapping', label: 'Targeted mapping',
+    k: 'proximate.cycle.src_mapping' },
 ];
 
 interface Money {
@@ -63,6 +69,7 @@ function usd(n: number | null | undefined): string {
 }
 
 export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit: boolean }) {
+  const { t } = useTranslation();
   const [setup, setSetup] = useState<Setup | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -128,7 +135,7 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
   if (loading) {
     return (
       <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="w-4 h-4 animate-spin" /> Loading cycle setup…
+        <Loader2 className="w-4 h-4 animate-spin" /> {t('proximate.cycle.loading_setup') || 'Loading cycle setup…'}
       </Card>
     );
   }
@@ -159,19 +166,19 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
         <div className="flex items-center justify-between">
           <h3 className="font-semibold flex items-center gap-2">
             <Banknote className="w-4 h-4 text-muted-foreground" />
-            Funding for this cycle
+            {t('proximate.cycle.money_title') || 'Funding for this cycle'}
           </h3>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Stat label="Donor envelope" value={usd(m.envelope_usd)} />
-          <Stat label="Administration" value={usd(m.admin_overhead_usd)} />
+          <Stat label={t('proximate.cycle.envelope') || 'Donor envelope'} value={usd(m.envelope_usd)} />
+          <Stat label={t('proximate.cycle.admin_overhead') || 'Administration'} value={usd(m.admin_overhead_usd)} />
           <Stat
-            label="Available for partners"
+            label={t('proximate.cycle.disbursable') || 'Available for partners'}
             value={usd(m.disbursable_usd)}
             emphasis
           />
           <Stat
-            label="Not yet committed"
+            label={t('proximate.cycle.uncommitted') || 'Not yet committed'}
             value={usd(m.uncommitted_usd)}
             tone={overCommitted ? 'bad' : undefined}
           />
@@ -185,7 +192,8 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
         {overCommitted && (
           <p className="text-xs text-red-700 dark:text-red-400 flex items-start gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-            Awards exceed what is available for partners in this cycle.
+            {t('proximate.cycle.over_committed')
+              || 'Awards exceed what is available for partners in this cycle.'}
           </p>
         )}
       </Card>
@@ -195,11 +203,11 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
         <div className="flex items-center justify-between">
           <h3 className="font-semibold flex items-center gap-2">
             <MapPin className="w-4 h-4 text-muted-foreground" />
-            Area and rationale
+            {t('proximate.cycle.area_title') || 'Area and rationale'}
           </h3>
           {canEdit && !editing && (
             <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-              Edit setup
+              {t('proximate.cycle.edit_setup') || 'Edit setup'}
             </Button>
           )}
         </div>
@@ -207,12 +215,12 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
         {!editing ? (
           <div className="space-y-3 text-sm">
             <div>
-              <span className="text-muted-foreground">Where: </span>
+              <span className="text-muted-foreground">{t('proximate.cycle.where') || 'Where'}: </span>
               {[setup.target_locality, setup.target_region].filter(Boolean).join(', ') || '—'}
             </div>
             <div>
-              <span className="text-muted-foreground">Why this area: </span>
-              {setup.area_rationale || <span className="text-muted-foreground">Not recorded yet.</span>}
+              <span className="text-muted-foreground">{t('proximate.cycle.why_area') || 'Why this area'}: </span>
+              {setup.area_rationale || <span className="text-muted-foreground">{t('proximate.cycle.why_area_none') || 'Not recorded yet.'}</span>}
             </div>
             {setup.area_sources.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
@@ -221,7 +229,8 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
                     key={s}
                     className="text-xs rounded-full border border-border px-2 py-0.5 text-muted-foreground"
                   >
-                    {AREA_SOURCES.find((x) => x.key === s)?.label || s}
+                    {(() => { const it = AREA_SOURCES.find((x) => x.key === s);
+                      return it ? (t(it.k) || it.label) : s; })()}
                   </span>
                 ))}
               </div>
@@ -231,28 +240,29 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
         ) : (
           <div className="space-y-3">
             <div className="grid sm:grid-cols-2 gap-3">
-              <Field label="Region / state" v={form.target_region}
+              <Field label={t('proximate.cycle.region') || 'Region / state'} v={form.target_region}
                      on={(x) => setForm({ ...form, target_region: x })} />
-              <Field label="Locality" v={form.target_locality}
+              <Field label={t('proximate.cycle.locality') || 'Locality'} v={form.target_locality}
                      on={(x) => setForm({ ...form, target_locality: x })} />
-              <Field label="Grant size for this cycle (USD)" v={form.grant_size_usd}
+              <Field label={t('proximate.cycle.grant_size') || 'Grant size for this cycle (USD)'} v={form.grant_size_usd}
                      on={(x) => setForm({ ...form, grant_size_usd: x })} />
-              <Field label="Donor envelope (USD)" v={form.envelope_usd}
+              <Field label={t('proximate.cycle.envelope_input') || 'Donor envelope (USD)'} v={form.envelope_usd}
                      on={(x) => setForm({ ...form, envelope_usd: x })} />
               <Field
-                label="Administration & overhead (USD)"
-                hint="Salaries, technology, admin. Subtracted from the envelope; the rest is what partners can be awarded."
+                label={t('proximate.cycle.overhead_input') || 'Administration & overhead (USD)'}
+                hint={t('proximate.cycle.overhead_hint')
+                  || 'Salaries, technology, admin. Subtracted from the envelope; the rest is what partners can be awarded.'}
                 v={form.admin_overhead_usd}
                 on={(x) => setForm({ ...form, admin_overhead_usd: x })}
               />
             </div>
 
-            <Area label="Why this area was selected" v={form.area_rationale}
+            <Area label={t('proximate.cycle.why_area') || 'Why this area was selected'} v={form.area_rationale}
                   on={(x) => setForm({ ...form, area_rationale: x })} />
 
             <div>
               <p className="text-xs text-muted-foreground mb-1.5">
-                What the selection is based on
+                {t('proximate.cycle.sources_label') || 'What the selection is based on'}
               </p>
               <div className="flex flex-wrap gap-2">
                 {AREA_SOURCES.map((s) => {
@@ -270,7 +280,7 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
                           : 'border-border text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      {s.label}
+                      {t(s.k) || s.label}
                     </button>
                   );
                 })}
@@ -278,37 +288,37 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
             </div>
 
             <div className="grid sm:grid-cols-2 gap-3">
-              <Area label="Security and access" v={form.security_note}
+              <Area label={t('proximate.cycle.security_note') || 'Security and access'} v={form.security_note}
                     on={(x) => setForm({ ...form, security_note: x })} />
-              <Area label="Market risk" v={form.market_risk_note}
+              <Area label={t('proximate.cycle.market_risk') || 'Market risk'} v={form.market_risk_note}
                     on={(x) => setForm({ ...form, market_risk_note: x })} />
-              <Area label="Conflict sensitivity" v={form.conflict_sensitivity_note}
+              <Area label={t('proximate.cycle.conflict_sensitivity') || 'Conflict sensitivity'} v={form.conflict_sensitivity_note}
                     on={(x) => setForm({ ...form, conflict_sensitivity_note: x })} />
-              <Area label="Implementation feasibility" v={form.feasibility_note}
+              <Area label={t('proximate.cycle.feasibility') || 'Implementation feasibility'} v={form.feasibility_note}
                     on={(x) => setForm({ ...form, feasibility_note: x })} />
             </div>
 
             <div className="grid sm:grid-cols-3 gap-3">
-              <Field label="Target award date" type="date" v={form.target_award_date}
+              <Field label={t('proximate.cycle.target_award_date') || 'Target award date'} type="date" v={form.target_award_date}
                      on={(x) => setForm({ ...form, target_award_date: x })} />
-              <Field label="Target disbursement date" type="date" v={form.target_disbursement_date}
+              <Field label={t('proximate.cycle.target_disb_date') || 'Target disbursement date'} type="date" v={form.target_disbursement_date}
                      on={(x) => setForm({ ...form, target_disbursement_date: x })} />
-              <Field label="Target reporting date" type="date" v={form.target_report_date}
+              <Field label={t('proximate.cycle.target_report_date') || 'Target reporting date'} type="date" v={form.target_report_date}
                      on={(x) => setForm({ ...form, target_report_date: x })} />
             </div>
             <p className="text-xs text-muted-foreground">
-              Target dates raise a note when they pass. They never stop you
-              continuing — ground conditions delay cycles, and that is not a
-              reason for the system to refuse the next step.
+              {t('proximate.cycle.dates_warn_note')
+                || 'Target dates raise a note when they pass. They never stop you continuing — ground conditions delay cycles, and that is not a reason for the system to refuse the next step.'}
             </p>
 
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex gap-2 justify-end">
               <Button size="sm" variant="outline" onClick={() => { setEditing(false); setError(''); }}>
-                Cancel
+                {t('proximate.cycle.cancel') || 'Cancel'}
               </Button>
               <Button size="sm" onClick={save} disabled={saving}>
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save setup'}
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : (t('proximate.cycle.save_setup') || 'Save setup')}
               </Button>
             </div>
           </div>

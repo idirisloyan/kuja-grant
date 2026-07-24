@@ -1,0 +1,41 @@
+name: Proximate — quiet implementation check
+
+# Partners mid-implementation who have logged nothing for a fortnight.
+# Silence is either "fine and busy" or "in trouble", and the difference is
+# what somebody should go and find out. This only records observations for
+# the secretariat — it does not message partners and does not change any
+# partner's status. Being hard to reach in Sudan is not misconduct.
+
+on:
+  schedule:
+    # Tuesdays 05:00 UTC — a day clear of the Sunday backup and the Monday
+    # sanctions sweep, so a failure here is unambiguous in the logs.
+    - cron: '0 5 * * 2'
+  workflow_dispatch:
+    inputs:
+      quiet_days:
+        description: 'Days of silence before flagging'
+        required: false
+        default: '14'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the quiet-implementation endpoint
+        run: |
+          DAYS="${{ github.event.inputs.quiet_days || '14' }}"
+          HTTP=$(curl -s -o /tmp/out.json -w '%{http_code}' \
+            -X POST "https://proximate.kuja.org/api/proximate/cron/stale-implementation" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"quiet_days\": ${DAYS}}")
+          echo "HTTP ${HTTP}"
+          cat /tmp/out.json
+          # Fail loudly. A cron that reports success while doing nothing is
+          # worse than one that is plainly broken — this repo has been bitten
+          # by exactly that before.
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::stale-implementation cron returned ${HTTP}"
+            exit 1
+          fi

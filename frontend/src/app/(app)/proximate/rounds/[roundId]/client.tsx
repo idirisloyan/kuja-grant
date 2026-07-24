@@ -122,10 +122,10 @@ const ROUND_TABS = [
   // 2026-07-24 — the cycle starts before partners exist. Setup, panel
   // and awards sit ahead of Partners because that is the order the
   // secretariat actually works in.
-  { key: 'setup', label: 'Cycle setup' },
-  { key: 'panel', label: 'Panel' },
-  { key: 'awards', label: 'Awards & contracts' },
-  { key: 'closeout', label: 'Closeout' },
+  { key: 'setup', label: 'Cycle setup', k: 'proximate.cycle.tab_setup' },
+  { key: 'panel', label: 'Panel', k: 'proximate.cycle.tab_panel' },
+  { key: 'awards', label: 'Awards & contracts', k: 'proximate.cycle.tab_awards' },
+  { key: 'closeout', label: 'Closeout', k: 'proximate.cycle.tab_closeout' },
   { key: 'partners', label: 'Partners' },
   { key: 'reports', label: 'Reports & closing pack' },
   { key: 'disbursements', label: 'Disbursements' },
@@ -414,7 +414,7 @@ export function ProximateRoundDetailClient() {
                       : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {x.label}
+                  {('k' in x && x.k) ? (t(x.k as string) || x.label) : x.label}
                 </button>
               ))}
           </div>

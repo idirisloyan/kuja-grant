@@ -48,6 +48,7 @@ Everything except the two public receipt routes is OB-only.
 """
 
 import json
+import os
 import logging
 import secrets
 from datetime import datetime, timezone, timedelta
@@ -1965,3 +1966,244 @@ def api_money_from_grants(round_id):
 
     return jsonify({'success': True, 'applied': False,
                     'proposal': proposal, 'money': rnd.money_summary()})
+
+
+# ===============================================================
+# Closeout pack — server-rendered PDF
+# ===============================================================
+
+@cycle_bp.route('/rounds/<int:round_id>/closeout.pdf', methods=['GET'])
+@login_required
+@ob_required
+def api_cycle_closeout_pdf(round_id):
+    """The closeout pack as a real PDF, not a browser print.
+
+    A donor-facing artefact should not depend on which browser the
+    secretariat happened to use, or on print CSS surviving the next
+    layout change. Arabic renders through the same shaping path as the
+    partner report pack — Amiri, reshaped and bidi-ordered — so a cycle
+    run in Arabic produces an Arabic pack.
+    """
+    rnd = _scoped_round(round_id)
+    if not rnd:
+        return jsonify({'success': False, 'error': 'Round not found'}), 404
+
+    import io as _io
+    from flask import send_file
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas as _canvas
+    from app.utils.arabic_pdf import ensure_arabic_fonts, has_arabic, shape_ar
+
+    data = api_cycle_closeout(round_id).get_json()
+    if not data or not data.get('success'):
+        return jsonify({'success': False, 'error': 'Could not build pack'}), 500
+
+    arabic_ok = False
+    try:
+        arabic_ok = ensure_arabic_fonts()
+    except Exception:
+        arabic_ok = False
+
+    buf = _io.BytesIO()
+    c = _canvas.Canvas(buf, pagesize=A4)
+    W, H = A4
+    L, R = 18 * mm, W - 18 * mm
+    y = H - 20 * mm
+
+    def line(text, *, size=10, bold=False, gap=5.5, colour=(0.1, 0.1, 0.1)):
+        nonlocal y
+        if y < 25 * mm:
+            c.showPage()
+            y = H - 20 * mm
+        text = str(text or '')
+        c.setFillColorRGB(*colour)
+        if arabic_ok and has_arabic(text):
+            c.setFont('Amiri-Bold' if bold else 'Amiri', size)
+            c.drawRightString(R, y, shape_ar(text))
+        else:
+            c.setFont('Helvetica-Bold' if bold else 'Helvetica', size)
+            c.drawString(L, y, text)
+        y -= (size + gap)
+
+    def rule():
+        nonlocal y
+        c.setStrokeColorRGB(0.85, 0.85, 0.85)
+        c.line(L, y + 3, R, y + 3)
+        y -= 6
+
+    cyc = data['cycle']
+    line(cyc.get('title') or f'Cycle #{round_id}', size=16, bold=True, gap=3)
+    where = ', '.join(x for x in [cyc.get('target_locality'),
+                                  cyc.get('target_region')] if x)
+    line(where or '—', size=10, colour=(0.45, 0.45, 0.45))
+    rule()
+
+    # Readiness first. If the pack opens with a summary of what went well,
+    # a cycle can be signed off with partners still unpaid.
+    if data['ready_to_close']:
+        line('Nothing is blocking closeout.', bold=True)
+    else:
+        line(f'{data["blocking_count"]} item(s) must be finished first.',
+             bold=True, colour=(0.7, 0.1, 0.1))
+    y -= 4
+
+    blocks = [o for o in data['outstanding'] if o['severity'] == 'block']
+    warns = [o for o in data['outstanding'] if o['severity'] != 'block']
+    if blocks:
+        line('Must be resolved', bold=True, size=11)
+        for o in blocks:
+            line(f'  • {(o["partner"] + ": ") if o["partner"] else ""}{o["what"]}',
+                 size=9, colour=(0.6, 0.1, 0.1))
+        y -= 4
+    if warns:
+        line('Worth noting', bold=True, size=11)
+        for o in warns:
+            line(f'  • {(o["partner"] + ": ") if o["partner"] else ""}{o["what"]}',
+                 size=9, colour=(0.5, 0.35, 0.05))
+        y -= 4
+
+    rule()
+    line('The cycle in summary', bold=True, size=11)
+    m = data['money']
+    for label, value in [
+        ('Panel members seated', data['panel']['confirmed']),
+        ('Localities represented', len(data['panel']['localities'])),
+        ('Meetings recorded', len(data['meetings'])),
+        ('Partners considered', data['awards']['considered']),
+        ('Awarded', data['awards']['awarded']),
+        ('Total approved', f'${data["awards"]["total_approved_usd"]:,.0f}'),
+        ('Total sent', f'${data["disbursements"]["total_sent_usd"]:,.0f}'),
+        ('Receipts confirmed',
+         f'{data["disbursements"]["receipts_confirmed"]} of '
+         f'{data["disbursements"]["count"]}'),
+        ('Donor envelope', f'${m["envelope_usd"]:,.0f}'),
+        ('Administration', f'${m["admin_overhead_usd"]:,.0f}'),
+        ('Available for partners', f'${m["disbursable_usd"]:,.0f}'),
+        ('Unspent', f'${m["uncommitted_usd"]:,.0f}'),
+    ]:
+        line(f'  {label}: {value}', size=9)
+
+    if data['panel']['localities']:
+        y -= 4
+        line('Panel drawn from: ' + ', '.join(data['panel']['localities']),
+             size=9, colour=(0.45, 0.45, 0.45))
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    _audit('proximate.cycle.closeout_pdf', 'round', rnd.id,
+           ready=data['ready_to_close'], blocking=data['blocking_count'])
+    return send_file(
+        buf, mimetype='application/pdf', as_attachment=True,
+        download_name=f'closeout-cycle-{round_id}.pdf',
+    )
+
+
+# ===============================================================
+# Cron — cycles gone quiet during implementation
+# ===============================================================
+
+@cycle_bp.route('/cron/stale-implementation', methods=['POST'])
+def api_cron_stale_implementation():
+    """Flag partners who have had money for a while with nothing logged.
+
+    Silence is the signal this catches. A partner mid-implementation who
+    has sent nothing for weeks is either fine and busy, or in trouble —
+    and the difference is exactly what somebody should go and find out.
+
+    It records observations for the secretariat; it does not message
+    partners and it does not change any partner's status. Being hard to
+    reach in Sudan is not misconduct, and this must never read as an
+    accusation.
+    """
+    secret = os.getenv('CRON_SECRET')
+    auth = request.headers.get('Authorization', '')
+    if not secret or auth != f'Bearer {secret}':
+        return jsonify({'success': False, 'error': 'unauthorized'}), 401
+
+    body = get_request_json() or {}
+    quiet_days = int(body.get('quiet_days') or 14)
+    cutoff = _now() - timedelta(days=quiet_days)
+
+    from app.models import Network
+    net = Network.query.filter_by(slug='proximate').first()
+    if not net:
+        return jsonify({'success': True, 'considered': 0, 'flagged': 0,
+                        'note': 'proximate tenant not present'})
+
+    # Disbursed, receipt confirmed, report not yet in — the window where
+    # a partner is actually implementing and should be in contact.
+    live = ProximateDisbursement.query.filter(
+        ProximateDisbursement.network_id == net.id,
+        ProximateDisbursement.receipt_confirmed_at.isnot(None),
+        ProximateDisbursement.report_submitted_at.is_(None),
+    ).all()
+
+    considered = flagged = 0
+    quiet = []
+    for d in live:
+        considered += 1
+        start = d.implementation_start_at or d.received_at or d.sent_at
+        if not start:
+            continue
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        if start > cutoff:
+            continue      # not yet quiet long enough
+
+        latest = ProximateEvidence.query.filter_by(
+            partner_id=d.partner_id, network_id=net.id,
+        ).order_by(ProximateEvidence.occurred_at.desc().nullslast()).first()
+        last_at = latest.occurred_at if latest else None
+        if last_at and last_at.tzinfo is None:
+            last_at = last_at.replace(tzinfo=timezone.utc)
+        if last_at and last_at > cutoff:
+            continue      # they have been in touch
+
+        # Don't stack duplicates: if an unresolved quiet flag is already
+        # open for this partner, leave it alone rather than adding a new
+        # one every time the cron runs.
+        existing = ProximateEvidence.query.filter_by(
+            partner_id=d.partner_id, network_id=net.id,
+            kind='issue', resolved_at=None,
+        ).filter(ProximateEvidence.summary.like('No contact logged%')).first()
+        if existing:
+            continue
+
+        days = (_now() - (last_at or start)).days
+        e = ProximateEvidence(
+            network_id=net.id,
+            partner_id=d.partner_id,
+            round_id=d.round_id,
+            disbursement_id=d.id,
+            occurred_at=_now(),
+            source='other',
+            kind='issue',
+            summary=(
+                f'No contact logged for {days} days since '
+                f'{"the last update" if last_at else "funds were received"}. '
+                'Worth a call — this is a prompt to check in, not a finding '
+                'against the partner.'
+            ),
+            is_issue=True,
+            needs_followup=True,
+        )
+        db.session.add(e)
+        flagged += 1
+        quiet.append({'partner_id': d.partner_id, 'disbursement_id': d.id,
+                      'quiet_days': days})
+
+    db.session.commit()
+    try:
+        from app.models import record_cron_run
+        record_cron_run('proximate-stale-implementation', status='success',
+                        detail=f'{flagged} flagged of {considered}')
+    except Exception:
+        db.session.rollback()
+
+    _audit('proximate.cron.stale_implementation', 'round', None,
+           considered=considered, flagged=flagged, quiet_days=quiet_days)
+    return jsonify({'success': True, 'considered': considered,
+                    'flagged': flagged, 'quiet_days': quiet_days,
+                    'partners': quiet})

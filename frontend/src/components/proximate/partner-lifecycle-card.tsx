@@ -20,6 +20,7 @@ import {
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface Field {
   key: string; label: string; value: string | null; filled: boolean;
@@ -40,6 +41,7 @@ function usd(n: unknown): string {
 export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
   partnerId: number; roundId?: number; canEdit: boolean;
 }) {
+  const { t } = useTranslation();
   const [stages, setStages] = useState<Stage[]>([]);
   const [loading, setLoading] = useState(true);
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -79,7 +81,7 @@ export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
   if (loading) {
     return (
       <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="w-4 h-4 animate-spin" /> Loading partner record…
+        <Loader2 className="w-4 h-4 animate-spin" /> {t('proximate.cycle.loading_record') || 'Loading partner record…'}
       </Card>
     );
   }
@@ -131,8 +133,8 @@ export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
               <div className="mt-4 pt-4 border-t border-border space-y-3">
                 {s.locked && (
                   <p className="text-xs text-muted-foreground">
-                    Not this partner&rsquo;s turn yet. The fields are listed so you
-                    can see what is coming.
+                    {t('proximate.cycle.stage_locked')
+                      || 'Not this partner’s turn yet. The fields are listed so you can see what is coming.'}
                   </p>
                 )}
 
@@ -143,7 +145,7 @@ export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
                         <div key={f.key}>
                           <dt className="text-xs text-muted-foreground">{f.label}</dt>
                           <dd className={`text-sm ${f.filled ? '' : 'text-muted-foreground'}`}>
-                            {f.value || 'Not recorded'}
+                            {f.value || (t('proximate.cycle.not_recorded') || 'Not recorded')}
                           </dd>
                         </div>
                       ))}
@@ -157,7 +159,7 @@ export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
                             s.fields.map((f) => [f.key, f.value || ''])));
                         }}
                       >
-                        <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
+                        <Pencil className="w-3.5 h-3.5 mr-1.5" /> {t('proximate.cycle.edit') || 'Edit'}
                       </Button>
                     )}
                   </>
@@ -180,10 +182,11 @@ export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
                     <div className="flex justify-end gap-2">
                       <Button size="sm" variant="outline"
                               onClick={() => { setEditKey(null); setDraft({}); }}>
-                        Cancel
+                        {t('proximate.cycle.cancel') || 'Cancel'}
                       </Button>
                       <Button size="sm" disabled={saving} onClick={() => save(s)}>
-                        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}
+                        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : (t('proximate.cycle.save') || 'Save')}
                       </Button>
                     </div>
                   </div>

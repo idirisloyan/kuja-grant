@@ -56,12 +56,12 @@ const PARTNER_TABS = [
   // 2026-07-24 — one record, revealed by stage. "Record" sits first
   // because it is the whole partner; the tabs after it are the parts
   // of that record that have their own machinery.
-  { key: 'record', label: 'Record' },
+  { key: 'record', label: 'Record', k: 'proximate.cycle.tab_record' },
   { key: 'endorsements', label: 'Endorsements' },
   { key: 'dd', label: 'Due diligence' },
   { key: 'disbursements', label: 'Disbursements' },
-  { key: 'evidence', label: 'Evidence' },
-  { key: 'history', label: 'History' },
+  { key: 'evidence', label: 'Evidence', k: 'proximate.cycle.tab_evidence' },
+  { key: 'history', label: 'History', k: 'proximate.cycle.tab_history' },
 ];
 
 interface PartnerDisbursement {
