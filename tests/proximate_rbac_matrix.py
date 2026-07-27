@@ -126,6 +126,19 @@ with app.app_context():
     did = disb.id if disb else 0
     rid = rnd.id if rnd else 0
 
+    # The RBAC matrix predates per-round donor subscription scoping (2026-07-16:
+    # a donor with no linked round now correctly 403s on /rounds/<id>). Subscribe
+    # the throwaway donor to the probed round so the donor-safe-shape check below
+    # exercises the 200 path (field redaction), not a bare 403.
+    if rid:
+        _dn = ProximateDonor.query.filter_by(
+            network_id=net.id,
+            primary_user_id=_ensure_user(DONOR_EMAIL, "ngo").id,
+        ).first()
+        if _dn and rid not in _dn.subscribed_round_ids():
+            _dn.set_subscribed_round_ids(list(_dn.subscribed_round_ids()) + [rid])
+            db.session.commit()
+
 ob = client_for(OB_EMAIL, OB_PW)
 donor = client_for(DONOR_EMAIL, PW)
 endorser = client_for(ENDORSER_EMAIL, PW)

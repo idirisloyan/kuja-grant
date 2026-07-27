@@ -2434,12 +2434,63 @@ def api_disbursement_preflight():
                         f'{cosigners_required} co-signature(s) — a different '
                         'OB member must cosign before funds move.')})
 
+    # Readiness checklist (QA OB-012, 2026-07-27): a positive, all-conditions
+    # view of a release's preconditions — each shown complete/missing — so the
+    # OB sees the whole gate, not only what's currently blocking. The award and
+    # contract items are round-scoped; pass ?round_id= to include them (a
+    # freeform, non-round release has no award/contract, so they're omitted).
+    href_routes = f'{href}#routes'
+    checklist = [{
+        'code': 'partner_cleared',
+        'label': 'Partner cleared for disbursement',
+        'ok': p.status == 'dd_clear',
+        'href': href,
+    }]
+    round_id = request.args.get('round_id', type=int)
+    if round_id:
+        from app.models.proximate_cycle import ProximateAward, ProximateContract
+        award = ProximateAward.query.filter_by(
+            network_id=net.id, round_id=round_id, partner_id=p.id,
+        ).first()
+        contract = (
+            ProximateContract.query.filter_by(award_id=award.id).first()
+            if award else None
+        )
+        checklist.append({
+            'code': 'award_recorded',
+            'label': 'Panel award recorded',
+            'ok': bool(award and award.decision == 'awarded'),
+        })
+        checklist.append({
+            'code': 'amount_approved',
+            'label': 'Approved amount set',
+            'ok': bool(award and (award.approved_amount_usd or 0) > 0),
+        })
+        checklist.append({
+            'code': 'contract_exists',
+            'label': 'Contract opened',
+            'ok': bool(contract),
+        })
+        checklist.append({
+            'code': 'contract_complete',
+            'label': 'Contract signed and complete',
+            'ok': bool(contract and contract.status == 'completed'),
+        })
+    checklist.append({
+        'code': 'verified_route',
+        'label': 'Verified payment route',
+        'ok': verified_methods > 0,
+        'href': href_routes,
+    })
+
     return jsonify({
         'success': True,
         'partner_status': p.status,
         'can_disburse': len(blockers) == 0,
         'blockers': blockers,
         'warnings': warnings,
+        'checklist': checklist,
+        'checklist_complete': all(item['ok'] for item in checklist),
         'cosigners_required': cosigners_required,
         'capital_class': classify_capital(amount) if amount else None,
     })

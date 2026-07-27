@@ -23,6 +23,7 @@
 import { useEffect, useState } from 'react';
 import {
   Loader2, Gavel, FileSignature, AlertTriangle, Plus, X, ExternalLink,
+  ChevronDown,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
@@ -268,7 +269,7 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
         : 'bg-muted text-muted-foreground';
 
   return (
-    <Card className="p-4">
+    <Card className={`p-4 transition-colors ${open ? 'ring-1 ring-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]' : ''}`}>
       <button type="button" onClick={onToggle} className="w-full text-left">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -281,6 +282,13 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
                 ? ` · ${t('proximate.cycle.approved') || 'Approved'} ${usd(a.approved_amount_usd)}`
                 : ''}
             </p>
+            {/* OB-010 — the decision UI opens INLINE (no modal); prompt for it
+                on undecided rows so the OB knows where to record the decision. */}
+            {canEdit && a.decision === 'pending' && !open && (
+              <p className="text-[11px] font-medium text-[hsl(var(--kuja-clay))] mt-1">
+                {t('proximate.cycle.record_decision_hint') || 'Tap to record the panel decision'}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {!a.decision_is_attributable && a.decision === 'awarded' && (
@@ -292,6 +300,7 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
                 return a.decision === 'pending'
                   ? (t('proximate.cycle.dec_pending') || 'Not yet decided') : a.decision; })()}
             </span>
+            <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
           </div>
         </div>
       </button>

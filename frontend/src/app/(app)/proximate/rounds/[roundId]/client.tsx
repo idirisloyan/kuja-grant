@@ -1071,6 +1071,17 @@ export function ProximateRoundDetailClient() {
                       >
                         {p.stage.replace(/_/g, ' ')}
                       </Badge>
+                      {/* OB-001 (2026-07-27) — partner history lives on the
+                          partner record (its History tab); link it from the
+                          roster so the OB can reach it without leaving the
+                          round workflow. */}
+                      <Link
+                        href={`/proximate/endorse/${p.partner_id}`}
+                        className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-muted"
+                        title="Open partner record & history"
+                      >
+                        History
+                      </Link>
                       {isOperator ? (
                         <button
                           type="button"
@@ -1163,6 +1174,12 @@ export function ProximateRoundDetailClient() {
                     onChange={(e) => setAddFilter(e.target.value)}
                     className="w-full text-sm rounded-md border bg-background p-2"
                   />
+                  {/* OB-006/007 — UAT safety: the roster picker draws from ALL
+                      tenant partners, live ones included. */}
+                  <p className="mt-2 text-[11px] text-amber-800 dark:text-amber-300">
+                    This list can include live partners. During UAT, add only
+                    test records (tagged <span className="font-semibold">TEST</span>).
+                  </p>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                   {availablePartners === null && (
@@ -1200,8 +1217,16 @@ export function ProximateRoundDetailClient() {
                             className="flex items-center gap-2 p-3 hover:bg-muted/40"
                           >
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">
-                                {p.name}
+                              <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                                <span className="truncate">{p.name}</span>
+                                {/* OB-006/007 — flag obviously-test records so an
+                                    OB doesn't add a LIVE partner during UAT. Positive
+                                    tag only; its absence makes no "live" claim. */}
+                                {/\b(uat|test|qa|codex|demo|fixture)\b/i.test(p.name) && (
+                                  <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 shrink-0">
+                                    TEST
+                                  </span>
+                                )}
                               </p>
                               <p className="text-[10px] text-muted-foreground">
                                 {[p.locality, p.status].filter(Boolean).join(' · ')}

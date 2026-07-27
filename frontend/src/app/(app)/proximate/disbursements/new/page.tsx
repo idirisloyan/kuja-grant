@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Loader2, Send, Copy, Check } from 'lucide-react';
+import { Loader2, Send, Copy, Check, CheckCircle2, Circle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -142,18 +142,25 @@ export default function ProximateDisbursementNewPage() {
 
   // Phase 717 "why blocked?" — the exact preconditions a release needs,
   // shown the moment a partner (and optionally an amount) is chosen.
-  const [preflight, setPreflight] = useState<{ blockers: Blocker[]; warnings: Blocker[] } | null>(null);
+  const [preflight, setPreflight] = useState<{
+    blockers: Blocker[];
+    warnings: Blocker[];
+    checklist: { code: string; label: string; ok: boolean }[];
+  } | null>(null);
   useEffect(() => {
     if (!partnerId) { setPreflight(null); return; }
     const params = new URLSearchParams({ partner_id: partnerId });
     if (amount && parseFloat(amount) > 0) params.set('amount', amount);
+    // OB-012 — pass the round so preflight includes the round-scoped award +
+    // contract readiness items (else it returns only the partner-level ones).
+    if (roundId) params.set('round_id', roundId);
     let cancelled = false;
-    api.get<{ blockers: Blocker[]; warnings: Blocker[] }>(
+    api.get<{ blockers: Blocker[]; warnings: Blocker[]; checklist?: { code: string; label: string; ok: boolean }[] }>(
       `/api/proximate/disbursements/preflight?${params.toString()}`)
-      .then((r) => { if (!cancelled) setPreflight({ blockers: r.blockers || [], warnings: r.warnings || [] }); })
+      .then((r) => { if (!cancelled) setPreflight({ blockers: r.blockers || [], warnings: r.warnings || [], checklist: r.checklist || [] }); })
       .catch(() => { if (!cancelled) setPreflight(null); });
     return () => { cancelled = true; };
-  }, [partnerId, amount]);
+  }, [partnerId, amount, roundId]);
 
   // OB-012 (2026-07-27) — when a round is in scope, the partner dropdown must
   // offer ONLY that round's awarded partners, not every cleared partner in the
@@ -340,6 +347,8 @@ export default function ProximateDisbursementNewPage() {
               {visiblePartners.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} {p.locality ? `(${p.locality})` : ''} — {p.status}
+                  {/* OB-006/007 — mark obvious test records (option text only). */}
+                  {/\b(uat|test|qa|codex|demo|fixture)\b/i.test(p.name) ? ' · TEST' : ''}
                 </option>
               ))}
             </select>
@@ -379,6 +388,30 @@ export default function ProximateDisbursementNewPage() {
           {/* Phase 717 — why-blocked: exact missing preconditions before submit */}
           {preflight && (
             <WhyBlocked blockers={preflight.blockers} warnings={preflight.warnings} />
+          )}
+
+          {/* OB-012 (2026-07-27) — disbursement readiness checklist: every
+              precondition for a release, each shown complete / still-missing,
+              so money never moves against an incomplete gate. Round-scoped
+              items (award, contract) appear when a round is selected. */}
+          {preflight && preflight.checklist.length > 0 && (
+            <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5">
+              <p className="text-xs font-semibold mb-1.5">
+                {tf('proximate.disbursements.readiness_title', 'Disbursement readiness')}
+              </p>
+              <ul className="space-y-1">
+                {preflight.checklist.map((item) => (
+                  <li key={item.code} className="flex items-center gap-2 text-xs">
+                    {item.ok ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[hsl(var(--kuja-grow))] shrink-0" />
+                    ) : (
+                      <Circle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    )}
+                    <span className={item.ok ? '' : 'text-muted-foreground'}>{item.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <div>
