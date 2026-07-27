@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useNetworkStore } from '@/stores/network-store';
 import { cn } from '@/lib/utils';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
@@ -143,6 +143,16 @@ export default function AuditChainPage() {
   // an expandable row. Presentation only — chain/export logic untouched.
   const [expandedSeq, setExpandedSeq] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // PRX-RBAC-024 (2026-07-27) — the audit chain is OB/admin-only server-side
+  // (/api/proximate/audit-chain 403s non-OB; /api/audit-chain/* is
+  // @role_required('admin')). This page previously rendered the shell + a
+  // bare <a download> Export control for ANY logged-in user, so a donor could
+  // fire a request that returned a 403 body the browser saved as
+  // "audit-chain.json". Gate the UI on the server's own verdict: a 401/403
+  // from the data load flips accessDenied, which hides the Export control and
+  // every entry, and shows an access-denied card instead. No client-side role
+  // rule to drift from the server gate.
+  const [accessDenied, setAccessDenied] = useState(false);
   const LIMIT = 25;
 
   const loadVerify = async () => {
@@ -154,7 +164,12 @@ export default function AuditChainPage() {
       const r = await api.get<VerifyResult>('/api/audit-chain/verify');
       setVerify(r);
     } catch (e) {
-      setError((e as Error).message);
+      if (e instanceof ApiError && (e.status === 403 || e.status === 401)) {
+        setAccessDenied(true);
+        setError(null);
+      } else {
+        setError((e as Error).message);
+      }
     } finally {
       setVerifyLoading(false);
     }
@@ -167,7 +182,12 @@ export default function AuditChainPage() {
       setRecent(r);
       setOffset(newOffset);
     } catch (e) {
-      setError((e as Error).message);
+      if (e instanceof ApiError && (e.status === 403 || e.status === 401)) {
+        setAccessDenied(true);
+        setError(null);
+      } else {
+        setError((e as Error).message);
+      }
     } finally {
       setRecentLoading(false);
     }
@@ -181,6 +201,38 @@ export default function AuditChainPage() {
 
   const integrityOk = verify?.ok === true;
 
+  // PRX-RBAC-024 — server said no. Render an access-denied state with NO
+  // Export control and NO entries, rather than the admin shell a donor
+  // could poke at.
+  if (accessDenied) {
+    return (
+      <div className="max-w-6xl mx-auto">
+        <PageShell>
+          <PageHeader
+            title="Hash-chained audit log"
+            icon={ShieldAlert}
+            subtitle="Restricted to Oversight Body members and platform administrators."
+          />
+          <PageMain>
+            <Card className="p-6 border-l-4 border-l-[hsl(var(--kuja-flag))]">
+              <div className="flex items-start gap-3">
+                <ShieldAlert className="w-6 h-6 text-[hsl(var(--kuja-flag))] shrink-0" />
+                <div>
+                  <h2 className="text-base font-semibold">Access restricted</h2>
+                  <p className="text-sm text-[hsl(var(--kuja-ink-soft))] mt-1">
+                    The audit chain is available only to Oversight Body members
+                    and platform administrators. Your account does not have
+                    permission to view or export it.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </PageMain>
+        </PageShell>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
       <PageShell>
@@ -188,16 +240,21 @@ export default function AuditChainPage() {
           title="Hash-chained audit log"
           icon={ShieldCheck}
           subtitle="Every critical event writes a hash-chained row. Any retroactive edit breaks the chain — this page proves it's intact."
+          // Export control renders only once an authorized data load has
+          // succeeded (recent !== null), so it never flashes for a user the
+          // server will 403 — closing the "bare <a download> fires anyway" gap.
           primaryAction={
-            <a
-              href={exportHref}
-              download
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted"
-              title="Download the full chain as NDJSON for offline verification"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export chain (NDJSON)
-            </a>
+            recent ? (
+              <a
+                href={exportHref}
+                download
+                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+                title="Download the full chain as NDJSON for offline verification"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export chain (NDJSON)
+              </a>
+            ) : undefined
           }
         />
         <PageMain>

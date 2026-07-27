@@ -135,6 +135,9 @@ admin = client_for(ADMIN_EMAIL, PW)
 check("ob", "/api/proximate/overview", ob, expect_status=200)
 check("ob", "/api/proximate/attention-queue", ob, expect_status=200)
 check("ob", "/api/proximate/audit-chain", ob, expect_status=200)  # was 403 pre-fix
+# PRX-RBAC-024 (2026-07-27) — the JSONL export rides the same gate; assert it
+# explicitly so the exact QA scenario (donor triggers "Export chain") is pinned.
+check("ob", "/api/proximate/audit-chain?format=jsonl", ob, expect_status=200)
 check("ob", f"/api/proximate/disbursements/preflight?partner_id={npid}", ob, expect_status=200)
 check("ob", f"/api/proximate/partners/{pid}", ob, expect_status=200, require=("trust_floor_signals",))
 if did:
@@ -142,7 +145,9 @@ if did:
 
 # ---- donor: locked out of OB ops; round detail donor-safe ----------------
 for p in ["/api/proximate/overview", "/api/proximate/attention-queue",
-          "/api/proximate/audit-chain", "/api/proximate/interventions",
+          "/api/proximate/audit-chain",
+          "/api/proximate/audit-chain?format=jsonl",  # PRX-RBAC-024 export guard
+          "/api/proximate/interventions",
           "/api/proximate/fsps",
           f"/api/proximate/disbursements/preflight?partner_id={npid}",
           f"/api/proximate/partners/{pid}",
@@ -167,7 +172,9 @@ if did:
 
 # ---- platform admin: NOT an OB — locked out ------------------------------
 for p in ["/api/proximate/overview", "/api/proximate/attention-queue",
-          "/api/proximate/audit-chain", f"/api/proximate/partners/{pid}"]:
+          "/api/proximate/audit-chain",
+          "/api/proximate/audit-chain?format=jsonl",  # PRX-RBAC-024 export guard
+          f"/api/proximate/partners/{pid}"]:
     check("admin", p, admin, expect_status=403)
 if did:
     check("admin", f"/api/proximate/disbursements/{did}", admin, expect_status=403)

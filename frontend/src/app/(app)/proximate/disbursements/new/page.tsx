@@ -57,6 +57,13 @@ interface CreateResp {
 
 export default function ProximateDisbursementNewPage() {
   const { t } = useTranslation();
+  // Guarded i18n fallback — mirrors the existing nominate_cta pattern below.
+  // Renders English when a key isn't in the locale bundle (keeps i18n parity
+  // green without churning all six locale files for two operational strings).
+  const tf = (key: string, fallback: string) => {
+    const v = t(key);
+    return !v || v === key ? fallback : v;
+  };
   const router = useRouter();
   // PRX-RBAC-013 — recording money is OB-only. Non-OB personas can reach
   // this URL directly; the POST is server-gated (403 err.ob_required), but
@@ -82,6 +89,12 @@ export default function ProximateDisbursementNewPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // OB-012 — a disbursement started from a round arrives with ?round=<id>
+    // (the round page deep-links it). Capture it so we can pre-select the
+    // round and scope the partner list to that round's awarded partners.
+    const roundParam = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('round')
+      : null;
     Promise.all([
       api.get<{ partners: Partner[] }>('/api/proximate/partners').catch(() => ({ partners: [] })),
       api.get<{ rounds: Round[] }>('/api/proximate/rounds').catch(() => ({ rounds: [] })),
@@ -91,7 +104,13 @@ export default function ProximateDisbursementNewPage() {
       // as confusing — hide them so the dropdown only offers fundable
       // partners. The preflight panel still explains any residual block.
       setPartners((p.partners || []).filter((x) => x.status === 'dd_clear'));
-      setRounds((r.rounds || []).filter((x) => x.status === 'active'));
+      // Active rounds are the disbursement targets; also keep the round we
+      // were deep-linked from even if it has moved past 'active', so the
+      // round scoping below can pin to it and the selector shows it.
+      setRounds((r.rounds || []).filter(
+        (x) => x.status === 'active' || (!!roundParam && String(x.id) === roundParam),
+      ));
+      if (roundParam && /^\d+$/.test(roundParam)) setRoundId(roundParam);
     });
   }, []);
 
@@ -135,6 +154,45 @@ export default function ProximateDisbursementNewPage() {
       .catch(() => { if (!cancelled) setPreflight(null); });
     return () => { cancelled = true; };
   }, [partnerId, amount]);
+
+  // OB-012 (2026-07-27) — when a round is in scope, the partner dropdown must
+  // offer ONLY that round's awarded partners, not every cleared partner in the
+  // network (QA saw unrelated dd_clear partners offered from a round). Fetch
+  // the round's award register; keep the awarded partner IDs. null = no round
+  // selected → the full cleared list stands (freeform, non-round release).
+  const [awardedIds, setAwardedIds] = useState<number[] | null>(null);
+  useEffect(() => {
+    if (!roundId) { setAwardedIds(null); return; }
+    let cancelled = false;
+    api.get<{ awards: { partner_id: number; decision: string }[] }>(
+      `/api/proximate/rounds/${roundId}/awards`)
+      .then((r) => {
+        if (cancelled) return;
+        setAwardedIds(
+          (r.awards || [])
+            .filter((a) => a.decision === 'awarded')
+            .map((a) => a.partner_id),
+        );
+      })
+      .catch(() => { if (!cancelled) setAwardedIds(null); });
+    return () => { cancelled = true; };
+  }, [roundId]);
+
+  const roundScoped = awardedIds !== null;
+  // Cleared partners, narrowed to the round's awarded partners when scoped.
+  const visiblePartners = roundScoped
+    ? partners.filter((p) => awardedIds!.includes(p.id))
+    : partners;
+
+  // If a scope change (round selected / switched) dropped the currently
+  // selected partner, clear it so the OB can't record a release against a
+  // partner not offered for this round.
+  useEffect(() => {
+    if (partnerId && !visiblePartners.some((p) => String(p.id) === partnerId)) {
+      setPartnerId('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awardedIds, partners]);
 
   async function submit() {
     setError(null);
@@ -279,13 +337,29 @@ export default function ProximateDisbursementNewPage() {
               className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md"
             >
               <option value="">— {t('proximate.disbursements.select_partner')} —</option>
-              {partners.map((p) => (
+              {visiblePartners.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} {p.locality ? `(${p.locality})` : ''} — {p.status}
                 </option>
               ))}
             </select>
-            {partners.length === 0 && (
+            {/* OB-012 — when scoped to a round, say so, so the OB knows the
+                list is the round's awarded partners, not every cleared org. */}
+            {roundScoped && visiblePartners.length > 0 && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {tf('proximate.disbursements.awarded_scope_note',
+                    'Showing only partners awarded in the selected round.')}
+              </p>
+            )}
+            {visiblePartners.length === 0 && roundScoped && (
+              <div className="mt-2 rounded-md border border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2.5">
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  {tf('proximate.disbursements.no_awarded_cleared_partners',
+                      'No partner in this round is both awarded by the panel and cleared for disbursement yet. Record the panel award and complete the partner’s clearance first.')}
+                </p>
+              </div>
+            )}
+            {visiblePartners.length === 0 && !roundScoped && (
               <div className="mt-2 rounded-md border border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2.5">
                 <p className="text-xs text-amber-800 dark:text-amber-300">
                   {t('proximate.disbursements.no_eligible_partners')}
@@ -296,7 +370,7 @@ export default function ProximateDisbursementNewPage() {
                   href="/proximate/admin/partners/new"
                   className="mt-1.5 inline-flex text-xs font-semibold text-amber-800 dark:text-amber-300 underline underline-offset-2 hover:no-underline"
                 >
-                  {(() => { const v = t('proximate.disbursements.nominate_cta'); return (!v || v === 'proximate.disbursements.nominate_cta') ? 'Nominate a partner' : v; })()} →
+                  {tf('proximate.disbursements.nominate_cta', 'Nominate a partner')} →
                 </Link>
               </div>
             )}
