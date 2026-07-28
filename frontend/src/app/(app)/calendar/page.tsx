@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 type EventKind =
   | 'grant_deadline' | 'report_due' | 'registration_expiry'
@@ -49,11 +50,11 @@ interface CalendarResponse {
 }
 
 const KIND_META: Record<EventKind, { label: string; icon: typeof Clock; color: string }> = {
-  grant_deadline:       { label: 'Grant closes',       icon: Briefcase,   color: 'text-[hsl(var(--kuja-clay))]' },
-  report_due:           { label: 'Report due',         icon: Clock,       color: 'text-[hsl(var(--kuja-sun))]' },
-  registration_expiry:  { label: 'Reg expires',        icon: ShieldCheck, color: 'text-[hsl(var(--kuja-flag))]' },
-  passport_expiry:      { label: 'Passport expires',   icon: Award,       color: 'text-[hsl(var(--kuja-spark))]' },
-  screening_due:        { label: 'Screening due',      icon: ShieldCheck, color: 'text-[hsl(var(--kuja-ink-soft))]' },
+  grant_deadline:       { label: 'calendar.kind_grant_deadline',      icon: Briefcase,   color: 'text-[hsl(var(--kuja-clay))]' },
+  report_due:           { label: 'calendar.kind_report_due',          icon: Clock,       color: 'text-[hsl(var(--kuja-sun))]' },
+  registration_expiry:  { label: 'calendar.kind_registration_expiry', icon: ShieldCheck, color: 'text-[hsl(var(--kuja-flag))]' },
+  passport_expiry:      { label: 'calendar.kind_passport_expiry',     icon: Award,       color: 'text-[hsl(var(--kuja-spark))]' },
+  screening_due:        { label: 'calendar.kind_screening_due',       icon: ShieldCheck, color: 'text-[hsl(var(--kuja-ink-soft))]' },
 };
 
 const SEV_DOT: Record<string, string> = {
@@ -79,6 +80,7 @@ function weekKey(iso: string): string {
 }
 
 function EventRow({ ev }: { ev: CalendarEvent }) {
+  const { t } = useTranslation();
   const meta = KIND_META[ev.kind] ?? KIND_META.report_due;
   const Icon = meta.icon;
   return (
@@ -96,7 +98,7 @@ function EventRow({ ev }: { ev: CalendarEvent }) {
             {formatDay(ev.date)}
           </span>
           <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--kuja-ink-soft))]">
-            {meta.label}
+            {t(meta.label)}
           </span>
         </div>
         <div className="text-sm font-semibold text-[hsl(var(--kuja-ink))]">{ev.label}</div>
@@ -108,6 +110,7 @@ function EventRow({ ev }: { ev: CalendarEvent }) {
 }
 
 function UpcomingView({ events }: { events: CalendarEvent[] }) {
+  const { t } = useTranslation();
   const groups = useMemo(() => {
     const byWeek = new Map<string, CalendarEvent[]>();
     for (const ev of events) {
@@ -122,9 +125,9 @@ function UpcomingView({ events }: { events: CalendarEvent[] }) {
     return (
       <Card className="p-8 text-center">
         <CalendarIcon className="w-10 h-10 mx-auto text-[hsl(var(--kuja-ink-soft))]" />
-        <p className="kuja-display text-lg mt-2">No upcoming events</p>
+        <p className="kuja-display text-lg mt-2">{t('calendar.empty_title')}</p>
         <p className="text-xs text-[hsl(var(--kuja-ink-soft))] mt-1">
-          Nothing in your window. Try a longer lookahead with <code>?days=180</code>.
+          {t('calendar.empty_hint')} <code>?days=180</code>.
         </p>
       </Card>
     );
@@ -138,8 +141,15 @@ function UpcomingView({ events }: { events: CalendarEvent[] }) {
         return (
           <Card key={wk} className="p-4">
             <div className="kuja-eyebrow mb-2">
-              Week of {monday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – {sunday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              <span className="ml-2 text-[hsl(var(--kuja-ink-soft))]">{items.length} event{items.length === 1 ? '' : 's'}</span>
+              {t('calendar.week_of', {
+                start: monday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+                end: sunday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+              })}
+              <span className="ml-2 text-[hsl(var(--kuja-ink-soft))]">
+                {items.length === 1
+                  ? t('calendar.event_count_one', { n: items.length })
+                  : t('calendar.event_count_other', { n: items.length })}
+              </span>
             </div>
             <div className="divide-y divide-[hsl(var(--border))]">
               {items.map((ev, i) => <EventRow key={i} ev={ev} />)}
@@ -156,6 +166,7 @@ function MonthView({ events, monthOffset, onShift }: {
   monthOffset: number;
   onShift: (delta: number) => void;
 }) {
+  const { t } = useTranslation();
   const today = new Date();
   const cursor = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
   const monthLabel = cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -179,18 +190,18 @@ function MonthView({ events, monthOffset, onShift }: {
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-base font-semibold">{monthLabel}</h3>
         <div className="flex items-center gap-1">
-          <button type="button" onClick={() => onShift(-1)} className="p-1 rounded hover:bg-[hsl(var(--kuja-sand-50))]" aria-label="Previous month">
+          <button type="button" onClick={() => onShift(-1)} className="p-1 rounded hover:bg-[hsl(var(--kuja-sand-50))]" aria-label={t('calendar.previous_month')}>
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button type="button" onClick={() => onShift(0)} className="px-2 text-xs font-semibold hover:bg-[hsl(var(--kuja-sand-50))] rounded">Today</button>
-          <button type="button" onClick={() => onShift(1)} className="p-1 rounded hover:bg-[hsl(var(--kuja-sand-50))]" aria-label="Next month">
+          <button type="button" onClick={() => onShift(0)} className="px-2 text-xs font-semibold hover:bg-[hsl(var(--kuja-sand-50))] rounded">{t('calendar.today')}</button>
+          <button type="button" onClick={() => onShift(1)} className="p-1 rounded hover:bg-[hsl(var(--kuja-sand-50))]" aria-label={t('calendar.next_month')}>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
       <div className="grid grid-cols-7 gap-px bg-[hsl(var(--border))] rounded-md overflow-hidden text-xs">
-        {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
-          <div key={d} className="bg-[hsl(var(--kuja-quartz))] py-1.5 text-center font-semibold text-[hsl(var(--kuja-ink-soft))]">{d}</div>
+        {(['mon','tue','wed','thu','fri','sat','sun'] as const).map(d => (
+          <div key={d} className="bg-[hsl(var(--kuja-quartz))] py-1.5 text-center font-semibold text-[hsl(var(--kuja-ink-soft))]">{t(`calendar.weekday_${d}`)}</div>
         ))}
         {cells.map((c, i) => {
           const iso = c.date.toISOString().slice(0,10);
@@ -224,7 +235,7 @@ function MonthView({ events, monthOffset, onShift }: {
                 </a>
               ))}
               {c.events.length > 3 && (
-                <div className="text-[10px] text-[hsl(var(--kuja-ink-soft))]">+{c.events.length - 3} more</div>
+                <div className="text-[10px] text-[hsl(var(--kuja-ink-soft))]">{t('calendar.more_count', { n: c.events.length - 3 })}</div>
               )}
             </div>
           );
@@ -235,6 +246,7 @@ function MonthView({ events, monthOffset, onShift }: {
 }
 
 export default function CalendarPage() {
+  const { t } = useTranslation();
   const [data, setData] = useState<CalendarResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'upcoming' | 'month'>('upcoming');
@@ -264,14 +276,14 @@ export default function CalendarPage() {
     <div className="max-w-6xl mx-auto">
       <PageShell>
         <PageHeader
-          title="All your deadlines"
+          title={t('calendar.page_title')}
           icon={CalendarIcon}
-          subtitle="Grant deadlines, reports, registration expiries, passport renewals — every donor and grantee, one view."
+          subtitle={t('calendar.page_subtitle')}
           primaryAction={
             <div className="flex items-center gap-3 flex-wrap">
               {highCount > 0 && (
                 <Badge variant="outline" className="border-[hsl(var(--kuja-flag))] text-[hsl(var(--kuja-flag))]">
-                  {highCount} urgent
+                  {t('calendar.urgent_count', { n: highCount })}
                 </Badge>
               )}
               <a
@@ -280,7 +292,7 @@ export default function CalendarPage() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--kuja-ink))] hover:bg-[hsl(var(--kuja-sand-50))]"
               >
-                <Download className="w-3.5 h-3.5" /> PDF
+                <Download className="w-3.5 h-3.5" /> {t('calendar.export_pdf')}
               </a>
               {/* Phase 127 — iCalendar (.ics) download. Subscribe in Google
                   Calendar / Outlook / Apple Calendar to see deadlines
@@ -289,9 +301,9 @@ export default function CalendarPage() {
                 href="/api/calendar/deadlines.ics?days=180&past=30"
                 download
                 className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--kuja-ink))] hover:bg-[hsl(var(--kuja-sand-50))]"
-                title="Subscribe in Google Calendar / Outlook / Apple Calendar"
+                title={t('calendar.calendar_feed_hint')}
               >
-                <Download className="w-3.5 h-3.5" /> Calendar feed
+                <Download className="w-3.5 h-3.5" /> {t('calendar.calendar_feed')}
               </a>
               <div className="inline-flex rounded-md border border-[hsl(var(--border))] overflow-hidden">
                 <button
@@ -302,7 +314,7 @@ export default function CalendarPage() {
                     view === 'upcoming' ? 'bg-[hsl(var(--kuja-clay))] text-white' : 'hover:bg-[hsl(var(--kuja-sand-50))]',
                   )}
                   aria-pressed={view === 'upcoming'}
-                >Upcoming</button>
+                >{t('calendar.view_upcoming')}</button>
                 <button
                   type="button"
                   onClick={() => setView('month')}
@@ -311,7 +323,7 @@ export default function CalendarPage() {
                     view === 'month' ? 'bg-[hsl(var(--kuja-clay))] text-white' : 'hover:bg-[hsl(var(--kuja-sand-50))]',
                   )}
                   aria-pressed={view === 'month'}
-                >Month</button>
+                >{t('calendar.view_month')}</button>
               </div>
             </div>
           }

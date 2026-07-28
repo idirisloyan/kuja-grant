@@ -23,6 +23,7 @@ import { NameChip } from '@/components/shared/name-chip';
 import { NativeShareButton } from '@/components/shared/native-share-button';
 import { OneNumberCard } from '@/components/shared/one-number-card';
 import { PageShell, PageBack, PageMain } from '@/components/layout/page-shell';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface NGOSummary {
   success: boolean;
@@ -64,6 +65,7 @@ function ScoreTile({ label, value, max = 100 }: { label: string; value: number |
 export default function NGOSummaryClient() {
   const params = useParams();
   const router = useRouter();
+  const { t } = useTranslation();
   const [id, setId] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
       const m = window.location.pathname.match(/\/ngo\/(\d+)/);
@@ -115,12 +117,12 @@ export default function NGOSummaryClient() {
             : <Building2 className="h-5 w-5 mt-0.5 text-[hsl(var(--kuja-flag))]" />}
           <div>
             <h2 className="text-base font-semibold">
-              {isPrivate ? "This NGO hasn't opted into a public summary" : 'NGO summary not found'}
+              {isPrivate ? t('ngo_detail.not_opted_in_title') : t('ngo_detail.not_found_title')}
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
               {isPrivate
-                ? 'The NGO can choose to publish a summary from their organisation profile.'
-                : "We couldn't load this NGO summary."}
+                ? t('ngo_detail.not_opted_in_body')
+                : t('ngo_detail.not_found_body')}
             </p>
           </div>
         </div>
@@ -131,7 +133,7 @@ export default function NGOSummaryClient() {
   return (
     <div className="max-w-5xl mx-auto">
       <PageShell>
-        <PageBack href="/organizations/search" label="Back to organizations" />
+        <PageBack href="/organizations/search" label={t('ngo_detail.back_to_organizations')} />
         <PageMain>
       {/* Hero card carries the title + verified badge */}
       <Card className="p-5 sm:p-6">
@@ -144,13 +146,13 @@ export default function NGOSummaryClient() {
               <h1 className="kuja-display text-2xl sm:text-3xl">{data.ngo_name}</h1>
               {data.verified && (
                 <Badge variant="outline" className="text-[10px] text-[hsl(var(--kuja-grow))] border-[hsl(var(--kuja-grow))]">
-                  <ShieldCheck className="h-3 w-3 mr-1" /> Verified
+                  <ShieldCheck className="h-3 w-3 mr-1" /> {t('ngo_detail.verified')}
                 </Badge>
               )}
-              <Badge variant="outline" className="text-[10px]">NGO</Badge>
+              <Badge variant="outline" className="text-[10px]">{t('ngo_detail.badge_ngo')}</Badge>
               {data.passport?.slug && (
                 <Badge variant="outline" className="text-[10px] text-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]">
-                  <Sparkles className="h-3 w-3 mr-1" /> Capacity passport
+                  <Sparkles className="h-3 w-3 mr-1" /> {t('ngo_detail.capacity_passport')}
                 </Badge>
               )}
             </div>
@@ -170,8 +172,8 @@ export default function NGOSummaryClient() {
                   <Globe className="h-3 w-3" /> {data.website.replace(/^https?:\/\//, '')}
                 </a>
               )}
-              {data.year_established && <span>Since {data.year_established}</span>}
-              {data.staff_count && <span>{data.staff_count} staff</span>}
+              {data.year_established && <span>{t('ngo_detail.since', { year: data.year_established })}</span>}
+              {data.staff_count && <span>{t('ngo_detail.staff_count', { count: data.staff_count })}</span>}
             </div>
             {data.mission && (
               <p className="mt-2 text-sm leading-relaxed">{data.mission}</p>
@@ -179,9 +181,9 @@ export default function NGOSummaryClient() {
           </div>
           <NativeShareButton
             url={typeof window !== 'undefined' ? window.location.href : ''}
-            title={`${data.ngo_name ?? 'Organisation'} · Kuja`}
-            text={`${data.ngo_name ?? 'Organisation'} on Kuja — trust profile, capacity, and delivery snapshot.`}
-            label="Share profile"
+            title={t('ngo_detail.share_title', { name: data.ngo_name ?? t('ngo_detail.organisation_fallback') })}
+            text={t('ngo_detail.share_text', { name: data.ngo_name ?? t('ngo_detail.organisation_fallback') })}
+            label={t('ngo_detail.share_profile')}
           />
         </div>
       </Card>
@@ -189,15 +191,15 @@ export default function NGOSummaryClient() {
       {/* Trust scores */}
       {(data.overall_score != null || data.capacity_score != null) && (
         <div>
-          <h2 className="kuja-display text-lg mb-2">Trust at a glance</h2>
+          <h2 className="kuja-display text-lg mb-2">{t('ngo_detail.trust_at_a_glance')}</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <ScoreTile label="Overall" value={data.overall_score} />
-            <ScoreTile label="Capacity" value={data.capacity_score} />
-            <ScoreTile label="Diligence" value={data.diligence_score} />
+            <ScoreTile label={t('ngo_detail.score_overall')} value={data.overall_score} />
+            <ScoreTile label={t('ngo_detail.score_capacity')} value={data.capacity_score} />
+            <ScoreTile label={t('ngo_detail.score_diligence')} value={data.diligence_score} />
           </div>
           {data.overall_status && (
             <p className="mt-2 text-[10px] text-muted-foreground">
-              Status: <strong className="text-foreground">{data.overall_status}</strong>
+              {t('ngo_detail.status_label')} <strong className="text-foreground">{data.overall_status}</strong>
             </p>
           )}
         </div>
@@ -205,25 +207,25 @@ export default function NGOSummaryClient() {
 
       {/* Delivery snapshot — Phase 98.4 OneNumberCard pattern */}
       <div>
-        <h2 className="kuja-display text-lg mb-2">Delivery snapshot</h2>
+        <h2 className="kuja-display text-lg mb-2">{t('ngo_detail.delivery_snapshot')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <OneNumberCard
-            label="Awarded"
+            label={t('ngo_detail.awarded')}
             value={String(data.awarded_count ?? 0)}
             icon={Award}
-            comparison="applications won"
+            comparison={t('ngo_detail.awarded_comparison')}
           />
           <OneNumberCard
-            label="Active"
+            label={t('ngo_detail.active')}
             value={String(data.active_grant_count ?? 0)}
             icon={Briefcase}
-            comparison="grants in flight"
+            comparison={t('ngo_detail.active_comparison')}
           />
           <OneNumberCard
-            label="Reports"
+            label={t('ngo_detail.reports')}
             value={String(data.reports_submitted_count ?? 0)}
             icon={FileCheck2}
-            comparison="submitted on time"
+            comparison={t('ngo_detail.reports_comparison')}
             tone="success"
           />
         </div>
@@ -232,30 +234,29 @@ export default function NGOSummaryClient() {
       {/* Sectors + geography */}
       <div className="grid gap-3 md:grid-cols-2">
         <Card className="p-4">
-          <h3 className="text-sm font-semibold mb-2">Sectors</h3>
+          <h3 className="text-sm font-semibold mb-2">{t('ngo_detail.sectors')}</h3>
           {data.sectors?.length ? (
             <div className="flex flex-wrap gap-1.5">
               {data.sectors.map((s) => <NameChip key={s} name={s} size="sm" />)}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground italic">No sectors listed.</p>
+            <p className="text-xs text-muted-foreground italic">{t('ngo_detail.no_sectors')}</p>
           )}
         </Card>
         <Card className="p-4">
-          <h3 className="text-sm font-semibold mb-2">Geographic footprint</h3>
+          <h3 className="text-sm font-semibold mb-2">{t('ngo_detail.geographic_footprint')}</h3>
           {data.geographic_areas?.length ? (
             <div className="flex flex-wrap gap-1.5">
               {data.geographic_areas.map((g) => <NameChip key={g} name={g} size="sm" />)}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground italic">No geographies listed.</p>
+            <p className="text-xs text-muted-foreground italic">{t('ngo_detail.no_geographies')}</p>
           )}
         </Card>
       </div>
 
       <p className="text-[10px] text-muted-foreground text-center">
-        Aggregate data only · individual applications and grant amounts never appear here ·
-        published by the NGO itself.
+        {t('ngo_detail.footer_note')}
       </p>
         </PageMain>
       </PageShell>

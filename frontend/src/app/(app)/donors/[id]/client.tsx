@@ -30,6 +30,7 @@ import { NameChip } from '@/components/shared/name-chip';
 import { NativeShareButton } from '@/components/shared/native-share-button';
 import { DonorCohortCard } from '@/components/dashboards/donor-cohort-card';
 import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { TrendingUp, TrendingDown, Minus, Users } from 'lucide-react';
 
 interface BenchmarkMetric {
@@ -76,17 +77,10 @@ interface DonorProfile {
   source?: 'profile' | 'sparse' | 'unavailable';
 }
 
-const BAND_LABELS: Record<string, string> = {
-  under_25k:   'Under $25k',
-  '25k_100k':  '$25k–100k',
-  '100k_500k': '$100k–500k',
-  '500k_plus': '$500k+',
-};
-
-const BURDEN_META: Record<string, { cls: string; label: string }> = {
-  low:    { cls: 'text-[hsl(var(--kuja-grow))]', label: 'Lighter than average' },
-  medium: { cls: 'text-[hsl(var(--kuja-sun))]',  label: 'Typical' },
-  high:   { cls: 'text-[hsl(var(--kuja-flag))]', label: 'Heavier than average' },
+const BURDEN_META: Record<string, { cls: string }> = {
+  low:    { cls: 'text-[hsl(var(--kuja-grow))]' },
+  medium: { cls: 'text-[hsl(var(--kuja-sun))]' },
+  high:   { cls: 'text-[hsl(var(--kuja-flag))]' },
 };
 
 function formatUsd(n?: number | null) {
@@ -97,6 +91,7 @@ function formatUsd(n?: number | null) {
 }
 
 export default function DonorProfileClient() {
+  const { t } = useTranslation();
   const params = useParams();
   const router = useRouter();
   const currentUser = useAuthStore((s) => s.user);
@@ -149,11 +144,11 @@ export default function DonorProfileClient() {
   if (!data?.success) {
     return (
       <Card className="p-6 max-w-lg mx-auto mt-12 border-[hsl(var(--kuja-flag)/0.3)]">
-        <h2 className="text-base font-semibold text-[hsl(var(--kuja-flag))]">Donor profile not found</h2>
+        <h2 className="text-base font-semibold text-[hsl(var(--kuja-flag))]">{t('donor_detail.donor_profile_not_found')}</h2>
         <p className="text-xs mt-1">
           {data?.reason === 'not_donor'
-            ? "This organisation isn't a donor — try /organizations instead."
-            : "We couldn't load this donor profile."}
+            ? t('donor_detail.not_a_donor')
+            : t('donor_detail.load_failed')}
         </p>
       </Card>
     );
@@ -163,10 +158,20 @@ export default function DonorProfileClient() {
     ? BURDEN_META[data.reporting_burden.signal]
     : null;
 
+  const bandLabel = (band: string): string => {
+    const map: Record<string, string> = {
+      under_25k:   t('donor_detail.band_under_25k'),
+      '25k_100k':  t('donor_detail.band_25k_100k'),
+      '100k_500k': t('donor_detail.band_100k_500k'),
+      '500k_plus': t('donor_detail.band_500k_plus'),
+    };
+    return map[band] ?? band;
+  };
+
   return (
     <div className="max-w-5xl mx-auto">
       <PageShell>
-        <PageBack href="/organizations/search" label="Back to organizations" />
+        <PageBack href="/organizations/search" label={t('donor_detail.back_to_organizations')} />
         <PageMain>
       {/* Hero card carries the title + verified badge */}
       <Card className="p-5 sm:p-6">
@@ -179,10 +184,10 @@ export default function DonorProfileClient() {
               <h1 className="kuja-display text-2xl sm:text-3xl">{data.donor_name}</h1>
               {data.verified && (
                 <Badge variant="outline" className="text-[10px] text-[hsl(var(--kuja-grow))] border-[hsl(var(--kuja-grow))]">
-                  <ShieldCheck className="h-3 w-3 mr-1" /> Verified
+                  <ShieldCheck className="h-3 w-3 mr-1" /> {t('donor_detail.verified')}
                 </Badge>
               )}
-              <Badge variant="outline" className="text-[10px]">Donor</Badge>
+              <Badge variant="outline" className="text-[10px]">{t('donor_detail.donor')}</Badge>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
               {data.donor_country && (
@@ -207,9 +212,9 @@ export default function DonorProfileClient() {
           </div>
           <NativeShareButton
             url={typeof window !== 'undefined' ? window.location.href : ''}
-            title={`${data.donor_name ?? 'Donor'} · Kuja`}
-            text={`${data.donor_name ?? 'Donor'} on Kuja — portfolio + funding patterns at a glance.`}
-            label="Share profile"
+            title={t('donor_detail.share_title', { name: data.donor_name ?? t('donor_detail.donor') })}
+            text={t('donor_detail.share_text', { name: data.donor_name ?? t('donor_detail.donor') })}
+            label={t('donor_detail.share_profile')}
           />
         </div>
       </Card>
@@ -219,10 +224,9 @@ export default function DonorProfileClient() {
           <div className="flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 mt-0.5 text-[hsl(var(--kuja-sun))]" />
             <div className="text-xs">
-              This donor has fewer than 3 decided applications on the platform —
-              not enough yet to fairly characterise their decision pattern.
+              {t('donor_detail.sparse_notice')}
               {data.open_grant_count !== undefined && data.open_grant_count > 0 && (
-                <> They have <strong>{data.open_grant_count}</strong> open grant{data.open_grant_count === 1 ? '' : 's'} you can still apply to.</>
+                <> {t('donor_detail.sparse_open_grants', { n: data.open_grant_count })}</>
               )}
             </div>
           </div>
@@ -231,54 +235,54 @@ export default function DonorProfileClient() {
 
       {/* Portfolio snapshot */}
       <div>
-        <h2 className="kuja-display text-lg mb-2">Portfolio snapshot</h2>
+        <h2 className="kuja-display text-lg mb-2">{t('donor_detail.portfolio_snapshot')}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <Card className="p-3">
             <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-              <Briefcase className="h-3 w-3" /> Open grants
+              <Briefcase className="h-3 w-3" /> {t('donor_detail.open_grants')}
             </div>
             <div className="text-2xl font-semibold tabular-nums mt-0.5">
               {data.open_grant_count ?? 0}
             </div>
             <div className="text-[10px] text-muted-foreground">
-              of {data.portfolio_size ?? 0} total
+              {t('donor_detail.of_n_total', { n: data.portfolio_size ?? 0 })}
             </div>
           </Card>
           <Card className="p-3">
             <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-              <DollarSign className="h-3 w-3" /> Committed
+              <DollarSign className="h-3 w-3" /> {t('donor_detail.committed')}
             </div>
             <div className="text-2xl font-semibold tabular-nums mt-0.5">
               {formatUsd(data.total_funding_committed_usd)}
             </div>
             <div className="text-[10px] text-muted-foreground">
               {data.typical_grant_size_band
-                ? `typical ${BAND_LABELS[data.typical_grant_size_band] ?? data.typical_grant_size_band}`
-                : 'across portfolio'}
+                ? t('donor_detail.typical_band', { band: bandLabel(data.typical_grant_size_band) })
+                : t('donor_detail.across_portfolio')}
             </div>
           </Card>
           <Card className="p-3">
             <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-              <CalendarClock className="h-3 w-3" /> Decision speed
+              <CalendarClock className="h-3 w-3" /> {t('donor_detail.decision_speed')}
             </div>
             <div className="text-2xl font-semibold tabular-nums mt-0.5">
               {data.decision_speed_days != null ? `${data.decision_speed_days}d` : '—'}
             </div>
             <div className="text-[10px] text-muted-foreground">
               {data.decided_applications_total
-                ? `median of ${data.decided_applications_total} decisions`
-                : 'no decisions yet'}
+                ? t('donor_detail.median_of_n_decisions', { n: data.decided_applications_total })
+                : t('donor_detail.no_decisions_yet')}
             </div>
           </Card>
           <Card className="p-3">
             <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-              <AlertTriangle className="h-3 w-3" /> Decline rate
+              <AlertTriangle className="h-3 w-3" /> {t('donor_detail.decline_rate')}
             </div>
             <div className="text-2xl font-semibold tabular-nums mt-0.5">
               {data.decline_rate != null ? `${data.decline_rate}%` : '—'}
             </div>
             <div className="text-[10px] text-muted-foreground">
-              rejected / decided
+              {t('donor_detail.rejected_decided')}
             </div>
           </Card>
         </div>
@@ -288,7 +292,7 @@ export default function DonorProfileClient() {
       <div className="grid gap-3 md:grid-cols-2">
         <Card className="p-4">
           <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-            <Briefcase className="h-4 w-4 text-[hsl(var(--kuja-clay))]" /> Active sectors
+            <Briefcase className="h-4 w-4 text-[hsl(var(--kuja-clay))]" /> {t('donor_detail.active_sectors')}
           </h3>
           {data.active_sectors?.length ? (
             <div className="flex flex-wrap gap-1.5">
@@ -301,13 +305,13 @@ export default function DonorProfileClient() {
               ))}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground italic">No sectors tagged on grants yet.</p>
+            <p className="text-xs text-muted-foreground italic">{t('donor_detail.no_sectors')}</p>
           )}
         </Card>
 
         <Card className="p-4">
           <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-            <MapPin className="h-4 w-4 text-[hsl(var(--kuja-clay))]" /> Active countries
+            <MapPin className="h-4 w-4 text-[hsl(var(--kuja-clay))]" /> {t('donor_detail.active_countries')}
           </h3>
           {data.active_countries?.length ? (
             <div className="flex flex-wrap gap-1.5">
@@ -320,7 +324,7 @@ export default function DonorProfileClient() {
               ))}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground italic">No countries tagged on grants yet.</p>
+            <p className="text-xs text-muted-foreground italic">{t('donor_detail.no_countries')}</p>
           )}
         </Card>
       </div>
@@ -329,16 +333,14 @@ export default function DonorProfileClient() {
       {data.reporting_burden && burden && (
         <Card className="p-4">
           <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-            <BookOpen className="h-4 w-4 text-[hsl(var(--kuja-clay))]" /> Reporting burden
+            <BookOpen className="h-4 w-4 text-[hsl(var(--kuja-clay))]" /> {t('donor_detail.reporting_burden')}
           </h3>
           <div className="flex items-center gap-3 flex-wrap">
             <Badge variant="outline" className={burden.cls}>
-              {burden.label}
+              {t(`donor_detail.burden_${data.reporting_burden.signal}`)}
             </Badge>
             <span className="text-xs text-muted-foreground">
-              Median <strong className="text-foreground tabular-nums">
-                {data.reporting_burden.median_requirements_per_grant}
-              </strong> reporting requirements per grant
+              {t('donor_detail.median_reporting_requirements', { n: data.reporting_burden.median_requirements_per_grant })}
             </span>
           </div>
         </Card>
@@ -348,10 +350,10 @@ export default function DonorProfileClient() {
       {bench && bench.success && bench.source === 'benchmark' && bench.metrics.length > 0 && (
         <Card className="p-4">
           <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-            <Users className="h-4 w-4 text-[hsl(var(--kuja-clay))]" /> How they compare to peer donors
+            <Users className="h-4 w-4 text-[hsl(var(--kuja-clay))]" /> {t('donor_detail.peer_comparison_heading')}
           </h3>
           <p className="text-[10px] text-muted-foreground mb-3">
-            Anonymous comparison vs {bench.peer_count} other donors on the platform.
+            {t('donor_detail.anonymous_comparison', { n: bench.peer_count })}
           </p>
           <div className="grid gap-2 sm:grid-cols-3">
             {bench.metrics.map((m) => {
@@ -368,7 +370,7 @@ export default function DonorProfileClient() {
                     <Icon className={`h-3.5 w-3.5 ${tone}`} />
                   </div>
                   <div className="text-[10px] text-muted-foreground">
-                    peers median {m.peer_median}{m.unit} · {m.percentile}th pct
+                    {t('donor_detail.peers_median', { median: m.peer_median, unit: m.unit, percentile: m.percentile })}
                   </div>
                 </div>
               );
@@ -382,8 +384,8 @@ export default function DonorProfileClient() {
         <Card className="p-4 bg-gradient-to-br from-background to-[hsl(var(--kuja-sand))]/30 border-[hsl(var(--kuja-clay))]/40">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <h3 className="text-sm font-semibold">{data.open_grant_count} open grant{data.open_grant_count === 1 ? '' : 's'}</h3>
-              <p className="text-xs text-muted-foreground">Browse this donor&apos;s active opportunities.</p>
+              <h3 className="text-sm font-semibold">{t('donor_detail.n_open_grants', { n: data.open_grant_count })}</h3>
+              <p className="text-xs text-muted-foreground">{t('donor_detail.browse_opportunities')}</p>
             </div>
             <button
               type="button"
@@ -391,7 +393,7 @@ export default function DonorProfileClient() {
               className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay-dark))] text-white text-sm font-medium px-3 py-2"
             >
               <FileText className="h-4 w-4" />
-              See grants
+              {t('donor_detail.see_grants')}
             </button>
           </div>
         </Card>

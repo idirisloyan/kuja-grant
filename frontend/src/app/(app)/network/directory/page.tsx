@@ -12,6 +12,7 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Users, Search, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -34,6 +35,7 @@ interface Resp {
 }
 
 export default function NetworkDirectoryPage() {
+  const { t } = useTranslation();
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -64,16 +66,16 @@ export default function NetworkDirectoryPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Member directory"
+        title={t('directory.title')}
         icon={Users}
         subtitle={
-          data ? `${data.total} active member${data.total === 1 ? '' : 's'}` : 'Loading…'
+          data ? t('directory.members_count', { n: data.total }) : t('common.loading')
         }
       />
       <PageMain>
         {loading && (
           <div className="text-sm text-muted-foreground py-6 text-center">
-            <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading…
+            <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> {t('common.loading')}
           </div>
         )}
         {data && (
@@ -85,7 +87,7 @@ export default function NetworkDirectoryPage() {
                   type="text"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="Search name, country, or sector…"
+                  placeholder={t('directory.search_placeholder')}
                   className="w-full rounded-md border border-border bg-background pl-8 pr-2 py-1.5 text-sm"
                 />
               </div>
@@ -94,11 +96,11 @@ export default function NetworkDirectoryPage() {
               <table className="w-full text-sm">
                 <thead className="text-xs uppercase tracking-wide text-muted-foreground border-b border-border">
                   <tr>
-                    <th className="px-3 py-2 text-left">Org</th>
-                    <th className="px-3 py-2 text-left">Country</th>
-                    <th className="px-3 py-2 text-left">Sectors</th>
-                    <th className="px-3 py-2 text-right">Capacity</th>
-                    <th className="px-3 py-2 text-left">Tier</th>
+                    <th className="px-3 py-2 text-left">{t('directory.col_org')}</th>
+                    <th className="px-3 py-2 text-left">{t('directory.col_country')}</th>
+                    <th className="px-3 py-2 text-left">{t('directory.col_sectors')}</th>
+                    <th className="px-3 py-2 text-right">{t('directory.col_capacity')}</th>
+                    <th className="px-3 py-2 text-left">{t('directory.col_tier')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -128,7 +130,7 @@ export default function NetworkDirectoryPage() {
             </div>
             {filtered.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-6">
-                No members match this filter.
+                {t('directory.empty')}
               </p>
             )}
           </Card>

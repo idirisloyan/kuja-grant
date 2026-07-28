@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -95,25 +96,26 @@ function ReportActions({ r, draftingId, onDraft, onEdit }: {
   onEdit: (r: ReportRow) => void;
 }) {
   const hasContent = !!r.content && Object.keys(r.content).length > 0;
+  const { t } = useTranslation();
   return (
     <span className="flex items-center gap-1">
       <button
         onClick={() => onDraft(r.id)}
         disabled={draftingId !== null}
         className="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-md border hover:bg-muted disabled:opacity-50"
-        title="AI drafts this report from real round and disbursement data"
+        title={t('prox_grant.draft_report_tooltip')}
       >
         {draftingId === r.id
           ? <Loader2 className="w-3 h-3 animate-spin" />
           : <Sparkles className="w-3 h-3" />}
-        {hasContent ? 'Re-draft' : 'Draft with AI'}
+        {hasContent ? t('prox_grant.re_draft') : t('prox_grant.draft_with_ai')}
       </button>
       {hasContent && (
         <button
           onClick={() => onEdit(r)}
           className="text-[10px] px-2 py-0.5 rounded-md border hover:bg-muted"
         >
-          Edit
+          {t('common.edit')}
         </button>
       )}
     </span>
@@ -167,6 +169,7 @@ export function ProximateGrantDetailClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { persona } = useProximatePersona();
+  const { t } = useTranslation();
   const isOb = persona === 'ob' || persona === 'admin';
 
   // Phase 721d — deliverables vs targets + report scoring
@@ -180,14 +183,14 @@ export function ProximateGrantDetailClient() {
     if (!grantId || grantId === '0') return;
     api.get<GrantResp>(`/api/proximate/grants/${grantId}`)
       .then((r) => setData(r))
-      .catch(() => setError('Failed to load grant.'))
+      .catch(() => setError(t('prox_grant.failed_load_grant')))
       .finally(() => setLoading(false));
     api.get<{ success: boolean; deliverables: DeliverableProgress[] }>(
       `/api/proximate/grants/${grantId}/compliance`,
     )
       .then((r) => setDeliverables(r.deliverables || []))
       .catch(() => {});
-  }, [grantId]);
+  }, [grantId, t]);
 
   useEffect(() => {
     setLoading(true);
@@ -203,7 +206,7 @@ export function ProximateGrantDetailClient() {
       );
       loadAll();
     } catch (e: unknown) {
-      setScoreError(e instanceof Error ? e.message : 'Scoring failed.');
+      setScoreError(e instanceof Error ? e.message : t('prox_grant.scoring_failed'));
     } finally {
       setScoringId(null);
     }
@@ -226,7 +229,7 @@ export function ProximateGrantDetailClient() {
       setEditorSections(r.report.content || {});
       loadAll();
     } catch (e: unknown) {
-      setScoreError(e instanceof Error ? e.message : 'Drafting failed.');
+      setScoreError(e instanceof Error ? e.message : t('prox_grant.drafting_failed'));
     } finally {
       setDraftingId(null);
     }
@@ -253,7 +256,7 @@ export function ProximateGrantDetailClient() {
       if (submit) setEditorId(null);
       loadAll();
     } catch (e: unknown) {
-      setScoreError(e instanceof Error ? e.message : 'Save failed.');
+      setScoreError(e instanceof Error ? e.message : t('prox_grant.save_failed'));
     } finally {
       setSavingReport(false);
     }
@@ -281,7 +284,7 @@ export function ProximateGrantDetailClient() {
         <PageMain>
           <p className="text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin inline me-2" />
-            Loading grant…
+            {t('prox_grant.loading_grant')}
           </p>
         </PageMain>
       </PageShell>
@@ -291,7 +294,7 @@ export function ProximateGrantDetailClient() {
     return (
       <PageShell>
         <PageMain>
-          <p className="text-sm text-destructive">{error || 'Not found'}</p>
+          <p className="text-sm text-destructive">{error || t('prox_grant.not_found')}</p>
         </PageMain>
       </PageShell>
     );
@@ -316,7 +319,7 @@ export function ProximateGrantDetailClient() {
     <PageShell>
       <PageHeader
         title={g.title}
-        subtitle={`${g.donor_name || 'Donor TBD'}${g.donor_grant_ref ? ` · Ref ${g.donor_grant_ref}` : ''}`}
+        subtitle={`${g.donor_name || t('prox_grant.donor_tbd')}${g.donor_grant_ref ? ` · ${t('prox_grant.ref_label', { ref: g.donor_grant_ref })}` : ''}`}
       />
       <PageMain>
         <div className="space-y-4">
@@ -326,26 +329,26 @@ export function ProximateGrantDetailClient() {
               href={`/api/proximate/grants/${g.id}/donor-pack.pdf`}
               className="inline-flex items-center gap-1.5 text-sm border rounded-lg px-3 py-1.5 hover:bg-muted/40"
             >
-              ⤓ Donor pack (PDF) — financials, deliverables, reports
+              ⤓ {t('prox_grant.donor_pack_pdf')}
             </a>
           </div>
           {/* Financial snapshot */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Card className="p-4">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                Committed
+                {t('prox_grant.committed')}
               </p>
               <p className="text-2xl font-semibold">{fmtUsd(g.amount_committed_usd)}</p>
             </Card>
             <Card className="p-4">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                Received to date
+                {t('prox_grant.received_to_date')}
               </p>
               <p className="text-2xl font-semibold">{fmtUsd(g.amount_received_usd)}</p>
             </Card>
             <Card className="p-4">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                Allocated
+                {t('prox_grant.allocated')}
               </p>
               <p className="text-2xl font-semibold">{fmtUsd(g.amount_allocated_usd)}</p>
               <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
@@ -357,7 +360,7 @@ export function ProximateGrantDetailClient() {
             </Card>
             <Card className="p-4">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                Uncommitted
+                {t('prox_grant.uncommitted')}
               </p>
               <p className="text-2xl font-semibold">{fmtUsd(g.amount_remaining_usd)}</p>
             </Card>
@@ -368,10 +371,10 @@ export function ProximateGrantDetailClient() {
             <Card className="p-4">
               <div className="flex items-center gap-2 mb-1">
                 <Target className="w-4 h-4 text-muted-foreground" />
-                <p className="text-sm font-medium">Deliverables vs targets</p>
+                <p className="text-sm font-medium">{t('prox_grant.deliverables_vs_targets')}</p>
               </div>
               <p className="text-xs text-muted-foreground mb-3">
-                What the agreement commits Adeso to, against live system data.
+                {t('prox_grant.deliverables_description')}
               </p>
               <ul className="space-y-3">
                 {deliverables.map((d) => (
@@ -391,15 +394,15 @@ export function ProximateGrantDetailClient() {
                           className="text-[10px]"
                           title={
                             d.source === 'auto:rounds'
-                              ? 'Counted from rounds allocated from this grant'
+                              ? t('prox_grant.source_auto_rounds')
                               : d.source === 'auto:reports'
-                                ? 'Counted from submitted donor reports'
+                                ? t('prox_grant.source_auto_reports')
                                 : d.source === 'manual'
-                                  ? 'Entered by the Oversight Body'
-                                  : 'Not tracked yet — enter a value'
+                                  ? t('prox_grant.source_manual')
+                                  : t('prox_grant.source_untracked')
                           }
                         >
-                          {d.source.startsWith('auto') ? 'live' : d.source}
+                          {d.source.startsWith('auto') ? t('prox_grant.live') : d.source}
                         </Badge>
                         {isOb && !d.source.startsWith('auto') && (
                           editIdx === d.index ? (
@@ -415,7 +418,7 @@ export function ProximateGrantDetailClient() {
                                 onClick={() => saveProgress(d.index)}
                                 className="text-xs px-2 py-1 rounded-md bg-emerald-600 text-white"
                               >
-                                Save
+                                {t('common.save')}
                               </button>
                             </span>
                           ) : (
@@ -426,7 +429,7 @@ export function ProximateGrantDetailClient() {
                               }}
                               className="text-xs text-emerald-700 hover:underline"
                             >
-                              {d.current === null ? 'Enter progress' : 'Update'}
+                              {d.current === null ? t('prox_grant.enter_progress') : t('prox_grant.update')}
                             </button>
                           )
                         )}
@@ -449,32 +452,32 @@ export function ProximateGrantDetailClient() {
 
           {/* Terms */}
           <Card className="p-4">
-            <p className="text-sm font-medium mb-3">Grant terms</p>
+            <p className="text-sm font-medium mb-3">{t('prox_grant.grant_terms')}</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
               <div>
-                <p className="text-[10px] uppercase text-muted-foreground">Period</p>
+                <p className="text-[10px] uppercase text-muted-foreground">{t('prox_grant.period')}</p>
                 <p className="mt-1">
                   {g.start_date || '?'} → {g.end_date || '?'}
                 </p>
               </div>
               <div>
                 <p className="text-[10px] uppercase text-muted-foreground">
-                  Reporting cadence
+                  {t('prox_grant.reporting_cadence')}
                 </p>
                 <p className="mt-1 font-mono">{g.reporting_cadence}</p>
               </div>
               <div>
                 <p className="text-[10px] uppercase text-muted-foreground">
-                  Signed PDF
+                  {t('prox_grant.signed_pdf')}
                 </p>
                 <p className="mt-1">
                   {g.has_signed_pdf ? (
                     <span className="text-emerald-700 inline-flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> On file
+                      <CheckCircle2 className="w-3 h-3" /> {t('prox_grant.on_file')}
                     </span>
                   ) : (
                     <span className="text-amber-700 inline-flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> Not uploaded
+                      <AlertCircle className="w-3 h-3" /> {t('prox_grant.not_uploaded')}
                     </span>
                   )}
                 </p>
@@ -484,12 +487,12 @@ export function ProximateGrantDetailClient() {
               || g.restrictions?.sectors?.length
               || g.restrictions?.purpose) && (
               <div className="mt-4 pt-4 border-t space-y-2">
-                <p className="text-xs font-medium">Donor restrictions</p>
+                <p className="text-xs font-medium">{t('prox_grant.donor_restrictions')}</p>
                 {g.restrictions?.geographies?.length ? (
                   <div className="flex items-center gap-2 flex-wrap">
                     <MapPin className="w-3 h-3 text-muted-foreground" />
                     <span className="text-[10px] uppercase text-muted-foreground">
-                      Geography:
+                      {t('prox_grant.geography_label')}
                     </span>
                     {g.restrictions.geographies.map((geo) => (
                       <Badge key={geo} variant="outline" className="text-[10px]">
@@ -501,7 +504,7 @@ export function ProximateGrantDetailClient() {
                 {g.restrictions?.sectors?.length ? (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[10px] uppercase text-muted-foreground">
-                      Sectors:
+                      {t('prox_grant.sectors_label')}
                     </span>
                     {g.restrictions.sectors.map((s) => (
                       <Badge key={s} variant="outline" className="text-[10px]">
@@ -523,18 +526,20 @@ export function ProximateGrantDetailClient() {
           <Card className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <Calendar className="w-4 h-4 text-muted-foreground" />
-              <p className="text-sm font-medium">Reporting calendar</p>
+              <p className="text-sm font-medium">{t('prox_grant.reporting_calendar')}</p>
             </div>
             {overdue.length > 0 && (
               <div className="mb-3 p-3 rounded-md border border-rose-300 bg-rose-50">
                 <p className="text-xs font-medium text-rose-800 mb-1">
-                  {overdue.length} report{overdue.length === 1 ? '' : 's'} overdue
+                  {overdue.length === 1
+                    ? t('prox_grant.reports_overdue_one', { n: overdue.length })
+                    : t('prox_grant.reports_overdue_other', { n: overdue.length })}
                 </p>
                 <ul className="text-xs space-y-1">
                   {overdue.map((r) => (
                     <li key={r.id} className="flex items-center gap-2">
                       <span className="flex-1">
-                        {r.report_type} · due {r.due_date}
+                        {r.report_type} · {t('prox_grant.due', { date: r.due_date ?? '' })}
                       </span>
                       {isOb && (
                         <ReportActions
@@ -552,7 +557,7 @@ export function ProximateGrantDetailClient() {
             {upcoming.length > 0 && (
               <div className="mb-3">
                 <p className="text-xs font-medium mb-2 text-muted-foreground uppercase">
-                  Upcoming
+                  {t('prox_grant.upcoming')}
                 </p>
                 <ul className="text-xs space-y-1.5">
                   {upcoming.map((r) => (
@@ -561,7 +566,7 @@ export function ProximateGrantDetailClient() {
                       className="flex items-center gap-2 border-b border-border/60 pb-1.5 last:border-b-0"
                     >
                       <span className="flex-1">
-                        {r.report_type} · due {r.due_date}
+                        {r.report_type} · {t('prox_grant.due', { date: r.due_date ?? '' })}
                       </span>
                       {isOb && (
                         <ReportActions
@@ -588,14 +593,13 @@ export function ProximateGrantDetailClient() {
               <div className="mb-3 p-3 rounded-md border bg-muted/20 space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold">
-                    Editing report #{editorId} — AI drafts from real round
-                    data; review every line before submitting.
+                    {t('prox_grant.editing_report', { id: editorId })}
                   </p>
                   <button
                     onClick={() => setEditorId(null)}
                     className="text-xs text-muted-foreground hover:underline"
                   >
-                    Close
+                    {t('common.close')}
                   </button>
                 </div>
                 {Object.entries(editorSections).map(([key, value]) => (
@@ -621,7 +625,7 @@ export function ProximateGrantDetailClient() {
                     disabled={savingReport}
                     className="text-xs px-3 py-1.5 rounded-md border hover:bg-muted disabled:opacity-50"
                   >
-                    Save draft
+                    {t('prox_grant.save_draft')}
                   </button>
                   <button
                     onClick={() => saveReport(editorId, true)}
@@ -631,7 +635,7 @@ export function ProximateGrantDetailClient() {
                     {savingReport
                       ? <Loader2 className="w-3 h-3 animate-spin inline me-1" />
                       : null}
-                    Submit to donor
+                    {t('prox_grant.submit_to_donor')}
                   </button>
                 </div>
               </div>
@@ -640,7 +644,7 @@ export function ProximateGrantDetailClient() {
             {submitted.length > 0 && (
               <div>
                 <p className="text-xs font-medium mb-2 text-muted-foreground uppercase">
-                  Submitted
+                  {t('prox_grant.submitted')}
                 </p>
                 {scoreError && (
                   <p className="text-xs text-rose-700 mb-2">{scoreError}</p>
@@ -661,7 +665,7 @@ export function ProximateGrantDetailClient() {
                             <Badge
                               variant="outline"
                               className={`text-[10px] font-mono ${scoreBadgeCls(avg)}`}
-                              title="Average AI compliance score across donor requirements"
+                              title={t('prox_grant.avg_score_tooltip')}
                             >
                               {avg}/100
                             </Badge>
@@ -671,12 +675,12 @@ export function ProximateGrantDetailClient() {
                               onClick={() => scoreReport(r.id)}
                               disabled={scoringId !== null}
                               className="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-md border hover:bg-muted disabled:opacity-50"
-                              title="AI scores this report against the donor's extracted requirements"
+                              title={t('prox_grant.score_report_tooltip')}
                             >
                               {scoringId === r.id
                                 ? <Loader2 className="w-3 h-3 animate-spin" />
                                 : <Sparkles className="w-3 h-3" />}
-                              {avg !== null ? 'Re-score' : 'Score with AI'}
+                              {avg !== null ? t('prox_grant.re_score') : t('prox_grant.score_with_ai')}
                             </button>
                           )}
                           <Badge
@@ -689,14 +693,15 @@ export function ProximateGrantDetailClient() {
                         {r.compliance_score?.length > 0 && (
                           <details className="mt-1 ms-2">
                             <summary className="cursor-pointer text-[10px] text-muted-foreground hover:underline">
-                              {r.compliance_score.length} requirement
-                              {r.compliance_score.length === 1 ? '' : 's'} scored —
-                              {' '}
-                              {r.compliance_score.filter((s) => s.verdict === 'met').length} met,
-                              {' '}
-                              {r.compliance_score.filter((s) => s.verdict === 'partial').length} partial,
-                              {' '}
-                              {r.compliance_score.filter((s) => s.verdict === 'missing').length} missing
+                              {r.compliance_score.length === 1
+                                ? t('prox_grant.requirements_scored_one', { n: r.compliance_score.length })
+                                : t('prox_grant.requirements_scored_other', { n: r.compliance_score.length })}
+                              {' — '}
+                              {t('prox_grant.score_breakdown', {
+                                met: r.compliance_score.filter((s) => s.verdict === 'met').length,
+                                partial: r.compliance_score.filter((s) => s.verdict === 'partial').length,
+                                missing: r.compliance_score.filter((s) => s.verdict === 'missing').length,
+                              })}
                             </summary>
                             <ul className="mt-1.5 space-y-1.5">
                               {r.compliance_score.map((s, i) => (
@@ -725,7 +730,7 @@ export function ProximateGrantDetailClient() {
             )}
             {data.reports.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                No reports scheduled yet — they are auto-generated per the grant&apos;s cadence.
+                {t('prox_grant.no_reports_scheduled')}
               </p>
             )}
           </Card>
@@ -735,13 +740,13 @@ export function ProximateGrantDetailClient() {
             <div className="flex items-center gap-2 mb-3">
               <DollarSign className="w-4 h-4 text-muted-foreground" />
               <p className="text-sm font-medium">
-                Round allocations ({data.allocations.length})
+                {t('prox_grant.round_allocations', { n: data.allocations.length })}
               </p>
             </div>
             {data.allocations.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                No rounds have drawn from this grant yet.
-                {isOb && ' Allocate from the round detail page.'}
+                {t('prox_grant.no_rounds_drawn')}
+                {isOb && ` ${t('prox_grant.allocate_from_round')}`}
               </p>
             ) : (
               <ul className="space-y-1.5">
@@ -780,9 +785,9 @@ export function ProximateGrantDetailClient() {
               <details>
                 <summary className="flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                   <FileText className="w-4 h-4 text-muted-foreground" />
-                  <p className="text-sm font-medium">AI-extracted terms</p>
+                  <p className="text-sm font-medium">{t('prox_grant.ai_extracted_terms')}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    raw first pass, already reviewed — click to inspect
+                    {t('prox_grant.ai_extracted_hint')}
                   </p>
                 </summary>
                 <pre className="mt-3 text-[10px] font-mono bg-muted/40 p-3 rounded-md overflow-x-auto max-h-64">

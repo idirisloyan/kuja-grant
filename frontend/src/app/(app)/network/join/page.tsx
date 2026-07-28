@@ -24,9 +24,11 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { CheckCircle2, AlertCircle, Loader2, ArrowRight, Award } from 'lucide-react';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 export default function JoinNetworkPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const viewer = useAuthStore((s) => s.user);
   const { data: cfg, isLoading: cfgLoading } = useMembershipConfig();
   const { data: mineData, mutate: refetchMine } = useMyMemberships();
@@ -63,7 +65,7 @@ export default function JoinNetworkPage() {
   if (!cfg?.success) {
     return (
       <div className="p-6 text-sm">
-        <p className="text-destructive">Couldn&rsquo;t load network configuration.</p>
+        <p className="text-destructive">{t('network_join.config_load_error')}</p>
       </div>
     );
   }
@@ -71,10 +73,9 @@ export default function JoinNetworkPage() {
   if (viewer?.role && viewer.role !== 'ngo') {
     return (
       <div className="p-6 max-w-xl">
-        <h1 className="kuja-display text-3xl mb-2">Join {cfg.network.name}</h1>
+        <h1 className="kuja-display text-3xl mb-2">{t('network_join.page_title', { name: cfg.network.name })}</h1>
         <p className="text-sm text-muted-foreground">
-          Only NGO accounts can apply for network membership. You are signed
-          in as <strong>{viewer.role}</strong>.
+          {t('network_join.ngo_only_notice')} <strong>{viewer.role}</strong>.
         </p>
       </div>
     );
@@ -96,11 +97,11 @@ export default function JoinNetworkPage() {
         },
       );
       if (res.success) {
-        toast.success('Application saved as draft.');
+        toast.success(t('network_join.toast_saved_draft'));
         await refetchMine();
       }
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : 'Failed to save.';
+      const msg = e instanceof ApiError ? e.message : t('network_join.toast_save_failed');
       toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -109,7 +110,7 @@ export default function JoinNetworkPage() {
 
   async function submitForReview() {
     if (!existing) {
-      toast.error('Save your draft first.');
+      toast.error(t('network_join.toast_save_draft_first'));
       return;
     }
     setSubmitting(true);
@@ -118,11 +119,11 @@ export default function JoinNetworkPage() {
         `/network/membership/${existing.id}/submit`,
       );
       if (res.success) {
-        toast.success('Submitted for review.');
+        toast.success(t('network_join.toast_submitted'));
         await refetchMine();
       }
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : 'Failed to submit.';
+      const msg = e instanceof ApiError ? e.message : t('network_join.toast_submit_failed');
       toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -133,9 +134,9 @@ export default function JoinNetworkPage() {
     <div className="max-w-3xl">
       <PageShell>
         <PageHeader
-          title={`Join ${cfg.network.name}`}
+          title={t('network_join.page_title', { name: cfg.network.name })}
           icon={Award}
-          subtitle={`Apply for membership. Review takes up to ${cfg.membership_review_days} days.`}
+          subtitle={t('network_join.page_subtitle', { days: cfg.membership_review_days })}
         />
         <PageMain>
       {/* Status banner */}
@@ -145,10 +146,9 @@ export default function JoinNetworkPage() {
 
       {/* Eligibility questionnaire */}
       <section className="border border-border rounded-lg bg-card p-5 space-y-3">
-        <h2 className="font-semibold text-base">Eligibility</h2>
+        <h2 className="font-semibold text-base">{t('network_join.eligibility_heading')}</h2>
         <p className="text-xs text-muted-foreground">
-          Answer all required questions truthfully. Misrepresentation results
-          in automatic rejection and a cooldown period.
+          {t('network_join.eligibility_note')}
         </p>
         <ul className="space-y-2">
           {cfg.eligibility_questions.map((q) => (
@@ -183,25 +183,25 @@ export default function JoinNetworkPage() {
         </ul>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
           <label className="text-xs space-y-1">
-            <span className="text-muted-foreground">Country</span>
+            <span className="text-muted-foreground">{t('network_join.country_label')}</span>
             <input
               type="text"
               value={country}
               onChange={(e) => setCountry(e.target.value)}
               disabled={existing?.status === 'under_review' || existing?.status === 'active'}
               className="w-full px-3 py-1.5 rounded-md border border-border bg-background text-sm"
-              placeholder="e.g. Kenya"
+              placeholder={t('network_join.country_placeholder')}
             />
           </label>
           <label className="text-xs space-y-1">
-            <span className="text-muted-foreground">Region</span>
+            <span className="text-muted-foreground">{t('network_join.region_label')}</span>
             <input
               type="text"
               value={region}
               onChange={(e) => setRegion(e.target.value)}
               disabled={existing?.status === 'under_review' || existing?.status === 'active'}
               className="w-full px-3 py-1.5 rounded-md border border-border bg-background text-sm"
-              placeholder="e.g. East Africa"
+              placeholder={t('network_join.region_placeholder')}
             />
           </label>
         </div>
@@ -209,13 +209,13 @@ export default function JoinNetworkPage() {
 
       {/* Required documents (read-only checklist for now) */}
       <section className="border border-border rounded-lg bg-card p-5 space-y-3">
-        <h2 className="font-semibold text-base">Required documents</h2>
+        <h2 className="font-semibold text-base">{t('network_join.required_docs_heading')}</h2>
         <p className="text-xs text-muted-foreground">
-          Upload these via the <button
+          {t('network_join.required_docs_upload_via')} <button
             type="button"
             onClick={() => router.push('/applications')}
-            className="underline hover:text-foreground">documents page</button>.
-          Each document is linked to your membership application.
+            className="underline hover:text-foreground">{t('network_join.required_docs_page_link')}</button>.{' '}
+          {t('network_join.required_docs_linked_note')}
         </p>
         <ul className="space-y-1.5 text-sm">
           {cfg.required_documents.map((d) => {
@@ -243,7 +243,7 @@ export default function JoinNetworkPage() {
       {/* Capacity assessment */}
       <section className="border border-border rounded-lg bg-card p-5 space-y-3">
         <h2 className="font-semibold text-base">
-          Capacity assessment
+          {t('network_join.capacity_heading')}
           {cfg.network.assessment_framework_display && (
             <span className="text-muted-foreground font-normal text-xs ml-2">
               ({cfg.network.assessment_framework_display})
@@ -251,17 +251,15 @@ export default function JoinNetworkPage() {
           )}
         </h2>
         <p className="text-xs text-muted-foreground">
-          You must complete a capacity self-assessment before submitting your
-          application. This becomes your <em>capacity passport</em> within the
-          network and is refreshed every {' '}
+          {t('network_join.capacity_intro')} <em>{t('network_join.capacity_passport')}</em>{' '}
           {/* refresh cadence isn't in the config response yet; default copy */}
-          24 months.
+          {t('network_join.capacity_refresh')}
         </p>
         <div className="flex items-center gap-2 text-sm">
           {existing?.capacity_assessment_id ? (
             <>
               <CheckCircle2 className="w-4 h-4 text-[hsl(var(--kuja-grow))]" />
-              <span>Assessment #{existing.capacity_assessment_id} linked</span>
+              <span>{t('network_join.assessment_linked', { id: existing.capacity_assessment_id })}</span>
             </>
           ) : (
             <>
@@ -271,7 +269,7 @@ export default function JoinNetworkPage() {
                 onClick={() => router.push('/assessments/wizard')}
                 className="underline hover:text-foreground"
               >
-                Start capacity assessment →
+                {t('network_join.start_assessment')} →
               </button>
             </>
           )}
@@ -286,7 +284,7 @@ export default function JoinNetworkPage() {
           disabled={submitting || existing?.status === 'under_review' || existing?.status === 'active'}
           className="px-4 py-2 rounded-md border border-border text-sm font-semibold hover:bg-muted disabled:opacity-50"
         >
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin inline" /> : 'Save draft'}
+          {submitting ? <Loader2 className="w-4 h-4 animate-spin inline" /> : t('network_join.save_draft')}
         </button>
         <button
           type="button"
@@ -301,17 +299,17 @@ export default function JoinNetworkPage() {
           className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
           title={
             !existing
-              ? 'Save your draft first'
+              ? t('network_join.tip_save_draft_first')
               : !allAnswered
-              ? 'Answer all required questions Yes'
+              ? t('network_join.tip_answer_all')
               : !existing.capacity_assessment_id
-              ? 'Complete the capacity assessment first'
+              ? t('network_join.tip_complete_assessment')
               : existing.status !== 'pending'
-              ? `Cannot submit from status '${existing.status}'`
+              ? t('network_join.tip_cannot_submit_status', { status: existing.status })
               : ''
           }
         >
-          Submit for OB review <ArrowRight className="w-4 h-4" />
+          {t('network_join.submit_for_review')} <ArrowRight className="w-4 h-4" />
         </button>
       </div>
         </PageMain>
@@ -321,6 +319,7 @@ export default function JoinNetworkPage() {
 }
 
 function StatusBanner({ m }: { m: Membership }) {
+  const { t } = useTranslation();
   const tone =
     m.status === 'active' ? 'bg-[hsl(var(--kuja-grow))]/10 border-[hsl(var(--kuja-grow))]/30'
     : m.status === 'rejected' ? 'bg-destructive/10 border-destructive/30'
@@ -334,7 +333,7 @@ function StatusBanner({ m }: { m: Membership }) {
       )}
       {m.cooldown_until && m.status === 'rejected' && (
         <div className="text-xs text-muted-foreground mt-0.5">
-          You may reapply after {new Date(m.cooldown_until).toLocaleDateString()}.
+          {t('network_join.reapply_after', { date: new Date(m.cooldown_until).toLocaleDateString() })}
         </div>
       )}
     </div>

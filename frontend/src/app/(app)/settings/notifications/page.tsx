@@ -21,6 +21,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface PrefRow {
   category: string;
@@ -40,32 +41,33 @@ interface PrefsResponse {
   };
 }
 
-const CATEGORY_LABELS: Record<string, { label: string; hint: string }> = {
-  deadlines:  { label: 'Deadlines',           hint: 'Report due dates, grant closing, registration expiry' },
-  reviews:    { label: 'Reviews',             hint: 'Application reviews assigned or completed' },
-  compliance: { label: 'Compliance & risk',   hint: 'AI pre-emption flags, sanctions hits, adverse media' },
-  decisions:  { label: 'Donor decisions',     hint: 'Donor decisions on your applications and reports' },
+const CATEGORY_LABELS: Record<string, { labelKey: string; hintKey: string }> = {
+  deadlines:  { labelKey: 'notif_prefs.cat_deadlines_label',  hintKey: 'notif_prefs.cat_deadlines_hint' },
+  reviews:    { labelKey: 'notif_prefs.cat_reviews_label',    hintKey: 'notif_prefs.cat_reviews_hint' },
+  compliance: { labelKey: 'notif_prefs.cat_compliance_label', hintKey: 'notif_prefs.cat_compliance_hint' },
+  decisions:  { labelKey: 'notif_prefs.cat_decisions_label',  hintKey: 'notif_prefs.cat_decisions_hint' },
   // Phase 170 added saved-search alerts. Phase 187 surfaces them in the UI.
   saved_search_matches: {
-    label: 'Saved-search matches',
-    hint: 'New grants published that match one of your saved searches',
+    labelKey: 'notif_prefs.cat_saved_search_matches_label',
+    hintKey: 'notif_prefs.cat_saved_search_matches_hint',
   },
   // Phase 326 — opt-out for weekly digests (NGO pipeline, donor recap, etc).
   digests: {
-    label: 'Weekly digests',
-    hint: 'Weekly summary of in-flight applications, decisions, and grants closing soon',
+    labelKey: 'notif_prefs.cat_digests_label',
+    hintKey: 'notif_prefs.cat_digests_hint',
   },
 };
 
-const CHANNEL_LABELS: Record<string, { label: string; icon: typeof Bell; muted?: boolean; locked?: boolean }> = {
-  in_app:   { label: 'In-app',   icon: Bell,         locked: true },
-  email:    { label: 'Email',    icon: Mail,         muted: true },   // stubbed
-  sms:      { label: 'SMS',      icon: MessageSquare },
-  whatsapp: { label: 'WhatsApp', icon: Phone },
-  web_push: { label: 'Push',     icon: Smartphone,   muted: true },   // not wired this push
+const CHANNEL_LABELS: Record<string, { labelKey: string; icon: typeof Bell; muted?: boolean; locked?: boolean }> = {
+  in_app:   { labelKey: 'notif_prefs.channel_in_app',   icon: Bell,         locked: true },
+  email:    { labelKey: 'notif_prefs.channel_email',    icon: Mail,         muted: true },   // stubbed
+  sms:      { labelKey: 'notif_prefs.channel_sms',      icon: MessageSquare },
+  whatsapp: { labelKey: 'notif_prefs.channel_whatsapp', icon: Phone },
+  web_push: { labelKey: 'notif_prefs.channel_push',     icon: Smartphone,   muted: true },   // not wired this push
 };
 
 export default function NotificationSettingsPage() {
+  const { t } = useTranslation();
   const [prefs, setPrefs] = useState<PrefsResponse | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,9 +141,11 @@ export default function NotificationSettingsPage() {
       const r = await api.post<TestResp>('/api/notification-preferences/test', { category });
       const sent = r.results.filter(x => x.success && !x.skipped).map(x => x.channel);
       const skipped = r.results.filter(x => x.skipped || !x.success);
-      const sentLabel = sent.length > 0 ? sent.join(', ') : 'no channels';
-      const skipDetail = skipped.length ? ` (skipped: ${skipped.map(s => s.channel + (s.reason ? ':' + s.reason : '')).join(', ')})` : '';
-      setTestResult(`Test sent via ${sentLabel}${skipDetail}.`);
+      const sentLabel = sent.length > 0 ? sent.join(', ') : t('notif_prefs.test_no_channels');
+      const skipDetail = skipped.length
+        ? t('notif_prefs.test_skipped_detail', { items: skipped.map(s => s.channel + (s.reason ? ':' + s.reason : '')).join(', ') })
+        : '';
+      setTestResult(t('notif_prefs.test_sent', { channels: sentLabel, detail: skipDetail }));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -150,7 +154,7 @@ export default function NotificationSettingsPage() {
   if (error && !prefs) {
     return (
       <Card className="p-6 max-w-lg mx-auto mt-12 border-[hsl(var(--kuja-flag)/0.3)]">
-        <h2 className="text-base font-semibold text-[hsl(var(--kuja-flag))]">Could not load preferences</h2>
+        <h2 className="text-base font-semibold text-[hsl(var(--kuja-flag))]">{t('notif_prefs.load_error_title')}</h2>
         <p className="text-xs mt-1">{error}</p>
       </Card>
     );
@@ -168,21 +172,19 @@ export default function NotificationSettingsPage() {
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
       <div>
-        <div className="kuja-eyebrow">Settings</div>
-        <h1 className="kuja-display text-3xl mt-1">Notifications</h1>
+        <div className="kuja-eyebrow">{t('notif_prefs.eyebrow')}</div>
+        <h1 className="kuja-display text-3xl mt-1">{t('notif_prefs.title')}</h1>
         <p className="text-sm text-[hsl(var(--kuja-ink-soft))] mt-1">
-          Choose how Kuja reaches you for each kind of update. In-app is always on
-          (that&apos;s where your notifications inbox lives). External channels respect
-          the contact info you provide below.
+          {t('notif_prefs.subtitle')}
         </p>
       </div>
 
       <Card className="p-4 sm:p-5">
-        <div className="kuja-label">Contact details</div>
+        <div className="kuja-label">{t('notif_prefs.contact_details')}</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
           <div>
             <label htmlFor="phone" className="text-xs font-semibold flex items-center gap-1.5">
-              <MessageSquare className="w-3 h-3" /> SMS phone (E.164)
+              <MessageSquare className="w-3 h-3" /> {t('notif_prefs.sms_phone_label')}
             </label>
             <input
               id="phone"
@@ -194,7 +196,7 @@ export default function NotificationSettingsPage() {
           </div>
           <div>
             <label htmlFor="wa" className="text-xs font-semibold flex items-center gap-1.5">
-              <Phone className="w-3 h-3" /> WhatsApp phone (E.164)
+              <Phone className="w-3 h-3" /> {t('notif_prefs.whatsapp_phone_label')}
             </label>
             <input
               id="wa"
@@ -207,15 +209,17 @@ export default function NotificationSettingsPage() {
         </div>
         <p className="text-[11px] text-[hsl(var(--kuja-ink-soft))] mt-2 flex items-start gap-1.5">
           <Info className="w-3 h-3 mt-0.5" />
-          We only message you on the channels you enable per category. You can clear these any time.
+          {t('notif_prefs.contact_hint')}
         </p>
       </Card>
 
       <Card className="p-4 sm:p-5">
-        <div className="kuja-label">Channels per category</div>
+        <div className="kuja-label">{t('notif_prefs.channels_per_category')}</div>
         <div className="mt-3 divide-y divide-[hsl(var(--border))]">
           {prefs.categories.map((c) => {
-            const meta = CATEGORY_LABELS[c.category] ?? { label: c.category, hint: '' };
+            const meta = CATEGORY_LABELS[c.category];
+            const catLabel = meta ? t(meta.labelKey) : c.category;
+            const catHint = meta ? t(meta.hintKey) : '';
             return (
               <div key={c.category} className="py-3 first:pt-0 last:pb-0">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -234,19 +238,21 @@ export default function NotificationSettingsPage() {
                           openCategory === c.category && 'rotate-90',
                         )}
                       />
-                      {meta.label}
+                      {catLabel}
                       <span className="text-[10px] font-normal text-[hsl(var(--kuja-ink-soft))]">
-                        {c.channels.length} channel{c.channels.length === 1 ? '' : 's'} on
+                        {c.channels.length === 1
+                          ? t('notif_prefs.channels_on_one')
+                          : t('notif_prefs.channels_on_other', { n: c.channels.length })}
                       </span>
                     </div>
-                    <div className="text-xs text-[hsl(var(--kuja-ink-soft))] mt-0.5 ps-5">{meta.hint}</div>
+                    <div className="text-xs text-[hsl(var(--kuja-ink-soft))] mt-0.5 ps-5">{catHint}</div>
                   </button>
                   <button
                     type="button"
                     onClick={() => sendTest(c.category)}
                     className="inline-flex items-center gap-1 rounded-md border border-[hsl(var(--border))] px-2 py-1 text-[11px] font-semibold hover:bg-[hsl(var(--kuja-sand-50))]"
                   >
-                    <Send className="w-3 h-3" /> Test
+                    <Send className="w-3 h-3" /> {t('notif_prefs.test')}
                   </button>
                 </div>
                 <div className={cn(
@@ -254,10 +260,12 @@ export default function NotificationSettingsPage() {
                   openCategory === c.category ? 'flex' : 'hidden',
                 )}>
                   {prefs.catalog.channels.map((ch) => {
-                    const cm = CHANNEL_LABELS[ch] ?? { label: ch, icon: Bell, muted: true };
-                    const Icon = cm.icon;
+                    const cm = CHANNEL_LABELS[ch];
+                    const Icon = cm?.icon ?? Bell;
+                    const channelLabel = cm ? t(cm.labelKey) : ch;
+                    const muted = cm ? cm.muted : true;
                     const enabled = c.channels.includes(ch);
-                    const locked = cm.locked;
+                    const locked = cm?.locked;
                     return (
                       <button
                         key={ch}
@@ -271,15 +279,15 @@ export default function NotificationSettingsPage() {
                             ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-clay)/0.08)] text-[hsl(var(--kuja-clay))]'
                             : 'border-[hsl(var(--border))] text-[hsl(var(--kuja-ink-soft))] hover:border-[hsl(var(--kuja-clay))]',
                           locked && 'opacity-60 cursor-not-allowed',
-                          cm.muted && !enabled && 'opacity-60',
+                          muted && !enabled && 'opacity-60',
                         )}
-                        title={locked ? 'Always on' : (enabled ? 'Click to disable' : 'Click to enable')}
+                        title={locked ? t('notif_prefs.tooltip_always_on') : (enabled ? t('notif_prefs.tooltip_click_disable') : t('notif_prefs.tooltip_click_enable'))}
                       >
                         {enabled ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        <Icon className="w-3 h-3" /> {cm.label}
-                        {cm.muted && (
+                        <Icon className="w-3 h-3" /> {channelLabel}
+                        {muted && (
                           <Badge variant="outline" className="ml-1 text-[9px]">
-                            {ch === 'web_push' ? 'soon' : 'stub'}
+                            {ch === 'web_push' ? t('notif_prefs.badge_soon') : t('notif_prefs.badge_stub')}
                           </Badge>
                         )}
                       </button>
@@ -295,7 +303,7 @@ export default function NotificationSettingsPage() {
       <div className="flex items-center justify-end gap-3">
         {savedAt && (
           <span className="text-xs text-[hsl(var(--kuja-grow))]">
-            <Check className="w-3 h-3 inline" /> Saved
+            <Check className="w-3 h-3 inline" /> {t('notif_prefs.saved')}
           </span>
         )}
         {error && <span className="text-xs text-[hsl(var(--kuja-flag))]">{error}</span>}
@@ -307,7 +315,7 @@ export default function NotificationSettingsPage() {
           className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50"
         >
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-          Save preferences
+          {t('notif_prefs.save_preferences')}
         </button>
       </div>
     </div>
