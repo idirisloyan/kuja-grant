@@ -126,7 +126,18 @@ export default function AuditChainPage() {
   // so we don't fake an "intact" badge; the OB verifies offline via the export.
   const network = useNetworkStore((s) => s.network);
   const { t } = useTranslation();
-  const isProx = network?.slug === 'proximate';
+  // QA 2026-07-28 (PRX-27JUL-RBAC-001): the network store hydrates async, so on
+  // the FIRST render `network` is null and this used to resolve isProx=false —
+  // firing the platform-admin audit endpoints (/api/audit-chain/*), which 403
+  // the Proximate OB and latched accessDenied=true (never reset), leaving the OB
+  // falsely "access restricted" even though /api/proximate/audit-chain returns
+  // 200 for them. Fall back to the host while the store is unresolved so the
+  // first fetch hits the right tenant-scoped endpoint; the store stays
+  // authoritative once it loads (covers the X-Network-Override tenant switch).
+  const isProx = network
+    ? network.slug === 'proximate'
+    : (typeof window !== 'undefined'
+       && window.location.hostname.toLowerCase().includes('proximate'));
   const recentUrl = isProx ? '/api/proximate/audit-chain' : '/api/audit-chain/recent';
   const exportHref = isProx
     ? '/api/proximate/audit-chain?format=jsonl'
@@ -194,6 +205,11 @@ export default function AuditChainPage() {
   };
 
   useEffect(() => {
+    // Clear any denial latched by a prior (wrong-endpoint) attempt before
+    // re-loading with the now-resolved tenant — a later 200 must not stay
+    // masked by an earlier 403. The load handlers re-set it if THIS attempt
+    // is genuinely refused.
+    setAccessDenied(false);
     loadVerify();
     loadRecent(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps

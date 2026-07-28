@@ -360,6 +360,20 @@ export default function ProximateDisbursementNewPage() {
                     'Showing only partners awarded in the selected round.')}
               </p>
             )}
+            {/* PRX-27JUL-DISB-001/002 — when a round has awarded partners that
+                are NOT in this selector, say WHY (awarded ≠ ready-to-pay), so an
+                awarded partner "missing" from the list reads as an explained
+                gate, not a bug. Count = awarded − (awarded ∩ cleared). */}
+            {roundScoped
+              && (awardedIds?.length ?? 0) > visiblePartners.length && (
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                {tf('proximate.disbursements.awarded_not_ready_note',
+                    'Some partners awarded in this round are not listed here yet — '
+                    + 'awarded by the panel but not cleared for disbursement '
+                    + '(contract, a verified payment route, or due-diligence '
+                    + 'clearance is still incomplete).')}
+              </p>
+            )}
             {visiblePartners.length === 0 && roundScoped && (
               <div className="mt-2 rounded-md border border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2.5">
                 <p className="text-xs text-amber-800 dark:text-amber-300">
@@ -384,6 +398,19 @@ export default function ProximateDisbursementNewPage() {
               </div>
             )}
           </div>
+
+          {/* PRX-27JUL-DISB-001/002 — the readiness checklist only loads for a
+              selected partner; before selection the OB saw nothing and read it
+              as "no checklist". Say so explicitly so the checklist's absence is
+              a prompt, not a gap. */}
+          {!partnerId && visiblePartners.length > 0 && (
+            <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2.5">
+              <p className="text-xs text-muted-foreground">
+                {tf('proximate.disbursements.select_to_see_readiness',
+                    'Select a partner to see the disbursement readiness checklist.')}
+              </p>
+            </div>
+          )}
 
           {/* Phase 717 — why-blocked: exact missing preconditions before submit */}
           {preflight && (
