@@ -13,7 +13,32 @@
 > See also: [docs/PROXIMATE_FUND_DESIGN.md](PROXIMATE_FUND_DESIGN.md),
 > `seed_proximate.py`, `memory/proximate_prod_state_2026-06-27.md`.
 
-Updated 2026-07-24.
+Updated 2026-07-27.
+
+---
+
+## Pilot-review follow-ups (2026-07-27)
+
+From the 9.4/10 pilot review. **Shipped:**
+- `cf565cd95` — localized the dynamic OB attention-queue labels (severity,
+  intervention kind, grievance type, "response window passed", "needs
+  triage"). These were backend-generated English strings a `t()`-parity
+  audit can't see; they now emit `title_key`/`subtitle_key`/`params` with an
+  English fallback and render via `t()`. See
+  `memory/kuja_i18n_dynamic_copy_gap.md`.
+- `614c2d1d5` — **permanent happy-path fixture** (`seed_proximate_happy_path.py`):
+  a standing TEST-tagged, Blue-Nile-safe, idempotent partner+round that is
+  always "ready to disburse" (no money moved), so a disbursement dry-run no
+  longer needs a hand-built round each UAT pass. **Live on prod** (partner
+  #92 / round #15, network 3) — re-run `railway ssh --service web -- python
+  seed_proximate_happy_path.py` to restore if ever wiped. Also folded the
+  reviewer's live checks into the standing gate
+  (`regression.py::run_proximate_happy_path`): attention-queue title_key
+  invariant, audit-chain JSONL-export 403-scoping, fixture preflight
+  zero-blockers. Gate: regression 124/124, RBAC matrix 29/0-fail.
+
+**Still with IT/ops (not code):** backups + object storage before pilot
+expansion; native Sudanese-Arabic read of the attention-queue strings.
 
 ---
 
