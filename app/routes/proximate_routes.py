@@ -2081,6 +2081,11 @@ def api_attention_queue():
             'title': f'{(m.kind or "").title()} intervention — {_pname(m.partner_id)}',
             'subtitle': ('Response window passed — escalate/resolve now' if hot
                          else 'Awaiting an independent OB response'),
+            'title_key': 'attention.intervention.title',
+            'subtitle_key': ('attention.intervention.sub_hot' if hot
+                             else 'attention.intervention.sub_normal'),
+            'params': {'kind_code': (m.kind or ''),
+                       'partner': _pname(m.partner_id)},
             'href': f'/proximate/endorse/{m.partner_id}',
             'entity_kind': 'intervention', 'entity_id': m.id,
             'due_at': (m.response_due_at.isoformat()
@@ -2102,6 +2107,11 @@ def api_attention_queue():
                 'title': f'Cosign needed — ${amt:,.0f} to {_pname(d.partner_id)}',
                 'subtitle': (f'{d.cosigners_required or 0} co-signature(s) '
                              'required before funds can move'),
+                'title_key': 'attention.cosign.title',
+                'subtitle_key': 'attention.cosign.sub',
+                'params': {'amount': f'{amt:,.0f}',
+                           'partner': _pname(d.partner_id),
+                           'count': d.cosigners_required or 0},
                 'href': f'/proximate/disbursements/{d.id}',
                 'entity_kind': 'disbursement', 'entity_id': d.id,
             })
@@ -2114,6 +2124,10 @@ def api_attention_queue():
                     'title': f'Report overdue — {_pname(d.partner_id)}',
                     'subtitle': (f'Partner report is {_days_since(due)} '
                                  'day(s) late'),
+                    'title_key': 'attention.report_overdue.title',
+                    'subtitle_key': 'attention.report_overdue.sub',
+                    'params': {'partner': _pname(d.partner_id),
+                               'days': _days_since(due)},
                     'href': f'/proximate/disbursements/{d.id}',
                     'entity_kind': 'disbursement', 'entity_id': d.id,
                     'due_at': d.report_due_at.isoformat() if d.report_due_at else None,
@@ -2127,6 +2141,10 @@ def api_attention_queue():
                 'subtitle': ('Verifier assigned — awaiting attestation'
                              if assigned else
                              'No independent verifier assigned yet'),
+                'title_key': 'attention.verify.title',
+                'subtitle_key': ('attention.verify.sub_assigned' if assigned
+                                 else 'attention.verify.sub_unassigned'),
+                'params': {'partner': _pname(d.partner_id)},
                 'href': f'/proximate/disbursements/{d.id}',
                 'entity_kind': 'disbursement', 'entity_id': d.id,
             })
@@ -2142,6 +2160,11 @@ def api_attention_queue():
             'title': (f'New {gr.category} grievance'
                       + (f' — {_pname(gr.partner_id)}' if gr.partner_id else '')),
             'subtitle': 'Needs triage (SLA clock is running)',
+            'title_key': ('attention.grievance.title_partner' if gr.partner_id
+                          else 'attention.grievance.title'),
+            'subtitle_key': 'attention.grievance.sub',
+            'params': {'category_code': gr.category,
+                       'partner': _pname(gr.partner_id) if gr.partner_id else ''},
             'href': '/proximate/admin/grievances',
             'entity_kind': 'grievance', 'entity_id': gr.id,
             'age_days': _days_since(gr.submitted_at),
@@ -2159,6 +2182,9 @@ def api_attention_queue():
             'severity': 'medium',
             'title': f'Round awaiting signatures — {r.title}',
             'subtitle': f'{signed}/2 signatures collected to activate',
+            'title_key': 'attention.round_sign.title',
+            'subtitle_key': 'attention.round_sign.sub',
+            'params': {'round': r.title, 'signed': signed},
             'href': f'/proximate/rounds/{r.id}',
             'entity_kind': 'round', 'entity_id': r.id,
         })
@@ -2173,6 +2199,9 @@ def api_attention_queue():
             'severity': 'low',
             'title': f'{pend} endorser(s) awaiting light-KYC review',
             'subtitle': 'Approve or reject in the endorser queue',
+            'title_key': 'attention.endorser_kyc.title',
+            'subtitle_key': 'attention.endorser_kyc.sub',
+            'params': {'count': pend},
             'href': '/proximate/admin/endorsers',
             'entity_kind': 'endorser_queue', 'entity_id': 0,
         })

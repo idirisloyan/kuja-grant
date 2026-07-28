@@ -26,12 +26,41 @@ export interface AttentionItem {
   severity: 'critical' | 'high' | 'medium' | 'low';
   title: string;
   subtitle?: string;
+  /** i18n keys + params (backend Phase, July 2026). English title/subtitle
+   *  remain as a fallback when a key is missing or on an older response. */
+  title_key?: string;
+  subtitle_key?: string;
+  params?: Record<string, string | number>;
   href: string;
   entity_kind: string;
   entity_id: number;
   due_at?: string | null;
   hours_until_due?: number | null;
   age_days?: number | null;
+}
+
+type TFn = (key: string, params?: Record<string, string | number>) => string;
+
+// Resolve nested enum codes (intervention kind, grievance category) to a
+// translated label, degrading to the English title-case of the raw code when
+// no translation exists — never a raw i18n key.
+function resolveParams(it: AttentionItem, t: TFn): Record<string, string | number> {
+  const p: Record<string, string | number> = { ...(it.params || {}) };
+  const nested: Array<[string, string]> = [
+    ['kind_code', 'kind'],
+    ['category_code', 'category'],
+  ];
+  for (const [codeField, outField] of nested) {
+    const code = p[codeField];
+    if (code != null && code !== '') {
+      const key = `attention.${codeField === 'kind_code' ? 'ikind' : 'gcat'}.${code}`;
+      const val = t(key);
+      p[outField] = val === key
+        ? String(code).charAt(0).toUpperCase() + String(code).slice(1)
+        : val;
+    }
+  }
+  return p;
 }
 
 interface QueueResp {
@@ -91,6 +120,12 @@ export function AttentionQueue({ limit }: { limit?: number }) {
         <ul className="divide-y divide-border/60">
           {items.map((it) => {
             const sev = SEV_STYLE[it.severity] || SEV_STYLE.low;
+            const rp = resolveParams(it, t);
+            const title = it.title_key ? t(it.title_key, rp) : it.title;
+            const subtitle = it.subtitle_key ? t(it.subtitle_key, rp) : it.subtitle;
+            const sevKey = `attention.severity.${it.severity}`;
+            const sevT = t(sevKey);
+            const sevLabel = sevT === sevKey ? sev.label : sevT;
             return (
               <li key={`${it.kind}-${it.entity_id}-${it.title}`}>
                 <Link
@@ -99,13 +134,13 @@ export function AttentionQueue({ limit }: { limit?: number }) {
                 >
                   <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${sev.dot}`} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium leading-snug">{it.title}</p>
-                    {it.subtitle && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{it.subtitle}</p>
+                    <p className="text-sm font-medium leading-snug">{title}</p>
+                    {subtitle && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
                     )}
                   </div>
                   <span className={`text-[10px] uppercase font-semibold tracking-wide shrink-0 mt-1 ${sev.text}`}>
-                    {sev.label}
+                    {sevLabel}
                   </span>
                   <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-1 group-hover:translate-x-0.5 transition-transform" />
                 </Link>
