@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { useCrisisReport, type CrisisRow } from '@/lib/hooks/use-api';
 import { useRouteId } from '@/lib/hooks/use-route-id';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
 import {
   Flag, Sparkles, Loader2, ShieldCheck, AlertOctagon,
@@ -31,17 +32,21 @@ const HDI_OPTIONS = ['low_hdi', 'medium_hdi', 'high_hdi'];
 
 // Crisis-monitoring-specific status copy. Lives here (not in lib/status-copy)
 // because the lifecycle is internal to this surface.
-function describeReportStatus(status: string): { label: string; tone: StatusTone } {
+function describeReportStatus(
+  status: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): { label: string; tone: StatusTone } {
   switch (status) {
-    case 'draft':     return { label: 'Draft',         tone: 'muted' };
-    case 'in_review': return { label: 'Awaiting review', tone: 'warn' };
-    case 'published': return { label: 'Published',     tone: 'good' };
-    case 'archived':  return { label: 'Archived',      tone: 'muted' };
+    case 'draft':     return { label: t('crisis_detail.status_draft'),           tone: 'muted' };
+    case 'in_review': return { label: t('crisis_detail.status_awaiting_review'), tone: 'warn' };
+    case 'published': return { label: t('crisis_detail.status_published'),       tone: 'good' };
+    case 'archived':  return { label: t('crisis_detail.status_archived'),        tone: 'muted' };
     default:          return { label: status.replace(/_/g, ' '), tone: 'muted' };
   }
 }
 
 export default function CrisisMonitoringDetailClient() {
+  const { t } = useTranslation();
   const reportId = useRouteId('crisis-monitoring');
   const viewer = useAuthStore((s) => s.user);
   const { data, isLoading, mutate } = useCrisisReport(reportId);
@@ -49,7 +54,7 @@ export default function CrisisMonitoringDetailClient() {
   if (viewer && viewer.role !== 'admin') {
     return (
       <div className="p-6 text-sm">
-        <p className="text-destructive">Only platform admins can view crisis reports.</p>
+        <p className="text-destructive">{t('crisis_detail.admin_only')}</p>
       </div>
     );
   }
@@ -62,7 +67,7 @@ export default function CrisisMonitoringDetailClient() {
     );
   }
   if (!data.success) {
-    return <div className="p-6 text-sm text-destructive">Failed to load report.</div>;
+    return <div className="p-6 text-sm text-destructive">{t('crisis_detail.load_failed')}</div>;
   }
 
   const r = data.report;
@@ -71,26 +76,28 @@ export default function CrisisMonitoringDetailClient() {
   );
   const isDraft = r.status === 'draft' || r.status === 'in_review';
 
-  const periodLabel =
-    `Week of ${new Date(r.period_start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` +
-    ` – ${new Date(r.period_end).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
-  const statusPill = describeReportStatus(r.status);
+  const periodStart = new Date(r.period_start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const periodEnd = new Date(r.period_end).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const periodLabel = t('crisis_detail.period_label', { start: periodStart, end: periodEnd });
+  const statusPill = describeReportStatus(r.status, t);
 
   return (
     <PageShell>
-      <PageBack href="/admin/crisis-monitoring" label="Back to reports" />
+      <PageBack href="/admin/crisis-monitoring" label={t('crisis_detail.back_to_reports')} />
 
       <PageHeader
         title={periodLabel}
         icon={AlertOctagon}
         status={statusPill}
         meta={[
-          { label: `${rows.length} ${rows.length === 1 ? 'row' : 'rows'}` },
+          { label: rows.length === 1
+              ? t('crisis_detail.row_count_one', { n: rows.length })
+              : t('crisis_detail.row_count_other', { n: rows.length }) },
           ...(r.flagged_row_count > 0
-            ? [{ label: `${r.flagged_row_count} flagged`, icon: Flag }]
+            ? [{ label: t('crisis_detail.flagged_count', { n: r.flagged_row_count }), icon: Flag }]
             : []),
           ...(r.cron_anchor_audit_id
-            ? [{ label: `audit #${r.cron_anchor_audit_id}`, icon: ShieldCheck }]
+            ? [{ label: t('crisis_detail.audit_anchor', { id: r.cron_anchor_audit_id }), icon: ShieldCheck }]
             : []),
         ]}
         primaryAction={isDraft ? <PublishButton reportId={reportId} onChange={mutate} /> : null}
@@ -100,7 +107,7 @@ export default function CrisisMonitoringDetailClient() {
         {/* Summary — collapsible if long, full if short */}
         {r.summary_md && (
           <section className="border border-border rounded-lg bg-card p-5">
-            <h2 className="font-semibold text-sm mb-2">Summary</h2>
+            <h2 className="font-semibold text-sm mb-2">{t('crisis_detail.summary')}</h2>
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{r.summary_md}</p>
           </section>
         )}
@@ -113,20 +120,20 @@ export default function CrisisMonitoringDetailClient() {
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="text-left px-3 py-2">Country</th>
-              <th className="text-left px-3 py-2">Event</th>
-              <th className="text-left px-3 py-2">HDI</th>
-              <th className="text-left px-3 py-2">Gov</th>
-              <th className="text-right px-3 py-2">Impacted</th>
-              <th className="text-left px-3 py-2">Attention</th>
-              <th className="text-right px-3 py-2">Score</th>
-              <th className="text-right px-3 py-2">Actions</th>
+              <th className="text-left px-3 py-2">{t('crisis_detail.col_country')}</th>
+              <th className="text-left px-3 py-2">{t('crisis_detail.col_event')}</th>
+              <th className="text-left px-3 py-2">{t('crisis_detail.col_hdi')}</th>
+              <th className="text-left px-3 py-2">{t('crisis_detail.col_gov')}</th>
+              <th className="text-right px-3 py-2">{t('crisis_detail.col_impacted')}</th>
+              <th className="text-left px-3 py-2">{t('crisis_detail.col_attention')}</th>
+              <th className="text-right px-3 py-2">{t('crisis_detail.col_score')}</th>
+              <th className="text-right px-3 py-2">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr><td colSpan={8} className="px-3 py-6 text-center text-xs text-muted-foreground italic">
-                No rows yet. {isDraft && 'Add one above.'}
+                {t('crisis_detail.no_rows_yet')}{isDraft && ` ${t('crisis_detail.add_one_above')}`}
               </td></tr>
             )}
             {rows.map((row) => (
@@ -141,15 +148,16 @@ export default function CrisisMonitoringDetailClient() {
 }
 
 function PublishButton({ reportId, onChange }: { reportId: number; onChange: () => void }) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   async function publish() {
     setBusy(true);
     try {
       await api.post(`/crisis/reports/${reportId}/publish`);
-      toast.success('Published. The OB can now cite this as declaration evidence.');
+      toast.success(t('crisis_detail.publish_success'));
       onChange();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Publish failed.');
+      toast.error(e instanceof ApiError ? e.message : t('crisis_detail.publish_failed'));
     } finally {
       setBusy(false);
     }
@@ -162,12 +170,13 @@ function PublishButton({ reportId, onChange }: { reportId: number; onChange: () 
       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
     >
       {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-      Publish report
+      {t('crisis_detail.publish_report')}
     </button>
   );
 }
 
 function AddRowForm({ reportId, onChange }: { reportId: number; onChange: () => void }) {
+  const { t } = useTranslation();
   const [country, setCountry] = useState('');
   const [eventType, setEventType] = useState('');
   const [eventTitle, setEventTitle] = useState('');
@@ -182,7 +191,7 @@ function AddRowForm({ reportId, onChange }: { reportId: number; onChange: () => 
 
   async function add() {
     if (country.trim().length !== 3) {
-      toast.error('Country must be ISO 3166 alpha-3 (e.g. SOM, KEN, ETH).');
+      toast.error(t('crisis_detail.country_iso_error'));
       return;
     }
     setBusy(true);
@@ -198,14 +207,14 @@ function AddRowForm({ reportId, onChange }: { reportId: number; onChange: () => 
         narrative: narrative.trim() || undefined,
         flagged_for_ob: flagged,
       });
-      toast.success('Row added.');
+      toast.success(t('crisis_detail.row_added'));
       setOpen(false);
       setCountry(''); setEventType(''); setEventTitle('');
       setHdiBand(''); setGovCapacityBand(''); setPeopleImpacted('');
       setAttentionBand(''); setNarrative(''); setFlagged(false);
       onChange();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Add failed.');
+      toast.error(e instanceof ApiError ? e.message : t('crisis_detail.add_failed'));
     } finally {
       setBusy(false);
     }
@@ -218,35 +227,35 @@ function AddRowForm({ reportId, onChange }: { reportId: number; onChange: () => 
         onClick={() => setOpen(true)}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
       >
-        <Plus className="w-3 h-3" /> Add country / event row
+        <Plus className="w-3 h-3" /> {t('crisis_detail.add_row_toggle')}
       </button>
     );
   }
 
   return (
     <div className="border border-border rounded-lg bg-card p-4 space-y-3">
-      <h3 className="font-semibold text-sm">New row</h3>
+      <h3 className="font-semibold text-sm">{t('crisis_detail.new_row')}</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
         <label className="space-y-1">
-          <span className="text-muted-foreground">Country (ISO-3)*</span>
+          <span className="text-muted-foreground">{t('crisis_detail.field_country')}</span>
           <input value={country} onChange={(e) => setCountry(e.target.value.toUpperCase().slice(0, 3))}
-            placeholder="SOM" maxLength={3}
+            placeholder={t('crisis_detail.placeholder_country')} maxLength={3}
             className="w-full px-2 py-1.5 rounded-md border border-border bg-background uppercase" />
         </label>
         <label className="space-y-1">
-          <span className="text-muted-foreground">Event type</span>
+          <span className="text-muted-foreground">{t('crisis_detail.field_event_type')}</span>
           <input value={eventType} onChange={(e) => setEventType(e.target.value)}
-            placeholder="drought / conflict / flood"
+            placeholder={t('crisis_detail.placeholder_event_type')}
             className="w-full px-2 py-1.5 rounded-md border border-border bg-background" />
         </label>
         <label className="space-y-1 sm:col-span-3">
-          <span className="text-muted-foreground">Event title</span>
+          <span className="text-muted-foreground">{t('crisis_detail.field_event_title')}</span>
           <input value={eventTitle} onChange={(e) => setEventTitle(e.target.value)}
-            placeholder="e.g. Somalia drought escalation, Jubbaland"
+            placeholder={t('crisis_detail.placeholder_event_title')}
             className="w-full px-2 py-1.5 rounded-md border border-border bg-background" />
         </label>
         <label className="space-y-1">
-          <span className="text-muted-foreground">HDI band</span>
+          <span className="text-muted-foreground">{t('crisis_detail.field_hdi_band')}</span>
           <select value={hdiBand} onChange={(e) => setHdiBand(e.target.value)}
             className="w-full px-2 py-1.5 rounded-md border border-border bg-background">
             <option value="">—</option>
@@ -254,7 +263,7 @@ function AddRowForm({ reportId, onChange }: { reportId: number; onChange: () => 
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-muted-foreground">Gov capacity</span>
+          <span className="text-muted-foreground">{t('crisis_detail.field_gov_capacity')}</span>
           <select value={govCapacityBand} onChange={(e) => setGovCapacityBand(e.target.value)}
             className="w-full px-2 py-1.5 rounded-md border border-border bg-background">
             <option value="">—</option>
@@ -262,7 +271,7 @@ function AddRowForm({ reportId, onChange }: { reportId: number; onChange: () => 
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-muted-foreground">Attention</span>
+          <span className="text-muted-foreground">{t('crisis_detail.field_attention')}</span>
           <select value={attentionBand} onChange={(e) => setAttentionBand(e.target.value)}
             className="w-full px-2 py-1.5 rounded-md border border-border bg-background">
             <option value="">—</option>
@@ -270,30 +279,30 @@ function AddRowForm({ reportId, onChange }: { reportId: number; onChange: () => 
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-muted-foreground">People impacted</span>
+          <span className="text-muted-foreground">{t('crisis_detail.field_people_impacted')}</span>
           <input type="number" value={peopleImpacted}
             onChange={(e) => setPeopleImpacted(e.target.value)} min={0}
             className="w-full px-2 py-1.5 rounded-md border border-border bg-background" />
         </label>
         <label className="space-y-1 sm:col-span-3">
-          <span className="text-muted-foreground">Narrative</span>
+          <span className="text-muted-foreground">{t('crisis_detail.field_narrative')}</span>
           <textarea value={narrative} onChange={(e) => setNarrative(e.target.value)} rows={3}
-            placeholder="What's happening, member-reported signals, gaps..."
+            placeholder={t('crisis_detail.placeholder_narrative')}
             className="w-full px-2 py-1.5 rounded-md border border-border bg-background" />
         </label>
         <label className="flex items-center gap-2 sm:col-span-3">
           <input type="checkbox" checked={flagged} onChange={(e) => setFlagged(e.target.checked)} />
-          <span>Flag for Oversight Body review</span>
+          <span>{t('crisis_detail.flag_for_ob')}</span>
         </label>
       </div>
       <div className="flex gap-2">
         <button type="button" onClick={add} disabled={busy}
           className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50">
-          {busy ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'Add row'}
+          {busy ? <Loader2 className="w-3 h-3 animate-spin inline" /> : t('crisis_detail.add_row_button')}
         </button>
         <button type="button" onClick={() => setOpen(false)}
           className="px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted">
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     </div>
@@ -305,6 +314,7 @@ function CrisisRowDisplay({
 }: {
   reportId: number; row: CrisisRow; onChange: () => void; isDraft: boolean;
 }) {
+  const { t } = useTranslation();
   const [aiBusy, setAiBusy] = useState(false);
   const [aiNarrative, setAiNarrative] = useState<string | null>(null);
 
@@ -317,11 +327,11 @@ function CrisisRowDisplay({
       );
       if (r?.narrative) {
         setAiNarrative(r.narrative);
-        if (r.ok) toast.success('AI narrative drafted.');
-        else toast.message('AI fallback — review manually.');
+        if (r.ok) toast.success(t('crisis_detail.ai_narrative_drafted'));
+        else toast.message(t('crisis_detail.ai_fallback'));
       }
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'AI drafter failed.');
+      toast.error(e instanceof ApiError ? e.message : t('crisis_detail.ai_drafter_failed'));
     } finally {
       setAiBusy(false);
     }
@@ -364,7 +374,7 @@ function CrisisRowDisplay({
             className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-[hsl(var(--kuja-spark))] text-white hover:opacity-90 disabled:opacity-50"
           >
             {aiBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-            AI draft
+            {t('crisis_detail.ai_draft')}
           </button>
         </td>
       </tr>
@@ -382,7 +392,7 @@ function CrisisRowDisplay({
               <Sparkles className="w-4 h-4 text-[hsl(var(--kuja-spark))] shrink-0 mt-0.5" />
               <div className="flex-1">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                  AI-drafted narrative (not applied — preview only)
+                  {t('crisis_detail.ai_narrative_preview')}
                 </div>
                 <p className="whitespace-pre-wrap leading-relaxed">{aiNarrative}</p>
               </div>
@@ -390,7 +400,7 @@ function CrisisRowDisplay({
                 type="button"
                 onClick={() => setAiNarrative(null)}
                 className="text-[10px] text-muted-foreground hover:text-foreground"
-              >Dismiss</button>
+              >{t('crisis_detail.dismiss')}</button>
             </div>
           </td>
         </tr>

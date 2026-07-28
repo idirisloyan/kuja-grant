@@ -22,6 +22,7 @@ import { DollarSign, Building2, AlertTriangle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { EmptyState } from '@/components/shared/empty-state';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface TenantRow {
   org_id: number | null;
@@ -56,6 +57,7 @@ function usd(n: number): string {
 
 export default function AICostByTenantPage() {
   const user = useAuthStore((s) => s.user);
+  const { t } = useTranslation();
   const [days, setDays] = useState(30);
 
   const { data, error, isLoading } = useSWR<Resp>(
@@ -66,21 +68,21 @@ export default function AICostByTenantPage() {
   if (user?.role !== 'admin') {
     return (
       <PageShell>
-        <PageHeader title="AI cost by tenant" subtitle="Admin only." />
+        <PageHeader title={t('ai_cost.title')} subtitle={t('ai_cost.admin_only')} />
       </PageShell>
     );
   }
 
   return (
     <PageShell>
-      <PageBack href="/admin/ai-telemetry" label="Back to AI telemetry" />
+      <PageBack href="/admin/ai-telemetry" label={t('ai_cost.back_to_ai_telemetry')} />
       <PageHeader
-        title="AI cost by tenant"
-        subtitle="Token spend attributed to each org. Joins call logs through user → org."
+        title={t('ai_cost.title')}
+        subtitle={t('ai_cost.subtitle')}
       />
 
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs text-muted-foreground">Window:</span>
+        <span className="text-xs text-muted-foreground">{t('ai_cost.window')}</span>
         {WINDOWS.map((w) => (
           <button
             type="button"
@@ -101,7 +103,7 @@ export default function AICostByTenantPage() {
         {isLoading && <div className="kuja-shimmer h-32 rounded-lg" />}
         {error && (
           <div className="border border-rose-200 bg-rose-50 rounded-md p-4 text-sm text-rose-800">
-            Could not load tenant cost rollup.
+            {t('ai_cost.load_error')}
           </div>
         )}
         {data?.success && (
@@ -109,65 +111,63 @@ export default function AICostByTenantPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
               <SummaryTile
                 icon={DollarSign}
-                label={`Total spend · last ${days}d`}
+                label={t('ai_cost.total_spend_last_days', { days })}
                 value={usd(data.total_usd)}
               />
               <SummaryTile
                 icon={Building2}
-                label="Tenants with AI usage"
-                value={String(data.by_tenant.filter((t) => t.org_id != null).length)}
-                sub="Plus a 'Platform' bucket for cron / anonymous calls"
+                label={t('ai_cost.tenants_with_ai_usage')}
+                value={String(data.by_tenant.filter((row) => row.org_id != null).length)}
+                sub={t('ai_cost.platform_bucket_note')}
               />
               <SummaryTile
                 icon={AlertTriangle}
-                label="Top tenant share"
+                label={t('ai_cost.top_tenant_share')}
                 value={
                   data.by_tenant.length > 0
                     ? `${data.by_tenant[0].share_pct}%`
                     : '—'
                 }
                 sub={data.by_tenant.length > 0
-                  ? data.by_tenant[0].org_name ?? 'Unattributed'
-                  : 'No usage yet'}
+                  ? data.by_tenant[0].org_name ?? t('ai_cost.unattributed')
+                  : t('ai_cost.no_usage_yet')}
               />
             </div>
 
             {data.by_tenant.length === 0 ? (
               <EmptyState
                 icon={DollarSign}
-                title="No AI cost recorded in this window"
-                body={`No AICallLog rows for the last ${days} days. Either the window is too short ` +
-                  `or AI surfaces aren't being exercised. Pick a longer window or check ` +
-                  `/admin/system-health for backend status.`}
+                title={t('ai_cost.no_cost_title')}
+                body={t('ai_cost.no_cost_body', { days })}
               />
             ) : (
               <div className="border border-border rounded-lg bg-card overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
                     <tr>
-                      <th className="text-left p-3">Tenant</th>
-                      <th className="text-right p-3">Calls</th>
-                      <th className="text-right p-3">Tokens in</th>
-                      <th className="text-right p-3">Tokens out</th>
-                      <th className="text-right p-3">USD</th>
-                      <th className="text-right p-3">Share</th>
+                      <th className="text-left p-3">{t('ai_cost.tenant')}</th>
+                      <th className="text-right p-3">{t('ai_cost.calls')}</th>
+                      <th className="text-right p-3">{t('ai_cost.tokens_in')}</th>
+                      <th className="text-right p-3">{t('ai_cost.tokens_out')}</th>
+                      <th className="text-right p-3">{t('ai_cost.usd')}</th>
+                      <th className="text-right p-3">{t('ai_cost.share')}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.by_tenant.map((t) => (
-                      <tr key={t.org_id ?? 'platform'} className="border-t border-border">
+                    {data.by_tenant.map((row) => (
+                      <tr key={row.org_id ?? 'platform'} className="border-t border-border">
                         <td className="p-3 font-semibold">
-                          {t.org_name ?? <span className="italic text-muted-foreground">Unattributed</span>}
+                          {row.org_name ?? <span className="italic text-muted-foreground">{t('ai_cost.unattributed')}</span>}
                         </td>
-                        <td className="p-3 text-right">{t.calls.toLocaleString()}</td>
-                        <td className="p-3 text-right">{t.tokens_in.toLocaleString()}</td>
-                        <td className="p-3 text-right">{t.tokens_out.toLocaleString()}</td>
-                        <td className="p-3 text-right font-semibold">{usd(t.usd)}</td>
+                        <td className="p-3 text-right">{row.calls.toLocaleString()}</td>
+                        <td className="p-3 text-right">{row.tokens_in.toLocaleString()}</td>
+                        <td className="p-3 text-right">{row.tokens_out.toLocaleString()}</td>
+                        <td className="p-3 text-right font-semibold">{usd(row.usd)}</td>
                         <td className="p-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <span className="font-mono">{t.share_pct}%</span>
+                            <span className="font-mono">{row.share_pct}%</span>
                             <div className="h-1.5 w-12 rounded-full overflow-hidden bg-muted">
-                              <div className="h-full bg-[hsl(var(--kuja-clay))]" style={{ width: `${t.share_pct}%` }} />
+                              <div className="h-full bg-[hsl(var(--kuja-clay))]" style={{ width: `${row.share_pct}%` }} />
                             </div>
                           </div>
                         </td>
@@ -179,8 +179,8 @@ export default function AICostByTenantPage() {
             )}
 
             <p className="text-xs text-muted-foreground mt-4">
-              {data.pricing_note} See <code>/admin/ai-spend</code> for day-bucketed totals
-              and <code>/admin/ai-spend/forecast</code> for 30-day projection vs.
+              {data.pricing_note} {t('ai_cost.see')} <code>/admin/ai-spend</code> {t('ai_cost.for_day_bucketed_totals_and')}{' '}
+              <code>/admin/ai-spend/forecast</code> {t('ai_cost.for_30d_projection_vs')}
               <code className="mx-1">KUJA_AI_BUDGET_USD_30D</code>.
             </p>
 
@@ -207,6 +207,7 @@ interface UserRow {
 }
 
 function ByUserTable({ days }: { days: number }) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<UserRow[]>([]);
 
   useEffect(() => {
@@ -222,17 +223,17 @@ function ByUserTable({ days }: { days: number }) {
   return (
     <div className="border border-border rounded-lg bg-card overflow-x-auto mt-6">
       <div className="p-3 border-b border-border text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-        Top users by AI cost ({days}d)
+        {t('ai_cost.top_users_by_ai_cost', { days })}
       </div>
       <table className="w-full text-xs">
         <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th className="text-left p-3">User</th>
-            <th className="text-left p-3">Role</th>
-            <th className="text-right p-3">Calls</th>
-            <th className="text-right p-3">Tokens in</th>
-            <th className="text-right p-3">Tokens out</th>
-            <th className="text-right p-3">USD</th>
+            <th className="text-left p-3">{t('ai_cost.user')}</th>
+            <th className="text-left p-3">{t('ai_cost.role')}</th>
+            <th className="text-right p-3">{t('ai_cost.calls')}</th>
+            <th className="text-right p-3">{t('ai_cost.tokens_in')}</th>
+            <th className="text-right p-3">{t('ai_cost.tokens_out')}</th>
+            <th className="text-right p-3">{t('ai_cost.usd')}</th>
           </tr>
         </thead>
         <tbody>
@@ -261,6 +262,7 @@ interface FeatureRow {
 }
 
 function FeatureUsageTable({ days }: { days: number }) {
+  const { t } = useTranslation();
   const [data, setData] = useState<{ top_events: FeatureRow[]; total_events: number } | null>(null);
 
   useEffect(() => {
@@ -276,13 +278,13 @@ function FeatureUsageTable({ days }: { days: number }) {
   return (
     <div className="border border-border rounded-lg bg-card overflow-x-auto mt-6">
       <div className="p-3 border-b border-border text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-        Top feature events ({days}d) — {data.total_events.toLocaleString()} total
+        {t('ai_cost.top_feature_events', { days, total: data.total_events.toLocaleString() })}
       </div>
       <table className="w-full text-xs">
         <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th className="text-left p-3">Event</th>
-            <th className="text-right p-3">Count</th>
+            <th className="text-left p-3">{t('ai_cost.event')}</th>
+            <th className="text-right p-3">{t('ai_cost.count')}</th>
           </tr>
         </thead>
         <tbody>

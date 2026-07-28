@@ -22,6 +22,7 @@ import useSWR from 'swr';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { useMembership } from '@/lib/hooks/use-api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { useRouteId } from '@/lib/hooks/use-route-id';
 import { useAuthStore } from '@/stores/auth-store';
 import {
@@ -53,15 +54,17 @@ type Membership = {
   org?: { name?: string; sector?: string } | null;
 };
 
-function describeMembershipStatus(m: Membership): { label: string; tone: 'muted' | 'warn' | 'good' | 'bad' | 'accent' } {
+type Translate = (key: string, params?: Record<string, string | number>) => string;
+
+function describeMembershipStatus(m: Membership, t: Translate): { label: string; tone: 'muted' | 'warn' | 'good' | 'bad' | 'accent' } {
   switch (m.status) {
-    case 'pending':       return { label: 'Awaiting review', tone: 'warn' };
-    case 'under_review':  return { label: 'Under review',    tone: 'warn' };
-    case 'active':        return { label: 'Active member',   tone: 'good' };
-    case 'rejected':      return { label: 'Rejected',        tone: 'bad' };
-    case 'suspended':     return { label: 'Suspended',       tone: 'bad' };
-    case 'expelled':      return { label: 'Expelled',        tone: 'bad' };
-    default:              return { label: m.status,          tone: 'muted' };
+    case 'pending':       return { label: t('membership_detail.status_awaiting_review'), tone: 'warn' };
+    case 'under_review':  return { label: t('membership_detail.status_under_review'),    tone: 'warn' };
+    case 'active':        return { label: t('membership_detail.status_active_member'),   tone: 'good' };
+    case 'rejected':      return { label: t('membership_detail.status_rejected'),        tone: 'bad' };
+    case 'suspended':     return { label: t('membership_detail.status_suspended'),       tone: 'bad' };
+    case 'expelled':      return { label: t('membership_detail.status_expelled'),        tone: 'bad' };
+    default:              return { label: m.status,                                      tone: 'muted' };
   }
 }
 
@@ -69,11 +72,12 @@ export default function MembershipReviewClient() {
   const id = useRouteId('network-memberships');
   const viewer = useAuthStore((s) => s.user);
   const { data, isLoading, mutate } = useMembership(id);
+  const { t } = useTranslation();
 
   if (viewer && viewer.role !== 'admin') {
     return (
       <div className="p-6 text-sm">
-        <p className="text-destructive">Only admins can review memberships.</p>
+        <p className="text-destructive">{t('membership_detail.only_admins_can_review')}</p>
       </div>
     );
   }
@@ -88,7 +92,7 @@ export default function MembershipReviewClient() {
   }
   const m = data.membership as unknown as Membership;
   const decidable = m.status === 'pending' || m.status === 'under_review';
-  const statusPill = describeMembershipStatus(m);
+  const statusPill = describeMembershipStatus(m, t);
 
   // Build attention strip — blockers + recommended next action.
   // Defaults to the page being calm; only surfaces items that ARE issues.
@@ -96,35 +100,35 @@ export default function MembershipReviewClient() {
   if (decidable && !m.capacity_assessment_id) {
     attention.push({
       tone: 'warn',
-      label: 'Capacity assessment not yet linked',
-      hint: 'Typically required before approval. Ask the applicant to complete the assessment self-service.',
+      label: t('membership_detail.attn_capacity_not_linked'),
+      hint: t('membership_detail.attn_capacity_not_linked_hint'),
     });
   }
   if (decidable && m.capacity_assessment_id) {
     attention.push({
       tone: 'accent',
-      label: 'Ready to review',
-      hint: 'Run the trust process on the Due diligence tab, then approve or reject from the header.',
+      label: t('membership_detail.attn_ready_to_review'),
+      hint: t('membership_detail.attn_ready_to_review_hint'),
     });
   }
 
   return (
     <PageShell>
-      <PageBack href="/admin/network-memberships" label="Back to memberships" />
+      <PageBack href="/admin/network-memberships" label={t('membership_detail.back_to_memberships')} />
 
       <PageHeader
-        title={m.org?.name || `Org #${m.org_id}`}
+        title={m.org?.name || t('membership_detail.org_fallback', { id: m.org_id })}
         icon={Building2}
         status={statusPill}
         meta={[
           ...(m.country ? [{ label: m.country, icon: MapPin }] : []),
           ...(m.region  ? [{ label: m.region }]                : []),
           ...(m.org?.sector ? [{ label: m.org.sector }]        : []),
-          ...(m.member_tier ? [{ label: `tier: ${m.member_tier}` }] : []),
+          ...(m.member_tier ? [{ label: t('membership_detail.meta_tier', { tier: m.member_tier }) }] : []),
           ...(m.applied_at
-            ? [{ label: `applied ${new Date(m.applied_at).toLocaleDateString()}` }]
+            ? [{ label: t('membership_detail.meta_applied', { date: new Date(m.applied_at).toLocaleDateString() }) }]
             : []),
-          ...(m.is_oversight_body ? [{ label: 'Oversight Body', icon: ShieldCheck }] : []),
+          ...(m.is_oversight_body ? [{ label: t('membership_detail.oversight_body'), icon: ShieldCheck }] : []),
         ]}
         primaryAction={
           decidable ? <DecisionActions m={m} onChange={mutate} /> : null
@@ -136,11 +140,11 @@ export default function MembershipReviewClient() {
       <PageMain>
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="w-full justify-start overflow-x-auto" variant="line">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="capacity">Capacity</TabsTrigger>
-            <TabsTrigger value="due_diligence">Due diligence</TabsTrigger>
-            <TabsTrigger value="messages">Messages</TabsTrigger>
-            <TabsTrigger value="audit">Audit</TabsTrigger>
+            <TabsTrigger value="overview">{t('membership_detail.tab_overview')}</TabsTrigger>
+            <TabsTrigger value="capacity">{t('membership_detail.tab_capacity')}</TabsTrigger>
+            <TabsTrigger value="due_diligence">{t('membership_detail.tab_due_diligence')}</TabsTrigger>
+            <TabsTrigger value="messages">{t('membership_detail.tab_messages')}</TabsTrigger>
+            <TabsTrigger value="audit">{t('membership_detail.tab_audit')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-3">
@@ -173,24 +177,25 @@ export default function MembershipReviewClient() {
 // ---------------------------------------------------------------------------
 
 function OverviewTab({ m, onChange }: { m: Membership; onChange: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <section className="border border-border rounded-lg bg-card p-5 space-y-2">
-        <h2 className="font-semibold text-sm">Summary</h2>
+        <h2 className="font-semibold text-sm">{t('membership_detail.summary')}</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          {m.org?.name || `Org #${m.org_id}`}
-          {m.country && <> in <strong className="text-foreground">{m.country}</strong></>}
+          {m.org?.name || t('membership_detail.org_fallback', { id: m.org_id })}
+          {m.country && <> {t('membership_detail.located_in')} <strong className="text-foreground">{m.country}</strong></>}
           {m.region && <>, {m.region}</>}
-          . Application status:{' '}
-          <strong className="text-foreground">{describeMembershipStatus(m).label.toLowerCase()}</strong>
-          {m.applied_at && <>, submitted {new Date(m.applied_at).toLocaleDateString()}</>}
+          . {t('membership_detail.application_status_label')}{' '}
+          <strong className="text-foreground">{describeMembershipStatus(m, t).label.toLowerCase()}</strong>
+          {m.applied_at && <>, {t('membership_detail.submitted')} {new Date(m.applied_at).toLocaleDateString()}</>}
           .
         </p>
       </section>
 
       {Object.keys(m.eligibility_answers || {}).length > 0 && (
         <section className="border border-border rounded-lg bg-card p-5 space-y-3">
-          <h2 className="font-semibold text-sm">Eligibility self-assessment</h2>
+          <h2 className="font-semibold text-sm">{t('membership_detail.eligibility_self_assessment')}</h2>
           <ul className="text-xs space-y-1.5">
             {Object.entries(m.eligibility_answers || {}).map(([k, v]) => (
               <li key={k} className="flex items-center justify-between gap-3 py-1 border-b border-border last:border-b-0">
@@ -216,32 +221,33 @@ function OverviewTab({ m, onChange }: { m: Membership; onChange: () => void }) {
 // ---------------------------------------------------------------------------
 
 function CapacityTab({ m }: { m: Membership }) {
+  const { t } = useTranslation();
   return (
     <section className="border border-border rounded-lg bg-card p-5 space-y-3">
       <h2 className="font-semibold text-sm flex items-center gap-2">
         <ClipboardCheck className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
-        Capacity assessment
+        {t('membership_detail.capacity_assessment')}
       </h2>
       {m.capacity_assessment_id ? (
         <div className="text-xs flex items-center justify-between gap-3 flex-wrap">
           <div>
             <div className="text-[hsl(var(--kuja-grow))] font-semibold">
-              Assessment #{m.capacity_assessment_id} linked
+              {t('membership_detail.assessment_linked', { id: m.capacity_assessment_id })}
             </div>
             <div className="text-muted-foreground mt-0.5">
-              Self-service capacity assessment completed by the applicant.
+              {t('membership_detail.capacity_completed_by_applicant')}
             </div>
           </div>
           <a
             href="/assessments"
             className="text-xs underline hover:no-underline text-muted-foreground"
           >
-            Open assessment
+            {t('membership_detail.open_assessment')}
           </a>
         </div>
       ) : (
         <p className="text-xs text-muted-foreground italic">
-          Applicant has not yet completed the capacity assessment. They must do this before approval.
+          {t('membership_detail.capacity_not_completed')}
         </p>
       )}
     </section>
@@ -277,6 +283,7 @@ interface AuditResp {
 function MembershipAuditTab({
   membershipId, orgId,
 }: { membershipId: number; orgId: number }) {
+  const { t } = useTranslation();
   // Pull entries for BOTH the membership row and the underlying org.
   // The chain tags each event with the most specific subject, so events
   // on the org (e.g. trust process runs, passport publish) are separate
@@ -310,11 +317,9 @@ function MembershipAuditTab({
     return (
       <section className="border border-dashed border-border rounded-lg bg-card p-8 text-center space-y-2">
         <History className="w-8 h-8 mx-auto text-muted-foreground opacity-50" />
-        <h3 className="font-semibold text-sm">No audit entries yet</h3>
+        <h3 className="font-semibold text-sm">{t('membership_detail.no_audit_entries')}</h3>
         <p className="text-xs text-muted-foreground max-w-md mx-auto">
-          Events touching this membership or its organisation will appear here
-          (approve, reject, OB seat grant/revoke, trust process runs, passport
-          publish, etc.).
+          {t('membership_detail.no_audit_entries_body')}
         </p>
       </section>
     );
@@ -325,18 +330,19 @@ function MembershipAuditTab({
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-sm flex items-center gap-2">
           <History className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
-          Decision audit trail
+          {t('membership_detail.decision_audit_trail')}
         </h2>
         <Link
           href={`/admin/audit-chain`}
           className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
         >
-          Open full chain <ExternalLink className="w-3 h-3" />
+          {t('membership_detail.open_full_chain')} <ExternalLink className="w-3 h-3" />
         </Link>
       </div>
       <p className="text-xs text-muted-foreground">
-        {merged.length} hash-chained event{merged.length === 1 ? '' : 's'} on
-        this membership or its organisation. Newest first.
+        {merged.length === 1
+          ? t('membership_detail.audit_events_summary_one', { count: merged.length })
+          : t('membership_detail.audit_events_summary_other', { count: merged.length })}
       </p>
       <ul className="space-y-1.5">
         {merged.map((e) => (
@@ -349,7 +355,7 @@ function MembershipAuditTab({
                 {e.action.replace(/_/g, ' ').replace(/\./g, ' · ')}
               </div>
               <div className="text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap text-[11px]">
-                {e.actor_email && <span>by {e.actor_email}</span>}
+                {e.actor_email && <span>{t('membership_detail.by_actor', { email: e.actor_email })}</span>}
                 <span>· {e.subject_kind} #{e.subject_id}</span>
                 {e.created_at && (
                   <span>· {new Date(e.created_at).toLocaleString()}</span>
@@ -358,7 +364,7 @@ function MembershipAuditTab({
             </div>
             <span
               className="font-mono text-[10px] text-muted-foreground shrink-0"
-              title={`payload hash: ${e.payload_hash}`}
+              title={t('membership_detail.payload_hash_tooltip', { hash: e.payload_hash })}
             >
               #{e.seq}
             </span>
@@ -392,6 +398,7 @@ interface MessagesResp {
 function MembershipMessagesTab({
   orgId, orgName,
 }: { orgId: number; orgName?: string }) {
+  const { t } = useTranslation();
   // Filter the global broadcast log to ones that resolve to this org —
   // either scope='org' with this org's id, or scope='network' (all
   // members), or scope='country' matching this org's country. For an
@@ -424,18 +431,16 @@ function MembershipMessagesTab({
       <section className="border border-dashed border-border rounded-lg bg-card p-8 text-center space-y-3">
         <Inbox className="w-8 h-8 mx-auto text-muted-foreground opacity-50" />
         <h3 className="font-semibold text-sm">
-          No direct messages with {orgName || 'this organisation'} yet
+          {t('membership_detail.no_direct_messages', { name: orgName || t('membership_detail.this_organisation') })}
         </h3>
         <p className="text-xs text-muted-foreground max-w-md mx-auto">
-          Direct (scope=org) broadcasts from the secretariat to this org will
-          appear here. Network-wide and country-wide messages live on the
-          global Messages surface.
+          {t('membership_detail.no_direct_messages_body')}
         </p>
         <Link
           href="/messages"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
         >
-          Open global Messages <ArrowUpRight className="w-3 h-3" />
+          {t('membership_detail.open_global_messages')} <ArrowUpRight className="w-3 h-3" />
         </Link>
       </section>
     );
@@ -446,13 +451,13 @@ function MembershipMessagesTab({
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-sm flex items-center gap-2">
           <Inbox className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
-          Direct messages with {orgName || 'this organisation'}
+          {t('membership_detail.direct_messages_with', { name: orgName || t('membership_detail.this_organisation') })}
         </h2>
         <Link
           href="/messages"
           className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
         >
-          Open global Messages <ExternalLink className="w-3 h-3" />
+          {t('membership_detail.open_global_messages')} <ExternalLink className="w-3 h-3" />
         </Link>
       </div>
       <ul className="space-y-2">
@@ -463,7 +468,7 @@ function MembershipMessagesTab({
           >
             <div className="font-semibold text-sm">{m.subject}</div>
             <div className="text-[11px] text-muted-foreground">
-              {m.sender_name || m.sender_email || 'Unknown sender'}
+              {m.sender_name || m.sender_email || t('membership_detail.unknown_sender')}
               {m.sent_at && <> · {new Date(m.sent_at).toLocaleString()}</>}
             </div>
             <p className="whitespace-pre-wrap leading-relaxed">{m.body_md}</p>
@@ -505,6 +510,7 @@ function PlaceholderTab({
 // ---------------------------------------------------------------------------
 
 function DecisionActions({ m, onChange }: { m: { id: number; capacity_assessment_id?: number | null }; onChange: () => void }) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -513,10 +519,10 @@ function DecisionActions({ m, onChange }: { m: { id: number; capacity_assessment
     setBusy(true);
     try {
       await api.post(`/network/membership/${m.id}/approve`);
-      toast.success('Approved — applicant is now an active member.');
+      toast.success(t('membership_detail.toast_approved'));
       onChange();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Approve failed.');
+      toast.error(e instanceof ApiError ? e.message : t('membership_detail.toast_approve_failed'));
     } finally {
       setBusy(false);
     }
@@ -524,18 +530,18 @@ function DecisionActions({ m, onChange }: { m: { id: number; capacity_assessment
 
   async function reject() {
     if (!rejectReason.trim()) {
-      toast.error('Reason is required.');
+      toast.error(t('membership_detail.toast_reason_required'));
       return;
     }
     setBusy(true);
     try {
       await api.post(`/network/membership/${m.id}/reject`, { reason: rejectReason.trim() });
-      toast.success('Rejected.');
+      toast.success(t('membership_detail.toast_rejected'));
       setRejectOpen(false);
       setRejectReason('');
       onChange();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Reject failed.');
+      toast.error(e instanceof ApiError ? e.message : t('membership_detail.toast_reject_failed'));
     } finally {
       setBusy(false);
     }
@@ -549,7 +555,7 @@ function DecisionActions({ m, onChange }: { m: { id: number; capacity_assessment
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
       >
         <XCircle className="w-3 h-3" />
-        Reject
+        {t('membership_detail.reject')}
       </button>
       <button
         type="button"
@@ -558,13 +564,13 @@ function DecisionActions({ m, onChange }: { m: { id: number; capacity_assessment
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[hsl(var(--kuja-grow))] text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50"
       >
         {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-        Approve
+        {t('membership_detail.approve')}
       </button>
       {rejectOpen && (
         <div className="absolute z-30 mt-2 top-full right-0 bg-popover border border-border rounded-md shadow-lg p-3 w-80 space-y-2">
           <label className="text-xs space-y-1 block">
             <span className="text-muted-foreground">
-              Rejection reason (visible to the applicant)
+              {t('membership_detail.rejection_reason_label')}
             </span>
             <textarea
               value={rejectReason}
@@ -579,7 +585,7 @@ function DecisionActions({ m, onChange }: { m: { id: number; capacity_assessment
               onClick={() => { setRejectOpen(false); setRejectReason(''); }}
               className="px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="button"
@@ -587,7 +593,7 @@ function DecisionActions({ m, onChange }: { m: { id: number; capacity_assessment
               disabled={busy || !rejectReason.trim()}
               className="px-3 py-1.5 rounded-md bg-destructive text-destructive-foreground text-xs font-semibold disabled:opacity-50"
             >
-              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Confirm reject'}
+              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : t('membership_detail.confirm_reject')}
             </button>
           </div>
         </div>
@@ -603,6 +609,7 @@ function DecisionActions({ m, onChange }: { m: { id: number; capacity_assessment
 function TrustProcessPanel({
   membershipId, onUpdate,
 }: { membershipId: number; onUpdate: () => void }) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{
     screening?: { recommendation?: string; high_count?: number; medium_count?: number; low_count?: number; sources_searched?: string[]; error?: string };
@@ -616,13 +623,13 @@ function TrustProcessPanel({
       setResult(r);
       if (r?.screening && !('error' in (r.screening || {}))) {
         const rec = r.screening?.recommendation;
-        toast.success(`Trust process complete. Recommendation: ${rec ?? '—'}`);
+        toast.success(t('membership_detail.toast_trust_complete', { rec: rec ?? '—' }));
       } else {
-        toast.message('Trust process ran — see results below.');
+        toast.message(t('membership_detail.toast_trust_ran'));
       }
       onUpdate();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Trust process failed.');
+      toast.error(e instanceof ApiError ? e.message : t('membership_detail.toast_trust_failed'));
     } finally {
       setBusy(false);
     }
@@ -640,7 +647,7 @@ function TrustProcessPanel({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="font-semibold text-sm flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
-          Trust process (sanctions · adverse media · registry)
+          {t('membership_detail.trust_process_heading')}
         </h2>
         <button
           type="button"
@@ -649,38 +656,36 @@ function TrustProcessPanel({
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
         >
           {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-          {result ? 'Re-run trust process' : 'Run trust process now'}
+          {result ? t('membership_detail.rerun_trust_process') : t('membership_detail.run_trust_process')}
         </button>
       </div>
       <p className="text-xs text-muted-foreground">
-        NEAR runs adverse-media screening, registry verification, and sanctions checks on the
-        applicant. Audit-anchored. Results stay on the applicant&rsquo;s trust profile and feed
-        future pre-disbursement checks.
+        {t('membership_detail.trust_process_description')}
       </p>
 
       {result?.screening?.error && (
         <div className="text-xs border border-destructive/30 bg-destructive/10 rounded-md p-2">
           <ShieldAlert className="w-3 h-3 inline mr-1" />
-          Service error: {result.screening.error}
+          {t('membership_detail.service_error', { error: result.screening.error })}
         </div>
       )}
 
       {result?.screening && !result.screening.error && (
         <div className="border border-border rounded-md p-3 space-y-2">
           <div className="flex items-center gap-3 flex-wrap text-xs">
-            <span className="font-semibold">Recommendation:</span>
+            <span className="font-semibold">{t('membership_detail.recommendation_label')}</span>
             <span className={`uppercase font-bold tracking-wide ${recTone}`}>
               {rec || '—'}
             </span>
           </div>
           <div className="grid grid-cols-3 gap-2 text-xs">
-            <CountChip label="High-severity hits" count={result.screening.high_count || 0} tone="bad" />
-            <CountChip label="Medium"             count={result.screening.medium_count || 0} tone="warn" />
-            <CountChip label="Low"                count={result.screening.low_count || 0} tone="muted" />
+            <CountChip label={t('membership_detail.high_severity_hits')} count={result.screening.high_count || 0} tone="bad" />
+            <CountChip label={t('membership_detail.medium')}             count={result.screening.medium_count || 0} tone="warn" />
+            <CountChip label={t('membership_detail.low')}                count={result.screening.low_count || 0} tone="muted" />
           </div>
           {result.screening.sources_searched && result.screening.sources_searched.length > 0 && (
             <div className="text-[10px] text-muted-foreground">
-              Sources: {result.screening.sources_searched.join(' · ')}
+              {t('membership_detail.sources', { sources: result.screening.sources_searched.join(' · ') })}
             </div>
           )}
         </div>
@@ -713,6 +718,7 @@ function OversightBodyPanel({
   membership: { id: number; is_oversight_body?: boolean; ob_role_started_at?: string | null; ob_role_ended_at?: string | null };
   onChange: () => void;
 }) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const isOB = m.is_oversight_body === true;
@@ -721,28 +727,28 @@ function OversightBodyPanel({
     setBusy(true);
     try {
       await api.post(`/network/membership/${m.id}/ob-seat`, { note: note.trim() || null });
-      toast.success('OB seat granted. The member can now act on declarations.');
+      toast.success(t('membership_detail.toast_ob_granted'));
       setNote('');
       onChange();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Grant failed.');
+      toast.error(e instanceof ApiError ? e.message : t('membership_detail.toast_grant_failed'));
     } finally {
       setBusy(false);
     }
   }
 
   async function revoke() {
-    if (!confirm('Revoke this Oversight Body seat? The member keeps their NGO-member access; they lose OB permissions.')) return;
+    if (!confirm(t('membership_detail.confirm_revoke_ob'))) return;
     setBusy(true);
     try {
       const reason = note.trim();
       const url = `/network/membership/${m.id}/ob-seat${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`;
       await api.delete(url);
-      toast.success('OB seat revoked.');
+      toast.success(t('membership_detail.toast_ob_revoked'));
       setNote('');
       onChange();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Revoke failed.');
+      toast.error(e instanceof ApiError ? e.message : t('membership_detail.toast_revoke_failed'));
     } finally {
       setBusy(false);
     }
@@ -756,24 +762,21 @@ function OversightBodyPanel({
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-sm">
-            {isOB ? 'Active Oversight Body seat' : 'No Oversight Body seat'}
+            {isOB ? t('membership_detail.ob_seat_active') : t('membership_detail.ob_seat_none')}
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5 max-w-2xl">
-            Per the IKEA Concept Note, the OB is peer-elected from member orgs.
-            Granting this seat gives every user at the org OB permissions
-            (sign declarations, approve membership, run trust process) on top
-            of their NGO-member access.
+            {t('membership_detail.ob_seat_description')}
           </p>
           {isOB && m.ob_role_started_at && (
             <p className="text-[11px] text-muted-foreground mt-1">
-              Seat started {new Date(m.ob_role_started_at).toLocaleDateString()}
+              {t('membership_detail.seat_started', { date: new Date(m.ob_role_started_at).toLocaleDateString() })}
             </p>
           )}
         </div>
       </div>
       <div className="border-t border-border pt-3 space-y-2">
         <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          {isOB ? 'Reason for revocation (optional)' : 'Note (optional — election cycle, term, etc.)'}
+          {isOB ? t('membership_detail.reason_for_revocation') : t('membership_detail.ob_note_label')}
         </label>
         <input
           type="text"
@@ -781,7 +784,7 @@ function OversightBodyPanel({
           onChange={(e) => setNote(e.target.value)}
           maxLength={500}
           className="w-full px-2 py-1.5 rounded-md border border-border bg-background text-sm"
-          placeholder={isOB ? 'e.g. End of 2-year term' : 'e.g. Elected by the Eastern Africa caucus, 2026 term'}
+          placeholder={isOB ? t('membership_detail.revoke_note_placeholder') : t('membership_detail.grant_note_placeholder')}
         />
         <div className="flex items-center gap-2">
           {!isOB ? (
@@ -792,7 +795,7 @@ function OversightBodyPanel({
               className="px-3 py-1.5 rounded-md text-xs font-semibold bg-[hsl(var(--kuja-clay))] text-white hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1"
             >
               {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
-              Grant OB seat
+              {t('membership_detail.grant_ob_seat')}
             </button>
           ) : (
             <button
@@ -802,7 +805,7 @@ function OversightBodyPanel({
               className="px-3 py-1.5 rounded-md text-xs font-semibold border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50 inline-flex items-center gap-1"
             >
               {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
-              Revoke OB seat
+              {t('membership_detail.revoke_ob_seat')}
             </button>
           )}
         </div>

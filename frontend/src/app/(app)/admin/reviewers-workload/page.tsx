@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -41,6 +42,7 @@ interface Resp {
 }
 
 export default function ReviewerWorkloadPage() {
+  const { t } = useTranslation();
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -61,26 +63,26 @@ export default function ReviewerWorkloadPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Reviewer workload"
+        title={t('reviewers_workload.title')}
         icon={Users}
-        subtitle="Current pipeline per reviewer. Sort highest active load first."
+        subtitle={t('reviewers_workload.subtitle')}
       />
       <PageMain>
         {loading && (
           <div className="text-sm text-muted-foreground py-6 text-center">
             <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
-            Loading…
+            {t('common.loading')}
           </div>
         )}
         {data && (
           <>
             <div className="grid gap-3 sm:grid-cols-3 mb-4">
               <Card className="p-4">
-                <div className="text-xs text-muted-foreground">Total assigned</div>
+                <div className="text-xs text-muted-foreground">{t('reviewers_workload.total_assigned')}</div>
                 <div className="font-serif text-2xl">{data.summary.total_assigned}</div>
               </Card>
               <Card className="p-4">
-                <div className="text-xs text-muted-foreground">In progress</div>
+                <div className="text-xs text-muted-foreground">{t('reviewers_workload.in_progress')}</div>
                 <div className="font-serif text-2xl">{data.summary.total_in_progress}</div>
               </Card>
               <Card className={cn(
@@ -88,7 +90,7 @@ export default function ReviewerWorkloadPage() {
                 data.summary.total_overdue > 0 ? 'border-rose-300' : '',
               )}>
                 <div className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                  Overdue ({'>'}{data.overdue_threshold_days}d)
+                  {t('reviewers_workload.overdue_threshold', { days: data.overdue_threshold_days })}
                   {data.summary.total_overdue > 0 && <AlertTriangle className="w-3 h-3 text-rose-600" />}
                 </div>
                 <div className={cn(
@@ -105,12 +107,12 @@ export default function ReviewerWorkloadPage() {
                 <table className="w-full text-sm">
                   <thead className="text-xs uppercase tracking-wide text-muted-foreground border-b border-border">
                     <tr>
-                      <th className="px-3 py-2 text-left">Reviewer</th>
-                      <th className="px-3 py-2 text-left">Active load</th>
-                      <th className="px-3 py-2 text-right">Assigned</th>
-                      <th className="px-3 py-2 text-right">In progress</th>
-                      <th className="px-3 py-2 text-right">Overdue</th>
-                      <th className="px-3 py-2 text-right">Completed</th>
+                      <th className="px-3 py-2 text-left">{t('reviewers_workload.col_reviewer')}</th>
+                      <th className="px-3 py-2 text-left">{t('reviewers_workload.col_active_load')}</th>
+                      <th className="px-3 py-2 text-right">{t('reviewers_workload.col_assigned')}</th>
+                      <th className="px-3 py-2 text-right">{t('reviewers_workload.in_progress')}</th>
+                      <th className="px-3 py-2 text-right">{t('reviewers_workload.col_overdue')}</th>
+                      <th className="px-3 py-2 text-right">{t('reviewers_workload.col_completed')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -142,7 +144,7 @@ export default function ReviewerWorkloadPage() {
                                 style={{ width: `${widthPct}%` }}
                               />
                             </div>
-                            <span className="text-[10px] text-muted-foreground">{active} active</span>
+                            <span className="text-[10px] text-muted-foreground">{t('reviewers_workload.n_active', { n: active })}</span>
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums">{r.assigned}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{r.in_progress}</td>

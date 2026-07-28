@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { useWindowReport, type WindowReportDeclaration } from '@/lib/hooks/use-api';
 import { useRouteId } from '@/lib/hooks/use-route-id';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
 import {
   ChevronLeft, FileSpreadsheet, Archive, Clock, ShieldCheck,
@@ -31,6 +32,7 @@ const SLA_BAD = 'bg-destructive/15 text-destructive';
 const SLA_NEUTRAL = 'bg-muted text-muted-foreground';
 
 export default function WindowReportClient() {
+  const { t } = useTranslation();
   const windowId = useRouteId('windows');
   const router = useRouter();
   const viewer = useAuthStore((s) => s.user);
@@ -39,7 +41,7 @@ export default function WindowReportClient() {
   if (viewer && viewer.role !== 'admin') {
     return (
       <div className="p-6 text-sm">
-        <p className="text-destructive">Only platform admins can view window reports.</p>
+        <p className="text-destructive">{t('window_report.admin_only')}</p>
       </div>
     );
   }
@@ -53,7 +55,7 @@ export default function WindowReportClient() {
     );
   }
   if (!data.success) {
-    return <div className="p-6 text-sm text-destructive">Failed to load report.</div>;
+    return <div className="p-6 text-sm text-destructive">{t('window_report.load_failed')}</div>;
   }
 
   const { window, fund, stats, sla, declarations, audit_chain, generated_at } = data;
@@ -64,31 +66,35 @@ export default function WindowReportClient() {
 
   return (
     <PageShell>
-      <PageBack href="/admin/funds" label="Back to funds" />
+      <PageBack href="/admin/funds" label={t('window_report.back_to_funds')} />
 
       <PageHeader
-        title={`${window.name} — report`}
+        title={t('window_report.report_title', { name: window.name })}
         icon={BarChart3}
-        subtitle={`${fund?.name} · ${fund?.currency} · generated ${new Date(generated_at).toLocaleString()}`}
+        subtitle={t('window_report.subtitle', {
+          fund: fund?.name ?? '',
+          currency: fund?.currency ?? '',
+          date: new Date(generated_at).toLocaleString(),
+        })}
         primaryAction={
           <div className="flex flex-wrap gap-2">
             <a
               href={`/api/windows/${windowId}/report.csv`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
             >
-              <FileSpreadsheet className="w-3 h-3" /> Declarations CSV
+              <FileSpreadsheet className="w-3 h-3" /> {t('window_report.declarations_csv')}
             </a>
             <a
               href={`/api/windows/${windowId}/report/grants.csv`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-muted"
             >
-              <FileSpreadsheet className="w-3 h-3" /> Grants CSV
+              <FileSpreadsheet className="w-3 h-3" /> {t('window_report.grants_csv')}
             </a>
             <a
               href={`/api/windows/${windowId}/report.zip`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90"
             >
-              <Archive className="w-3 h-3" /> Full bundle (ZIP)
+              <Archive className="w-3 h-3" /> {t('window_report.full_bundle_zip')}
             </a>
           </div>
         }
@@ -97,15 +103,15 @@ export default function WindowReportClient() {
       <PageMain>
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard icon={<AlertCircle className="w-4 h-4" />} label="Declarations"
-          value={`${stats.declarations_active} active`}
-          sub={`${stats.declarations_total} total`} />
-        <StatCard icon={<Coins className="w-4 h-4" />} label="Grants"
+        <StatCard icon={<AlertCircle className="w-4 h-4" />} label={t('window_report.stat_declarations')}
+          value={t('window_report.n_active', { n: stats.declarations_active })}
+          sub={t('window_report.n_total', { n: stats.declarations_total })} />
+        <StatCard icon={<Coins className="w-4 h-4" />} label={t('window_report.stat_grants')}
           value={stats.grants_total.toString()}
-          sub={`${stats.total_disbursed_estimate.toLocaleString()} disbursed`} />
-        <StatCard icon={<Users className="w-4 h-4" />} label="NGOs reached"
-          value={stats.ngos_reached.toString()} sub="distinct" />
-        <StatCard icon={<MapPin className="w-4 h-4" />} label="Countries"
+          sub={t('window_report.n_disbursed', { n: stats.total_disbursed_estimate.toLocaleString() })} />
+        <StatCard icon={<Users className="w-4 h-4" />} label={t('window_report.stat_ngos_reached')}
+          value={stats.ngos_reached.toString()} sub={t('window_report.distinct')} />
+        <StatCard icon={<MapPin className="w-4 h-4" />} label={t('window_report.stat_countries')}
           value={stats.countries_count.toString()}
           sub={stats.countries_covered.join(', ').slice(0, 40) || '—'} />
       </div>
@@ -113,16 +119,16 @@ export default function WindowReportClient() {
       {/* SLA-vs-target */}
       <section className="border border-border rounded-lg bg-card p-5 space-y-3">
         <h2 className="font-semibold text-sm flex items-center gap-2">
-          <Clock className="w-4 h-4" /> SLA performance
+          <Clock className="w-4 h-4" /> {t('window_report.sla_performance')}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <SlaBlock
-            label={`Application window ≤ ${sla.target_app_window_hours}h`}
+            label={t('window_report.sla_app_window', { n: sla.target_app_window_hours })}
             hits={sla.app_window_hits} misses={sla.app_window_misses}
             rate={hitRate72}
           />
           <SlaBlock
-            label={`Decision ≤ ${sla.target_decision_days} days`}
+            label={t('window_report.sla_decision', { n: sla.target_decision_days })}
             hits={sla.decision_hits} misses={sla.decision_misses}
             rate={hitRate6d}
           />
@@ -141,17 +147,22 @@ export default function WindowReportClient() {
         }>
           {audit_chain.ok === true ? <ShieldCheck className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
           <span>
-            Audit chain {audit_chain.ok === true ? 'verified' : audit_chain.ok === false ? 'BROKEN' : 'unverified'}
-            {audit_chain.total !== null && <> · {audit_chain.total} entries</>}
+            {t('window_report.audit_chain')}{' '}
+            {audit_chain.ok === true
+              ? t('window_report.audit_verified')
+              : audit_chain.ok === false
+              ? t('window_report.audit_broken')
+              : t('window_report.audit_unverified')}
+            {audit_chain.total !== null && <> · {t('window_report.n_entries', { n: audit_chain.total })}</>}
           </span>
         </div>
       )}
 
       {/* Declaration roster */}
       <section className="border border-border rounded-lg bg-card p-5 space-y-3">
-        <h2 className="font-semibold text-sm">Declarations ({declarations.length})</h2>
+        <h2 className="font-semibold text-sm">{t('window_report.declarations_count', { n: declarations.length })}</h2>
         {declarations.length === 0 ? (
-          <div className="text-xs text-muted-foreground italic">No declarations in this window.</div>
+          <div className="text-xs text-muted-foreground italic">{t('window_report.no_declarations')}</div>
         ) : (
           <ul className="space-y-3">
             {declarations.map((d) => <DeclarationRow key={d.id} d={d} />)}
@@ -168,6 +179,7 @@ export default function WindowReportClient() {
 }
 
 function AINarrativePanel({ windowId }: { windowId: number }) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{
     ok?: boolean;
@@ -184,10 +196,10 @@ function AINarrativePanel({ windowId }: { windowId: number }) {
         `/windows/${windowId}/report/ai-narrative`,
       );
       setResult(r);
-      if (r?.ok) toast.success('Narrative drafted.');
-      else toast.message('AI unavailable — using fallback.');
+      if (r?.ok) toast.success(t('window_report.narrative_drafted'));
+      else toast.message(t('window_report.ai_unavailable'));
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Failed.');
+      toast.error(e instanceof ApiError ? e.message : t('window_report.failed'));
     } finally {
       setBusy(false);
     }
@@ -198,7 +210,7 @@ function AINarrativePanel({ windowId }: { windowId: number }) {
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-semibold text-sm flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-[hsl(var(--kuja-spark))]" />
-          AI narrative
+          {t('window_report.ai_narrative')}
         </h2>
         <button
           type="button"
@@ -207,40 +219,40 @@ function AINarrativePanel({ windowId }: { windowId: number }) {
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[hsl(var(--kuja-spark))] text-white text-xs font-semibold disabled:opacity-50"
         >
           {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-          {result ? 'Re-draft' : 'Draft narrative'}
+          {result ? t('window_report.redraft') : t('window_report.draft_narrative')}
         </button>
       </div>
       <p className="text-xs text-muted-foreground">
-        AI-drafted prose sections from the structured stats above. Edit before publishing the report PDF.
+        {t('window_report.ai_narrative_help')}
       </p>
       {result && (
         <div className="space-y-3 text-sm">
           {!result.ok && (
             <div className="text-xs italic text-muted-foreground">
-              Fallback shown — AI service unavailable in this environment.
+              {t('window_report.fallback_shown')}
             </div>
           )}
           {result.overview_md && (
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Overview</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{t('window_report.overview')}</div>
               <p className="whitespace-pre-wrap leading-relaxed">{result.overview_md}</p>
             </div>
           )}
           {result.sla_commentary_md && (
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">SLA commentary</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{t('window_report.sla_commentary')}</div>
               <p className="whitespace-pre-wrap leading-relaxed">{result.sla_commentary_md}</p>
             </div>
           )}
           {result.governance_md && (
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Governance</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{t('window_report.governance')}</div>
               <p className="whitespace-pre-wrap leading-relaxed">{result.governance_md}</p>
             </div>
           )}
           {result.closing_md && (
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Closing</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{t('window_report.closing')}</div>
               <p className="whitespace-pre-wrap leading-relaxed">{result.closing_md}</p>
             </div>
           )}
@@ -251,6 +263,7 @@ function AINarrativePanel({ windowId }: { windowId: number }) {
 }
 
 function CrossWindowPatternsPanel() {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{
     ok?: boolean;
@@ -265,12 +278,19 @@ function CrossWindowPatternsPanel() {
       setResult(r);
       if (r?.ok) {
         const count = r.patterns?.length || 0;
-        toast.success(`${count} pattern${count === 1 ? '' : 's'} detected.`);
+        toast.success(
+          t(
+            count === 1
+              ? 'window_report.pattern_detected_one'
+              : 'window_report.patterns_detected_other',
+            { n: count },
+          ),
+        );
       } else {
-        toast.message('AI unavailable — using fallback.');
+        toast.message(t('window_report.ai_unavailable'));
       }
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Failed.');
+      toast.error(e instanceof ApiError ? e.message : t('window_report.failed'));
     } finally {
       setBusy(false);
     }
@@ -281,7 +301,7 @@ function CrossWindowPatternsPanel() {
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-semibold text-sm flex items-center gap-2">
           <Lightbulb className="w-4 h-4 text-[hsl(var(--kuja-sun))]" />
-          Cross-window patterns
+          {t('window_report.cross_window_patterns')}
         </h2>
         <button
           type="button"
@@ -290,12 +310,11 @@ function CrossWindowPatternsPanel() {
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[hsl(var(--kuja-spark))] text-white text-xs font-semibold disabled:opacity-50"
         >
           {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-          Detect patterns
+          {t('window_report.detect_patterns')}
         </button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Scans across every window in the network for emergent patterns
-        (SLA drift, sector concentration, response-speed shifts).
+        {t('window_report.patterns_help')}
       </p>
       {result?.note && (
         <div className="text-xs italic text-muted-foreground">{result.note}</div>
@@ -308,7 +327,7 @@ function CrossWindowPatternsPanel() {
               <div className="text-xs text-muted-foreground mt-0.5">{p.observation}</div>
               {p.evidence_windows && p.evidence_windows.length > 0 && (
                 <div className="text-[10px] text-muted-foreground mt-0.5">
-                  Evidence: {p.evidence_windows.join(' · ')}
+                  {t('window_report.evidence', { items: p.evidence_windows.join(' · ') })}
                 </div>
               )}
             </li>
@@ -336,6 +355,7 @@ function StatCard({ icon, label, value, sub }: {
 function SlaBlock({ label, hits, misses, rate }: {
   label: string; hits: number; misses: number; rate: number | null;
 }) {
+  const { t } = useTranslation();
   const tone = rate === null ? SLA_NEUTRAL
     : rate >= 80 ? SLA_GOOD
     : SLA_BAD;
@@ -344,10 +364,10 @@ function SlaBlock({ label, hits, misses, rate }: {
       <div className="text-muted-foreground">{label}</div>
       <div className="flex items-center gap-2">
         <span className={`px-2 py-1 rounded-md text-xs font-semibold ${tone}`}>
-          {rate === null ? '—' : `${rate}% hit`}
+          {rate === null ? '—' : t('window_report.n_hit_rate', { n: rate })}
         </span>
         <span className="text-[11px] text-muted-foreground">
-          {hits} hit · {misses} miss
+          {t('window_report.hits_misses', { hits, misses })}
         </span>
       </div>
     </div>
@@ -355,6 +375,7 @@ function SlaBlock({ label, hits, misses, rate }: {
 }
 
 function DeclarationRow({ d }: { d: WindowReportDeclaration }) {
+  const { t } = useTranslation();
   return (
     <li className="border border-border rounded-md bg-background p-3 space-y-2">
       <div className="flex items-baseline gap-2 flex-wrap">
@@ -367,13 +388,20 @@ function DeclarationRow({ d }: { d: WindowReportDeclaration }) {
         {d.country && <span>{d.country}</span>}
         {d.crisis_type && <span>{d.crisis_type}</span>}
         <span>
-          {d.signed_count} signed
-          {d.recused_count > 0 && <> · {d.recused_count} recused</>}
-          {d.rejected_count > 0 && <> · {d.rejected_count} rejected</>}
+          {t('window_report.n_signed', { n: d.signed_count })}
+          {d.recused_count > 0 && <> · {t('window_report.n_recused', { n: d.recused_count })}</>}
+          {d.rejected_count > 0 && <> · {t('window_report.n_rejected', { n: d.rejected_count })}</>}
         </span>
-        <span>{d.grants.length} grant{d.grants.length !== 1 ? 's' : ''}</span>
+        <span>
+          {t(
+            d.grants.length === 1
+              ? 'window_report.n_grant_one'
+              : 'window_report.n_grants_other',
+            { n: d.grants.length },
+          )}
+        </span>
         {d.signed_active_audit_id && (
-          <span title={`Activation audit anchor: #${d.signed_active_audit_id}`}>
+          <span title={t('window_report.activation_audit_anchor', { n: d.signed_active_audit_id })}>
             🔒 #{d.signed_active_audit_id}
           </span>
         )}
@@ -391,7 +419,7 @@ function DeclarationRow({ d }: { d: WindowReportDeclaration }) {
       {d.monitoring_visits.length > 0 && (
         <div className="text-[11px] text-muted-foreground border-l border-border pl-2">
           <div className="font-medium text-foreground/80 mb-1">
-            Monitoring ({d.monitoring_visits.length})
+            {t('window_report.monitoring_count', { n: d.monitoring_visits.length })}
           </div>
           {d.monitoring_visits.slice(0, 3).map((v) => (
             <div key={v.id} className="mb-1">

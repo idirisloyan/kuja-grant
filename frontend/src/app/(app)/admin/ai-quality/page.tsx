@@ -27,6 +27,7 @@ import { Sparkles, AlertTriangle, ShieldAlert, Globe } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { EmptyState } from '@/components/shared/empty-state';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface LanguageRow {
   language: string;
@@ -92,6 +93,7 @@ function tone(value: number, thresholds: { warn: number; bad: number }): string 
 
 export default function AIQualityPage() {
   const user = useAuthStore((s) => s.user);
+  const { t } = useTranslation();
   const [hours, setHours] = useState(168);
 
   const { data, error, isLoading } = useSWR<Resp>(
@@ -102,22 +104,22 @@ export default function AIQualityPage() {
   if (user?.role !== 'admin') {
     return (
       <PageShell>
-        <PageHeader title="AI quality" subtitle="Admin only." />
+        <PageHeader title={t('ai_quality.title')} subtitle={t('ai_quality.admin_only')} />
       </PageShell>
     );
   }
 
   return (
     <PageShell>
-      <PageBack href="/admin/ai-telemetry" label="Back to AI telemetry" />
+      <PageBack href="/admin/ai-telemetry" label={t('ai_quality.back_to_telemetry')} />
       <PageHeader
-        title="AI quality"
-        subtitle="Edit-ratio, mode distribution, and false-confidence rate per surface × language."
+        title={t('ai_quality.title')}
+        subtitle={t('ai_quality.subtitle')}
       />
 
       {/* Window picker */}
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs text-muted-foreground">Window:</span>
+        <span className="text-xs text-muted-foreground">{t('ai_quality.window')}</span>
         {WINDOWS.map((w) => (
           <button
             type="button"
@@ -140,7 +142,7 @@ export default function AIQualityPage() {
         )}
         {error && (
           <div className="border border-rose-200 bg-rose-50 rounded-md p-4 text-sm text-rose-800">
-            Could not load AI quality. Check /admin/system-health for backend status.
+            {t('ai_quality.load_error')}
           </div>
         )}
         {data?.success && (
@@ -149,15 +151,15 @@ export default function AIQualityPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
               <SummaryTile
                 icon={Sparkles}
-                label="Surfaces with quality signal"
+                label={t('ai_quality.surfaces_with_signal')}
                 value={String(data.overall.total_surfaces)}
-                sub={`${data.overall.total_events} events`}
+                sub={t('ai_quality.events_count', { n: data.overall.total_events })}
               />
               <SummaryTile
                 icon={AlertTriangle}
-                label="Median edit ratio (overall)"
+                label={t('ai_quality.median_edit_ratio_overall')}
                 value={pct(data.overall.median_edit_ratio_overall)}
-                sub="Lower = AI output more accepted"
+                sub={t('ai_quality.lower_more_accepted')}
                 toneClass={
                   data.overall.median_edit_ratio_overall != null
                     ? tone(data.overall.median_edit_ratio_overall, { warn: 0.4, bad: 0.6 })
@@ -166,9 +168,9 @@ export default function AIQualityPage() {
               />
               <SummaryTile
                 icon={ShieldAlert}
-                label="False confidence (overall)"
+                label={t('ai_quality.false_confidence_overall')}
                 value={`${data.overall.false_confidence_rate_pct_overall}%`}
-                sub="Of verbatim accepts later corrected"
+                sub={t('ai_quality.of_verbatim_corrected')}
                 toneClass={tone(data.overall.false_confidence_rate_pct_overall / 100, {
                   warn: 0.1,
                   bad: 0.25,
@@ -191,22 +193,20 @@ export default function AIQualityPage() {
             {data.surfaces.length === 0 ? (
               <EmptyState
                 icon={Sparkles}
-                title="No AI quality events yet"
-                body={`No <recordAiQuality> events recorded in the last ${hours}h. ` +
-                  `Verify the producer endpoints (POST /api/ai-telemetry/quality + ` +
-                  `/false-confidence) are wired on the surfaces you want to measure.`}
+                title={t('ai_quality.empty_title')}
+                body={t('ai_quality.empty_body', { hours })}
               />
             ) : (
               <div className="border border-border rounded-lg bg-card overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
                     <tr>
-                      <th className="text-left p-3">Surface</th>
-                      <th className="text-right p-3">Events</th>
-                      <th className="text-right p-3">Median edit ratio</th>
-                      <th className="text-right p-3">Mode mix</th>
-                      <th className="text-right p-3">False confidence</th>
-                      <th className="text-left p-3">Languages</th>
+                      <th className="text-left p-3">{t('ai_quality.col_surface')}</th>
+                      <th className="text-right p-3">{t('ai_quality.col_events')}</th>
+                      <th className="text-right p-3">{t('ai_quality.col_median_edit_ratio')}</th>
+                      <th className="text-right p-3">{t('ai_quality.col_mode_mix')}</th>
+                      <th className="text-right p-3">{t('ai_quality.col_false_confidence')}</th>
+                      <th className="text-left p-3">{t('ai_quality.col_languages')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -232,7 +232,7 @@ export default function AIQualityPage() {
                             {s.false_confidence_rate_pct}%
                           </span>
                           <div className="text-[10px] text-muted-foreground mt-0.5">
-                            {s.false_confidence_count} of {s.mode_distribution.verbatim} verbatim
+                            {t('ai_quality.fc_of_verbatim', { count: s.false_confidence_count, total: s.mode_distribution.verbatim })}
                           </div>
                         </td>
                         <td className="p-3 space-y-0.5">
@@ -251,17 +251,17 @@ export default function AIQualityPage() {
                                 </span>
                                 {(lr.verbatim_count ?? 0) > 0 && (
                                   <span
-                                    title={`${lr.false_confidence_count ?? 0} FC of ${v} verbatim`}
+                                    title={t('ai_quality.fc_of_verbatim_tooltip', { count: lr.false_confidence_count ?? 0, total: v })}
                                     className={`rounded px-1 ${fcClass}`}
                                   >
-                                    FC {fcRate}%
+                                    {t('ai_quality.fc_pct', { rate: fcRate })}
                                   </span>
                                 )}
                               </div>
                             );
                           })}
                           {s.by_language.length === 0 && (
-                            <span className="text-muted-foreground italic">no language tag</span>
+                            <span className="text-muted-foreground italic">{t('ai_quality.no_language_tag')}</span>
                           )}
                         </td>
                       </tr>
@@ -272,9 +272,7 @@ export default function AIQualityPage() {
             )}
 
             <p className="text-xs text-muted-foreground mt-4">
-              Median edit ratio: amber ≥ 40%, red ≥ 60%. False-confidence rate: amber ≥ 10%,
-              red ≥ 25% — these mean users accepted AI verbatim and the recipient later
-              corrected it. Backed by AICallLog rows with endpoint tag
+              {t('ai_quality.legend_help')}
               <code className="mx-1">ai-quality/&lt;surface&gt;</code>.
             </p>
           </>
@@ -307,6 +305,7 @@ function SummaryTile({
 }
 
 function FCByLanguagePanel({ rows }: { rows: FCByLanguageRow[] }) {
+  const { t } = useTranslation();
   // Reliability threshold for the FC rate to be visually "loud". Below
   // this many verbatim samples we still show the row but greyed, with a
   // small "(low sample)" suffix so the team doesn't act on noise.
@@ -315,9 +314,9 @@ function FCByLanguagePanel({ rows }: { rows: FCByLanguageRow[] }) {
     <div className="border border-border bg-card rounded-lg p-4 mb-4">
       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
         <Globe className="w-3.5 h-3.5" />
-        False confidence by language
+        {t('ai_quality.fc_by_language')}
         <span className="text-[10px]">
-          (sorted highest rate first, ≥{SIGNAL_THRESHOLD} verbatim samples prioritised)
+          {t('ai_quality.fc_by_language_hint', { n: SIGNAL_THRESHOLD })}
         </span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -330,15 +329,15 @@ function FCByLanguagePanel({ rows }: { rows: FCByLanguageRow[] }) {
             <div
               key={r.language}
               className={`rounded-md border border-border p-2 ${toneCls}`}
-              title={`${r.false_confidence_count} of ${r.verbatim_count} verbatim accepts corrected`}
+              title={t('ai_quality.fc_verbatim_corrected_tooltip', { count: r.false_confidence_count, total: r.verbatim_count })}
             >
               <div className="flex items-center justify-between gap-1 text-[11px] font-semibold">
                 <span className="uppercase">{r.language}</span>
                 <span>{r.false_confidence_rate_pct}%</span>
               </div>
               <div className="text-[10px] mt-0.5 opacity-75">
-                {r.false_confidence_count}/{r.verbatim_count} verbatim
-                {!reliable && ' · low sample'}
+                {r.false_confidence_count}/{r.verbatim_count} {t('ai_quality.verbatim')}
+                {!reliable && t('ai_quality.low_sample_suffix')}
               </div>
             </div>
           );
@@ -352,6 +351,7 @@ function ModeBar({ dist, total }: {
   dist: { verbatim: number; blended: number; rejected: number };
   total: number;
 }) {
+  const { t } = useTranslation();
   if (total === 0) return <span className="text-muted-foreground">—</span>;
   const vPct = (dist.verbatim / total) * 100;
   const bPct = (dist.blended / total) * 100;
@@ -359,9 +359,9 @@ function ModeBar({ dist, total }: {
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="h-1.5 w-24 rounded-full overflow-hidden bg-muted flex">
-        <div className="bg-emerald-500" style={{ width: `${vPct}%` }} title={`${dist.verbatim} verbatim`} />
-        <div className="bg-amber-500" style={{ width: `${bPct}%` }} title={`${dist.blended} blended`} />
-        <div className="bg-rose-500" style={{ width: `${rPct}%` }} title={`${dist.rejected} rejected`} />
+        <div className="bg-emerald-500" style={{ width: `${vPct}%` }} title={t('ai_quality.n_verbatim', { n: dist.verbatim })} />
+        <div className="bg-amber-500" style={{ width: `${bPct}%` }} title={t('ai_quality.n_blended', { n: dist.blended })} />
+        <div className="bg-rose-500" style={{ width: `${rPct}%` }} title={t('ai_quality.n_rejected', { n: dist.rejected })} />
       </div>
       <div className="text-[10px] text-muted-foreground">
         {dist.verbatim}v / {dist.blended}b / {dist.rejected}r

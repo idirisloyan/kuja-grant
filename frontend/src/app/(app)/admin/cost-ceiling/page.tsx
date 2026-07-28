@@ -17,6 +17,7 @@ import { DollarSign, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface OrgCap {
   org_id: number;
@@ -30,6 +31,7 @@ interface OrgCap {
 interface Resp { success: boolean; orgs: OrgCap[]; }
 
 export default function CostCeilingPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const [edits, setEdits] = useState<Record<number, string>>({});
   const [savingId, setSavingId] = useState<number | null>(null);
@@ -40,7 +42,7 @@ export default function CostCeilingPage() {
   );
 
   if (user?.role !== 'admin') {
-    return <PageShell><PageHeader title="Cost ceiling" subtitle="Admin only." /></PageShell>;
+    return <PageShell><PageHeader title={t('cost_ceiling.title_short')} subtitle={t('cost_ceiling.admin_only')} /></PageShell>;
   }
 
   const saveCap = async (orgId: number) => {
@@ -55,7 +57,7 @@ export default function CostCeilingPage() {
       await mutate();
       setEdits((prev) => { const { [orgId]: _, ...rest } = prev; return rest; });
     } catch (e) {
-      alert((e as Error).message || 'Save failed.');
+      alert((e as Error).message || t('cost_ceiling.save_failed'));
     } finally {
       setSavingId(null);
     }
@@ -64,29 +66,29 @@ export default function CostCeilingPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Per-tenant AI cost ceiling"
-        subtitle="Set monthly USD caps. Crossing 75% / 90% / 100% fires admin notifications automatically."
+        title={t('cost_ceiling.title')}
+        subtitle={t('cost_ceiling.subtitle')}
       />
       <PageMain>
         {isLoading && <div className="kuja-shimmer h-32 rounded-lg" />}
-        {error && <div className="border border-rose-200 bg-rose-50 rounded-md p-4 text-sm text-rose-800">Could not load.</div>}
+        {error && <div className="border border-rose-200 bg-rose-50 rounded-md p-4 text-sm text-rose-800">{t('cost_ceiling.could_not_load')}</div>}
         {data?.success && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-              <Tile icon={DollarSign} label="Orgs with caps set" value={String(data.orgs.filter((o) => o.budget_usd != null).length)} />
-              <Tile icon={AlertTriangle} label="Orgs ≥ 75% used" value={String(data.orgs.filter((o) => (o.pct_used ?? 0) >= 75).length)} tone="warning" />
-              <Tile icon={AlertTriangle} label="Orgs at/over cap" value={String(data.orgs.filter((o) => (o.pct_used ?? 0) >= 100).length)} tone="danger" />
+              <Tile icon={DollarSign} label={t('cost_ceiling.tile_orgs_with_caps')} value={String(data.orgs.filter((o) => o.budget_usd != null).length)} />
+              <Tile icon={AlertTriangle} label={t('cost_ceiling.tile_orgs_over_75')} value={String(data.orgs.filter((o) => (o.pct_used ?? 0) >= 75).length)} tone="warning" />
+              <Tile icon={AlertTriangle} label={t('cost_ceiling.tile_orgs_at_over_cap')} value={String(data.orgs.filter((o) => (o.pct_used ?? 0) >= 100).length)} tone="danger" />
             </div>
 
             <div className="border border-border rounded-lg bg-card overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
                   <tr>
-                    <th className="text-left p-3">Org</th>
-                    <th className="text-right p-3">Spent (MTD)</th>
-                    <th className="text-left p-3">Monthly cap (USD)</th>
-                    <th className="text-right p-3">% used</th>
-                    <th className="text-right p-3">Action</th>
+                    <th className="text-left p-3">{t('cost_ceiling.col_org')}</th>
+                    <th className="text-right p-3">{t('cost_ceiling.col_spent_mtd')}</th>
+                    <th className="text-left p-3">{t('cost_ceiling.col_monthly_cap')}</th>
+                    <th className="text-right p-3">{t('cost_ceiling.col_pct_used')}</th>
+                    <th className="text-right p-3">{t('cost_ceiling.col_action')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -113,16 +115,16 @@ export default function CostCeilingPage() {
                             step="1"
                             value={editing ?? (o.budget_usd != null ? String(o.budget_usd) : '')}
                             onChange={(e) => setEdits((prev) => ({ ...prev, [o.org_id]: e.target.value }))}
-                            placeholder="(no cap)"
+                            placeholder={t('cost_ceiling.no_cap_placeholder')}
                             className="w-28 text-sm rounded-md border border-border bg-card px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--kuja-clay)/0.3)]"
                           />
-                          <span className="ml-2 text-[10px] text-muted-foreground">empty = unlimited</span>
+                          <span className="ml-2 text-[10px] text-muted-foreground">{t('cost_ceiling.empty_unlimited')}</span>
                         </td>
                         <td className={`p-3 text-right ${tone}`}>{pct == null ? '—' : `${pct}%`}</td>
                         <td className="p-3 text-right">
                           {editing !== undefined && (
                             <Button size="sm" onClick={() => saveCap(o.org_id)} disabled={savingId === o.org_id}>
-                              {savingId === o.org_id ? <RefreshCw className="w-3 h-3 animate-spin" /> : 'Save'}
+                              {savingId === o.org_id ? <RefreshCw className="w-3 h-3 animate-spin" /> : t('common.save')}
                             </Button>
                           )}
                         </td>
@@ -134,10 +136,8 @@ export default function CostCeilingPage() {
             </div>
 
             <p className="text-[11px] text-muted-foreground mt-4">
-              Pricing: $3/M input + $15/M output (Sonnet 4.6). The hard
-              gate (BudgetExceededError) blocks AI calls once spent ≥ cap.
-              Soft thresholds (75% / 90% / 100%) fire admin notifications
-              via <code>cost_ceiling_service.maybe_fire_threshold_notification</code>.
+              {t('cost_ceiling.pricing_note')}{' '}
+              <code>cost_ceiling_service.maybe_fire_threshold_notification</code>.
             </p>
           </>
         )}

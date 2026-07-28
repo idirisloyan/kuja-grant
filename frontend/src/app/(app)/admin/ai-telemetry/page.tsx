@@ -20,6 +20,7 @@ import {
 import { Activity, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface ByEndpoint {
   endpoint: string;
@@ -61,13 +62,14 @@ interface TelemetryResp {
 }
 
 const WINDOW_OPTIONS = [
-  { hours: 24,  label: 'Last 24h' },
-  { hours: 72,  label: 'Last 3d' },
-  { hours: 168, label: 'Last 7d' },
-  { hours: 720, label: 'Last 30d' },
+  { hours: 24,  labelKey: 'ai_telemetry.window_24h' },
+  { hours: 72,  labelKey: 'ai_telemetry.window_3d' },
+  { hours: 168, labelKey: 'ai_telemetry.window_7d' },
+  { hours: 720, labelKey: 'ai_telemetry.window_30d' },
 ];
 
 export default function AdminAiTelemetryPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const [hours, setHours] = useState(168);
   const isAdmin = !user || user.role === 'admin';
@@ -84,16 +86,14 @@ export default function AdminAiTelemetryPage() {
   if (user && user.role !== 'admin') {
     return (
       <PageShell>
-        <PageHeader title="AI telemetry" icon={Activity} subtitle="" />
+        <PageHeader title={t('ai_telemetry.title')} icon={Activity} subtitle="" />
         <PageMain>
           <div className="border border-border rounded-lg bg-card p-6 flex items-start gap-3">
             <ShieldAlert className="h-5 w-5 text-[hsl(var(--kuja-clay))] mt-0.5 shrink-0" />
             <div className="text-sm">
-              <div className="font-semibold mb-1">This page is for platform admins.</div>
+              <div className="font-semibold mb-1">{t('ai_telemetry.admin_only_title')}</div>
               <div className="text-muted-foreground">
-                AI telemetry shows system-wide failure rates and is only available to
-                administrators. If you reached this page by accident, head back to your
-                dashboard.
+                {t('ai_telemetry.admin_only_body')}
               </div>
             </div>
           </div>
@@ -104,11 +104,11 @@ export default function AdminAiTelemetryPage() {
 
   return (
     <PageShell>
-      <PageBack href="/admin/security" label="Back to admin" />
+      <PageBack href="/admin/security" label={t('ai_telemetry.back_to_admin')} />
       <PageHeader
-        title="AI telemetry"
+        title={t('ai_telemetry.title')}
         icon={Activity}
-        subtitle="Real-world AI call statistics — per-endpoint failure rates, latency, token usage."
+        subtitle={t('ai_telemetry.subtitle')}
       />
 
       <PageMain>
@@ -125,7 +125,7 @@ export default function AdminAiTelemetryPage() {
                   : 'border-border text-muted-foreground hover:text-foreground')
               }
             >
-              {o.label}
+              {t(o.labelKey)}
             </button>
           ))}
         </div>
@@ -138,15 +138,15 @@ export default function AdminAiTelemetryPage() {
                 from "stale" (deprecated model) so historical 404s from
                 retired model IDs don't muddy today's SLA. */}
             <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Stat label="Total AI calls" value={data.total_calls.toLocaleString()} />
+              <Stat label={t('ai_telemetry.stat_total_calls')} value={data.total_calls.toLocaleString()} />
               <Stat
-                label="All failures"
+                label={t('ai_telemetry.stat_all_failures')}
                 value={data.total_failures.toLocaleString()}
                 tone={data.failure_rate_pct >= 10 ? 'bad' : data.failure_rate_pct >= 3 ? 'warn' : 'good'}
               />
               {typeof data.current_failure_rate_pct === 'number' ? (
                 <Stat
-                  label="Live failure rate"
+                  label={t('ai_telemetry.stat_live_failure_rate')}
                   value={`${data.current_failure_rate_pct.toFixed(1)}%`}
                   tone={
                     data.current_failure_rate_pct >= 10 ? 'bad' :
@@ -155,14 +155,14 @@ export default function AdminAiTelemetryPage() {
                 />
               ) : (
                 <Stat
-                  label="Failure rate"
+                  label={t('ai_telemetry.stat_failure_rate')}
                   value={`${data.failure_rate_pct.toFixed(1)}%`}
                   tone={data.failure_rate_pct >= 10 ? 'bad' : data.failure_rate_pct >= 3 ? 'warn' : 'good'}
                 />
               )}
               {typeof data.stale_failures === 'number' && (
                 <Stat
-                  label="Stale-model failures"
+                  label={t('ai_telemetry.stat_stale_failures')}
                   value={data.stale_failures.toLocaleString()}
                   tone="muted"
                 />
@@ -170,9 +170,11 @@ export default function AdminAiTelemetryPage() {
             </section>
             {typeof data.current_failure_rate_pct === 'number' && data.stale_failures !== undefined && data.stale_failures > 0 && (
               <p className="text-[11px] text-muted-foreground -mt-1">
-                Live failure rate excludes {data.stale_failures.toLocaleString()} historical failure
-                {data.stale_failures === 1 ? '' : 's'} attributed to deprecated model IDs (the deploy has
-                already moved past those). Current models:{' '}
+                {t(
+                  data.stale_failures === 1 ? 'ai_telemetry.stale_note_one' : 'ai_telemetry.stale_note_many',
+                  { n: data.stale_failures.toLocaleString() },
+                )}{' '}
+                {t('ai_telemetry.current_models_label')}{' '}
                 <span className="font-mono">{(data.current_models ?? []).join(', ')}</span>.
               </p>
             )}
@@ -180,18 +182,18 @@ export default function AdminAiTelemetryPage() {
             {/* Per-endpoint rollup */}
             <section className="border border-border rounded-lg bg-card overflow-hidden">
               <div className="px-4 py-2 border-b border-border bg-muted/30">
-                <h2 className="text-sm font-semibold">By endpoint</h2>
+                <h2 className="text-sm font-semibold">{t('ai_telemetry.by_endpoint_heading')}</h2>
               </div>
               <table className="w-full text-xs">
                 <thead className="bg-muted/30">
                   <tr className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
-                    <th className="text-left px-3 py-2">Endpoint</th>
-                    <th className="text-right px-3 py-2">Calls</th>
-                    <th className="text-right px-3 py-2">Failures</th>
-                    <th className="text-right px-3 py-2">Fail %</th>
+                    <th className="text-left px-3 py-2">{t('ai_telemetry.col_endpoint')}</th>
+                    <th className="text-right px-3 py-2">{t('ai_telemetry.col_calls')}</th>
+                    <th className="text-right px-3 py-2">{t('ai_telemetry.col_failures')}</th>
+                    <th className="text-right px-3 py-2">{t('ai_telemetry.col_fail_pct')}</th>
                     <th className="text-right px-3 py-2">p50</th>
                     <th className="text-right px-3 py-2">p95</th>
-                    <th className="text-right px-3 py-2">Tokens out</th>
+                    <th className="text-right px-3 py-2">{t('ai_telemetry.col_tokens_out')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -216,7 +218,7 @@ export default function AdminAiTelemetryPage() {
                   {data.by_endpoint.length === 0 && (
                     <tr>
                       <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground italic">
-                        No AI calls recorded in this window.
+                        {t('ai_telemetry.empty_no_calls')}
                       </td>
                     </tr>
                   )}
@@ -229,7 +231,7 @@ export default function AdminAiTelemetryPage() {
               <section className="border border-destructive/30 bg-destructive/5 rounded-lg overflow-hidden">
                 <div className="px-4 py-2 border-b border-destructive/30 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-destructive" />
-                  <h2 className="text-sm font-semibold">Recent failures</h2>
+                  <h2 className="text-sm font-semibold">{t('ai_telemetry.recent_failures_heading')}</h2>
                 </div>
                 <ul className="divide-y divide-border">
                   {data.recent_failures.map((f, i) => (
@@ -240,9 +242,9 @@ export default function AdminAiTelemetryPage() {
                           {f.is_stale_model && (
                             <span
                               className="px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide bg-muted text-muted-foreground border border-border"
-                              title={`Failure against deprecated model "${f.model}" — already retired in the live deploy.`}
+                              title={t('ai_telemetry.stale_model_tooltip', { model: f.model ?? '' })}
                             >
-                              stale model
+                              {t('ai_telemetry.stale_model_badge')}
                             </span>
                           )}
                         </span>
@@ -252,9 +254,9 @@ export default function AdminAiTelemetryPage() {
                       </div>
                       {(f.error_code || f.model) && (
                         <div className="mt-0.5 text-[10px] text-muted-foreground">
-                          {f.error_code && <>code: {f.error_code}</>}
+                          {f.error_code && <>{t('ai_telemetry.label_code')} {f.error_code}</>}
                           {f.error_code && f.model && <> · </>}
-                          {f.model && <>model: <span className="font-mono">{f.model}</span></>}
+                          {f.model && <>{t('ai_telemetry.label_model')} <span className="font-mono">{f.model}</span></>}
                         </div>
                       )}
                       {f.error_message && (

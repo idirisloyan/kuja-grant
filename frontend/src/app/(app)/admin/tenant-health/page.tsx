@@ -15,6 +15,7 @@ import {
 import { Heart, AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface TenantRow {
   org_id: number;
@@ -44,15 +45,16 @@ interface Resp {
 
 const WINDOWS = [{ label: '7d', days: 7 }, { label: '14d', days: 14 }, { label: '30d', days: 30 }];
 
-const FLAG_DESCRIPTIONS: Record<string, string> = {
-  ai_failure_rate_high: 'AI failure rate ≥ 25% over the window',
-  ai_failure_rate_elevated: 'AI failure rate ≥ 10% over the window',
-  many_stale_drafts: '5+ draft applications older than 30 days',
-  drafts_without_ai_activity: 'Drafts exist but no AI usage at all',
-  no_active_passport: 'No active Capacity Passport published',
+const FLAG_KEYS: Record<string, string> = {
+  ai_failure_rate_high: 'tenant_health.flag_ai_failure_rate_high',
+  ai_failure_rate_elevated: 'tenant_health.flag_ai_failure_rate_elevated',
+  many_stale_drafts: 'tenant_health.flag_many_stale_drafts',
+  drafts_without_ai_activity: 'tenant_health.flag_drafts_without_ai_activity',
+  no_active_passport: 'tenant_health.flag_no_active_passport',
 };
 
 export default function TenantHealthPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const [days, setDays] = useState(7);
 
@@ -62,17 +64,17 @@ export default function TenantHealthPage() {
   );
 
   if (user?.role !== 'admin') {
-    return <PageShell><PageHeader title="Tenant health" subtitle="Admin only." /></PageShell>;
+    return <PageShell><PageHeader title={t('tenant_health.title')} subtitle={t('tenant_health.admin_only')} /></PageShell>;
   }
 
   return (
     <PageShell>
       <PageHeader
-        title="Tenant health"
-        subtitle="Per-tenant rollup of AI failure rate, stale drafts, and Trust Profile state."
+        title={t('tenant_health.title')}
+        subtitle={t('tenant_health.subtitle')}
       />
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs text-muted-foreground">Window:</span>
+        <span className="text-xs text-muted-foreground">{t('tenant_health.window_label')}</span>
         {WINDOWS.map((w) => (
           <button
             type="button"
@@ -86,68 +88,68 @@ export default function TenantHealthPage() {
       </div>
       <PageMain>
         {isLoading && <div className="kuja-shimmer h-32 rounded-lg" />}
-        {error && <div className="border border-rose-200 bg-rose-50 rounded-md p-4 text-sm text-rose-800">Could not load.</div>}
+        {error && <div className="border border-rose-200 bg-rose-50 rounded-md p-4 text-sm text-rose-800">{t('tenant_health.could_not_load')}</div>}
         {data?.success && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
-              <Tile icon={Heart} label="Total tenants" value={String(data.summary.total_tenants)} />
-              <Tile icon={CheckCircle2} label="Green" value={String(data.summary.green)} tone="success" />
-              <Tile icon={AlertCircle} label="Amber" value={String(data.summary.amber)} tone={data.summary.amber > 0 ? 'warning' : 'neutral'} />
-              <Tile icon={AlertTriangle} label="Red" value={String(data.summary.red)} tone={data.summary.red > 0 ? 'danger' : 'neutral'} />
+              <Tile icon={Heart} label={t('tenant_health.total_tenants')} value={String(data.summary.total_tenants)} />
+              <Tile icon={CheckCircle2} label={t('tenant_health.health_green')} value={String(data.summary.green)} tone="success" />
+              <Tile icon={AlertCircle} label={t('tenant_health.health_amber')} value={String(data.summary.amber)} tone={data.summary.amber > 0 ? 'warning' : 'neutral'} />
+              <Tile icon={AlertTriangle} label={t('tenant_health.health_red')} value={String(data.summary.red)} tone={data.summary.red > 0 ? 'danger' : 'neutral'} />
             </div>
 
             <div className="border border-border rounded-lg bg-card overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
                   <tr>
-                    <th className="text-left p-3">Tenant</th>
-                    <th className="text-left p-3">Health</th>
-                    <th className="text-right p-3">AI calls / fail %</th>
-                    <th className="text-right p-3">Drafts / stale</th>
-                    <th className="text-right p-3">Submitted</th>
-                    <th className="text-right p-3">Members</th>
-                    <th className="text-left p-3">Passport</th>
-                    <th className="text-left p-3">Last activity</th>
+                    <th className="text-left p-3">{t('tenant_health.col_tenant')}</th>
+                    <th className="text-left p-3">{t('tenant_health.col_health')}</th>
+                    <th className="text-right p-3">{t('tenant_health.col_ai_calls')}</th>
+                    <th className="text-right p-3">{t('tenant_health.col_drafts')}</th>
+                    <th className="text-right p-3">{t('tenant_health.col_submitted')}</th>
+                    <th className="text-right p-3">{t('tenant_health.col_members')}</th>
+                    <th className="text-left p-3">{t('tenant_health.col_passport')}</th>
+                    <th className="text-left p-3">{t('tenant_health.col_last_activity')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.tenants.map((t) => (
-                    <tr key={t.org_id} className="border-t border-border align-top">
+                  {data.tenants.map((tenant) => (
+                    <tr key={tenant.org_id} className="border-t border-border align-top">
                       <td className="p-3">
-                        <div className="font-semibold">{t.org_name}</div>
+                        <div className="font-semibold">{tenant.org_name}</div>
                         <div className="text-[10px] text-muted-foreground">
-                          {t.org_type} · {t.country ?? '—'}
+                          {tenant.org_type} · {tenant.country ?? '—'}
                         </div>
                       </td>
                       <td className="p-3">
-                        <HealthChip health={t.health} flags={t.flags} />
+                        <HealthChip health={tenant.health} flags={tenant.flags} />
                       </td>
                       <td className="p-3 text-right">
-                        <div>{t.ai_calls}</div>
+                        <div>{tenant.ai_calls}</div>
                         <div className={`text-[10px] ${
-                          t.ai_failure_rate_pct >= 25 ? 'text-rose-700' :
-                            t.ai_failure_rate_pct >= 10 ? 'text-amber-700' : 'text-muted-foreground'
-                        }`}>{t.ai_failure_rate_pct}%</div>
+                          tenant.ai_failure_rate_pct >= 25 ? 'text-rose-700' :
+                            tenant.ai_failure_rate_pct >= 10 ? 'text-amber-700' : 'text-muted-foreground'
+                        }`}>{tenant.ai_failure_rate_pct}%</div>
                       </td>
                       <td className="p-3 text-right">
-                        <div>{t.applications_draft}</div>
-                        {t.stale_drafts > 0 && (
-                          <div className="text-[10px] text-rose-700">{t.stale_drafts} stale</div>
+                        <div>{tenant.applications_draft}</div>
+                        {tenant.stale_drafts > 0 && (
+                          <div className="text-[10px] text-rose-700">{t('tenant_health.stale_count', { n: tenant.stale_drafts })}</div>
                         )}
                       </td>
-                      <td className="p-3 text-right">{t.applications_submitted}</td>
+                      <td className="p-3 text-right">{tenant.applications_submitted}</td>
                       <td className="p-3 text-right">
-                        {t.members}
-                        {t.admins > 0 && <span className="text-[10px] text-muted-foreground"> · {t.admins} admin</span>}
+                        {tenant.members}
+                        {tenant.admins > 0 && <span className="text-[10px] text-muted-foreground"> · {t('tenant_health.admin_count', { n: tenant.admins })}</span>}
                       </td>
                       <td className="p-3">
-                        {t.has_active_passport
-                          ? <span className="text-emerald-700 font-semibold">Active</span>
-                          : <span className="text-muted-foreground italic">None</span>}
+                        {tenant.has_active_passport
+                          ? <span className="text-emerald-700 font-semibold">{t('tenant_health.passport_active')}</span>
+                          : <span className="text-muted-foreground italic">{t('tenant_health.passport_none')}</span>}
                       </td>
                       <td className="p-3 text-[10px] text-muted-foreground">
-                        {t.last_activity_at
-                          ? new Date(t.last_activity_at).toLocaleDateString()
+                        {tenant.last_activity_at
+                          ? new Date(tenant.last_activity_at).toLocaleDateString()
                           : '—'}
                       </td>
                     </tr>
@@ -156,7 +158,12 @@ export default function TenantHealthPage() {
               </table>
             </div>
             <p className="text-[11px] text-muted-foreground mt-4">
-              Thresholds: <strong>red</strong> = AI failure ≥ 25% OR 5+ stale drafts. <strong>amber</strong> = AI failure ≥ 10% OR drafts without AI activity. Adjust in <code>app/routes/tenant_health_routes.py:_classify</code>.
+              {t('tenant_health.thresholds_label')}{' '}
+              <strong>{t('tenant_health.health_red')}</strong>{' '}
+              {t('tenant_health.thresholds_red_desc')}{' '}
+              <strong>{t('tenant_health.health_amber')}</strong>{' '}
+              {t('tenant_health.thresholds_amber_desc')}{' '}
+              <code>app/routes/tenant_health_routes.py:_classify</code>.
             </p>
           </>
         )}
@@ -185,6 +192,8 @@ function Tile({ icon: Icon, label, value, tone = 'neutral' }: {
 }
 
 function HealthChip({ health, flags }: { health: 'red' | 'amber' | 'green'; flags: string[] }) {
+  const { t } = useTranslation();
+  const flagText = (f: string) => (FLAG_KEYS[f] ? t(FLAG_KEYS[f]) : f);
   const tone =
     health === 'red' ? 'bg-rose-50 text-rose-700 border-rose-200' :
       health === 'amber' ? 'bg-amber-50 text-amber-700 border-amber-200' :
@@ -192,13 +201,13 @@ function HealthChip({ health, flags }: { health: 'red' | 'amber' | 'green'; flag
   return (
     <div className="space-y-1">
       <span
-        title={flags.map((f) => FLAG_DESCRIPTIONS[f] ?? f).join('\n') || 'No flags'}
+        title={flags.map(flagText).join('\n') || t('tenant_health.no_flags')}
         className={`inline-block text-[10px] uppercase tracking-wider font-semibold rounded-full border px-2 py-0.5 ${tone}`}
-      >{health}</span>
+      >{t(`tenant_health.health_${health}`)}</span>
       {flags.length > 0 && (
         <ul className="text-[10px] text-muted-foreground">
           {flags.slice(0, 3).map((f) => (
-            <li key={f}>· {FLAG_DESCRIPTIONS[f] ?? f}</li>
+            <li key={f}>· {flagText(f)}</li>
           ))}
         </ul>
       )}

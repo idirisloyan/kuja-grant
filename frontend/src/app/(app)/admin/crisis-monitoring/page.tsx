@@ -17,6 +17,7 @@ import {
 } from '@/lib/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import {
   PageShell, PageHeader, PageAttention, PageMain, type AttentionItem,
 } from '@/components/layout/page-shell';
@@ -32,9 +33,21 @@ const STATUS_COLOUR: Record<string, string> = {
   archived: 'bg-muted text-muted-foreground',
 };
 
+// Map a backend status enum to a translated, human-readable label. Keeps the
+// enum id intact; only the visible label is localised.
+function statusLabel(
+  status: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  const key = `crisis_list.status_${status}`;
+  const label = t(key);
+  return label === key ? status.replace('_', ' ') : label;
+}
+
 export default function CrisisMonitoringPage() {
   const viewer = useAuthStore((s) => s.user);
   const network = useNetworkStore((s) => s.network);
+  const { t } = useTranslation();
 
   const { data: latest }     = useLatestCrisisReport();
   const { data: allReports } = useCrisisReports();
@@ -45,7 +58,7 @@ export default function CrisisMonitoringPage() {
     return (
       <div className="p-6 text-sm">
         <p className="text-destructive">
-          Only platform admins can view Crisis Monitoring reports.
+          {t('crisis_list.admin_only')}
         </p>
       </div>
     );
@@ -62,30 +75,47 @@ export default function CrisisMonitoringPage() {
   if (draftCount > 0) {
     attention.push({
       tone: 'warn',
-      label: `${draftCount} draft report${draftCount === 1 ? '' : 's'} awaiting review`,
-      hint: 'Auto-drafted by the weekly cron. Publish to make them the evidence anchor for declarations.',
+      label: t(
+        draftCount === 1
+          ? 'crisis_list.drafts_awaiting_review_one'
+          : 'crisis_list.drafts_awaiting_review_other',
+        { n: draftCount },
+      ),
+      hint: t('crisis_list.drafts_hint'),
     });
   }
   if (inReviewCount > 0) {
     attention.push({
       tone: 'info',
-      label: `${inReviewCount} report${inReviewCount === 1 ? '' : 's'} in review`,
-      hint: 'Sign off and publish.',
+      label: t(
+        inReviewCount === 1
+          ? 'crisis_list.reports_in_review_one'
+          : 'crisis_list.reports_in_review_other',
+        { n: inReviewCount },
+      ),
+      hint: t('crisis_list.in_review_hint'),
     });
   }
   if (current?.flagged_row_count && current.flagged_row_count > 0) {
     attention.push({
       tone: 'accent',
-      label: `${current.flagged_row_count} signal${current.flagged_row_count === 1 ? '' : 's'} flagged for Oversight Body`,
-      hint: 'In the latest published report. Consider whether any warrants an emergency declaration.',
+      label: t(
+        current.flagged_row_count === 1
+          ? 'crisis_list.signals_flagged_ob_one'
+          : 'crisis_list.signals_flagged_ob_other',
+        { n: current.flagged_row_count },
+      ),
+      hint: t('crisis_list.flagged_hint'),
     });
   }
 
   return (
     <PageShell>
       <PageHeader
-        title={network?.name ? `${network.name} — Crisis monitoring` : 'Crisis monitoring'}
-        subtitle="Weekly evidence anchor for emergency declarations."
+        title={network?.name
+          ? t('crisis_list.title_with_network', { name: network.name })
+          : t('crisis_list.title')}
+        subtitle={t('crisis_list.subtitle')}
         icon={AlertOctagon}
       />
 
@@ -94,9 +124,9 @@ export default function CrisisMonitoringPage() {
       <PageMain>
         <Tabs defaultValue="current" className="w-full">
           <TabsList className="w-full justify-start overflow-x-auto" variant="line">
-            <TabsTrigger value="current">Current report</TabsTrigger>
-            <TabsTrigger value="signals">Signals</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
+            <TabsTrigger value="current">{t('crisis_list.tab_current')}</TabsTrigger>
+            <TabsTrigger value="signals">{t('crisis_list.tab_signals')}</TabsTrigger>
+            <TabsTrigger value="history">{t('crisis_list.tab_history')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="current" className="mt-3">
@@ -121,13 +151,13 @@ export default function CrisisMonitoringPage() {
 // ---------------------------------------------------------------------------
 
 function CurrentReportTab({ report }: { report: CrisisReport | null }) {
+  const { t } = useTranslation();
   if (!report) {
     return (
       <section className="border border-dashed border-border rounded-lg bg-card p-8 text-center">
         <Inbox className="w-8 h-8 mx-auto text-muted-foreground opacity-50 mb-2" />
         <p className="text-sm text-muted-foreground">
-          No published crisis monitoring report yet. The weekly cron drafts
-          a fresh report every Monday at 06:00 UTC.
+          {t('crisis_list.no_published_report')}
         </p>
       </section>
     );
@@ -141,19 +171,26 @@ function CurrentReportTab({ report }: { report: CrisisReport | null }) {
       <section className="border border-border rounded-lg bg-card p-5 space-y-3">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <h2 className="font-semibold text-base">Week of {period}</h2>
+            <h2 className="font-semibold text-base">{t('crisis_list.week_of', { period })}</h2>
             <div className="text-xs text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
               <span className={`px-2 py-0.5 rounded-full font-semibold capitalize ${STATUS_COLOUR[report.status]}`}>
-                {report.status.replace('_', ' ')}
+                {statusLabel(report.status, t)}
               </span>
-              <span>{report.row_count} signal{report.row_count === 1 ? '' : 's'}</span>
+              <span>
+                {t(
+                  report.row_count === 1
+                    ? 'crisis_list.signal_count_one'
+                    : 'crisis_list.signal_count_other',
+                  { n: report.row_count },
+                )}
+              </span>
               {report.flagged_row_count > 0 && (
                 <span className="inline-flex items-center gap-1 text-[hsl(var(--kuja-clay))]">
-                  <Flag className="w-3 h-3" /> {report.flagged_row_count} flagged
+                  <Flag className="w-3 h-3" /> {t('crisis_list.flagged_count', { n: report.flagged_row_count })}
                 </span>
               )}
               {report.published_at && (
-                <span>published {new Date(report.published_at).toLocaleDateString()}</span>
+                <span>{t('crisis_list.published_on', { date: new Date(report.published_at).toLocaleDateString() })}</span>
               )}
             </div>
           </div>
@@ -161,13 +198,13 @@ function CurrentReportTab({ report }: { report: CrisisReport | null }) {
             href={`/admin/crisis-monitoring/${report.id}`}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
-            Open full report <ChevronRight className="w-3 h-3" />
+            {t('crisis_list.open_full_report')} <ChevronRight className="w-3 h-3" />
           </Link>
         </div>
         {report.summary_md && (
           <details className="group">
             <summary className="cursor-pointer list-none text-xs text-muted-foreground hover:text-foreground">
-              Show executive summary
+              {t('crisis_list.show_executive_summary')}
             </summary>
             <p className="text-sm whitespace-pre-wrap leading-relaxed mt-2 pt-2 border-t border-border">
               {report.summary_md}
@@ -180,7 +217,7 @@ function CurrentReportTab({ report }: { report: CrisisReport | null }) {
         <section className="border border-border rounded-lg bg-card p-5 space-y-3">
           <h2 className="font-semibold text-sm flex items-center gap-2">
             <Flag className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
-            Top flagged signals
+            {t('crisis_list.top_flagged_signals')}
           </h2>
           <ul className="space-y-2">
             {flagged.slice(0, 5).map((r) => (
@@ -211,10 +248,11 @@ function CurrentReportTab({ report }: { report: CrisisReport | null }) {
 // ---------------------------------------------------------------------------
 
 function SignalsTab({ report }: { report: CrisisReport | null }) {
+  const { t } = useTranslation();
   if (!report || !report.rows) {
     return (
       <section className="border border-dashed border-border rounded-lg bg-card p-8 text-center text-sm text-muted-foreground">
-        No signals to show yet.
+        {t('crisis_list.no_signals_yet')}
       </section>
     );
   }
@@ -223,13 +261,13 @@ function SignalsTab({ report }: { report: CrisisReport | null }) {
     return (
       <section className="border border-dashed border-border rounded-lg bg-card p-8 text-center text-sm text-muted-foreground">
         <Activity className="w-8 h-8 mx-auto opacity-50 mb-2" />
-        Nothing flagged for the Oversight Body in this edition.
+        {t('crisis_list.nothing_flagged')}
       </section>
     );
   }
   return (
     <section className="border border-border rounded-lg bg-card p-5 space-y-3">
-      <h2 className="font-semibold text-sm">Signals flagged for the Oversight Body</h2>
+      <h2 className="font-semibold text-sm">{t('crisis_list.signals_flagged_heading')}</h2>
       <ul className="space-y-2">
         {flagged.map((r) => (
           <li key={r.id} className="border border-border rounded-md p-3 text-xs">
@@ -257,6 +295,7 @@ function SignalsTab({ report }: { report: CrisisReport | null }) {
 // ---------------------------------------------------------------------------
 
 function HistoryTab({ reports }: { reports: CrisisReport[] }) {
+  const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState('');
   const filtered = statusFilter
     ? reports.filter((r) => r.status === statusFilter)
@@ -264,26 +303,31 @@ function HistoryTab({ reports }: { reports: CrisisReport[] }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-xs">
-        <label className="text-muted-foreground">Filter:</label>
+        <label className="text-muted-foreground">{t('common.filter')}:</label>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           className="px-2 py-1 rounded-md border border-border bg-background text-xs"
         >
-          <option value="">All</option>
-          <option value="draft">Draft</option>
-          <option value="in_review">In review</option>
-          <option value="published">Published</option>
-          <option value="archived">Archived</option>
+          <option value="">{t('crisis_list.filter_all')}</option>
+          <option value="draft">{t('crisis_list.status_draft')}</option>
+          <option value="in_review">{t('crisis_list.status_in_review')}</option>
+          <option value="published">{t('crisis_list.status_published')}</option>
+          <option value="archived">{t('crisis_list.status_archived')}</option>
         </select>
         <span className="text-muted-foreground ml-2">
-          {filtered.length} edition{filtered.length === 1 ? '' : 's'}
+          {t(
+            filtered.length === 1
+              ? 'crisis_list.edition_count_one'
+              : 'crisis_list.edition_count_other',
+            { n: filtered.length },
+          )}
         </span>
       </div>
 
       {filtered.length === 0 && (
         <div className="border border-dashed border-border rounded-lg bg-card p-8 text-center text-sm text-muted-foreground">
-          No reports in this state.
+          {t('crisis_list.no_reports_in_state')}
         </div>
       )}
 
@@ -298,16 +342,25 @@ function HistoryTab({ reports }: { reports: CrisisReport[] }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="font-medium text-sm">
-                      Week of {new Date(r.period_start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                      {' – '}
-                      {new Date(r.period_end).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {t('crisis_list.week_of', {
+                        period:
+                          `${new Date(r.period_start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` +
+                          ` – ${new Date(r.period_end).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`,
+                      })}
                     </span>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold capitalize ${STATUS_COLOUR[r.status]}`}>
-                      {r.status.replace('_', ' ')}
+                      {statusLabel(r.status, t)}
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-3 flex-wrap">
-                    <span>{r.row_count} signal{r.row_count === 1 ? '' : 's'}</span>
+                    <span>
+                      {t(
+                        r.row_count === 1
+                          ? 'crisis_list.signal_count_one'
+                          : 'crisis_list.signal_count_other',
+                        { n: r.row_count },
+                      )}
+                    </span>
                     {r.flagged_row_count > 0 && (
                       <span className="inline-flex items-center gap-1 text-[hsl(var(--kuja-clay))]">
                         <Flag className="w-3 h-3" /> {r.flagged_row_count}

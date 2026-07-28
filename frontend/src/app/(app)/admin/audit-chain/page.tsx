@@ -209,20 +209,18 @@ export default function AuditChainPage() {
       <div className="max-w-6xl mx-auto">
         <PageShell>
           <PageHeader
-            title="Hash-chained audit log"
+            title={t('audit_chain.page_title')}
             icon={ShieldAlert}
-            subtitle="Restricted to Oversight Body members and platform administrators."
+            subtitle={t('audit_chain.access_denied_subtitle')}
           />
           <PageMain>
             <Card className="p-6 border-l-4 border-l-[hsl(var(--kuja-flag))]">
               <div className="flex items-start gap-3">
                 <ShieldAlert className="w-6 h-6 text-[hsl(var(--kuja-flag))] shrink-0" />
                 <div>
-                  <h2 className="text-base font-semibold">Access restricted</h2>
+                  <h2 className="text-base font-semibold">{t('audit_chain.access_restricted')}</h2>
                   <p className="text-sm text-[hsl(var(--kuja-ink-soft))] mt-1">
-                    The audit chain is available only to Oversight Body members
-                    and platform administrators. Your account does not have
-                    permission to view or export it.
+                    {t('audit_chain.access_denied_body')}
                   </p>
                 </div>
               </div>
@@ -237,9 +235,9 @@ export default function AuditChainPage() {
     <div className="max-w-6xl mx-auto">
       <PageShell>
         <PageHeader
-          title="Hash-chained audit log"
+          title={t('audit_chain.page_title')}
           icon={ShieldCheck}
-          subtitle="Every critical event writes a hash-chained row. Any retroactive edit breaks the chain — this page proves it's intact."
+          subtitle={t('audit_chain.page_subtitle')}
           // Export control renders only once an authorized data load has
           // succeeded (recent !== null), so it never flashes for a user the
           // server will 403 — closing the "bare <a download> fires anyway" gap.
@@ -249,10 +247,10 @@ export default function AuditChainPage() {
                 href={exportHref}
                 download
                 className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted"
-                title="Download the full chain as NDJSON for offline verification"
+                title={t('audit_chain.export_hint')}
               >
                 <Download className="w-3.5 h-3.5" />
-                Export chain (NDJSON)
+                {t('audit_chain.export_chain')}
               </a>
             ) : undefined
           }
@@ -265,14 +263,12 @@ export default function AuditChainPage() {
           <div className="flex items-start gap-3">
             <ShieldCheck className="w-6 h-6 text-[hsl(var(--kuja-clay))]" />
             <div>
-              <div className="kuja-eyebrow">Tenant audit chain</div>
+              <div className="kuja-eyebrow">{t('audit_chain.tenant_chain_eyebrow')}</div>
               <h2 className="kuja-display text-xl mt-0.5">
-                {recent ? `${recent.total.toLocaleString()} entries` : '…'}
+                {recent ? t('audit_chain.entries_count', { n: recent.total.toLocaleString() }) : '…'}
               </h2>
               <p className="text-xs text-[hsl(var(--kuja-ink-soft))] mt-2">
-                Every critical Proximate action writes a hash-chained row.
-                Cryptographic re-verification runs offline against the exported
-                file — download the chain (NDJSON) above and verify independently.
+                {t('audit_chain.tenant_chain_desc')}
               </p>
             </div>
           </div>
@@ -294,19 +290,19 @@ export default function AuditChainPage() {
               <ShieldAlert className="w-6 h-6 text-[hsl(var(--kuja-flag))]" />
             )}
             <div>
-              <div className="kuja-eyebrow">Chain integrity</div>
+              <div className="kuja-eyebrow">{t('audit_chain.chain_integrity')}</div>
               <h2 className="kuja-display text-xl mt-0.5">
-                {verifyLoading ? 'Verifying…'
-                  : integrityOk ? `Intact — ${verify?.total_checked.toLocaleString()} rows verified`
-                  : `${verify?.breaks.length} break(s) detected in ${verify?.total_checked} rows`}
+                {verifyLoading ? t('audit_chain.verifying')
+                  : integrityOk ? t('audit_chain.intact_rows', { n: verify?.total_checked.toLocaleString() ?? '' })
+                  : t('audit_chain.breaks_detected', { breaks: verify?.breaks.length ?? 0, rows: verify?.total_checked ?? 0 })}
               </h2>
               {verify && !integrityOk && (
                 <ul className="text-xs text-[hsl(var(--kuja-flag))] mt-2 space-y-1">
                   {verify.breaks.slice(0, 5).map((b, i) => (
                     <li key={i}>
                       <strong>seq {b.seq}</strong>: {b.kind}
-                      {b.expected && <> · expected <code>{b.expected.slice(0, 12)}…</code></>}
-                      {b.got && <> · got <code>{b.got.slice(0, 12)}…</code></>}
+                      {b.expected && <> · {t('audit_chain.expected')} <code>{b.expected.slice(0, 12)}…</code></>}
+                      {b.got && <> · {t('audit_chain.got')} <code>{b.got.slice(0, 12)}…</code></>}
                     </li>
                   ))}
                 </ul>
@@ -320,7 +316,7 @@ export default function AuditChainPage() {
             className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] px-3 py-1.5 text-xs font-semibold hover:bg-[hsl(var(--kuja-sand-50))] disabled:opacity-50"
           >
             {verifyLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            Re-verify
+            {t('audit_chain.re_verify')}
           </button>
         </div>
       </Card>
@@ -330,12 +326,12 @@ export default function AuditChainPage() {
       <Card className="p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <div className="kuja-eyebrow">Recent entries</div>
+            <div className="kuja-eyebrow">{t('audit_chain.recent_entries')}</div>
             <h3 className="text-base font-semibold mt-0.5">
-              {recent ? `${recent.total.toLocaleString()} total` : '…'}
+              {recent ? t('audit_chain.total_count', { n: recent.total.toLocaleString() }) : '…'}
               {recent && recent.entries.length > 0 && (
                 <span className="text-[hsl(var(--kuja-ink-soft))] font-normal">
-                  {' '}· showing {offset + 1}–{offset + recent.entries.length}
+                  {' · '}{t('audit_chain.showing_range', { from: offset + 1, to: offset + recent.entries.length })}
                 </span>
               )}
             </h3>
@@ -346,7 +342,7 @@ export default function AuditChainPage() {
               onClick={() => loadRecent(Math.max(0, offset - LIMIT))}
               disabled={offset === 0 || recentLoading}
               className="rounded-md border border-[hsl(var(--border))] p-1.5 hover:bg-[hsl(var(--kuja-sand-50))] disabled:opacity-50"
-              aria-label="Previous page"
+              aria-label={t('audit_chain.previous_page')}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -355,7 +351,7 @@ export default function AuditChainPage() {
               onClick={() => loadRecent(offset + LIMIT)}
               disabled={!recent || offset + LIMIT >= recent.total || recentLoading}
               className="rounded-md border border-[hsl(var(--border))] p-1.5 hover:bg-[hsl(var(--kuja-sand-50))] disabled:opacity-50"
-              aria-label="Next page"
+              aria-label={t('audit_chain.next_page')}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -373,9 +369,9 @@ export default function AuditChainPage() {
         {recent && recent.entries.length === 0 && (
           <div className="mt-4 rounded-md border-2 border-dashed border-[hsl(var(--border))] p-8 text-center">
             <Award className="w-8 h-8 mx-auto text-[hsl(var(--kuja-ink-soft))]" />
-            <p className="text-sm font-semibold mt-2">No audit entries yet</p>
+            <p className="text-sm font-semibold mt-2">{t('audit_chain.no_entries')}</p>
             <p className="text-xs text-[hsl(var(--kuja-ink-soft))] mt-1">
-              Publishing a capacity passport (or other high-trust actions, as wired) will populate the chain.
+              {t('audit_chain.no_entries_desc')}
             </p>
           </div>
         )}
@@ -386,11 +382,11 @@ export default function AuditChainPage() {
               <thead>
                 <tr className="border-b border-[hsl(var(--border))] text-[hsl(var(--kuja-ink-soft))]">
                   <th className="py-2 text-left font-semibold">seq</th>
-                  <th className="py-2 text-left font-semibold">Action</th>
-                  <th className="py-2 text-left font-semibold">Actor</th>
-                  <th className="py-2 text-left font-semibold">Subject</th>
-                  <th className="py-2 text-left font-semibold">When</th>
-                  <th className="py-2 text-left font-semibold" aria-label="Expand" />
+                  <th className="py-2 text-left font-semibold">{t('audit_chain.col_action')}</th>
+                  <th className="py-2 text-left font-semibold">{t('audit_chain.col_actor')}</th>
+                  <th className="py-2 text-left font-semibold">{t('audit_chain.col_subject')}</th>
+                  <th className="py-2 text-left font-semibold">{t('audit_chain.col_when')}</th>
+                  <th className="py-2 text-left font-semibold" aria-label={t('audit_chain.expand')} />
                 </tr>
               </thead>
               <tbody>
@@ -434,7 +430,7 @@ export default function AuditChainPage() {
                         return (
                           <Link
                             href={href}
-                            title={`Open ${e.subject_kind} #${e.subject_id}`}
+                            title={t('audit_chain.open_subject', { kind: e.subject_kind ?? '', id: e.subject_id ?? '' })}
                             className="inline-block"
                           >
                             {inner}
@@ -459,16 +455,16 @@ export default function AuditChainPage() {
                       <td colSpan={6} className="py-2 px-3">
                         <div className="grid gap-1.5 text-[10px] font-mono">
                           <div>
-                            <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">Prev hash</span>
-                            <span className="break-all">{e.prev_hash || '(genesis)'}</span>
+                            <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">{t('audit_chain.prev_hash')}</span>
+                            <span className="break-all">{e.prev_hash || t('audit_chain.genesis')}</span>
                           </div>
                           <div>
-                            <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">Payload hash</span>
+                            <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">{t('audit_chain.payload_hash')}</span>
                             <span className="break-all">{e.payload_hash}</span>
                           </div>
                           {e.details && Object.keys(e.details).length > 0 && (
                             <div>
-                              <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">Details</span>
+                              <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">{t('common.details')}</span>
                               <pre className="whitespace-pre-wrap break-all inline">{JSON.stringify(e.details)}</pre>
                             </div>
                           )}
@@ -486,12 +482,12 @@ export default function AuditChainPage() {
 
       <p className="text-[10px] text-[hsl(var(--kuja-ink-soft))] flex items-center gap-1.5">
         <ExternalLink className="w-3 h-3" />
-        The verify routine recomputes each row&apos;s hash with the previous row&apos;s payload — any retroactive edit will break every row that follows.
+        {t('audit_chain.verify_note')}
       </p>
 
       {error && (
         <Card className="p-3 border-[hsl(var(--kuja-flag)/0.3)]">
-          <p className="text-xs text-[hsl(var(--kuja-flag))]">Error: {error}</p>
+          <p className="text-xs text-[hsl(var(--kuja-flag))]">{t('common.error')}: {error}</p>
         </Card>
       )}
         </PageMain>

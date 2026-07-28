@@ -17,6 +17,7 @@ import { Users, ChevronRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
 import { api, ApiError } from '@/lib/api';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,6 +40,7 @@ interface ReviewerUser {
 }
 
 export default function BulkReviewerAssignPage() {
+  const { t } = useTranslation();
   const viewer = useAuthStore((s) => s.user);
   const [apps, setApps] = useState<ListItem[]>([]);
   const [reviewers, setReviewers] = useState<ReviewerUser[]>([]);
@@ -62,7 +64,7 @@ export default function BulkReviewerAssignPage() {
       setApps(merged);
       setReviewers((r.users ?? []).filter((x) => x.role === 'reviewer'));
     }).catch(() => {
-      if (!cancelled) toast.error('Failed to load data.');
+      if (!cancelled) toast.error(t('reviews_bulk.load_failed'));
     }).finally(() => {
       if (!cancelled) setLoading(false);
     });
@@ -72,7 +74,7 @@ export default function BulkReviewerAssignPage() {
   if (viewer && viewer.role !== 'admin' && viewer.role !== 'donor') {
     return (
       <PageShell>
-        <PageHeader title="Bulk reviewer assignment" subtitle="Admins and donors only." />
+        <PageHeader title={t('reviews_bulk.title')} subtitle={t('reviews_bulk.admins_donors_only')} />
       </PageShell>
     );
   }
@@ -103,14 +105,14 @@ export default function BulkReviewerAssignPage() {
       );
       const { created, already_assigned, failed } = res.summary;
       const msg = [
-        created ? `${created} new` : '',
-        already_assigned ? `${already_assigned} already assigned` : '',
-        failed ? `${failed} failed` : '',
+        created ? t('reviews_bulk.n_new', { n: created }) : '',
+        already_assigned ? t('reviews_bulk.n_already_assigned', { n: already_assigned }) : '',
+        failed ? t('reviews_bulk.n_failed', { n: failed }) : '',
       ].filter(Boolean).join(', ');
-      toast.success(`Bulk assignment: ${msg || 'no changes'}`);
+      toast.success(t('reviews_bulk.bulk_assignment_result', { result: msg || t('reviews_bulk.no_changes') }));
       setSelected(new Set());
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Bulk assign failed');
+      toast.error(e instanceof ApiError ? e.message : t('reviews_bulk.bulk_assign_failed'));
     } finally {
       setBusy(false);
     }
@@ -119,20 +121,20 @@ export default function BulkReviewerAssignPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Bulk reviewer assignment"
+        title={t('reviews_bulk.title')}
         icon={Users}
-        subtitle="Pick a reviewer + select submissions to assign in one go. Already-assigned applications are skipped silently."
+        subtitle={t('reviews_bulk.subtitle')}
       />
       <PageMain>
         <Card className="p-4 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <label className="text-xs font-semibold text-muted-foreground">Reviewer:</label>
+            <label className="text-xs font-semibold text-muted-foreground">{t('reviews_bulk.reviewer_label')}</label>
             <select
               value={reviewerId ?? ''}
               onChange={(e) => setReviewerId(e.target.value ? Number(e.target.value) : null)}
               className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
             >
-              <option value="">— Pick a reviewer —</option>
+              <option value="">{t('reviews_bulk.pick_reviewer')}</option>
               {reviewers.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name || r.email}
@@ -140,7 +142,7 @@ export default function BulkReviewerAssignPage() {
               ))}
             </select>
             <span className="text-xs text-muted-foreground">
-              {selected.size} of {apps.length} selected
+              {t('reviews_bulk.n_of_m_selected', { selected: selected.size, total: apps.length })}
             </span>
             <Button
               type="button"
@@ -149,20 +151,20 @@ export default function BulkReviewerAssignPage() {
               className="ml-auto"
             >
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-              Assign {selected.size > 0 ? `(${selected.size})` : ''}
+              {t('reviews_bulk.assign')} {selected.size > 0 ? `(${selected.size})` : ''}
             </Button>
           </div>
 
           {loading && (
             <div className="text-sm text-muted-foreground py-6 text-center">
               <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
-              Loading submissions…
+              {t('reviews_bulk.loading_submissions')}
             </div>
           )}
 
           {!loading && apps.length === 0 && (
             <p className="text-sm text-muted-foreground py-6 text-center">
-              No submissions awaiting reviewer assignment.
+              {t('reviews_bulk.empty_state')}
             </p>
           )}
 
@@ -174,15 +176,15 @@ export default function BulkReviewerAssignPage() {
                     <th className="px-2 py-2 w-8 text-left">
                       <input
                         type="checkbox"
-                        aria-label="Select all"
+                        aria-label={t('reviews_bulk.select_all')}
                         checked={selected.size === apps.length && apps.length > 0}
                         onChange={toggleAll}
                       />
                     </th>
-                    <th className="px-3 py-2 text-left">Application</th>
-                    <th className="px-3 py-2 text-left">NGO</th>
-                    <th className="px-3 py-2 text-left">Grant</th>
-                    <th className="px-3 py-2 text-left">Status</th>
+                    <th className="px-3 py-2 text-left">{t('reviews_bulk.col_application')}</th>
+                    <th className="px-3 py-2 text-left">{t('reviews_bulk.col_ngo')}</th>
+                    <th className="px-3 py-2 text-left">{t('reviews_bulk.col_grant')}</th>
+                    <th className="px-3 py-2 text-left">{t('common.status')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -191,7 +193,7 @@ export default function BulkReviewerAssignPage() {
                       <td className="px-2 py-2">
                         <input
                           type="checkbox"
-                          aria-label={`Select application ${a.id}`}
+                          aria-label={t('reviews_bulk.select_application', { id: a.id })}
                           checked={selected.has(a.id)}
                           onChange={() => toggle(a.id)}
                         />
@@ -206,10 +208,10 @@ export default function BulkReviewerAssignPage() {
                         </Link>
                       </td>
                       <td className="px-3 py-2 text-xs">
-                        {a.ngo_org?.name ?? `Org #${a.ngo_org?.id ?? '?'}`}
+                        {a.ngo_org?.name ?? t('reviews_bulk.org_fallback', { id: a.ngo_org?.id ?? '?' })}
                       </td>
                       <td className="px-3 py-2 text-xs truncate max-w-[280px]">
-                        {a.grant?.title ?? `Grant #${a.grant?.id ?? '?'}`}
+                        {a.grant?.title ?? t('reviews_bulk.grant_fallback', { id: a.grant?.id ?? '?' })}
                       </td>
                       <td className="px-3 py-2 text-[11px] text-muted-foreground">
                         {a.status}

@@ -30,6 +30,7 @@ import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface Hook {
   id: number;
@@ -57,6 +58,7 @@ interface Delivery {
 }
 
 function DeliveryHistory({ hookId }: { hookId: number }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -83,23 +85,23 @@ function DeliveryHistory({ hookId }: { hookId: number }) {
         onClick={() => { setOpen((o) => !o); void load(); }}
         className="text-[11px] text-muted-foreground hover:text-foreground"
       >
-        {open ? 'Hide' : 'Show'} delivery history
+        {open ? t('webhooks.hide_delivery_history') : t('webhooks.show_delivery_history')}
       </button>
       {open && (
         <div className="mt-2 text-[11px]">
-          {loading && <div className="text-muted-foreground">Loading…</div>}
+          {loading && <div className="text-muted-foreground">{t('common.loading')}</div>}
           {!loading && deliveries && deliveries.length === 0 && (
-            <div className="text-muted-foreground">No deliveries yet.</div>
+            <div className="text-muted-foreground">{t('webhooks.no_deliveries_yet')}</div>
           )}
           {!loading && deliveries && deliveries.length > 0 && (
             <table className="w-full">
               <thead className="text-muted-foreground">
                 <tr>
-                  <th className="text-left py-1">When</th>
-                  <th className="text-left">Event</th>
-                  <th className="text-right">Status</th>
-                  <th className="text-right">ms</th>
-                  <th className="text-right">tries</th>
+                  <th className="text-left py-1">{t('webhooks.col_when')}</th>
+                  <th className="text-left">{t('webhooks.col_event')}</th>
+                  <th className="text-right">{t('common.status')}</th>
+                  <th className="text-right">{t('webhooks.col_ms')}</th>
+                  <th className="text-right">{t('webhooks.col_tries')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -128,6 +130,7 @@ function DeliveryHistory({ hookId }: { hookId: number }) {
 }
 
 export default function WebhooksSettingsPage() {
+  const { t } = useTranslation();
   const [hooks, setHooks] = useState<Hook[]>([]);
   const [events, setEvents] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,7 +154,7 @@ export default function WebhooksSettingsPage() {
       setHooks(hr.webhooks ?? []);
       setEvents(er.events ?? []);
     } catch {
-      toast.error('Failed to load webhooks.');
+      toast.error(t('webhooks.load_error'));
     } finally {
       setLoading(false);
     }
@@ -169,7 +172,7 @@ export default function WebhooksSettingsPage() {
 
   const create = async () => {
     if (!newUrl.trim() || newEvents.size === 0) {
-      toast.error('URL + at least one event required.');
+      toast.error(t('webhooks.url_event_required'));
       return;
     }
     setCreating(true);
@@ -186,7 +189,7 @@ export default function WebhooksSettingsPage() {
       setShowForm(false);
       await load();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Failed to register webhook');
+      toast.error(e instanceof ApiError ? e.message : t('webhooks.register_failed'));
     } finally {
       setCreating(false);
     }
@@ -197,36 +200,38 @@ export default function WebhooksSettingsPage() {
       const r = await api.post<{ result: { status: number | null; attempts: number; error?: string | null } }>(
         `/api/webhooks/${id}/test`, {});
       if (r.result.status && r.result.status < 300) {
-        toast.success(`Test delivered (${r.result.status}) in ${r.result.attempts} attempt(s).`);
+        toast.success(t('webhooks.test_delivered', { status: r.result.status, attempts: r.result.attempts }));
       } else {
-        toast.error(`Test failed: ${r.result.error ?? `status ${r.result.status ?? 'n/a'}`}`);
+        toast.error(t('webhooks.test_failed', {
+          reason: r.result.error ?? t('webhooks.test_failed_status', { status: r.result.status ?? t('webhooks.not_available') }),
+        }));
       }
       await load();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Test ping failed');
+      toast.error(e instanceof ApiError ? e.message : t('webhooks.test_ping_failed'));
     }
   };
 
   const deleteHook = async (id: number) => {
-    if (!confirm('Delete this webhook? The receiver will no longer get events.')) return;
+    if (!confirm(t('webhooks.delete_confirm'))) return;
     try {
       await api.delete(`/api/webhooks/${id}`);
-      toast.success('Webhook deleted.');
+      toast.success(t('webhooks.deleted'));
       await load();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Delete failed');
+      toast.error(e instanceof ApiError ? e.message : t('webhooks.delete_failed'));
     }
   };
 
   return (
     <PageShell>
       <PageHeader
-        title="Webhooks"
+        title={t('webhooks.title')}
         icon={WebhookIcon}
-        subtitle="Receive event payloads from Kuja in your own systems. Each delivery is signed with X-Kuja-Signature (HMAC-SHA256)."
+        subtitle={t('webhooks.subtitle')}
         primaryAction={
           <Button onClick={() => setShowForm(true)} disabled={showForm}>
-            <Plus className="w-3.5 h-3.5" /> Register
+            <Plus className="w-3.5 h-3.5" /> {t('webhooks.register')}
           </Button>
         }
       />
@@ -238,10 +243,10 @@ export default function WebhooksSettingsPage() {
               <div>
                 <h3 className="font-semibold text-sm inline-flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-                  Webhook registered
+                  {t('webhooks.registered_title')}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Copy the secret now — it will never be shown again.
+                  {t('webhooks.copy_secret_now')}
                 </p>
               </div>
               <button
@@ -249,13 +254,13 @@ export default function WebhooksSettingsPage() {
                 className="text-xs text-muted-foreground hover:text-foreground"
                 onClick={() => setCreatedSecret(null)}
               >
-                Dismiss
+                {t('webhooks.dismiss')}
               </button>
             </header>
             <div className="text-xs">
-              <div className="text-muted-foreground mb-1">URL: {createdSecret.url}</div>
+              <div className="text-muted-foreground mb-1">{t('webhooks.secret_url', { url: createdSecret.url })}</div>
               <div className="mb-2 text-muted-foreground">
-                Events: {createdSecret.events.join(', ')}
+                {t('webhooks.secret_events', { events: createdSecret.events.join(', ') })}
               </div>
               <div className="font-mono break-all bg-card border border-border rounded p-2 flex items-center gap-2">
                 <code className="flex-1">{createdSecret.secret}</code>
@@ -268,7 +273,7 @@ export default function WebhooksSettingsPage() {
                   className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 hover:bg-muted"
                 >
                   {secretCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  {secretCopied ? 'Copied' : 'Copy'}
+                  {secretCopied ? t('webhooks.copied') : t('webhooks.copy')}
                 </button>
               </div>
             </div>
@@ -277,9 +282,9 @@ export default function WebhooksSettingsPage() {
 
         {showForm && (
           <Card className="p-4 mb-4 space-y-3">
-            <h3 className="font-semibold text-sm">Register a new webhook</h3>
+            <h3 className="font-semibold text-sm">{t('webhooks.register_new')}</h3>
             <label className="block text-xs">
-              <span className="text-muted-foreground">URL</span>
+              <span className="text-muted-foreground">{t('webhooks.field_url')}</span>
               <input
                 type="url"
                 value={newUrl}
@@ -289,17 +294,17 @@ export default function WebhooksSettingsPage() {
               />
             </label>
             <label className="block text-xs">
-              <span className="text-muted-foreground">Description (optional)</span>
+              <span className="text-muted-foreground">{t('webhooks.field_description')}</span>
               <input
                 type="text"
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
-                placeholder="Pipes submissions into our CRM"
+                placeholder={t('webhooks.description_placeholder')}
                 className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5"
               />
             </label>
             <div className="text-xs">
-              <div className="text-muted-foreground mb-1.5">Events</div>
+              <div className="text-muted-foreground mb-1.5">{t('webhooks.field_events')}</div>
               <div className="flex flex-wrap gap-1.5">
                 {events.map((e) => (
                   <button
@@ -320,14 +325,14 @@ export default function WebhooksSettingsPage() {
             </div>
             <div className="flex gap-2">
               <Button onClick={create} disabled={creating}>
-                {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Register'}
+                {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : t('webhooks.register')}
               </Button>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </Card>
@@ -335,13 +340,13 @@ export default function WebhooksSettingsPage() {
 
         {loading && (
           <div className="text-sm text-muted-foreground py-6 text-center">
-            <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading…
+            <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> {t('common.loading')}
           </div>
         )}
 
         {!loading && hooks.length === 0 && (
           <Card className="p-6 text-center text-sm text-muted-foreground">
-            No webhooks registered yet. Click <strong>Register</strong> to add one.
+            {t('webhooks.empty_line1')} <strong>{t('webhooks.register')}</strong> {t('webhooks.empty_line2')}
           </Card>
         )}
 
@@ -349,13 +354,13 @@ export default function WebhooksSettingsPage() {
             multiple hooks exist. */}
         {hooks.length > 1 && (
           <div className="flex items-center gap-2 mb-3 text-xs">
-            <span className="text-muted-foreground">Filter by event:</span>
+            <span className="text-muted-foreground">{t('webhooks.filter_by_event')}</span>
             <select
               value={eventFilter}
               onChange={(e) => setEventFilter(e.target.value)}
               className="rounded-md border border-border bg-background px-2 py-1"
             >
-              <option value="">All events</option>
+              <option value="">{t('webhooks.all_events')}</option>
               {events.map((e) => (
                 <option key={e} value={e}>{e}</option>
               ))}
@@ -393,31 +398,31 @@ export default function WebhooksSettingsPage() {
                       type="button"
                       onClick={() => testHook(h.id)}
                       className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs hover:bg-muted"
-                      title="Send a synthetic test payload"
+                      title={t('webhooks.test_tooltip')}
                     >
-                      <Send className="w-3 h-3" /> Test
+                      <Send className="w-3 h-3" /> {t('webhooks.test')}
                     </button>
                     <button
                       type="button"
                       onClick={() => deleteHook(h.id)}
                       className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
                     >
-                      <Trash2 className="w-3 h-3" /> Delete
+                      <Trash2 className="w-3 h-3" /> {t('common.delete')}
                     </button>
                   </div>
                 </header>
                 <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-3 border-t border-border pt-2">
                   <span>
-                    {h.delivery_count} deliveries
+                    {t('webhooks.deliveries_count', { count: h.delivery_count })}
                   </span>
                   <span className={
                     errorRate > 0 ? 'text-rose-600 font-semibold' : 'text-muted-foreground'
                   }>
-                    {errorRate}% errors
+                    {t('webhooks.error_rate', { rate: errorRate })}
                   </span>
                   {h.last_delivery_at && (
                     <span>
-                      Last: {new Date(h.last_delivery_at).toLocaleString()}{' '}
+                      {t('webhooks.last_delivery', { date: new Date(h.last_delivery_at).toLocaleString() })}{' '}
                       {h.last_delivery_status && (
                         <span className={
                           h.last_delivery_status >= 200 && h.last_delivery_status < 300
