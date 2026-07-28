@@ -129,6 +129,9 @@ def seed_fresh_db(db_path):
     _run_seed("seed_networked_funds.py", db_path, required=False)
     # Proximate fixtures (OB user, partners, endorsers, rounds).
     _run_seed("seed_proximate.py", db_path, required=True)
+    # Permanent happy-path fixture (reviewer improvement #2): a standing
+    # awarded + contracted + ready-to-disburse partner the gate asserts on.
+    _run_seed("seed_proximate_happy_path.py", db_path, required=True)
     _seed_read_only_fixture(db_path)
 
 
@@ -322,6 +325,39 @@ def _first_id(sess, base, path, override=None):
     return None
 
 
+_FIXTURE_NAME_RE = None
+
+
+def _first_non_fixture_id(sess, base, path, override=None):
+    """Return the first row whose name/title is NOT a TEST/fixture record.
+
+    The destructive Proximate write checks (suspend, disburse, intervene)
+    must operate on DISPOSABLE demo data — never the standing happy-path
+    fixture (partner + round) seeded by seed_proximate_happy_path.py, which
+    the later happy-path check asserts stays releasable. Proximate list
+    endpoints order newest-first, so the freshly-seeded fixture would
+    otherwise be _first_id's pick: the destructive suite would suspend the
+    fixture partner (breaking its own check) and target the fixture round
+    (which the disposable demo partner was never awarded in → the disburse
+    check's cycle-gate 422s on no_award). Matches the same TEST-name regex
+    the console UI uses. Falls back to the first row if every row is a
+    fixture."""
+    import re
+    global _FIXTURE_NAME_RE
+    if _FIXTURE_NAME_RE is None:
+        _FIXTURE_NAME_RE = re.compile(r"\b(uat|test|qa|codex|demo|fixture)\b", re.I)
+    r = get(sess, base, path, override=override)
+    if r.status_code != 200:
+        return None
+    rows = [row for row in _list(r)
+            if isinstance(row, dict) and row.get("id") is not None]
+    for row in rows:
+        label = str(row.get("name") or row.get("title") or "")
+        if not _FIXTURE_NAME_RE.search(label):
+            return row["id"]
+    return rows[0]["id"] if rows else None
+
+
 # ---------------------------------------------------------------------------
 # Write-path regression — the coverage the old gate lacked.
 # Every check asserts the handler RAN (no 5xx / Python error). A NameError /
@@ -392,8 +428,14 @@ def run_proximate_writes(base):
     ob = login(base, "prox_ob", override=OV)
     donor = login(base, "prox_donor", override=OV)
 
-    pid = _first_id(ob, base, "/api/proximate/partners", override=OV)
-    rid = _first_id(ob, base, "/api/proximate/rounds", override=OV)
+    # Destructive checks below (suspend, disburse, intervene) run against this
+    # partner + round — pick DISPOSABLE demo records, never the standing
+    # happy-path fixture (which the later happy-path check asserts stays
+    # releasable). Skipping the fixture round matters too: disburse posts
+    # {partner, round}, and a demo partner was never awarded in the fixture
+    # round, so the cycle-gate would 422 on no_award.
+    pid = _first_non_fixture_id(ob, base, "/api/proximate/partners", override=OV)
+    rid = _first_non_fixture_id(ob, base, "/api/proximate/rounds", override=OV)
     gid = _first_id(ob, base, "/api/proximate/grants", override=OV)
     did = _first_id(ob, base, "/api/proximate/disbursements", override=OV)
     eid = _first_id(ob, base, "/api/proximate/admin/endorsers", override=OV)
@@ -1294,6 +1336,118 @@ def run_proximate_rbac(base):
     check("unauth denied (no data / no 5xx) /overview", unauth_denied)
 
 
+def run_proximate_happy_path(base):
+    """Fold the pilot reviewer's live-test concerns into the standing gate
+    (reviewer improvement #3), anchored on the permanent happy-path fixture
+    (improvement #2, seeded by seed_proximate_happy_path.py). Three guards:
+
+      1. Attention-queue i18n INVARIANT — every dynamic OB "needs attention"
+         item MUST carry a non-empty title_key. This is the exact class the
+         review caught: backend-generated English labels (severity, intervention
+         kind, "needs triage") that no t()-parity audit can see. A future item
+         builder that ships an English-only label (no title_key) fails here.
+      2. Audit-chain EXPORT scoping — donor and platform-admin get 403 on the
+         JSONL export (not just the JSON read); the OB gets 200. The reviewer
+         tested this live; pin it so a refactor can't open the export.
+      3. Disbursement happy-path READINESS — the standing fixture partner
+         preflights with ZERO blockers. This is the releasable state the
+         reviewer previously had to hand-build every UAT pass; the gate now
+         proves it always exists.
+    """
+    section("Proximate — happy-path fixture + attention i18n + audit export")
+    OV = "proximate"
+    ob = login(base, "prox_ob", override=OV)
+    donor = login(base, "prox_donor", override=OV)
+    admin = login(base, "admin", override=OV)
+
+    # Locate the permanent fixture partner by its marker name.
+    partners = get(ob, base, "/api/proximate/partners", override=OV)
+    fixture_pid = None
+    if partners.status_code == 200:
+        for row in (partners.json().get("partners") or []):
+            if str(row.get("name", "")).startswith("QA Fixture Partner"):
+                fixture_pid = row.get("id")
+                break
+
+    # --- 1. Attention-queue i18n invariant --------------------------------
+    # Force a deterministic, non-empty queue: submit a public grievance about
+    # the fixture partner (category 'other' so it does NOT auto-freeze). Then
+    # every returned item must be localizable.
+    def seed_one_attention_item():
+        anon = requests.Session()
+        anon.headers["X-Network-Override"] = OV
+        body = {"description": "Gate fixture grievance — attention i18n probe.",
+                "category": "other"}
+        if fixture_pid:
+            body["partner_id"] = fixture_pid
+        r = anon.post(f"{base}/api/proximate/public/grievances",
+                      json=body, headers={"X-Requested-With": "XMLHttpRequest"},
+                      timeout=15)
+        # 200 created OR 400/409 (dedup on a re-run) all mean the handler ran;
+        # the queue is non-empty either way after the first insert.
+        assert not _is_server_error(r), f"grievance submit 5xx: {r.text[:200]}"
+    check("seed one attention item (public grievance)", seed_one_attention_item)
+
+    SEV = {"critical", "high", "medium", "low"}
+
+    def attention_items_localizable():
+        r = get(ob, base, "/api/proximate/attention-queue", override=OV)
+        assert r.status_code == 200, f"attention-queue -> {r.status_code}"
+        items = r.json().get("items") or []
+        assert items, "attention queue is empty — cannot verify the i18n invariant"
+        missing = [f"{it.get('kind')}#{it.get('entity_id')}"
+                   for it in items if not it.get("title_key")]
+        assert not missing, (
+            f"{len(missing)} attention item(s) ship NO title_key (English-only, "
+            f"un-localizable): {missing[:6]}")
+        bad_sev = sorted({it.get("severity") for it in items} - SEV)
+        assert not bad_sev, f"attention items carry unknown severities: {bad_sev}"
+    check("attention items all carry title_key (i18n invariant)",
+          attention_items_localizable)
+
+    def grievance_item_params():
+        r = get(ob, base, "/api/proximate/attention-queue", override=OV)
+        gr = next((it for it in (r.json().get("items") or [])
+                   if it.get("kind") == "grievance"), None)
+        assert gr is not None, "no grievance item present to check params"
+        params = gr.get("params") or {}
+        assert params.get("category_code"), (
+            f"grievance item missing params.category_code (breaks localized "
+            f"category label): {params}")
+    check("grievance attention item carries category_code param",
+          grievance_item_params)
+
+    # --- 2. Audit-chain EXPORT scoping (JSONL, not just the JSON read) -----
+    def ob_export_ok():
+        r = get(ob, base, "/api/proximate/audit-chain?format=jsonl", override=OV)
+        assert r.status_code == 200, f"OB audit export -> {r.status_code} (want 200)"
+    check("OB 200 /audit-chain?format=jsonl (export)", ob_export_ok)
+
+    for who, sess in (("donor", donor), ("admin", admin)):
+        def export_denied(sess=sess, who=who):
+            r = get(sess, base, "/api/proximate/audit-chain?format=jsonl",
+                    override=OV)
+            assert r.status_code == 403, (
+                f"{who} audit EXPORT -> {r.status_code} (want 403 — the export "
+                f"must refuse non-OB exactly like the read)")
+        check(f"{who} 403 /audit-chain?format=jsonl (export)", export_denied)
+
+    # --- 3. Disbursement happy-path readiness (the permanent fixture) ------
+    def fixture_ready_to_disburse():
+        assert fixture_pid, (
+            "permanent happy-path fixture partner not found — "
+            "seed_proximate_happy_path.py did not run or did not clear")
+        r = get(ob, base,
+                f"/api/proximate/disbursements/preflight?partner_id={fixture_pid}"
+                f"&amount_usd=50", override=OV)
+        assert r.status_code == 200, f"preflight -> {r.status_code}: {r.text[:160]}"
+        blockers = r.json().get("blockers") or []
+        assert not blockers, (
+            f"the standing happy-path fixture has disbursement blockers "
+            f"(it must stay releasable): {[b.get('code') for b in blockers]}")
+    check("fixture partner preflights with ZERO blockers", fixture_ready_to_disburse)
+
+
 def run_near_writes(base):
     section("NEAR — write paths (best-effort; needs seeded funds)")
     OV = "near"
@@ -1522,6 +1676,7 @@ def run_api_regression(base):
     run_kuja_writes(base)
     run_proximate_writes(base)
     run_proximate_rbac(base)
+    run_proximate_happy_path(base)
     run_near_writes(base)
     run_saxansaxo_writes(base)
 
