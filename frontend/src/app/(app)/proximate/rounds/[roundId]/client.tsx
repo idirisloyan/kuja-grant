@@ -582,22 +582,30 @@ export function ProximateRoundDetailClient() {
                     {/* Pilot feedback: the hint told operators to invite
                         endorsers but gave them nothing to click. Jump to
                         the roster, where each partner has its own
-                        invite/share-endorser action. */}
-                    {bottleneck <= 1 && (
-                      <button
-                        type="button"
-                        onClick={() =>
+                        invite/share-endorser action.
+                        PRX-27JUL-FIXTURE-001 (28 Jul QA): the roster lives on
+                        the Partners tab, so from Overview the named partners
+                        (and their ready-to-disburse state) weren't reachable in
+                        one step once the round moved past endorsements. Always
+                        offer the jump; switch to the Partners tab so the roster
+                        is actually shown, not scrolled to on a hidden tab. */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTab('partners');
+                        setTimeout(() => {
                           document.getElementById('round-roster')?.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'start',
-                          })
-                        }
-                        className="text-[11px] inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 shrink-0"
-                      >
-                        {t('proximate.rounds.journey_start_endorsements') || 'Start endorsements'}
-                        <span aria-hidden>↓</span>
-                      </button>
-                    )}
+                            behavior: 'smooth', block: 'start',
+                          });
+                        }, 50);
+                      }}
+                      className="text-[11px] inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 shrink-0"
+                    >
+                      {bottleneck <= 1
+                        ? (t('proximate.rounds.journey_start_endorsements') || 'Start endorsements')
+                        : (t('proximate.rounds.journey_view_roster') || 'View partner roster')}
+                      <span aria-hidden>→</span>
+                    </button>
                   </div>
                 )}
               </Card>
