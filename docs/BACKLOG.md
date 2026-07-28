@@ -72,7 +72,7 @@ Updated 2026-07-05.
 - [ ] Railway daily Postgres backups enabled, 30-day retention
       (Phase 720 in the Proximate file covers the R2 pg_dump cron)
 
-### i18n Tier-2: admin/secondary surfaces still English-only
+### i18n Tier-2: admin/secondary surfaces — DONE (2026-07-27, `ae7db8ec2`)
 - **last_touched:** 2026-07-15 (QA "incomplete translation" finding)
 - Ground truth after the 2026-07-15 audit: all six public/token-holder
   journeys (Proximate endorse/verify/report/outcome tokens, donor
@@ -84,28 +84,15 @@ Updated 2026-07-05.
   wired `t()` + 237 new keys × en/ar/fr/es/sw/so at full parity (3425 →
   3662 each): donors/[id], ngo/[id], network/directory, network/join,
   settings/notifications, calendar, and proximate/admin/grants/[grantId].
-  What remains is 17 substantive files with zero `t()` wiring — all
-  internal admin/ops consoles where English is acceptable short-term but
-  should be wired for consistency:
-  - `app/(app)/admin/metrics/page.tsx` (~22 strings)
-  - `app/(app)/admin/crisis-monitoring/[id]/client.tsx` (~20)
-  - `app/(app)/admin/ai-cost/page.tsx` (~14)
-  - `app/(app)/admin/tenant-health/page.tsx` (~11)
-  - `app/(app)/settings/webhooks/page.tsx` (~11)
-  - `app/(app)/admin/audit-chain/page.tsx` (~10)
-  - `app/(app)/admin/crisis-monitoring/page.tsx` (~10)
-  - `app/(app)/admin/network-memberships/[id]/client.tsx` (~10)
-  - `app/(app)/admin/declarations/[id]/client.tsx` (~9)
-  - `app/(app)/admin/ai-telemetry/page.tsx` (~8)
-  - `app/(app)/admin/reviewers-workload/page.tsx` (~8)
-  - `app/(app)/admin/ai-quality/page.tsx` (~7)
-  - `app/(app)/admin/network-memberships/page.tsx` (~7)
-  - `app/(app)/admin/windows/[id]/report/client.tsx` (~6)
-  - `app/(app)/admin/cost-ceiling/page.tsx` (~5)
-  - `app/(app)/admin/reviews-bulk/page.tsx` (~4)
-  - `app/(app)/admin/cron-health/page.tsx` (~3)
-- Suggested order: the 7 user-facing files are done (2026-07-27);
-  remaining admin consoles in descending string count.
+  **Update 2026-07-27 (`ae7db8ec2`) — COMPLETE.** All 17 internal
+  admin/ops consoles are now wired: metrics, ai-cost, ai-quality,
+  ai-telemetry, audit-chain (access-restricted card), crisis-monitoring
+  (list + detail), network-memberships (list + detail), declarations
+  detail, window report, tenant-health, webhooks, cost-ceiling,
+  reviews-bulk, reviewers-workload, cron-health. 702 new keys ×
+  en/ar/fr/es/sw/so at full parity (3662 -> 4364 each). The i18n Tier-2
+  backlog item is CLOSED — every app surface with `t()`-wireable strings
+  is now translated across all six locales.
 - Also untranslated by design so far: the OB sidebar labels and dynamic
   import-result notes ("Imported N new partners…") on the partners page.
 
