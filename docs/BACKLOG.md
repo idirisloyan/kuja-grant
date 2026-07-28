@@ -79,9 +79,14 @@ Updated 2026-07-05.
   journey, OB journey) and the primary app surfaces ARE translated
   (2,788 keys × en/ar/fr/es/sw/so, parity-tested). Tier 1 of the QA fix
   added `proximate.partners.*` + donor follow keys and wired the
-  Proximate partners list. What remains is 24 substantive files with
-  zero `t()` wiring — overwhelmingly internal admin/ops consoles where
-  English is acceptable short-term but should be wired for consistency:
+  Proximate partners list.
+  **Update 2026-07-27 (`2494a5f25`):** the 7 user-facing files are DONE —
+  wired `t()` + 237 new keys × en/ar/fr/es/sw/so at full parity (3425 →
+  3662 each): donors/[id], ngo/[id], network/directory, network/join,
+  settings/notifications, calendar, and proximate/admin/grants/[grantId].
+  What remains is 17 substantive files with zero `t()` wiring — all
+  internal admin/ops consoles where English is acceptable short-term but
+  should be wired for consistency:
   - `app/(app)/admin/metrics/page.tsx` (~22 strings)
   - `app/(app)/admin/crisis-monitoring/[id]/client.tsx` (~20)
   - `app/(app)/admin/ai-cost/page.tsx` (~14)
@@ -96,19 +101,11 @@ Updated 2026-07-05.
   - `app/(app)/admin/ai-quality/page.tsx` (~7)
   - `app/(app)/admin/network-memberships/page.tsx` (~7)
   - `app/(app)/admin/windows/[id]/report/client.tsx` (~6)
-  - `app/(app)/donors/[id]/client.tsx` (~6) ← user-facing, do first
-  - `app/(app)/ngo/[id]/client.tsx` (~6) ← user-facing, do first
   - `app/(app)/admin/cost-ceiling/page.tsx` (~5)
-  - `app/(app)/network/directory/page.tsx` (~5) ← user-facing
-  - `app/(app)/network/join/page.tsx` (~5) ← user-facing
-  - `app/(app)/proximate/admin/grants/[grantId]/client.tsx` (~5, OB-only)
-  - `app/(app)/settings/notifications/page.tsx` (~5) ← user-facing
   - `app/(app)/admin/reviews-bulk/page.tsx` (~4)
-  - `app/(app)/calendar/page.tsx` (~4) ← user-facing
   - `app/(app)/admin/cron-health/page.tsx` (~3)
-- Suggested order: the 7 user-facing files first (donors/ngo detail,
-  network directory/join, notifications settings, calendar, Proximate
-  grant detail), then admin consoles in descending string count.
+- Suggested order: the 7 user-facing files are done (2026-07-27);
+  remaining admin consoles in descending string count.
 - Also untranslated by design so far: the OB sidebar labels and dynamic
   import-result notes ("Imported N new partners…") on the partners page.
 
