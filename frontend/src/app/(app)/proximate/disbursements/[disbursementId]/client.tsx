@@ -17,6 +17,7 @@ import {
   Loader2, Copy, Check, AlertTriangle, CheckCircle2, ArrowLeft, ShieldCheck, UserCheck,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { formatComplianceDate } from '@/lib/format-date';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
@@ -358,10 +359,10 @@ export function ProximateDisbursementDetailClient() {
               </span>
             )}
             {data.sent_at && (
-              <span>· {t('proximate.disbursement.sent')} {new Date(data.sent_at).toLocaleDateString()}</span>
+              <span>· {t('proximate.disbursement.sent')} {formatComplianceDate(data.sent_at)}</span>
             )}
             {data.report_due_at && (
-              <span>· {t('proximate.disbursement.due')} {new Date(data.report_due_at).toLocaleDateString()}</span>
+              <span>· {t('proximate.disbursement.due')} {formatComplianceDate(data.report_due_at)}</span>
             )}
             {data.overdue && (
               <Badge variant="outline" className="text-[10px] bg-red-100 text-red-800 border-red-300">
@@ -758,7 +759,7 @@ export function ProximateDisbursementDetailClient() {
                   {data.outcome.due_at
                     ? t('proximate.outcome.due_at_prefix') +
                       ' ' +
-                      new Date(data.outcome.due_at).toLocaleDateString()
+                      formatComplianceDate(data.outcome.due_at)
                     : ''}
                   {data.outcome.overdue && (
                     <span className="ms-2 text-red-600">

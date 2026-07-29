@@ -1084,7 +1084,7 @@ export function ProximateRoundDetailClient() {
                           roster so the OB can reach it without leaving the
                           round workflow. */}
                       <Link
-                        href={`/proximate/endorse/${p.partner_id}`}
+                        href={`/proximate/endorse/${p.partner_id}?tab=history`}
                         className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-muted"
                         title="Open partner record & history"
                       >

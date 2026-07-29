@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, Plus, Copy, Check } from 'lucide-react';
 import { api } from '@/lib/api';
+import { formatComplianceDate } from '@/lib/format-date';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
@@ -208,10 +209,10 @@ export default function ProximateDisbursementsPage() {
                         )}
                         {d.purpose && <span>· {d.purpose}</span>}
                         {d.sent_at && (
-                          <span>· {new Date(d.sent_at).toLocaleDateString()}</span>
+                          <span>· {formatComplianceDate(d.sent_at)}</span>
                         )}
                         {d.report_due_at && d.status === 'pending_report' && (
-                          <span>· {t('proximate.disbursements.due')} {new Date(d.report_due_at).toLocaleDateString()}</span>
+                          <span>· {t('proximate.disbursements.due')} {formatComplianceDate(d.report_due_at)}</span>
                         )}
                       </div>
                     </Link>

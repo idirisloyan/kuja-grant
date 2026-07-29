@@ -404,8 +404,9 @@ function fmtDate(iso?: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
+  // UTC so compliance-event dates never shift by the viewer's timezone.
   return d.toLocaleDateString(undefined, {
-    year: 'numeric', month: 'short', day: 'numeric',
+    timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric',
   });
 }
 function fmtUsd(n?: number | null): string {

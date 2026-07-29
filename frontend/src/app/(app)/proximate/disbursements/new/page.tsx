@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2, Send, Copy, Check, CheckCircle2, Circle } from 'lucide-react';
 import { api } from '@/lib/api';
+import { formatComplianceDate } from '@/lib/format-date';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
@@ -79,7 +80,13 @@ export default function ProximateDisbursementNewPage() {
   const [roundId, setRoundId] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
   const [purpose, setPurpose] = useState<string>('');
-  const [windowDays, setWindowDays] = useState<string>('14');
+  // Blank by default: the reporting window follows the contract's
+  // implementation period (computed server-side from receipt). Only a
+  // deliberate override sends an explicit report_window_days — see the
+  // override toggle below (Khalid SOP alignment, 29 Jul QA).
+  const [windowDays, setWindowDays] = useState<string>('');
+  const [overrideWindow, setOverrideWindow] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('');
   // Phase 669 — ISF (SoP §3) annotation. OB confirms the partner cleared
   // the Internally Stratified Funding gate. Recorded as audit metadata.
   const [isfCleared, setIsfCleared] = useState(false);
@@ -211,17 +218,37 @@ export default function ProximateDisbursementNewPage() {
       setError(t('proximate.disbursements.amount_required'));
       return;
     }
+    const wd = parseInt(windowDays, 10);
+    if (overrideWindow && (!wd || wd < 1 || wd > 90 || !overrideReason.trim())) {
+      const msg = t('proximate.disbursements.window_override_required');
+      setError(msg === 'proximate.disbursements.window_override_required'
+        ? 'Enter a reporting window (1–90 days) and a reason for overriding '
+          + 'the contract’s implementation period.'
+        : msg);
+      return;
+    }
     setSubmitting(true);
     try {
-      const res = await api.post<CreateResp>('/api/proximate/disbursements', {
+      // By default we send NO report_window_days, so the backend anchors the
+      // reporting deadline to the contract’s implementation period. Only a
+      // deliberate override sends an explicit window (with a reason recorded
+      // in the purpose so it stays auditable). SOP alignment, 29 Jul QA.
+      const payload: Record<string, unknown> = {
         partner_id: parseInt(partnerId, 10),
         round_id: roundId ? parseInt(roundId, 10) : undefined,
         amount_usd: parseFloat(amount),
         purpose: purpose.trim() || undefined,
-        report_window_days: parseInt(windowDays, 10) || 14,
         disbursement_method_id: methodId ? parseInt(methodId, 10) : undefined,
         isf_cleared: isfCleared,
-      });
+      };
+      if (overrideWindow) {
+        payload.report_window_days = wd;
+        const note = `[Reporting window override: ${wd}d — ${overrideReason.trim()}]`;
+        payload.purpose = (purpose.trim() ? `${purpose.trim()} ` : '') + note;
+      }
+      const res = await api.post<CreateResp>(
+        '/api/proximate/disbursements', payload,
+      );
       if (!res.success || !res.disbursement) {
         setError(res.error || t('proximate.disbursements.create_failed'));
       } else {
@@ -287,7 +314,7 @@ export default function ProximateDisbursementNewPage() {
               {result.report_due_at && (
                 <p className="text-xs text-muted-foreground mt-1">
                   {t('proximate.disbursements.due')}{' '}
-                  {new Date(result.report_due_at).toLocaleDateString()}
+                  {formatComplianceDate(result.report_due_at)}
                 </p>
               )}
             </div>
@@ -502,17 +529,43 @@ export default function ProximateDisbursementNewPage() {
               <label className="block text-sm font-medium mb-1">
                 {t('proximate.disbursements.field_window')}
               </label>
-              <input
-                type="number"
-                min={1}
-                max={90}
-                value={windowDays}
-                onChange={(e) => setWindowDays(e.target.value)}
-                className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                {t('proximate.disbursements.window_hint')}
+              <p className="text-xs text-muted-foreground mb-2 leading-snug">
+                {t('proximate.disbursements.window_default_note') === 'proximate.disbursements.window_default_note'
+                  ? 'Reporting follows the contract’s implementation period, counted from the day the partner confirms receipt. Leave this off unless a specific override is needed.'
+                  : t('proximate.disbursements.window_default_note')}
               </p>
+              <label className="flex items-center gap-2 text-sm mb-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={overrideWindow}
+                  onChange={(e) => setOverrideWindow(e.target.checked)}
+                />
+                {t('proximate.disbursements.window_override_toggle') === 'proximate.disbursements.window_override_toggle'
+                  ? 'Set a custom reporting window instead'
+                  : t('proximate.disbursements.window_override_toggle')}
+              </label>
+              {overrideWindow && (
+                <div className="space-y-2 pl-6">
+                  <input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={windowDays}
+                    onChange={(e) => setWindowDays(e.target.value)}
+                    placeholder="45"
+                    className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md"
+                  />
+                  <input
+                    type="text"
+                    value={overrideReason}
+                    onChange={(e) => setOverrideReason(e.target.value)}
+                    placeholder={t('proximate.disbursements.window_override_reason_ph') === 'proximate.disbursements.window_override_reason_ph'
+                      ? 'Reason for the override'
+                      : t('proximate.disbursements.window_override_reason_ph')}
+                    className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
