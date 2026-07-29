@@ -1447,6 +1447,31 @@ def run_proximate_happy_path(base):
             f"(it must stay releasable): {[b.get('code') for b in blockers]}")
     check("fixture partner preflights with ZERO blockers", fixture_ready_to_disburse)
 
+    # --- 4. Partner-history TIMELINE contract (Khalid 29 Jul, item #12) ----
+    # Partner history must be a real cross-round event timeline, not just a
+    # stats scoreboard: a `rounds[]` array, each round carrying a `timeline`,
+    # and the fixture partner (nominated -> DD-cleared -> awarded ->
+    # contracted) must surface an actual 'awarded' event. A regression that
+    # drops the timeline back to counts-only fails here.
+    def partner_history_timeline():
+        assert fixture_pid, "fixture partner missing — cannot check history"
+        r = get(ob, base, f"/api/proximate/partners/{fixture_pid}/history",
+                override=OV)
+        assert r.status_code == 200, f"partner history -> {r.status_code}"
+        body = r.json()
+        assert isinstance(body.get("rounds"), list), (
+            "partner history missing `rounds[]` — timeline shape regressed to "
+            "the old stats-only scoreboard")
+        assert isinstance(body.get("partner_timeline"), list), (
+            "partner history missing `partner_timeline[]` (lifetime events)")
+        events = [ev.get("type")
+                  for rd in body["rounds"] for ev in (rd.get("timeline") or [])]
+        assert "awarded" in events, (
+            "fixture partner history shows no 'awarded' timeline event — the "
+            f"timeline is not surfacing award decisions (saw: {sorted(set(events))})")
+    check("partner history returns a populated cross-round timeline",
+          partner_history_timeline)
+
 
 def run_near_writes(base):
     section("NEAR — write paths (best-effort; needs seeded funds)")

@@ -369,6 +369,13 @@ export function ProximateDisbursementDetailClient() {
               </Badge>
             )}
           </div>
+          {data.report_due_at && (
+            <p className="text-[11px] text-muted-foreground mt-2 leading-snug">
+              {t('proximate.disbursement.report_due_hint') === 'proximate.disbursement.report_due_hint'
+                ? 'Reporting is due at the end of the implementation period — the window follows the contract duration, counted from the day the partner confirmed receipt.'
+                : t('proximate.disbursement.report_due_hint')}
+            </p>
+          )}
         </Card>
 
         {/* Phase 717 — one-line "what happens next" guidance. */}

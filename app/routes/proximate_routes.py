@@ -4807,7 +4807,25 @@ def api_record_disbursement():
     from app.models.proximate_disbursement import (
         COSIGN_THRESHOLD_USD, cosigners_required_for,
     )
-    window_days = int(payload.get('report_window_days') or DEFAULT_REPORT_WINDOW_DAYS)
+    # Khalid (29 Jul 2026): the report window should reflect the
+    # contract's implementation period, not a flat 14 days. An explicit
+    # override wins; otherwise anchor to the contract duration when one
+    # is set. This is provisional — it is re-anchored to received_at when
+    # the partner confirms receipt (see _apply_receipt).
+    _explicit_window = payload.get('report_window_days')
+    if _explicit_window:
+        window_days = int(_explicit_window)
+    else:
+        window_days = DEFAULT_REPORT_WINDOW_DAYS
+        if _round_id:
+            from app.models import ProximateAward, ProximateContract
+            _awd = ProximateAward.query.filter_by(
+                round_id=_round_id, partner_id=partner.id, network_id=net.id,
+            ).first()
+            if _awd:
+                _ctr = ProximateContract.query.filter_by(award_id=_awd.id).first()
+                if _ctr and _ctr.duration_days and _ctr.duration_days > 0:
+                    window_days = int(_ctr.duration_days)
     now = datetime.now(timezone.utc)
 
     # Phase 662 (extended by Phase 668) — Allocation Committee tier

@@ -358,9 +358,134 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
  * diligence — and a number on a partner card becomes a funding gate by
  * accident, against exactly the organisations this fund exists for.
  */
+type HistEvent = {
+  ts: string | null;
+  type: string;
+  detail?: string;
+  actor?: string;
+  amount_usd?: number;
+  requested_usd?: number;
+  approved_usd?: number;
+  on_time?: boolean;
+  is_issue?: boolean;
+};
+type HistRound = {
+  round_id: number;
+  round_title?: string | null;
+  region?: string | null;
+  decision?: string | null;
+  requested_amount_usd?: number | null;
+  approved_amount_usd?: number | null;
+  closeout?: { status?: string | null; closed_at?: string | null };
+  timeline: HistEvent[];
+};
+
+// English fallbacks so a missing i18n key never renders the raw key
+// (translate() returns the key itself on a miss).
+const EVENT_LABELS: Record<string, string> = {
+  nominated: 'Nominated',
+  sanctions_checked: 'Sanctions / watchlist screened',
+  bank_verified: 'Payment route verified',
+  dd_cleared: 'Due diligence cleared',
+  awarded: 'Awarded by the panel',
+  not_awarded: 'Not awarded',
+  award_pending: 'Award decision pending',
+  contract_opened: 'Contract opened',
+  contract_partner_signed: 'Partner signed the contract',
+  contract_signed: 'Contract signed',
+  disbursed: 'Funds disbursed',
+  receipt_confirmed: 'Receipt confirmed',
+  report_submitted: 'Report submitted',
+  evidence: 'Update / evidence',
+  closeout: 'Round closed',
+};
+
+function fmtDate(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+  });
+}
+function fmtUsd(n?: number | null): string {
+  return `$${Number(n || 0).toLocaleString()}`;
+}
+
+function TimelineRow(
+  { ev, t, last }: { ev: HistEvent; t: (k: string) => string; last?: boolean },
+) {
+  const key = `proximate.history.event.${ev.type}`;
+  const translated = t(key);
+  const label = translated === key
+    ? (EVENT_LABELS[ev.type] || ev.type) : translated;
+  const dotClass = ev.is_issue
+    ? 'bg-red-500'
+    : ev.type === 'awarded' || ev.type === 'dd_cleared'
+        || ev.type === 'receipt_confirmed'
+      ? 'bg-emerald-500'
+      : ev.type === 'closeout'
+        ? 'bg-primary'
+        : 'bg-muted-foreground/50';
+  const money =
+    ev.type === 'awarded'
+      ? [
+          ev.requested_usd != null
+            ? `${t('proximate.history.requested') === 'proximate.history.requested'
+                ? 'Requested' : t('proximate.history.requested')} ${fmtUsd(ev.requested_usd)}`
+            : null,
+          ev.approved_usd != null
+            ? `${t('proximate.history.approved') === 'proximate.history.approved'
+                ? 'Approved' : t('proximate.history.approved')} ${fmtUsd(ev.approved_usd)}`
+            : null,
+        ].filter(Boolean).join(' · ')
+      : ev.amount_usd != null
+        ? fmtUsd(ev.amount_usd)
+        : '';
+  return (
+    <li className="flex gap-2.5">
+      <span className="relative flex flex-col items-center">
+        <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+        {!last && <span className="flex-1 w-px bg-border" aria-hidden />}
+      </span>
+      <div className="pb-3 min-w-0">
+        <p className="text-sm font-medium leading-tight">{label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          {ev.ts && <span className="tabular-nums">{fmtDate(ev.ts)}</span>}
+          {ev.actor && <span>· {ev.actor}</span>}
+          {money && <span className="tabular-nums">· {money}</span>}
+          {ev.on_time === true && (
+            <span className="text-emerald-600 dark:text-emerald-400">
+              · {t('proximate.history.on_time') === 'proximate.history.on_time'
+                  ? 'On time' : t('proximate.history.on_time')}
+            </span>
+          )}
+          {ev.on_time === false && (
+            <span className="text-amber-600 dark:text-amber-400">
+              · {t('proximate.history.late') === 'proximate.history.late'
+                  ? 'Late' : t('proximate.history.late')}
+            </span>
+          )}
+          {ev.is_issue && (
+            <span className="text-red-600 dark:text-red-400">
+              · {t('proximate.history.issue') === 'proximate.history.issue'
+                  ? 'Issue' : t('proximate.history.issue')}
+            </span>
+          )}
+        </p>
+        {ev.detail && translated === key && !EVENT_LABELS[ev.type] && (
+          <p className="text-xs text-muted-foreground mt-0.5">{ev.detail}</p>
+        )}
+      </div>
+    </li>
+  );
+}
+
 export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
   const { t } = useTranslation();
   const [data, setData] = useState<{
+    partner_timeline?: HistEvent[];
+    rounds?: HistRound[];
     cycles: Record<string, unknown>[];
     observations: Record<string, number | null>;
     note: string;
@@ -389,6 +514,8 @@ export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
   if (!data) return null;
 
   const o = data.observations;
+  const partnerTimeline = data.partner_timeline || [];
+  const histRounds = data.rounds || [];
   const rows: [string, string][] = [
     [t('proximate.cycle.cycles_participated') || 'Cycles participated in',
       String(o.cycles_participated ?? 0)],
@@ -419,6 +546,57 @@ export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
       <h3 className="font-semibold flex items-center gap-2">
         <History className="w-4 h-4 text-muted-foreground" /> {t('proximate.cycle.history_title') || 'History with the fund'}
       </h3>
+
+      {(partnerTimeline.length > 0 || histRounds.length > 0) && (
+        <div className="space-y-4">
+          {partnerTimeline.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                {t('proximate.history.profile_events') === 'proximate.history.profile_events'
+                  ? 'Partner profile' : t('proximate.history.profile_events')}
+              </p>
+              <ul className="ml-0.5">
+                {partnerTimeline.map((ev, i) => (
+                  <TimelineRow key={`p-${i}`} ev={ev} t={t}
+                    last={i === partnerTimeline.length - 1} />
+                ))}
+              </ul>
+            </div>
+          )}
+          {histRounds.map((rd) => (
+            <div key={rd.round_id}>
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                <p className="text-sm font-semibold">
+                  {rd.round_title || `#${rd.round_id}`}
+                  {rd.region && (
+                    <span className="text-xs text-muted-foreground font-normal"> · {rd.region}</span>
+                  )}
+                </p>
+                {rd.closeout?.status === 'closed' && (
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                    {t('proximate.history.closed') === 'proximate.history.closed'
+                      ? 'Closed' : t('proximate.history.closed')}
+                    {rd.closeout?.closed_at ? ` · ${fmtDate(rd.closeout.closed_at)}` : ''}
+                  </span>
+                )}
+              </div>
+              {rd.timeline.length > 0 ? (
+                <ul className="ml-0.5">
+                  {rd.timeline.map((ev, i) => (
+                    <TimelineRow key={`${rd.round_id}-${i}`} ev={ev} t={t}
+                      last={i === rd.timeline.length - 1} />
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {t('proximate.history.no_events') === 'proximate.history.no_events'
+                    ? 'No recorded events yet.' : t('proximate.history.no_events')}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {data.cycles.length > 0 && (
         <div className="overflow-x-auto">

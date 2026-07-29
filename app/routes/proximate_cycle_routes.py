@@ -1186,6 +1186,30 @@ def api_receipt_record(disb_id):
     return jsonify({'success': True, 'disbursement': d.to_dict()})
 
 
+def _report_window_days_for(d: ProximateDisbursement) -> int:
+    """Days from receipt to report-due.
+
+    Khalid (29 Jul 2026): reporting is due at the END of the
+    implementation period, not on a flat clock started when the money
+    lands. When the contract records an implementation duration, the
+    report window follows it. The 14-day default only applies when no
+    implementation period has been set on the contract yet.
+    """
+    from app.models.proximate_disbursement import DEFAULT_REPORT_WINDOW_DAYS
+    default = DEFAULT_REPORT_WINDOW_DAYS
+    if not getattr(d, 'round_id', None):
+        return default
+    award = ProximateAward.query.filter_by(
+        round_id=d.round_id, partner_id=d.partner_id, network_id=d.network_id,
+    ).first()
+    if not award:
+        return default
+    contract = ProximateContract.query.filter_by(award_id=award.id).first()
+    if contract and contract.duration_days and contract.duration_days > 0:
+        return int(contract.duration_days)
+    return default
+
+
 def _apply_receipt(d: ProximateDisbursement, body: dict, source: str) -> None:
     """Write the confirmation and restart the implementation clock.
 
@@ -1194,6 +1218,11 @@ def _apply_receipt(d: ProximateDisbursement, body: dict, source: str) -> None:
     have not landed, and transfers through hawala routinely take days.
     Holding them to a clock that started in transit would penalise them
     for the fund's own payment rails.
+
+    The window itself follows the contract's implementation period, so a
+    partner with a 60-day activity is not flagged overdue on day 15 —
+    reporting is due when the implementation period ends, not a flat 14
+    days after the money lands (Khalid, 29 Jul 2026).
     """
     d.receipt_amount = _f(body.get('amount'))
     d.receipt_currency = (body.get('currency') or 'SDG')[:8]
@@ -1217,7 +1246,8 @@ def _apply_receipt(d: ProximateDisbursement, body: dict, source: str) -> None:
     d.received_at = parsed or _now()
     d.implementation_start_at = d.received_at
 
-    window = int(body.get('report_window_days') or 14)
+    explicit = body.get('report_window_days')
+    window = int(explicit) if explicit else _report_window_days_for(d)
     d.report_due_at = d.received_at + timedelta(days=window)
 
     part = ProximateRoundParticipant.query.filter_by(
@@ -1648,9 +1678,61 @@ def api_partner_history(partner_id):
     disbs = ProximateDisbursement.query.filter_by(
         partner_id=partner_id, network_id=nid,
     ).all()
+    contracts = ProximateContract.query.filter_by(
+        partner_id=partner_id, network_id=nid,
+    ).all()
+    # ProximateRoundParticipant has no network_id column — it is scoped
+    # through the partner, which we have already confirmed belongs to nid.
+    participants = ProximateRoundParticipant.query.filter_by(
+        partner_id=partner_id,
+    ).all()
+    ev = ProximateEvidence.query.filter_by(
+        partner_id=partner_id, network_id=nid).all()
 
-    round_ids = {a.round_id for a in awards} | {
-        d.round_id for d in disbs if d.round_id}
+    # ---- resolve actor names once (id -> display name) ----------------
+    user_ids = set()
+    for a in awards:
+        if a.recorded_by_user_id:
+            user_ids.add(a.recorded_by_user_id)
+    for c in contracts:
+        if c.created_by_user_id:
+            user_ids.add(c.created_by_user_id)
+    for d in disbs:
+        if getattr(d, 'sent_by_user_id', None):
+            user_ids.add(d.sent_by_user_id)
+    for p in participants:
+        if p.added_by_user_id:
+            user_ids.add(p.added_by_user_id)
+    for e in ev:
+        if e.recorded_by_user_id:
+            user_ids.add(e.recorded_by_user_id)
+    if getattr(partner, 'nominated_by_user_id', None):
+        user_ids.add(partner.nominated_by_user_id)
+    names = {}
+    if user_ids:
+        from app.models import User
+        for u in User.query.filter(User.id.in_(list(user_ids))).all():
+            names[u.id] = u.name or u.email
+
+    def _who(uid):
+        return names.get(uid) if uid else None
+
+    def _iso(dt):
+        if not dt:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+    # Widen the round set: the roster (participant), awards, disbursements,
+    # contracts, and evidence — so a round where the partner was nominated
+    # or vetted but never awarded is still visible.
+    round_ids = {a.round_id for a in awards}
+    round_ids |= {d.round_id for d in disbs if d.round_id}
+    round_ids |= {p.round_id for p in participants if p.round_id}
+    round_ids |= {c.round_id for c in contracts if c.round_id}
+    round_ids |= {e.round_id for e in ev if e.round_id}
+    round_ids.discard(None)
     rounds = {}
     if round_ids:
         for r in ProximateRound.query.filter(
@@ -1658,6 +1740,128 @@ def api_partner_history(partner_id):
         ).all():
             rounds[r.id] = r
 
+    # ---- partner-level lifetime timeline (nomination + due diligence) --
+    partner_timeline = []
+
+    def _padd(dt, type_, detail, actor=None, **extra):
+        if dt:
+            item = {'ts': _iso(dt), 'type': type_, 'detail': detail}
+            if actor:
+                item['actor'] = actor
+            item.update({k: v for k, v in extra.items() if v is not None})
+            partner_timeline.append(item)
+
+    _padd(getattr(partner, 'nominated_at', None), 'nominated',
+          'Nominated to the fund',
+          actor=_who(getattr(partner, 'nominated_by_user_id', None)))
+    _padd(getattr(partner, 'sanctions_checked_at', None), 'sanctions_checked',
+          ('Sanctions / watchlist screened — flag raised'
+           if getattr(partner, 'sanctions_flag', False)
+           else 'Sanctions / watchlist screened — clear'),
+          is_issue=bool(getattr(partner, 'sanctions_flag', False)) or None)
+    _padd(getattr(partner, 'bank_verified_at', None), 'bank_verified',
+          'Payment route verified')
+    _padd(getattr(partner, 'dd_cleared_at', None), 'dd_cleared',
+          'Cleared for funding (due diligence complete)')
+    for e in ev:
+        if not e.round_id:
+            _padd(e.occurred_at or e.created_at, 'evidence',
+                  (e.summary or (e.kind or 'evidence').replace('_', ' ')),
+                  actor=_who(e.recorded_by_user_id),
+                  is_issue=bool(e.is_issue) or None, kind=e.kind)
+    partner_timeline.sort(key=lambda x: x['ts'] or '')
+
+    # ---- per-round event timeline -------------------------------------
+    rounds_out = []
+    for rid in sorted(round_ids):
+        r = rounds.get(rid)
+        a = next((x for x in awards if x.round_id == rid), None)
+        tl = []
+
+        def _add(dt, type_, detail, actor=None, **extra):
+            if dt:
+                item = {'ts': _iso(dt), 'type': type_, 'detail': detail}
+                if actor:
+                    item['actor'] = actor
+                item.update({k: v for k, v in extra.items() if v is not None})
+                tl.append(item)
+
+        for p in participants:
+            if p.round_id == rid:
+                _add(p.added_at, 'nominated', 'Added to this round',
+                     actor=_who(p.added_by_user_id))
+        if a:
+            adt = a.decided_at or a.created_at
+            if a.decision == 'awarded':
+                _add(adt, 'awarded', 'Awarded by the panel',
+                     actor=_who(a.recorded_by_user_id),
+                     requested_usd=a.requested_amount_usd,
+                     approved_usd=a.approved_amount_usd,
+                     decision_method=a.decision_method)
+            elif a.decision == 'not_awarded':
+                _add(adt, 'not_awarded', 'Not awarded this round',
+                     actor=_who(a.recorded_by_user_id),
+                     requested_usd=a.requested_amount_usd)
+            else:
+                _add(adt, 'award_pending', 'Award decision pending',
+                     requested_usd=a.requested_amount_usd)
+        for c in contracts:
+            if c.round_id == rid or (a and c.award_id == a.id):
+                _add(c.created_at, 'contract_opened', 'Contract opened',
+                     actor=_who(c.created_by_user_id))
+                if c.is_complete:
+                    _add(c.completed_at or c.adeso_signed_at,
+                         'contract_signed', 'Contract signed & complete')
+                elif c.partner_signed_at:
+                    _add(c.partner_signed_at, 'contract_partner_signed',
+                         'Partner signed the contract')
+        for d in disbs:
+            if d.round_id != rid:
+                continue
+            _add(d.sent_at, 'disbursed', 'Funds disbursed',
+                 actor=_who(getattr(d, 'sent_by_user_id', None)),
+                 amount_usd=d.amount_usd)
+            _add(d.receipt_confirmed_at, 'receipt_confirmed',
+                 'Receipt confirmed by partner', amount_usd=d.receipt_amount)
+            if d.report_submitted_at:
+                on_time_flag = None
+                if d.report_due_at:
+                    due, sub = d.report_due_at, d.report_submitted_at
+                    if due.tzinfo is None:
+                        due = due.replace(tzinfo=timezone.utc)
+                    if sub.tzinfo is None:
+                        sub = sub.replace(tzinfo=timezone.utc)
+                    on_time_flag = sub <= due
+                _add(d.report_submitted_at, 'report_submitted',
+                     'Partner report submitted', on_time=on_time_flag)
+        for e in ev:
+            if e.round_id == rid:
+                _add(e.occurred_at or e.created_at, 'evidence',
+                     (e.summary or (e.kind or 'evidence').replace('_', ' ')),
+                     actor=_who(e.recorded_by_user_id),
+                     is_issue=bool(e.is_issue) or None, kind=e.kind)
+        if r and getattr(r, 'closed_at', None):
+            _add(r.closed_at, 'closeout',
+                 'Round closed by the fund manager')
+        tl.sort(key=lambda x: x['ts'] or '')
+        rounds_out.append({
+            'round_id': rid,
+            'round_title': r.title if r else None,
+            'region': r.target_region if r else None,
+            'decision': a.decision if a else None,
+            'requested_amount_usd': a.requested_amount_usd if a else None,
+            'approved_amount_usd': a.approved_amount_usd if a else None,
+            'closeout': {
+                'status': r.status if r else None,
+                'closed_at': (
+                    _iso(r.closed_at)
+                    if (r and getattr(r, 'closed_at', None)) else None
+                ),
+            },
+            'timeline': tl,
+        })
+
+    # ---- backward-compatible per-round stats (cycles) ------------------
     cycles = []
     for rid in sorted(round_ids):
         r = rounds.get(rid)
@@ -1668,6 +1872,7 @@ def api_partner_history(partner_id):
             'round_title': r.title if r else None,
             'region': r.target_region if r else None,
             'decision': a.decision if a else None,
+            'requested_amount_usd': a.requested_amount_usd if a else None,
             'approved_amount_usd': a.approved_amount_usd if a else None,
             'disbursements': len(ds),
             'total_sent_usd': float(sum(float(d.amount_usd or 0) for d in ds)),
@@ -1694,14 +1899,20 @@ def api_partner_history(partner_id):
         else:
             late += 1
 
-    ev = ProximateEvidence.query.filter_by(
-        partner_id=partner_id, network_id=nid).all()
-
     return jsonify({
         'success': True,
         'partner': {'id': partner.id, 'name': partner.name,
+                    'name_ar': getattr(partner, 'name_ar', None),
                     'status': partner.status,
-                    'locality': getattr(partner, 'locality', None)},
+                    'locality': getattr(partner, 'locality', None),
+                    'nominated_at': _iso(getattr(partner, 'nominated_at', None)),
+                    'dd_cleared_at': _iso(getattr(partner, 'dd_cleared_at', None)),
+                    'bank_verified_at': _iso(
+                        getattr(partner, 'bank_verified_at', None)),
+                    'sanctions_flag': bool(
+                        getattr(partner, 'sanctions_flag', False))},
+        'partner_timeline': partner_timeline,
+        'rounds': rounds_out,
         'cycles': cycles,
         'observations': {
             'cycles_participated': len(cycles),
