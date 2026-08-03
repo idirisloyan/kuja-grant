@@ -17,6 +17,115 @@ Updated 2026-07-27.
 
 ---
 
+## UI/UX + workflow QA wave (2026-08-03) — from the Proximate operations review
+
+Fourteen tickets from a UI/UX + workflow review of the OB-facing surfaces
+(dashboard, partners, disbursements, nomination form). The framing is right and
+worth keeping as the acceptance test for the whole wave:
+
+> Summary cards first · priority actions second · full registers only after
+> drill-down · clear next actions · less repeated list noise · stronger
+> separation of test data from live data.
+
+Or put as the reviewer did: the dashboard should read as a decision centre,
+partners as a workflow workspace, disbursements as a payment/reporting control
+centre. Today all three read as registers.
+
+**Verified against the code 2026-08-03 before filing.** Three findings change
+what should be built — read them before picking anything up.
+
+### FINDING A — there are TWO nomination forms, and the review saw the staff one
+- `frontend/src/app/(auth)/proximate-nominate/page.tsx` is the PARTNER-facing
+  form. It has **no bank fields at all** and says so out loud: *"No bank details
+  are asked on this form."*
+- `frontend/src/app/(app)/proximate/admin/partners/new/page.tsx` is the
+  SECRETARIAT form, staff-only, and it does collect account holder / account
+  number / bank name. Its own docstring says it exists for when the secretariat
+  "needs to nominate a partner directly (with bank details)".
+- **So PRX-WORKFLOW-FORM-002's stated rationale does not hold**: partners never
+  see the form with the bank fields, so it cannot be creating false funding
+  expectations in partners. The reviewer read a staff screen as a partner screen.
+- **But the ticket is still worth doing on a different rationale.** Storing
+  account numbers for organisations that may never be funded is unnecessary data
+  collection — a data-minimisation problem, and in Sudan a safeguarding one. The
+  right change is to make the bank block collapsed/optional and moved behind
+  award readiness, NOT to redesign partner-facing intake that is already correct.
+- **Do not "fix" the public form.** It already does the right thing.
+
+### FINDING B — the sidebar bug is a prefix collision, not a route-detection bug
+- `components/layout/sidebar.tsx:280` —
+  `isActive = pathname === item.href || pathname?.startsWith(item.href + '/')`.
+- Dashboard is `/proximate/admin`; Partners is `/proximate/admin/partners`. The
+  first is a strict PREFIX of the second, so on the Partners page both match and
+  both light up. Same collision will hit Endorsers, Messages and any other
+  `/proximate/admin/*` child.
+- Fix is longest-match-wins (compute the most specific matching href across the
+  nav set and mark only that one), not per-item special-casing. One-line class of
+  fix; affects every tenant's sidebar, so it belongs to the platform.
+
+### FINDING C — TEST badging already exists; extend the pattern, do not invent one
+- `disbursements/new/page.tsx:378` and `rounds/[roundId]/client.tsx` already tag
+  fixture rows using the name regex `/\b(uat|test|qa|codex|demo|fixture)\b/i`.
+- The main disbursements list and the partners register simply do not use it.
+  So PRX-UI-DISB-002 is "apply the existing convention in two more places",
+  not new design work.
+- **Hard constraint:** the QA Fixture partner (#92 / round #15) is a PERMANENT,
+  deliberate prod fixture — see `memory/proximate_happy_path_fixture_2026-07-27.md`
+  and `seed_proximate_happy_path.py`. Hide it behind a toggle; **do not delete it
+  and do not make it unreachable**, the gate seeds and asserts against it.
+- A name-regex is a heuristic, not a data model. If test/live separation matters
+  operationally, the honest fix is an `is_test` column set at seed time. Worth
+  deciding before spreading the regex further.
+
+### Confirmed accurate as reported
+- Bank fields ARE on the secretariat nomination form (see Finding A for the
+  correct rationale).
+- Geography IS unstructured: the staff form has free-text `locality` and
+  free-text `country` defaulted to `SD`, with **no State field at all**; the
+  public form hard-codes `country: 'SD'` and takes free-text locality. Sudan's
+  18 states are nowhere in the model. This is the highest-value data fix in the
+  wave — area selection, panel relevance and donor reporting all key off
+  geography, and free text will not aggregate.
+- `proximate.disbursements.copy_link` is the generic string "Copy partner link"
+  (`i18n/en.json:2044`), with no status-specific variants.
+
+### Open question the review itself flagged
+- PRX-WORKFLOW-FORM-003 ("links limited to due-diligence-passed partners") does
+  not say WHICH link. There are several partner-facing links with different
+  gates already (nomination, report package, receipt confirmation, per-domain
+  delegation). Needs the reviewer to name the surface before it can be scoped —
+  do not guess, the gates differ deliberately.
+
+### Tickets
+
+| Ref | Item | Severity | Notes |
+|---|---|---|---|
+| PRX-WORKFLOW-FORM-002 | Bank details off first-stage nomination | High | See Finding A — do it for data minimisation, not the stated reason |
+| PRX-WORKFLOW-FORM-001 | Country → State → Locality as structured fields | High | Needs Sudan 18-state reference data + a locality list or free-text fallback; touches BOTH forms and the model |
+| PRX-UI-DISB-002 | Separate TEST/UAT records from operational views | Med-High | Finding C — extend existing regex, keep fixture reachable |
+| PRX-UI-DASH-001 | Dashboard first-screen overload | Med-High | Top 3–5 priorities, grouped, severity filters, "view all" |
+| PRX-UI-PARTNERS-001 | Duplicate active sidebar state | Low-Med | Finding B — platform-wide fix |
+| PRX-UI-DISB-003 | Action-specific partner-link labels | Med | Label follows the disbursement's current required action |
+| PRX-UI-DASH-002 | Dashboard quick-action row | Med | Start round · nominate · record disbursement · confirm receipt · review reports · close round |
+| PRX-UI-PARTNERS-002 | Partners page register-heavy | Med | Priority section above the full register |
+| PRX-UI-PARTNERS-003 | Partner rows need next-action + history | Med | |
+| PRX-UI-DISB-001 | Disbursements page register-heavy | Med | Summary cards + needs-action first |
+| PRX-UI-DISB-004 | Due-date / days-overdue / next-action per row | Med | |
+| PRX-WORKFLOW-FORM-004 | Progressive disclosure + funding disclaimer | Med | Public form already carries a version of the disclaimer — check before adding a second |
+| PRX-UI-NAV-001 | Consistent active states + page-level next actions | Med | Absorbs PRX-UI-PARTNERS-001 |
+| PRX-WORKFLOW-FORM-003 | Stage-gate detailed partner links | Blocked | Needs the reviewer to name the link |
+
+### Sequencing note
+Build order should follow evidence, not the list order. The sidebar fix and the
+TEST badging are hours and remove real confusion. Geography is the highest-value
+change but needs reference data decided first (which locality list, and what
+happens to the free-text values already in prod — they must be migrated or
+preserved, not dropped). The dashboard/partners/disbursements restructures are
+the largest and the most subjective; they should be shaped against one real OB
+session rather than built to spec from a document, or we will simply produce a
+different layout that is also wrong.
+
+---
 ## Media gap — video is accepted but never read (2026-08-01)
 
 ### Video evidence is silently never transcribed
