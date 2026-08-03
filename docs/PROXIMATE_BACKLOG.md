@@ -96,6 +96,59 @@ what should be built — read them before picking anything up.
   delegation). Needs the reviewer to name the surface before it can be scoped —
   do not guess, the gates differ deliberately.
 
+### SHIPPED 2026-08-03 — five of the fourteen
+
+- [x] **PRX-UI-PARTNERS-001 / part of PRX-UI-NAV-001 — one active nav item.**
+      `activeNavHref()` in sidebar.tsx now resolves the LONGEST matching href
+      across every group and marks only that one. Verified in a browser on the
+      exact reported page: `/proximate/admin/partners/` → 1 active item.
+      Guarded by `npm run verify:nav` (12 cases, lifts the shipped function
+      out of the TSX rather than re-implementing it, so a copy cannot pass
+      while the real one regresses). Fixes the same latent collision on
+      Endorsers and Messages, and applies to every tenant.
+- [x] **PRX-UI-DISB-002 — test records separated.** `lib/test-records.ts`
+      consolidates the regex that was duplicated inline, and both the
+      disbursements list and the partners register now hide fixtures by
+      default behind a labelled toggle that shows the hidden count. Status
+      chips and the sanctions-flag count follow the same visibility, so a chip
+      never promises more rows than clicking it delivers.
+      **Checked against real prod names before shipping:** of 91 partners, 13
+      hide and all 13 are genuine fixtures; the 78 that stay visible include
+      every real Blue Nile organisation. No false positives.
+      The QA Fixture partner remains present and reachable via the toggle.
+      Still a NAME HEURISTIC — the `is_test` column remains the honest fix and
+      is written up in the module docstring.
+- [x] **PRX-UI-DISB-003 — link label says what the link does.** The button only
+      ever renders for `pending_report` and only ever copies the report URL, so
+      it now reads “Copy report link”. NOTE: the ticket asked for a matrix of
+      status-specific labels; there is only ONE partner-facing link on this
+      surface, so a matrix would be inventing variants that do not exist.
+- [x] **PRX-UI-DISB-004 (partial) — due dates do the arithmetic.** Rows now read
+      “due 15 Aug (8 days overdue)” in red, or “due in 12 days”. The rest of
+      the ticket (next-action button per row) is left with the register
+      restructure it belongs to.
+- [x] **PRX-WORKFLOW-FORM-001 (frontend + model) — structured geography.**
+      `lib/geography.ts` holds Sudan’s 18 states; the nomination form now has
+      Country and State dropdowns, and changing country clears a stale state.
+      `ProximatePartner.state` added (nullable; the Phase 610 reconciler ALTERs
+      it in on boot) and accepted by both partner-create handlers.
+      **Localities deliberately NOT enumerated** — there are well over a
+      hundred, boundaries moved during the conflict, and a stale
+      official-looking dropdown is worse than a text box. Locality stays free
+      text with the state above it doing the aggregation.
+      **Existing partners keep state = NULL on purpose.** Inferring a state
+      from a locality spelling would be invented precision; surfaces must read
+      NULL as “not recorded”.
+- [x] **PRX-WORKFLOW-FORM-002 (revised) — bank details behind a disclosure.**
+      Collapsed by default on the SECRETARIAT form with the reason stated (we
+      do not hold account numbers for organisations that may never be funded),
+      reachable in one click for a partner already through diligence. The
+      partner-facing form was left alone: it never had bank fields. See
+      Finding A.
+
+**Still open from this wave:** the three page restructures (DASH-001, DASH-002,
+PARTNERS-002, PARTNERS-003, DISB-001), the remainder of DISB-004,
+FORM-003 (blocked on which link), FORM-004, and the rest of NAV-001.
 ### Tickets
 
 | Ref | Item | Severity | Notes |

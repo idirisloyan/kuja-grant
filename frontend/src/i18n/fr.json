@@ -4418,5 +4418,16 @@
   "attention.round_sign.title": "Round en attente de signatures — {round}",
   "attention.round_sign.sub": "{signed}/2 signatures recueillies pour activer",
   "attention.endorser_kyc.title": "{count} endosseur(s) en attente de contrôle KYC léger",
-  "attention.endorser_kyc.sub": "Approuver ou rejeter dans la file des endosseurs"
+  "attention.endorser_kyc.sub": "Approuver ou rejeter dans la file des endosseurs",
+  "common.test_record": "TEST",
+  "proximate.disbursements.copy_report_link": "Copier le lien du rapport",
+  "proximate.disbursements.show_test": "Afficher les enregistrements de test ({n})",
+  "proximate.disbursements.hide_test": "Masquer les enregistrements de test ({n})",
+  "proximate.disbursements.test_toggle_hint": "Enregistrements de test. Masqués par défaut pour garder la liste lisible — ils ne sont jamais supprimés.",
+  "proximate.disbursements.days_overdue": "{n} jours de retard",
+  "proximate.disbursements.due_today": "Échéance aujourd'hui",
+  "proximate.disbursements.days_left": "Échéance dans {n} jours",
+  "proximate.partners.show_test": "Afficher les partenaires de test ({n})",
+  "proximate.partners.hide_test": "Masquer les partenaires de test ({n})",
+  "proximate.partners.test_toggle_hint": "Partenaires de test. Masqués par défaut pour garder le registre lisible — ils ne sont jamais supprimés."
 }

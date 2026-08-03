@@ -4418,5 +4418,16 @@
   "attention.round_sign.title": "Duru inasubiri saini — {round}",
   "attention.round_sign.sub": "Saini {signed}/2 zimekusanywa kuwezesha",
   "attention.endorser_kyc.title": "Wadhamini {count} wanasubiri ukaguzi mwepesi wa KYC",
-  "attention.endorser_kyc.sub": "Idhinisha au kataa katika foleni ya wadhamini"
+  "attention.endorser_kyc.sub": "Idhinisha au kataa katika foleni ya wadhamini",
+  "common.test_record": "JARIBIO",
+  "proximate.disbursements.copy_report_link": "Nakili kiungo cha ripoti",
+  "proximate.disbursements.show_test": "Onyesha rekodi za majaribio ({n})",
+  "proximate.disbursements.hide_test": "Ficha rekodi za majaribio ({n})",
+  "proximate.disbursements.test_toggle_hint": "Rekodi za majaribio. Zimefichwa kwa chaguo-msingi ili orodha halisi ibaki wazi — hazifutwi kamwe.",
+  "proximate.disbursements.days_overdue": "Imechelewa siku {n}",
+  "proximate.disbursements.due_today": "Inatakiwa leo",
+  "proximate.disbursements.days_left": "Inatakiwa baada ya siku {n}",
+  "proximate.partners.show_test": "Onyesha washirika wa majaribio ({n})",
+  "proximate.partners.hide_test": "Ficha washirika wa majaribio ({n})",
+  "proximate.partners.test_toggle_hint": "Washirika wa majaribio. Wamefichwa kwa chaguo-msingi ili daftari halisi libaki wazi — hawafutwi kamwe."
 }

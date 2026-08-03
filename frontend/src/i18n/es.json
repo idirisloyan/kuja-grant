@@ -4418,5 +4418,16 @@
   "attention.round_sign.title": "Ronda a la espera de firmas — {round}",
   "attention.round_sign.sub": "{signed}/2 firmas reunidas para activar",
   "attention.endorser_kyc.title": "{count} avalador(es) a la espera de revisión KYC ligera",
-  "attention.endorser_kyc.sub": "Aprobar o rechazar en la cola de avaladores"
+  "attention.endorser_kyc.sub": "Aprobar o rechazar en la cola de avaladores",
+  "common.test_record": "PRUEBA",
+  "proximate.disbursements.copy_report_link": "Copiar enlace del informe",
+  "proximate.disbursements.show_test": "Mostrar registros de prueba ({n})",
+  "proximate.disbursements.hide_test": "Ocultar registros de prueba ({n})",
+  "proximate.disbursements.test_toggle_hint": "Registros de prueba. Ocultos por defecto para mantener la lista legible — nunca se eliminan.",
+  "proximate.disbursements.days_overdue": "{n} días de retraso",
+  "proximate.disbursements.due_today": "Vence hoy",
+  "proximate.disbursements.days_left": "Vence en {n} días",
+  "proximate.partners.show_test": "Mostrar socios de prueba ({n})",
+  "proximate.partners.hide_test": "Ocultar socios de prueba ({n})",
+  "proximate.partners.test_toggle_hint": "Socios de prueba. Ocultos por defecto para mantener el registro legible — nunca se eliminan."
 }

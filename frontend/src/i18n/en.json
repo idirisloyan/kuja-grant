@@ -4418,5 +4418,16 @@
   "attention.round_sign.title": "Round awaiting signatures — {round}",
   "attention.round_sign.sub": "{signed}/2 signatures collected to activate",
   "attention.endorser_kyc.title": "{count} endorser(s) awaiting light-KYC review",
-  "attention.endorser_kyc.sub": "Approve or reject in the endorser queue"
+  "attention.endorser_kyc.sub": "Approve or reject in the endorser queue",
+  "common.test_record": "TEST",
+  "proximate.disbursements.copy_report_link": "Copy report link",
+  "proximate.disbursements.show_test": "Show test records ({n})",
+  "proximate.disbursements.hide_test": "Hide test records ({n})",
+  "proximate.disbursements.test_toggle_hint": "Fixture records used for testing. Hidden by default so the live list stays readable — they are never deleted.",
+  "proximate.disbursements.days_overdue": "{n} days overdue",
+  "proximate.disbursements.due_today": "Due today",
+  "proximate.disbursements.days_left": "Due in {n} days",
+  "proximate.partners.show_test": "Show test partners ({n})",
+  "proximate.partners.hide_test": "Hide test partners ({n})",
+  "proximate.partners.test_toggle_hint": "Fixture partners used for testing. Hidden by default so the live register stays readable — they are never deleted."
 }

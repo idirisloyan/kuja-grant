@@ -22,6 +22,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
+import { isTestRecord, splitTestRecords } from '@/lib/test-records';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -59,6 +60,10 @@ export default function ProximateDisbursementsPage() {
   // Redesign Stage 3c — status filter chips, URL-persisted (same
   // pattern as the rounds and partners registers).
   const [statusFilter, setStatusFilter] = useState('all');
+  // Fixture rows are hidden by default so a live session does not open on a
+  // list of QA Fixture / UAT records. Never removed — the count stays
+  // visible and one click brings them back.
+  const [showTest, setShowTest] = useState(false);
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get('status');
     if (s) setStatusFilter(s);
@@ -72,16 +77,29 @@ export default function ProximateDisbursementsPage() {
       null, '', window.location.pathname + (qs ? `?${qs}` : ''),
     );
   }, [statusFilter]);
+  const { real: realRows, test: testRows } = useMemo(
+    () => splitTestRecords(rows ?? [], (d) => d.partner_name),
+    [rows],
+  );
+  // Everything the register is willing to show right now, before the status
+  // chips narrow it further.
+  const countedRows = useMemo(
+    () => (showTest ? [...realRows, ...testRows] : realRows),
+    [realRows, testRows, showTest],
+  );
+  // Counted over the same set the list shows. Counting hidden fixtures here
+  // would put a number on a chip that then filters to fewer rows than it
+  // promised — the kind of small dishonesty that erodes trust in a register.
   const statusCounts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const d of rows ?? []) c[d.status] = (c[d.status] || 0) + 1;
+    for (const d of countedRows) c[d.status] = (c[d.status] || 0) + 1;
     return c;
-  }, [rows]);
+  }, [countedRows]);
   const visibleRows = useMemo(
-    () => (rows ?? []).filter(
+    () => countedRows.filter(
       (d) => statusFilter === 'all' || d.status === statusFilter,
     ),
-    [rows, statusFilter],
+    [countedRows, statusFilter],
   );
 
   useEffect(() => {
@@ -119,6 +137,17 @@ export default function ProximateDisbursementsPage() {
         </PageMain>
       </PageShell>
     );
+  }
+
+  // "Due Aug 15" makes someone do the arithmetic. "8 days overdue" does not.
+  function dueAge(iso: string | null | undefined): { text: string; late: boolean } | null {
+    if (!iso) return null;
+    const due = new Date(iso);
+    if (Number.isNaN(due.getTime())) return null;
+    const days = Math.round((due.getTime() - Date.now()) / 86_400_000);
+    if (days < 0) return { text: t('proximate.disbursements.days_overdue', { n: Math.abs(days) }), late: true };
+    if (days === 0) return { text: t('proximate.disbursements.due_today'), late: true };
+    return { text: t('proximate.disbursements.days_left', { n: days }), late: false };
   }
 
   function copyReportUrl(d: Disbursement) {
@@ -177,10 +206,26 @@ export default function ProximateDisbursementsPage() {
                   }`}
                 >
                   {s === 'all'
-                    ? `All (${rows.length})`
+                    ? `All (${countedRows.length})`
                     : `${labelForProximateStatus(s, t)} (${statusCounts[s]})`}
                 </button>
               ))}
+            {testRows.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowTest((v) => !v)}
+                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                  showTest
+                    ? `bg-slate-700 text-white border-slate-700`
+                    : `bg-muted/50 text-muted-foreground border-dashed border-border hover:bg-muted`
+                }`}
+                title={t('proximate.disbursements.test_toggle_hint')}
+              >
+                {showTest
+                  ? t('proximate.disbursements.hide_test', { n: testRows.length })
+                  : t('proximate.disbursements.show_test', { n: testRows.length })}
+              </button>
+            )}
           </div>
         )}
         {visibleRows.length > 0 && (
@@ -202,6 +247,11 @@ export default function ProximateDisbursementsPage() {
                             {t('proximate.disbursements.overdue')}
                           </Badge>
                         )}
+                        {isTestRecord(d.partner_name) && (
+                          <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 border-slate-300">
+                            {t('common.test_record')}
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
                         {d.amount_usd && (
@@ -211,9 +261,15 @@ export default function ProximateDisbursementsPage() {
                         {d.sent_at && (
                           <span>· {formatComplianceDate(d.sent_at)}</span>
                         )}
-                        {d.report_due_at && d.status === 'pending_report' && (
-                          <span>· {t('proximate.disbursements.due')} {formatComplianceDate(d.report_due_at)}</span>
-                        )}
+                        {d.report_due_at && d.status === 'pending_report' && (() => {
+                          const age = dueAge(d.report_due_at);
+                          return (
+                            <span className={age?.late ? 'text-red-700 font-medium' : undefined}>
+                              · {t('proximate.disbursements.due')} {formatComplianceDate(d.report_due_at)}
+                              {age ? ` (${age.text})` : ''}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </Link>
                     {d.report_token && d.status === 'pending_report' && (
@@ -229,7 +285,7 @@ export default function ProximateDisbursementsPage() {
                         )}
                         {copied === d.id
                           ? t('proximate.disbursements.copied')
-                          : t('proximate.disbursements.copy_link')}
+                          : t('proximate.disbursements.copy_report_link')}
                       </Button>
                     )}
                   </div>

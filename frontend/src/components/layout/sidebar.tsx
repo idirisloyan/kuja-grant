@@ -116,6 +116,16 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
     : isProximateFlavor
       ? proximateProfile(persona ?? 'none', t)
       : pickNavProfile(role, isNearFlavor, t);
+
+  // Exactly one item may show as active. Resolved across EVERY href the
+  // sidebar will render — groups included — so a parent route can never
+  // stay lit while you are standing on its child.
+  const activeHref = activeNavHref(pathname, [
+    ...(profile.groups?.flatMap((g) => g.items.map((i) => i.href)) ?? []),
+    ...profile.primary.map((i) => i.href),
+    ...profile.secondary.map((i) => i.href),
+  ]);
+
   const currentWidth = sidebarCollapsed ? collapsedWidth : width;
 
   const body = (
@@ -162,7 +172,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
               )}
               <NavGroup
                 items={g.items}
-                pathname={pathname}
+                activeHref={activeHref}
                 collapsed={sidebarCollapsed}
                 tone={i === 0 ? 'primary' : 'secondary'}
               />
@@ -172,7 +182,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
           <>
             <NavGroup
               items={profile.primary}
-              pathname={pathname}
+              activeHref={activeHref}
               collapsed={sidebarCollapsed}
             />
             {profile.secondary.length > 0 && (
@@ -186,7 +196,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
                 />
                 <NavGroup
                   items={profile.secondary}
-                  pathname={pathname}
+                  activeHref={activeHref}
                   collapsed={sidebarCollapsed}
                   tone="secondary"
                 />
@@ -263,21 +273,54 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Which nav item is active
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the single href that should render as active, or null.
+ *
+ * A plain `pathname.startsWith(href + '/')` test lights up EVERY item whose
+ * href is a prefix of the current path. Proximate hit this because the
+ * dashboard (`/proximate/admin`) is a strict prefix of partners
+ * (`/proximate/admin/partners`), so standing on Partners highlighted both and
+ * left the user unsure which section they were in. Endorsers and Messages sit
+ * under the same parent and would have done the same.
+ *
+ * So: collect every candidate that matches, and keep only the LONGEST — the
+ * most specific route wins. Computed across ALL groups rather than within one,
+ * because a parent and its child can live in different groups.
+ */
+export function activeNavHref(pathname: string | null, hrefs: string[]): string | null {
+  if (!pathname) return null;
+  // Ignore any hash-only entry (e.g. '/proximate/donor#ask'): it addresses a
+  // section of a page, not a route, and must never win over the page itself.
+  const routes = hrefs.filter((h) => !h.includes('#'));
+  const path = pathname.replace(/\/+$/, '') || '/';
+  let best: string | null = null;
+  for (const href of routes) {
+    const clean = href.replace(/\/+$/, '') || '/';
+    const matches = path === clean || path.startsWith(clean + '/');
+    if (matches && (best === null || clean.length > best.length)) best = href;
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------------------
 // NavGroup — primary or secondary group renderer
 // ---------------------------------------------------------------------------
 
 function NavGroup({
-  items, pathname, collapsed, tone = 'primary',
+  items, activeHref, collapsed, tone = 'primary',
 }: {
   items: NavItem[];
-  pathname: string | null;
+  activeHref: string | null;
   collapsed: boolean;
   tone?: 'primary' | 'secondary';
 }) {
   return (
     <ul className="space-y-0.5">
       {items.map((item) => {
-        const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+        const isActive = item.href === activeHref;
         const Icon = item.icon;
         return (
           <li key={item.href}>

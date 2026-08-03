@@ -4418,5 +4418,16 @@
   "attention.round_sign.title": "Wareeg sugaya saxeexyo — {round}",
   "attention.round_sign.sub": "{signed}/2 saxeex ayaa la ururiyay si loo shido",
   "attention.endorser_kyc.title": "{count} taageere oo sugaya dib-u-eegis KYC fudud",
-  "attention.endorser_kyc.sub": "Ansixi ama diid safka taageerayaasha"
+  "attention.endorser_kyc.sub": "Ansixi ama diid safka taageerayaasha",
+  "common.test_record": "TIJAABO",
+  "proximate.disbursements.copy_report_link": "Nuqul linkiga warbixinta",
+  "proximate.disbursements.show_test": "Muuji diiwaanka tijaabada ({n})",
+  "proximate.disbursements.hide_test": "Qari diiwaanka tijaabada ({n})",
+  "proximate.disbursements.test_toggle_hint": "Diiwaanka tijaabada. Si caadi ah waa la qariyay si liiska dhabta ah u sahlanaado — waligood lama tirtiro.",
+  "proximate.disbursements.days_overdue": "{n} maalmood ayaa ka dhacay",
+  "proximate.disbursements.due_today": "Maanta ayay dhacaysaa",
+  "proximate.disbursements.days_left": "Waxay dhacaysaa {n} maalmood",
+  "proximate.partners.show_test": "Muuji shurakada tijaabada ({n})",
+  "proximate.partners.hide_test": "Qari shurakada tijaabada ({n})",
+  "proximate.partners.test_toggle_hint": "Shuraka tijaabo ah. Si caadi ah waa la qariyay si diiwaanka dhabta ah u sahlanaado — waligood lama tirtiro."
 }

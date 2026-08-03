@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { isTestRecord, splitTestRecords } from '@/lib/test-records';
 import Link from 'next/link';
 import {
   Loader2, Search, Users, ShieldCheck, AlertTriangle, Upload,
@@ -52,6 +53,9 @@ export default function ProximatePartnersPage() {
   const [sort, setSort] = useState<'name' | 'newest'>('name');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Fixtures hidden by default — see lib/test-records.ts. The count stays
+  // visible so nothing disappears without the user being told.
+  const [showTest, setShowTest] = useState(false);
   // Redesign spec "saved filters where practical" — named search+status
   // combos persisted per-device in localStorage. Presentation only; the
   // saved entry just replays the same URL-backed filter state.
@@ -147,9 +151,15 @@ export default function ProximatePartnersPage() {
     load();
   };
 
+  const { real: realPartners, test: testPartners } = useMemo(
+    () => splitTestRecords(partners, (p) => p.name),
+    [partners],
+  );
+
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    return partners.filter((p) => {
+    const base = showTest ? partners : realPartners;
+    return base.filter((p) => {
       if (statusFilter !== 'all' && p.status !== statusFilter) return false;
       if (!q) return true;
       return (
@@ -157,7 +167,7 @@ export default function ProximatePartnersPage() {
         || (p.locality || '').toLowerCase().includes(q)
       );
     });
-  }, [partners, filter, statusFilter]);
+  }, [partners, realPartners, showTest, filter, statusFilter]);
 
   const sorted = useMemo(() => {
     const list = [...filtered];
@@ -168,13 +178,16 @@ export default function ProximatePartnersPage() {
 
   useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filter, statusFilter, sort]);
 
+  // Counted over the same set the register shows, so a chip never promises
+  // more rows than clicking it delivers.
+  const counted = showTest ? partners : realPartners;
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: partners.length };
-    for (const p of partners) c[p.status] = (c[p.status] || 0) + 1;
+    const c: Record<string, number> = { all: counted.length };
+    for (const p of counted) c[p.status] = (c[p.status] || 0) + 1;
     return c;
-  }, [partners]);
+  }, [counted]);
 
-  const withSanctionsFlag = partners.filter((p) => p.sanctions_flag).length;
+  const withSanctionsFlag = counted.filter((p) => p.sanctions_flag).length;
 
   return (
     <PageShell>
@@ -341,6 +354,25 @@ export default function ProximatePartnersPage() {
               </div>
             </Card>
 
+            {testPartners.length > 0 && (
+              <div className="mb-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTest((v) => !v)}
+                  title={t('proximate.partners.test_toggle_hint')}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    showTest
+                      ? `bg-slate-700 text-white border-slate-700`
+                      : `bg-muted/50 text-muted-foreground border-dashed border-border hover:bg-muted`
+                  }`}
+                >
+                  {showTest
+                    ? t('proximate.partners.hide_test', { n: testPartners.length })
+                    : t('proximate.partners.show_test', { n: testPartners.length })}
+                </button>
+              </div>
+            )}
+
             {/* Partner list */}
             <Card className="p-4">
               {filtered.length === 0 ? (
@@ -366,7 +398,14 @@ export default function ProximatePartnersPage() {
                         className="flex items-center gap-2 py-1.5 hover:bg-muted/30 rounded-sm px-2 -mx-2"
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{p.name}</p>
+                          <p className="text-sm font-medium truncate">
+                            {p.name}
+                            {isTestRecord(p.name) && (
+                              <span className="ms-1.5 align-middle text-[9px] px-1.5 py-0.5 rounded border border-slate-300 bg-slate-100 text-slate-700">
+                                {t('common.test_record')}
+                              </span>
+                            )}
+                          </p>
                           {p.locality && (
                             <p className="text-[10px] text-muted-foreground">
                               {p.locality}

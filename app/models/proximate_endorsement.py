@@ -124,8 +124,20 @@ class ProximatePartner(db.Model):
     name = db.Column(db.String(200), nullable=False)
     name_ar = db.Column(db.String(200), nullable=True)
 
-    # Location — for COI auto-check + audit-trail location pin
+    # Location — for COI auto-check + audit-trail location pin.
+    #
+    # `state` was added 2026-08-03 (PRX-WORKFLOW-FORM-001). Area selection,
+    # panel relevance and donor reporting all aggregate by geography, and
+    # free-text locality does not aggregate: "Khartoum", "khartoum" and
+    # "Al Khartoum" are three rows to a GROUP BY. State is a controlled
+    # value from frontend/src/lib/geography.ts (Sudan has 18).
+    #
+    # NULLABLE and left NULL for every pre-existing partner ON PURPOSE:
+    # their state is genuinely unknown, and inferring one from a locality
+    # spelling would be invented precision. Surfaces must read a NULL as
+    # "not recorded", never as a default state.
     locality = db.Column(db.String(120), nullable=True)
+    state = db.Column(db.String(16), nullable=True)
     country = db.Column(db.String(80), nullable=False, default="SD")
 
     contact_phone = db.Column(db.String(40), nullable=True)
@@ -251,6 +263,7 @@ class ProximatePartner(db.Model):
             "name": self.name,
             "name_ar": self.name_ar,
             "locality": self.locality,
+            "state": self.state,
             "country": self.country,
             "contact_phone": self.contact_phone,
             "contact_email": self.contact_email,
