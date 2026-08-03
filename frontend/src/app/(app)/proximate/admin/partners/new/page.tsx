@@ -15,7 +15,7 @@ import { ArrowLeft, UserPlus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
-import { COUNTRIES, statesFor } from '@/lib/geography';
+import { COUNTRIES, statesFor, geolocateState, type GeolocateOutcome } from '@/lib/geography';
 
 const input = 'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring';
 const label = 'block text-sm font-medium mb-1';
@@ -49,6 +49,46 @@ export default function NominatePartnerPage() {
   // behind a disclosure because the OB occasionally registers a partner
   // who is already through diligence.
   const [showBank, setShowBank] = useState(false);
+
+  // "Use my location" only ever fills the State dropdown. The coordinate is
+  // read in the browser, resolved to a state and dropped — it is never stored,
+  // sent or logged. These are community organisations in an active conflict;
+  // a state is administrative geography, a GPS fix is a targeting risk.
+  const [locating, setLocating] = useState(false);
+  const [geoNote, setGeoNote] = useState<{ tone: 'ok' | 'check' | 'warn'; text: string } | null>(null);
+
+  async function useMyLocation() {
+    setLocating(true);
+    setGeoNote(null);
+    const r: GeolocateOutcome = await geolocateState();
+    setLocating(false);
+    switch (r.kind) {
+      case 'suggestion':
+        setForm((f) => ({ ...f, country: 'SD', state: r.state.code }));
+        // Near a border the nearest-centre method genuinely cannot tell, so
+        // say so instead of quietly picking one.
+        setGeoNote(r.confident
+          ? { tone: 'ok', text: `Set to ${r.state.name}. Change it if that is not right.` }
+          : {
+            tone: 'check',
+            text: `You appear to be near the boundary of ${r.state.name}`
+              + `${r.alternative ? ` and ${r.alternative.name}` : ''}`
+              + `. We have set ${r.state.name} — please confirm before saving.`,
+          });
+        break;
+      case 'outside_known_area':
+        setGeoNote({ tone: 'warn', text: 'That position is not inside Sudan, so we have not changed the state. Choose it by hand.' });
+        break;
+      case 'denied':
+        setGeoNote({ tone: 'warn', text: 'Location permission was declined — no problem, the dropdown works fine.' });
+        break;
+      case 'unsupported':
+        setGeoNote({ tone: 'warn', text: 'This browser cannot report a location. Use the dropdown.' });
+        break;
+      default:
+        setGeoNote({ tone: 'warn', text: 'Could not get a location fix — this is common on a weak connection. Use the dropdown.' });
+    }
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +137,20 @@ export default function NominatePartnerPage() {
                 </select>
               </div>
               <div>
-                <label className={label}>State</label>
+                <div className="flex items-baseline justify-between gap-2">
+                  <label className={label}>State</label>
+                  {statesFor(form.country).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={useMyLocation}
+                      disabled={locating}
+                      className="text-[11px] underline text-muted-foreground hover:text-foreground disabled:opacity-60 mb-1"
+                      title="Reads your device location, picks the state, and discards the coordinates. Nothing is stored or sent."
+                    >
+                      {locating ? 'Finding…' : 'Use my location'}
+                    </button>
+                  )}
+                </div>
                 {statesFor(form.country).length > 0 ? (
                   <select className={select} value={form.state} onChange={setSelect('state')}>
                     <option value="">Not recorded</option>
@@ -108,6 +161,14 @@ export default function NominatePartnerPage() {
                 ) : (
                   <p className="text-xs text-muted-foreground py-2">
                     No state list held for this country — record it in Locality.
+                  </p>
+                )}
+                {geoNote && (
+                  <p className={`text-[11px] mt-1 ${
+                    geoNote.tone === 'ok' ? 'text-emerald-700'
+                      : geoNote.tone === 'check' ? 'text-amber-700' : 'text-muted-foreground'
+                  }`}>
+                    {geoNote.text}
                   </p>
                 )}
               </div>

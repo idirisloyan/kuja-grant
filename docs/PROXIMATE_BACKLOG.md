@@ -96,6 +96,45 @@ what should be built — read them before picking anything up.
   delegation). Needs the reviewer to name the surface before it can be scoped —
   do not guess, the gates differ deliberately.
 
+### SHIPPED 2026-08-03 (later) — coarse geolocation for the State field
+
+- [x] **“Use my location” on the nomination form.** Reads the device position,
+      resolves it to one of the 18 states, sets the dropdown, and **discards the
+      coordinate**. Verified end-to-end in a browser: the submit payload carries
+      `state` and contains no lat/lng/coordinate field of any kind.
+- **The privacy constraint is the design, not a detail.** These are community
+      organisations in an active conflict; a state is administrative geography
+      already effectively public about a group, a GPS fix is a targeting risk if
+      the database is ever breached or compelled. So we take the resolution
+      reporting needs and drop the rest in the browser.
+- **Method and its limit, stated in the code:** nearest state centre, NOT
+      boundary containment — there are no polygons. Guarded by
+      `npm run verify:geo`: one real town per state, 19/19 resolve correctly,
+      and Cairo/Nairobi/Juba report `outside_known_area` rather than being
+      snapped to the least-wrong Sudanese state. Near a border the function
+      returns `confident:false` and the UI names both candidates and asks the
+      person to confirm, rather than quietly choosing.
+- **Degrades honestly:** permission denied, unsupported browser, no fix and
+      position-outside-Sudan each get plain language and leave the dropdown
+      untouched. A GPS fix on a low-end handset often just fails; the button is
+      an accelerator, never a requirement.
+
+### OPEN — decide what to do about the dormant endorsement coordinates
+- `proximate_endorsements.location_lat` / `location_lng` exist and BOTH submit
+  routes accept them from the client payload, for a stated Sybil-detection
+  purpose (were all endorsements submitted from one geocluster). **Nothing has
+  ever sent them — 0 of 18 endorsements on prod carry coordinates.**
+- Two problems if anyone wires them up as-is. (1) They are CLIENT-SUPPLIED on a
+  public token route, so they are trivially spoofable: as an anti-fraud signal
+  they would catch only the honest while giving the OB false confidence. (2)
+  Endorsers are community members in Sudan vouching for organisations that
+  receive foreign funding — storing their precise position is the most sensitive
+  data in this tenant.
+- **Decision needed from Khalid, not from us:** either wire it with explicit
+  consent, a stated retention period and an honest note that it is
+  self-reported, or drop the columns. An accepted-but-unread input that is also
+  spoofable is a trap for whoever builds on it next.
+
 ### SHIPPED 2026-08-03 — five of the fourteen
 
 - [x] **PRX-UI-PARTNERS-001 / part of PRX-UI-NAV-001 — one active nav item.**

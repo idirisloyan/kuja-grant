@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "verify:built": "node scripts/verify-built.js",
-    "verify:nav": "node scripts/verify-nav-active.js"
+    "verify:nav": "node scripts/verify-nav-active.js",
+    "verify:geo": "node scripts/verify-geolocate-state.js"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
