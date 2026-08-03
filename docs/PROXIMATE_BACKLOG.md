@@ -17,6 +17,49 @@ Updated 2026-07-27.
 
 ---
 
+## Media gap — video is accepted but never read (2026-08-01)
+
+### Video evidence is silently never transcribed
+- **last_touched:** 2026-08-01
+- Report packages accept `video` (mp4/mov/webm/3gp/mkv, 100MB cap) and
+  disbursement reports accept media the same way. The transcription branch
+  in the upload handler is `if kind == 'voice'` — **video takes no branch
+  at all.** It is saved, hashed, audit-chained and shown to whoever has
+  access, and nothing reads its contents.
+- **Why this matters more than it looks:** a partner who records their
+  update as a video instead of a voice note has their entire narrative
+  absent from the AI-compiled donor report. The package still looks
+  complete — an attachment is present — so neither the partner nor the OB
+  is told anything was lost. That is the failure mode this platform is
+  supposed to make impossible: something looking more complete than it is.
+- **Two fixes, and they are independent:**
+  1. **Immediate, cheap, no new dependency:** when a `video` item is added,
+     say so — on the partner's upload confirmation and on the OB review
+     screen — that video is kept as a record but not transcribed, and offer
+     a voice note if they want the content in the report. Honest today.
+  2. **Proper:** server-side audio extraction feeding the existing voice
+     pipeline. Platform-level work, tracked in
+     [BACKLOG.md](BACKLOG.md) "Transcription covers audio only".
+- Recommend (1) regardless of when (2) lands: it costs a sentence of copy
+  and closes the silent-loss window immediately.
+- **Measured on prod 2026-08-01 — the gap is real but so far unexercised:**
+  `proximate_report_items` holds **4 items, all `photo`. Zero video, zero
+  voice.** Voice transcription IS live elsewhere, lightly: 2 of 39
+  disbursements carry a `report_voice_transcript`, and 2 of 18 endorsements
+  carry q1/q2 transcripts. So Whisper works and is used — but no partner has
+  ever uploaded a video, and no report package has ever contained a voice
+  note either.
+- **What that changes:** do (1), the honest label, because it costs a
+  sentence and removes a silent-loss window before the pilot widens. Do NOT
+  prioritise (2) yet — there is no evidence anyone wants to send video, and
+  building an ffmpeg pipeline for a behaviour nobody has exhibited is the
+  wrong order. Re-measure when report packages have real traffic.
+- **Separate signal worth noticing:** report packages are barely used at all
+  (4 photos total). Before treating any conclusion about this feature as
+  solid — including this one — check whether the feature is reaching
+  partners in the first place.
+
+---
 ## Pilot-review follow-ups (2026-07-27)
 
 From the 9.4/10 pilot review. **Shipped:**

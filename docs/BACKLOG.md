@@ -52,6 +52,41 @@ Updated 2026-07-05.
       browser job). Live browser leg reuses `browser_test.py --base`.
       Old `smoke_test.py` stays as an advisory quick-check.
 
+### Transcription covers audio only — video is stored, never read
+- **last_touched:** 2026-08-01
+- `whisper_service.transcribe_audio()` relays to the OpenAI Whisper
+  endpoint (`/v1/audio/transcriptions`), which accepts **audio only**.
+  Any video file handed to it is rejected at the API, so the shared
+  service has no path from a video upload to text.
+- Consequence today is tenant-visible in Proximate report packages, which
+  ACCEPT video (mp4/mov/webm/3gp/mkv, up to 100MB) and transcribe nothing —
+  see PROXIMATE_BACKLOG "Video evidence is silently never transcribed".
+- **The fix is a demux step, not a config change.** Extract the audio track
+  server-side (ffmpeg) and send that to Whisper. That means a new binary in
+  the Railway image, a size/duration policy for 100MB uploads (a 10-minute
+  video is ~$0.06 at $0.006/min, which is fine; a 2-hour one is not), and a
+  decision about whether extraction runs inline or in the background queue
+  like the voice path already does.
+- **Until it is built, do not describe video as "processed" anywhere.**
+  Stored, hashed and audit-chained is the honest claim.
+- Discovered 2026-08-01 while tracing what the OpenAI key is actually used
+  for — no ticket, no report. Prod counts taken the same day: **zero video
+  uploads have ever happened**, while voice transcription is live and lightly
+  used (4 transcripts across 39 disbursements and 18 endorsements). So this
+  is a correctness gap to LABEL now and BUILD later, not an outage.
+- Priority follows the evidence: ship the honest “video is kept but not
+  transcribed” copy; defer the ffmpeg pipeline until something shows partners
+  actually want to send video.
+
+### Voice transcription language is hard-coded per call site
+- **last_touched:** 2026-08-01
+- `transcribe_audio(..., language=...)` is correctly parameterised, but both
+  Proximate call sites pass `language='ar'` literally. Right for Blue Nile,
+  wrong for any other tenant or any Somali/Swahili speaker on the same route —
+  and `WHISPER_PRIMARY_LANGUAGES` already declares `{so, sw, ar}` as the set
+  the service exists to serve.
+- Should derive from the partner/user language (or the network default) with
+  `ar` as the Proximate fallback, not the constant.
 ### "What is this / what needs action / what happens next" copy pass
 - **last_touched:** 2026-07-01 (UAT feedback: applies platform-wide,
   start with Proximate's 6 primary OB surfaces)

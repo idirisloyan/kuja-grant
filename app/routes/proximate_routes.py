@@ -10681,6 +10681,15 @@ def api_add_report_item(token):
         details={'item_id': item.id, 'kind': kind, 'bytes': file_size},
     )
 
+    # NOTE: only 'voice' is transcribed. 'video' is accepted above (100MB,
+    # mp4/mov/webm/3gp/mkv) and deliberately takes NO branch here — Whisper
+    # accepts audio only, so there is no path from a video upload to text.
+    # A partner who records a video instead of a voice note therefore has
+    # their narrative absent from the compiled report while the package
+    # still looks complete. Tracked in docs/PROXIMATE_BACKLOG.md
+    # ('Video evidence is silently never transcribed') and docs/BACKLOG.md
+    # ('Transcription covers audio only'). Fixing it needs server-side audio
+    # extraction (ffmpeg), not a flag here.
     if kind == 'voice':
         # Same background pattern as disbursement report voice notes.
         try:
