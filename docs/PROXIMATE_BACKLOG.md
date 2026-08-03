@@ -17,6 +17,42 @@ Updated 2026-07-27.
 
 ---
 
+## Arabic native-speaker review — round 1 applied (2026-08-03)
+
+- [x] **60 revisions applied to `ar.json`** from the returned
+      `Proximate_Arabic_Review_Pack_2026-07-16`. Checked before applying, not
+      after: every key still exists, the pack’s “current” matched the live
+      value exactly (no drift since 16 July), no revision was a no-op, and no
+      English source string had changed underneath the reviewer.
+- [x] **Placeholder integrity verified** — 0 mismatches across all 60. A
+      reviewer working in Word cannot be expected to guard `{n}`/`{name}`, and
+      a dropped placeholder renders a hole while an invented one renders literal
+      braces; both are invisible in review. The only Latin left in the Arabic is
+      “PDF” and the brand name “Proximate”, both intentional.
+- [x] Verified live in a browser at `dir=rtl` — the revised nomination
+      placeholder renders correctly in Arabic.
+
+### OPEN — round 2 pack sent, 40 strings
+- The reviewers made four TERMINOLOGY decisions, not just wording fixes:
+  round `جولة → دورة`, endorsement `تزكية → تأييد`, `Adeso → أديسو`,
+  Oversight Body `جهاز المراقبة → هيئة الإشراف`.
+- **40 further strings still carry the old terms** — they were not in pack 1.
+  Applying only the 60 leaves the same concept spelled two ways, which inside a
+  single screen reads as a bug.
+- **Deliberately NOT find-replaced.** Arabic agreement follows grammatical
+  gender: تزكية is feminine, تأييد is masculine, so “قُدّمت تزكية” must become
+  “قُدّم تأييد” — the verb changes too. A blind substitution would produce
+  confident, grammatically wrong Arabic across a dozen screens.
+  `docs/Proximate_Arabic_Followup_Pack_2026-08-03.docx` puts exactly those
+  strings back to the same reviewers.
+- **One open question in that pack:** singular vs plural address. Revisions
+  moved some strings to singular, but the nomination FORM is still plural
+  (“مجموعتكم”) while its own confirmation is now singular (“ترشيحك”) — one
+  person, one journey, two registers. Needs a rule, not a guess.
+- **Still no native review at all** for FR / ES / SW / SO.
+
+---
+
 ## UI/UX + workflow QA wave (2026-08-03) — from the Proximate operations review
 
 Fourteen tickets from a UI/UX + workflow review of the OB-facing surfaces
