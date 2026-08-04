@@ -1746,6 +1746,8 @@
   "proximate.attention.all_clear": "كل شيء على ما يرام — لا يوجد إجراء مطلوب الآن.",
   "proximate.attention.more": "أخرى",
   "proximate.attention.open_items": "مفتوحة",
+  "proximate.attention.show_all": "عرض الكل",
+  "proximate.attention.show_fewer": "عرض أقل",
   "proximate.attention.title": "يتطلب انتباهك",
   "proximate.bottom_nav.disbursements": "الصرف",
   "proximate.bottom_nav.home": "الرئيسية",

@@ -1746,6 +1746,8 @@
   "proximate.attention.all_clear": "Tout est en ordre — aucune action requise pour le moment.",
   "proximate.attention.more": "de plus",
   "proximate.attention.open_items": "ouverts",
+  "proximate.attention.show_all": "Tout afficher",
+  "proximate.attention.show_fewer": "Afficher moins",
   "proximate.attention.title": "Nécessite votre attention",
   "proximate.bottom_nav.disbursements": "Décaissements",
   "proximate.bottom_nav.home": "Accueil",

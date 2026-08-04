@@ -15,7 +15,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  AlertTriangle, ArrowRight, CheckCircle2, ChevronRight,
+  AlertTriangle, CheckCircle2, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -81,6 +81,7 @@ export function AttentionQueue({ limit }: { limit?: number }) {
   const { t } = useTranslation();
   const [data, setData] = useState<QueueResp | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,8 +94,20 @@ export function AttentionQueue({ limit }: { limit?: number }) {
 
   if (loading || !data) return null;
 
-  const items = limit ? data.items.slice(0, limit) : data.items;
-  const critical = data.counts?.critical ?? 0;
+  const counts = data.counts || {};
+  const critical = counts.critical ?? 0;
+  // When a limit is set (dashboard), show only the top-N priorities and let
+  // the OB expand — the point of this surface is "what to do next", not a
+  // 33-row wall that pushes the workflow cards off screen.
+  const effLimit = limit && !expanded ? limit : undefined;
+  const items = effLimit ? data.items.slice(0, effLimit) : data.items;
+  const hasMore = !!limit && data.items.length > limit;
+  const sevOrder = ['critical', 'high', 'medium', 'low'] as const;
+  const sevChipLabel = (s: string) => {
+    const k = `attention.severity.${s}`;
+    const v = t(k);
+    return v === k ? (SEV_STYLE[s]?.label ?? s) : v;
+  };
 
   return (
     <Card className={`p-4 ${critical > 0 ? 'border-red-400/60' : ''}`}>
@@ -109,6 +122,22 @@ export function AttentionQueue({ limit }: { limit?: number }) {
           </span>
         )}
       </div>
+
+      {/* Severity summary — the shape of the queue at a glance, so the OB
+          reads "6 critical · 12 high" without scrolling the whole list. */}
+      {data.total > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-3">
+          {sevOrder.filter((s) => (counts[s] ?? 0) > 0).map((s) => (
+            <span
+              key={s}
+              className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-muted/60 ${SEV_STYLE[s].text}`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${SEV_STYLE[s].dot}`} />
+              {counts[s]} {sevChipLabel(s)}
+            </span>
+          ))}
+        </div>
+      )}
 
       {data.items.length === 0 ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
@@ -150,11 +179,19 @@ export function AttentionQueue({ limit }: { limit?: number }) {
         </ul>
       )}
 
-      {limit && data.items.length > limit && (
-        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-          + {data.items.length - limit} {t('proximate.attention.more') || 'more'}
-          <ArrowRight className="w-3 h-3" />
-        </p>
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+        >
+          {expanded
+            ? (t('proximate.attention.show_fewer') === 'proximate.attention.show_fewer'
+                ? 'Show fewer' : t('proximate.attention.show_fewer'))
+            : `${t('proximate.attention.show_all') === 'proximate.attention.show_all'
+                ? 'Show all' : t('proximate.attention.show_all')} ${data.items.length}`}
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
       )}
     </Card>
   );

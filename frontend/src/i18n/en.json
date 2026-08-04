@@ -1746,6 +1746,8 @@
   "proximate.attention.all_clear": "All clear — nothing needs an action right now.",
   "proximate.attention.more": "more",
   "proximate.attention.open_items": "open",
+  "proximate.attention.show_all": "Show all",
+  "proximate.attention.show_fewer": "Show fewer",
   "proximate.attention.title": "Needs your attention",
   "proximate.bottom_nav.disbursements": "Disbursements",
   "proximate.bottom_nav.home": "Home",
