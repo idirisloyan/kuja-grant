@@ -13,7 +13,43 @@
 > See also: [docs/PROXIMATE_FUND_DESIGN.md](PROXIMATE_FUND_DESIGN.md),
 > `seed_proximate.py`, `memory/proximate_prod_state_2026-06-27.md`.
 
-Updated 2026-07-27.
+Updated 2026-08-06.
+
+---
+
+## Khalid/Marwa walkthrough UI review — audit vs deployed build (2026-08-06)
+
+A 12-ticket UI/UX + workflow review came in after a live walkthrough. Audited
+each ticket against the **deployed** build (`0c19aaa7f`, source == prod). The
+overwhelming majority were already implemented and live — the walkthrough was
+run on a build from **before the 3 August deploys** (or a browser-cached
+bundle). Status ledger:
+
+| Ticket | What it asked | Status vs deployed |
+|---|---|---|
+| PRX-UI-DASH-001 | Dashboard overload — cards first, capped priorities | **Shipped** 2026-08-06 (`0c19aaa7f`): cards + workflow tiles lead; attention feed capped to top-5, severity summary, show all/fewer. *Remaining:* clickable severity filters on the feed. |
+| PRX-UI-DASH-002 | Quick-action navigation | **Substantially served** — 7 workflow tiles (Rounds, Disbursements, Nominate, Register FSP, Crisis, Grievances, self-nominate). *Remaining:* tighter verb bar. |
+| PRX-UI-PARTNERS-001 | Duplicate active sidebar state | **Fixed & live** (`0ac9b1a13`, 3 Aug) — `activeNavHref` longest-match-wins; `verify:nav` 12/12 asserts exactly one active. Stale-build sighting. |
+| PRX-UI-PARTNERS-002 | Register-heavy / prioritise | **Partial** — summary tiles + status chips + search/sort/saved-filters + paging exist. *Remaining:* explicit priority-first section. |
+| PRX-UI-PARTNERS-003 | Per-row next-action + history | **Shipped** 2026-08-06 — each row now shows a next-action verb (Start endorsements / Continue review / Complete due diligence / Ready for award / Review suspension); links to the partner workspace. |
+| PRX-UI-DISB-001 | Register-heavy — summary cards + needs-action first | **Partial** — status filter chips w/ counts + per-row status/overdue exist. *Remaining:* summary-card row + needs-action ordering. |
+| PRX-UI-DISB-002 | Separate test/UAT data | **Fixed & live** — `lib/test-records.ts` hides fixtures by default with a "Show test data (N)" toggle on both Partners and Disbursements. *Improvement tracked:* real `is_test` column (currently a name heuristic). |
+| PRX-UI-DISB-003 | Action-specific link labels | **Mostly done** — "Copy report link", gated to `pending_report`. Could be "Copy report submission link". |
+| PRX-WORKFLOW-FORM-001 | Country/State/Locality structured | **Done & live** — `lib/geography.ts`: Country + 18-state Sudan dropdown + "Use my location", Locality free-text (deliberate — conflict-shifted boundaries) with "Other/not listed". |
+| PRX-WORKFLOW-FORM-002 | Remove banking from first form | **Done & live** — bank fields behind a disclosure, default hidden, with the exact "collected at award stage… we do not hold account numbers for orgs that may never be funded" rationale. Public form: "No bank details are asked on this form." |
+| PRX-WORKFLOW-FORM-003 | Stage-gate detailed/payment links | **NEEDS INPUT** — report links are already post-disbursement-only; the public nominate link is open by design. Which link does the reviewer mean? |
+| PRX-UI-NAV-001 | One active item + clickable filter cards | **Partial** — one-active-item done; **clickable filter cards shipped** on Partners 2026-08-06 (tiles now filter the register). |
+
+### Shipped in this wave (2026-08-06)
+- [x] Partners summary tiles are **clickable filters** (Total / Cleared / In review / Sanctions) with active-ring state; `in_review` and `sanctions` are synthetic filters over the same counted set.
+- [x] Each partner row carries a **next-action verb** keyed to status. 9 new i18n keys × 6 locales (EN/AR real; AR uses the agreed `تأييد` term; FR/ES/SW/SO interim, joins existing native-review debt).
+
+### Remaining genuine gaps (sequenced, not blocking)
+- [ ] Disbursements: summary-card row + needs-action-first ordering + optional group-by-partner (PRX-UI-DISB-001/007).
+- [ ] Dashboard: clickable severity filters on the attention feed (PRX-UI-DASH-001 remainder).
+- [ ] Partners: explicit priority-first section + workflow-stage strip (PRX-UI-PARTNERS-002/005).
+- [ ] `is_test` DB column to replace the name heuristic (PRX-UI-DISB-002 hardening).
+- [ ] **PRX-WORKFLOW-FORM-003** — awaiting reviewer: which link is meant.
 
 ---
 

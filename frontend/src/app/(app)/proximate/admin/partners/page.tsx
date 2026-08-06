@@ -13,7 +13,7 @@ import { isTestRecord, splitTestRecords } from '@/lib/test-records';
 import Link from 'next/link';
 import {
   Loader2, Search, Users, ShieldCheck, AlertTriangle, Upload,
-  SlidersHorizontal,
+  SlidersHorizontal, ChevronRight,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -39,6 +39,31 @@ interface Partner {
 
 const PAGE_SIZE = 30;
 const SAVED_FILTERS_KEY = 'kuja_partner_saved_filters_v1';
+
+// The clickable summary tiles filter by more than one raw status: "In review"
+// is endorsements-open OR due-diligence-pending, and "Sanctions" is a flag, not
+// a status. One matcher keeps the tile, chip, and count logic honest and in
+// agreement, so a tile never promises more rows than clicking it delivers.
+function partnerMatchesStatus(
+  p: { status: string; sanctions_flag: boolean }, sf: string,
+): boolean {
+  if (sf === 'all') return true;
+  if (sf === 'in_review') return p.status === 'endorsements_open' || p.status === 'dd_pending';
+  if (sf === 'sanctions') return p.sanctions_flag;
+  return p.status === sf;
+}
+
+// The one thing to DO for a partner at each status — so a row reads as a next
+// step, not just a state. All resolve to the same partner workspace; the verb
+// is what tells Khalid/Marwa why they'd open it. English fallback lives beside
+// the key so a missing translation never renders a raw i18n key.
+const NEXT_ACTION: Record<string, { key: string; en: string }> = {
+  nominated: { key: 'proximate.partners.next.nominated', en: 'Start endorsements' },
+  endorsements_open: { key: 'proximate.partners.next.endorsements_open', en: 'Continue review' },
+  dd_pending: { key: 'proximate.partners.next.dd_pending', en: 'Complete due diligence' },
+  dd_clear: { key: 'proximate.partners.next.dd_clear', en: 'Ready for award' },
+  suspended: { key: 'proximate.partners.next.suspended', en: 'Review suspension' },
+};
 
 export default function ProximatePartnersPage() {
   const { t } = useTranslation();
@@ -160,7 +185,7 @@ export default function ProximatePartnersPage() {
     const q = filter.trim().toLowerCase();
     const base = showTest ? partners : realPartners;
     return base.filter((p) => {
-      if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+      if (!partnerMatchesStatus(p, statusFilter)) return false;
       if (!q) return true;
       return (
         p.name.toLowerCase().includes(q)
@@ -205,42 +230,78 @@ export default function ProximatePartnersPage() {
         {error && <p className="text-sm text-destructive">{error}</p>}
         {!loading && !error && (
           <div className="space-y-4">
-            {/* Rollup tiles — compact stat row (Stage 3c): the spec calls
-                for a summary strip, not oversized cards. */}
+            {/* Rollup tiles — compact stat row (Stage 3c), now clickable
+                filters (Khalid/Marwa review, Aug 2026: "summary cards should
+                be clickable filters"). Clicking a tile narrows the register
+                below to that group; the active tile carries a ring so it is
+                obvious which slice you are looking at. Total clears back to
+                everything. */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <Card className="p-3">
-                <div className="flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('proximate.partners.total')}</p>
-                </div>
-                <p className="text-xl font-semibold">{counts.all}</p>
-              </Card>
-              <Card className="p-3">
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('proximate.partners.cleared')}</p>
-                </div>
-                <p className="text-xl font-semibold">{counts.dd_clear || 0}</p>
-              </Card>
-              <Card className="p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  {t('proximate.partners.in_review')}
-                </p>
-                <p className="text-xl font-semibold">
-                  {(counts.endorsements_open || 0) + (counts.dd_pending || 0)}
-                </p>
-              </Card>
-              <Card className={`p-3 ${withSanctionsFlag > 0 ? 'border-destructive' : ''}`}>
-                <div className="flex items-center gap-1.5">
-                  <AlertTriangle
-                    className={`w-3.5 h-3.5 ${withSanctionsFlag > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
-                  />
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                aria-pressed={statusFilter === 'all'}
+                title={t('proximate.partners.filter_to_total')}
+                className="text-start"
+              >
+                <Card className={`p-3 transition-colors ${statusFilter === 'all' ? 'ring-2 ring-primary' : 'hover:bg-muted/40'}`}>
+                  <div className="flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('proximate.partners.total')}</p>
+                  </div>
+                  <p className="text-xl font-semibold">{counts.all}</p>
+                </Card>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('dd_clear')}
+                aria-pressed={statusFilter === 'dd_clear'}
+                title={t('proximate.partners.filter_to_cleared')}
+                className="text-start"
+              >
+                <Card className={`p-3 transition-colors ${statusFilter === 'dd_clear' ? 'ring-2 ring-primary' : 'hover:bg-muted/40'}`}>
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('proximate.partners.cleared')}</p>
+                  </div>
+                  <p className="text-xl font-semibold">{counts.dd_clear || 0}</p>
+                </Card>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('in_review')}
+                aria-pressed={statusFilter === 'in_review'}
+                title={t('proximate.partners.filter_to_in_review')}
+                className="text-start"
+              >
+                <Card className={`p-3 transition-colors ${statusFilter === 'in_review' ? 'ring-2 ring-primary' : 'hover:bg-muted/40'}`}>
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    {t('proximate.partners.sanctions_flags')}
+                    {t('proximate.partners.in_review')}
                   </p>
-                </div>
-                <p className="text-xl font-semibold">{withSanctionsFlag}</p>
-              </Card>
+                  <p className="text-xl font-semibold">
+                    {(counts.endorsements_open || 0) + (counts.dd_pending || 0)}
+                  </p>
+                </Card>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('sanctions')}
+                aria-pressed={statusFilter === 'sanctions'}
+                title={t('proximate.partners.filter_to_sanctions')}
+                className="text-start"
+              >
+                <Card className={`p-3 transition-colors ${statusFilter === 'sanctions' ? 'ring-2 ring-primary' : withSanctionsFlag > 0 ? 'border-destructive' : 'hover:bg-muted/40'}`}>
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle
+                      className={`w-3.5 h-3.5 ${withSanctionsFlag > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
+                    />
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {t('proximate.partners.sanctions_flags')}
+                    </p>
+                  </div>
+                  <p className="text-xl font-semibold">{withSanctionsFlag}</p>
+                </Card>
+              </button>
             </div>
 
             {/* Filter bar */}
@@ -426,6 +487,21 @@ export default function ProximatePartnersPage() {
                         >
                           {labelForProximateStatus(p.status, t)}
                         </Badge>
+                        {/* The one thing to do next for this partner. Reads as
+                            a step, not just a state — the whole row already
+                            opens the workspace where the action happens. */}
+                        {(() => {
+                          const na = NEXT_ACTION[p.status];
+                          if (!na) return null;
+                          const resolved = t(na.key);
+                          const label = resolved === na.key ? na.en : resolved;
+                          return (
+                            <span className="hidden sm:inline-flex items-center gap-0.5 text-[11px] text-muted-foreground shrink-0 ms-1">
+                              {label}
+                              <ChevronRight className="w-3 h-3" />
+                            </span>
+                          );
+                        })()}
                       </Link>
                     </li>
                   ))}
