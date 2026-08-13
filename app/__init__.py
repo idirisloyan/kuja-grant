@@ -1543,6 +1543,37 @@ def _register_spa_routes(app):
                 return resp
         _abort(404)
 
+    @app.route('/manifest.webmanifest')
+    def tenant_manifest():
+        """Host-aware PWA manifest (2026-08-13). The INSTALLED app identity
+        (name + icon shown in the OS/window chrome) is frozen from whatever
+        manifest the host served at install time. Serving one static
+        manifest for every host meant installing from any subdomain baked
+        in a single identity — the 'NEAR Network Fund' name + N icon that
+        leaked onto Proximate. Resolve the tenant from the Host header, so
+        proximate.kuja.org installs as Proximate, near.kuja.org as NEAR,
+        saxansaxo/sclr.kuja.org as Saxansaxo, and the Kuja host as Kuja.
+        Mirrors /favicon.ico. In-app, network-provider still swaps the
+        <link rel=manifest> per active tenant for the shared-host switcher."""
+        from flask import request as _rq, abort as _abort
+        slug = 'kuja'
+        try:
+            from app.models import Network
+            net = Network.resolve_from_host(_rq.headers.get('Host', ''))
+            if net and net.slug:
+                slug = net.slug
+        except Exception:
+            pass
+        for candidate in (f'tenants/{slug}/manifest.webmanifest',
+                          'tenants/kuja/manifest.webmanifest'):
+            p = os.path.join(nextjs_dir, candidate)
+            if os.path.isfile(p):
+                resp = send_from_directory(nextjs_dir, candidate)
+                resp.headers['Content-Type'] = 'application/manifest+json'
+                resp.headers['Cache-Control'] = 'public, max-age=3600'
+                return resp
+        _abort(404)
+
     @app.route('/<path:path>')
     def catch_all(path):
         """Catch-all route for Next.js client-side routing."""
