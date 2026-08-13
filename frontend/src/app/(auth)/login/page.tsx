@@ -72,6 +72,10 @@ export default function LoginPage() {
   // The TenantSwitcher above the card lets the demo viewer flip between
   // them in-place without having to remember URL query params.
   const tenantSlug = (network?.slug || 'kuja').toLowerCase();
+  // Saxansaxo (SCLR Somalia) is an ops-run console tenant — no separate
+  // donor/member logins, no self-apply membership. Handled explicitly so
+  // it doesn't inherit NEAR's demo accounts, hero copy, or join CTA.
+  const isSax = tenantSlug === 'saxansaxo';
   let demoAccounts: {
     label: string;
     email: string;
@@ -94,6 +98,16 @@ export default function LoginPage() {
         icon: Wallet,
         accent: 'hsl(var(--kuja-clay-dark))',
         description: 'Demo Donor Foundation — portfolio + Ask AI',
+      },
+    ];
+  } else if (isSax) {
+    demoAccounts = [
+      {
+        label: 'Saxansaxo ops',
+        email: 'ops@saxansaxo.org',
+        icon: Star,
+        accent: tenantBrandDark,
+        description: 'Secretariat — community groups, funds, disbursement clock',
       },
     ];
   } else if (isNetworkTenant) {
@@ -297,11 +311,23 @@ export default function LoginPage() {
                   login backdrop or the tenant name is unreadable. */}
               <div className="kuja-display text-2xl text-white">{tenantName}</div>
               <div className="text-xs text-orange-200 uppercase tracking-widest">
-                {isNetworkTenant ? 'Network fund operations' : 'Grant intelligence'}
+                {isSax ? 'Community-led response' : isNetworkTenant ? 'Network fund operations' : 'Grant intelligence'}
               </div>
             </div>
           </div>
-          {isNetworkTenant ? (
+          {isSax ? (
+            <>
+              <h1 className="kuja-display text-4xl lg:text-5xl text-white text-balance">
+                Community-led response,
+                <span className="block text-orange-300">delivered in days.</span>
+              </h1>
+              <p className="text-orange-100/90 text-base max-w-md leading-relaxed">
+                {tenantName} runs the SCLR cycle on Kuja: permission-first intake, light community
+                vetting, and micro-grants to already-active groups — with a visible
+                selection-to-disbursement clock. Decisions are recorded; spending is never policed.
+              </p>
+            </>
+          ) : isNetworkTenant ? (
             <>
               <h1 className="kuja-display text-4xl lg:text-5xl text-white text-balance">
                 Locally-led
@@ -464,7 +490,7 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {isNetworkTenant && (
+            {isNetworkTenant && !isSax && (
               <div className="mt-5 pt-5 border-t border-border text-center">
                 <p className="text-xs text-muted-foreground mb-2">
                   Not a member yet?

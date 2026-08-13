@@ -1,14 +1,15 @@
 'use client';
 
 // ============================================================================
-// TenantSwitcher — Phase 708 (2026-06-30).
+// TenantSwitcher — Phase 708 (2026-06-30); Saxansaxo added 2026-08-13.
 //
-// Three-button segmented control that flips the browser between the three
-// live tenants on the same backend:
+// Segmented control that flips the browser between the live tenants on the
+// same backend:
 //
 //   - Kuja      (default, multi-role marketplace)
 //   - NEAR      (closed network — OB + NGO members)
 //   - Proximate (Sudan humanitarian fund — OB + donor + partner)
+//   - Saxansaxo (SCLR Somalia micro-grants — ops-run console)
 //
 // The selection writes `kuja_network_override` to localStorage; every
 // subsequent API call's `X-Network-Override` header is set from that key by
@@ -30,13 +31,18 @@
 
 import { useNetworkStore } from '@/stores/network-store';
 
-type TenantSlug = 'kuja' | 'near' | 'proximate';
+type TenantSlug = 'kuja' | 'near' | 'proximate' | 'saxansaxo';
 
 const TENANTS: { slug: TenantSlug; label: string; sub: string }[] = [
   { slug: 'kuja', label: 'Kuja', sub: 'Marketplace' },
   { slug: 'near', label: 'NEAR', sub: 'Closed network' },
   { slug: 'proximate', label: 'Proximate', sub: 'Sudan fund' },
+  { slug: 'saxansaxo', label: 'Saxansaxo', sub: 'SCLR Somalia' },
 ];
+
+// Every non-default (non-Kuja) tenant. Used to resolve the active chip
+// from either the network store or the persisted override.
+const NON_KUJA: readonly string[] = ['near', 'proximate', 'saxansaxo'];
 
 interface TenantSwitcherProps {
   /** When true (default) clicking a chip on a non-login page logs the
@@ -58,12 +64,12 @@ export function TenantSwitcher({
   // before the store has loaded we read straight from localStorage so the
   // chip highlight is correct on first paint.
   let current: TenantSlug = 'kuja';
-  if (network?.slug && (network.slug === 'near' || network.slug === 'proximate')) {
-    current = network.slug;
+  if (network?.slug && NON_KUJA.includes(network.slug)) {
+    current = network.slug as TenantSlug;
   } else if (typeof window !== 'undefined') {
     try {
       const stored = (window.localStorage.getItem('kuja_network_override') || '').toLowerCase();
-      if (stored === 'near' || stored === 'proximate') current = stored;
+      if (NON_KUJA.includes(stored)) current = stored as TenantSlug;
     } catch {
       // localStorage unavailable — fall through to 'kuja'.
     }
