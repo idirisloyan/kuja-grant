@@ -1,6 +1,6 @@
 # Kuja Platform Integration — Specification (v0.2)
 
-**Status:** design, pre-build · **Date:** 2026-08-14 · **Owner:** Kuja platform team
+**Status:** design; **Trust seam (Seam 2) built & deployed** — Link and Build seams pre-build · **Date:** 2026-08-14 · **Owner:** Kuja platform team
 **Visual spec (diagrams):** [`kuja-platform-integration.html`](./kuja-platform-integration.html) — open in a browser, or the live artifact at
 <https://claude.ai/code/artifact/2a8650b9-23a9-4703-a6ac-0172a2fab505>
 
@@ -58,6 +58,8 @@ Token claims: `sub`, `email`, `partner_id`, `org_name`, `role`, (optional) `gran
 
 ## Seam 2 — Grant → Trust (one due-diligence engine)
 
+> **Shipped 2026-08-14 (Phase 3 code, live in prod).** Trust exposes authenticated service endpoints (`/api/service/trust-profile`, `/api/service/screening/run`; bearer `KUJA_TRUST_SERVICE_TOKEN`, constant-time compare). Grant delegates through an engine selector `KUJA_TRUST_ENGINE = local | shadow | remote` (`trust_engine.py` + `trust_client.py`), verified end-to-end from inside the grant container. Left on **`local`**, so prod behaviour is unchanged. Grant always calls Trust's **live prod URL** (`KUJA_TRUST_BASE_URL`) — never a pinned copy — so every new Trust deploy is picked up automatically; the only stable contract is the `/api/service/*` response shape Grant reads (`overall`, `capacity`, `diligence`). **The shadow→remote cutover is intentionally held until the identity backfill lands** (see *what we need*, below) so parity is measured on real orgs, not just the seeded demo org.
+
 **Key finding:** the grant app already carries a **fork of the Trust engine** — same two-pillar model, identical `DD_WEIGHTS`, same worst-pillar reconciliation, same OpenSanctions/SAM/adverse-media/PEP checks, its own Capacity Passport + VC — that has drifted behind. "Reuse Trust" means **Grant calls Trust and we retire the fork.**
 
 - **Grant delegates to Trust:** run screening, compute the two-pillar score, issue/verify the Capacity Passport + credential, evaluate funder policy.
@@ -108,10 +110,11 @@ Keep: token model (public id + secret, hash-only, constant-time compare), tenant
 | 5 | Financial-source abstraction (`erp \| manual`); manual/upload path made source-equivalent | M |
 | 6 | Build feed (authenticated) + the dashboard-share link (security-reviewed) | L |
 
-Phases 3–4 (Trust consolidation) need **no** Odoo dependency and can run in parallel with the Link/Build work.
+Phases 3–4 (Trust consolidation) need **no** Odoo dependency and can run in parallel with the Link/Build work. **Phase 3 code is already shipped** (behind `KUJA_TRUST_ENGINE=local`); only the shadow→remote flip waits on the Phase 0 identity map.
 
 ## Open questions & what we need
 
+- **Immediate ask — unblocks the already-shipped Trust path:** the **org identity mapping** — for each Grant `Organization`, its Odoo `res.partner` id. Simplest form: a CSV of `grant org id` (or `email`) → `partner_id`, or the Odoo member export we can key on. We backfill `Organization.kuja_partner_id` (Grant) and `organizations.external_ref` (Trust) from it, then flip `KUJA_TRUST_ENGINE` shadow→remote and retire the fork. This single item is the *only* dependency between the shipped Trust code and a live remote cutover — nothing else is blocked on it.
 - **Link test env:** URL + admin/donor/NGO logins; OIDC provider on (client id/secret, redirect URIs); the `res.partner` ↔ org model.
 - **Build test env:** URL + admin (donor & NGO tenants); finance API creds (XML-RPC/JSON-RPC or REST) + service account; **one sample real-time payload** + the grant ↔ analytic-account mapping.
 - **Open:** is the shared dashboard Odoo's own or Grant's fed by Build? Does Build hold a real grant model or only a finance projection? What financial objects at what granularity? Feed = pull-on-view / scheduled / webhook? In Build, separate company per donor+NGO or one DB with record rules?
