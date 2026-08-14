@@ -156,7 +156,7 @@ export default function ProximateVotePage() {
             the outcome with the panel.
           </p>
           <p className="text-sm text-muted-foreground" dir="rtl">
-            تم تسجيل اختيارك. ستشارك هيئة الرقابة النتيجة مع اللجنة.
+            تم تسجيل اختيارك. ستشارك هيئة الإشراف النتيجة مع اللجنة.
           </p>
         </div>
       </div>
