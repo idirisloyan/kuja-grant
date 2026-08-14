@@ -569,6 +569,12 @@ def api_update_application(app_id):
         application.set_budget_lines(data['budget_lines'])
     new_status = None
     if 'status' in data and current_user.role in ('donor', 'admin'):
+        # Kuja licensing gate (Phase 2): awarding is a licensed donor power.
+        # No-op while GRANT_LICENSING_ENFORCED is off; admins always pass.
+        from app.utils.decorators import donor_publish_allowed
+        if not donor_publish_allowed(current_user):
+            return jsonify({'success': False, 'error': 'license_required',
+                            'message': 'Awarding grants requires an active Kuja Grant licence for your organisation.'}), 403
         new_status = data['status']
         application.status = new_status
     if 'ai_score' in data:
@@ -1201,6 +1207,13 @@ def api_application_status_inline(app_id):
         grant = db.session.get(Grant, application.grant_id)
         if not grant or getattr(grant, 'donor_org_id', None) != current_user.org_id:
             return error_response('auth.access_denied', 403)
+
+    # Kuja licensing gate (Phase 2): inline award/decision is a licensed donor
+    # power. No-op while GRANT_LICENSING_ENFORCED is off; admins always pass.
+    from app.utils.decorators import donor_publish_allowed
+    if not donor_publish_allowed(current_user):
+        return jsonify({'success': False, 'error': 'license_required',
+                        'message': 'Awarding grants requires an active Kuja Grant licence for your organisation.'}), 403
 
     data = get_request_json() or {}
     try:

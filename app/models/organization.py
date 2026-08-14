@@ -33,6 +33,22 @@ class Organization(db.Model):
     # and Kuja Build. Nullable until populated; auto-schema backfills existing
     # rows. Also the ref the grant app hands Trust over /api/service/*.
     kuja_partner_id = db.Column(db.String(64), nullable=True, index=True)
+
+    # --- Kuja Platform licensing / entitlements (Phase 2) -----------------
+    # Per-donor-org entitlements, enforced by the GRANT app (source of record).
+    # Kuja Link (Odoo) owns identity + billing and can later drive these via a
+    # webhook, but the grant app's flag is authoritative for enforcement.
+    # DENY BY DEFAULT: unset / NULL => not licensed. NGO capabilities are NEVER
+    # gated on these — the licence only ever gates donor publish/award powers.
+    # Enforcement is behind the GRANT_LICENSING_ENFORCED env flag, so licences
+    # can be populated before the gate is switched on (prod-safe rollout).
+    grant_licensed = db.Column(db.Boolean, default=False)             # may publish & award
+    grant_license_tier = db.Column(db.String(32), nullable=True)      # e.g. 'standard' | 'pro'
+    grant_license_expires_at = db.Column(db.DateTime, nullable=True)  # NULL = no expiry
+    has_kuja_build = db.Column(db.Boolean, default=False)             # Build ERP finance feed available
+    license_updated_at = db.Column(db.DateTime, nullable=True)
+    license_updated_by = db.Column(db.String(255), nullable=True)     # admin email or 'odoo-webhook'
+
     website = db.Column(db.String(500), nullable=True)
     logo_url = db.Column(db.String(500), nullable=True)
     assess_score = db.Column(db.Float, nullable=True)
@@ -108,10 +124,35 @@ class Organization(db.Model):
         labels = s.get('stage_labels') or {}
         return labels if isinstance(labels, dict) else {}
 
+    def is_grant_licensed(self) -> bool:
+        """True only if this org currently holds an active grant licence.
+
+        Deny-by-default: a missing/False flag or a past expiry both return
+        False. Single source of truth for licence *state*; whether that state is
+        *enforced* is a separate concern (GRANT_LICENSING_ENFORCED). NGO
+        capabilities never consult this — it only gates donor publish/award.
+        """
+        if not self.grant_licensed:
+            return False
+        exp = self.grant_license_expires_at
+        if exp is not None:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if exp < now:
+                return False
+        return True
+
     def to_dict(self):
         return {
             'id': self.id,
             'kuja_partner_id': self.kuja_partner_id,
+            'grant_licensed': bool(self.grant_licensed),
+            'grant_license_active': self.is_grant_licensed(),
+            'grant_license_tier': self.grant_license_tier,
+            'grant_license_expires_at': self.grant_license_expires_at.isoformat() if self.grant_license_expires_at else None,
+            'has_kuja_build': bool(self.has_kuja_build),
             'name': self.name,
             'org_type': self.org_type,
             'country': self.country,

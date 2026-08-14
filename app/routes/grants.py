@@ -4,7 +4,7 @@ from werkzeug.utils import secure_filename
 from app.extensions import db
 from app.models import Grant, Application, Report, Review
 from app.utils.helpers import get_request_json, paginate_query
-from app.utils.decorators import role_required
+from app.utils.decorators import role_required, grant_license_required
 from app.services.ai_service import AIService, HAS_PYPDF2, HAS_PYTHON_DOCX
 from datetime import datetime, date, timezone
 import os
@@ -689,7 +689,7 @@ def api_delete_grant(grant_id):
 
 
 @grants_bp.route('/<int:grant_id>/publish', methods=['POST'])
-@role_required('donor', 'admin')
+@grant_license_required
 def api_publish_grant(grant_id):
     """Publish a grant (set status to 'open')."""
     grant = db.session.get(Grant, grant_id)
