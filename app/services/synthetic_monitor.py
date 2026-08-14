@@ -190,11 +190,15 @@ class SyntheticMonitor:
         started = datetime.now(timezone.utc)
         t0 = time.monotonic()
 
-        # Credentials — env-overridable for non-default tenants
+        # Credentials — env-overridable for non-default tenants. The login
+        # probes no longer fall back to the shared demo password (pass123):
+        # those accounts are retired for go-live, so a probe only runs when
+        # a monitor password is explicitly configured. Point these at a
+        # dedicated low-privilege monitor account per tenant.
         ngo_email = os.environ.get('KUJA_SYN_NGO_EMAIL', 'fatima@amani.org')
-        ngo_password = os.environ.get('KUJA_SYN_NGO_PASSWORD', 'pass123')
+        ngo_password = os.environ.get('KUJA_SYN_NGO_PASSWORD')
         donor_email = os.environ.get('KUJA_SYN_DONOR_EMAIL', 'sarah@globalhealth.org')
-        donor_password = os.environ.get('KUJA_SYN_DONOR_PASSWORD', 'pass123')
+        donor_password = os.environ.get('KUJA_SYN_DONOR_PASSWORD')
 
         result = MonitorRunResult(
             started_at=started.isoformat(),
@@ -218,34 +222,36 @@ class SyntheticMonitor:
                 '/api/credentials/status-list/2021', 'status_list',
             ))
 
-        # NGO probes — auth'd session
-        with requests.Session() as ngo:
-            probe = _Probe(ngo, base_url)
-            result.probes.append(probe.login(ngo_email, ngo_password, 'ngo'))
-            # Phase 707 followup — bare /api/dashboard was never wired
-            # (all dashboard routes are subpaths). /api/dashboard/today
-            # is the canonical role-aware NGO landing surface
-            # (Phase 82). Hits TodayBriefingService → walks DB →
-            # returns the briefing the user sees on /dashboard.
-            result.probes.append(probe.get_json(
-                '/api/dashboard/today', 'ngo_dashboard', expect='role',
-            ))
-            result.probes.append(probe.get_json('/api/applications', 'ngo_apps_list'))
-            result.probes.append(probe.get_json('/api/reports/upcoming', 'ngo_reports_upcoming'))
+        # NGO probes — auth'd session (only when a monitor password is set)
+        if ngo_password:
+            with requests.Session() as ngo:
+                probe = _Probe(ngo, base_url)
+                result.probes.append(probe.login(ngo_email, ngo_password, 'ngo'))
+                # Phase 707 followup — bare /api/dashboard was never wired
+                # (all dashboard routes are subpaths). /api/dashboard/today
+                # is the canonical role-aware NGO landing surface
+                # (Phase 82). Hits TodayBriefingService → walks DB →
+                # returns the briefing the user sees on /dashboard.
+                result.probes.append(probe.get_json(
+                    '/api/dashboard/today', 'ngo_dashboard', expect='role',
+                ))
+                result.probes.append(probe.get_json('/api/applications', 'ngo_apps_list'))
+                result.probes.append(probe.get_json('/api/reports/upcoming', 'ngo_reports_upcoming'))
 
-        # Donor probes — auth'd session
-        with requests.Session() as donor:
-            probe = _Probe(donor, base_url)
-            result.probes.append(probe.login(donor_email, donor_password, 'donor'))
-            result.probes.append(probe.get_json('/api/applications?status=submitted', 'donor_reviews_pending'))
+        # Donor probes — auth'd session (only when a monitor password is set)
+        if donor_password:
+            with requests.Session() as donor:
+                probe = _Probe(donor, base_url)
+                result.probes.append(probe.login(donor_email, donor_password, 'donor'))
+                result.probes.append(probe.get_json('/api/applications?status=submitted', 'donor_reviews_pending'))
 
         # Phase 707 — Proximate-tenant login probe. The reviewer found
         # /api/health stayed green while ob@proximate.org logins
         # hung; without a tenant-scoped probe the monitor would have
         # missed it. Disable by clearing KUJA_SYN_PROXIMATE_EMAIL.
         prox_email = os.environ.get('KUJA_SYN_PROXIMATE_EMAIL', 'ob@proximate.org')
-        prox_password = os.environ.get('KUJA_SYN_PROXIMATE_PASSWORD', 'pass123')
-        if prox_email:
+        prox_password = os.environ.get('KUJA_SYN_PROXIMATE_PASSWORD')
+        if prox_email and prox_password:
             with requests.Session() as prox:
                 probe = _Probe(prox, base_url)
                 result.probes.append(probe.login(
