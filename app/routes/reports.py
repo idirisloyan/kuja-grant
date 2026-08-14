@@ -675,15 +675,19 @@ def api_submit_report(report_id):
     # Phase 157 — fire report.submitted webhook to NGO + donor org.
     try:
         from app.routes.webhook_routes import dispatch_event
+        # The grantee org is submitted_by_org_id (there is no ngo_org_id on
+        # Report). Using the wrong attribute here used to raise AttributeError
+        # inside the outer try/except, so the report.submitted webhook to the
+        # NGO org silently never fired.
         payload = {
             'report_id': report.id,
             'grant_id': report.grant_id,
-            'ngo_org_id': report.ngo_org_id,
+            'ngo_org_id': report.submitted_by_org_id,
             'report_type': getattr(report, 'report_type', None),
             'submitted_at':
                 report.submitted_at.isoformat() if report.submitted_at else None,
         }
-        dispatch_event(report.ngo_org_id, 'report.submitted', payload)
+        dispatch_event(report.submitted_by_org_id, 'report.submitted', payload)
         try:
             grant_obj = (
                 db.session.get(Grant, report.grant_id)

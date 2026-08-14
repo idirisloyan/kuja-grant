@@ -10,6 +10,7 @@ import { PhotoEvidenceUploader } from '@/components/reports/PhotoEvidenceUploade
 import { AIToolsAccordion } from '@/components/shared/ai-tools-accordion';
 import { ReportReadiness } from '@/components/reports/ReportReadiness';
 import { ReportBundlePanel } from '@/components/reports/report-bundle-panel';
+import { DonorReportInbox } from '@/components/reports/donor-report-inbox';
 import { useAuthStore } from '@/stores/auth-store';
 import { useApiError } from '@/lib/hooks/use-api-error';
 import { useReports, useUpcomingReports } from '@/lib/hooks/use-api';
@@ -913,6 +914,10 @@ function KujaReportsPage() {
         <PageAttention items={attentionStrip} />
 
         <PageMain>
+        {/* Donor approval inbox — pre-scored reports awaiting a decision.
+            Self-gates to donor/admin and self-hides when the queue is empty,
+            so it sits above everything only when there's something to act on. */}
+        <DonorReportInbox onReviewed={mutateReports} />
         {/* Phase 66 — active window filter chip. The user came from
             /admin/windows/<id> "See all"; let them clear the scope. */}
         {windowId && (

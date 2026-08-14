@@ -22,6 +22,19 @@ class Application(db.Model):
     # draft, submitted, under_review, scored, awarded, rejected
     responses = db.Column(db.Text, nullable=True)              # JSON dict keyed by criterion id
     eligibility_responses = db.Column(db.Text, nullable=True)  # JSON dict
+    # NOTE ON SCORE SEMANTICS (the three signals the platform keeps distinct):
+    #   ai_score     — the DETERMINISTIC auto-score. Despite the legacy column
+    #                  name, this is NOT an LLM judgement: it is written at
+    #                  /submit by ScoringEngine.score_application (a fast,
+    #                  offline heuristic over completeness / keyword coverage /
+    #                  eligibility). Exposed in the API under the clearer name
+    #                  `auto_score` (see to_dict + the auto_score property).
+    #                  The separate, genuine LLM per-criterion scoring lives in
+    #                  /api/ai/score-criterion|score-application and is advisory.
+    #   human_score  — the AUTHORITATIVE signal: mean of completed reviewers'
+    #                  weighted overall_scores.
+    #   final_score  — blended 0.4*auto + 0.6*human once human review lands
+    #                  (falls back to auto alone before any review completes).
     ai_score = db.Column(db.Float, nullable=True)
     human_score = db.Column(db.Float, nullable=True)
     final_score = db.Column(db.Float, nullable=True)
@@ -85,6 +98,15 @@ class Application(db.Model):
     documents = db.relationship('Document', backref='application', lazy='dynamic', cascade='all, delete-orphan')
     reviews = db.relationship('Review', backref='application', lazy='dynamic', cascade='all, delete-orphan')
 
+    # --- Score semantics ---
+    @property
+    def auto_score(self):
+        """Clear alias for the deterministic auto-score stored in the
+        legacy-named ``ai_score`` column. Prefer this name in new code and
+        surfaces so the three signals (auto / human / final) read plainly.
+        Read-only: writes still go to ``ai_score`` on the /submit path."""
+        return self.ai_score
+
     # --- JSON helpers ---
     def get_responses(self):
         return _json_load(self.responses) or {}
@@ -117,9 +139,10 @@ class Application(db.Model):
             'grant_id': self.grant_id,
             'ngo_org_id': self.ngo_org_id,
             'status': self.status,
-            'ai_score': self.ai_score,
-            'human_score': self.human_score,
-            'final_score': self.final_score,
+            'ai_score': self.ai_score,        # legacy name (deterministic auto-score)
+            'auto_score': self.ai_score,      # clear alias — same value, plain name
+            'human_score': self.human_score,  # authoritative: mean of reviewer scores
+            'final_score': self.final_score,  # blended 0.4*auto + 0.6*human
             'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
