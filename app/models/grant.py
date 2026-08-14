@@ -40,8 +40,25 @@ class Grant(db.Model):
                            onupdate=lambda: datetime.now(timezone.utc))
     published_at = db.Column(db.DateTime, nullable=True)
 
+    # --- Kuja Build financial-source binding (per grant) ------------------
+    # Where this grant's financials come from. 'manual' (default) = uploaded
+    # reports; 'erp' = pulled from the operator's Kuja Build via build_ref.
+    # build_ref is the Build analytic-account / project id — the ONLY key the
+    # feed queries, resolved server-side (isolation by record). Tenant-agnostic:
+    # Kuja and the networked tenants (Proximate/Saxansaxo) share this contract.
+    # Inert until a BuildClient is configured — 'erp' with no client just falls
+    # back to the empty/manual shape. See docs/KUJA_BUILD_NETWORKED_TENANTS_INTEGRATION.md.
+    financial_source = db.Column(db.String(16), default='manual')   # 'erp' | 'manual'
+    build_ref = db.Column(db.String(128), nullable=True, index=True)
+    financial_synced_at = db.Column(db.DateTime, nullable=True)
+
     # Relationships
     applications = db.relationship('Application', backref='grant', lazy='dynamic')
+
+    def financial_source_value(self) -> str:
+        """Normalised source, deny-nothing default of 'manual'."""
+        v = (self.financial_source or 'manual').strip().lower()
+        return v if v in ('erp', 'manual') else 'manual'
 
     # --- JSON helpers ---
     def get_sectors(self):
@@ -96,6 +113,9 @@ class Grant(db.Model):
             'currency': self.currency,
             'deadline': self.deadline.isoformat() if self.deadline else None,
             'status': self.status,
+            'financial_source': self.financial_source_value(),
+            'build_ref': self.build_ref,
+            'financial_synced_at': self.financial_synced_at.isoformat() if self.financial_synced_at else None,
             'sectors': self.get_sectors(),
             'countries': self.get_countries(),
             'created_at': self.created_at.isoformat() if self.created_at else None,

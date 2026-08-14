@@ -85,6 +85,7 @@ def register_blueprints(app):
     from app.routes.proximate_ops_routes import proximate_ops_bp  # Phase 719-720: object storage + backup crons
     from app.routes.proximate_messaging_routes import proximate_messaging_bp, proximate_hooks_bp  # Proximate messaging log + automations (July 2026)
     from app.routes.licensing_routes import licensing_bp  # Kuja licensing (Phase 2): donor grant licence admin
+    from app.routes.build_routes import build_bp  # Kuja Build financial-source binding + donor financials feed
 
     for bp in [auth_bp, dashboard_bp, organizations_bp, grants_bp,
                applications_bp, assessments_bp, documents_bp, ai_bp,
@@ -109,5 +110,5 @@ def register_blueprints(app):
                donor_portfolio_qa_bp, cost_ceiling_bp, peer_snippets_bp, webhook_bp,
                proximate_bp, proximate_cycle_bp, saxansaxo_bp,
                proximate_messaging_bp, proximate_hooks_bp,
-               proximate_ops_bp, licensing_bp]:
+               proximate_ops_bp, licensing_bp, build_bp]:
         app.register_blueprint(bp)
