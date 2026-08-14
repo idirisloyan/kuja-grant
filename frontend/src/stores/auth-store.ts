@@ -32,6 +32,13 @@ interface AuthState {
 
   /** Persist the user's preferred language to the backend. */
   setLanguage: (lang: string) => Promise<void>;
+
+  /** Set a new password. Clears the must_change_password flag on success.
+   *  Returns { ok } and, on failure, a human-readable error message. */
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,5 +88,23 @@ export const useAuthStore = create<AuthState>((set) => ({
     set((state) => ({
       user: state.user ? { ...state.user, language: lang } : null,
     }));
+  },
+
+  changePassword: async (currentPassword, newPassword) => {
+    try {
+      await api.post<{ success: boolean }>('/auth/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      // Clear the forced-change flag locally so guards release immediately.
+      set((state) => ({
+        user: state.user
+          ? { ...state.user, must_change_password: false }
+          : null,
+      }));
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: (e as { message?: string })?.message || 'Could not change your password.' };
+    }
   },
 }));

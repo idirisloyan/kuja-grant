@@ -51,6 +51,12 @@ _ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
 _VALID_ROLES = ('ngo', 'donor', 'reviewer', 'admin')
 OB_ORG_NAME = 'Proximate Oversight Body'
 
+# When PROVISION_FORCE_CHANGE=1, existing users in the roster are ALSO put
+# on the forced-change path. Used ONCE to backfill accounts created before
+# the must_change_password column existed. Off by default so ordinary
+# re-runs never re-force someone who already rotated their password.
+_FORCE_CHANGE_EXISTING = os.environ.get('PROVISION_FORCE_CHANGE') == '1'
+
 
 def _temp_password() -> str:
     return '-'.join(
@@ -133,6 +139,10 @@ def main():
                 elif existing.role != role:
                     existing.role = role
                     notes.append(f'role -> {role}')
+                if _FORCE_CHANGE_EXISTING and not bool(
+                        getattr(existing, 'must_change_password', False)):
+                    existing.must_change_password = True
+                    notes.append('forced password change on next login')
                 skipped.append((email, '; '.join(notes) or 'already exists — unchanged'))
                 continue
 
@@ -149,6 +159,8 @@ def main():
                 org_id=org_id, is_active=True,
             )
             user.set_password(pw)
+            # Temp password is single-use: force a change on first sign-in.
+            user.must_change_password = True
             db.session.add(user)
             db.session.flush()
 

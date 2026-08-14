@@ -445,6 +445,54 @@ def api_me():
     return jsonify(payload)
 
 
+def _validate_new_password(pw: str) -> str | None:
+    """Minimal, honest password policy. Not a substitute for the lockout +
+    rate limiting already in place, but stops trivially weak choices."""
+    if len(pw) < 10:
+        return 'Password must be at least 10 characters.'
+    if pw.strip() == '':
+        return 'Password cannot be blank.'
+    return None
+
+
+@auth_bp.route('/change-password', methods=['POST'])
+@login_required
+def api_change_password():
+    """Let a signed-in user set a new password.
+
+    Also the ONLY way to clear the must_change_password flag: a
+    forced-change user proves knowledge of their temp password (the
+    `current_password` field) and picks a new one. The enforce_password_change
+    middleware allowlists this endpoint so a flagged user can reach it.
+    """
+    data = get_request_json()
+    current = (data.get('current_password') or '')
+    new = (data.get('new_password') or '')
+    if not current or not new:
+        return jsonify({'success': False, 'error': 'Both current and new password are required'}), 400
+    if not current_user.check_password(current):
+        return jsonify({'success': False, 'error': 'Your current password is incorrect'}), 400
+    err = _validate_new_password(new)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+    if current_user.check_password(new):
+        return jsonify({'success': False, 'error': 'New password must be different from your current one'}), 400
+
+    current_user.set_password(new)
+    current_user.must_change_password = False
+    db.session.commit()
+    try:
+        from app.models.audit_chain import AuditChainEntry
+        AuditChainEntry.append(
+            action='auth.password.changed', actor_email=current_user.email,
+            subject_kind='user', subject_id=current_user.id, details={'self': True},
+        )
+    except Exception:
+        pass
+    logger.info(f"Password changed by {current_user.email}")
+    return jsonify({'success': True})
+
+
 @auth_bp.route('/language', methods=['PUT'])
 @login_required
 def api_set_language():

@@ -1858,6 +1858,8 @@ def api_admin_create_user():
     user = User(email=email, name=name, role=role,
                 org_id=org.id if org else None, is_active=True)
     user.set_password(temp_password)
+    # Admin-issued password is temporary: force a change on first sign-in.
+    user.must_change_password = True
     db.session.add(user)
 
     ob_granted_to_org = None
@@ -1914,6 +1916,49 @@ def api_admin_create_user():
         # also affects colleagues who share the organisation.
         'ob_granted_to_org': ob_granted_to_org,
     }), 201
+
+
+@admin_bp.route('/admin/users/<int:user_id>/reset-password', methods=['POST'])
+@login_required
+def api_admin_reset_password(user_id):
+    """Reset a user's password to a fresh temporary one. Admin only.
+
+    Returns `temp_password` — the ONLY time it is readable. The user is
+    flagged must_change_password so the temp is single-use: they are forced
+    to set their own on next sign-in. Also clears any brute-force lockout so
+    a locked-out user can get back in with the new temp.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'admin only'}), 403
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'error': 'user not found'}), 404
+
+    temp_password = _generate_temp_password()
+    user.set_password(temp_password)
+    user.must_change_password = True
+    user.failed_login_count = 0
+    user.locked_until = None
+    db.session.commit()
+
+    AuditChainEntry.append(
+        action='admin.user.password_reset',
+        actor_email=getattr(current_user, 'email', None),
+        subject_kind='user',
+        subject_id=user.id,
+        details={'email': user.email},
+    )
+    logger.info(
+        'admin.user.password_reset by=%s email=%s',
+        getattr(current_user, 'email', '?'), user.email,
+    )
+    return jsonify({
+        'success': True,
+        'temp_password': temp_password,
+        'email': user.email,
+        'name': user.name,
+    })
 
 
 @admin_bp.route('/admin/users/<int:user_id>/deactivate', methods=['POST'])

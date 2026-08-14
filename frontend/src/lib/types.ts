@@ -56,6 +56,8 @@ export interface User {
   avatar_url: string | null;
   created_at: string | null;
   is_active: boolean;
+  /** When true, the user must set a new password before using the app. */
+  must_change_password?: boolean;
 }
 
 export interface Organization {

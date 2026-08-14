@@ -52,6 +52,11 @@ class User(UserMixin, db.Model):
     # app ever sets it; it is assigned directly in the DB.
     read_only = db.Column(db.Boolean, default=False)
 
+    # Force-change-on-next-login. Set True when an admin creates the account
+    # or resets the password; cleared the moment the user sets their own.
+    # Nullable so the auto-schema backfill on existing rows reads as falsy.
+    must_change_password = db.Column(db.Boolean, default=False)
+
     # Relationships
     organization = db.relationship('Organization', backref=db.backref('users', lazy='dynamic'))
     reviews = db.relationship('Review', backref='reviewer', lazy='dynamic')
@@ -75,6 +80,7 @@ class User(UserMixin, db.Model):
             'is_active': self.is_active,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'read_only': bool(self.read_only),
+            'must_change_password': bool(self.must_change_password),
         }
         if include_org and self.organization:
             data['organization'] = self.organization.to_dict()

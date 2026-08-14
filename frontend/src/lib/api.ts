@@ -116,6 +116,15 @@ async function apiFetch<T>(
     // Legacy shape: { error: 'human text' } — message field absent.
     const message = body.message || body.error || `HTTP ${res.status}`;
     const code = body.message ? body.error : message;
+    // Safety net: a user flagged must_change_password is 403'd on every
+    // non-allowlisted call. Route them to the forced-change screen so no
+    // surface can be used before they rotate. The change page itself only
+    // hits allowlisted endpoints, so this never loops.
+    if (res.status === 403 && (code === 'password_change_required' || body.error === 'password_change_required')
+        && typeof window !== 'undefined'
+        && !window.location.pathname.startsWith('/change-password')) {
+      window.location.href = '/change-password';
+    }
     throw new ApiError(res.status, message, code);
   }
 

@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Users, Search, Loader2, UserPlus, Copy, Check, X } from 'lucide-react';
+import { Users, Search, Loader2, UserPlus, Copy, Check, X, KeyRound } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -317,6 +317,10 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [resetResult, setResetResult] = useState<
+    { email: string; name: string | null; temp_password: string } | null
+  >(null);
+  const [resetCopied, setResetCopied] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -358,6 +362,35 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function resetPassword(u: UserRow) {
+    if (!window.confirm(
+      `Reset the password for ${u.email}?\n\n`
+      + 'A new one-time password is generated and shown once. They will be '
+      + 'required to set their own on next sign-in. Any current password '
+      + 'stops working immediately.',
+    )) return;
+    setBusyId(u.id);
+    try {
+      const r = await api.post<{
+        success: boolean; temp_password?: string; email?: string;
+        name?: string; error?: string;
+      }>(`/api/admin/users/${u.id}/reset-password`, {});
+      if (r?.success && r.temp_password) {
+        setResetResult({
+          email: r.email || u.email,
+          name: r.name ?? u.name,
+          temp_password: r.temp_password,
+        });
+      } else {
+        window.alert(r?.error || 'Could not reset the password.');
+      }
+    } catch (e) {
+      window.alert((e as { message?: string })?.message || 'Could not reset the password.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <PageShell>
       <PageHeader
@@ -375,6 +408,46 @@ export default function AdminUsersPage() {
           onClose={() => setShowCreate(false)}
           onCreated={load}
         />
+      )}
+      {resetResult && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <Card className="w-full max-w-lg p-5 space-y-4">
+            <h2 className="text-lg font-semibold">
+              New password for {resetResult.name || resetResult.email}
+            </h2>
+            <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
+              <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
+                This password is shown once. Copy it now and send it to them
+                through a channel they already use — it is not recoverable
+                from this screen or anywhere else.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-background rounded px-2 py-1.5 text-sm font-mono select-all">
+                  {resetResult.temp_password}
+                </code>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(resetResult.temp_password);
+                      setResetCopied(true);
+                      setTimeout(() => setResetCopied(false), 1500);
+                    } catch { /* clipboard blocked — text is selectable */ }
+                  }}
+                >
+                  {resetCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                </Button>
+              </div>
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                They must set their own password the next time they sign in.
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={() => setResetResult(null)}>Done</Button>
+            </div>
+          </Card>
+        </div>
       )}
       <PageMain>
         <Card className="p-4 space-y-3">
@@ -451,16 +524,27 @@ export default function AdminUsersPage() {
                         : <span className="text-emerald-700 dark:text-emerald-400">Active</span>}
                     </td>
                     <td className="px-2 py-2 text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busyId === u.id}
-                        onClick={() => setActive(u, u.is_active === false)}
-                      >
-                        {busyId === u.id
-                          ? <Loader2 className="w-3 h-3 animate-spin" />
-                          : u.is_active === false ? 'Restore' : 'Remove'}
-                      </Button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busyId === u.id}
+                          onClick={() => resetPassword(u)}
+                          title="Generate a new one-time password"
+                        >
+                          <KeyRound className="w-3 h-3 mr-1" /> Reset password
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busyId === u.id}
+                          onClick={() => setActive(u, u.is_active === false)}
+                        >
+                          {busyId === u.id
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : u.is_active === false ? 'Restore' : 'Remove'}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

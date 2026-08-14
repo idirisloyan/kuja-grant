@@ -11,6 +11,7 @@
 import Link from 'next/link';
 import { ShieldCheck, KeyRound, ChevronRight } from 'lucide-react';
 import { WebAuthnPanel } from '@/components/shared/webauthn-panel';
+import { ChangePasswordForm } from '@/components/shared/change-password-form';
 import { useAuthStore } from '@/stores/auth-store';
 
 export default function SecuritySettingsPage() {
@@ -25,6 +26,17 @@ export default function SecuritySettingsPage() {
           credential.
         </p>
       </div>
+
+      <div className="border border-border rounded-lg bg-card p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <KeyRound className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+          <h2 className="text-sm font-semibold">Change your password</h2>
+        </div>
+        <div className="max-w-sm">
+          <ChangePasswordForm />
+        </div>
+      </div>
+
       <WebAuthnPanel />
       {user?.role === 'admin' && (
         <Link

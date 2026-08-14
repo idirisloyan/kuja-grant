@@ -347,6 +347,39 @@ def register_middleware(app):
             return None
         return None
 
+    @app.before_request
+    def enforce_password_change():
+        """A user flagged must_change_password can reach ONLY the
+        change-password endpoint (plus logout / me / brand) until they set a
+        new one. Server-side gate, not just a UI redirect — the same posture
+        as read-only accounts. Blocks reads too, so a forced-change user
+        can't touch any data before rotating.
+        """
+        try:
+            if not current_user.is_authenticated:
+                return None
+            if not bool(getattr(current_user, 'must_change_password', False)):
+                return None
+        except Exception:
+            # Auth layer not ready (first boot) — never block the request.
+            return None
+        path = request.path or ''
+        if not path.startswith('/api/'):
+            return None  # let the static shell load; the frontend redirects
+        allow = (
+            '/api/auth/change-password',
+            '/api/auth/logout',
+            '/api/auth/me',
+            '/api/network/current',
+        )
+        if any(path.startswith(p) for p in allow):
+            return None
+        return jsonify({
+            'success': False,
+            'error': 'password_change_required',
+            'message': 'Please set a new password before continuing.',
+        }), 403
+
     @app.after_request
     def add_request_id_header(response):
         """Include request ID in response for client-side correlation."""

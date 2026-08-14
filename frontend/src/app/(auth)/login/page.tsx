@@ -173,6 +173,13 @@ export default function LoginPage() {
     try {
       const success = await login(submittedEmail, submittedPassword);
       if (success) {
+        // Admin-issued / reset passwords are temporary: send the user
+        // straight to the forced-change screen. The server also 403s every
+        // other API call until they rotate, so this is a real gate.
+        if (useAuthStore.getState().user?.must_change_password) {
+          window.location.href = '/change-password';
+          return;
+        }
         toast.success(t('toast.welcome_back'));
         // Phase 697: persona-aware landing. The Proximate tenant's OB
         // and donor users are seeded with User.role='ngo' for platform
