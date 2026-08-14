@@ -28,6 +28,11 @@ class Organization(db.Model):
     registration_status = db.Column(db.String(50), default='pending')
     registration_number = db.Column(db.String(100), nullable=True)
     verified = db.Column(db.Boolean, default=False)
+    # Kuja Platform Integration: the shared organisation identity (Odoo
+    # res.partner id). The join key linking this org to Kuja Link, Kuja Trust,
+    # and Kuja Build. Nullable until populated; auto-schema backfills existing
+    # rows. Also the ref the grant app hands Trust over /api/service/*.
+    kuja_partner_id = db.Column(db.String(64), nullable=True, index=True)
     website = db.Column(db.String(500), nullable=True)
     logo_url = db.Column(db.String(500), nullable=True)
     assess_score = db.Column(db.Float, nullable=True)
@@ -106,6 +111,7 @@ class Organization(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'kuja_partner_id': self.kuja_partner_id,
             'name': self.name,
             'org_type': self.org_type,
             'country': self.country,

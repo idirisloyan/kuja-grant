@@ -32,6 +32,7 @@ from app.models import (
 from app.services.adverse_media_service import AdverseMediaService
 from app.services.bank_verification_service import BankVerificationService
 from app.services.trust_profile_service import TrustProfileService
+from app.services import trust_engine
 from app.services.capacity_passport_service import CapacityPassportService
 from app.utils.helpers import get_request_json
 from app.utils.decorators import role_required
@@ -48,8 +49,12 @@ trust_bp = Blueprint('trust', __name__, url_prefix='/api')
 @trust_bp.route('/trust-profile/<int:org_id>', methods=['GET'])
 @login_required
 def api_get_trust_profile(org_id):
-    """Return the unified two-pillar Trust Profile for an org."""
-    profile = TrustProfileService.build(org_id)
+    """Return the unified two-pillar Trust Profile for an org.
+
+    Sourced via trust_engine, which selects the local fork or the shared Kuja
+    Trust engine per KUJA_TRUST_ENGINE (default 'local' — unchanged behaviour).
+    """
+    profile = trust_engine.get_trust_profile(org_id)
     if profile is None:
         return jsonify({'error': 'Organization not found', 'success': False}), 404
 
@@ -68,6 +73,17 @@ def api_get_trust_profile(org_id):
         pass
 
     return jsonify({'success': True, 'profile': profile})
+
+
+@trust_bp.route('/admin/trust-engine/status', methods=['GET'])
+@login_required
+def api_trust_engine_status():
+    """Diagnostics (admin-only): which due-diligence engine mode is active
+    (local | remote | shadow) and whether the shared Kuja Trust service is
+    configured and reachable right now. Lets us watch the cutover safely."""
+    if getattr(current_user, 'role', None) != 'admin':
+        return jsonify({'error': 'forbidden', 'success': False}), 403
+    return jsonify({'success': True, 'engine': trust_engine.engine_status()})
 
 
 @trust_bp.route('/trust-profile/<int:org_id>/gap-insights', methods=['GET'])
