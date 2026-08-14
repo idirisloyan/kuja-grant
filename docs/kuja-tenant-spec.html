@@ -126,13 +126,14 @@
 <div class="wrap">
   <header class="hero">
     <div class="pillrow">
-      <span class="vpill accent">Requirements &amp; Design · v1.1</span>
+      <span class="vpill accent">Requirements &amp; Design · v1.2</span>
       <span class="vpill">Kuja tenant · <code>slug=kuja</code></span>
       <span class="vpill">2026-08-14</span>
     </div>
     <h1>The easiest end-to-end<br>grant system to comply with.</h1>
     <p class="lede">A donor defines a grant's criteria once. From there the system helps the NGO apply accurately, scores it fairly with AI <em>and</em> humans, and keeps everyone on top of every deliverable — offline, in five languages, on a cheap phone.</p>
     <div class="finding"><b>Finding (verified against the code):</b> the Kuja tenant already implements most of what follows. The work ahead is <b>consolidation, clarity, and polish</b> — not net-new features. Each function below is tagged <span class="pill live">live</span> <span class="pill partial">partial</span> <span class="pill gap">gap</span>.</div>
+    <div class="finding"><b>New in v1.2 — shipped &amp; live this cycle</b> (commit <code>60408f4a3</code>): the <b>donor approval inbox</b> (pre-scored deliverables → accept / request-revision) <span class="pill live">live</span> · a standing <b>end-to-end core-lifecycle test</b>, 30/30 green <span class="pill live">live</span> · <b>scoring clarity</b> (<code>auto_score</code> alias) <span class="pill live">live</span> · a latent report-webhook bug fixed. The one substantive piece still open is applying this page's redesign direction across the live screens.</div>
   </header>
 
   <section id="chain">
@@ -251,10 +252,13 @@
         <tr><td>NGO in-context AI — draft/strengthen/polish, autofill, live rubric, readiness, voice, offline autosave</td><td><span class="pill live">live</span></td></tr>
         <tr><td>NGO — criterion-aware "strong answer" guidance + reusable evidence library</td><td><span class="pill partial">partial</span></td></tr>
         <tr><td>Scoring — deterministic + AI + human + calibration + adopt-AI-score</td><td><span class="pill live">live</span></td></tr>
-        <tr><td>Scoring — clean 3-signal model (rename <code>ai_score</code>, per-criterion AI object)</td><td><span class="pill gap">gap</span></td></tr>
+        <tr><td>Scoring — <code>auto_score</code> alias + documented 3-signal model</td><td><span class="pill live">live</span></td></tr>
+        <tr><td>Scoring — per-criterion AI first-pass object <code>{score,rationale,confidence,provenance}</code></td><td><span class="pill gap">gap</span></td></tr>
         <tr><td>Donor application-status (funnel, awaiting-decision, applicant table, CSV)</td><td><span class="pill live">live</span></td></tr>
         <tr><td>Deliverables calendar (NGO+donor, .ics) + at-risk prediction · reporting (voice/photo/bundle/PDF)</td><td><span class="pill live">live</span></td></tr>
-        <tr><td>Unified Obligations entity + donor approval inbox</td><td><span class="pill partial">partial</span></td></tr>
+        <tr><td>Donor approval inbox (pre-scored reports → accept / request-revision)</td><td><span class="pill live">live</span></td></tr>
+        <tr><td>Standing end-to-end core-lifecycle health check (30/30 green)</td><td><span class="pill live">live</span></td></tr>
+        <tr><td>Unified Obligations/Deliverables entity (dated, first-class)</td><td><span class="pill gap">gap</span></td></tr>
         <tr><td>Financials abstraction + operator mapping + donor financials panel</td><td><span class="pill live">live</span></td></tr>
         <tr><td>Trust Profile (two-pillar, local) + screening</td><td><span class="pill live">live</span></td></tr>
         <tr><td>Link SSO + billing webhook · Trust remote cutover · Build finance call · SAM.gov · offline submit/report · localization</td><td><span class="pill gap">gap</span></td></tr>
@@ -275,5 +279,5 @@
     <p class="muted">Full detail, endpoints, and data shapes: <code>docs/KUJA_TENANT_SPEC.md</code>.</p>
   </section>
 
-  <footer>Kuja Tenant — Requirements &amp; Design Specification v1.1 · 2026-08-14 · Kuja tenant only (not Proximate / NEAR / Saxansaxo).</footer>
+  <footer>Kuja Tenant — Requirements &amp; Design Specification v1.2 · 2026-08-14 · Kuja tenant only (not Proximate / NEAR / Saxansaxo).</footer>
 </div>

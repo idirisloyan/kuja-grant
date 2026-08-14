@@ -1,11 +1,14 @@
-# Kuja Tenant — Requirements & Design Specification (v1.1)
+# Kuja Tenant — Requirements & Design Specification (v1.2)
 
 **Tenant:** Kuja Marketplace — the default network (`slug='kuja'`, `app/models/network.py:31`), served at `https://web-production-6f8a.up.railway.app`.
-**Status:** Draft v1.1 · 2026-08-14 · consolidates the current build with the target design, verified against the code.
+**Status:** Draft v1.2 · 2026-08-14 · consolidates the current build with the target design, verified against the code.
 **Scope:** the **Kuja tenant only** — Proximate, NEAR, and Saxansaxo are separate tenants and are out of scope (referenced only where they prove a portable pattern).
 **Companion specs:** [`KUJA_PLATFORM_INTEGRATION.md`](KUJA_PLATFORM_INTEGRATION.md) · [`KUJA_BUILD_NETWORKED_TENANTS_INTEGRATION.md`](KUJA_BUILD_NETWORKED_TENANTS_INTEGRATION.md).
+**Companion prototype:** the redesign direction (interactive) — [Kuja Redesign Prototype](https://claude.ai/code/artifact/a12db9fb-c3fc-49d9-962b-60733db42297).
 
 > **What changed in v1.1.** Expanded around the product's core: donor grant creation, the NGO's in-context AI application help ("the heart"), the AI-*and*-human scoring model, deliverables/compliance/reporting, and clean action-oriented dashboards. Every core function now carries an honest **Today (built) / Gap / Improvement** so this is a true design doc grounded in the running system — not a wishlist. **Finding: the Kuja tenant already implements most of what follows; the work ahead is consolidation, clarity, and polish, not net-new features.**
+>
+> **What changed in v1.2 (shipped this cycle — commit `60408f4a3`, live on prod).** Four items moved from *gap/recommended* to *live*, tightening the exact selling points this spec is built on: **(1)** the **donor approval inbox** is now built (`donor-report-inbox.tsx`) — pre-scored deliverables, one-click accept / request-revision (§9.3, §10); **(2)** the **standing end-to-end health check** exists and is green — `test_core_lifecycle.py` drives grant→apply→submit→score→award→report→accept in-process, **30/30 checks** (§14); **(3)** **scoring clarity** — the deterministic auto-score is now exposed under the clear name `auto_score` alongside legacy `ai_score` (§8); **(4)** a latent **report-webhook** bug is fixed (§14). See the change log at the end of §14.
 
 Status tags: **[live]** in production · **[partial]** built but incomplete · **[gap]** designed here, not built.
 
@@ -131,15 +134,15 @@ This is the system's core promise: because we hold the grant's exact criteria, w
 
 The system already has three scoring signals; the improvement is to **name and separate them cleanly** so donors trust the result.
 
-**Today [live], but muddled:**
-- **Deterministic auto-score** — `ScoringEngine.score_application` (`scoring_engine.py`) computes a weighted score from response completeness/keywords, document scores, and eligibility. It runs at submit and writes the fields `ai_score`/`final_score`. *(It is heuristic, **not** an LLM — despite the field name.)*
+**Today [live], being clarified:**
+- **Deterministic auto-score** — `ScoringEngine.score_application` (`scoring_engine.py`) computes a weighted score from response completeness/keywords, document scores, and eligibility. It runs at submit and writes the fields `ai_score`/`final_score`. *(It is heuristic, **not** an LLM — despite the legacy field name.)* **[live, clarified this cycle]** the model now documents the three signals and exposes this deterministic score under the clear name **`auto_score`** (a read-only property + `to_dict` alias in `application.py`) alongside legacy `ai_score`, so the API reads plainly without a risky column rename/migration.
 - **AI (LLM) scoring** — `/api/ai/score-criterion`, `/score-application` produce a model assessment against the criteria; surfaced to reviewers/donors.
 - **Human scoring** — assigned reviewers score per criterion; the weighted mean (`Review.overall_score`, auto-computed from criteria weights, `reviews.py:963-1023`) is the decision score.
 - **Calibration + accelerators** — AI-vs-human agreement (`ai-vs-human-card.tsx`, `GET /api/grants/<id>/ai-vs-human`), one-click **adopt-AI-score** into the human score (editable), reviewer summary, rubric guidance, private notes, COI recuse. NGOs see an **anonymized** score-breakdown (`ScoreBreakdownService`: strengths/weaknesses per criterion, `reviewer_count` — never reviewer identities).
 
 **Improvement — the clean model (simple, defensible):**
 1. **Eligibility gate** — deterministic pass/fail on hard requirements, kept *separate* from quality scoring.
-2. **Completeness auto-check** — the current heuristic engine, **renamed** `auto_score`/`completeness` (retire the misleading `ai_score` name), used only to flag thin/incomplete submissions.
+2. **Completeness auto-check** — the current heuristic engine, now surfaced as **`auto_score`** (done this cycle; legacy `ai_score` retained for back-compat), used only to flag thin/incomplete submissions.
 3. **AI first-pass score** — the LLM, per criterion: `{score, rationale, confidence, provenance}`. Runs on submit (async). Purpose: give the NGO a pre-submit self-check, give reviewers a head start, and rank a large pool.
 4. **Human score** — reviewers decide; weighted mean is **authoritative for the award**. AI never awards.
 5. **Calibration view** — AI-vs-human agreement per criterion; divergence + reviewer-outlier flags feed a quality loop.
@@ -165,7 +168,8 @@ A grant's eligibility + documents + reporting requirements + deliverables should
 - **Offline-safe** — extend the outbox (today: apply autosave) to **report submission** so a report written on a weak connection is never lost. **[gap]**
 
 ### 9.3 Donor experience — the approval inbox
-- **"What needs your decision now"** — pre-checked, **pre-scored** deliverables queued for one-click **accept** / **request revision**; a portfolio "due soon" + "at risk" rollup. Report review exists (`/api/reports/<id>/review`, inline status); the improvement is to present it as a clean **approval inbox**, not scattered tiles. **[partial → improve]**
+- **"What needs your decision now" — built this cycle. [live]** `DonorReportInbox` (`frontend/src/components/reports/donor-report-inbox.tsx`) is a clean, action-oriented queue of submitted / under-review deliverables **across all the donor's grants**, each showing the **AI pre-score** + per-requirement **met / partial / missing** coverage + summary, with one-click **Accept** and **Request revision** (with a short note back to the grantee) inline. It consumes `GET /api/reports/?status=submitted|under_review` (already scoped to the donor's grants + the Kuja network server-side) and `POST /api/reports/<id>/review {action, notes}` — an endpoint that previously had **no UI at all**. It renders atop the reports page for donor/admin only, self-hides when the queue is empty, and refreshes the grouped list on action. *(Live-proven end-to-end by the core lifecycle test, §14: donor sees the submitted report in the inbox and accepts it.)*
+  - **Still open [gap]:** a portfolio "due soon" + "at risk" rollup card beside the inbox, and surfacing the same inbox as a donor-dashboard tile (today it lives on `/reports`).
 - **Application status per grant** — # applied, funnel by status, # awaiting decision, review progress, deadline countdown, top applicants by score. All the data exists (applications-by-status, awaiting-decision, review-pipeline, applicant table, CSV export); consolidate into one clean grant home (§10). **[live → consolidate]**
 
 ### 9.4 Financials — with our ERP *and* without it
@@ -197,9 +201,9 @@ The design language for every surface. (Prior work already moved this way — "C
 **Three home screens to get right:**
 - **NGO home** — a single "do this next" banner (finish a draft, a report due in 3 days, a document requested), then a compact deliverables calendar, then everything else one tap away.
 - **Donor grant home** — a clean funnel (applied / under review / awaiting your decision), a "needs your decision now" queue, deadline countdown, top applicants by score — no tile wall.
-- **Donor approval inbox** — pre-scored deliverables, one-click accept / request revision, portfolio due-soon + at-risk.
+- **Donor approval inbox** — pre-scored deliverables, one-click accept / request revision, portfolio due-soon + at-risk. **The inbox itself is now built [live] (§9.3);** the remaining work is the surrounding grant-home consolidation and the due-soon/at-risk rollup.
 
-**On "the UI looks dated":** the app is functional and feature-complete but visually busy in places (tile sprawl, dense panels). The move is a **design-system pass** — consolidate to the calm patterns above, retire redundant tiles, and modernize spacing/hierarchy — not a rebuild. This spec's companion HTML shows the target visual direction; the same language should land in the product.
+**On "the UI looks dated":** the app is functional and feature-complete but visually busy in places (tile sprawl, dense panels). The move is a **design-system pass** — consolidate to the calm patterns above, retire redundant tiles, and modernize spacing/hierarchy — **not a rebuild**. The visual direction is now shown concretely by the interactive **[Kuja Redesign Prototype](https://claude.ai/code/artifact/a12db9fb-c3fc-49d9-962b-60733db42297)** (NGO "do this next" home · criterion-aware apply with a live rubric meter · donor funnel + pre-scored inbox — calm, theme- and RTL-aware). Applying that language across the live screens, incrementally behind the existing tokens, is the **one substantive piece still deferred** (see §17 Phase A). The companion HTML for this spec carries the same direction.
 
 ---
 
@@ -242,9 +246,17 @@ The core lifecycle must be *boringly* stable — the request was explicit about 
 - **Server-side enforcement.** Static export = no client route auth; the server is the only gate; deny-by-default; object-level ownership; licence gate fails *closed*.
 - **Auditability.** Governance actions on a hash-chained, tenant-scoped audit log; replayable AI calls; full JSONL export.
 - **Schema safety.** A boot-time reconciler ALTER-adds missing columns as nullable (no silent drift).
-- **A standing end-to-end health check.** A repeatable pass that exercises grant → apply → review → award → report on a seeded fixture and asserts the invariants — so "the core works" is provable on demand, not assumed. *(Recommended next action; see §17.)*
+- **A standing end-to-end health check — built this cycle. [live]** `test_core_lifecycle.py` (repo root) drives the *whole* core engine in-process through the real Flask routes against an isolated throwaway SQLite: **create grant (+weighted criteria) → publish → NGO apply → fill responses → submit (deterministic auto-score) → reviewer panel scores + completes → `scored` (human + blended `final_score`) → donor award → NGO report create → submit (AI analysis attached) → donor approval inbox lists it → donor accept.** It asserts every state transition and all three score signals — **30 / 30 checks green.** Zero production impact by construction (a full award run can't be cleaned off prod, since grant-delete blocks on non-draft applications with a 409, so the test runs entirely in-process). This makes "the core works" provable on demand, and it is the live proof behind the donor-approval-inbox claim (§9.3).
 
-**Current-function status:** grant CRUD/publish, application draft→award (+revision/withdraw/appeal), reviewer assign/score/COI, compliance screening, Trust Profile, reporting (voice/photo/bundle/PDF), and the financials abstraction are all **[live]**. The stability work is verification + the invariants above, not rebuilding.
+**Current-function status:** grant CRUD/publish, application draft→award (+revision/withdraw/appeal), reviewer assign/score/COI, compliance screening, Trust Profile, reporting (voice/photo/bundle/PDF), the **donor approval inbox**, and the financials abstraction are all **[live]**. The core lifecycle is now **verified green end-to-end**; remaining stability work is coverage breadth, not rebuilding.
+
+### 14.1 Change log — shipped this cycle (commit `60408f4a3`, live on prod build `60408f4a3189`)
+All Kuja-tenant only; Proximate / NEAR / Saxansaxo untouched.
+1. **Donor approval inbox** — `donor-report-inbox.tsx` on the reports page (§9.3). New UI on the pre-existing, previously-UI-less `POST /api/reports/<id>/review`.
+2. **Standing core-lifecycle health check** — `test_core_lifecycle.py`, 30/30 green (§14).
+3. **Scoring clarity** — `auto_score` alias + documented three-signal model on `Application` (§8); additive, no migration.
+4. **Report-webhook fix** — report-submit read a nonexistent `report.ngo_org_id`, so the `report.submitted` webhook to the grantee org **silently never fired** (the `AttributeError` was swallowed by the surrounding `try/except`). Corrected to `report.submitted_by_org_id` in `reports.py`.
+Also produced (not code): the interactive redesign prototype (§10) establishing the visual direction.
 
 ---
 
@@ -267,25 +279,28 @@ The core lifecycle must be *boringly* stable — the request was explicit about 
 | NGO in-context AI (draft/strengthen/polish/autofill/live-rubric/readiness/voice/offline-autosave) | **[live]** |
 | NGO criterion-aware "what a strong answer covers" + reusable evidence library | **[partial/gap]** |
 | Scoring — deterministic + AI + human + calibration + adopt-AI-score | **[live]** |
-| Scoring — clean 3-signal model (rename `ai_score`, per-criterion AI object) | **[gap]** |
+| Scoring — `auto_score` alias + documented 3-signal model | **[live]** (this cycle) |
+| Scoring — per-criterion AI first-pass object `{score,rationale,confidence,provenance}` | **[gap]** |
 | Donor application-status (funnel, awaiting-decision, applicant table, CSV) | **[live]** |
 | Deliverables calendar (NGO + donor, `.ics`) + at-risk prediction | **[live]** |
-| Unified Obligations/Deliverables entity + donor approval inbox | **[partial/gap]** |
+| Donor approval inbox (pre-scored reports, accept / request-revision) | **[live]** (this cycle) |
+| Unified Obligations/Deliverables entity (dated, first-class) | **[gap]** |
 | Reporting (voice/photo/precheck/bundle/PDF) | **[live]** |
 | Financials abstraction + operator mapping + donor financials panel | **[live]** |
 | Trust Profile (two-pillar, local) + screening | **[live]** (SAM.gov, Build feed, Link SSO gated) |
+| Standing end-to-end core-lifecycle health check (30/30) | **[live]** (this cycle) |
 | Offline coverage for submit/report writes | **[gap]** |
 | Localization completion + 3 hardcoded surfaces | **[gap]** |
-| Dashboards — clean/consolidated design-system pass | **[partial]** |
+| Dashboards — clean/consolidated design-system pass on live app | **[partial]** (direction set; prototype done) |
 
 ---
 
 ## 17. Roadmap (priority-ordered)
 
 **Phase A — core stability & clarity (highest priority, mostly consolidation).**
-- Stand up the end-to-end health check (§14); confirm grant→apply→review→award→report on prod.
-- Scoring clarity: rename the heuristic `ai_score` → `auto_score`; make the AI first-pass a per-criterion `{score, rationale, confidence, provenance}` object; keep human authoritative.
-- Dashboards design-system pass: NGO "next action" home, donor grant home, donor approval inbox; retire tile sprawl.
+- ✅ **Done this cycle:** the end-to-end health check (§14, 30/30); the `auto_score` clarity alias (§8); the donor approval inbox (§9.3); the report-webhook fix (§14.1).
+- **Now:** make the AI first-pass a per-criterion `{score, rationale, confidence, provenance}` object (human stays authoritative).
+- **The one substantive piece still open:** the **dashboards design-system pass on the live app** — apply the [prototype](https://claude.ai/code/artifact/a12db9fb-c3fc-49d9-962b-60733db42297) language screen-by-screen behind the existing tokens (NGO "next action" home → donor grant home → donor approval-inbox surround), retiring tile sprawl. Held pending sign-off on the direction.
 
 **Phase B — the NGO moat.**
 - Criterion-aware "what a strong answer covers" + reusable evidence library.
