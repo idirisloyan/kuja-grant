@@ -1,6 +1,6 @@
-# Kuja Build ↔ Networked Tenants — Financial Integration (v0.1)
+# Kuja Build ↔ Networked Tenants — Financial Integration (v0.2)
 
-**Status:** design, pre-build · **Date:** 2026-08-14 · **Owner:** Kuja platform team
+**Status:** design; **grant-side scaffold (Phases 0–1) built & deployed, inert on prod** · **Date:** 2026-08-14 · **Owner:** Kuja platform team
 **In scope:** **Proximate**, **Saxansaxo** (and future networked grant tenants) ↔ **Kuja Build** (Odoo 18 ERP)
 **Visual spec (diagrams):** [`kuja-build-networked-tenants-integration.html`](./kuja-build-networked-tenants-integration.html)
 **Companion spec:** the four-product [`KUJA_PLATFORM_INTEGRATION.md`](./KUJA_PLATFORM_INTEGRATION.md) is the **Kuja-tenant** spec (Link + Grant + Trust + Build). This document is its **sibling for the non-Kuja network tenants** — a different connection mechanism, and Trust deliberately excluded.
@@ -67,6 +67,8 @@ So the Build connection here needs a mechanism that does **not** depend on Odoo 
 ---
 
 ## The connection mechanism (per-grant)
+
+> **Shipped 2026-08-14 (Phases 0–1, inert on prod, commit `80de64321`).** The tenant-agnostic scaffold is built and deployed, dormant until a Build client is configured — prod behaviour is unchanged. Live now: `Grant.financial_source` (`erp` | `manual`, default `manual`) + `build_ref` + `financial_synced_at`; `app/services/build_client.py` (env `KUJA_BUILD_BASE_URL` / `KUJA_BUILD_SERVICE_TOKEN`; `.configured`, `get_financials(build_ref)` keyed **only** by the ref, `normalize()`); `app/services/build_engine.py` (the `erp` | `manual` selector); and the endpoints `POST /api/grants/<id>/financial-source` (operator, admin-gated + audited), `GET /api/grants/<id>/financials` (donor-scoped), `GET /api/admin/build/status`. The **only** thing left is the concrete finance-API call inside `build_client.py` — which needs the contract + **sample payload example** below.
 
 1. **Operator maps the grant.** On the donor grant in the tenant, an operator sets `financial_source = 'erp'` and `build_ref = <analytic account id>` (one action, audited).
 2. **Backend pulls on demand.** When the donor opens their grant's financials, the grant backend calls `BuildClient.get_financials(build_ref)` with the service credential — **keyed off the grant's stored `build_ref`, resolved server-side**, never a value from the request.
@@ -137,13 +139,13 @@ A real, self-contained proof on **actual Adeso prod financial data** (already lo
 
 | Phase | Scope | Size |
 |---|---|---|
-| 0 | Financial-source abstraction — `financial_source` + `build_ref` on the tenant grant; operator "map to Build account" action; audit | S |
-| 1 | `BuildClient` (service-credential finance client) + normaliser to the shared shape; inert behind a flag until creds are set | M |
+| 0 | Financial-source abstraction — `financial_source` + `build_ref` on the tenant grant; operator "map to Build account" action; audit | ✅ shipped |
+| 1 | `BuildClient` (service-credential finance client) + normaliser to the shared shape; inert until creds are set | ✅ shipped |
 | 2 | Surface booked actuals in the tenant's donor reporting (Proximate dashboards / Donor Pack PDF); `manual` fallback stays source-equivalent | M |
 | 3 | Isolation hardening — source-side scoping (per-account service creds or `grant.dashboard.share` token); positive **and** negative (QCF-can't-see-other-grants) tests | M |
 | 4 | Freshness — pull-on-view → scheduled sync / webhook-on-posting, per the dev team's answer; Saxansaxo parity | M |
 
-Phases 0–1 are buildable now on our side, inert until the Build creds land (same pattern as the Trust and licensing rollouts).
+Phases 0–1 are **built & deployed** (inert on prod, commit `80de64321`) — the remaining Build-side work waits on the dev-team items below (same inert-rollout pattern as the Trust and licensing seams). What's left to run the QCF test: fill the one finance-API call in `build_client.py`, set the `KUJA_BUILD_*` env, and map the grant.
 
 ---
 
@@ -163,6 +165,44 @@ Phases 0–1 are buildable now on our side, inert until the Build creds land (sa
 7. A **sample payload** for that account covering: **budget lines**, **booked actuals** (journal items / analytic lines), and **disbursements/payments** — with field names and types.
 8. **Semantics:** amount **sign conventions** (debit/credit), **currency** (grant currency vs company currency — QAR/USD) and where FX conversion should happen, date fields, and how categories/cost-lines are identified.
 9. How Adeso's **Build-booked disbursements** relate to the tenant's **own recorded disbursements** (the app records partner payments): same events to **reconcile**, or **complementary**?
+
+### Example of the sample payload we need (item 7)
+
+One real (redacted is fine) **response** from the Build finance API for a **single** analytic account — that's all we need to lock the contract. The names and structure can be whatever Build already returns; this only shows the *kind* of thing we're after:
+
+```json
+{
+  "analytic_account_id": "4471",
+  "name": "QCF – Proximate Fund 2026",
+  "currency": "USD",
+  "as_of": "2026-07-31",
+  "budget_lines": [
+    { "category": "Grants to partners",        "planned": 500000 },
+    { "category": "Monitoring & verification", "planned":  40000 }
+  ],
+  "actuals": [
+    { "category": "Grants to partners",        "spent": 312000, "date": "2026-07-31" },
+    { "category": "Monitoring & verification", "spent":  18500, "date": "2026-07-31" }
+  ],
+  "disbursements": [
+    { "amount": 25000, "date": "2026-06-15", "reference": "PMT-0091" }
+  ]
+}
+```
+
+We map their fields → our normalised shape (`budget_lines / actuals / disbursements`). One sample answers, in a single shot:
+
+| What we need to know | Where the example shows it |
+|---|---|
+| The **account key** we query | `analytic_account_id` (= our `build_ref`) |
+| **Budget** per line | `budget_lines[].category` + `planned` |
+| **Booked spend** per line | `actuals[].category` + `spent` + `date` |
+| **Payments / disbursements** | `disbursements[].amount` + `date` + `reference` |
+| **Currency** (+ where FX happens) | `currency` — grant vs company (QAR/USD)? |
+| **Sign convention** | are `spent`/`amount` positive, or credits/negatives? |
+| **Freshness** | is there an `as_of` / `last_posted` timestamp? |
+
+If Build's real object names differ (e.g. `journal_items` instead of `actuals`, `amount_signed`, `partner_id` for the payee), **just send it as-is** — we adapt `normalize()` to match. One representative example per object beats a written schema.
 
 **D. Isolation at the source (the security ask)**
 10. Can the service account be **scoped per analytic account** (Odoo record rules), so it can only read the mapped account? If not —

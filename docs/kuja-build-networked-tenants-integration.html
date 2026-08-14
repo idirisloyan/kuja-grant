@@ -162,10 +162,10 @@
 <div class="wrap">
 
   <header class="masthead">
-    <div class="kicker">Integration Specification · v0.1 · draft</div>
+    <div class="kicker">Integration Specification · v0.2 · scaffold shipped</div>
     <h1>Kuja Build ↔ Networked Tenants</h1>
     <p class="lede">Financial integration for the non-Kuja tenants — Proximate &amp; Saxansaxo. A tenant pulls real, booked financials for a single donor grant from the operator's Kuja Build ERP, scoped so the donor sees only their grant. No Link, no shared identity, no Trust engine.</p>
-    <div class="meta"><span>14 Aug 2026</span><span>Kuja platform team</span><span>Status: design, pre-build</span></div>
+    <div class="meta"><span>14 Aug 2026</span><span>Kuja platform team</span><span>Status: scaffold (Phases 0–1) built &amp; deployed · inert</span></div>
   </header>
 
   <div class="decisions">
@@ -328,6 +328,10 @@
   <section>
     <div class="sec-head"><span class="eyebrow build-eyebrow">Mechanism</span></div>
     <h2><span class="num">04</span> &nbsp;The connection, per grant</h2>
+    <div class="callout teal">
+      <div class="h">Shipped 14 Aug 2026 · Phases 0–1, inert on prod</div>
+      <p>The tenant-agnostic scaffold is built and deployed, dormant until a Build client is configured — prod behaviour is unchanged. Live now: <code>Grant.financial_source</code> (<code>erp</code> | <code>manual</code>, default <code>manual</code>) + <code>build_ref</code> + <code>financial_synced_at</code>; <code>build_client.py</code> (env <code>KUJA_BUILD_BASE_URL</code> / <code>KUJA_BUILD_SERVICE_TOKEN</code>; keyed <strong>only</strong> by the ref); <code>build_engine.py</code> (the <code>erp</code> | <code>manual</code> selector); and the endpoints <code>POST /api/grants/&lt;id&gt;/financial-source</code> (operator, admin-gated + audited), <code>GET /api/grants/&lt;id&gt;/financials</code> (donor-scoped), <code>GET /api/admin/build/status</code>. The <strong>only</strong> thing left is the concrete finance-API call — which needs the sample payload below.</p>
+    </div>
     <ol class="steps">
       <li><b>Operator maps the grant.</b> <span class="note">Sets <code>financial_source = 'erp'</code> and <code>build_ref = &lt;analytic account id&gt;</code> on the donor grant — one audited action.</span></li>
       <li><b>Backend pulls on demand.</b> <span class="note">The grant backend calls <code>BuildClient.get_financials(build_ref)</code> with the service credential, keyed off the grant's stored ref — never a request value.</span></li>
@@ -381,13 +385,13 @@
     <div class="sec-head"><span class="eyebrow">Sequencing</span></div>
     <h2><span class="num">07</span> &nbsp;Phased path</h2>
     <div class="card" style="padding:6px 22px">
-      <div class="phase"><div class="pnum">0</div><div><h3>Financial-source abstraction</h3><p><code>financial_source</code> + <code>build_ref</code> on the tenant grant; operator "map to Build account" action; audit.</p></div><span class="size s">S</span></div>
-      <div class="phase"><div class="pnum">1</div><div><h3>BuildClient + normaliser</h3><p>Service-credential finance client → the shared shape; inert behind a flag until creds are set.</p></div><span class="size m">M</span></div>
+      <div class="phase"><div class="pnum">0</div><div><h3>Financial-source abstraction &nbsp;<span class="pill good">shipped</span></h3><p><code>financial_source</code> + <code>build_ref</code> on the tenant grant; operator "map to Build account" action; audit.</p></div><span class="pill good">✓</span></div>
+      <div class="phase"><div class="pnum">1</div><div><h3>BuildClient + normaliser &nbsp;<span class="pill good">shipped</span></h3><p>Service-credential finance client → the shared shape; inert until creds are set.</p></div><span class="pill good">✓</span></div>
       <div class="phase"><div class="pnum">2</div><div><h3>Surface in donor reporting</h3><p>Booked actuals in the tenant's donor dashboards / Donor Pack PDF; <code>manual</code> fallback stays source-equivalent.</p></div><span class="size m">M</span></div>
       <div class="phase"><div class="pnum">3</div><div><h3>Isolation hardening</h3><p>Source-side scoping (per-account creds or share token); positive <em>and</em> negative (QCF-can't-see-other-grants) tests.</p></div><span class="size m">M</span></div>
       <div class="phase"><div class="pnum">4</div><div><h3>Freshness + Saxansaxo parity</h3><p>Pull-on-view → scheduled sync / webhook, per the dev team's answer; repeat for Saxansaxo.</p></div><span class="size m">M</span></div>
     </div>
-    <p class="prose" style="color:var(--muted);font-size:14px">Phases 0–1 are buildable now on our side, inert until the Build creds land — the same pattern used for the Trust and licensing seams.</p>
+    <p class="prose" style="color:var(--muted);font-size:14px">Phases 0–1 are <strong>built &amp; deployed</strong> (inert on prod, commit <code>80de64321</code>); the rest waits on the dev-team items below — the same inert-rollout pattern used for the Trust and licensing seams.</p>
   </section>
 
   <!-- ============ 8. WHAT WE NEED ============ -->
@@ -416,6 +420,42 @@
       <li>How Adeso's <strong>Build-booked disbursements</strong> relate to the tenant's <strong>own recorded</strong> disbursements — same events to <strong>reconcile</strong>, or <strong>complementary</strong>?</li>
     </ol>
 
+    <h3>Example of the sample payload we need <span class="pill build">item 7</span></h3>
+    <p class="prose">One real (redacted is fine) <strong>response</strong> from the Build finance API for a <strong>single</strong> analytic account is all we need to lock the contract. Names and structure can be whatever Build already returns — this only shows the <em>kind</em> of thing:</p>
+    <pre style="font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin:14px 0;overflow-x:auto;line-height:1.55;color:var(--ink)">{
+  "analytic_account_id": "4471",
+  "name": "QCF – Proximate Fund 2026",
+  "currency": "USD",
+  "as_of": "2026-07-31",
+  "budget_lines": [
+    { "category": "Grants to partners",        "planned": 500000 },
+    { "category": "Monitoring &amp; verification", "planned":  40000 }
+  ],
+  "actuals": [
+    { "category": "Grants to partners",        "spent": 312000, "date": "2026-07-31" },
+    { "category": "Monitoring &amp; verification", "spent":  18500, "date": "2026-07-31" }
+  ],
+  "disbursements": [
+    { "amount": 25000, "date": "2026-06-15", "reference": "PMT-0091" }
+  ]
+}</pre>
+    <p class="prose">We map their fields → our normalised shape. One sample answers, in a single shot:</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>What we need to know</th><th>Where the example shows it</th></tr></thead>
+        <tbody>
+          <tr><td>The <strong>account key</strong> we query</td><td><code>analytic_account_id</code> (= our <code>build_ref</code>)</td></tr>
+          <tr><td><strong>Budget</strong> per line</td><td><code>budget_lines[].category</code> + <code>planned</code></td></tr>
+          <tr><td><strong>Booked spend</strong> per line</td><td><code>actuals[].category</code> + <code>spent</code> + <code>date</code></td></tr>
+          <tr><td><strong>Payments / disbursements</strong></td><td><code>disbursements[].amount</code> + <code>date</code> + <code>reference</code></td></tr>
+          <tr><td><strong>Currency</strong> (+ where FX happens)</td><td><code>currency</code> — grant vs company (QAR/USD)?</td></tr>
+          <tr><td><strong>Sign convention</strong></td><td>are <code>spent</code> / <code>amount</code> positive, or credits/negatives?</td></tr>
+          <tr><td><strong>Freshness</strong></td><td>an <code>as_of</code> / <code>last_posted</code> timestamp?</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose" style="color:var(--muted);font-size:14px">If Build's real object names differ (e.g. <code>journal_items</code> instead of <code>actuals</code>, <code>amount_signed</code>, <code>partner_id</code> for the payee), <strong>just send it as-is</strong> — we adapt <code>normalize()</code>. One representative example per object beats a written schema.</p>
+
     <h3>D · Isolation at the source (the security ask)</h3>
     <ol class="need" start="10">
       <li>Can the service account be <strong>scoped per analytic account</strong> (Odoo record rules), reading only the mapped account?</li>
@@ -435,7 +475,7 @@
   </section>
 
   <footer>
-    Kuja Build ↔ Networked Tenants · integration specification v0.1 · 14 Aug 2026<br>
+    Kuja Build ↔ Networked Tenants · integration specification v0.2 · 14 Aug 2026<br>
     Sibling of the Kuja-tenant platform spec. Trust excluded by design — Proximate &amp; Saxansaxo use community-based trust.
   </footer>
 
