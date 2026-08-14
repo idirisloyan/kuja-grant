@@ -36,6 +36,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isDev, setIsDev] = useState(false);
+  // Demo affordances (tenant switcher, one-click demo logins, shared
+  // password) only render when this is true — never on a live customer
+  // domain. Resolved from the host in the mount effect below.
+  const [demoMode, setDemoMode] = useState(false);
   // hydrated flips true after React mounts. Until then the submit button
   // stays disabled so a native HTML form submission can't fire — without
   // this, a user on a slow connection who clicks "Sign in" (or hits
@@ -55,12 +59,22 @@ export default function LoginPage() {
 
   useEffect(() => {
     setHydrated(true);
-    setIsDev(
-      typeof window !== 'undefined' && (
-        window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1'
-      ),
-    );
+    // Demo affordances (tenant switcher, one-click demo accounts, the
+    // shared demo password) must NEVER render on a live customer domain —
+    // a real tenant user should not learn other tenants exist, nor see a
+    // working set of test credentials. Gate them to internal surfaces:
+    //   - localhost / 127.0.0.1        (local dev)
+    //   - *.up.railway.app             (raw Railway URL used for cross-tenant QA)
+    //   - NEXT_PUBLIC_DEMO_MODE=true   (explicit staging/demo build)
+    // Branded hosts (proximate.kuja.org, saxansaxo.kuja.org, …) get a clean
+    // production login. Testers keep the ?network=<slug> escape hatch.
+    const host =
+      typeof window !== 'undefined' ? window.location.hostname : '';
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
+    const isInternal = host.endsWith('.up.railway.app');
+    const envForced = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+    setIsDev(isLocal);
+    setDemoMode(isLocal || isInternal || envForced);
   }, []);
 
   // Phase 708 — three tenants now have distinct demo identity sets.
@@ -362,12 +376,23 @@ export default function LoginPage() {
           <div className="rounded-2xl bg-card/95 backdrop-blur border border-border/40 shadow-2xl p-6 lg:p-8">
             {/* Phase 708 — Tenant switcher above the heading. Flips
                 branding + demo accounts in place; localStorage carries
-                X-Network-Override on every subsequent API call. */}
+                X-Network-Override on every subsequent API call.
+                Demo-only: on a live customer domain we render a static
+                tenant label instead, so a real user never sees the other
+                tenants exist (see demoMode gate). */}
             <div className="mb-4">
               <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
                 Sign in to
               </div>
-              <TenantSwitcher />
+              {demoMode ? (
+                <TenantSwitcher />
+              ) : (
+                <div className="inline-flex items-center rounded-lg bg-muted/60 p-1">
+                  <span className="rounded-md bg-background px-3.5 py-2 text-sm font-semibold text-foreground shadow-sm ring-1 ring-border">
+                    {tenantName}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="mb-6">
               <h2 className="kuja-display text-2xl text-foreground">Sign in</h2>
@@ -449,7 +474,10 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            {/* Demo login cards */}
+            {/* Demo login cards — demo-only. Hidden on live customer
+                domains so real users never see quick-login test accounts
+                or the shared demo password (see demoMode gate). */}
+            {demoMode && (
             <div className="mt-6 pt-6 border-t border-border">
               <p className="kuja-eyebrow text-[10px] mb-3">
                 {isNetworkTenant ? `Sign in as a ${tenantName} role` : 'Try a demo account'}
@@ -489,6 +517,7 @@ export default function LoginPage() {
                 Password: <code className="font-mono bg-muted px-1.5 py-0.5 rounded">pass123</code> for all demos
               </p>
             </div>
+            )}
 
             {isNetworkTenant && !isSax && (
               <div className="mt-5 pt-5 border-t border-border text-center">
