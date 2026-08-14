@@ -160,10 +160,10 @@
 <div class="wrap">
 
   <header class="masthead">
-    <div class="kicker">Integration Specification · v0.2 · draft</div>
+    <div class="kicker">Integration Specification · v0.3 · Trust seam shipped</div>
     <h1>Kuja Platform Integration</h1>
     <p class="lede">One platform from four products: the Kuja Link marketplace, the Grant system, the Trust due-diligence engine, and the Build ERP — joined by one login, one shared organisation, and one due-diligence engine. NGOs never pay.</p>
-    <div class="meta"><span>14 Aug 2026</span><span>Kuja platform team</span><span>Status: design, pre-build</span></div>
+    <div class="meta"><span>14 Aug 2026</span><span>Kuja platform team</span><span>Status: Seam 2 (Trust) built &amp; deployed · Link + Build pre-build</span></div>
   </header>
 
   <div class="decisions">
@@ -360,6 +360,12 @@
     <h2><span class="num">05</span> &nbsp;One due-diligence engine</h2>
     <p class="prose">The grant app already carries a <strong>fork of the Trust engine</strong> — same two-pillar model, identical weights, same checks, its own passport + credential — that has drifted behind. "Reuse Trust" means <strong>Grant calls Trust and we retire the fork</strong>, which also erases three real bugs it carries.</p>
 
+    <div class="callout teal">
+      <div class="h">Shipped 14 Aug 2026 · Phase 3 code, live in prod</div>
+      <p>Trust now exposes authenticated service endpoints (<code>/api/service/trust-profile</code>, <code>/api/service/screening/run</code>; bearer <code>KUJA_TRUST_SERVICE_TOKEN</code>, constant-time compare). Grant delegates through an engine selector <code>KUJA_TRUST_ENGINE = local | shadow | remote</code>, verified end-to-end from inside the grant container. Left on <code>local</code>, so prod behaviour is unchanged.</p>
+      <p>Grant always calls Trust's <strong>live prod URL</strong> — never a pinned copy — so every new Trust deploy is picked up automatically; the only stable contract is the <code>/api/service/*</code> response shape. <strong>The shadow&rarr;remote cutover is held until the identity backfill lands</strong> (&sect;09), so parity is measured on real orgs, not just the seeded demo org.</p>
+    </div>
+
     <figure>
       <svg viewBox="0 0 900 430" role="img" aria-label="Before: the grant app contains its own duplicated due-diligence engine with three bugs. After: the engine moves to the Trust app. The grant app keeps its lifecycle gates and reads results from Trust over an API.">
         <defs><marker id="arB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="mk-teal"/></marker></defs>
@@ -505,19 +511,24 @@
       <div class="phase"><div class="pnum">0</div><div><h3>Identity foundation</h3><p>Stamp <code>partner_id</code> onto Grant <code>Organization</code>; Odoo as OIDC provider; map the 1,700 members.</p></div><span class="size m">M</span></div>
       <div class="phase"><div class="pnum">1</div><div><h3>SSO launch + "Grants" tile</h3><p>Members click through into Grant, no second login; auto-provision on first entry.</p></div><span class="size m">M</span></div>
       <div class="phase"><div class="pnum">2</div><div><h3>Entitlements + licensing</h3><p>Admin toggles for <code>grant_licensed</code> and <code>has_kuja_build</code>; donor publishing gated; NGO paths untouched.</p></div><span class="size s">S</span></div>
-      <div class="phase"><div class="pnum">3</div><div><h3>Trust delegation — read path</h3><p>Grant reads screening + scores + passport from Trust; run both engines in parallel to compare, then switch.</p></div><span class="size l">L</span></div>
+      <div class="phase"><div class="pnum">3</div><div><h3>Trust delegation — read path &nbsp;<span class="pill good">code shipped</span></h3><p>Grant reads screening + scores + passport from Trust; run both engines in parallel to compare, then switch. <strong>Live in prod behind <code>KUJA_TRUST_ENGINE=local</code>; only the shadow&rarr;remote flip waits on the Phase 0 identity map.</strong></p></div><span class="size l">L</span></div>
       <div class="phase"><div class="pnum">4</div><div><h3>Retire the DD fork + fix 3 bugs</h3><p>Delete Grant's duplicate DD services; the fixes come free from Trust.</p></div><span class="size m">M</span></div>
       <div class="phase"><div class="pnum">5</div><div><h3>Financial-source abstraction</h3><p>Grant's <code>financial_source</code> (erp | manual); the manual/upload path made source-equivalent for compliance.</p></div><span class="size m">M</span></div>
       <div class="phase"><div class="pnum">6</div><div><h3>Build feed + dashboard share</h3><p>Authenticated Build to Grant feed for ERP customers; the magic-link share aligned to our security review.</p></div><span class="size l">L</span></div>
     </div>
-    <p class="prose" style="color:var(--muted);font-size:14px">Sizing is relative effort (S / M / L), not a schedule. Phases 0–2 are the visible "grant module on kuja.org"; 3–4 consolidate trust; 5–6 are the ERP upsell. Trust work (3–4) needs no Odoo dependency and can run in parallel.</p>
+    <p class="prose" style="color:var(--muted);font-size:14px">Sizing is relative effort (S / M / L), not a schedule. Phases 0–2 are the visible "grant module on kuja.org"; 3–4 consolidate trust; 5–6 are the ERP upsell. Trust work (3–4) needs no Odoo dependency and can run in parallel — <strong>Phase 3 code is already shipped</strong> (behind the <code>local</code> flag); only the shadow&rarr;remote flip waits on the Phase 0 identity map.</p>
   </section>
 
   <!-- ============ 9. OPEN QUESTIONS + NEEDS ============ -->
   <section>
     <div class="sec-head"><span class="eyebrow">Before we build</span></div>
     <h2><span class="num">09</span> &nbsp;Open questions &amp; what we need</h2>
-    <p class="prose">The Grant and Trust code is all in hand. The unknowns are on the two Odoo environments — Link and Build. Your team has stood up test environments for both; with access plus one sample payload we can start immediately.</p>
+    <p class="prose">The Grant&harr;Trust seam is built and deployed; the one remaining input is the identity mapping (below). The other unknowns are on the two Odoo environments — Link and Build. Your team has stood up test environments for both; with access plus one sample payload we can start immediately.</p>
+
+    <div class="callout teal">
+      <div class="h">Immediate ask · unblocks the shipped Trust path</div>
+      <p>One item stands between the deployed Trust integration and a live remote cutover: the <strong>org identity mapping</strong> — for each Grant <code>Organization</code>, its Odoo <code>res.partner</code> id (a CSV of <code>grant org id</code> / <code>email</code> &rarr; <code>partner_id</code>, or the Odoo member export). We backfill <code>Organization.kuja_partner_id</code> (Grant) and <code>organizations.external_ref</code> (Trust) from it, then flip <code>KUJA_TRUST_ENGINE</code> shadow &rarr; remote and retire the fork. Nothing else is blocked on it.</p>
+    </div>
 
     <div class="grid2">
       <div class="card"><span class="eyebrow">Open questions</span>
@@ -544,7 +555,7 @@
   </section>
 
   <footer>
-    Kuja Platform Integration · integration specification v0.2 · 14 Aug 2026<br>
+    Kuja Platform Integration · integration specification v0.3 · 14 Aug 2026<br>
     Kuja Link (Odoo 18) · Kuja Grant (Flask + Next) · Kuja Trust (Node + Postgres) · Kuja Build (Odoo 18) — four products, one shared organisation identity.
   </footer>
 
