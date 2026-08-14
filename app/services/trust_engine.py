@@ -17,6 +17,16 @@ us cut over safely, one surface at a time, behind an env flag:
             Trust and log any divergence. This is how we validate parity
             before flipping 'remote' on — "run both in parallel to compare."
 
+TENANT GUARD (multi-tenant safety): only the default Kuja network is wired to
+the standalone Kuja Trust app — its NGOs authenticate through Kuja Link and
+carry a shared res.partner identity. Every other tenant keeps its own local
+engine and must NEVER reach remote Trust, whatever KUJA_TRUST_ENGINE says:
+Proximate and Saxansaxo do *community-based* trust, and NEAR runs an admin-led
+process. So remote/shadow only ever engage for the 'kuja' tenant; for any other
+resolved tenant — or when no tenant is resolved (background jobs) — we fail safe
+to local. This makes the engine flag safe to flip globally once identity
+backfill lands, without leaking one tenant's delegation into another.
+
 Nothing imports this module yet; wiring individual read surfaces onto
 `get_trust_profile()` is the next step. Until then it is inert.
 """
@@ -34,6 +44,33 @@ def _mode() -> str:
     change) and fail safe to 'local' for any unrecognised value."""
     mode = (os.environ.get('KUJA_TRUST_ENGINE', 'local') or 'local').strip().lower()
     return mode if mode in _VALID_MODES else 'local'
+
+
+def _current_network_slug() -> str | None:
+    """Slug of the tenant resolved for the current request (set on flask.g by
+    the network-resolution middleware), or None when there is no request /
+    network context — e.g. a background job. Never raises."""
+    try:
+        from flask import g
+        net = getattr(g, 'network', None)
+        if net is not None:
+            return getattr(net, 'slug', None)
+    except Exception:
+        pass
+    return None
+
+
+def _tenant_allows_remote() -> bool:
+    """Tenant guard for the Kuja Trust engine.
+
+    True only for the default Kuja network — the sole tenant wired to the
+    standalone Kuja Trust app. Proximate/Saxansaxo (community trust), NEAR
+    (admin-led process), and any request without a resolved tenant all return
+    False and stay on the local engine. Deny-by-default: unknown tenant => no
+    remote delegation.
+    """
+    from app.models.network import DEFAULT_NETWORK_SLUG
+    return _current_network_slug() == DEFAULT_NETWORK_SLUG
 
 
 def _org_ref(org) -> str:
@@ -61,6 +98,15 @@ def get_trust_profile(org_id: int) -> dict | None:
     mode = _mode()
 
     if mode == 'local':
+        return _local_profile(org_id)
+
+    # Tenant guard — non-Kuja tenants never delegate to remote Trust, no matter
+    # what KUJA_TRUST_ENGINE is set to. This keeps the engine flag safe to flip
+    # globally: only the 'kuja' tenant is wired to the standalone Trust app.
+    if not _tenant_allows_remote():
+        logger.debug(
+            'trust_engine: tenant=%s is not the Kuja network; serving local (mode=%s bypassed)',
+            _current_network_slug(), mode)
         return _local_profile(org_id)
 
     # remote / shadow both need the org to resolve a ref
@@ -127,8 +173,17 @@ def engine_status() -> dict:
     from app.services.trust_client import get_client
     client = get_client()
     reachable = client.health() if client.configured else False
+    mode = _mode()
+    tenant_slug = _current_network_slug()
+    allows_remote = _tenant_allows_remote()
+    # What this tenant would ACTUALLY use right now: the configured mode unless
+    # the tenant guard forces it back to local.
+    effective_mode = mode if (mode == 'local' or allows_remote) else 'local'
     return {
-        'mode': _mode(),
+        'mode': mode,
+        'effective_mode': effective_mode,
+        'tenant_slug': tenant_slug,
+        'tenant_allows_remote': allows_remote,
         'remote_configured': client.configured,
         'remote_reachable': reachable,
         'base_url_set': bool(client.base_url),

@@ -23,6 +23,7 @@ import { JourneyRail } from '@/components/dashboards/journey-rail';
 import { WhatsNewBanner } from '@/components/layout/whats-new-banner';
 import { OfflineQueuePanel } from '@/components/layout/offline-queue-panel';
 import { ProximateBottomNav } from '@/components/proximate/bottom-nav';
+import { LicenseRequiredDialog } from '@/components/licensing/license-required-dialog';
 
 const SIDEBAR_WIDTH = 280;
 const COLLAPSED_WIDTH = 72;
@@ -149,6 +150,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Phase 2 — Cmd+K command palette. Listens for Cmd/Ctrl+K and "/"
             anywhere in the app. */}
         <CommandPalette />
+        {/* Kuja licensing (Phase 2) — global "grant licence required" prompt.
+            Self-gated: only appears when the server 403s a publish/award with
+            license_required (enforcement is OFF by default, so inert today). */}
+        <LicenseRequiredDialog />
       </div>
     </OnboardingTourProvider>
   );

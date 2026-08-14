@@ -28,6 +28,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
+import { isLicenseRequired } from '@/lib/license-gate';
 import { useApplications } from '@/lib/hooks/use-api';
 import { cn } from '@/lib/utils';
 import { RecencyChip } from '@/components/shared/recency-chip';
@@ -204,8 +205,13 @@ export function ApplicationKanban() {
       setOptimistic((p) => {
         const next = { ...p }; delete next[id]; return next;
       });
-      setError(e instanceof Error ? e.message : 'Move failed');
-      setTimeout(() => setError(null), 4000);
+      // Licensing (Phase 2): a 403 license_required (unlicensed donor awarding)
+      // already triggers the global "licence required" dialog via the API
+      // client — don't also flash the inline error banner.
+      if (!isLicenseRequired(e)) {
+        setError(e instanceof Error ? e.message : 'Move failed');
+        setTimeout(() => setError(null), 4000);
+      }
     } finally {
       setMovingId(null);
     }

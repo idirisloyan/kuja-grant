@@ -152,6 +152,10 @@ export interface Grant {
   reporting_frequency?: string | null;
   application_count?: number;
   user_application_status?: string | null;
+  // Kuja Build financial-source mapping (inert until KUJA_BUILD_* is configured).
+  financial_source?: 'erp' | 'manual';
+  build_ref?: string | null;
+  financial_synced_at?: string | null;
 }
 
 // ---------------------------------------------------------------------------

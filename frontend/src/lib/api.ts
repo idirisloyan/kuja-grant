@@ -125,6 +125,16 @@ async function apiFetch<T>(
         && !window.location.pathname.startsWith('/change-password')) {
       window.location.href = '/change-password';
     }
+    // Kuja licensing (Phase 2): a donor without an active grant licence is 403'd
+    // on publish/award when enforcement is on. Fire a global event so a single
+    // mounted dialog can show a friendly "licence required" prompt, wherever the
+    // call originated. Enforcement is OFF by default, so this never fires in
+    // prod today. Lazy import keeps license-gate out of any require cycle.
+    if (res.status === 403 && (code === 'license_required' || body.error === 'license_required')) {
+      import('./license-gate')
+        .then((m) => m.promptLicenseRequired({ message: body.message }))
+        .catch(() => { /* non-critical */ });
+    }
     throw new ApiError(res.status, message, code);
   }
 

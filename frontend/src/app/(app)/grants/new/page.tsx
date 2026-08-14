@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { isLicenseRequired } from '@/lib/license-gate';
 import { CriteriaTemplatePicker } from '@/components/grants/criteria-template-picker';
 import { fetchGrantScaffold } from '@/lib/copilot-api';
 import { toast } from 'sonner';
@@ -790,8 +791,13 @@ export default function CreateGrantPage() {
       toast.success(t('toast.grant_published'));
       router.push('/grants');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to publish grant';
-      toast.error(msg);
+      // Licensing (Phase 2): the API client already fires the global
+      // "licence required" dialog for a 403 license_required, so suppress the
+      // raw error toast here to avoid a redundant, ugly message.
+      if (!isLicenseRequired(err)) {
+        const msg = err instanceof Error ? err.message : 'Failed to publish grant';
+        toast.error(msg);
+      }
     } finally {
       setPublishing(false);
     }

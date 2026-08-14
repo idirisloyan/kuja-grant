@@ -30,6 +30,7 @@ import { CriterionAveragesCard } from '@/components/grants/criterion-averages-ca
 import { ApplicationsReceivedTable } from '@/components/grants/applications-received-table';
 import { AiVsHumanCard } from '@/components/grants/ai-vs-human-card';
 import { ReviewerPanelCard } from '@/components/grants/reviewer-panel-card';
+import { BuildFinancialSourceCard } from '@/components/build-integration/build-financial-source-card';
 import { PeersWatching } from '@/components/grants/peers-watching';
 import { AiScoreHistogram } from '@/components/grants/ai-score-histogram';
 import { api } from '@/lib/api';
@@ -359,7 +360,18 @@ export default function GrantDetailClient() {
           ))}
         </div>
 
-        {tab === 'overview' && <OverviewTab grant={grant} t={t} formatDeadline={formatDeadline} />}
+        {tab === 'overview' && (
+          <>
+            <OverviewTab grant={grant} t={t} formatDeadline={formatDeadline} />
+            {/* Kuja Build financial-source mapping — admin operator control.
+                Inert until KUJA_BUILD_* is configured server-side. */}
+            {user?.role === 'admin' && (
+              <div className="mt-4">
+                <BuildFinancialSourceCard grant={grant} />
+              </div>
+            )}
+          </>
+        )}
         {tab === 'eligibility' && <EligibilityTab requirements={grant.eligibility ?? []} t={t} />}
         {tab === 'criteria' && <CriteriaTab criteria={grant.criteria ?? []} t={t} />}
         {tab === 'documents' && <DocumentsTab requirements={grant.doc_requirements ?? []} t={t} />}
