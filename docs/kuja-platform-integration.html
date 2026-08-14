@@ -1,0 +1,551 @@
+<title>Kuja Platform Integration</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --ground:#F4F6F4; --surface:#FFFFFF; --surface-2:#ECF1ED; --raise:#FFFFFF;
+    --ink:#16211E; --muted:#586A63; --faint:#7D8C86; --line:#D7DED8;
+    --teal:#0E5A54; --teal-ink:#0E5A54; --teal-soft:#E1EEEB;
+    --amber:#A9661A; --amber-soft:#F3E7D2;
+    --indigo:#3E5C8A; --indigo-soft:#E4EAF3;
+    --good:#2E7D5B; --warn:#A9781C; --crit:#B03A3A;
+    --good-soft:#E2F0E8; --warn-soft:#F4EAD5; --crit-soft:#F5E1E1;
+    --shadow:0 1px 2px rgba(20,40,34,.05),0 6px 20px rgba(20,40,34,.06);
+    --radius:10px;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#0E1513; --surface:#16201D; --surface-2:#1D2925; --raise:#1B2723;
+      --ink:#E9EFEB; --muted:#9AABA4; --faint:#7C8D86; --line:#2A3833;
+      --teal:#4BC9BA; --teal-ink:#8FE0D5; --teal-soft:#123330;
+      --amber:#E0A45B; --amber-soft:#33271A;
+      --indigo:#86A6D8; --indigo-soft:#1B2740;
+      --good:#5FBE92; --warn:#D9A94E; --crit:#DE7C7C;
+      --good-soft:#14302A; --warn-soft:#302819; --crit-soft:#331F1F;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0E1513; --surface:#16201D; --surface-2:#1D2925; --raise:#1B2723;
+    --ink:#E9EFEB; --muted:#9AABA4; --faint:#7C8D86; --line:#2A3833;
+    --teal:#4BC9BA; --teal-ink:#8FE0D5; --teal-soft:#123330;
+    --amber:#E0A45B; --amber-soft:#33271A;
+    --indigo:#86A6D8; --indigo-soft:#1B2740;
+    --good:#5FBE92; --warn:#D9A94E; --crit:#DE7C7C;
+    --good-soft:#14302A; --warn-soft:#302819; --crit-soft:#331F1F;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+    line-height:1.6;-webkit-font-smoothing:antialiased;font-size:16px}
+  .wrap{max-width:980px;margin:0 auto;padding:clamp(20px,5vw,64px) clamp(18px,5vw,40px)}
+  .prose{max-width:70ch}
+  a{color:var(--teal);text-underline-offset:2px}
+  h1,h2,h3{text-wrap:balance;line-height:1.15;margin:0}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);font-weight:600}
+  .teal-eyebrow{color:var(--teal-ink)}
+  .build-eyebrow{color:var(--indigo)}
+  header.masthead{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:12px}
+  .kicker{font-family:var(--mono);font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  h1{font-size:clamp(30px,5vw,46px);font-weight:680;letter-spacing:-.02em;margin:14px 0 10px}
+  .lede{font-size:clamp(17px,2.4vw,20px);color:var(--muted);max-width:62ch;margin:0}
+  .meta{font-family:var(--mono);font-size:12.5px;color:var(--faint);margin-top:18px;display:flex;
+    gap:18px;flex-wrap:wrap}
+  .decisions{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:26px 0 6px}
+  .chip{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;box-shadow:var(--shadow);border-left:3px solid var(--teal)}
+  .chip .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .chip .val{font-weight:640;margin-top:5px;font-size:15px}
+  .chip .val small{display:block;font-weight:400;color:var(--muted);font-size:12.5px;margin-top:3px;font-family:var(--sans);line-height:1.4}
+  .chip.b{border-left-color:var(--indigo)}
+  section{margin-top:52px}
+  h2{font-size:clamp(22px,3.2vw,29px);font-weight:660;letter-spacing:-.015em;margin-top:10px}
+  h3{font-size:18px;font-weight:640;margin:26px 0 6px}
+  p{margin:14px 0}
+  .sec-head{border-top:1px solid var(--line);padding-top:14px}
+  .num{font-family:var(--mono);color:var(--amber);font-weight:600}
+  strong{font-weight:640}
+  code{font-family:var(--mono);font-size:.85em;background:var(--surface-2);padding:1.5px 6px;border-radius:5px;color:var(--ink)}
+  ul,ol{margin:14px 0;padding-left:22px}
+  li{margin:7px 0}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px 22px;box-shadow:var(--shadow)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr}}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin:18px 0}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:560px;background:var(--surface)}
+  th,td{text-align:left;padding:12px 15px;border-bottom:1px solid var(--line);vertical-align:top}
+  thead th{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--muted);font-weight:600;background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:none}
+  td .sys{font-weight:640}
+  td code{white-space:nowrap}
+  .pill{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.03em;
+    padding:2px 8px;border-radius:20px;white-space:nowrap}
+  .pill.good{background:var(--good-soft);color:var(--good)}
+  .pill.warn{background:var(--warn-soft);color:var(--warn)}
+  .pill.crit{background:var(--crit-soft);color:var(--crit)}
+  .pill.teal{background:var(--teal-soft);color:var(--teal-ink)}
+  .pill.amber{background:var(--amber-soft);color:var(--amber)}
+  .pill.build{background:var(--indigo-soft);color:var(--indigo)}
+  figure{margin:26px 0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px 20px 14px;box-shadow:var(--shadow)}
+  figure svg{display:block;width:100%;height:auto;color:var(--ink)}
+  figure svg text{fill:currentColor}
+  figure svg .tmut{fill:var(--muted)}
+  figure svg .tfaint{fill:var(--faint)}
+  figure svg .tteal{fill:var(--teal-ink)}
+  figure svg .tamber{fill:var(--amber)}
+  figure svg .tbuild{fill:var(--indigo)}
+  figure svg .tcrit{fill:var(--crit)}
+  figure svg .fsurf{fill:var(--surface)}
+  figure svg .fsurf2{fill:var(--surface-2)}
+  figure svg .fteal{fill:var(--teal-soft)}
+  figure svg .fbuild{fill:var(--indigo-soft)}
+  figure svg .fcrit{fill:var(--crit-soft)}
+  figure svg .fcur{fill:currentColor}
+  figure svg .fnone{fill:none}
+  figure svg .sline{stroke:var(--line)}
+  figure svg .steal{stroke:var(--teal)}
+  figure svg .samber{stroke:var(--amber)}
+  figure svg .sbuild{stroke:var(--indigo)}
+  figure svg .scrit{stroke:var(--crit)}
+  figure svg .scur{stroke:currentColor}
+  figure svg .mk-cur{fill:currentColor}
+  figure svg .mk-teal{fill:var(--teal)}
+  figure svg .mk-amber{fill:var(--amber)}
+  figure svg .mk-build{fill:var(--indigo)}
+  figcaption{font-size:13px;color:var(--muted);margin-top:12px;text-align:center;font-family:var(--mono);letter-spacing:.02em}
+  .callout{border-left:3px solid var(--amber);background:var(--amber-soft);border-radius:0 var(--radius) var(--radius) 0;padding:16px 20px;margin:20px 0}
+  .callout.teal{border-left-color:var(--teal);background:var(--teal-soft)}
+  .callout.build{border-left-color:var(--indigo);background:var(--indigo-soft)}
+  .callout .h{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--amber);margin-bottom:6px}
+  .callout.teal .h{color:var(--teal-ink)}
+  .callout.build .h{color:var(--indigo)}
+  .callout p{margin:6px 0}
+  ol.steps{list-style:none;padding:0;counter-reset:s;margin:18px 0}
+  ol.steps>li{counter-increment:s;position:relative;padding:14px 16px 14px 56px;background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--radius);margin:9px 0;box-shadow:var(--shadow)}
+  ol.steps>li::before{content:counter(s,decimal-leading-zero);position:absolute;left:16px;top:14px;
+    font-family:var(--mono);font-size:13px;font-weight:600;color:var(--amber)}
+  ol.steps.t>li::before{color:var(--indigo)}
+  ol.steps>li.gate{border-left:3px solid var(--teal)}
+  ol.steps>li.gateb{border-left:3px solid var(--indigo)}
+  ol.steps>li b{font-weight:640}
+  ol.steps>li .note{color:var(--muted);font-size:14px}
+  .phase{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:start;padding:16px 0;border-bottom:1px solid var(--line)}
+  .phase:last-child{border-bottom:none}
+  .phase .pnum{font-family:var(--mono);font-weight:700;font-size:20px;color:var(--teal-ink);line-height:1.2}
+  .phase h3{margin:0 0 4px}
+  .phase p{margin:0;color:var(--muted);font-size:14.5px}
+  .size{font-family:var(--mono);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;
+    background:var(--surface-2);color:var(--muted);white-space:nowrap;letter-spacing:.04em}
+  .size.s{color:var(--good);background:var(--good-soft)}
+  .size.m{color:var(--warn);background:var(--warn-soft)}
+  .size.l{color:var(--crit);background:var(--crit-soft)}
+  ul.check{list-style:none;padding:0}
+  ul.check li{padding-left:26px;position:relative}
+  ul.check li::before{content:"\2192";position:absolute;left:0;color:var(--amber);font-family:var(--mono)}
+  .contract{font-family:var(--mono);font-size:13px;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:var(--radius);padding:16px 18px;margin:16px 0;overflow-x:auto;line-height:1.7}
+  .contract .k{color:var(--teal-ink)}
+  .contract .c{color:var(--faint)}
+  footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:var(--faint);
+    font-family:var(--mono);font-size:12px;line-height:1.7}
+  .free{color:var(--good);font-weight:640}
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="kicker">Integration Specification · v0.2 · draft</div>
+    <h1>Kuja Platform Integration</h1>
+    <p class="lede">One platform from four products: the Kuja Link marketplace, the Grant system, the Trust due-diligence engine, and the Build ERP — joined by one login, one shared organisation, and one due-diligence engine. NGOs never pay.</p>
+    <div class="meta"><span>14 Aug 2026</span><span>Kuja platform team</span><span>Status: design, pre-build</span></div>
+  </header>
+
+  <div class="decisions">
+    <div class="chip"><div class="lbl">Decision · Odoo</div><div class="val">In-house, full control<small>Odoo can be a custom module host + identity provider.</small></div></div>
+    <div class="chip"><div class="lbl">Decision · Due diligence</div><div class="val">Reuse Trust as the engine<small>Grant calls the standalone Trust app; no second copy.</small></div></div>
+    <div class="chip"><div class="lbl">Decision · Licensing</div><div class="val">Lives in the Grant app<small>Platform admins grant/revoke a donor's licence.</small></div></div>
+    <div class="chip b"><div class="lbl">Model · ERP financials</div><div class="val">Real-time if on Build<small>No ERP → upload reports. Compliance works either way.</small></div></div>
+  </div>
+
+  <!-- ============ 1. OVERVIEW ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow">Overview</span></div>
+    <h2><span class="num">01</span> &nbsp;Scope &amp; the four products</h2>
+    <p class="prose">This spec defines three integration seams around the main <strong>Kuja</strong> tenant. It does <em>not</em> merge codebases — each product keeps its own stack. It connects them through a shared identity and a shared organisation record so a member experiences one platform.</p>
+
+    <div class="grid2">
+      <div class="card"><span class="eyebrow teal-eyebrow">In scope</span>
+        <ul class="check" style="margin-top:8px">
+          <li>Single sign-on from Kuja Link into Grant</li>
+          <li>Donor licensing + the NGOs-free guarantee</li>
+          <li>Grant delegating due diligence to Trust</li>
+          <li>Build ERP financials feeding Grant's compliance &amp; reporting</li>
+          <li>One shared organisation identity across all four</li>
+        </ul>
+      </div>
+      <div class="card"><span class="eyebrow">Non-goals (for now)</span>
+        <ul class="check" style="margin-top:8px">
+          <li>Merging the Grant and Trust databases</li>
+          <li>Rebuilding grant dashboards or compliance inside Odoo</li>
+          <li>Moving billing out of Odoo</li>
+          <li>Other tenants (NEAR / Proximate / Saxansaxo) — Kuja tenant first</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>System</th><th>Role in the platform</th><th>Stack</th><th>Owns</th></tr></thead>
+        <tbody>
+          <tr><td><span class="sys">Kuja Link</span><br><span class="pill amber">front door</span></td><td>The network &amp; marketplace — 1,700 NGO members + donors. Identity provider.</td><td>Odoo 18</td><td>Members, profiles, billing, matching</td></tr>
+          <tr><td><span class="sys">Kuja Grant</span><br><span class="pill">the hub</span></td><td>Publish, apply, review, award, report, comply. The licensed module.</td><td>Flask + Next</td><td>Grants, budgets, compliance, reporting</td></tr>
+          <tr><td><span class="sys">Kuja Trust</span><br><span class="pill teal">the engine</span></td><td>Screening, capacity, the signed Capacity Passport.</td><td>Node + Postgres</td><td>Due diligence, scores, credentials</td></tr>
+          <tr><td><span class="sys">Kuja Build</span><br><span class="pill build">the ledger</span></td><td>Accounting &amp; finance ERP, sold as an upsell. Feeds live financials.</td><td>Odoo 18</td><td>Ledger, actuals, disbursements</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 2. CORE IDEA + MAP ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow">Architecture</span></div>
+    <h2><span class="num">02</span> &nbsp;Link is the backbone; Grant is the hub</h2>
+    <p class="prose"><strong>Kuja Link (Odoo) owns identity and membership.</strong> Grant, Trust, and Build all key off <strong>one shared organisation record</strong>. A member logs in once at kuja.org; a launcher opens Grant; Grant leans on Trust for due diligence and on Build for live financials. Same person, same org, everywhere.</p>
+
+    <figure>
+      <svg viewBox="0 0 940 512" role="img" aria-label="Kuja Link (Odoo) is the identity provider. A member logs in once and launches Kuja Grant over single sign-on carrying entitlements. Grant calls Kuja Trust for due diligence and receives a financial feed from Kuja Build. All four products key off one shared organisation identity.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="mk-cur"/></marker>
+          <marker id="ar-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="mk-amber"/></marker>
+          <marker id="ar-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="mk-teal"/></marker>
+          <marker id="ar-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="mk-build"/></marker>
+        </defs>
+        <!-- member -->
+        <g font-family="ui-monospace,monospace" font-size="12.5" text-anchor="middle">
+          <circle cx="55" cy="108" r="15" class="fnone scur" stroke-width="1.5"/>
+          <path d="M55 116 c-13 0 -20 8 -20 18 h40 c0 -10 -7 -18 -20 -18z" class="fcur" opacity=".75"/>
+          <text x="55" y="160">Member</text>
+          <text x="55" y="177" class="tfaint" font-size="11">NGO or donor</text>
+        </g>
+        <line x1="76" y1="108" x2="116" y2="108" class="scur" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="96" y="99" font-family="ui-monospace,monospace" font-size="10" class="tmut" text-anchor="middle">logs in once</text>
+
+        <!-- Link -->
+        <rect x="120" y="52" width="196" height="152" rx="10" class="fsurf samber" stroke-width="1.5"/>
+        <text x="218" y="80" font-family="system-ui" font-size="15" font-weight="700" text-anchor="middle">Kuja Link</text>
+        <text x="218" y="98" font-family="ui-monospace,monospace" font-size="10.5" class="tamber" text-anchor="middle">Odoo 18 · identity</text>
+        <line x1="140" y1="108" x2="296" y2="108" class="samber" stroke-width="1" opacity=".35"/>
+        <g font-family="system-ui" font-size="12" text-anchor="middle">
+          <text x="218" y="130">Identity provider (OIDC)</text>
+          <text x="218" y="150">Membership · billing</text>
+          <text x="218" y="170">Profiles · matching</text>
+        </g>
+        <text x="218" y="191" font-family="ui-monospace,monospace" font-size="10" class="tamber" text-anchor="middle">the front door</text>
+
+        <!-- Link -> Grant -->
+        <line x1="316" y1="118" x2="398" y2="118" class="samber" stroke-width="2" marker-end="url(#ar-a)"/>
+        <text x="357" y="107" font-family="ui-monospace,monospace" font-size="10" class="tamber" text-anchor="middle">SSO +</text>
+        <text x="357" y="134" font-family="ui-monospace,monospace" font-size="10" class="tamber" text-anchor="middle">entitlements</text>
+
+        <!-- Grant hub -->
+        <rect x="400" y="66" width="170" height="124" rx="10" class="fsurf sline" stroke-width="1.8"/>
+        <text x="485" y="93" font-family="system-ui" font-size="15" font-weight="700" text-anchor="middle">Kuja Grant</text>
+        <text x="485" y="110" font-family="ui-monospace,monospace" font-size="10.5" class="tmut" text-anchor="middle">Flask + Next · hub</text>
+        <g font-family="system-ui" font-size="12" text-anchor="middle">
+          <text x="485" y="134">publish · apply</text>
+          <text x="485" y="153">review · award</text>
+          <text x="485" y="172">report · comply</text>
+        </g>
+
+        <!-- Grant -> Trust -->
+        <line x1="570" y1="118" x2="653" y2="118" class="steal" stroke-width="2" marker-end="url(#ar-t)"/>
+        <text x="612" y="107" font-family="ui-monospace,monospace" font-size="10" class="tteal" text-anchor="middle">DD / passport</text>
+        <text x="612" y="134" font-family="ui-monospace,monospace" font-size="10" class="tteal" text-anchor="middle">API</text>
+
+        <!-- Trust -->
+        <rect x="655" y="52" width="200" height="152" rx="10" class="fteal steal" stroke-width="1.5"/>
+        <text x="755" y="80" font-family="system-ui" font-size="15" font-weight="700" text-anchor="middle">Kuja Trust</text>
+        <text x="755" y="98" font-family="ui-monospace,monospace" font-size="10.5" class="tteal" text-anchor="middle">the engine</text>
+        <g font-family="system-ui" font-size="12" text-anchor="middle">
+          <text x="755" y="128">screening · scoring</text>
+          <text x="755" y="148">passport · VC</text>
+          <text x="755" y="168">funder policy</text>
+        </g>
+        <text x="755" y="191" font-family="ui-monospace,monospace" font-size="10" class="tteal" text-anchor="middle">one DD engine</text>
+
+        <!-- Build -> Grant (up) -->
+        <line x1="485" y1="300" x2="485" y2="192" class="sbuild" stroke-width="2" marker-end="url(#ar-b)"/>
+        <text x="500" y="238" font-family="ui-monospace,monospace" font-size="10" class="tbuild">financial feed</text>
+        <text x="500" y="254" font-family="ui-monospace,monospace" font-size="10" class="tbuild">ERP customers</text>
+
+        <!-- Build -->
+        <rect x="400" y="300" width="170" height="120" rx="10" class="fbuild sbuild" stroke-width="1.5"/>
+        <text x="485" y="328" font-family="system-ui" font-size="15" font-weight="700" text-anchor="middle">Kuja Build</text>
+        <text x="485" y="346" font-family="ui-monospace,monospace" font-size="10.5" class="tbuild" text-anchor="middle">Odoo ERP</text>
+        <g font-family="system-ui" font-size="12" text-anchor="middle">
+          <text x="485" y="374">accounting · finance</text>
+          <text x="485" y="394">ledger · actuals</text>
+        </g>
+
+        <!-- identity ribbon -->
+        <rect x="120" y="452" width="735" height="52" rx="8" class="fsurf2 sline" stroke-width="1"/>
+        <text x="138" y="474" font-family="ui-monospace,monospace" font-size="11" class="tmut">ONE SHARED ORGANISATION IDENTITY</text>
+        <text x="138" y="492" font-family="ui-monospace,monospace" font-size="12">res.partner  ↔  Grant Organization  ↔  Trust org  ↔  Build company</text>
+        <line x1="218" y1="204" x2="218" y2="452" class="sline" stroke-width="1" stroke-dasharray="4 4"/>
+        <line x1="755" y1="204" x2="755" y2="452" class="sline" stroke-width="1" stroke-dasharray="4 4"/>
+        <line x1="485" y1="420" x2="485" y2="452" class="sline" stroke-width="1" stroke-dasharray="4 4"/>
+      </svg>
+      <figcaption>Amber = identity seam (Link) · Teal = due-diligence seam (Trust) · Indigo = finance seam (Build) · Grant is the neutral hub.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ 3. IDENTITY & ENTITLEMENTS ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow">Foundation</span></div>
+    <h2><span class="num">03</span> &nbsp;Identity &amp; entitlements</h2>
+    <p class="prose">Everything hangs on two ideas: <strong>one organisation identity</strong> shared across products, and <strong>entitlements</strong> that decide what a donor org may do. Both are small, explicit, and live where they're cheapest to reason about.</p>
+
+    <div class="grid2">
+      <div class="card"><span class="eyebrow teal-eyebrow">Shared organisation identity</span>
+        <p style="margin-top:10px">The Odoo <code>res.partner</code> id is the join key. It is stamped onto the Grant app's <code>Organization</code>, the Trust org, and the Build company — so "one member, one org, four products" is true by construction.</p>
+        <div class="contract"><span class="c"># Grant app: Organization (new column)</span><br>id<br>name<br><span class="k">kuja_partner_id</span>  <span class="c"># Odoo res.partner id — the join key</span><br>...</div>
+      </div>
+      <div class="card"><span class="eyebrow build-eyebrow">Entitlements (per donor org)</span>
+        <p style="margin-top:10px">Two independent flags, both read by Grant. Neither ever touches NGO capabilities.</p>
+        <div class="contract"><span class="k">grant_licensed</span>   <span class="c"># may publish &amp; award grants</span><br><span class="k">has_kuja_build</span>   <span class="c"># finance feed available (real-time)</span></div>
+        <p style="font-size:14px;color:var(--muted)">Source of record: Grant app admin. Billing stays in Odoo; the flags can later reconcile to it.</p>
+      </div>
+    </div>
+    <div class="callout">
+      <div class="h">The load-bearing rule</div>
+      <p>Entitlements gate <strong>donor</strong> powers only (publishing grants, live financials). Every NGO capability — applying, the capacity assessment, the Trust Passport, uploading reports — sits <em>outside</em> every entitlement check. NGOs are free by construction, not by policy.</p>
+    </div>
+  </section>
+
+  <!-- ============ 4. SEAM 1 ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow">Seam 1 · Link ↔ Grant</span></div>
+    <h2><span class="num">04</span> &nbsp;Single sign-on &amp; the licensed module</h2>
+    <p class="prose">Odoo acts as an <strong>OpenID Connect provider</strong>. A "Grants" tile in the Kuja Link portal launches the grant app with a signed token — no second password.</p>
+
+    <ol class="steps">
+      <li><b>Member is on kuja.org</b>, already signed in. A <b>Grants</b> tile appears for every member.</li>
+      <li><b>Click launches SSO.</b> Odoo redirects to Grant with an OIDC token: identity, email, Kuja Link org (<code>partner_id</code>), role, and the two entitlement claims.</li>
+      <li class="gate"><b>Grant provisions or links.</b> First time in, Grant creates (or matches by <code>partner_id</code>/email) an <code>Organization</code> + <code>User</code> in the Kuja tenant. No signup form.</li>
+      <li class="gate"><b>Entitlement check — inside Grant.</b> <span class="note">Licensed donor → full powers (open a programme, publish a call, award). Unlicensed → an upgrade path. NGO → full free access. Decided by Grant's own flags.</span></li>
+      <li><b>They land in the module</b> as the right persona, scoped to their org, one identity shared back to Link.</li>
+    </ol>
+
+    <div class="grid2">
+      <div class="card"><span class="eyebrow teal-eyebrow">Who gets what</span>
+        <p style="margin-top:10px"><span class="pill amber">Donor · licensed</span><br>Publish, run calls, review, award, request reports.</p>
+        <p><span class="pill teal">NGO member</span> <span class="free">always free</span><br>Discover &amp; apply, build a Trust Passport, upload reports.</p>
+        <p><span class="pill">Donor · unlicensed</span><br>Browse; publishing behind an upgrade prompt.</p>
+      </div>
+      <div class="card"><span class="eyebrow teal-eyebrow">Token claims (OIDC)</span>
+        <div class="contract" style="margin-top:8px"><span class="k">sub</span>            <span class="c"># stable user id</span><br><span class="k">email</span><br><span class="k">partner_id</span>     <span class="c"># the org join key</span><br><span class="k">org_name</span><br><span class="k">role</span>           <span class="c"># donor | ngo | ...</span><br><span class="k">grant_licensed</span> <span class="c"># optional; Grant may override</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5. SEAM 2 ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow">Seam 2 · Grant ↔ Trust</span></div>
+    <h2><span class="num">05</span> &nbsp;One due-diligence engine</h2>
+    <p class="prose">The grant app already carries a <strong>fork of the Trust engine</strong> — same two-pillar model, identical weights, same checks, its own passport + credential — that has drifted behind. "Reuse Trust" means <strong>Grant calls Trust and we retire the fork</strong>, which also erases three real bugs it carries.</p>
+
+    <figure>
+      <svg viewBox="0 0 900 430" role="img" aria-label="Before: the grant app contains its own duplicated due-diligence engine with three bugs. After: the engine moves to the Trust app. The grant app keeps its lifecycle gates and reads results from Trust over an API.">
+        <defs><marker id="arB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="mk-teal"/></marker></defs>
+        <text x="40" y="30" font-family="ui-monospace,monospace" font-size="12" letter-spacing="1.5" class="tmut">TODAY</text>
+        <rect x="40" y="44" width="360" height="150" rx="10" class="fsurf sline" stroke-width="1.5"/>
+        <text x="60" y="70" font-family="system-ui" font-size="14" font-weight="700">Kuja Grant</text>
+        <rect x="60" y="82" width="320" height="96" rx="8" class="fcrit scrit" stroke-width="1.2" stroke-dasharray="5 4"/>
+        <text x="74" y="104" font-family="ui-monospace,monospace" font-size="11" class="tcrit">DUPLICATE DD ENGINE — a fork of Trust</text>
+        <g font-family="system-ui" font-size="12"><text x="74" y="126">compliance_service · trust_profile</text><text x="74" y="146">vc_service · scoring</text></g>
+        <text x="74" y="168" font-family="ui-monospace,monospace" font-size="10.5" class="tcrit">3 bugs · drifts from the standalone</text>
+        <text x="450" y="115" font-family="ui-monospace,monospace" font-size="22" class="tmut" text-anchor="middle">→</text>
+        <text x="450" y="138" font-family="ui-monospace,monospace" font-size="10.5" class="tmut" text-anchor="middle">consolidate</text>
+        <text x="500" y="30" font-family="ui-monospace,monospace" font-size="12" letter-spacing="1.5" class="tteal">TARGET</text>
+        <rect x="500" y="44" width="360" height="150" rx="10" class="fsurf sline" stroke-width="1.5"/>
+        <text x="520" y="70" font-family="system-ui" font-size="14" font-weight="700">Kuja Grant</text>
+        <rect x="520" y="82" width="320" height="96" rx="8" class="fsurf2 sline" stroke-width="1.1"/>
+        <text x="534" y="104" font-family="ui-monospace,monospace" font-size="11" class="tmut">KEEPS ITS LIFECYCLE WRAPPER</text>
+        <g font-family="system-ui" font-size="12"><text x="534" y="126">capacity gate · diligence Q&amp;A room</text><text x="534" y="146">reviewer view (reads Trust)</text></g>
+        <text x="534" y="168" font-family="ui-monospace,monospace" font-size="10.5" class="tteal">no screening logic of its own</text>
+        <line x1="680" y1="194" x2="680" y2="250" class="steal" stroke-width="2" marker-end="url(#arB)"/>
+        <text x="700" y="226" font-family="ui-monospace,monospace" font-size="10.5" class="tteal">calls</text>
+        <rect x="500" y="252" width="360" height="150" rx="10" class="fteal steal" stroke-width="1.5"/>
+        <text x="520" y="280" font-family="system-ui" font-size="14" font-weight="700">Kuja Trust — the shared engine</text>
+        <g font-family="system-ui" font-size="12.5">
+          <text x="520" y="306">▸ live screening: OpenSanctions · SAM.gov · PEP · adverse media</text>
+          <text x="520" y="328">▸ two-pillar scoring · worst-pillar reconciliation</text>
+          <text x="520" y="350">▸ Capacity Passport · Verifiable Credential (did:web)</text>
+          <text x="520" y="372">▸ funder policy engine · governed-AI drafts</text>
+        </g>
+        <text x="520" y="393" font-family="ui-monospace,monospace" font-size="10.5" class="tteal">one engine, every Kuja product · fixes the 3 bugs</text>
+      </svg>
+      <figcaption>The screening / scoring / passport engine moves out of Grant into Trust. Grant keeps its gates and reads results.</figcaption>
+    </figure>
+
+    <div class="grid2">
+      <div class="card"><span class="eyebrow teal-eyebrow">Grant delegates to Trust</span>
+        <ul class="check" style="margin-top:8px"><li>Run screening (sanctions / PEP / SAM / adverse media)</li><li>Compute the two-pillar trust score</li><li>Issue &amp; verify the Capacity Passport + credential</li><li>Evaluate a donor's funder policy against an org</li></ul>
+      </div>
+      <div class="card"><span class="eyebrow teal-eyebrow">Grant keeps for itself</span>
+        <ul class="check" style="margin-top:8px"><li>The mandatory capacity gate on membership</li><li>The per-application diligence Q&amp;A room</li><li>Reviewer &amp; award flow (reading Trust)</li><li>Grant lifecycle, reporting, notifications</li></ul>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="h">Three bugs in the grant fork we retire on the way out</div>
+      <p><span class="pill crit">bug</span> &nbsp;Every issued Verifiable Credential serialises its pillar scores as <code>null</code>.</p>
+      <p><span class="pill crit">bug</span> &nbsp;The "re-assess before disbursement" freshness gate is written and displayed but never enforced.</p>
+      <p><span class="pill crit">bug</span> &nbsp;A never-screened org and a sanctioned org both score 0 on diligence. Trust already fixes this (no-data ≠ fail).</p>
+    </div>
+  </section>
+
+  <!-- ============ 6. SEAM 3 (BUILD) ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow build-eyebrow">Seam 3 · Build ↔ Grant</span></div>
+    <h2><span class="num">06</span> &nbsp;ERP financials &mdash; the upsell</h2>
+    <p class="prose">Kuja Build (Odoo accounting) is sold as an upsell. When a donor buys the ERP for themselves <em>and</em> their NGO, the grant's financial actuals flow into Grant's compliance &amp; reporting in real time. When they don't, they upload reports — and <strong>compliance works exactly the same</strong>. The trick is to make Grant's compliance read one normalised shape, whatever the source.</p>
+
+    <figure>
+      <svg viewBox="0 0 900 292" role="img" aria-label="Two financial sources converge on the grant app: Kuja Build sends a real-time feed, or the NGO uploads reports from any system. Grant normalises both into budget-versus-actual, and compliance and reporting run identically on the normalised data.">
+        <defs>
+          <marker id="fb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="mk-build"/></marker>
+          <marker id="fn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="mk-cur"/></marker>
+          <marker id="ft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="mk-teal"/></marker>
+        </defs>
+        <rect x="30" y="36" width="220" height="80" rx="10" class="fbuild sbuild" stroke-width="1.5"/>
+        <text x="140" y="66" font-family="system-ui" font-size="13.5" font-weight="700" text-anchor="middle">Kuja Build (ERP)</text>
+        <text x="140" y="90" font-family="ui-monospace,monospace" font-size="11" class="tbuild" text-anchor="middle">authenticated real-time feed</text>
+
+        <rect x="30" y="176" width="220" height="80" rx="10" class="fsurf sline" stroke-width="1.3" stroke-dasharray="5 4"/>
+        <text x="140" y="206" font-family="system-ui" font-size="13.5" font-weight="700" text-anchor="middle">Uploaded reports</text>
+        <text x="140" y="230" font-family="ui-monospace,monospace" font-size="11" class="tmut" text-anchor="middle">any system · manual</text>
+
+        <line x1="250" y1="72" x2="356" y2="118" class="sbuild" stroke-width="2" marker-end="url(#fb)"/>
+        <line x1="250" y1="216" x2="356" y2="164" class="scur" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#fn)"/>
+        <text x="300" y="150" font-family="ui-monospace,monospace" font-size="11" class="tmut" text-anchor="middle">or</text>
+
+        <rect x="360" y="94" width="236" height="94" rx="10" class="fsurf sline" stroke-width="1.6"/>
+        <text x="376" y="118" font-family="ui-monospace,monospace" font-size="10.5" class="tmut">GRANT — FINANCIAL SOURCE</text>
+        <g font-family="system-ui" font-size="12.5"><text x="376" y="142">source = erp | manual</text><text x="376" y="164">→ normalised budget vs actual</text></g>
+
+        <line x1="596" y1="141" x2="672" y2="141" class="steal" stroke-width="2" marker-end="url(#ft)"/>
+        <text x="634" y="130" font-family="ui-monospace,monospace" font-size="9.5" class="tteal" text-anchor="middle">runs on either</text>
+
+        <rect x="676" y="94" width="196" height="94" rx="10" class="fteal steal" stroke-width="1.5"/>
+        <text x="774" y="130" font-family="system-ui" font-size="13.5" font-weight="700" text-anchor="middle">Compliance +</text>
+        <text x="774" y="150" font-family="system-ui" font-size="13.5" font-weight="700" text-anchor="middle">Reporting</text>
+        <text x="774" y="172" font-family="ui-monospace,monospace" font-size="10.5" class="tteal" text-anchor="middle">source-agnostic</text>
+      </svg>
+      <figcaption>Compliance reads one normalised shape. The ERP is a convenience, not a requirement — the upload path is a first-class equal.</figcaption>
+    </figure>
+
+    <h3>Two channels, kept distinct</h3>
+    <div class="grid2">
+      <div class="card"><span class="eyebrow build-eyebrow">A · Authenticated data feed <span class="pill build">core</span></span>
+        <p style="margin-top:10px">Build to Grant, system-to-system, over a <strong>service credential</strong> (OAuth client / API key on the shared org id). Structured financial data — budget, actuals, disbursements — feeds the financial-source pipeline. This is the upsell's real value.</p>
+      </div>
+      <div class="card"><span class="eyebrow">B · Public dashboard share <span class="pill">complement</span></span>
+        <p style="margin-top:10px">Your dev team's <code>grant.dashboard.share</code> spec: a tokenised, no-login link so a donor or auditor can view a read-only dashboard. Keep it — for <strong>human</strong> viewers. Don't run channel A over its <code>auth="none"</code> token.</p>
+      </div>
+    </div>
+
+    <h3>On the dev team's Grant Dashboard Sharing spec</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Their design</th><th>Our view</th></tr></thead>
+        <tbody>
+          <tr><td>Token = public id + separate secret, hash-only, constant-time compare</td><td><span class="pill good">keep</span> mirrors our Trust Passport sharing</td></tr>
+          <tr><td>Tenant isolation by resolving the grant through the share record</td><td><span class="pill good">keep</span> the part most teams get wrong</td></tr>
+          <tr><td>Snapshot vs Real-Time modes</td><td><span class="pill good">keep</span> right conceptual line</td></tr>
+          <tr><td>Public <code>auth="none"</code> endpoint as the data path</td><td><span class="pill warn">refine</span> use a service credential for system-to-system</td></tr>
+          <tr><td>A <code>grant.grant</code> model inside Odoo</td><td><span class="pill warn">refine</span> keep it a thin finance projection, not a 2nd grant model</td></tr>
+          <tr><td>"Never" expiry option; create/revoke audit</td><td><span class="pill warn">refine</span> default a TTL for finance links; add <code>created_by</code> + audit trail</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Financial-source contract (Grant side)</h3>
+    <div class="contract"><span class="c"># per grant (or grant × partner)</span><br><span class="k">financial_source</span>  <span class="c"># "erp" | "manual"</span><br><span class="k">build_ref</span>         <span class="c"># analytic account / project id, when erp</span><br><span class="c"># normalised rows compliance reads, from either source:</span><br>budget_lines[]      <span class="c"># category, planned</span><br>actuals[]           <span class="c"># category, spent, date, source</span><br>disbursements[]     <span class="c"># amount, date</span><br>last_synced_at</div>
+
+    <div class="callout build">
+      <div class="h">System of record</div>
+      <p>Grant owns the grant, budgets, compliance, and reporting. Build owns the ledger and actuals. Odoo's <code>grant.grant</code> is a <strong>finance projection keyed to the Grant-app grant</strong> — not a second grant, and not a place to rebuild dashboards the Grant app already has.</p>
+    </div>
+  </section>
+
+  <!-- ============ 7. SECURITY ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow">Cross-cutting</span></div>
+    <h2><span class="num">07</span> &nbsp;Security model</h2>
+    <ul>
+      <li><strong>Two credential classes.</strong> Humans authenticate via Kuja Link SSO. Systems talk to each other via scoped service credentials. Public magic-link tokens are for external humans only — never a system-to-system channel.</li>
+      <li><strong>Isolation by record, not by URL.</strong> Every shared or cross-system lookup resolves through a validated record (share, membership, org link) and never trusts an id supplied in a URL — the pattern the dashboard-share spec already follows.</li>
+      <li><strong>One audit spine.</strong> Grant and Trust both hash-chain their audit logs; the Build feed and every share create/revoke append to it, so "who saw what, when" is answerable end-to-end.</li>
+      <li><strong>Least data.</strong> Explicit serializers (allowlist, per audience) decide what leaves each system. Store token hashes, never raw tokens. Financial links carry a TTL.</li>
+    </ul>
+  </section>
+
+  <!-- ============ 8. ROADMAP ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow">Sequencing</span></div>
+    <h2><span class="num">08</span> &nbsp;Phased path (each phase ships value alone)</h2>
+    <div class="card" style="padding:6px 22px">
+      <div class="phase"><div class="pnum">0</div><div><h3>Identity foundation</h3><p>Stamp <code>partner_id</code> onto Grant <code>Organization</code>; Odoo as OIDC provider; map the 1,700 members.</p></div><span class="size m">M</span></div>
+      <div class="phase"><div class="pnum">1</div><div><h3>SSO launch + "Grants" tile</h3><p>Members click through into Grant, no second login; auto-provision on first entry.</p></div><span class="size m">M</span></div>
+      <div class="phase"><div class="pnum">2</div><div><h3>Entitlements + licensing</h3><p>Admin toggles for <code>grant_licensed</code> and <code>has_kuja_build</code>; donor publishing gated; NGO paths untouched.</p></div><span class="size s">S</span></div>
+      <div class="phase"><div class="pnum">3</div><div><h3>Trust delegation — read path</h3><p>Grant reads screening + scores + passport from Trust; run both engines in parallel to compare, then switch.</p></div><span class="size l">L</span></div>
+      <div class="phase"><div class="pnum">4</div><div><h3>Retire the DD fork + fix 3 bugs</h3><p>Delete Grant's duplicate DD services; the fixes come free from Trust.</p></div><span class="size m">M</span></div>
+      <div class="phase"><div class="pnum">5</div><div><h3>Financial-source abstraction</h3><p>Grant's <code>financial_source</code> (erp | manual); the manual/upload path made source-equivalent for compliance.</p></div><span class="size m">M</span></div>
+      <div class="phase"><div class="pnum">6</div><div><h3>Build feed + dashboard share</h3><p>Authenticated Build to Grant feed for ERP customers; the magic-link share aligned to our security review.</p></div><span class="size l">L</span></div>
+    </div>
+    <p class="prose" style="color:var(--muted);font-size:14px">Sizing is relative effort (S / M / L), not a schedule. Phases 0–2 are the visible "grant module on kuja.org"; 3–4 consolidate trust; 5–6 are the ERP upsell. Trust work (3–4) needs no Odoo dependency and can run in parallel.</p>
+  </section>
+
+  <!-- ============ 9. OPEN QUESTIONS + NEEDS ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow">Before we build</span></div>
+    <h2><span class="num">09</span> &nbsp;Open questions &amp; what we need</h2>
+    <p class="prose">The Grant and Trust code is all in hand. The unknowns are on the two Odoo environments — Link and Build. Your team has stood up test environments for both; with access plus one sample payload we can start immediately.</p>
+
+    <div class="grid2">
+      <div class="card"><span class="eyebrow">Open questions</span>
+        <ol style="margin-top:8px;padding-left:20px;font-size:14.5px">
+          <li>Is the shared dashboard Odoo's own finance view, or the Grant app's dashboard fed by Build data?</li>
+          <li>Does Build hold a real grant model, or only the finance projection? How does it map to a Grant-app grant?</li>
+          <li>What financial objects does Build expose per grant — budgets, analytic actuals, journal lines, disbursements — and at what granularity?</li>
+          <li>Is the feed pull-on-view, scheduled sync, or webhook-on-posting? What freshness do donors expect?</li>
+          <li>In Build, is each donor + NGO a separate company, or one DB with record rules?</li>
+        </ol>
+      </div>
+      <div class="card"><span class="eyebrow build-eyebrow">What we need to start now</span>
+        <p style="margin:8px 0 4px;font-weight:640;font-size:14px">Kuja Link test env</p>
+        <ul class="check" style="font-size:14px"><li>URL + a test admin, donor, and NGO login</li><li>OIDC provider on: client id/secret, redirect URIs</li><li>The <code>res.partner</code> ↔ org model</li></ul>
+        <p style="margin:12px 0 4px;font-weight:640;font-size:14px">Kuja Build test env</p>
+        <ul class="check" style="font-size:14px"><li>URL + test admin (donor &amp; NGO tenants)</li><li>Finance API creds (XML-RPC / JSON-RPC or REST) + service account</li><li>One sample real-time payload + the grant ↔ analytic-account mapping</li></ul>
+      </div>
+    </div>
+
+    <div class="callout teal">
+      <div class="h">Recommended start</div>
+      <p>Green-light <strong>Phases 0–1</strong> (identity + the SSO tile) the moment the Link OIDC details land, and let <strong>Phases 3–4</strong> (Trust consolidation) run in parallel with no Odoo dependency. The Build feed (5–6) starts as soon as the Build test-env credentials and one sample payload arrive.</p>
+    </div>
+  </section>
+
+  <footer>
+    Kuja Platform Integration · integration specification v0.2 · 14 Aug 2026<br>
+    Kuja Link (Odoo 18) · Kuja Grant (Flask + Next) · Kuja Trust (Node + Postgres) · Kuja Build (Odoo 18) — four products, one shared organisation identity.
+  </footer>
+
+</div>
