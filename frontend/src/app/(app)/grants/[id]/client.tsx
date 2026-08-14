@@ -31,6 +31,7 @@ import { ApplicationsReceivedTable } from '@/components/grants/applications-rece
 import { AiVsHumanCard } from '@/components/grants/ai-vs-human-card';
 import { ReviewerPanelCard } from '@/components/grants/reviewer-panel-card';
 import { BuildFinancialSourceCard } from '@/components/build-integration/build-financial-source-card';
+import { GrantFinancialsPanel } from '@/components/build-integration/grant-financials-panel';
 import { PeersWatching } from '@/components/grants/peers-watching';
 import { AiScoreHistogram } from '@/components/grants/ai-score-histogram';
 import { api } from '@/lib/api';
@@ -363,6 +364,13 @@ export default function GrantDetailClient() {
         {tab === 'overview' && (
           <>
             <OverviewTab grant={grant} t={t} formatDeadline={formatDeadline} />
+            {/* Financials — donor/admin read-only view of the normalized
+                ERP-or-manual shape (with-or-without Kuja Build). */}
+            {isDonor && grant.id != null && (
+              <div className="mt-4">
+                <GrantFinancialsPanel grantId={grant.id} />
+              </div>
+            )}
             {/* Kuja Build financial-source mapping — admin operator control.
                 Inert until KUJA_BUILD_* is configured server-side. */}
             {user?.role === 'admin' && (

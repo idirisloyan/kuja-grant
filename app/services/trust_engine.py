@@ -27,8 +27,13 @@ resolved tenant — or when no tenant is resolved (background jobs) — we fail 
 to local. This makes the engine flag safe to flip globally once identity
 backfill lands, without leaking one tenant's delegation into another.
 
-Nothing imports this module yet; wiring individual read surfaces onto
-`get_trust_profile()` is the next step. Until then it is inert.
+The Trust-Profile read surface (`trust_routes.py`) delegates to
+`get_trust_profile()`, so THIS module is the live path for that read — running
+in `local` mode by default, i.e. today's behaviour is unchanged. Only the
+`remote`/`shadow` branches are inert (env-gated on KUJA_TRUST_ENGINE +
+KUJA_TRUST_* creds, and Kuja-tenant-guarded). Other Trust consumers
+(compliance, adverse-media, capacity passport, bank verification) still call the
+local services directly; folding them behind this engine is future work.
 """
 
 import os

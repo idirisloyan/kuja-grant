@@ -1,0 +1,441 @@
+<title>Kuja Tenant Spec</title>
+<style>
+  :root {
+    --bg: #f7f4ef;
+    --surface: #fffdf9;
+    --surface-2: #f1ece3;
+    --ink: #23201c;
+    --ink-soft: #5c554c;
+    --ink-faint: #8a8177;
+    --line: #e3ddd2;
+    --line-strong: #d3cabb;
+    --accent: #c2410c;        /* Kuja clay */
+    --accent-soft: #f6e7de;
+    --accent-ink: #9a340a;
+    --grow: #2f6b4f;          /* live */
+    --grow-soft: #e2efe8;
+    --warn: #b45309;          /* scaffold */
+    --warn-soft: #f7ecd9;
+    --plan: #4c5fb8;          /* to build */
+    --plan-soft: #e6e9f7;
+    --radius: 14px;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17140f;
+      --surface: #201c16;
+      --surface-2: #2a251d;
+      --ink: #ece6dc;
+      --ink-soft: #b6ac9d;
+      --ink-faint: #8a8074;
+      --line: #322c23;
+      --line-strong: #423a2e;
+      --accent: #f97316;
+      --accent-soft: #33200f;
+      --accent-ink: #fdba74;
+      --grow: #6ec49a;
+      --grow-soft: #16281f;
+      --warn: #e0a44a;
+      --warn-soft: #2c2210;
+      --plan: #9aa6ec;
+      --plan-soft: #1b1f33;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17140f; --surface: #201c16; --surface-2: #2a251d; --ink: #ece6dc;
+    --ink-soft: #b6ac9d; --ink-faint: #8a8074; --line: #322c23; --line-strong: #423a2e;
+    --accent: #f97316; --accent-soft: #33200f; --accent-ink: #fdba74;
+    --grow: #6ec49a; --grow-soft: #16281f; --warn: #e0a44a; --warn-soft: #2c2210;
+    --plan: #9aa6ec; --plan-soft: #1b1f33;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px); }
+  .layout { display: grid; grid-template-columns: 232px minmax(0,1fr); gap: 44px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; gap: 0; } }
+
+  /* ---- header ---- */
+  header.hero { padding: clamp(40px,7vw,80px) 0 34px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent-ink); margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 600; letter-spacing: -.01em;
+    font-size: clamp(34px, 6vw, 58px); line-height: 1.04; margin: 0; text-wrap: balance;
+  }
+  h1 .light { color: var(--ink-soft); }
+  .lede { font-size: clamp(17px,2.1vw,20px); color: var(--ink-soft); max-width: 62ch; margin: 20px 0 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 26px; font-size: 13px; color: var(--ink-faint); }
+  .meta code { font-family: var(--mono); color: var(--accent-ink); }
+
+  /* ---- nav ---- */
+  nav.toc { position: sticky; top: 0; padding: 28px 0; max-height: 100vh; overflow: auto; }
+  @media (max-width: 860px) { nav.toc { position: static; max-height: none; padding: 20px 0 4px; border-bottom: 1px solid var(--line); } }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+  nav.toc a {
+    display: block; padding: 5px 0 5px 26px; color: var(--ink-soft); text-decoration: none;
+    font-size: 13.5px; position: relative; border-radius: 6px;
+  }
+  nav.toc a::before {
+    counter-increment: s; content: counter(s); position: absolute; left: 0; top: 5px;
+    font-family: var(--mono); font-size: 11px; color: var(--ink-faint);
+  }
+  nav.toc a:hover { color: var(--accent-ink); }
+
+  main { padding: 34px 0 90px; min-width: 0; }
+  section { padding: 30px 0; border-top: 1px solid var(--line); scroll-margin-top: 12px; }
+  section:first-child { border-top: 0; }
+  h2 { font-family: var(--serif); font-size: clamp(23px,3.2vw,30px); font-weight: 600; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 .n { font-family: var(--mono); font-size: 14px; color: var(--accent); margin-right: 10px; vertical-align: middle; }
+  h3 { font-size: 16px; margin: 26px 0 8px; letter-spacing: -.005em; }
+  p { margin: 12px 0; max-width: 72ch; }
+  a { color: var(--accent-ink); }
+  code { font-family: var(--mono); font-size: .88em; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+  strong { font-weight: 650; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit,minmax(215px,1fr)); gap: 14px; margin: 18px 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 18px 16px; }
+  .card h4 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+  .card .k { font-family: var(--mono); font-size: 11px; color: var(--accent-ink); letter-spacing: .04em; }
+
+  .callout { border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 0 var(--radius) var(--radius) 0; padding: 16px 20px; margin: 20px 0; }
+  .callout p { margin: 6px 0; }
+  .callout strong { color: var(--accent-ink); }
+
+  ul.clean { margin: 12px 0; padding-left: 20px; }
+  ul.clean li { margin: 7px 0; max-width: 72ch; }
+
+  /* status chips */
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10.5px; font-weight: 600;
+          letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .chip::before { content:""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .chip.live { color: var(--grow); background: var(--grow-soft); }
+  .chip.scaf { color: var(--warn); background: var(--warn-soft); }
+  .chip.plan { color: var(--plan); background: var(--plan-soft); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 6px; }
+
+  .scroll { overflow-x: auto; margin: 18px 0; border: 1px solid var(--line); border-radius: var(--radius); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 480px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th { background: var(--surface-2); font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); position: sticky; top: 0; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td code { font-size: 12px; }
+
+  figure { margin: 24px 0; }
+  figure svg { display: block; width: 100%; height: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  figcaption { font-size: 12.5px; color: var(--ink-faint); margin-top: 8px; text-align: center; }
+  .dg-box { fill: var(--surface-2); stroke: var(--line-strong); }
+  .dg-accent { fill: var(--accent-soft); stroke: var(--accent); }
+  .dg-t { fill: var(--ink); font-family: var(--sans); font-size: 13px; font-weight: 600; }
+  .dg-s { fill: var(--ink-soft); font-family: var(--sans); font-size: 11px; }
+  .dg-l { fill: var(--ink-faint); font-family: var(--mono); font-size: 10px; }
+  .dg-edge { stroke: var(--ink-faint); stroke-width: 1.5; fill: none; }
+
+  footer { border-top: 1px solid var(--line); padding: 28px 0 60px; color: var(--ink-faint); font-size: 13px; }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">Requirements &amp; Design · v1.0 · 2026-08-14</p>
+    <h1>Kuja Tenant<br><span class="light">the flagship grant platform</span></h1>
+    <p class="lede">A donor publishes a grant; NGOs across the Global South apply from a phone on a weak connection, in their own language, guided end-to-end by embedded AI. Reviewers score a transparent rubric; the donor awards, then oversees compliance and reporting — with financials flowing from our ERP when they have it, and through simple manual entry when they don't.</p>
+    <div class="meta">
+      <span>Tenant <code>slug=kuja</code> (default network)</span>
+      <span>Prod <code>web-production-6f8a.up.railway.app</code></span>
+      <span>Scope: Kuja only — not Proximate / NEAR / Saxansaxo</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Contents">
+      <ol>
+        <li><a href="#principles">Design principles</a></li>
+        <li><a href="#platform">Platform &amp; integration</a></li>
+        <li><a href="#personas">Personas</a></li>
+        <li><a href="#lifecycle">End-to-end lifecycle</a></li>
+        <li><a href="#ai">AI integration</a></li>
+        <li><a href="#financials">Financials — ERP &amp; manual</a></li>
+        <li><a href="#foundations">Offline &amp; localization</a></li>
+        <li><a href="#state">Current state</a></li>
+        <li><a href="#roadmap">Roadmap</a></li>
+        <li><a href="#need">What we need</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <section id="principles">
+        <h2><span class="n">01</span>Design principles</h2>
+        <p>Five commitments define the Kuja tenant. The first three are the reason NGOs adopt us and the reason donors pay; the product must protect them in order.</p>
+        <div class="cards">
+          <div class="card"><span class="k">01 · SELLING POINT</span><h4>Barrier-free for NGOs</h4><p>The system does the heavy lifting; the NGO answers plain, guided questions. Voice and photo are first-class input. One obvious next action, always.</p></div>
+          <div class="card"><span class="k">02 · SELLING POINT</span><h4>AI integrated, not a chatbot</h4><p>AI lives inside each task — draft, check, score, structure, translate — with visible per-finding provenance. Money-gating stays deterministic.</p></div>
+          <div class="card"><span class="k">03 · SELLING POINT</span><h4>Works where NGOs work</h4><p>Offline-first PWA, low-bandwidth, cheap Android phones. Writes queue and replay on reconnect.</p></div>
+          <div class="card"><span class="k">04</span><h4>Localized</h4><p>French, Arabic (RTL), Spanish, Swahili, Somali + English. User language beats the tenant default.</p></div>
+          <div class="card"><span class="k">05</span><h4>Trustworthy</h4><p>Deny-by-default, server-enforced; every governance action on a tamper-evident audit chain; every AI claim grounded and sourced.</p></div>
+        </div>
+        <p style="color:var(--ink-soft);font-size:14px">NGOs never pay — monetization is structural on the donor/foundation side (licence + ERP upsell). That is <em>why</em> NGOs adopt: zero cost, minimum friction.</p>
+      </section>
+
+      <section id="platform">
+        <h2><span class="n">02</span>Platform &amp; integration</h2>
+        <p>Kuja Grant is one of four products. The Kuja tenant integrates with <strong>Link</strong> (identity + entitlements), <strong>Trust</strong> (the due-diligence engine), and <strong>Build</strong> (ERP financials). Every organization carries a shared identity key (<code>kuja_partner_id</code> = Odoo <code>res.partner</code> id) that joins them.</p>
+
+        <figure>
+          <svg viewBox="0 0 720 300" role="img" aria-label="Kuja Grant at the centre, integrating with Link for SSO and entitlements, Trust as the due-diligence engine, and Build for ERP financials.">
+            <defs>
+              <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-faint)"/>
+              </marker>
+            </defs>
+            <!-- center -->
+            <rect class="dg-accent" x="280" y="115" width="160" height="70" rx="12"/>
+            <text class="dg-t" x="360" y="145" text-anchor="middle" style="font-size:15px">Kuja Grant</text>
+            <text class="dg-s" x="360" y="164" text-anchor="middle">this tenant</text>
+            <!-- Link -->
+            <rect class="dg-box" x="40" y="30" width="180" height="66" rx="10"/>
+            <text class="dg-t" x="130" y="56" text-anchor="middle">Kuja Link</text>
+            <text class="dg-s" x="130" y="74" text-anchor="middle">identity · entitlements</text>
+            <!-- Trust -->
+            <rect class="dg-box" x="500" y="30" width="180" height="66" rx="10"/>
+            <text class="dg-t" x="590" y="56" text-anchor="middle">Kuja Trust</text>
+            <text class="dg-s" x="590" y="74" text-anchor="middle">due-diligence engine</text>
+            <!-- Build -->
+            <rect class="dg-box" x="500" y="204" width="180" height="66" rx="10"/>
+            <text class="dg-t" x="590" y="230" text-anchor="middle">Kuja Build</text>
+            <text class="dg-s" x="590" y="248" text-anchor="middle">ERP financials</text>
+            <!-- NGO/Donor users -->
+            <rect class="dg-box" x="40" y="204" width="180" height="66" rx="10"/>
+            <text class="dg-t" x="130" y="230" text-anchor="middle">NGOs · Donors</text>
+            <text class="dg-s" x="130" y="248" text-anchor="middle">users</text>
+            <!-- edges -->
+            <path class="dg-edge" d="M220,63 H278" marker-end="url(#ar)"/>
+            <text class="dg-l" x="250" y="53" text-anchor="middle">SSO</text>
+            <path class="dg-edge" d="M280,150 H222" marker-end="url(#ar)"/>
+            <text class="dg-l" x="250" y="140" text-anchor="middle">app</text>
+            <path class="dg-edge" d="M440,140 H498" marker-end="url(#ar)"/>
+            <text class="dg-l" x="470" y="130" text-anchor="middle">DD</text>
+            <path class="dg-edge" d="M440,165 L498,232" marker-end="url(#ar)"/>
+            <text class="dg-l" x="480" y="205" text-anchor="middle">$$</text>
+            <path class="dg-edge" d="M130,204 V98" marker-end="url(#ar)"/>
+          </svg>
+          <figcaption>The four-product platform. Grant is the hub; Link, Trust, and Build are the seams — each detailed in §5–6 with its current state.</figcaption>
+        </figure>
+
+        <div class="legend">
+          <span class="chip live">live</span><span class="chip scaf">scaffold</span><span class="chip plan">to build</span>
+        </div>
+        <div class="scroll"><table>
+          <thead><tr><th>Seam</th><th>Today</th><th>Target</th><th>State</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Link → Grant</strong> (SSO + entitlements)</td><td>Identity column only; login is local email/password. No OIDC, no inbound webhook.</td><td>Odoo OIDC SSO + a billing→entitlement webhook driving <code>grant_licensed</code>/<code>has_kuja_build</code>.</td><td><span class="chip scaf">scaffold</span></td></tr>
+            <tr><td><strong>Grant → Trust</strong> (one DD engine)</td><td>Trust-Profile read routes through <code>trust_engine</code> in <em>local</em> mode.</td><td>Flip to <code>shadow</code>→<code>remote</code> after identity backfill; retire the local DD fork.</td><td><span class="chip live">live (local)</span></td></tr>
+            <tr><td><strong>Build → Grant</strong> (ERP upsell)</td><td>Source abstraction + operator mapping + endpoints all live; one finance call stubbed.</td><td>Fill the call to the dev-team contract; live budget/actuals/disbursements.</td><td><span class="chip scaf">scaffold</span></td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="personas">
+        <h2><span class="n">03</span>Personas</h2>
+        <p>Four roles (<code>User.role</code>): <code>ngo</code>, <code>donor</code>, <code>reviewer</code>, <code>admin</code>. Authorization is server-side and deny-by-default; donor publish/award is additionally licence-gated (off by default today).</p>
+        <div class="cards">
+          <div class="card"><span class="k">NGO</span><h4>Applicant</h4><p>Discover grants; apply AI-guided &amp; offline; submit; respond to revision/doc requests; report by voice or photo. Never licence-gated, never pays.</p></div>
+          <div class="card"><span class="k">DONOR / FOUNDATION</span><h4>Grant-maker</h4><p>Create &amp; publish grants; set criteria; assign reviewers; award; oversee compliance &amp; reporting; map ERP financials.</p></div>
+          <div class="card"><span class="k">REVIEWER</span><h4>Assessor</h4><p>Score assigned applications against the weighted rubric; disclose COI; private notes never shown to the NGO.</p></div>
+          <div class="card"><span class="k">ADMIN</span><h4>Platform operator</h4><p>Provisioning, licensing, compliance oversight, AI-quality + cost telemetry, audit-chain integrity.</p></div>
+        </div>
+      </section>
+
+      <section id="lifecycle">
+        <h2><span class="n">04</span>End-to-end lifecycle</h2>
+        <p>One grant, four personas, seven stages — AI embedded at each step, offline-safe on the NGO's side, deterministic where money is gated.</p>
+        <figure>
+          <svg viewBox="0 0 720 250" role="img" aria-label="The grant lifecycle: donor creates and publishes; NGO applies and submits; reviewers score; donor awards; then compliance and reporting.">
+            <defs>
+              <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+              </marker>
+            </defs>
+            <text class="dg-l" x="8" y="40">DONOR</text>
+            <text class="dg-l" x="8" y="120">NGO</text>
+            <text class="dg-l" x="8" y="200">REVIEW · OVERSIGHT</text>
+            <!-- donor row -->
+            <rect class="dg-accent" x="70" y="18" width="150" height="46" rx="9"/>
+            <text class="dg-t" x="145" y="40" text-anchor="middle" style="font-size:12px">Create + publish</text>
+            <text class="dg-s" x="145" y="55" text-anchor="middle">AI extracts from call doc</text>
+            <!-- ngo row -->
+            <rect class="dg-box" x="70" y="98" width="150" height="46" rx="9"/>
+            <text class="dg-t" x="145" y="120" text-anchor="middle" style="font-size:12px">Apply</text>
+            <text class="dg-s" x="145" y="135" text-anchor="middle">AI-guided · offline</text>
+            <rect class="dg-box" x="260" y="98" width="150" height="46" rx="9"/>
+            <text class="dg-t" x="335" y="120" text-anchor="middle" style="font-size:12px">Submit</text>
+            <text class="dg-s" x="335" y="135" text-anchor="middle">deterministic auto-score</text>
+            <!-- review row -->
+            <rect class="dg-box" x="260" y="178" width="150" height="46" rx="9"/>
+            <text class="dg-t" x="335" y="200" text-anchor="middle" style="font-size:12px">Score</text>
+            <text class="dg-s" x="335" y="215" text-anchor="middle">weighted rubric · COI</text>
+            <rect class="dg-accent" x="450" y="178" width="120" height="46" rx="9"/>
+            <text class="dg-t" x="510" y="200" text-anchor="middle" style="font-size:12px">Award</text>
+            <text class="dg-s" x="510" y="215" text-anchor="middle">licence-gated</text>
+            <rect class="dg-box" x="600" y="98" width="112" height="126" rx="9"/>
+            <text class="dg-t" x="656" y="150" text-anchor="middle" style="font-size:12px">Comply +</text>
+            <text class="dg-t" x="656" y="166" text-anchor="middle" style="font-size:12px">report</text>
+            <text class="dg-s" x="656" y="184" text-anchor="middle">ERP or manual</text>
+            <!-- edges -->
+            <path class="dg-edge" style="stroke:var(--accent)" d="M145,64 V96" marker-end="url(#ar2)"/>
+            <path class="dg-edge" style="stroke:var(--accent)" d="M220,121 H258" marker-end="url(#ar2)"/>
+            <path class="dg-edge" style="stroke:var(--accent)" d="M335,144 V176" marker-end="url(#ar2)"/>
+            <path class="dg-edge" style="stroke:var(--accent)" d="M410,201 H448" marker-end="url(#ar2)"/>
+            <path class="dg-edge" style="stroke:var(--accent)" d="M570,190 Q640,190 655,226 V226" marker-end="url(#ar2)"/>
+          </svg>
+          <figcaption>Deterministic scoring gates money; AI is advisory around it. The NGO's apply→submit path is offline-capable end to end.</figcaption>
+        </figure>
+      </section>
+
+      <section id="ai">
+        <h2><span class="n">05</span>AI integration — not a chatbot</h2>
+        <p>A heavily-wired system today, not scaffolding: a real Anthropic path with a consistent <em>budget-gate → telemetry → provenance → replay</em> plumbing behind every surface. Intelligence lives <strong>inside the tasks</strong>. Crucially, the surfaces that gate money or must be explainable are <strong>deliberately deterministic</strong>.</p>
+        <div class="scroll"><table>
+          <thead><tr><th>Where</th><th>LLM-backed surfaces</th><th>Deterministic by design</th></tr></thead>
+          <tbody>
+            <tr><td>Grant creation</td><td>PDF→requirements extraction, grant scaffold, suggest-criteria, burden/median-NGO preview</td><td>—</td></tr>
+            <tr><td>Application</td><td>Draft answer, strengthen/polish, submission-readiness, compliance-preempt, autofill</td><td>Live rubric preview, guided questions, why-this-match (<code>match_engine</code>), plain-language flags catalogue</td></tr>
+            <tr><td>Selection</td><td>Summarize application, reviewer recommendation, AI score (advisory), compare</td><td><strong>Scoring</strong> (<code>scoring_engine</code>) + score-breakdown</td></tr>
+            <tr><td>Compliance</td><td>Adverse-media web check (hosted web_search + fallback)</td><td>Sanctions / registration / keyword screening</td></tr>
+            <tr><td>Reporting</td><td>Voice→structured report, draft report, readiness, photo-evidence, bundle summary, translation</td><td>—</td></tr>
+          </tbody>
+        </table></div>
+        <h3>Grounding &amp; guardrails</h3>
+        <ul class="clean">
+          <li><strong>Per-claim provenance</strong> — <code>AIProvenance</code> stores basis / source / confidence for each AI finding; extracted items are tagged <code>ai_extracted · ai_edited · manual</code> so a human always sees what came from the model.</li>
+          <li><strong>Server-side output validation</strong> — forced tool-use against a JSON schema; a deterministic fallback dict when the shape is missing; 8 flagship surfaces contract-checked against fixtures.</li>
+          <li><strong>Replay + false-confidence loop</strong> — full calls persisted for admin replay; the UI records when an AI output was accepted verbatim then corrected, rolled up as <code>false_confidence_rate</code> <em>per language</em>.</li>
+          <li><strong>Cost &amp; degradation</strong> — a hard per-org budget inside the call path; missing key / over-budget / timeout / malformed all shed to deterministic templates; a service-status banner keeps the workflow honest. There is always a non-AI path.</li>
+        </ul>
+        <div class="callout"><p><strong>Design item:</strong> there is no single registry of <em>mutating</em> AI actions yet — the equivalents are a read-only query-tool registry, provenance, and extraction tagging. A closed action-catalogue for any AI-proposed mutation is recommended hardening (Roadmap, Phase 5).</p></div>
+      </section>
+
+      <section id="financials">
+        <h2><span class="n">06</span>Financials — with our ERP <em>and</em> without it</h2>
+        <p>The tenant must serve both kinds of donor: those who buy Kuja Build and those who don't. A single <code>financial_source = erp | manual</code> abstraction returns <strong>one normalized shape</strong> from <code>GET /api/grants/&lt;id&gt;/financials</code>, so compliance and reporting read the same thing either way.</p>
+        <figure>
+          <svg viewBox="0 0 720 250" role="img" aria-label="A grant's financial_source switch routes to either the Kuja Build ERP feed or manual uploaded figures, both producing one normalized shape consumed by the donor view, compliance, and reporting.">
+            <defs>
+              <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-faint)"/>
+              </marker>
+            </defs>
+            <rect class="dg-box" x="30" y="98" width="120" height="54" rx="10"/>
+            <text class="dg-t" x="90" y="122" text-anchor="middle" style="font-size:12px">Grant</text>
+            <text class="dg-l" x="90" y="140" text-anchor="middle">financial_source</text>
+            <!-- erp branch -->
+            <rect class="dg-box" x="230" y="34" width="180" height="54" rx="10"/>
+            <text class="dg-t" x="320" y="56" text-anchor="middle" style="font-size:12px">Kuja Build (ERP)</text>
+            <text class="dg-s" x="320" y="73" text-anchor="middle">live, keyed by build_ref</text>
+            <!-- manual branch -->
+            <rect class="dg-box" x="230" y="162" width="180" height="54" rx="10"/>
+            <text class="dg-t" x="320" y="184" text-anchor="middle" style="font-size:12px">Manual / uploaded</text>
+            <text class="dg-s" x="320" y="201" text-anchor="middle">entered from reports</text>
+            <!-- normalized -->
+            <rect class="dg-accent" x="470" y="98" width="120" height="54" rx="10"/>
+            <text class="dg-t" x="530" y="120" text-anchor="middle" style="font-size:12px">Normalized</text>
+            <text class="dg-s" x="530" y="137" text-anchor="middle">one shape</text>
+            <!-- consumers -->
+            <rect class="dg-box" x="628" y="72" width="72" height="34" rx="8"/>
+            <text class="dg-s" x="664" y="93" text-anchor="middle">Donor view</text>
+            <rect class="dg-box" x="628" y="112" width="72" height="34" rx="8"/>
+            <text class="dg-s" x="664" y="133" text-anchor="middle">Compliance</text>
+            <rect class="dg-box" x="628" y="152" width="72" height="34" rx="8"/>
+            <text class="dg-s" x="664" y="173" text-anchor="middle">Reporting</text>
+            <!-- edges -->
+            <path class="dg-edge" d="M150,112 Q195,112 228,66" marker-end="url(#ar3)"/>
+            <text class="dg-l" x="185" y="80" text-anchor="middle">erp</text>
+            <path class="dg-edge" d="M150,138 Q195,138 228,186" marker-end="url(#ar3)"/>
+            <text class="dg-l" x="182" y="172" text-anchor="middle">manual</text>
+            <path class="dg-edge" d="M410,61 Q450,61 468,110" marker-end="url(#ar3)"/>
+            <path class="dg-edge" d="M410,189 Q450,189 468,140" marker-end="url(#ar3)"/>
+            <path class="dg-edge" d="M590,120 H626" marker-end="url(#ar3)"/>
+          </svg>
+          <figcaption>Isolation by record: the feed is keyed only by the grant's stored <code>build_ref</code>, so a donor only ever sees the grant their org owns.</figcaption>
+        </figure>
+        <div class="scroll"><table>
+          <thead><tr><th>source</th><th>behavior</th><th><code>status</code></th></tr></thead>
+          <tbody>
+            <tr><td><code>manual</code> (default)</td><td>Empty/manual shape; figures entered in the app &amp; from reports</td><td><code>manual</code></td></tr>
+            <tr><td><code>erp</code>, Build not configured</td><td>Degrades to manual/empty (inert today)</td><td><code>erp_unconfigured</code></td></tr>
+            <tr><td><code>erp</code>, Build configured</td><td>Pulls live budget / actuals / disbursements</td><td><code>erp</code></td></tr>
+            <tr><td><code>erp</code>, Build error</td><td>Degrades, never raises</td><td><code>erp_unavailable:*</code></td></tr>
+          </tbody>
+        </table></div>
+        <p>Shipped this cycle: an operator card to map a grant to its Build account, and a donor/admin <strong>financials panel</strong> that renders this shape (ERP feed or the manual state) on the grant page. The one pending piece is the concrete Build finance call.</p>
+      </section>
+
+      <section id="foundations">
+        <h2><span class="n">07</span>Offline &amp; localization</h2>
+        <h3>Offline-first / low-bandwidth</h3>
+        <p>A custom service worker (network-first navigations with a cached shell, cache-first static, stale-while-revalidate reads) plus an IndexedDB outbox that queues writes and replays on reconnect. Static export removes SSR round-trips. <span class="chip plan">to build</span> extend the outbox from 2 surfaces to the NGO's critical writes — application submit and report create/submit.</p>
+        <h3>Localization</h3>
+        <p>Six full locale catalogues with a target→English→key fallback and Arabic RTL; user language beats the tenant default. Coverage: Arabic ~99.5%, Somali/Swahili ~93.7%, Spanish ~93.2%, French ~91.5%. <span class="chip plan">to build</span> finish fr/es/sw/so, fix three surfaces that bypass <code>t()</code>, and localize integration-seam error bodies; Whisper server transcription unlocks Somali voice (unsupported in browser speech).</p>
+      </section>
+
+      <section id="state">
+        <h2><span class="n">08</span>Current state</h2>
+        <div class="legend"><span class="chip live">live</span><span class="chip scaf">scaffold / flag-gated</span><span class="chip plan">to build</span></div>
+        <div class="scroll"><table>
+          <thead><tr><th>Capability</th><th>State</th></tr></thead>
+          <tbody>
+            <tr><td>Grant CRUD / publish / templates · 6-step wizard + PDF→AI extraction</td><td><span class="chip live">live</span></td></tr>
+            <tr><td>Application draft→submit→award, revision, withdraw, appeal · deterministic auto-score</td><td><span class="chip live">live</span></td></tr>
+            <tr><td>Reviewer assign / weighted score / COI / anonymized breakdown</td><td><span class="chip live">live</span></td></tr>
+            <tr><td>Compliance screening (OpenSanctions + fallbacks, adverse-media)</td><td><span class="chip live">live</span></td></tr>
+            <tr><td>Trust Profile (two-pillar, local) via <code>trust_engine</code></td><td><span class="chip live">live (local)</span></td></tr>
+            <tr><td>Reporting (draft→accept, voice, photo, bundle, PDF)</td><td><span class="chip live">live</span></td></tr>
+            <tr><td>AI surfaces + provenance + budget/telemetry/replay + degradation</td><td><span class="chip live">live</span></td></tr>
+            <tr><td>i18n 6 locales + RTL</td><td><span class="chip live">live</span></td></tr>
+            <tr><td><code>financial_source</code> abstraction + operator mapping + financials panel</td><td><span class="chip live">live</span></td></tr>
+            <tr><td>Link SSO + inbound billing webhook</td><td><span class="chip plan">to build</span></td></tr>
+            <tr><td>Trust remote cutover · Build ERP finance call · SAM.gov exclusions</td><td><span class="chip scaf">scaffold</span></td></tr>
+            <tr><td>Offline coverage for submit/report writes · localization completion</td><td><span class="chip plan">to build</span></td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="roadmap">
+        <h2><span class="n">09</span>Roadmap</h2>
+        <div class="cards">
+          <div class="card"><span class="k">PHASE 0 · THIS CYCLE</span><h4>Kuja-scoped, inert-safe</h4><p>Trust tenant-guard + docstring fix; licensing upgrade prompt; Build operator mapping UI; donor/admin financials panel.</p></div>
+          <div class="card"><span class="k">PHASE 1</span><h4>Identity &amp; entitlements</h4><p>Inbound Link→Grant billing webhook; OIDC SSO + <code>res.partner</code> linking; licence provisioning; flip enforcement.</p></div>
+          <div class="card"><span class="k">PHASE 2</span><h4>Trust as one engine</h4><p>Identity backfill → <code>shadow</code> → <code>remote</code> → retire the local DD fork.</p></div>
+          <div class="card"><span class="k">PHASE 3</span><h4>Build ERP live</h4><p>Fill the finance call to the dev-team contract; wire live financials into the report bundle + compliance.</p></div>
+          <div class="card"><span class="k">PHASE 4</span><h4>Barrier-free depth</h4><p>Offline outbox on submit/report; finish fr/es/sw/so + the 3 hardcoded surfaces; Whisper for Somali.</p></div>
+          <div class="card"><span class="k">PHASE 5</span><h4>AI depth</h4><p>More embedded surfaces + provenance coverage; a closed mutating-action catalogue; accept/edit/dismiss quality loop.</p></div>
+        </div>
+      </section>
+
+      <section id="need">
+        <h2><span class="n">10</span>What we need</h2>
+        <ul class="clean">
+          <li><strong>Link</strong> — OIDC IdP details + the billing→entitlement webhook contract (events, payload, signing) + the Link test env; which donors are already Link members (SSO onboarding candidates).</li>
+          <li><strong>Trust</strong> — the org identity backfill (map <code>res.partner</code> ↔ grant org).</li>
+          <li><strong>Build</strong> — the finance API contract: endpoint, read-only service account, one sample payload (sign/currency/FX), and the grant↔analytic-account (<code>build_ref</code>) mapping + freshness model.</li>
+          <li><strong>Licensing</strong> — which donor orgs to license first + the go-live date to flip enforcement.</li>
+          <li><strong>Localization</strong> — native reviewers for fr/es/sw/so sign-off.</li>
+        </ul>
+        <p style="color:var(--ink-faint);font-size:13px">Full detail, endpoints, and data shapes: <code>docs/KUJA_TENANT_SPEC.md</code>.</p>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    Kuja Tenant — Requirements &amp; Design Specification v1.0 · 2026-08-14 · Kuja tenant only (not Proximate / NEAR / Saxansaxo).
+  </footer>
+</div>
