@@ -1,0 +1,442 @@
+<title>Kuja Build · Networked Tenants</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --ground:#F4F6F4; --surface:#FFFFFF; --surface-2:#ECF1ED; --raise:#FFFFFF;
+    --ink:#16211E; --muted:#586A63; --faint:#7D8C86; --line:#D7DED8;
+    --teal:#0E5A54; --teal-ink:#0E5A54; --teal-soft:#E1EEEB;
+    --amber:#A9661A; --amber-soft:#F3E7D2;
+    --indigo:#3E5C8A; --indigo-soft:#E4EAF3;
+    --good:#2E7D5B; --warn:#A9781C; --crit:#B03A3A;
+    --good-soft:#E2F0E8; --warn-soft:#F4EAD5; --crit-soft:#F5E1E1;
+    --shadow:0 1px 2px rgba(20,40,34,.05),0 6px 20px rgba(20,40,34,.06);
+    --radius:10px;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#0E1513; --surface:#16201D; --surface-2:#1D2925; --raise:#1B2723;
+      --ink:#E9EFEB; --muted:#9AABA4; --faint:#7C8D86; --line:#2A3833;
+      --teal:#4BC9BA; --teal-ink:#8FE0D5; --teal-soft:#123330;
+      --amber:#E0A45B; --amber-soft:#33271A;
+      --indigo:#86A6D8; --indigo-soft:#1B2740;
+      --good:#5FBE92; --warn:#D9A94E; --crit:#DE7C7C;
+      --good-soft:#14302A; --warn-soft:#302819; --crit-soft:#331F1F;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0E1513; --surface:#16201D; --surface-2:#1D2925; --raise:#1B2723;
+    --ink:#E9EFEB; --muted:#9AABA4; --faint:#7C8D86; --line:#2A3833;
+    --teal:#4BC9BA; --teal-ink:#8FE0D5; --teal-soft:#123330;
+    --amber:#E0A45B; --amber-soft:#33271A;
+    --indigo:#86A6D8; --indigo-soft:#1B2740;
+    --good:#5FBE92; --warn:#D9A94E; --crit:#DE7C7C;
+    --good-soft:#14302A; --warn-soft:#302819; --crit-soft:#331F1F;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+    line-height:1.6;-webkit-font-smoothing:antialiased;font-size:16px}
+  .wrap{max-width:980px;margin:0 auto;padding:clamp(20px,5vw,64px) clamp(18px,5vw,40px)}
+  .prose{max-width:70ch}
+  a{color:var(--teal);text-underline-offset:2px}
+  h1,h2,h3{text-wrap:balance;line-height:1.15;margin:0}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);font-weight:600}
+  .teal-eyebrow{color:var(--teal-ink)}
+  .build-eyebrow{color:var(--indigo)}
+  header.masthead{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:12px}
+  .kicker{font-family:var(--mono);font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  h1{font-size:clamp(30px,5vw,46px);font-weight:680;letter-spacing:-.02em;margin:14px 0 10px}
+  .lede{font-size:clamp(17px,2.4vw,20px);color:var(--muted);max-width:64ch;margin:0}
+  .meta{font-family:var(--mono);font-size:12.5px;color:var(--faint);margin-top:18px;display:flex;
+    gap:18px;flex-wrap:wrap}
+  .decisions{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:26px 0 6px}
+  .chip{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;box-shadow:var(--shadow);border-left:3px solid var(--indigo)}
+  .chip .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .chip .val{font-weight:640;margin-top:5px;font-size:15px}
+  .chip .val small{display:block;font-weight:400;color:var(--muted);font-size:12.5px;margin-top:3px;font-family:var(--sans);line-height:1.4}
+  .chip.t{border-left-color:var(--teal)}
+  section{margin-top:52px}
+  h2{font-size:clamp(22px,3.2vw,29px);font-weight:660;letter-spacing:-.015em;margin-top:10px}
+  h3{font-size:18px;font-weight:640;margin:26px 0 6px}
+  p{margin:14px 0}
+  .sec-head{border-top:1px solid var(--line);padding-top:14px}
+  .num{font-family:var(--mono);color:var(--indigo);font-weight:600}
+  strong{font-weight:640}
+  code{font-family:var(--mono);font-size:.85em;background:var(--surface-2);padding:1.5px 6px;border-radius:5px;color:var(--ink)}
+  ul,ol{margin:14px 0;padding-left:22px}
+  li{margin:7px 0}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px 22px;box-shadow:var(--shadow)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr}}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin:18px 0}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:560px;background:var(--surface)}
+  th,td{text-align:left;padding:12px 15px;border-bottom:1px solid var(--line);vertical-align:top}
+  thead th{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--muted);font-weight:600;background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:none}
+  td .sys{font-weight:640}
+  td code{white-space:nowrap}
+  .pill{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.03em;
+    padding:2px 8px;border-radius:20px;white-space:nowrap}
+  .pill.good{background:var(--good-soft);color:var(--good)}
+  .pill.warn{background:var(--warn-soft);color:var(--warn)}
+  .pill.crit{background:var(--crit-soft);color:var(--crit)}
+  .pill.teal{background:var(--teal-soft);color:var(--teal-ink)}
+  .pill.amber{background:var(--amber-soft);color:var(--amber)}
+  .pill.build{background:var(--indigo-soft);color:var(--indigo)}
+  figure{margin:26px 0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px 20px 14px;box-shadow:var(--shadow)}
+  figure svg{display:block;width:100%;height:auto;color:var(--ink)}
+  figure svg text{fill:currentColor}
+  figure svg .tmut{fill:var(--muted)}
+  figure svg .tfaint{fill:var(--faint)}
+  figure svg .tteal{fill:var(--teal-ink)}
+  figure svg .tamber{fill:var(--amber)}
+  figure svg .tbuild{fill:var(--indigo)}
+  figure svg .tcrit{fill:var(--crit)}
+  figure svg .tgood{fill:var(--good)}
+  figure svg .fsurf{fill:var(--surface)}
+  figure svg .fsurf2{fill:var(--surface-2)}
+  figure svg .fteal{fill:var(--teal-soft)}
+  figure svg .fbuild{fill:var(--indigo-soft)}
+  figure svg .fcrit{fill:var(--crit-soft)}
+  figure svg .fcur{fill:currentColor}
+  figure svg .fnone{fill:none}
+  figure svg .sline{stroke:var(--line)}
+  figure svg .steal{stroke:var(--teal)}
+  figure svg .samber{stroke:var(--amber)}
+  figure svg .sbuild{stroke:var(--indigo)}
+  figure svg .scrit{stroke:var(--crit)}
+  figure svg .scur{stroke:currentColor}
+  figure svg .mk-cur{fill:currentColor}
+  figure svg .mk-teal{fill:var(--teal)}
+  figure svg .mk-build{fill:var(--indigo)}
+  figcaption{font-size:13px;color:var(--muted);margin-top:12px;text-align:center;font-family:var(--mono);letter-spacing:.02em}
+  .callout{border-left:3px solid var(--indigo);background:var(--indigo-soft);border-radius:0 var(--radius) var(--radius) 0;padding:16px 20px;margin:20px 0}
+  .callout.teal{border-left-color:var(--teal);background:var(--teal-soft)}
+  .callout.crit{border-left-color:var(--crit);background:var(--crit-soft)}
+  .callout .h{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--indigo);margin-bottom:6px}
+  .callout.teal .h{color:var(--teal-ink)}
+  .callout.crit .h{color:var(--crit)}
+  .callout p{margin:6px 0}
+  ol.steps{list-style:none;padding:0;counter-reset:s;margin:18px 0}
+  ol.steps>li{counter-increment:s;position:relative;padding:14px 16px 14px 56px;background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--radius);margin:9px 0;box-shadow:var(--shadow)}
+  ol.steps>li::before{content:counter(s,decimal-leading-zero);position:absolute;left:16px;top:14px;
+    font-family:var(--mono);font-size:13px;font-weight:600;color:var(--indigo)}
+  ol.steps>li b{font-weight:640}
+  ol.steps>li .note{color:var(--muted);font-size:14px}
+  .phase{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:start;padding:16px 0;border-bottom:1px solid var(--line)}
+  .phase:last-child{border-bottom:none}
+  .phase .pnum{font-family:var(--mono);font-weight:700;font-size:20px;color:var(--indigo);line-height:1.2}
+  .phase h3{margin:0 0 4px}
+  .phase p{margin:0;color:var(--muted);font-size:14.5px}
+  .size{font-family:var(--mono);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;
+    background:var(--surface-2);color:var(--muted);white-space:nowrap;letter-spacing:.04em}
+  .size.s{color:var(--good);background:var(--good-soft)}
+  .size.m{color:var(--warn);background:var(--warn-soft)}
+  .size.l{color:var(--crit);background:var(--crit-soft)}
+  ul.check{list-style:none;padding:0}
+  ul.check li{padding-left:26px;position:relative}
+  ul.check li::before{content:"\2192";position:absolute;left:0;color:var(--indigo);font-family:var(--mono)}
+  ol.need{padding-left:0;list-style:none;counter-reset:n}
+  ol.need>li{counter-increment:n;position:relative;padding:9px 0 9px 34px;border-bottom:1px solid var(--line)}
+  ol.need>li:last-child{border-bottom:none}
+  ol.need>li::before{content:counter(n);position:absolute;left:0;top:9px;font-family:var(--mono);font-size:12px;
+    font-weight:700;color:var(--indigo);background:var(--indigo-soft);width:22px;height:22px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center}
+  .contract{font-family:var(--mono);font-size:13px;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:var(--radius);padding:16px 18px;margin:16px 0;overflow-x:auto;line-height:1.7}
+  .contract .k{color:var(--teal-ink)}
+  .contract .c{color:var(--faint)}
+  footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:var(--faint);
+    font-family:var(--mono);font-size:12px;line-height:1.7}
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="kicker">Integration Specification · v0.1 · draft</div>
+    <h1>Kuja Build ↔ Networked Tenants</h1>
+    <p class="lede">Financial integration for the non-Kuja tenants — Proximate &amp; Saxansaxo. A tenant pulls real, booked financials for a single donor grant from the operator's Kuja Build ERP, scoped so the donor sees only their grant. No Link, no shared identity, no Trust engine.</p>
+    <div class="meta"><span>14 Aug 2026</span><span>Kuja platform team</span><span>Status: design, pre-build</span></div>
+  </header>
+
+  <div class="decisions">
+    <div class="chip"><div class="lbl">Decision · Trust</div><div class="val">Out of scope<small>Proximate/Saxansaxo use community-based trust.</small></div></div>
+    <div class="chip"><div class="lbl">Decision · Who runs Build</div><div class="val">The operator (Adeso)<small>Donor is an external, scoped viewer — not a Build owner.</small></div></div>
+    <div class="chip t"><div class="lbl">Decision · Grant ↔ Build</div><div class="val">Operator-set build_ref<small>Per-grant analytic-account mapping — no shared identity.</small></div></div>
+    <div class="chip t"><div class="lbl">Decision · Isolation</div><div class="val">Per grant<small>Donor resolves to exactly one analytic account.</small></div></div>
+  </div>
+
+  <!-- ============ 1. WHY SEPARATE ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow build-eyebrow">Framing</span></div>
+    <h2><span class="num">01</span> &nbsp;Why this is a separate spec</h2>
+    <p class="prose">The Kuja-tenant Build seam assumes a <strong>shared Link (Odoo) identity</strong> — the donor logs in through Link and the grant&harr;Build link is derived from the shared <code>res.partner</code>. <strong>Proximate and Saxansaxo don't use Link.</strong> They authenticate their own users, do community-based trust, and run under their own network. So the Build connection needs a mechanism that <em>doesn't</em> depend on Odoo SSO — different enough to keep in its own spec, so the two tenants never get conflated.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th>Kuja tenant</th><th>Networked tenants (this spec)</th></tr></thead>
+        <tbody>
+          <tr><td class="sys">Trust</td><td>Delegates to the Kuja Trust engine</td><td><span class="pill teal">none</span> community-based trust</td></tr>
+          <tr><td class="sys">Human auth</td><td>Link (Odoo) SSO</td><td>Tenant's own login / token-links</td></tr>
+          <tr><td class="sys">Grant ↔ Build link</td><td>Auto-derived from shared <code>res.partner</code></td><td><strong>Operator-set <code>build_ref</code></strong> per grant</td></tr>
+          <tr><td class="sys">Who runs Build</td><td>The <strong>donor</strong> buys Build (upsell)</td><td>The <strong>operator (Adeso)</strong> runs Build; donor is a scoped viewer</td></tr>
+          <tr><td class="sys">Data feed</td><td>Service credential</td><td>Service credential <span class="pill build">same</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 2. CORE IDEA + TOPOLOGY ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow build-eyebrow">Architecture</span></div>
+    <h2><span class="num">02</span> &nbsp;One binding, one feed, existing scope</h2>
+    <p class="prose"><strong>Bind one grant to one Build account, feed it over a service credential, show it through the donor scope you already enforce.</strong> Three layers — only the middle one is tenant-specific.</p>
+
+    <figure>
+      <svg viewBox="0 0 940 300" role="img" aria-label="A donor authenticates to the networked tenant using the tenant's own login, not Link. The tenant's grant backend pulls financials from Kuja Build over a service credential. One grant is bound to one Build analytic account by an operator-set build_ref.">
+        <defs>
+          <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="mk-cur"/></marker>
+          <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="mk-build"/></marker>
+        </defs>
+        <!-- donor -->
+        <g text-anchor="middle">
+          <circle cx="56" cy="86" r="15" class="fnone scur" stroke-width="1.5"/>
+          <path d="M56 94 c-13 0 -20 8 -20 18 h40 c0 -10 -7 -18 -20 -18z" class="fcur" opacity=".75"/>
+          <text x="56" y="140" font-family="system-ui" font-size="12.5">QCF (donor)</text>
+          <text x="56" y="157" class="tfaint" font-family="ui-monospace,monospace" font-size="10.5">scoped viewer</text>
+        </g>
+        <line x1="78" y1="90" x2="150" y2="90" class="scur" stroke-width="1.5" marker-end="url(#a)"/>
+        <text x="114" y="80" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" class="tmut">own login</text>
+        <text x="114" y="106" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9.5" class="tcrit">no Link</text>
+
+        <!-- tenant -->
+        <rect x="154" y="36" width="300" height="150" rx="10" class="fteal steal" stroke-width="1.5"/>
+        <text x="304" y="64" text-anchor="middle" font-family="system-ui" font-size="15" font-weight="700">Proximate / Saxansaxo</text>
+        <text x="304" y="82" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10.5" class="tteal">networked tenant · own auth</text>
+        <line x1="174" y1="94" x2="434" y2="94" class="steal" stroke-width="1" opacity=".35"/>
+        <g text-anchor="middle" font-family="system-ui" font-size="12">
+          <text x="304" y="116">community trust (no Trust engine)</text>
+          <text x="304" y="136">rounds · disbursements</text>
+          <text x="304" y="156">scoped donor reporting</text>
+        </g>
+        <text x="304" y="176" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" class="tteal">grant backend holds the feed</text>
+
+        <!-- tenant -> build -->
+        <line x1="454" y1="100" x2="636" y2="100" class="sbuild" stroke-width="2" marker-end="url(#ab)"/>
+        <text x="545" y="88" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" class="tbuild">service credential</text>
+        <text x="545" y="120" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" class="tbuild">system → system</text>
+
+        <!-- build -->
+        <rect x="640" y="36" width="264" height="150" rx="10" class="fbuild sbuild" stroke-width="1.5"/>
+        <text x="772" y="64" text-anchor="middle" font-family="system-ui" font-size="15" font-weight="700">Kuja Build</text>
+        <text x="772" y="82" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10.5" class="tbuild">Odoo 18 · operator's ERP</text>
+        <g text-anchor="middle" font-family="system-ui" font-size="12">
+          <text x="772" y="114">analytic accounts</text>
+          <text x="772" y="134">booked actuals · payments</text>
+        </g>
+        <text x="772" y="170" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" class="tbuild">the real financials</text>
+
+        <!-- binding ribbon -->
+        <rect x="154" y="230" width="750" height="46" rx="8" class="fsurf2 sline" stroke-width="1"/>
+        <text x="172" y="250" font-family="ui-monospace,monospace" font-size="11" class="tmut">OPERATOR-SET BINDING (replaces shared identity)</text>
+        <text x="172" y="268" font-family="ui-monospace,monospace" font-size="12">Proximate grant  &#8212;build_ref&#8594;  Build analytic account (one : one)</text>
+      </svg>
+      <figcaption>No Link and no shared identity — an operator maps the grant to its Build account; the feed is a service credential.</figcaption>
+    </figure>
+
+    <div class="grid2">
+      <div class="card"><span class="eyebrow build-eyebrow">Tenant-agnostic (shared)</span>
+        <ul class="check" style="margin-top:8px"><li>One <code>BuildClient</code> (service credential)</li><li>Normalise to <code>budget_lines / actuals / disbursements</code></li><li>Same shape the Kuja seam uses</li></ul>
+      </div>
+      <div class="card"><span class="eyebrow teal-eyebrow">Tenant-specific</span>
+        <ul class="check" style="margin-top:8px"><li>Operator sets <code>build_ref</code> per grant</li><li>Human auth = tenant's own login</li><li>Surfaces in the tenant's scoped donor reporting</li></ul>
+      </div>
+    </div>
+
+    <h3>Grant-side financial contract</h3>
+    <div class="contract"><span class="c"># per grant</span><br><span class="k">financial_source</span>  <span class="c"># "erp" | "manual"</span><br><span class="k">build_ref</span>         <span class="c"># Build analytic account / project id, when erp</span><br><span class="c"># normalised rows the donor view reads, from either source:</span><br>budget_lines[]     <span class="c"># category, planned, currency</span><br>actuals[]          <span class="c"># category, spent, date, source</span><br>disbursements[]    <span class="c"># amount, date, payee_ref</span><br>last_synced_at</div>
+  </section>
+
+  <!-- ============ 3. ISOLATION ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow">The crux</span></div>
+    <h2><span class="num">03</span> &nbsp;Multi-tenant isolation</h2>
+    <p class="prose">Adeso's Build holds <strong>many</strong> grants from the same donor. QCF must see <strong>only</strong> the account funding the Proximate grant — never Adeso's other QCF grants. Isolation is a composition of three controls; we want all three.</p>
+
+    <figure>
+      <svg viewBox="0 0 900 330" role="img" aria-label="Kuja Build holds several analytic accounts for donor QCF and others. Only the one account mapped to the Proximate grant by a build_ref is exposed to QCF's scoped donor view. The other QCF grants and other donors' accounts have no mapping, no donor scope, and ideally no source access, so QCF cannot reach them.">
+        <defs><marker id="im" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="mk-teal"/></marker></defs>
+        <!-- build container -->
+        <rect x="30" y="30" width="430" height="272" rx="12" class="fbuild sbuild" stroke-width="1.5"/>
+        <text x="50" y="58" font-family="system-ui" font-size="14" font-weight="700">Kuja Build — analytic accounts (Adeso)</text>
+        <!-- mapped account (highlighted) -->
+        <rect x="50" y="74" width="390" height="46" rx="8" class="fteal steal" stroke-width="1.6"/>
+        <text x="66" y="94" font-family="system-ui" font-size="13" font-weight="640">QCF · Proximate grant</text>
+        <text x="66" y="111" font-family="ui-monospace,monospace" font-size="11" class="tteal">analytic acct #4471 &nbsp;·&nbsp; mapped by build_ref</text>
+        <!-- muted accounts -->
+        <rect x="50" y="130" width="390" height="38" rx="8" class="fsurf2 sline" stroke-width="1" stroke-dasharray="4 4"/>
+        <text x="66" y="154" font-family="system-ui" font-size="12.5" class="tmut">QCF · grant B (other Adeso programme)  #4472</text>
+        <rect x="50" y="176" width="390" height="38" rx="8" class="fsurf2 sline" stroke-width="1" stroke-dasharray="4 4"/>
+        <text x="66" y="200" font-family="system-ui" font-size="12.5" class="tmut">QCF · grant C  #4473</text>
+        <rect x="50" y="222" width="390" height="38" rx="8" class="fsurf2 sline" stroke-width="1" stroke-dasharray="4 4"/>
+        <text x="66" y="246" font-family="system-ui" font-size="12.5" class="tmut">Other donors …</text>
+        <text x="50" y="286" font-family="ui-monospace,monospace" font-size="10.5" class="tcrit">✗ no mapping · ✗ no donor scope · ✗ no source access</text>
+
+        <!-- arrow only from mapped account -->
+        <line x1="440" y1="97" x2="600" y2="97" class="steal" stroke-width="2.5" marker-end="url(#im)"/>
+        <text x="520" y="86" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" class="tteal">build_ref</text>
+        <text x="520" y="112" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" class="tteal">the only path out</text>
+
+        <!-- donor view -->
+        <rect x="604" y="56" width="266" height="86" rx="10" class="fsurf steal" stroke-width="1.6"/>
+        <text x="737" y="86" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="700">QCF donor view</text>
+        <text x="737" y="106" text-anchor="middle" font-family="system-ui" font-size="12" class="tmut">(Proximate reporting)</text>
+        <text x="737" y="126" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10.5" class="tteal">sees exactly one account</text>
+      </svg>
+      <figcaption>QCF resolves to exactly one analytic account — the grant funding Proximate. The rest are unreachable.</figcaption>
+    </figure>
+
+    <div class="grid2">
+      <div class="card"><span class="eyebrow build-eyebrow">The three controls</span>
+        <ol style="margin-top:8px;padding-left:20px;font-size:14.5px">
+          <li><strong>Single-ref binding</strong> — the grant stores one <code>build_ref</code>, resolved server-side; no enumeration.</li>
+          <li><strong>Donor scope</strong> — the donor account is already scoped to its grants; the financials inherit that scope.</li>
+          <li><strong>Source-side scoping</strong> — Build exposes only the one account (record rules / per-grant token).</li>
+        </ol>
+      </div>
+      <div class="card"><span class="eyebrow teal-eyebrow">Isolation by record</span>
+        <p style="margin-top:10px">The feed is keyed off the grant's <em>stored</em> <code>build_ref</code>, resolved from a grant the viewer is already authorised to see — <strong>a request never supplies an analytic-account id.</strong></p>
+      </div>
+    </div>
+
+    <div class="callout crit">
+      <div class="h">Load-bearing risk</div>
+      <p>If the Build service credential can read all of Adeso's finance data, isolation rests entirely on control 1 (the grant-app side). <strong>Source-side scoping (control 3) is what makes "QCF only sees the Proximate grant" a structural guarantee</strong> rather than a filter that could be forgotten. This is the single most important thing to settle with the dev team.</p>
+    </div>
+  </section>
+
+  <!-- ============ 4. CONNECTION MECHANISM ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow build-eyebrow">Mechanism</span></div>
+    <h2><span class="num">04</span> &nbsp;The connection, per grant</h2>
+    <ol class="steps">
+      <li><b>Operator maps the grant.</b> <span class="note">Sets <code>financial_source = 'erp'</code> and <code>build_ref = &lt;analytic account id&gt;</code> on the donor grant — one audited action.</span></li>
+      <li><b>Backend pulls on demand.</b> <span class="note">The grant backend calls <code>BuildClient.get_financials(build_ref)</code> with the service credential, keyed off the grant's stored ref — never a request value.</span></li>
+      <li><b>Normalise + cache.</b> <span class="note">Build's response is normalised to the shared shape and cached with <code>last_synced_at</code>; the donor sees booked actuals vs budget.</span></li>
+      <li><b>Fallback is seamless.</b> <span class="note">With <code>financial_source = 'manual'</code> (or Build unreachable) the same surface renders uploaded reports — compliance is identical either way.</span></li>
+    </ol>
+  </section>
+
+  <!-- ============ 5. REFERENCE USE CASE ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow teal-eyebrow">Proof</span></div>
+    <h2><span class="num">05</span> &nbsp;Reference use case — QCF → Proximate</h2>
+    <p class="prose">A real, self-contained proof on <strong>actual Adeso financial data</strong> already loaded in the Build test env.</p>
+    <div class="grid2">
+      <div class="card"><span class="eyebrow teal-eyebrow">Setup &amp; map</span>
+        <ul class="check" style="margin-top:8px;font-size:14px"><li>Proximate is funded by QCF; Adeso holds several QCF grants</li><li>The specific Proximate-funding grant is uploaded to the tenant; QCF has a scoped donor account</li><li>Operator maps that grant's <code>build_ref</code> to the QCF analytic account</li></ul>
+      </div>
+      <div class="card"><span class="eyebrow">Acceptance</span>
+        <p style="margin:8px 0"><span class="pill good">positive</span> QCF sees real budget vs booked actuals + disbursements for <em>its</em> Proximate grant.</p>
+        <p style="margin:8px 0"><span class="pill crit">negative</span> QCF <strong>cannot</strong> see Adeso's other QCF grants — no mapping, no scope, no source access.</p>
+        <p style="margin:8px 0"><span class="pill teal">parity</span> Saxansaxo is the same shape — proving one proves the pattern.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6. BENEFITS ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow build-eyebrow">Why this approach</span></div>
+    <h2><span class="num">06</span> &nbsp;Benefits</h2>
+    <div class="grid2">
+      <div class="card">
+        <ul class="check" style="font-size:14.5px">
+          <li><b>One feed, every tenant.</b> Same client + abstraction for Kuja, Proximate, Saxansaxo — no per-tenant financial code to drift.</li>
+          <li><b>Decoupled from identity.</b> Never touches Link/SSO — works for tenants that authenticate their own way.</li>
+          <li><b>Isolation by construction.</b> Per-grant <code>build_ref</code> makes "donor sees only their grant" structural, not a filter to remember.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <ul class="check" style="font-size:14.5px">
+          <li><b>Compliance with or without the ERP.</b> <code>erp | manual</code> — a grant without Build still reports via uploads on the same surface.</li>
+          <li><b>Real numbers, less reconciliation.</b> Donors see actuals booked in the accounting system, not re-keyed figures.</li>
+          <li><b>Reuses hardened plumbing.</b> Rides existing donor scoping + hash-chained audit; no new access-control surface.</li>
+          <li><b>Incremental &amp; reversible.</b> Flag-gated inert rollout — ship dormant, map one grant, prove, expand.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 7. ROADMAP ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow">Sequencing</span></div>
+    <h2><span class="num">07</span> &nbsp;Phased path</h2>
+    <div class="card" style="padding:6px 22px">
+      <div class="phase"><div class="pnum">0</div><div><h3>Financial-source abstraction</h3><p><code>financial_source</code> + <code>build_ref</code> on the tenant grant; operator "map to Build account" action; audit.</p></div><span class="size s">S</span></div>
+      <div class="phase"><div class="pnum">1</div><div><h3>BuildClient + normaliser</h3><p>Service-credential finance client → the shared shape; inert behind a flag until creds are set.</p></div><span class="size m">M</span></div>
+      <div class="phase"><div class="pnum">2</div><div><h3>Surface in donor reporting</h3><p>Booked actuals in the tenant's donor dashboards / Donor Pack PDF; <code>manual</code> fallback stays source-equivalent.</p></div><span class="size m">M</span></div>
+      <div class="phase"><div class="pnum">3</div><div><h3>Isolation hardening</h3><p>Source-side scoping (per-account creds or share token); positive <em>and</em> negative (QCF-can't-see-other-grants) tests.</p></div><span class="size m">M</span></div>
+      <div class="phase"><div class="pnum">4</div><div><h3>Freshness + Saxansaxo parity</h3><p>Pull-on-view → scheduled sync / webhook, per the dev team's answer; repeat for Saxansaxo.</p></div><span class="size m">M</span></div>
+    </div>
+    <p class="prose" style="color:var(--muted);font-size:14px">Phases 0–1 are buildable now on our side, inert until the Build creds land — the same pattern used for the Trust and licensing seams.</p>
+  </section>
+
+  <!-- ============ 8. WHAT WE NEED ============ -->
+  <section>
+    <div class="sec-head"><span class="eyebrow">Before we build</span></div>
+    <h2><span class="num">08</span> &nbsp;What we need from the dev team</h2>
+
+    <h3>A · Build finance API access (test env first)</h3>
+    <ol class="need">
+      <li>Test-env base URL + which API: <strong>Odoo external API (XML-RPC / JSON-RPC)</strong> or a <strong>custom REST</strong> endpoint.</li>
+      <li>A dedicated, <strong>read-only service account</strong> + credentials for the grant backend (not a human login).</li>
+      <li>Rate limits / SLA on the finance API, and whether prod Build exposes the <strong>same</strong> API shape.</li>
+    </ol>
+
+    <h3>B · The mapping keys (for the QCF → Proximate test)</h3>
+    <ol class="need" start="4">
+      <li>The <strong>analytic account / project id</strong> in Build for the QCF grant that funds Proximate (the <code>build_ref</code>).</li>
+      <li>A <strong>second, unrelated</strong> QCF analytic-account id, for the <strong>negative isolation test</strong>.</li>
+      <li>The Build grant model: is there a <code>grant.grant</code> object or only analytic accounts/projects? One account = one donor grant, or many:1?</li>
+    </ol>
+
+    <h3>C · The data contract (one sample per object)</h3>
+    <ol class="need" start="7">
+      <li>A <strong>sample payload</strong> for that account: <strong>budget lines</strong>, <strong>booked actuals</strong> (journal / analytic lines), <strong>disbursements/payments</strong> — with field names + types.</li>
+      <li><strong>Semantics:</strong> amount <strong>sign conventions</strong>, <strong>currency</strong> (grant vs company — QAR/USD) and where FX conversion happens, date fields, how categories are identified.</li>
+      <li>How Adeso's <strong>Build-booked disbursements</strong> relate to the tenant's <strong>own recorded</strong> disbursements — same events to <strong>reconcile</strong>, or <strong>complementary</strong>?</li>
+    </ol>
+
+    <h3>D · Isolation at the source (the security ask)</h3>
+    <ol class="need" start="10">
+      <li>Can the service account be <strong>scoped per analytic account</strong> (Odoo record rules), reading only the mapped account?</li>
+      <li>If not — can Build issue a <strong>per-grant <code>grant.dashboard.share</code>-style token</strong> (public id + secret, hash-only) scoped to one account, that the backend calls instead of a broad credential?</li>
+    </ol>
+
+    <h3>E · Freshness &amp; operations</h3>
+    <ol class="need" start="12">
+      <li>Feed model: <strong>pull-on-view</strong>, <strong>scheduled sync</strong>, or <strong>webhook-on-posting</strong>? Expected latency? If webhook: event catalogue, payload, signing.</li>
+      <li>Confirm the test env holds the <strong>real Adeso financial data</strong> for this grant, and the entitlement model — ERP/real-time gated <strong>per donor</strong> or <strong>per grant</strong>, and who provisions it.</li>
+    </ol>
+
+    <div class="callout teal">
+      <div class="h">What we'll do in parallel</div>
+      <p>Phases 0–1 (the <code>financial_source</code>/<code>build_ref</code> mapping + the <code>BuildClient</code> scaffolding) can be built now and left inert behind a flag. The moment items A–B land, the QCF → Proximate test is just: point the client at the test env, set the one <code>build_ref</code>, and run the positive + negative checks.</p>
+    </div>
+  </section>
+
+  <footer>
+    Kuja Build ↔ Networked Tenants · integration specification v0.1 · 14 Aug 2026<br>
+    Sibling of the Kuja-tenant platform spec. Trust excluded by design — Proximate &amp; Saxansaxo use community-based trust.
+  </footer>
+
+</div>
