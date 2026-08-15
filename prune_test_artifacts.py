@@ -44,10 +44,16 @@ def main():
     confirm = '--confirm' in sys.argv
     app = create_app()
     with app.app_context():
-        # Scan all grants; match by the canonical test-title rule. Keep this in
+        # Scan grants; match by the canonical test-title rule. Keep this in
         # Python (not SQL) so the regex patterns are applied exactly as the
         # rest of the app understands them.
-        all_grants = Grant.query.all()
+        #
+        # SAFETY: restrict to the default Kuja marketplace network only
+        # (grants with no fund_window assignment). Other tenants (NEAR /
+        # Proximate / Saxansaxo) attach their grants to a FundWindow, so this
+        # filter guarantees the pruner can NEVER delete another tenant's data,
+        # even if a title happened to match the test-artifact pattern.
+        all_grants = Grant.query.filter(Grant.fund_window_id.is_(None)).all()
         targets, protected_awarded = [], []
         for g in all_grants:
             if not is_test_artifact_title(g.title):
