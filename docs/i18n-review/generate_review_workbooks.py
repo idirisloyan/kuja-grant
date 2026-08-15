@@ -29,6 +29,21 @@ I18N = os.path.join(REPO, 'frontend', 'src', 'i18n')
 DOWNLOADS = r'C:\Users\IdirisLoyan\Downloads\Latest Kuja files'
 STAMP = date.today().isoformat()  # informational only
 
+# This review is scoped to the KUJA MARKETPLACE tenant only. The i18n files are
+# one shared table serving all four tenants, so we drop the namespaces that only
+# appear in the other tenants' products (Proximate's endorsement/disbursement/
+# crisis vocabulary — all under `proximate.*` + `prox_grant`; NEAR's networked-
+# funds vocabulary — declarations, network membership, window/near reports).
+# Everything else (grants, applications, donors, reviewers, NGOs, Trust Profile,
+# compliance, reporting, AI, dashboards, admin) is shared and reviewed.
+EXCLUDE_NAMESPACES = {
+    'proximate', 'prox_grant',
+    'declaration', 'declaration_detail',
+    'membership_detail', 'membership_list', 'network_join',
+    'window_report', 'near_reports',
+    'crisis_detail', 'crisis_list',
+}
+
 # (code, English name, native name, is_RTL)
 LANGS = [
     ('en', 'English', 'English', False),
@@ -101,7 +116,8 @@ def placeholders(s):
 def build(code, name, native, rtl, en):
     is_src = (code == 'en')
     tgt = en if is_src else load(code)
-    keys = sorted(set(en) | set(tgt))
+    keys = sorted(k for k in (set(en) | set(tgt))
+                  if k.split('.')[0] not in EXCLUDE_NAMESPACES)
 
     wb = Workbook()
 
@@ -125,10 +141,11 @@ def build(code, name, native, rtl, en):
                     'language is translated from, so please proofread it for clarity, correctness, tone and '
                     'consistency. Improvements you make here should also be reflected in the other languages.', )
     else:
-        r = line(r, f'Thank you for reviewing the {name} translation of the Kuja grant-management platform. '
-                    f'These are the exact words end-users (NGOs, donors, reviewers, oversight bodies) see in the '
-                    f'app. Your job is to make the {name} read naturally, correctly and respectfully for a '
-                    f'grassroots / humanitarian audience.')
+        r = line(r, f'Thank you for reviewing the {name} translation of the Kuja Marketplace. These are the exact '
+                    f'words end-users (NGOs, donors, reviewers, admins) see in the app. Your job is to make the '
+                    f'{name} read naturally, correctly and respectfully for a grassroots / humanitarian audience. '
+                    f'(Scope: this file covers the Kuja Marketplace product only — strings that belong to the other '
+                    f'Kuja networks have been left out so you do not have to review them.)')
     r += 1
     r = line(r, 'What we need you to do', H2_FONT)
     r = line(r, '1.  Go to the "Strings to review" tab.')
