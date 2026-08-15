@@ -115,14 +115,29 @@ export function CopilotRail({ scope }: { scope?: CopilotScope }) {
 
       {/* Rail — z-[1250] so it sits above MUI's sidebar/header but below
           MUI modals (1300). Guarantees the Ask tab input is never
-          occluded by layout chrome. */}
+          occluded by layout chrome.
+
+          Wrapped in a viewport-sized clip layer: the rail is
+          `position: fixed`, so when closed (`translate-x-full`) it sits off
+          the RIGHT edge and, on a phone (≤380px), lengthened the page's
+          horizontal scroll — the 14-Aug pilot's mobile overflow at 360×800.
+          An ancestor's `overflow` cannot clip a fixed descendant, so the rail
+          is `absolute` inside this `fixed inset-0 overflow-x-hidden` layer,
+          which clips the off-canvas overhang without touching the document's
+          scroll container (sticky-safe) and keeps the slide animation.
+          `pointer-events-none` lets clicks fall through the transparent
+          layer; the rail re-enables them. */}
+      <div
+        className="fixed inset-0 overflow-x-hidden pointer-events-none"
+        style={{ zIndex: 1250 }}
+        aria-hidden={!open}
+      >
       <aside
         className={cn(
-          'fixed right-0 top-0 bottom-0 flex w-[380px] flex-col border-l border-border bg-background shadow-2xl',
+          'pointer-events-auto absolute right-0 top-0 bottom-0 flex w-[380px] max-w-full flex-col border-l border-border bg-background shadow-2xl',
           'transition-transform duration-300 ease-in-out',
           open ? 'translate-x-0' : 'translate-x-full',
         )}
-        style={{ zIndex: 1250 }}
         aria-label={`${tenantName} Co-pilot`}
       >
         {/* Header */}
@@ -169,6 +184,7 @@ export function CopilotRail({ scope }: { scope?: CopilotScope }) {
           )}
         </div>
       </aside>
+      </div>
     </>
   );
 }

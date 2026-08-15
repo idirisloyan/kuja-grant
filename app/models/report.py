@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.utils.helpers import _json_load, _json_dump
+from app.utils.helpers import _json_load, _json_dump, iso_utc
 
 
 class Report(db.Model):
@@ -95,12 +95,12 @@ class Report(db.Model):
             'attachments': self.get_attachments(),
             'status': self.status,
             'due_date': self.due_date.isoformat() if self.due_date else None,
-            'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
-            'reviewed_at': self.reviewed_at.isoformat() if self.reviewed_at else None,
+            'submitted_at': iso_utc(self.submitted_at),
+            'reviewed_at': iso_utc(self.reviewed_at),
             'reviewer_notes': self.reviewer_notes,
             'ai_analysis': self.get_ai_analysis(),
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'created_at': iso_utc(self.created_at),
+            'updated_at': iso_utc(self.updated_at),
             'revision_number': self.revision_number or 1,
             'revision_count': len(self.get_revision_history()),
             'grant_title': self.grant.title if self.grant else None,

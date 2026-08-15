@@ -157,6 +157,7 @@ def main():
     ds = donor.get(f"{BASE}/api/dashboard/stats", headers=HDR, timeout=20)
     if ds.status_code == 200:
         stats = ds.json()
+        stats = stats.get("stats", stats)  # /dashboard/stats nests under 'stats'
         awaiting = None
         for k in ("applications_awaiting_review", "awaiting_review", "pending_review", "to_review"):
             if isinstance(stats.get(k), int):

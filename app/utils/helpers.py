@@ -6,6 +6,7 @@ Pure utility functions with no app-level side effects.
 """
 
 import json
+from datetime import timezone
 from flask import request
 
 # ---------------------------------------------------------------------------
@@ -57,6 +58,31 @@ def _json_dump(obj):
     if isinstance(obj, str):
         return obj
     return json.dumps(obj, default=str)
+
+
+def iso_utc(dt):
+    """Serialize a datetime as an explicit-UTC ISO-8601 string (with offset).
+
+    Our timestamp columns are declared ``db.DateTime`` (no ``timezone=True``),
+    so a value written tz-aware in UTC (``datetime.now(timezone.utc)``) is read
+    back NAIVE from SQLite/Postgres. A bare ``.isoformat()`` then emits e.g.
+    ``"2026-08-14T09:00:00"`` with no zone marker, and the frontend's
+    ``new Date(...)`` / ``Date.parse(...)`` interprets that as *local* time — so
+    a just-now timestamp reads as the future for any viewer west of UTC
+    ("Updated in future", a 14-Aug pilot finding). Emitting an explicit UTC
+    offset makes every consumer parse the instant correctly.
+
+    Naive values are treated as the UTC they actually are; already-aware values
+    are converted to UTC (never mangled). Returns ``None`` for ``None``. Only
+    for ``datetime`` — pass ``date`` values through ``.isoformat()`` directly.
+    """
+    if dt is None:
+        return None
+    if getattr(dt, 'tzinfo', None) is not None:
+        dt = dt.astimezone(timezone.utc)
+    else:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
 
 
 # ---------------------------------------------------------------------------

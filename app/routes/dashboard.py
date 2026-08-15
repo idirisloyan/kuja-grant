@@ -498,12 +498,20 @@ def _build_donor_stats(org_id):
     """Build donor dashboard stats with consolidated queries."""
     stats = {}
 
-    # -- Single GROUP BY for grant status counts --
-    grant_counts = db.session.query(
-        Grant.status,
-        func.count(Grant.id)
-    ).filter(
-        Grant.donor_org_id == org_id
+    # Reconcile with the list endpoints (14-Aug pilot: "counts don't
+    # reconcile"). /api/grants and /api/applications are BOTH network-scoped,
+    # and donors/reviewers never see NGO drafts. The dashboard tiles must
+    # count the SAME rows or the numbers disagree — the review saw ~342 grants
+    # here vs 322 in the list (unscoped vs scoped) and draft applications
+    # inflating the app totals. So: scope both counts to the current network,
+    # and exclude drafts from the application totals (a draft is the NGO's
+    # private, unfinished work the donor cannot see).
+    from app.utils.network import scope_grant_query, scope_application_query
+
+    # -- Single GROUP BY for grant status counts (network-scoped) --
+    grant_counts = scope_grant_query(
+        db.session.query(Grant.status, func.count(Grant.id))
+        .filter(Grant.donor_org_id == org_id)
     ).group_by(Grant.status).all()
 
     grant_status_map = dict(grant_counts)
@@ -511,12 +519,13 @@ def _build_donor_stats(org_id):
     stats['open_grants'] = grant_status_map.get('open', 0)
     stats['draft_grants'] = grant_status_map.get('draft', 0)
 
-    # -- Single GROUP BY for application status counts (via join) --
-    app_counts = db.session.query(
-        Application.status,
-        func.count(Application.id)
-    ).join(Grant).filter(
-        Grant.donor_org_id == org_id
+    # -- Single GROUP BY for application status counts (network-scoped;
+    #    drafts excluded — donors cannot see NGO drafts) --
+    app_counts = scope_application_query(
+        db.session.query(Application.status, func.count(Application.id))
+        .join(Grant)
+        .filter(Grant.donor_org_id == org_id,
+                Application.status != 'draft')
     ).group_by(Application.status).all()
 
     app_status_map = dict(app_counts)
@@ -526,8 +535,7 @@ def _build_donor_stats(org_id):
     )
     stats['awarded'] = app_status_map.get('awarded', 0)
     # Phase 206 — full per-status breakdown so the dashboard tile can
-    # render every bucket (not just pending + awarded). Keys are
-    # already canonical status strings.
+    # render every bucket. Draft is intentionally absent (excluded above).
     stats['app_status_breakdown'] = {
         k: v for k, v in app_status_map.items() if k
     }
@@ -3038,8 +3046,12 @@ def api_dashboard_donor_grants_by_status():
     """
     if current_user.role not in ('donor', 'admin'):
         return jsonify({'error': 'access denied'}), 403
-    rows = (Grant.query
-            .filter(Grant.donor_org_id == current_user.org_id)
+    # Network-scoped so this tile's total matches /api/grants (14-Aug pilot
+    # count-reconciliation): an unscoped donor grant count read ~342 here vs
+    # 322 in the scoped list.
+    from app.utils.network import scope_grant_query
+    rows = (scope_grant_query(
+                Grant.query.filter(Grant.donor_org_id == current_user.org_id))
             .with_entities(Grant.status)
             .all())
     counts = {'draft': 0, 'open': 0, 'review': 0, 'closed': 0, 'awarded': 0}
@@ -3417,10 +3429,16 @@ def api_dashboard_donor_apps_by_country():
     if current_user.role not in ('donor', 'admin'):
         return jsonify({'error': 'access denied'}), 403
     from collections import Counter
-    rows = (db.session.query(Organization.country)
-            .join(Application, Application.ngo_org_id == Organization.id)
-            .join(Grant, Grant.id == Application.grant_id)
-            .filter(Grant.donor_org_id == current_user.org_id)
+    # Network-scoped + drafts excluded so this geography tile reconciles with
+    # the other application counts (14-Aug pilot: "243 by country" vs "7 last
+    # 12 months" — the 243 counted drafts + all history, unscoped).
+    from app.utils.network import scope_application_query
+    rows = (scope_application_query(
+                db.session.query(Organization.country)
+                .join(Application, Application.ngo_org_id == Organization.id)
+                .join(Grant, Grant.id == Application.grant_id)
+                .filter(Grant.donor_org_id == current_user.org_id,
+                        Application.status != 'draft'))
             .all())
     counts = Counter((c[0] or 'Unknown') for c in rows)
     out = [{'country': k, 'count': v}
@@ -5839,7 +5857,10 @@ def api_dashboard_donor_apps_awaiting_first_review():
     rows = (db.session.query(Application.id)
             .join(Grant, Application.grant_id == Grant.id)
             .filter(Grant.donor_org_id == current_user.org_id,
-                    Application.status.in_(['submitted', 'in_review']),
+                    # canonical statuses are 'submitted'/'under_review'
+                    # ('in_review' never matched — silent under-count,
+                    # 14-Aug pilot count-reconciliation finding)
+                    Application.status.in_(['submitted', 'under_review']),
                     Application.submitted_at.isnot(None),
                     Application.submitted_at <= cutoff,
                     not_(sub.exists()))

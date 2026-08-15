@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.utils.helpers import _json_load, _json_dump
+from app.utils.helpers import _json_load, _json_dump, iso_utc
 
 
 class Grant(db.Model):
@@ -115,12 +115,12 @@ class Grant(db.Model):
             'status': self.status,
             'financial_source': self.financial_source_value(),
             'build_ref': self.build_ref,
-            'financial_synced_at': self.financial_synced_at.isoformat() if self.financial_synced_at else None,
+            'financial_synced_at': iso_utc(self.financial_synced_at),
             'sectors': self.get_sectors(),
             'countries': self.get_countries(),
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'published_at': self.published_at.isoformat() if self.published_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'created_at': iso_utc(self.created_at),
+            'published_at': iso_utc(self.published_at),
+            'updated_at': iso_utc(self.updated_at),
         }
         if not summary:
             data['eligibility'] = self.get_eligibility()

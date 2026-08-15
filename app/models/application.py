@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.utils.helpers import _json_load, _json_dump
+from app.utils.helpers import _json_load, _json_dump, iso_utc
 
 
 class Application(db.Model):
@@ -143,20 +143,20 @@ class Application(db.Model):
             'auto_score': self.ai_score,      # clear alias — same value, plain name
             'human_score': self.human_score,  # authoritative: mean of reviewer scores
             'final_score': self.final_score,  # blended 0.4*auto + 0.6*human
-            'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'submitted_at': iso_utc(self.submitted_at),
+            'created_at': iso_utc(self.created_at),
+            'updated_at': iso_utc(self.updated_at),
             'decision_reason_code': self.decision_reason_code,
             'decision_notes': self.decision_notes,
-            'decision_recorded_at': self.decision_recorded_at.isoformat() if self.decision_recorded_at else None,
+            'decision_recorded_at': iso_utc(self.decision_recorded_at),
             'decision_recorded_by_user_id': self.decision_recorded_by_user_id,
-            'applicant_viewed_feedback_at': self.applicant_viewed_feedback_at.isoformat() if self.applicant_viewed_feedback_at else None,
-            'outreach_initiated_at': self.outreach_initiated_at.isoformat() if self.outreach_initiated_at else None,
+            'applicant_viewed_feedback_at': iso_utc(self.applicant_viewed_feedback_at),
+            'outreach_initiated_at': iso_utc(self.outreach_initiated_at),
             'outreach_initiated_by_user_id': self.outreach_initiated_by_user_id,
             'outreach_message_text': self.outreach_message_text,
-            'appeal_requested_at': self.appeal_requested_at.isoformat() if self.appeal_requested_at else None,
+            'appeal_requested_at': iso_utc(self.appeal_requested_at),
             'appeal_reason_text': self.appeal_reason_text,
-            'appeal_resolved_at': self.appeal_resolved_at.isoformat() if self.appeal_resolved_at else None,
+            'appeal_resolved_at': iso_utc(self.appeal_resolved_at),
             'appeal_resolution': self.appeal_resolution,
             'appeal_resolution_text': self.appeal_resolution_text,
             'appeal_resolved_by_user_id': self.appeal_resolved_by_user_id,
