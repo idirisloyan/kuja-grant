@@ -110,6 +110,15 @@ def api_list_applications():
     # Admin sees all (still tenant-scoped — admin viewing NEAR sees NEAR
     # only; admin viewing Kuja sees Kuja only; admin can switch tenants).
 
+    # A draft is the NGO's private, unfinished work. Donors and reviewers must
+    # never see it — the 14-Aug pilot review found the donor Review queue full
+    # of NGO drafts, which is both queue pollution AND an exposure of unfinished
+    # applications. NGOs still see their own drafts (branch above); donors and
+    # reviewers only ever see submitted-or-later. This holds even when the
+    # caller passes ?status=draft, so a draft can never leak through the filter.
+    if current_user.role in ('donor', 'reviewer'):
+        query = query.filter(Application.status != 'draft')
+
     # Tenant scope last so the joins don't fight with the role-specific
     # joins above. Donor branch already joined Grant — scope_application_query
     # joins it again, which is harmless for SQLAlchemy.
