@@ -370,12 +370,13 @@ TRUST_ROWS = [
   "Signed in; org has NO passport","—",
   "1. Start/submit an application without a Trust profile/passport",
   "A soft CTA ('Open Trust') may appear, but application submission is NOT blocked — readiness returns ready:true; grant submit has no passport/trust gate."),
- ("TRU-011","Grant↔Trust","Seam diagnostics show engine mode","Setup","P2","Admin · admin@kuja.org",
+ ("TRU-011","Grant↔Trust","Seam diagnostics show the engine is LIVE","Setup","P2","Admin · admin@kuja.org",
   "Signed in as admin","—","1. Call GET /api/admin/trust-engine/status (admin diagnostics)",
-  "Reports engine mode (default 'local'), and whether remote Trust is configured/reachable — expected DORMANT unless KUJA_TRUST_* env vars are set."),
- ("TRU-012","Grant↔Trust","No user-facing Grant→Trust handoff today","Edge","P2",N,
-  "Signed in","—","1. Look across the Grant UI for any link/redirect/SSO to kuja-app-production (Trust app)",
-  "There is NO in-UI handoff currently; the 'real' capacity assessment is completed directly in the standalone Trust app. (Document this as expected pilot behaviour.)"),
+  "For the Kuja tenant with the hand-off configured: mode='remote', remote_configured=true, remote_reachable=true. (If the shared secret / engine are unset it falls back to 'local' — the kill switch.)"),
+ ("TRU-012","Grant↔Trust","Hand-off: Grant → Kuja Trust assessment (no 2nd login)","Happy","P1",N,
+  "Signed in as NGO on /trust; hand-off configured","—",
+  "1. On /trust click 'Complete your capacity assessment in Kuja Trust'\n2. Follow the redirect",
+  "You land on the Assessment tab in Kuja Trust with NO second login (a short-lived signed link binds your org); a 'Return to your application' bar is shown. Your Trust org is created/linked on first arrival (external_ref=grant:<id>)."),
  ("TRU-013","Trust app — access","Enter the demo workspace (no credentials)","Happy","P1",TA,
   "On https://kuja-app-production.up.railway.app","—",
   "1. Click 'Explore the demo workspace'",
@@ -447,6 +448,14 @@ TRUST_ROWS = [
  ("TRU-032","Trust app — admin","Pilot cross-org read is time-boxed and audited","Security","P3","Trust admin (provisioned)",
   "Platform-admin Trust access","—","1. As a Trust platform admin, read another org during the pilot window",
   "Cross-org READ is allowed until KUJA_ADMIN_FULL_READ_UNTIL and every read is audited; cross-org WRITE is never allowed."),
+ ("TRU-033","Grant↔Trust","Return to grant + result reads back","Happy","P1",N,
+  "Completed a hand-off assessment in Kuja Trust (TRU-012)","—",
+  "1. In Kuja Trust click 'Return to your application'\n2. Land back on Grant /trust (?from=trust)",
+  "You return to the Grant app; a 'Welcome back from Kuja Trust' banner shows and the capacity & due-diligence status now reflects the Trust assessment (the profile is served with source='trust')."),
+ ("TRU-034","Grant↔Trust","Hand-off availability gate / kill switch","Edge","P2",N,
+  "Signed in as NGO","—",
+  "1. Call GET /api/trust/handoff/available\n2. (Ops) confirm the CTA hides if KUJA_TRUST_HANDOFF_SECRET is unset",
+  "Returns available:true only when the hand-off is configured for the Kuja tenant; with the secret unset the CTA is hidden, /handoff is inert, and the app falls back to its own in-app assessment — non-destructive kill switch."),
 ]
 D = "Donor · sarah@globalhealth.org"
 DONOR_ROWS = [
@@ -997,7 +1006,7 @@ def coverage(wb):
                 "post-award compliance & reporting (voice, photo evidence, pre-check, submit)."),
       ("bullet","Capacity & Trust: in-app assessment + Passport publish/share/verify; the standalone Kuja "
                 "Trust app (7 C4C domains, evidence room, screening, self-declared vs verified-clear, "
-                "languages/RTL, low-data mode); and the (currently dormant) Grant↔Trust service seam."),
+                "languages/RTL, low-data mode); and the LIVE Grant↔Trust hand-off + service read-back."),
       ("bullet","Donor: create grant (incl. PDF→AI extraction) → set criteria/weights → publish (licence) "
                 "→ review pipeline → request revision/documents → shortlist/compare → decide → debrief → "
                 "appeals → portfolio Q&A → review grantee reports → exports."),

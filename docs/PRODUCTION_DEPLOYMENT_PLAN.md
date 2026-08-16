@@ -226,6 +226,11 @@ The Marketplace notifies via **email + in-app** (and optional web push). No What
 
 **Screening (Trust Profile):** `OPENSANCTIONS_API_KEY`, `SAM_GOV_API_KEY`, `RESCREENING_SCHEDULER`, `RESCREENING_INTERVAL_HOURS`.
 
+**Kuja Trust hand-off (capacity assessment — LIVE, see `docs/TRUST_HANDOFF_DESIGN.md`):** a shared secret pair must be set identically on BOTH deployments — the Grant `web` service AND the Kuja Trust `kuja-app` service — or the hand-off/read-back stays off:
+- `KUJA_TRUST_HANDOFF_SECRET` — shared HS256 signing secret for the hand-off link (Grant mints, Trust verifies). Unset = feature hidden/inert (kill switch).
+- `KUJA_TRUST_SERVICE_TOKEN` — shared bearer for the `/api/service/*` read-back (Grant sends, Trust validates). Must match on both.
+- Grant only: `KUJA_TRUST_BASE_URL` (the Trust app URL), `KUJA_TRUST_ENGINE=remote` (turns read-back on; falls back to local if Trust is down), `KUJA_GRANT_BASE_URL` (this app's public URL, for the signed return link). Rotate the secret pair on both services together.
+
 **AI:** `ANTHROPIC_WEB_SEARCH`, `KUJA_AI_BUDGET_USD_30D`, `KUJA_USER_AI_CONCURRENT`, `WHISPER_API_KEY`/`WHISPER_MODEL`/`WHISPER_API_URL` (if voice used).
 
 **Storage/infra:** `S3_ENDPOINT`/`S3_ACCESS_KEY`/`S3_SECRET_KEY`/`S3_BUCKET`/`S3_REGION` (or persistent `UPLOAD_FOLDER`), `TASK_RUNNER_WORKERS`, `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` (if web push), `SENTRY_DSN`, `KUJA_PUBLIC_HOST`/`KUJA_PUBLIC_BASE_URL`, `KUJA_VC_SIGNING_KEY_HEX`, `KUJA_AUDIT_RETENTION_DAYS`.
