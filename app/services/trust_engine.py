@@ -121,6 +121,17 @@ def get_trust_profile(org_id: int) -> dict | None:
     if not org:
         return None
 
+    # Only an org LINKED to the shared platform identity (kuja_partner_id) has a
+    # safe, collision-free ref to hand Trust. Without one, falling back to the
+    # bare local org id could resolve to an UNRELATED Trust org that happens to
+    # share that numeric id — a cross-org read. So an unlinked org always serves
+    # local until it's linked (which the capacity-assessment hand-off does by
+    # backfilling kuja_partner_id). This makes remote reads opt-in per linked org.
+    if not (getattr(org, 'kuja_partner_id', None) or '').strip():
+        logger.debug('trust_engine: org %s has no kuja_partner_id; serving local (mode=%s)',
+                     org_id, mode)
+        return _local_profile(org_id)
+
     if mode == 'remote':
         return _remote_or_fallback(org)
 
