@@ -1,0 +1,4 @@
+# Large/regenerable test assets (rebuild with make_testfiles.py; grab zip from Downloads)
+testfiles/99_edge_cases/oversized_20MB.pdf
+Kuja_UAT_TestFiles.zip
+__pycache__/
