@@ -1,6 +1,6 @@
 # Grant ↔ Trust capacity-assessment hand-off — design
 
-**Status:** approved, in build · **Scope:** Kuja Marketplace tenant (`slug='kuja'`) · **Date:** 2026-08-15
+**Status:** LIVE — verified end-to-end on prod 2026-08-15 (mint → verify → org link → session → return → read-back `source:"trust"`). · **Scope:** Kuja Marketplace tenant (`slug='kuja'`) · **Date:** 2026-08-15
 
 ## Goal
 
