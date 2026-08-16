@@ -183,4 +183,11 @@ export const trustApi = {
       `/api/passport/${passportId}/revoke`,
       { reason },
     ),
+
+  // Capacity-assessment hand-off to the standalone Kuja Trust app.
+  // available: whether to show the "assess in Kuja Trust" CTA for this tenant.
+  handoffAvailable: () =>
+    api.get<{ available: boolean }>(`/api/trust/handoff/available`),
+  // startHandoff: returns { url } to navigate the browser to Kuja Trust.
+  startHandoff: () => api.post<{ url: string }>(`/api/trust/handoff`, {}),
 };

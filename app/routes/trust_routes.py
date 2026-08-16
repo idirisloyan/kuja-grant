@@ -19,7 +19,9 @@ Routes:
 import logging
 from datetime import datetime, timezone
 
-from flask import Blueprint, request, jsonify
+import os
+
+from flask import Blueprint, request, jsonify, g
 from flask_login import login_required, current_user
 
 from app.extensions import db
@@ -84,6 +86,84 @@ def api_trust_engine_status():
     if getattr(current_user, 'role', None) != 'admin':
         return jsonify({'error': 'forbidden', 'success': False}), 403
     return jsonify({'success': True, 'engine': trust_engine.engine_status()})
+
+
+# =============================================================================
+# CAPACITY-ASSESSMENT HAND-OFF (Grant -> standalone Kuja Trust app -> back)
+# See docs/TRUST_HANDOFF_DESIGN.md. The NGO does its capacity assessment in the
+# Trust app; we mint a short-lived signed link (stdlib HS256) that Trust verifies
+# and uses to open the right org's assessment with no second login, then returns.
+# Feature-gated on KUJA_TRUST_HANDOFF_SECRET + KUJA_TRUST_BASE_URL, and Kuja
+# tenant only. When unconfigured the CTA hides and the app keeps its local
+# in-app assessment — nothing breaks.
+# =============================================================================
+
+def _handoff_enabled_for_request() -> bool:
+    """Hand-off is live only when the shared secret + Trust base URL are set AND
+    the resolved tenant is the default Kuja network. Deny-by-default."""
+    from app.models.network import DEFAULT_NETWORK_SLUG
+    secret = (os.environ.get('KUJA_TRUST_HANDOFF_SECRET') or '').strip()
+    base = (os.environ.get('KUJA_TRUST_BASE_URL') or '').strip()
+    net = getattr(g, 'network', None)
+    return bool(secret and base and getattr(net, 'slug', None) == DEFAULT_NETWORK_SLUG)
+
+
+@trust_bp.route('/trust/handoff/available', methods=['GET'])
+@login_required
+def api_trust_handoff_available():
+    """Lets the UI decide whether to show the 'assess in Kuja Trust' CTA (vs the
+    local in-app assessment fallback) without leaking config to non-Kuja tenants."""
+    return jsonify({'success': True, 'available': _handoff_enabled_for_request()})
+
+
+@trust_bp.route('/trust/handoff', methods=['POST'])
+@login_required
+def api_trust_handoff():
+    """Mint a signed hand-off link to the Kuja Trust app for the caller's org.
+
+    Returns { url } for the browser to navigate to. NGO/admin only; Kuja tenant
+    only; 503 when the feature isn't configured (UI then falls back to /assessments).
+    """
+    from app.services.handoff_token import mint, HandoffTokenError
+
+    if getattr(current_user, 'role', None) not in ('ngo', 'admin'):
+        return jsonify({'success': False, 'error': 'not_permitted'}), 403
+    if not _handoff_enabled_for_request():
+        return jsonify({'success': False, 'error': 'handoff_not_configured'}), 503
+
+    org = db.session.get(Organization, current_user.org_id) if getattr(current_user, 'org_id', None) else None
+    if not org:
+        return jsonify({'success': False, 'error': 'no_org_for_user'}), 400
+
+    # Durable cross-app identity: reuse kuja_partner_id; backfill a stable ref on
+    # first hand-off so Trust always resolves the same org.
+    ref = (org.kuja_partner_id or '').strip()
+    if not ref:
+        ref = f'grant:{org.id}'
+        org.kuja_partner_id = ref
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            logger.exception('handoff: failed to backfill kuja_partner_id for org %s', org.id)
+            return jsonify({'success': False, 'error': 'identity_backfill_failed'}), 500
+
+    secret = (os.environ.get('KUJA_TRUST_HANDOFF_SECRET') or '').strip()
+    trust_base = (os.environ.get('KUJA_TRUST_BASE_URL') or '').strip().rstrip('/')
+    # Return target = this Grant app. Prefer an explicit public URL; fall back to
+    # the request host (Railway forwards the public host via the proxy layer).
+    grant_base = (os.environ.get('KUJA_GRANT_BASE_URL') or request.host_url or '').strip().rstrip('/')
+    return_url = f'{grant_base}/trust?from=trust'
+
+    try:
+        # NB: no email in the token — keep PII out of the URL; Trust resolves the
+        # org by ref, the org name is enough to label a freshly-created Trust org.
+        token = mint(secret, sub=ref, name=org.name or '', return_url=return_url, ttl_seconds=300)
+    except HandoffTokenError as exc:
+        logger.warning('handoff: mint failed: %s', exc)
+        return jsonify({'success': False, 'error': 'mint_failed'}), 500
+
+    return jsonify({'success': True, 'url': f'{trust_base}/handoff?token={token}'})
 
 
 @trust_bp.route('/trust-profile/<int:org_id>/gap-insights', methods=['GET'])

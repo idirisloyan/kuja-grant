@@ -51,6 +51,7 @@ function TrustProfilePageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlOrgId = searchParams.get('org');
+  const fromTrust = searchParams.get('from') === 'trust';
   const initialOrgId = urlOrgId ? Number(urlOrgId) : user?.org_id ?? null;
 
   const [orgId, setOrgId] = useState<number | null>(initialOrgId);
@@ -146,6 +147,21 @@ function TrustProfilePageInner() {
           subtitle="Identity, sanctions, adverse media, bank verification, COI, and capacity — one canonical view."
         />
         <PageMain>
+      {/* Returned from the Kuja Trust capacity assessment — the status below now
+          reflects the latest assessment (read back via the Trust service). */}
+      {fromTrust && (
+        <Card className="p-4 flex items-center gap-3 border-[hsl(var(--kuja-clay)/0.35)] bg-[hsl(var(--kuja-clay)/0.06)]">
+          <ShieldCheck className="w-5 h-5 text-[hsl(var(--kuja-clay))] shrink-0" />
+          <p className="text-sm">
+            Welcome back from Kuja Trust — your capacity &amp; due-diligence status below reflects your latest assessment.
+          </p>
+        </Card>
+      )}
+
+      {/* Capacity-assessment hand-off CTA — NGO viewing their own org, only when
+          the Trust hand-off is configured for this tenant. */}
+      <CapacityHandoffCta show={ownsThisOrg} />
+
       {/* Identity & Registration — folded in from /verification */}
       <RegistrationPanel orgId={orgId} />
 
@@ -207,5 +223,64 @@ function TrustProfilePageInner() {
         </PageMain>
       </PageShell>
     </div>
+  );
+}
+
+/**
+ * CapacityHandoffCta — sends the NGO to the standalone Kuja Trust app to complete
+ * their capacity assessment (no second login) and bring them back. Renders only
+ * when the hand-off is configured for this tenant (checked server-side); otherwise
+ * it stays hidden and the NGO uses the in-app assessment as before.
+ */
+function CapacityHandoffCta({ show }: { show: boolean }) {
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!show) return;
+    let active = true;
+    trustApi.handoffAvailable()
+      .then((r) => { if (active) setAvailable(!!r.available); })
+      .catch(() => { if (active) setAvailable(false); });
+    return () => { active = false; };
+  }, [show]);
+
+  if (!show || !available) return null;
+
+  const start = async () => {
+    setStarting(true);
+    setErr(null);
+    try {
+      const { url } = await trustApi.startHandoff();
+      window.location.href = url;
+    } catch (e) {
+      setErr((e as Error).message || 'Could not open Kuja Trust. Please try again.');
+      setStarting(false);
+    }
+  };
+
+  return (
+    <Card className="p-5 border-[hsl(var(--kuja-clay)/0.35)] bg-[hsl(var(--kuja-clay)/0.06)]">
+      <div className="flex items-start gap-4 flex-wrap">
+        <ShieldCheck className="w-6 h-6 text-[hsl(var(--kuja-clay))] shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-[220px]">
+          <h3 className="kuja-display text-lg">Complete your capacity assessment</h3>
+          <p className="text-sm text-[hsl(var(--kuja-ink-soft))] mt-1">
+            Your capacity &amp; due-diligence assessment is completed in <strong>Kuja Trust</strong>.
+            We&apos;ll take you there securely — no separate password — and bring you straight back when you&apos;re done.
+          </p>
+          {err && <p className="text-xs text-[hsl(var(--kuja-flag))] mt-2">{err}</p>}
+        </div>
+        <button
+          type="button"
+          onClick={start}
+          disabled={starting}
+          className="rounded-lg px-4 py-2 text-sm font-medium text-white bg-[hsl(var(--kuja-clay))] hover:opacity-90 disabled:opacity-60 whitespace-nowrap"
+        >
+          {starting ? 'Opening Kuja Trust…' : 'Open Kuja Trust'}
+        </button>
+      </div>
+    </Card>
   );
 }
