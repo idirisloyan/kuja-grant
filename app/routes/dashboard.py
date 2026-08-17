@@ -23,6 +23,21 @@ logger = logging.getLogger('kuja')
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api/dashboard')
 
 
+def _aware_utc(dt):
+    """Coerce a possibly-naive datetime to UTC-aware.
+
+    DB DateTime columns are stored/returned naive on both SQLite and Postgres
+    (the columns are plain ``db.DateTime``), so subtracting them from an
+    aware ``datetime.now(timezone.utc)`` raises ``TypeError: can't subtract
+    offset-naive and offset-aware datetimes``. Wrap the DB operand with this
+    before any such subtraction. No-op if already aware or None.
+    """
+    from datetime import timezone as _tz_utc
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=_tz_utc.utc)
+    return dt
+
+
 @dashboard_bp.route('/today', methods=['GET'])
 @login_required
 def api_dashboard_today():
@@ -984,7 +999,7 @@ def api_dashboard_donor_appeal_sla():
     now = datetime.now(timezone.utc)
     out = []
     for a in rows[:3]:
-        days_pending = int((now - a.appeal_requested_at).total_seconds() / 86400) if a.appeal_requested_at else None
+        days_pending = int((now - _aware_utc(a.appeal_requested_at)).total_seconds() / 86400) if a.appeal_requested_at else None
         out.append({
             'application_id': a.id,
             'ngo_org_name': a.ngo_org.name if a.ngo_org else None,
@@ -1779,7 +1794,7 @@ def api_dashboard_sla_breaches():
     now = datetime.now(timezone.utc)
     top = []
     for a in overdue[:3]:
-        days_overdue = int((now - a.submitted_at).total_seconds() / 86400) - sla_days
+        days_overdue = int((now - _aware_utc(a.submitted_at)).total_seconds() / 86400) - sla_days
         org_name = a.ngo_org.name if a.ngo_org else None
         top.append({
             'application_id': a.id,
@@ -2181,7 +2196,7 @@ def api_dashboard_ngo_stalled_applications():
     for a in rows:
         if not a.updated_at:
             continue
-        days = (now - a.updated_at).total_seconds() / 86400.0
+        days = (now - _aware_utc(a.updated_at)).total_seconds() / 86400.0
         out.append({
             'application_id': a.id,
             'grant_title': a.grant.title if a.grant else None,
@@ -3621,7 +3636,7 @@ def api_dashboard_ngo_fastest_submission():
     from datetime import datetime, timezone, timedelta
     cutoff = datetime.now(timezone.utc) - timedelta(days=90)
     rows = (Application.query
-            .filter(Application.org_id == current_user.org_id,
+            .filter(Application.ngo_org_id == current_user.org_id,
                     Application.submitted_at.isnot(None),
                     Application.submitted_at >= cutoff,
                     Application.created_at.isnot(None))
@@ -3726,11 +3741,11 @@ def api_dashboard_ngo_draft_funnel():
     from datetime import datetime, timezone, timedelta
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     drafts = (Application.query
-              .filter(Application.org_id == current_user.org_id,
+              .filter(Application.ngo_org_id == current_user.org_id,
                       Application.created_at >= cutoff)
               .count())
     submitted = (Application.query
-                 .filter(Application.org_id == current_user.org_id,
+                 .filter(Application.ngo_org_id == current_user.org_id,
                          Application.created_at >= cutoff,
                          Application.submitted_at.isnot(None))
                  .count())
@@ -3832,7 +3847,7 @@ def api_dashboard_ngo_oldest_draft_age():
         return jsonify({'error': 'access denied'}), 403
     from datetime import datetime, timezone
     drafts = (Application.query
-              .filter(Application.org_id == current_user.org_id,
+              .filter(Application.ngo_org_id == current_user.org_id,
                       Application.status == 'draft',
                       Application.created_at.isnot(None))
               .all())
@@ -4057,7 +4072,7 @@ def api_dashboard_donor_applicants_this_quarter():
     quarter_start_month = ((now.month - 1) // 3) * 3 + 1
     quarter_start = datetime(now.year, quarter_start_month, 1, tzinfo=timezone.utc)
     try:
-        distinct_count = (db.session.query(Application.org_id)
+        distinct_count = (db.session.query(Application.ngo_org_id)
                           .join(Grant, Application.grant_id == Grant.id)
                           .filter(Grant.donor_org_id == current_user.org_id,
                                   Application.submitted_at.isnot(None),
@@ -4146,7 +4161,7 @@ def api_dashboard_ngo_apps_submitted_ytd():
     from datetime import datetime, timezone
     year_start = datetime(datetime.now(timezone.utc).year, 1, 1, tzinfo=timezone.utc)
     count = (Application.query
-             .filter(Application.org_id == current_user.org_id,
+             .filter(Application.ngo_org_id == current_user.org_id,
                      Application.submitted_at.isnot(None),
                      Application.submitted_at >= year_start)
              .count())
@@ -4253,7 +4268,7 @@ def api_dashboard_ngo_funding_total_ytd():
     year_start = datetime(datetime.now(timezone.utc).year, 1, 1, tzinfo=timezone.utc)
     rows = (db.session.query(Grant.total_funding, Grant.currency)
             .join(Application, Application.grant_id == Grant.id)
-            .filter(Application.org_id == current_user.org_id,
+            .filter(Application.ngo_org_id == current_user.org_id,
                     Application.status.in_(['funded', 'awarded']),
                     Application.decision_recorded_at.isnot(None),
                     Application.decision_recorded_at >= year_start,
@@ -4440,7 +4455,7 @@ def api_dashboard_ngo_lifetime_win_rate():
     if current_user.role != 'ngo' or not current_user.org_id:
         return jsonify({'error': 'access denied'}), 403
     rows = (db.session.query(Application.status)
-            .filter(Application.org_id == current_user.org_id,
+            .filter(Application.ngo_org_id == current_user.org_id,
                     Application.decision_recorded_at.isnot(None))
             .all())
     decisions = [s for (s,) in rows]
@@ -4544,7 +4559,7 @@ def api_dashboard_ngo_win_rate_quarter():
     quarter_start_month = ((now.month - 1) // 3) * 3 + 1
     quarter_start = datetime(now.year, quarter_start_month, 1, tzinfo=timezone.utc)
     rows = (db.session.query(Application.status)
-            .filter(Application.org_id == current_user.org_id,
+            .filter(Application.ngo_org_id == current_user.org_id,
                     Application.decision_recorded_at.isnot(None),
                     Application.decision_recorded_at >= quarter_start)
             .all())
@@ -4718,7 +4733,7 @@ def api_dashboard_ngo_sector_breadth():
     import json as _json
     rows = (db.session.query(Grant.sectors)
             .join(Application, Application.grant_id == Grant.id)
-            .filter(Application.org_id == current_user.org_id,
+            .filter(Application.ngo_org_id == current_user.org_id,
                     Grant.sectors.isnot(None))
             .distinct().all())
     sector_set = set()
@@ -4835,7 +4850,7 @@ def api_dashboard_ngo_days_since_last_submission():
         return jsonify({'error': 'access denied'}), 403
     from datetime import datetime, timezone
     newest = (Application.query
-              .filter(Application.org_id == current_user.org_id,
+              .filter(Application.ngo_org_id == current_user.org_id,
                       Application.submitted_at.isnot(None))
               .order_by(Application.submitted_at.desc())
               .first())

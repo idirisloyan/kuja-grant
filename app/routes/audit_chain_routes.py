@@ -130,7 +130,7 @@ def api_export_chain():
     Query: ?subject_kind=&subject_id= to scope (optional).
     """
     import json
-    from flask import Response
+    from flask import Response, stream_with_context
 
     subject_kind = request.args.get('subject_kind') or None
     subject_id_param = request.args.get('subject_id')
@@ -163,7 +163,9 @@ def api_export_chain():
                 'subject_id': r.subject_id,
                 'prev_hash': r.prev_hash,
                 'payload_hash': r.payload_hash,
-                'created_at': r.created_at.isoformat() if r.created_at else None,
+                'created_at': (r.created_at.isoformat()
+                               if hasattr(r.created_at, 'isoformat')
+                               else (str(r.created_at) if r.created_at else None)),
                 'details': details,
             }
             yield json.dumps(row, separators=(',', ':')) + '\n'
@@ -172,4 +174,9 @@ def api_export_chain():
         'Content-Disposition': 'attachment; filename="kuja-audit-chain.jsonl"',
         'Cache-Control': 'no-store',
     }
-    return Response(stream(), mimetype='application/x-ndjson', headers=headers)
+    # stream_with_context keeps the Flask app/request context (and thus the
+    # DB session) alive while the generator is consumed by the WSGI server;
+    # without it, ``q.yield_per`` runs outside the context and raises
+    # "Working outside of application context" (fails on SQLite AND Postgres).
+    return Response(stream_with_context(stream()),
+                    mimetype='application/x-ndjson', headers=headers)

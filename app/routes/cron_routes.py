@@ -2828,7 +2828,7 @@ def api_cron_ngo_closing_soon_watchlist():
                 continue
             applied_ids = {gid for (gid,) in db.session.query(
                 Application.grant_id).filter(
-                Application.org_id == u.org_id,
+                Application.ngo_org_id == u.org_id,
                 Application.grant_id.in_([g.id for g in closing])
             ).distinct().all()}
             unapplied = [g for g in closing if g.id not in applied_ids]
@@ -3325,13 +3325,13 @@ def api_cron_ngo_monthly_accomplishments():
             if not channels:
                 continue
             submitted = (Application.query
-                         .filter(Application.org_id == u.org_id,
+                         .filter(Application.ngo_org_id == u.org_id,
                                  Application.submitted_at.isnot(None),
                                  Application.submitted_at >= period_start,
                                  Application.submitted_at < period_end)
                          .count())
             funded = (Application.query
-                      .filter(Application.org_id == u.org_id,
+                      .filter(Application.ngo_org_id == u.org_id,
                               Application.status.in_(['funded', 'awarded']),
                               Application.decision_recorded_at.isnot(None),
                               Application.decision_recorded_at >= period_start,
@@ -3661,7 +3661,7 @@ def api_cron_ngo_draft_activity_recap():
             if not channels:
                 continue
             drafts = (Application.query
-                      .filter(Application.org_id == u.org_id,
+                      .filter(Application.ngo_org_id == u.org_id,
                               Application.status == 'draft',
                               Application.created_at.isnot(None))
                       .all())
