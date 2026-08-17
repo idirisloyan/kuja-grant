@@ -297,9 +297,9 @@ export function TrustProfileCard({
       {/* Capacity pillar */}
       <PillarCard
         title="Capacity Profile"
-        subtitle={`${profile.capacity.frameworks_completed} of ${profile.capacity.frameworks_total} frameworks completed · ${profile.capacity.completion_pct}%`}
-        score={profile.capacity.score}
-        status={profile.capacity.status}
+        subtitle={`${profile.capacity?.frameworks_completed ?? 0} of ${profile.capacity?.frameworks_total ?? 0} frameworks completed · ${profile.capacity?.completion_pct ?? 0}%`}
+        score={profile.capacity?.score ?? 0}
+        status={profile.capacity?.status ?? 'incomplete'}
       >
         <div className="pt-3">
           {(profile.capacity?.breakdown ?? []).map((row) => (
