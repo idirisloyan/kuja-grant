@@ -17,7 +17,9 @@
 
 ## Part A — DNS record (in the `kuja.org` zone)
 
-You already run other subdomains here (`proximate.kuja.org`, `near.kuja.org`), so this is one more subdomain record.
+You already run other subdomains here (`proximate.kuja.org`, `saxansaxo.kuja.org`, `sclr.kuja.org`), so this is one more subdomain record.
+
+> **The custom domain is already registered in Railway** (Part B is done — see below), so the target value is known. **Add exactly ONE record — this CNAME. No TXT record is needed** (all three existing kuja.org subdomains are CNAME-only and verified; Railway verifies `fund` the same way).
 
 Add a single **CNAME** record:
 
@@ -25,9 +27,11 @@ Add a single **CNAME** record:
 |---|---|
 | **Type** | `CNAME` |
 | **Host / Name** | `fund`  *(just `fund` — see gotcha #1)* |
-| **Value / Target** | **the CNAME target Railway shows** in Part B (e.g. `…​.up.railway.app`) — copy it exactly |
+| **Value / Target** | **`u7b375h8.up.railway.app`**  *(copy exactly)* |
 | **TTL** | `300` (5 min) is fine |
 | **Proxy** | **DNS only** if this zone is on Cloudflare (grey cloud), at least until the cert is issued — see gotcha #3 |
+
+> **Ignore any `_railway-verify` TXT line** you may see printed by the Railway CLI — it is not in Railway's required-records list for this domain, its CLI rendering has a doubled `railway-verify=` prefix bug, and the CNAME alone is what flips the domain to Active.
 
 ### Gotchas (these have bitten this zone before)
 1. **Don't double the prefix.** Many DNS UIs auto-append the zone. Enter the host as **`fund`**, *not* `fund.kuja.org` — otherwise you create `fund.kuja.org.kuja.org` and it won't resolve. (If your UI needs a FQDN, then use the full `fund.kuja.org`, but never both.)
@@ -40,10 +44,12 @@ Add a single **CNAME** record:
 
 ## Part B — Add the custom domain in Railway (dev/ops)
 
+> ✅ **Already done (2026-08-17).** `fund.kuja.org` is registered on the `web` service; Railway's required CNAME target is **`u7b375h8.up.railway.app`** (already filled into Part A). It shows **"Waiting for DNS update"** until Part A propagates — that is expected. You only need Part B if you ever have to re-create it.
+
 1. Open **Railway → project `clever-cooperation` → environment `production` → service `web`**.
 2. **Settings → Networking → Custom Domain → + Custom Domain**.
 3. Enter **`fund.kuja.org`** and confirm.
-4. Railway shows the **CNAME target** to point at — give this to the DNS team for Part A.
+4. Railway shows the **CNAME target** to point at — give this to the DNS team for Part A. *(For this domain it is `u7b375h8.up.railway.app`.)*
 5. Once the DNS record is live, Railway auto-verifies and issues the TLS certificate. The domain flips to **Active** (green). If it's stuck "waiting", re-check the CNAME target and the Cloudflare/CAA gotchas above.
 
 ---
@@ -94,5 +100,5 @@ The app remains fully available at `https://web-production-6f8a.up.railway.app` 
 ### Quick reference
 - **Domain:** `fund.kuja.org` → main **Kuja** tenant (integrates Kuja Trust)
 - **Hosting:** Railway · project `clever-cooperation` · env `production` · service `web`
-- **DNS record:** `CNAME  fund  →  <target Railway shows>`  (TTL 300, DNS-only if Cloudflare)
+- **DNS record (the only one needed):** `CNAME  fund  →  u7b375h8.up.railway.app`  (TTL 300, DNS-only if Cloudflare; no TXT)
 - **Env to update on `web`:** `CORS_ORIGINS`, `WEBAUTHN_ORIGIN`, `WEBAUTHN_RP_ID`, `KUJA_GRANT_BASE_URL`, `KUJA_PUBLIC_HOST` (+ `KUJA_PUBLIC_BASE_URL` if present)
