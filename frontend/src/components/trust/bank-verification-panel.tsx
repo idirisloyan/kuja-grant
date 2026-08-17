@@ -217,7 +217,7 @@ export function BankVerificationPanel({
             </div>
           </div>
 
-          {latest.findings.length === 0 ? (
+          {(latest.findings?.length ?? 0) === 0 ? (
             <div className="rounded-md border border-[hsl(var(--kuja-grow)/0.3)] bg-[hsl(var(--kuja-grow)/0.05)] p-3 flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-[hsl(var(--kuja-grow))] shrink-0 mt-0.5" />
               <div className="text-xs">
@@ -226,7 +226,7 @@ export function BankVerificationPanel({
             </div>
           ) : (
             <div className="space-y-2">
-              {latest.findings.map((f, i) => <FindingRow key={i} f={f} />)}
+              {(latest.findings ?? []).map((f, i) => <FindingRow key={i} f={f} />)}
             </div>
           )}
         </div>

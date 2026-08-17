@@ -302,17 +302,17 @@ export function TrustProfileCard({
         status={profile.capacity.status}
       >
         <div className="pt-3">
-          {profile.capacity.breakdown.map((row) => (
+          {(profile.capacity?.breakdown ?? []).map((row) => (
             <CapacityRow key={row.framework} row={row} />
           ))}
         </div>
-        {(profile.capacity.strengths.length > 0 || profile.capacity.gaps.length > 0) && (
+        {((profile.capacity?.strengths?.length ?? 0) > 0 || (profile.capacity?.gaps?.length ?? 0) > 0) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 pt-3 border-t border-[hsl(var(--border))]">
-            {profile.capacity.strengths.length > 0 && (
+            {(profile.capacity?.strengths?.length ?? 0) > 0 && (
               <div>
                 <div className="kuja-label">Top strengths</div>
                 <ul className="text-xs space-y-1 mt-1.5">
-                  {profile.capacity.strengths.map((s, i) => (
+                  {(profile.capacity?.strengths ?? []).map((s, i) => (
                     <li key={i} className="flex items-start gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5 text-[hsl(var(--kuja-grow))] mt-0.5 shrink-0" />
                       <span>{s}</span>
@@ -321,11 +321,11 @@ export function TrustProfileCard({
                 </ul>
               </div>
             )}
-            {profile.capacity.gaps.length > 0 && (
+            {(profile.capacity?.gaps?.length ?? 0) > 0 && (
               <div>
                 <div className="kuja-label">Priority gaps</div>
                 <ul className="text-xs space-y-1 mt-1.5">
-                  {profile.capacity.gaps.map((g, i) => (
+                  {(profile.capacity?.gaps ?? []).map((g, i) => (
                     <li key={i} className="flex items-start gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5 text-[hsl(var(--kuja-sun))] mt-0.5 shrink-0" />
                       <span>{g}</span>

@@ -20,6 +20,7 @@ import { ShieldCheck, Search } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { TrustProfileCard } from '@/components/trust/trust-profile-card';
 import { TrustGapInsightsCard } from '@/components/trust/trust-gap-insights-card';
 import { AdverseMediaPanel } from '@/components/trust/adverse-media-panel';
@@ -80,10 +81,10 @@ function TrustProfilePageInner() {
         trustApi.listBankVerifications(id),
         trustApi.listPassports(id),
       ]);
-      setProfile(pf.profile);
-      setAdverseMedia(am.latest);
-      setBank(bk.latest);
-      setPassports(ps.passports);
+      setProfile(pf.profile ?? null);
+      setAdverseMedia(am.latest ?? null);
+      setBank(bk.latest ?? null);
+      setPassports(ps.passports ?? []);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -162,6 +163,7 @@ function TrustProfilePageInner() {
           the Trust hand-off is configured for this tenant. */}
       <CapacityHandoffCta show={ownsThisOrg} />
 
+      <ErrorBoundary label="Trust Profile">
       {/* Identity & Registration — folded in from /verification */}
       <RegistrationPanel orgId={orgId} />
 
@@ -220,6 +222,7 @@ function TrustProfilePageInner() {
           canRevoke={canRevoke}
         />
       </div>
+      </ErrorBoundary>
         </PageMain>
       </PageShell>
     </div>
