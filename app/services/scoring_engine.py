@@ -51,6 +51,8 @@ class ScoringEngine:
         weighted_sum = 0
 
         for idx, criterion in enumerate(criteria):
+            if not isinstance(criterion, dict):
+                continue  # tolerate malformed criteria (e.g. plain strings from API-created grants)
             # Support both id-based keys and index-based keys (criterion_0, criterion_1, etc.)
             cid = str(criterion.get('id', ''))
             index_key = f'criterion_{idx}'
@@ -275,6 +277,8 @@ class ScoringEngine:
         required_passed = True
 
         for elig in eligibility_defs:
+            if not isinstance(elig, dict):
+                continue  # tolerate malformed eligibility entries (e.g. plain strings)
             eid = str(elig.get('id', ''))
             required = elig.get('required', True)
             response = eligibility_responses.get(eid)

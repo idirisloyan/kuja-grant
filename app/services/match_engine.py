@@ -122,6 +122,8 @@ def _eligibility_passes(org, grant) -> tuple[bool, str | None]:
     org_countries = _normalize_list(getattr(org, 'countries', None))
 
     for item in elig or []:
+        if not isinstance(item, dict):
+            continue  # tolerate malformed eligibility entries (e.g. plain strings)
         if not item.get('required') and not item.get('enabled'):
             continue
         key = (item.get('key') or '').lower()
