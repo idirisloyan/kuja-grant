@@ -526,10 +526,14 @@ export default function LoginPage() {
             </div>
             )}
 
-            {isNetworkTenant && !isSax && (
+            {/* Self-service "apply to join" is the Kuja MARKETPLACE only.
+                The closed networks (Proximate / Saxansaxo·SCLR / NEAR) run
+                membership by invitation through their own trust process, so
+                their tenants must not even show a join CTA. */}
+            {!isNetworkTenant && (
               <div className="mt-5 pt-5 border-t border-border text-center">
                 <p className="text-xs text-muted-foreground mb-2">
-                  Not a member yet?
+                  New to {tenantName}?
                 </p>
                 <a
                   href="/network/join/"
@@ -539,7 +543,7 @@ export default function LoginPage() {
                   Apply to join {tenantName} <ArrowRight className="h-3.5 w-3.5" />
                 </a>
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  Membership is reviewed by the {tenantName} Oversight Body.
+                  New organisations are reviewed before joining.
                 </p>
               </div>
             )}
