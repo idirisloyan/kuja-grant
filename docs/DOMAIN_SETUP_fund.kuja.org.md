@@ -1,6 +1,15 @@
 # Set up `fund.kuja.org` for the Kuja Fund app — IT admin runbook
 
-**Goal:** point **`fund.kuja.org`** at the Kuja Fund application (the main Kuja tenant — the one that integrates Kuja Trust). Date: 2026-08-16.
+**Goal:** point **`fund.kuja.org`** at the Kuja Fund application (the main Kuja tenant — the one that integrates Kuja Trust). Date: 2026-08-16 · **corrected 2026-08-18.**
+
+> ## ⚠️ If you're stuck right now (page shows Railway "Not Found")
+> **This is a one-record fix.** As of 2026-08-18 the DNS is in this exact state:
+> - ✅ The `CNAME` (`fund` → `u7b375h8.up.railway.app`) **is in place and resolving.**
+> - ❌ The domain-**verification** record `_railway-verify.fund` (a **TXT**) **is missing.**
+>
+> Railway will not issue the HTTPS certificate or route the hostname until that TXT exists, so the edge shows *"the train has not arrived at the station."* **An earlier version of this runbook wrongly said "no TXT is needed" — that was the blocker.** Proof: the two live tenants both have this record — `_railway-verify.proximate.kuja.org` and `_railway-verify.saxansaxo.kuja.org` each resolve to a `railway-verify=…` value; `fund` does not.
+>
+> **To finish: add the TXT record in Part A (record #2). Its value comes from Railway → `web` → Settings → Networking → the `fund.kuja.org` entry.** Nothing else needs to change.
 
 **Good to know before you start**
 - The app is hosted on **Railway** (project **`clever-cooperation`**, environment **production**, service **`web`**). It is currently reachable at `https://web-production-6f8a.up.railway.app`.
@@ -17,11 +26,11 @@
 
 ## Part A — DNS record (in the `kuja.org` zone)
 
-You already run other subdomains here (`proximate.kuja.org`, `saxansaxo.kuja.org`, `sclr.kuja.org`), so this is one more subdomain record.
+You already run other subdomains here (`proximate.kuja.org`, `saxansaxo.kuja.org`), so this is the same shape they used.
 
-> **The custom domain is already registered in Railway** (Part B is done — see below), so the target value is known. **Add exactly ONE record — this CNAME. No TXT record is needed** (all three existing kuja.org subdomains are CNAME-only and verified; Railway verifies `fund` the same way).
+> **The custom domain is already registered in Railway** (Part B is done — see below), so both values are known. **You need TWO records:** the `CNAME` (routes traffic) **and** the `_railway-verify` `TXT` (proves you own the domain so Railway will issue the certificate). The live tenants `proximate` and `saxansaxo` each have both — that is why they work. `fund` currently has only the CNAME, which is why it's stuck.
 
-Add a single **CNAME** record:
+**Record #1 — CNAME** (already in place; shown for completeness):
 
 | Field | Value |
 |---|---|
@@ -31,10 +40,20 @@ Add a single **CNAME** record:
 | **TTL** | `300` (5 min) is fine |
 | **Proxy** | **DNS only** if this zone is on Cloudflare (grey cloud), at least until the cert is issued — see gotcha #3 |
 
-> **Ignore any `_railway-verify` TXT line** you may see printed by the Railway CLI — it is not in Railway's required-records list for this domain, its CLI rendering has a doubled `railway-verify=` prefix bug, and the CNAME alone is what flips the domain to Active.
+**Record #2 — TXT (the missing one — add this to finish):**
+
+| Field | Value |
+|---|---|
+| **Type** | `TXT` |
+| **Host / Name** | `_railway-verify.fund`  *(just this — the zone appends `.kuja.org`; see gotcha #1)* |
+| **Value / Content** | `railway-verify=…`  — **copy the exact string from Railway → `web` → Settings → Networking → the `fund.kuja.org` entry** (it lists the CNAME as done and the TXT as pending). Do **not** reuse another tenant's value; each domain has its own. **Gotcha #2b: the value must contain exactly ONE `railway-verify=` prefix.** Railway's field already includes it, so paste it as-is — if your DNS UI shows `railway-verify=railway-verify=…`, delete the duplicate. |
+| **TTL** | `300` |
+| **Proxy** | N/A (TXT records are never proxied) |
+
+Once both records are live, Railway auto-verifies within a few minutes, issues the TLS certificate, and `fund.kuja.org` flips to **Active** — the "Not Found" page disappears.
 
 ### Gotchas (these have bitten this zone before)
-1. **Don't double the prefix.** Many DNS UIs auto-append the zone. Enter the host as **`fund`**, *not* `fund.kuja.org` — otherwise you create `fund.kuja.org.kuja.org` and it won't resolve. (If your UI needs a FQDN, then use the full `fund.kuja.org`, but never both.)
+1. **Don't double the prefix — this is the trap that stuck `fund`.** Many DNS UIs auto-append the zone. Enter the host as **`fund`** for the CNAME and **`_railway-verify.fund`** for the TXT — *not* `fund.kuja.org` / `_railway-verify.fund.kuja.org`, or you create `fund.kuja.org.kuja.org` / `_railway-verify.fund.kuja.org.kuja.org`, which won't verify. (If your UI *requires* an FQDN, use the full `fund.kuja.org` / `_railway-verify.fund.kuja.org` — but never both forms.) After saving, confirm with `nslookup -type=TXT _railway-verify.fund.kuja.org` — it must return the `railway-verify=…` value, at that exact name.
 2. **Copy the target from Railway verbatim.** Don't guess it or reuse another subdomain's target — each custom domain gets its own value.
 3. **Cloudflare:** if `kuja.org` is proxied by Cloudflare, set this record to **DNS only** so Railway/Let's Encrypt can validate and issue the certificate. (If you later turn the orange-cloud proxy on, use SSL mode **Full (strict)**.)
 4. **CAA records:** if the `kuja.org` zone has any **CAA** records, make sure they allow **`letsencrypt.org`** to issue certs, or Railway's TLS issuance will fail.
@@ -78,8 +97,8 @@ Saving variables triggers a redeploy (about a minute).
 
 ## Part D — Verify (after DNS is live + variables saved)
 
-1. **DNS resolves:** `nslookup fund.kuja.org` returns a Railway address (a CNAME to `*.up.railway.app`).
-2. **HTTPS + health:** `curl -I https://fund.kuja.org/api/health` → `HTTP/…​ 200`, with a valid (non-warning) certificate. In a browser the padlock is clean.
+1. **Both DNS records resolve:** `nslookup fund.kuja.org` returns a Railway address (CNAME → `*.up.railway.app`), **and** `nslookup -type=TXT _railway-verify.fund.kuja.org` returns a `railway-verify=…` value. (If that TXT lookup says "does not exist", you're still in the stuck state — go back to Part A record #2.)
+2. **Railway shows Active + HTTPS:** the domain is green/**Active** in Railway → web → Settings → Networking, and `curl -I https://fund.kuja.org/api/health` → `HTTP/…​ 200` with a valid (non-warning) certificate. In a browser the padlock is clean. *(A `SEC_E_WRONG_PRINCIPAL` / cert-name error here means the certificate hasn't issued yet — almost always the missing TXT.)*
 3. **App loads on the right tenant:** open `https://fund.kuja.org` → the **Kuja** sign-in page with Kuja branding. (On a real branded domain the one-click "demo account" buttons are intentionally hidden — that's correct.)
 4. **Sign in** with a real account; the dashboard loads with no console/CORS errors.
 5. **Passkey (if used):** re-register a passkey under `fund.kuja.org`, sign out, sign back in with it.
@@ -92,7 +111,7 @@ Saving variables triggers a redeploy (about a minute).
 Because the change is additive, rollback is low-risk:
 1. Revert the Variables in Part C to their previous values (or the old Railway URL).
 2. In Railway → web → Settings → Networking, **remove** the `fund.kuja.org` custom domain.
-3. Delete the DNS CNAME record.
+3. Delete the DNS **CNAME and `_railway-verify` TXT** records.
 The app remains fully available at `https://web-production-6f8a.up.railway.app` throughout.
 
 ---
@@ -100,5 +119,5 @@ The app remains fully available at `https://web-production-6f8a.up.railway.app` 
 ### Quick reference
 - **Domain:** `fund.kuja.org` → main **Kuja** tenant (integrates Kuja Trust)
 - **Hosting:** Railway · project `clever-cooperation` · env `production` · service `web`
-- **DNS record (the only one needed):** `CNAME  fund  →  u7b375h8.up.railway.app`  (TTL 300, DNS-only if Cloudflare; no TXT)
+- **DNS records (BOTH required):** (1) `CNAME  fund  →  u7b375h8.up.railway.app` — already live; (2) `TXT  _railway-verify.fund  →  railway-verify=…` (value from Railway → web → Settings → Networking) — **the missing one that's blocking it.** TTL 300; DNS-only if Cloudflare.
 - **Env to update on `web`:** `CORS_ORIGINS`, `WEBAUTHN_ORIGIN`, `WEBAUTHN_RP_ID`, `KUJA_GRANT_BASE_URL`, `KUJA_PUBLIC_HOST` (+ `KUJA_PUBLIC_BASE_URL` if present)

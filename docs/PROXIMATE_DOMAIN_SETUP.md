@@ -20,7 +20,7 @@ returns `{"grants_walked":9,"reports_created":2,"success":true}`.
 | Type  | Name                        | Value | TTL |
 |-------|-----------------------------|-------|-----|
 | CNAME | `proximate`                 | `1zj8ev6l.up.railway.app` | 300 |
-| TXT   | `_railway-verify.proximate` | `railway-verify=railway-verify=d1510a5526b115edfbe2d1d752728da76dce403f758b46334a5b41710d545e2a` | 300 |
+| TXT   | `_railway-verify.proximate` | `railway-verify=d1510a5526b115edfbe2d1d752728da76dce403f758b46334a5b41710d545e2a` | 300 |
 
 Values above are what the Railway CLI returned at registration. If the
 DNS provider rejects the TXT value, copy it verbatim from
