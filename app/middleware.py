@@ -298,8 +298,24 @@ def register_middleware(app):
             # frontend's first call is /api/network/current (used to
             # paint the login-page brand). If we waited for auth, the
             # login page would show the wrong tenant brand.
+            # Tenant isolation: the DOMAIN (Host) is the source of truth for
+            # which tenant a request belongs to. The X-Network-Override header
+            # may switch tenants ONLY for:
+            #   • unauthenticated requests — the login page needs it to paint
+            #     the right tenant brand before anyone is signed in; and
+            #   • platform admins (role == 'admin') — the one-login tenant
+            #     switcher, so Adeso staff can operate every network.
+            # For an authenticated non-admin the override is IGNORED, so a
+            # member of tenant A can never pull tenant B's data by setting a
+            # header. Combined with per-subdomain session cookies (each tenant
+            # domain is its own auth realm), this seals every tenant to itself.
+            from flask_login import current_user
+            _authed = getattr(current_user, 'is_authenticated', False)
+            _is_platform_admin = _authed and getattr(current_user, 'role', None) == 'admin'
+            _override_allowed = (not _authed) or _is_platform_admin
+
             override_slug = (request.headers.get('X-Network-Override', '') or '').strip().lower()
-            if override_slug:
+            if override_slug and _override_allowed:
                 net = Network.query.filter_by(slug=override_slug, is_active=True).first()
                 if net:
                     g.network = net

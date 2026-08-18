@@ -193,12 +193,26 @@ def start_server(db_path):
 # ---------------------------------------------------------------------------
 # HTTP helpers
 # ---------------------------------------------------------------------------
+def _tenant_host(override):
+    """Simulate a tenant's real subdomain via the Host header.
+
+    The harness runs on 127.0.0.1 with no subdomains, so it used to fake a
+    tenant with X-Network-Override. That header is now admin-only (tenant
+    isolation), so authenticated non-admin tenant users must arrive via the
+    host — exactly like production (proximate.kuja.org, saxansaxo.kuja.org,
+    near.kuja.org). Returns None for the default Kuja network (no override)."""
+    if not override:
+        return None
+    return f"{override}.kuja.org"
+
+
 def login(base, who, override=None):
     """Return a logged-in session for a role key or raw email."""
     email = USERS.get(who, who)
     s = requests.Session()
-    if override:
-        s.headers["X-Network-Override"] = override
+    host = _tenant_host(override)
+    if host:
+        s.headers["Host"] = host
     r = s.post(
         f"{base}/api/auth/login",
         json={"email": email, "password": PASSWORD},
@@ -211,8 +225,9 @@ def login(base, who, override=None):
 
 def _hdrs(override=None):
     h = {"X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"}
-    if override:
-        h["X-Network-Override"] = override
+    host = _tenant_host(override)
+    if host:
+        h["Host"] = host
     return h
 
 
@@ -292,6 +307,33 @@ def run_foundation(base):
         assert r.status_code == 200, r.status_code
         assert r.json()["network"]["slug"] == "proximate", r.json()
     check("network/current override = proximate (seed present)", net_prox)
+
+    # ---- Tenant isolation (2026-08-18): the domain IS the tenant ----------
+    # X-Network-Override may switch tenants ONLY for unauthenticated requests
+    # (login-page branding) or platform admins (the switcher). An authenticated
+    # non-admin can NEVER cross tenants by setting the header — every data
+    # endpoint scopes by the resolved network, so this is the seal that stops
+    # a Kuja user from reading Proximate/Saxansaxo/NEAR.
+    def _cur_slug(sess, ov):
+        r = sess.get(f"{base}/api/network/current",
+                     headers={"X-Network-Override": ov}, timeout=8)
+        assert r.status_code == 200, r.status_code
+        return r.json()["network"]["slug"]
+
+    def iso_nonadmin_refused():
+        ngo = login(base, "ngo")          # default host -> kuja tenant
+        assert _cur_slug(ngo, "proximate") == "kuja", "override leaked to proximate!"
+        assert _cur_slug(ngo, "saxansaxo") == "kuja", "override leaked to saxansaxo!"
+        assert _cur_slug(ngo, "near") == "kuja", "override leaked to near!"
+    check("isolation: non-admin override is REFUSED (stays on own tenant)",
+          iso_nonadmin_refused)
+
+    def iso_admin_allowed():
+        adm = login(base, "admin")        # platform admin -> may switch
+        assert _cur_slug(adm, "proximate") == "proximate", "admin switch broke"
+        assert _cur_slug(adm, "saxansaxo") == "saxansaxo", "admin switch broke"
+    check("isolation: platform admin override switches tenants (one login)",
+          iso_admin_allowed)
 
     for who in ("admin", "ngo", "donor", "reviewer"):
         check(f"login {who}", lambda who=who: login(base, who))
