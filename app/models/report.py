@@ -46,6 +46,12 @@ class Report(db.Model):
         return _json_load(self.content) or {}
 
     def set_content(self, value):
+        # Report content is a structured JSON object (the UI sends {sections, ...}).
+        # A stray plain string would be stored raw, then fail to JSON-parse on read
+        # and come back as {} — silently losing the NGO's report. Wrap it so nothing
+        # a caller writes is ever dropped.
+        if isinstance(value, str):
+            value = {'text': value}
         self.content = _json_dump(value)
 
     def get_attachments(self):
