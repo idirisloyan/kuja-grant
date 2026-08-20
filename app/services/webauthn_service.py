@@ -43,7 +43,27 @@ _REAUTH_TOKENS: dict[str, dict] = {}
 
 
 def _origin() -> str:
-    return os.getenv('WEBAUTHN_ORIGIN', 'https://web-production-6f8a.up.railway.app')
+    # WebAuthn requires the RP origin to EXACTLY match the origin the browser is on.
+    # One backend serves several tenant domains (fund/proximate/saxansaxo.kuja.org),
+    # so a single pinned origin would let passkeys validate on only one of them.
+    # Derive the origin from the current request instead; an explicit WEBAUTHN_ORIGIN
+    # still overrides (tests / non-request contexts), and we fall back to the Railway
+    # URL when there is no request (CLI, background jobs). Scheme is forced to https
+    # for real hosts because Railway terminates TLS at its edge (request.scheme can be
+    # http internally), while localhost stays http for dev.
+    explicit = os.getenv('WEBAUTHN_ORIGIN')
+    if explicit:
+        return explicit
+    try:
+        from flask import request, has_request_context
+        if has_request_context() and request.host:
+            host = request.host  # Host header, e.g. 'fund.kuja.org' (may carry :port in dev)
+            bare = host.split(':', 1)[0]
+            scheme = 'http' if bare in ('localhost', '127.0.0.1') else 'https'
+            return f'{scheme}://{host}'
+    except Exception:
+        pass
+    return 'https://web-production-6f8a.up.railway.app'
 
 
 def _rp_id() -> str:
