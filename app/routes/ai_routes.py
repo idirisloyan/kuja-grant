@@ -604,6 +604,10 @@ def api_ai_draft_section():
 
     data = get_request_json()
     criterion = data.get('criterion') or {}
+    # SMK-010: a non-dict `criterion` (e.g. a string) crashed criterion.get(...)
+    # with an unhandled AttributeError -> 500. Validate the shape -> clean 400.
+    if not isinstance(criterion, dict):
+        return jsonify({'error': 'criterion must be an object with a label', 'success': False}), 400
     current_text = (data.get('current_text') or '').strip()
     grant_id = data.get('grant_id')
 

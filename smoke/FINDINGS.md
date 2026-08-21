@@ -22,6 +22,8 @@
 | SMK-004b | P2 | Cross-cutting (root cause) | CI | **Root cause of SMK-004 found**: `e2e-regression.yml` runs write-heavy E2E tests against **PROD on every push to main**, creating `[E2E-TEST]` grants via the real apply flow, and **nothing ever ran the cleanup pruner** → accumulation to 3,936. (My own session pushes created new ones, e.g. grant 7762.) | **PARTIAL FIX** — added an always-run self-clean step to `e2e-regression.yml` (runs `smoke/purge_test_grants.py`); **team must add a `PROD_DATABASE_URL` secret** to activate it. Better long-term: run destructive E2E against staging, not prod |
 | SMK-007 | P3 | Ops | CI/Deploy | **Every push to main — even test/doc-only files — redeploys prod (brief 502 rolling-restart) AND triggers a prod E2E run.** Matters during client UAT: routine commits cause prod blips + test-data creation. | Open — batch commits / consider path filters / non-prod E2E target |
 | SMK-008 | P3 | Demo readiness | Data | All 7 seed marketplace grants have **past deadlines** (show "Expired"). Clients demoing the apply flow hit expired grants. | Open — refresh seed grant deadlines to future dates before demos |
+| SMK-009 | P3 | Grant application | UI | Apply-wizard **Next button stays enabled and silently no-ops** when eligibility is incomplete — no validation message, so a user could click Next and be confused why nothing happens. | Open — disable Next until complete, or show a validation hint |
+| SMK-010 | P3 | AI guidance | API | `POST /api/ai/draft-section` returned **500** when `criterion` was sent as a non-object (string) — `criterion.get()` raised an unhandled `AttributeError`. Bad input should be a clean 400. | **FIXED** — `isinstance` guard → 400 |
 
 ## Journey status tracker
 | # | Journey | API | UI | Notes |
@@ -30,8 +32,8 @@
 | 2 | NGO onboarding / join | ⏳ | ⏳ | membership endpoints pending (fatima already a member — fresh-NGO join to test in UI) |
 | 3 | Capacity assessment → Trust hand-off | ✅ | ✅ | **FULL round-trip VERIFIED in browser**: Grant→Trust SSO (no 2nd login) → rate domain (auto-save) → "Return to your application" → **read-back accurate** (Accountability 3/4 → 75/100 on Grant side, capacity 0→11). No console errors. |
 | 4 | Due diligence | ⏳ | ⏳ | diligence endpoints pending |
-| 5 | AI guidance / co-pilot | ⏳ | ⏳ | pending (guidance/draft/score endpoints) |
-| 6 | Grant application | ✅ | ⏳ | create/publish/criteria-accuracy/apply/fill/submit/auto-score/cross-surface all PASS |
+| 5 | AI guidance / co-pilot | ✅ | ✅ | `/ai/guidance` + `/ai/draft-section` return grounded quality output; co-pilot rail present in UI. SMK-010 (500 on bad input) fixed |
+| 6 | Grant application | ✅ | ◑ | API create/publish/criteria/apply/submit/auto-score/cross-surface all PASS. UI: wizard renders + eligibility logic works, but multi-step React wizard couldn't be fully click-driven in the in-app test browser (automation friction, NOT a product bug — fatima has real apps + API works). Minor SMK-009 UX. Recommend a manual UI click-through or real-Chrome pass |
 | 7 | Review & decision | ✅ | ⏳ | **SMK-001 P1 fixed+redeployed+verified**; full chain: panel auto-assign → score → complete → **scored** → award → cross-surface all PASS. SMK-003 (P2) `under_review` never fires |
 | 8 | Compliance & reporting | ✅* | ⏳ | report create/submit/accept PASS; *`/attachments` probe did not 500 |
 | 9 | Donor features | 🔄 | ⏳ | queues/counts partial (via lifecycle); dedicated donor checks pending |
