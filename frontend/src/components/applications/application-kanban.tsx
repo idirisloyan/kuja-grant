@@ -33,7 +33,7 @@ import { useApplications } from '@/lib/hooks/use-api';
 import { cn } from '@/lib/utils';
 import { RecencyChip } from '@/components/shared/recency-chip';
 
-type Status = 'draft' | 'submitted' | 'under_review' | 'awarded' | 'rejected';
+type Status = 'draft' | 'submitted' | 'under_review' | 'scored' | 'awarded' | 'rejected';
 
 interface KanbanCard {
   id: number;
@@ -60,6 +60,13 @@ const COLUMNS: { id: Status; label: string; icon: typeof Inbox; tone: string }[]
 const DONOR_TRANSITIONS: Partial<Record<Status, Status[]>> = {
   submitted:    ['under_review', 'awarded', 'rejected'],
   under_review: ['submitted', 'awarded', 'rejected'],
+  // SMK-017: a fully-scored application (every panel review complete) must
+  // remain awardable/declinable. Previously 'scored' had no kanban column and
+  // no allowed transition, so such a card was dropped from the board entirely
+  // and the donor's funding decision was unreachable — the "score fully, then
+  // decide" happy path dead-ended. It shares the "Under review" column (see
+  // byStatus) and can move straight to a decision, or back to under_review.
+  scored:       ['awarded', 'rejected', 'under_review'],
   awarded:      ['under_review'], // allow undo within window
   rejected:     ['under_review'], // allow undo within window
 };
@@ -163,10 +170,15 @@ export function ApplicationKanban() {
 
   const byStatus = useMemo(() => {
     const out: Record<Status, KanbanCard[]> = {
-      draft: [], submitted: [], under_review: [], awarded: [], rejected: [],
+      draft: [], submitted: [], under_review: [], scored: [], awarded: [], rejected: [],
     };
     for (const a of merged) {
-      const s = a.status as Status;
+      // SMK-017: 'scored' has no column of its own (the board is tuned to 5
+      // columns); surface fully-scored apps in the "Under review" column so
+      // the donor can still drag them to a decision. Their real status stays
+      // 'scored', so canDrop/DONOR_TRANSITIONS gate the move correctly.
+      const raw = a.status as Status;
+      const s: Status = raw === 'scored' ? 'under_review' : raw;
       if (out[s]) out[s].push(a);
     }
     // Sort each column by updated_at desc

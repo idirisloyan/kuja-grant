@@ -273,6 +273,13 @@ export default function ReviewDetailClient() {
 
   const handleSubmit = useCallback(async () => {
     if (!appId) return;
+    // SMK-016: submitting requires the reviewer-owned review id. Without it we
+    // cannot PUT/complete, so surface a clear error instead of silently hitting
+    // the donor/admin-only create endpoint (which 403s for every reviewer).
+    if (!reviewId) {
+      setError('Could not resolve your review assignment — reload the page and try again.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
@@ -282,7 +289,17 @@ export default function ReviewDetailClient() {
         scoreMap[key] = val.score;
         commentMap[key] = val.comment;
       }
-      await api.post('/reviews/', { application_id: appId, scores: scoreMap, comments: commentMap });
+      // SMK-016 FIX: the reviewer submit must save scores against their own
+      // review (PUT) then finalize it (POST /complete). The previous
+      // `api.post('/reviews/', …)` hit the donor/admin-only *create* endpoint
+      // (@role_required('donor','admin')) and returned 403 "Insufficient
+      // permissions" for the reviewer on every submit — the entire scoring
+      // action was unreachable from the UI. PUT flips assigned→in_progress
+      // (and app submitted→under_review, SMK-003); /complete computes the
+      // human/final score and advances the application to `scored` once every
+      // panel review is in.
+      await api.put(`/api/reviews/${reviewId}`, { scores: scoreMap, comments: commentMap });
+      await api.post(`/api/reviews/${reviewId}/complete`, {});
       setSuccess(true);
       await mutateApp();
     } catch (err) {
@@ -290,7 +307,7 @@ export default function ReviewDetailClient() {
     } finally {
       setSubmitting(false);
     }
-  }, [appId, scores, mutateApp]);
+  }, [appId, reviewId, scores, mutateApp]);
 
   // Show skeleton while we resolve id from URL, while we figure out
   // whether the URL id was a review or application id, OR while SWR is
