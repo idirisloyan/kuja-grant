@@ -192,7 +192,7 @@ def api_create_review():
     # Phase 182 — fan out to every user in the applicant org since
     # Notification is per-user (user_id NOT NULL).
     try:
-        from app.models import Notification, User
+        from app.models import Notification
         ngo_users = User.query.filter_by(
             org_id=application.ngo_org_id, role='ngo',
         ).all()
@@ -602,7 +602,7 @@ def api_decline_review(review_id):
 
     # Notify admins via in-app notification — surface in their queue.
     try:
-        from app.models import Notification, User
+        from app.models import Notification
         admins = User.query.filter_by(role='admin').all()
         msg = (
             f'{current_user.name or current_user.email} declined review #{review.id}'
@@ -924,7 +924,7 @@ def api_review_coi_flag(review_id):
     )
 
     try:
-        from app.models import Notification, User
+        from app.models import Notification
         admins = User.query.filter_by(role='admin').all()
         msg = (
             f'{current_user.name or current_user.email} disclosed a {kind} conflict on review #{review.id}'
