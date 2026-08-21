@@ -32,6 +32,20 @@ def api_list_organizations():
     if search:
         query = query.filter(Organization.name.ilike(f'%{search}%'))
 
+    # SMK-015 — tenant isolation: this list was network-blind, so a user on
+    # one tenant could enumerate every org (NGOs + donors) on all other
+    # tenants. Restrict to the current network's orgs, always keeping the
+    # caller's own org visible. current_network_org_ids() respects the
+    # admin-only X-Network-Override and returns None only when no network is
+    # resolvable (rare — admin tooling / boot), where we preserve prior scope.
+    from app.utils.network import current_network_org_ids
+    allowed_org_ids = current_network_org_ids()
+    if allowed_org_ids is not None:
+        own = getattr(current_user, 'org_id', None)
+        if own:
+            allowed_org_ids = allowed_org_ids | {own}
+        query = query.filter(Organization.id.in_(allowed_org_ids or {-1}))
+
     # Phase 218 — admin-only sanctions screening filters.
     if current_user.is_authenticated and getattr(current_user, 'role', None) == 'admin':
         from app.models.adverse_media import AdverseMediaScreening

@@ -148,6 +148,60 @@ def scope_review_query(query):
     return query.filter(Review.application_id.in_(network_app_ids))
 
 
+def current_network_org_ids() -> set[int] | None:
+    """Org ids that belong to the current network (SMK-015 tenant isolation).
+
+    Organizations have no direct network_id column — an org is "in" a
+    network through activity/membership. This returns every org id that is:
+      • an applicant to a grant in this network (Application.ngo_org_id), OR
+      • an active NetworkMembership.org_id for this network, OR
+      • a donor that owns a grant in this network (Grant.donor_org_id).
+
+    Both the applicant and membership clauses are needed: the default Kuja
+    marketplace carries NO NetworkMemberships (membership-only scoping would
+    return an empty set), while closed NEAR-style networks may have member
+    orgs that have not applied. The donor clause keeps grant-owners visible
+    in org listings.
+
+    Returns None when no network is resolvable (rare — admin tooling / boot),
+    signalling callers to fail open rather than hide everything.
+    """
+    from app.extensions import db
+    from app.models import Application, NetworkMembership, Grant
+
+    grant_sub = _current_network_grant_id_subquery()
+    nid = get_current_network_id()
+    if grant_sub is None and nid is None:
+        return None
+
+    org_ids: set[int] = set()
+    if grant_sub is not None:
+        for (oid,) in (
+            db.session.query(Application.ngo_org_id)
+            .filter(Application.grant_id.in_(grant_sub))
+            .distinct()
+        ):
+            if oid:
+                org_ids.add(oid)
+        for (oid,) in (
+            db.session.query(Grant.donor_org_id)
+            .filter(Grant.id.in_(grant_sub))
+            .distinct()
+        ):
+            if oid:
+                org_ids.add(oid)
+    if nid is not None:
+        for (oid,) in (
+            db.session.query(NetworkMembership.org_id)
+            .filter(NetworkMembership.network_id == nid,
+                    NetworkMembership.status == 'active')
+            .distinct()
+        ):
+            if oid:
+                org_ids.add(oid)
+    return org_ids
+
+
 # ---------------------------------------------------------------------------
 # Phase 44 — Oversight Body permission helpers
 # ---------------------------------------------------------------------------

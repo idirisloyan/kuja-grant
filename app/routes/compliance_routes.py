@@ -194,10 +194,22 @@ def api_get_all_verifications():
     if current_user.role not in ('donor', 'admin'):
         return jsonify({'error': 'Only donors and admins can view all verifications'}), 403
 
-    # Get all NGO-type organizations (ngo, cbo, ingo, network - everything except donor/reviewer)
-    ngos = Organization.query.filter(
-        ~Organization.org_type.in_(['donor', 'reviewer'])
-    ).all()
+    # SMK-015 — tenant isolation. This list was network-blind: it returned
+    # EVERY NGO-type org across ALL tenants, so a Kuja donor saw Proximate /
+    # Saxansaxo NGOs (and vice-versa). Scope it to the current network's orgs.
+    # current_network_org_ids() respects the admin-only X-Network-Override, so
+    # an admin sees the tenant they are on; it returns None only when no
+    # network is resolvable (rare), in which case we preserve prior behaviour.
+    from app.utils.network import current_network_org_ids
+
+    allowed_org_ids = current_network_org_ids()
+    base = Organization.query.filter(~Organization.org_type.in_(['donor', 'reviewer']))
+    if allowed_org_ids is None:
+        ngos = base.all()
+    elif not allowed_org_ids:
+        ngos = []
+    else:
+        ngos = base.filter(Organization.id.in_(allowed_org_ids)).all()
 
     results = []
     for org in ngos:
