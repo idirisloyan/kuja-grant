@@ -1435,7 +1435,13 @@ def api_application_appeals_queue():
     now = datetime.now(timezone.utc)
     out = []
     for a in rows:
-        days_pending = int((now - a.appeal_requested_at).total_seconds() / 86400) if a.appeal_requested_at else None
+        # SMK-011: appeal_requested_at is stored naive; `now` is aware. Subtracting
+        # them raised TypeError -> the whole appeals queue 500'd whenever an appeal
+        # was pending (exactly when a donor needs it). Coerce naive -> aware UTC.
+        _ts = a.appeal_requested_at
+        if _ts is not None and _ts.tzinfo is None:
+            _ts = _ts.replace(tzinfo=timezone.utc)
+        days_pending = int((now - _ts).total_seconds() / 86400) if _ts else None
         out.append({
             'application_id': a.id,
             'ngo_org_name': a.ngo_org.name if a.ngo_org else None,
