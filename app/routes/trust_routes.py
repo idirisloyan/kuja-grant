@@ -37,7 +37,7 @@ from app.services.trust_profile_service import TrustProfileService
 from app.services import trust_engine
 from app.services.capacity_passport_service import CapacityPassportService
 from app.utils.helpers import get_request_json
-from app.utils.decorators import role_required
+from app.utils.decorators import role_required, can_view_org_dd
 
 logger = logging.getLogger('kuja')
 
@@ -56,6 +56,12 @@ def api_get_trust_profile(org_id):
     Sourced via trust_engine, which selects the local fork or the shared Kuja
     Trust engine per KUJA_TRUST_ENGINE (default 'local' — unchanged behaviour).
     """
+    # SMK-006 — access scope was COMPUTED (is_own/is_external below) but only used
+    # for analytics, never enforced: any authenticated NGO could read ANY org's full
+    # Trust Profile (bank, sanctions, adverse media, PEP, beneficial ownership).
+    if not can_view_org_dd(org_id):
+        return jsonify({'error': 'forbidden', 'success': False}), 403
+
     profile = trust_engine.get_trust_profile(org_id)
     if profile is None:
         return jsonify({'error': 'Organization not found', 'success': False}), 404
@@ -208,6 +214,8 @@ def api_trust_gap_insights(org_id):
 @login_required
 def api_list_adverse_media(org_id):
     """List adverse media screening runs for an organisation (most recent first)."""
+    if not can_view_org_dd(org_id):  # SMK-006: NGO -> own org only
+        return jsonify({'error': 'forbidden', 'success': False}), 403
     org = db.session.get(Organization, org_id)
     if not org:
         return jsonify({'error': 'Organization not found', 'success': False}), 404
@@ -295,6 +303,8 @@ def api_run_adverse_media():
 @login_required
 def api_list_bank_verifications(org_id):
     """List bank account verification runs for an org."""
+    if not can_view_org_dd(org_id):  # SMK-006: NGO -> own org only
+        return jsonify({'error': 'forbidden', 'success': False}), 403
     org = db.session.get(Organization, org_id)
     if not org:
         return jsonify({'error': 'Organization not found', 'success': False}), 404

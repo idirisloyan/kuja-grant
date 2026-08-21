@@ -25,6 +25,23 @@ def role_required(*roles):
     return decorator
 
 
+def can_view_org_dd(org_id):
+    """Access scope for an org's due-diligence / trust surfaces (SMK-006).
+
+    NGO -> its OWN org only; donor / reviewer / admin -> any org (they assess
+    NGOs for funding); any unknown role -> deny (fail closed). Without this, any
+    authenticated NGO could harvest every other org's sanctions, adverse-media,
+    bank-verification, compliance and registration data by iterating org ids.
+    Callers return 403 when this is False.
+    """
+    role = getattr(current_user, 'role', None)
+    if role in ('donor', 'reviewer', 'admin'):
+        return True
+    if role == 'ngo':
+        return getattr(current_user, 'org_id', None) == org_id
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Kuja Platform licensing gate (Phase 2)
 # ---------------------------------------------------------------------------

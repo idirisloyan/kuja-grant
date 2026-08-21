@@ -35,7 +35,7 @@ from app.services.bank_verification_service import BankVerificationService
 from app.services.trust_profile_service import TrustProfileService
 from app.services.capacity_passport_service import CapacityPassportService
 from app.utils.helpers import get_request_json
-from app.utils.decorators import role_required
+from app.utils.decorators import role_required, can_view_org_dd
 
 logger = logging.getLogger('kuja')
 
@@ -50,6 +50,8 @@ compliance_bp = Blueprint('compliance', __name__, url_prefix='/api')
 @login_required
 def api_get_compliance(org_id):
     """Get all compliance checks for an organization."""
+    if not can_view_org_dd(org_id):  # SMK-006: NGO -> own org only
+        return jsonify({'error': 'forbidden', 'success': False}), 403
     org = db.session.get(Organization, org_id)
     if not org:
         return jsonify({'error': 'Organization not found', 'success': False}), 404
@@ -146,6 +148,8 @@ def api_get_registries():
 @login_required
 def api_get_verification(org_id):
     """Get verification status for an organization."""
+    if not can_view_org_dd(org_id):  # SMK-006: NGO -> own org only
+        return jsonify({'error': 'forbidden', 'success': False}), 403
     org = db.session.get(Organization, org_id)
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
