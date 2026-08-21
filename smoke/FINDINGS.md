@@ -24,6 +24,8 @@
 | SMK-008 | P3 | Demo readiness | Data | All 7 seed marketplace grants have **past deadlines** (show "Expired"). Clients demoing the apply flow hit expired grants. | Open — refresh seed grant deadlines to future dates before demos |
 | SMK-009 | P3 | Grant application | UI | Apply-wizard **Next button stays enabled and silently no-ops** when eligibility is incomplete — no validation message, so a user could click Next and be confused why nothing happens. | Open — disable Next until complete, or show a validation hint |
 | SMK-010 | P3 | AI guidance | API | `POST /api/ai/draft-section` returned **500** when `criterion` was sent as a non-object (string) — `criterion.get()` raised an unhandled `AttributeError`. Bad input should be a clean 400. | **FIXED** — `isinstance` guard → 400 |
+| SMK-011 | **P2** | Reporting/Appeals + DD | API | **7 naive/aware datetime 500s** (`TypeError: can't subtract offset-naive and offset-aware`): donor **appeals queue** (any pending appeal), **capacity-passport** serialization + **public** share endpoint + verify, **membership** serialization (disbursement gate), rejected-org cooldown re-apply, proximate overdue cron. All crash when the relevant date is set. | **FIXED** — shared `helpers.aware_utc()` applied at all 7 sites (`a39213c53`, `5237f4d69`) |
+| SMK-012 | P3 | i18n | UI | Applications filter renders the **raw key `common.all`** instead of "All": the key is missing from message files, and next-intl `t()` returns the key (truthy) so the `\|\| 'All'` fallback is defeated. **Any missing key leaks as raw text this way.** | Open — add key + **systematic i18n key-coverage audit** before launch (fix+rebuild as one batch) |
 
 ## Journey status tracker
 | # | Journey | API | UI | Notes |
