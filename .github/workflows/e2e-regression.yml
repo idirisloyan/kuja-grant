@@ -63,6 +63,23 @@ jobs:
         env:
           KUJA_URL: ${{ env.KUJA_URL }}
 
+      # This E2E gate writes to PROD on every push and used to leave its
+      # [E2E-TEST]/[SMOKE-TEST] grants behind — they accumulated to ~4,000 and
+      # cluttered the marketplace/dashboards. Self-clean here (always, even on
+      # test failure). Requires a PROD_DATABASE_URL secret (the Postgres PUBLIC
+      # proxy URL); skips with a warning if not set.
+      - name: Prune test-artifact grants (self-clean)
+        if: always()
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::warning::PROD_DATABASE_URL not set — skipping auto-prune; [E2E-TEST] grants will accumulate in prod. Add the secret to enable self-cleanup."
+            exit 0
+          fi
+          pip install psycopg2-binary
+          APPLY=1 python smoke/purge_test_grants.py
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
