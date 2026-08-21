@@ -24,7 +24,7 @@ in Phase 33 (TaskCreate #3).
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.utils.helpers import _json_load, _json_dump
+from app.utils.helpers import _json_load, _json_dump, aware_utc
 
 
 # Status vocab — see file docstring for state machine.
@@ -173,7 +173,7 @@ class NetworkMembership(db.Model):
         """True if no refresh is due yet. Used as a grant-disbursement gate."""
         if not self.assessment_next_refresh_due_at:
             return self.status == "active"  # never refreshed yet but active
-        return datetime.now(timezone.utc) < self.assessment_next_refresh_due_at
+        return datetime.now(timezone.utc) < aware_utc(self.assessment_next_refresh_due_at)  # SMK-011 class
 
     # --- State-machine transitions ---
     # Every transition writes an AuditChainEntry. Each is best-effort

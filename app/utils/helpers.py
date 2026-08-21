@@ -60,6 +60,20 @@ def _json_dump(obj):
     return json.dumps(obj, default=str)
 
 
+def aware_utc(dt):
+    """Coerce a datetime to timezone-aware UTC for safe arithmetic/comparison.
+
+    Our timestamp columns are plain ``db.DateTime`` (no ``timezone=True``), so a
+    value written tz-aware is read back NAIVE. Subtracting/comparing such a naive
+    value with ``datetime.now(timezone.utc)`` raises
+    ``TypeError: can't subtract offset-naive and offset-aware datetimes`` -> 500.
+    Treat naive DB datetimes as UTC. No-op for already-aware or None inputs.
+    """
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def iso_utc(dt):
     """Serialize a datetime as an explicit-UTC ISO-8601 string (with offset).
 

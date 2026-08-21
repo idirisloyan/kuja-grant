@@ -38,7 +38,7 @@ from app.models import (
 )
 from app.services.email_service import EmailService
 from app.utils.network import get_current_network, get_current_network_id, ob_required
-from app.utils.helpers import get_request_json
+from app.utils.helpers import get_request_json, aware_utc
 from app.utils.decorators import role_required
 
 logger = logging.getLogger("kuja")
@@ -266,7 +266,7 @@ def api_apply_for_membership():
             })
         if existing.status == "rejected" and existing.cooldown_until:
             now = datetime.now(timezone.utc)
-            if now < existing.cooldown_until:
+            if now < aware_utc(existing.cooldown_until):  # SMK-011 class
                 return jsonify({
                     "success": False,
                     "error": "In rejection cooldown",

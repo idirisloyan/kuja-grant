@@ -28,6 +28,7 @@ verification happen?" and we replay the hash chain to prove it.
 
 import logging
 from datetime import datetime, timezone
+from app.utils.helpers import aware_utc
 from secrets import compare_digest
 
 from app.extensions import db
@@ -139,7 +140,7 @@ class CapacityPassportService:
 
         if passport.status == 'revoked':
             return None, 'revoked'
-        if passport.expires_at and passport.expires_at < datetime.now(timezone.utc):
+        if passport.expires_at and aware_utc(passport.expires_at) < datetime.now(timezone.utc):  # SMK-011 class
             # Auto-mark expired on the fly
             passport.status = 'expired'
             db.session.commit()

@@ -43,7 +43,7 @@ from app.models import (
     ProximateDisbursement, DEFAULT_REPORT_WINDOW_DAYS,
 )
 from app.utils.network import ob_required
-from app.utils.helpers import get_request_json
+from app.utils.helpers import get_request_json, aware_utc
 
 logger = logging.getLogger('kuja')
 
@@ -7611,7 +7611,7 @@ def api_cron_disbursement_nudge():
         )
         if already_today:
             continue
-        days_overdue = (now - d.report_due_at).days
+        days_overdue = (now - aware_utc(d.report_due_at)).days  # SMK-011 class (naive on SQLite)
         AuditChainEntry.append(
             action='proximate.report.overdue_nudge',
             actor_email='cron-monitoring',

@@ -36,7 +36,7 @@ from app.services.bank_verification_service import BankVerificationService
 from app.services.trust_profile_service import TrustProfileService
 from app.services import trust_engine
 from app.services.capacity_passport_service import CapacityPassportService
-from app.utils.helpers import get_request_json
+from app.utils.helpers import get_request_json, aware_utc
 from app.utils.decorators import role_required, can_view_org_dd
 
 logger = logging.getLogger('kuja')
@@ -510,7 +510,7 @@ def api_share_passport(slug):
         return jsonify({'success': False, 'reason': 'not_found'}), 404
     if p.status == 'revoked':
         return jsonify({'success': False, 'reason': 'revoked'}), 410
-    if p.expires_at and p.expires_at < datetime.now(timezone.utc):
+    if p.expires_at and aware_utc(p.expires_at) < datetime.now(timezone.utc):  # SMK-011 class (public endpoint)
         return jsonify({'success': False, 'reason': 'expired'}), 410
     if p.status != 'active':
         return jsonify({'success': False, 'reason': p.status}), 410

@@ -48,7 +48,7 @@ import secrets
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.utils.helpers import _json_load, _json_dump
+from app.utils.helpers import _json_load, _json_dump, aware_utc
 
 
 class CapacityPassport(db.Model):
@@ -117,7 +117,7 @@ class CapacityPassport(db.Model):
     def is_active(self) -> bool:
         if self.status != 'active':
             return False
-        if self.expires_at and self.expires_at < datetime.now(timezone.utc):
+        if self.expires_at and aware_utc(self.expires_at) < datetime.now(timezone.utc):  # SMK-011 class
             return False
         return True
 
