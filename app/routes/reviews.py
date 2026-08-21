@@ -1018,6 +1018,13 @@ def api_update_review(review_id):
 
     if review.status == 'assigned':
         review.status = 'in_progress'
+        # SMK-003: mirror api_create_review / bulk-assign so an application whose
+        # panel was AUTO-assigned on submit also advances to 'under_review' once a
+        # reviewer actually starts scoring. Without this, auto-assigned apps jump
+        # submitted -> scored and never show as 'under review' in donor pipelines.
+        app_obj = db.session.get(Application, review.application_id)
+        if app_obj and app_obj.status == 'submitted':
+            app_obj.status = 'under_review'
 
     db.session.commit()
     return jsonify({'success': True, 'review': review.to_dict()})
