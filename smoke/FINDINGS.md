@@ -17,6 +17,8 @@
 | SMK-002 | ~~P2~~ **By design** | Auth & access | API | `admin@kuja.org` can't log in — **confirmed intentional**: the account is `is_active=False`, deactivated at go-live by `retire_demo_accounts.py` (correct security hardening for a client-facing host; the shared admin demo is deliberately withheld from reseed). **Not a bug.** Admin features were verified by reprovisioning a **temp strong password**, testing, then **re-retiring** (prod left hardened; login now 401 for any pw). | **Resolved — no action; do NOT re-enable pass123 admin on prod** |
 | SMK-003 | P2 | Review & decision | API | Auto-assigned applications **never transition to `under_review`** — they go `submitted → scored` directly. The PUT handler (reviewer starts scoring) doesn't flip app status like manual/bulk assign do, and auto-assign-on-submit is the default, so the donor pipeline can't tell "untouched" from "actively under review". | **FIXED (code)** — PUT now flips `submitted→under_review`; verify after deploy |
 | SMK-004 | **P1** (scale) | Cross-cutting (demo readiness) | Data | UAT DB was **99.5% test junk**: **3,936 of 3,954 grants** were `[SMOKE-TEST]`/`[E2E-TEST]` (+ 298 apps, 13,491 compliance snapshots). Clients browsing the marketplace would wade through 4,000 junk grants. Root cause: E2E/soak test scripts create grants and never clean up. | **FIXED** — purged (FK-safe) → **18 real grants, 0 junk**. Reusable tool `smoke/purge_test_grants.py`; run before demos. Recommend: make E2E/soak tests self-clean |
+| SMK-005 | P3 | Admin & dashboards | API | `GET /api/dashboard/portfolio-risk-heatmap` returns 400 (likely requires a query param). Not a crash; verify intended contract. | Open — low priority |
+| SMK-006 | **P1** | Security (IDOR) | API | **Any authenticated NGO could read ANY org's due-diligence data** by iterating org ids — 5 endpoints were `@login_required` only, no ownership check: `trust-profile` (bank/sanctions/adverse/PEP/beneficial-ownership), `adverse-media`, `bank-verification`, `compliance`, `verification`. `trust-profile` even computed the access scope but used it only for analytics. Confirmed live leak (200). | **FIXED `96abedf56`** — `can_view_org_dd()` helper (NGO→own; donor/reviewer/admin→any; unknown→deny); verify after deploy |
 
 ## Journey status tracker
 | # | Journey | API | UI | Notes |
@@ -32,6 +34,13 @@
 | 9 | Donor features | 🔄 | ⏳ | queues/counts partial (via lifecycle); dedicated donor checks pending |
 | 10 | Reviewer features | 🔄 | ⏳ | blocked by SMK-001; re-verify after deploy |
 | 11 | Admin & dashboards | ✅ | ⏳ | ngo/donor/reviewer dashboards OK, no negative counts; **admin (temp-reprovisioned) verified**: stats/metrics/users/data-integrity/sla-breaches/ai-dashboard/clear-lockouts all 200, RBAC denies non-admin 403. Minor: `portfolio-risk-heatmap` 400 (needs param) |
-| 12 | Cross-cutting (uploads, hygiene, RBAC, mobile/RTL) | ✅* | ⏳ | RBAC negative matrix PASS; no future timestamps / no draft leak; *uploads + mobile/RTL are UI-layer |
+| 12 | Cross-cutting (uploads, hygiene, RBAC, mobile/RTL) | ✅* | ⏳ | RBAC negative matrix PASS; no future timestamps/draft leak; **500-sweep clean** (0 5xx, 30 eps × 5 personas); **read-IDOR fixed** (SMK-006); **write-authz 10/10 clean**; UnboundLocalError class contained; *uploads + mobile/RTL still UI-layer |
+
+## Security sweep summary (added beyond the original ask)
+- **500-sweep:** 0 server errors across ~30 read endpoints × 5 personas.
+- **Read IDOR (SMK-006, P1):** 5 due-diligence endpoints leaked any org's bank/sanctions/adverse-media to any NGO — **fixed + verified** (NGO→own 200, NGO→other 403, donor→any 200).
+- **Write authz:** 10/10 cross-persona mutations correctly refused (no write-side IDOR).
+- **UnboundLocalError class:** whole codebase scanned; the one live bug (SMK-001) was the only instance; CI-guard tool added.
+- **Still to do:** file-upload security (malicious edge-case files), UI walkthroughs (apply wizard+AI, donor decision, reporting, reviewer, fresh-NGO join), i18n/RTL/mobile.
 
 Legend: ⏳ not started · 🔄 in progress · ✅ pass · ❌ defects found (see table)
